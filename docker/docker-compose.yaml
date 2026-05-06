@@ -1,0 +1,214 @@
+services:
+
+  astrolift-local:
+    build: ..
+    container_name: astrolift-local
+    image: astrolift-local
+    ports:
+      - '8000:8000'
+    env_file:
+      - ../config/local.env
+    environment:
+      - COMPOSE_DOCKER_CLI_BUILD=0
+      - DOCKER_BUILDKIT=0
+      - DJANGO_CONFIGURATION=Local
+      - POSTGRES_ENGINE=django.db.backends.postgresql
+      - POSTGRES_DB=astrolift
+      - POSTGRES_USER=dbadmin
+      - POSTGRES_PASSWORD=Password123
+      - POSTGRES_HOST=postgres-local
+      - POSTGRES_PORT=5432
+      - DJANGO_CACHE_URL=redis://redis-local:6379/1
+      - OPENSEARCH_URL=http://opensearch-local:9200
+      - DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+      - EMAIL_HOST=mailpit-local
+      - EMAIL_PORT=1025
+      - USE_S3=true
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_STORAGE_BUCKET_NAME=astrolift
+      - AWS_S3_ENDPOINT_URL=http://minio-local:9000
+      - AWS_S3_CUSTOM_DOMAIN=
+      - TEMPORAL_ADDRESS=temporal-server:7233
+      - TEMPORAL_NAMESPACE=default
+    volumes:
+      - ..:/astrolift
+    depends_on:
+      postgres-local:
+        condition: service_healthy
+      redis-local:
+        condition: service_healthy
+
+  temporal-server:
+    image: temporalio/auto-setup:latest
+    container_name: temporal-server
+    ports:
+      - '7233:7233'
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=dbadmin
+      - POSTGRES_PWD=Password123
+      - POSTGRES_SEEDS=postgres-local
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    depends_on:
+      postgres-local:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: temporal-ui
+    ports:
+      - '8233:8080'
+    environment:
+      - TEMPORAL_ADDRESS=temporal-server:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - temporal-server
+
+  postgres-local:
+    image: postgres:17
+    container_name: postgres-local
+    volumes:
+      - ../docker/runtime/postgres-local/postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ../config/local.env
+    environment:
+      - PGUSER=dbadmin
+      - POSTGRES_DB=astrolift
+      - POSTGRES_HOST=postgres
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_PASSWORD=Password123
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=dbadmin
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-p", "${POSTGRES_PORT}", "-U", "${POSTGRES_USER}" ]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  redis-local:
+    container_name: redis-local
+    image: 'redis:7-alpine'
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'astrolift-redis:/data'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      retries: 3
+      timeout: 5s
+
+  postgres-exporter:
+    profiles: ["monitoring"]
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    ports:
+      - '9187:9187'
+    environment:
+      - DATA_SOURCE_NAME=postgresql://dbadmin:Password123@postgres-local:5432/astrolift?sslmode=disable
+    depends_on:
+      postgres-local:
+        condition: service_healthy
+
+  redis-exporter:
+    profiles: ["monitoring"]
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - '9121:9121'
+    environment:
+      - REDIS_ADDR=redis://redis-local:6379
+    depends_on:
+      redis-local:
+        condition: service_healthy
+
+  opensearch-local:
+    profiles: ["search"]
+    image: opensearchproject/opensearch:2
+    container_name: opensearch-local
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-local:
+    profiles: ["storage"]
+    image: minio/minio:latest
+    container_name: minio-local
+    ports:
+      - '9000:9000'   # S3 API
+      - '9001:9001'   # Console UI
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    profiles: ["storage"]
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      minio-local:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio-local:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/astrolift;
+      mc anonymous set download local/astrolift/public;
+      echo 'MinIO bucket ready';
+      "
+
+  mailpit-local:
+    image: axllent/mailpit:latest
+    container_name: mailpit-local
+    ports:
+      - '8025:8025'   # web UI
+      - '1025:1025'   # SMTP
+
+  ui:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    container_name: ui
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    env_file:
+      - path: ../frontend/local.env
+        required: false
+      - path: ../frontend/.env.local
+        required: false
+    environment:
+      - NEXT_PUBLIC_API_ROOT=http://localhost:8000
+    depends_on:
+      - astrolift-local
+
+volumes:
+  astrolift-redis:
+    driver: local
+  postgres_data:
+  static_volume:
+  media_volume:
+  opensearch-data:
+  minio-data:
