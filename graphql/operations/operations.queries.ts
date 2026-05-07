@@ -35,6 +35,36 @@ export const LIST_AUDIT_EVENTS = gql`
   }
 `;
 
+export const LIST_WEBHOOKS = gql`
+  query ListWebhooks {
+    astroliftWebhookSubscriptions {
+      id
+      url
+      events
+      isActive
+      lastDeliveryAt
+      lastResponseStatus
+      failureCount
+      createdAt
+    }
+  }
+`;
+
+export const LIST_MY_NOTIFICATIONS = gql`
+  query ListMyNotifications($unreadOnly: Boolean, $limit: Int) {
+    astroliftMyNotifications(unreadOnly: $unreadOnly, limit: $limit) {
+      id
+      userId
+      kind
+      title
+      body
+      link
+      readAt
+      createdAt
+    }
+  }
+`;
+
 export const LIST_WORKFLOW_RUNS = gql`
   query ListWorkflowRuns($limit: Int) {
     astroliftWorkflowRuns(limit: $limit) {
