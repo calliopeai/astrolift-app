@@ -1,3 +1,6 @@
+# Local docker volume data (Postgres datadir, etc.)
+/docker/runtime/
+
 # Python
 __pycache__/
 *.py[cod]

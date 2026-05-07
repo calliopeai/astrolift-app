@@ -12,7 +12,6 @@ import logging
 
 from core.events import EventEnvelope
 
-
 log = logging.getLogger("astrolift_operations.events")
 
 

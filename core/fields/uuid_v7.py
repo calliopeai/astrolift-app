@@ -1,11 +1,11 @@
 """
-Astrolift platform field types.
+UUIDv7 field type.
 
-UUIDv7 is the external-facing identifier for every BaseCoreModel. It is a
-time-ordered UUID (RFC 9562) so that primary-key-ordered scans match
+UUIDv7 is the external-facing identifier for every BaseCoreModel. It is
+a time-ordered UUID (RFC 9562) so primary-key-ordered scans match
 chronological order, which matters for log-style and event-style tables.
 
-Note: Python 3.13 ships ``uuid.uuid7``; on 3.12 we generate v7 inline.
+Python 3.13 ships ``uuid.uuid7``; on 3.12 we generate v7 inline.
 """
 
 from __future__ import annotations

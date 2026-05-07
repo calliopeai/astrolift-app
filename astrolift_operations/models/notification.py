@@ -27,12 +27,12 @@ class Notification(BaseCoreModel):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name="notifications",
+        related_name="astrolift_notifications",
         on_delete=models.CASCADE,
     )
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
-        related_name="notifications",
+        related_name="astrolift_notifications",
         on_delete=models.CASCADE,
     )
     kind = models.CharField(max_length=32, choices=Kind.choices)

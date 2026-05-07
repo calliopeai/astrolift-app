@@ -57,7 +57,7 @@ class RoleBinding(BaseCoreModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(user__isnull=False, group_external_id="")
                     | models.Q(user__isnull=True) & ~models.Q(group_external_id="")
                 ),

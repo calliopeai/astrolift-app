@@ -32,7 +32,7 @@ class Member(BaseCoreModel):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name="memberships",
+        related_name="astrolift_memberships",
         on_delete=models.CASCADE,
     )
     scope_kind = models.CharField(max_length=16, choices=ScopeKind.choices)
