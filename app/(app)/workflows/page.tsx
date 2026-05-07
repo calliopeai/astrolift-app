@@ -58,7 +58,11 @@ export default function WorkflowsPage() {
         </div>
       )}
 
-      {error && <div className="rounded-md bg-red-50 p-4 text-red-800">Error: {error.message}</div>}
+      {error && (
+        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
+          Error: {error.message}
+        </div>
+      )}
 
       {!loading && workflows.length === 0 && (
         <div className="text-muted-foreground flex flex-col items-center gap-3 py-12 text-center">
@@ -99,7 +103,7 @@ export default function WorkflowsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => handleDelete(wf)}
-                className="text-red-600 hover:text-red-700"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <TrashIcon className="mr-1 h-3 w-3" /> Delete
               </Button>

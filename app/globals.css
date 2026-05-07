@@ -48,9 +48,21 @@
 }
 
 :root {
-  /* ── Brand seeds — change these to retheme ───────────────────────── */
-  --brand-primary: oklch(0.55 0.2 16); /* #DC394C  light-mode primary  */
-  --brand-primary-dark: oklch(0.62 0.2 16); /* #DC394C  dark-mode primary   */
+  /* ── Brand seeds — Astrolift / Calliope Labs palette ──────────────────
+   *
+   * Canonical hex values, shared with astrolift-site and astrolift-docs:
+   *   accent.500    #08d4b8   Astrolift teal (accent + brand primary)
+   *   navy.900      #010409   background.900 — dark-mode background
+   *   navy.800      #090C10   navy surface
+   *   navy.700      #0D1117   navy raised surface
+   *   navy.50       #1A2035   navy borders
+   *   fg            #e0e5f2   dark-mode foreground
+   *   fg-muted      #a3aed0   dark-mode muted foreground
+   *   on-accent     #0b0b19   text on teal (matches marketing site)
+   * ───────────────────────────────────────────────────────────────────── */
+  --brand-primary: #08d4b8; /* Astrolift teal — light-mode primary */
+  --brand-primary-dark: #08d4b8; /* same teal works on dark too */
+  --brand-on-primary: #0b0b19; /* text/icon when sitting on teal */
   --brand-text: oklch(0.22 0.003 152); /* #2B2D2C  body text           */
   --brand-muted: oklch(0.41 0 0); /* #515151  muted foreground    */
   /* ─────────────────────────────────────────────────────────────────── */
@@ -62,19 +74,19 @@
   --popover: oklch(1 0 0);
   --popover-foreground: var(--brand-text);
   --primary: var(--brand-primary);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary-foreground: var(--brand-on-primary);
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: var(--brand-text);
   --muted: oklch(0.96 0 0);
   --muted-foreground: var(--brand-muted);
-  --accent: oklch(0.95 0.008 16);
+  --accent: oklch(0.95 0.04 180);
   --accent-foreground: var(--brand-text);
   --destructive: oklch(0.55 0.22 27);
   --border: oklch(0.915 0 0);
   --input: oklch(0.915 0 0);
   --ring: var(--brand-primary);
   --chart-1: var(--brand-primary);
-  --chart-2: oklch(0.65 0.15 16);
+  --chart-2: oklch(0.7 0.13 200);
   --chart-3: oklch(0.71 0.19 60);
   --chart-4: oklch(0.68 0.16 130);
   --chart-5: oklch(0.6 0.18 240);
@@ -82,47 +94,48 @@
   --sidebar: oklch(0.975 0 0);
   --sidebar-foreground: var(--brand-text);
   --sidebar-primary: var(--brand-primary);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.008 16);
+  --sidebar-primary-foreground: var(--brand-on-primary);
+  --sidebar-accent: oklch(0.95 0.04 180);
   --sidebar-accent-foreground: var(--brand-text);
   --sidebar-border: oklch(0.91 0 0);
   --sidebar-ring: var(--brand-primary);
 }
 
 .dark {
-  /* Override primary seed for dark mode (brighter red for dark backgrounds) */
+  /* Astrolift dark — the Calliope Labs navy/teal palette shared with
+   * the marketing site (astrolift.ai) and docs site (astrolift.dev). */
   --brand-primary: var(--brand-primary-dark);
 
-  --background: oklch(0.22 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.27 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.27 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: var(--brand-primary); /* resolves to --brand-primary-dark */
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.32 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.32 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.36 0.01 16);
-  --accent-foreground: oklch(0.95 0 0);
+  --background: #010409; /* navy.900 / background.900 */
+  --foreground: #e0e5f2;
+  --card: #090c10; /* navy.800 */
+  --card-foreground: #e0e5f2;
+  --popover: #0d1117; /* navy.700 */
+  --popover-foreground: #e0e5f2;
+  --primary: var(--brand-primary);
+  --primary-foreground: var(--brand-on-primary);
+  --secondary: #0d1117; /* navy.700 */
+  --secondary-foreground: #e0e5f2;
+  --muted: #0d1117; /* navy.700 */
+  --muted-foreground: #a3aed0;
+  --accent: #1a2035; /* navy.50 */
+  --accent-foreground: #e0e5f2;
   --destructive: oklch(0.65 0.22 27);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 18%);
+  --border: #1a2035; /* navy.50 */
+  --input: #1a2035;
   --ring: var(--brand-primary);
   --chart-1: var(--brand-primary);
-  --chart-2: oklch(0.72 0.15 16);
+  --chart-2: #37efed;
   --chart-3: oklch(0.74 0.19 60);
   --chart-4: oklch(0.72 0.16 130);
   --chart-5: oklch(0.68 0.18 240);
-  --sidebar: oklch(0.2 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar: #010409; /* navy.900 — matches docs/marketing chrome */
+  --sidebar-foreground: #e0e5f2;
   --sidebar-primary: var(--brand-primary);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.32 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-primary-foreground: var(--brand-on-primary);
+  --sidebar-accent: #0d1117; /* navy.700 */
+  --sidebar-accent-foreground: #e0e5f2;
+  --sidebar-border: #1a2035; /* navy.50 */
   --sidebar-ring: var(--brand-primary);
 }
 

@@ -168,14 +168,18 @@ const nodeTypes: NodeTypes = {
   stateNode: StateNode as unknown as NodeTypes[string],
 };
 
+// Categorical palette for workflow state nodes. Astrolift teal leads so the
+// first / default state inherits brand identity; the rest are widely-spaced
+// hues for visual differentiation. `#ef4444` (red) is intentionally retained
+// — workflow authors often map it to "failed" / "rejected" states.
 const STATE_COLORS = [
+  "#08d4b8",
   "#3b82f6",
   "#22c55e",
   "#f59e0b",
   "#ef4444",
   "#8b5cf6",
   "#ec4899",
-  "#06b6d4",
   "#6b7280",
 ];
 
@@ -231,7 +235,7 @@ function ConditionEditor({
             </Select>
             <button
               type="button"
-              className="rounded p-0.5 text-red-400 hover:text-red-600"
+              className="text-muted-foreground hover:text-destructive rounded p-0.5"
               onClick={() => removeCondition(i)}
             >
               <XIcon className="h-3 w-3" />
@@ -337,7 +341,7 @@ function ActionEditor({
             </Select>
             <button
               type="button"
-              className="rounded p-0.5 text-red-400 hover:text-red-600"
+              className="text-muted-foreground hover:text-destructive rounded p-0.5"
               onClick={() => removeAction(i)}
             >
               <XIcon className="h-3 w-3" />
@@ -781,7 +785,7 @@ export function WorkflowBuilder({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => removeState(selectedState.name)}
                 >
                   <TrashIcon className="mr-1 h-3 w-3" /> Delete State
@@ -841,7 +845,7 @@ export function WorkflowBuilder({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => removeEdge(selectedEdge.id)}
                 >
                   <TrashIcon className="mr-1 h-3 w-3" /> Delete Transition

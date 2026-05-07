@@ -267,7 +267,7 @@ function FileWidget({ name, schema, control }: FieldWidgetProps) {
                 {files.map((f: File, i: number) => (
                   <div key={i} className="flex items-center justify-between rounded bg-muted px-2 py-1 text-xs">
                     <span>{f.name}</span>
-                    <button type="button" onClick={() => field.onChange(files.filter((_: File, j: number) => j !== i))} className="text-red-400 hover:text-red-600">
+                    <button type="button" onClick={() => field.onChange(files.filter((_: File, j: number) => j !== i))} className="text-muted-foreground hover:text-destructive">
                       <XIcon className="h-3 w-3" />
                     </button>
                   </div>
@@ -483,7 +483,7 @@ export function DynamicField(props: FieldWidgetProps) {
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={name}>{title}</Label>
       <Widget {...props} />
-      {error && <p className="text-sm text-red-500">{error.message as string}</p>}
+      {error && <p className="text-destructive text-sm">{error.message as string}</p>}
       {schema.description && !isDisplay && (
         <p className="text-muted-foreground text-xs">{schema.description as string}</p>
       )}

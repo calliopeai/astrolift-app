@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { BuildingIcon } from "lucide-react";
+import Image from "next/image";
 import * as React from "react";
 
 import {
@@ -26,6 +26,9 @@ interface OrgListData {
  * switch to. We still pin the active org's guid in a cookie so the
  * X-Astrolift-Organization header on every GraphQL request is set
  * even before the single-membership inference kicks in.
+ *
+ * The Astrolift mark + wordmark is the persistent brand identity;
+ * the org name/slug sits underneath as the tenancy context.
  */
 export function OrgSwitcher() {
   const { data, loading } = useQuery<OrgListData>(LIST_ORGANIZATIONS);
@@ -39,15 +42,21 @@ export function OrgSwitcher() {
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton size="lg" className="cursor-default">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <BuildingIcon className="size-4" />
+          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/10 ring-1 ring-sidebar-primary/30">
+            <Image
+              src="/logo.svg"
+              alt="Astrolift"
+              width={20}
+              height={20}
+              priority
+            />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">
-              {loading ? "…" : org?.name ?? "Astrolift"}
+            <span className="truncate font-semibold tracking-tight">
+              Astrolift
             </span>
             <span className="truncate text-xs text-muted-foreground">
-              {org?.slug ?? "control plane"}
+              {loading ? "…" : (org?.name ?? "control plane")}
             </span>
           </div>
         </SidebarMenuButton>

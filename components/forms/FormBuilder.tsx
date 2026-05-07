@@ -209,7 +209,7 @@ function SelectConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
       {field.options.map((opt, i) => (
         <div key={i} className="flex gap-1">
           <Input value={opt} onChange={(e) => updateOption(i, e.target.value)} className="text-xs" />
-          <button type="button" onClick={() => removeOption(i)} className="text-red-400 hover:text-red-600 px-1">
+          <button type="button" onClick={() => removeOption(i)} className="text-muted-foreground hover:text-destructive px-1">
             <TrashIcon className="h-3 w-3" />
           </button>
         </div>
@@ -293,7 +293,7 @@ function PercentageSplitConfig({ field, onUpdate }: { field: FieldDef; onUpdate:
       {field.categories.map((cat, i) => (
         <div key={i} className="flex gap-1">
           <Input value={cat} onChange={(e) => updateCategory(i, e.target.value)} className="text-xs" />
-          <button type="button" onClick={() => removeCategory(i)} className="text-red-400 hover:text-red-600 px-1">
+          <button type="button" onClick={() => removeCategory(i)} className="text-muted-foreground hover:text-destructive px-1">
             <TrashIcon className="h-3 w-3" />
           </button>
         </div>
@@ -405,7 +405,7 @@ function SortableField({
         <button type="button" onClick={onDuplicate} className="text-gray-400 hover:text-gray-600">
           <CopyIcon className="h-4 w-4" />
         </button>
-        <button type="button" onClick={onRemove} className="text-red-400 hover:text-red-600">
+        <button type="button" onClick={onRemove} className="text-muted-foreground hover:text-destructive">
           <TrashIcon className="h-4 w-4" />
         </button>
       </div>

@@ -85,7 +85,7 @@ export default function NewWorkflowPage() {
               autoSlug(e.target.value);
             }}
           />
-          {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+          {errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -95,7 +95,7 @@ export default function NewWorkflowPage() {
               {...register("slug", { required: "Slug is required" })}
               placeholder="approval-process"
             />
-            {errors.slug && <p className="text-sm text-red-500">{errors.slug.message}</p>}
+            {errors.slug && <p className="text-destructive text-sm">{errors.slug.message}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Model Label</Label>
@@ -104,7 +104,7 @@ export default function NewWorkflowPage() {
               placeholder="e.g. myapp.MyModel"
             />
             {errors.modelLabel && (
-              <p className="text-sm text-red-500">{errors.modelLabel.message}</p>
+              <p className="text-destructive text-sm">{errors.modelLabel.message}</p>
             )}
           </div>
         </div>

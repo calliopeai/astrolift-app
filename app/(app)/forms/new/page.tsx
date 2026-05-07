@@ -111,7 +111,7 @@ export default function NewFormPage() {
                 placeholder="e.g. Expense Report"
                 onChange={(e) => { register("name").onChange(e); autoSlug(e.target.value); }}
               />
-              {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+              {errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect } from "react";
 
 // In dev (NEXT_PUBLIC_DEV_LOGIN=1) hit the backend's dev-login bypass
@@ -19,6 +20,12 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <div className="text-muted-foreground text-sm">Redirecting to login…</div>
+    <div className="flex flex-col items-center gap-4">
+      <Image src="/logo.svg" alt="Astrolift" width={48} height={48} priority />
+      <div className="text-foreground text-lg font-semibold tracking-tight">
+        Astrolift
+      </div>
+      <div className="text-muted-foreground text-sm">Redirecting to login…</div>
+    </div>
   );
 }

@@ -27,7 +27,7 @@ export default function FormDetailPage() {
   if (error || !form) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
-        <div className="rounded-md bg-red-50 p-4 text-red-800">
+        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
           {error ? `Error: ${error.message}` : `No published form found for "${slug}"`}
         </div>
       </div>

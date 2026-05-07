@@ -41,7 +41,7 @@ export default function FormsPage() {
       )}
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800">
+        <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
           Error loading forms: {error.message}
         </div>
       )}
