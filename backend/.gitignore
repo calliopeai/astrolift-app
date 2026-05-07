@@ -16,7 +16,7 @@ eggs/
 .venv/
 venv/
 env/
-Pipfile.lock
+# Pipfile.lock IS tracked — Dockerfile COPYs it for reproducible builds.
 
 # Django
 /db.sqlite3
