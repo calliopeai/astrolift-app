@@ -16,6 +16,7 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_identity.models import (
+    ApiToken,
     Member,
     Organization,
     Project,
@@ -24,12 +25,14 @@ from astrolift_identity.models import (
     Team,
 )
 from astrolift_identity.schema.types import (
+    ApiTokenType,
     MemberType,
     OrganizationType,
     ProjectType,
     RoleBindingType,
     RoleType,
     TeamType,
+    api_token_to_type,
     member_to_type,
     organization_to_type,
     project_to_type,
@@ -96,3 +99,13 @@ class IdentityQuery:
             .order_by("-granted_at")[:500]
         )
         return [role_binding_to_type(rb) for rb in qs]
+
+    @strawberry.field
+    @require_permission(Permission.API_TOKEN_CREATE)
+    @tenant_scoped()
+    def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
+        qs = (
+            ApiToken.objects.select_related("user", "team")
+            .order_by("-created_at")[:200]
+        )
+        return [api_token_to_type(t) for t in qs]

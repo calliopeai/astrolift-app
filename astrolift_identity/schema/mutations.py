@@ -30,6 +30,7 @@ from astrolift_graphql import (
     success as gql_success,
 )
 from astrolift_identity.models import (
+    ApiToken,
     Member,
     Organization,
     Project,
@@ -38,10 +39,13 @@ from astrolift_identity.models import (
     Team,
 )
 from astrolift_identity.schema.types import (
+    ApiTokenPlaintextType,
+    ApiTokenType,
     OrganizationType,
     ProjectType,
     RoleBindingType,
     TeamType,
+    api_token_to_type,
     organization_to_type,
     project_to_type,
     role_binding_to_type,
@@ -117,6 +121,19 @@ class GrantRoleInput:
 
 @strawberry.input
 class RevokeRoleBindingInput:
+    id: GUID
+
+
+@strawberry.input
+class CreateApiTokenInput:
+    name: str
+    scopes: list[str] | None = None
+    expires_in_days: int | None = None
+    team_slug: str | None = None
+
+
+@strawberry.input
+class RevokeApiTokenInput:
     id: GUID
 
 
@@ -390,6 +407,74 @@ class IdentityMutation:
         binding.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
+    # ---- API tokens --------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="api_token.create")
+    @require_permission(Permission.API_TOKEN_CREATE)
+    def create_api_token(
+        self, info: Info, input: CreateApiTokenInput
+    ) -> MutationResultType[ApiTokenPlaintextType]:
+        actor = _actor()
+        if actor is None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "no actor")
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        team = None
+        if input.team_slug:
+            team = Team.objects.filter(organization=org, slug=input.team_slug).first()
+            if team is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug"
+                )
+
+        plaintext, digest, last4 = _make_token_secret()
+
+        expires_at = None
+        if input.expires_in_days:
+            from datetime import timedelta
+
+            from django.utils import timezone
+
+            expires_at = timezone.now() + timedelta(days=int(input.expires_in_days))
+
+        token = ApiToken.objects.create(
+            user=actor,
+            organization=org,
+            team=team,
+            name=input.name.strip(),
+            token_hash=digest,
+            token_last_4=last4,
+            scopes=list(input.scopes or []),
+            expires_at=expires_at,
+        )
+        return gql_success(
+            ApiTokenPlaintextType(
+                api_token=api_token_to_type(token),
+                plaintext=plaintext,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="api_token.revoke")
+    @require_permission(Permission.API_TOKEN_REVOKE)
+    def revoke_api_token(
+        self, info: Info, input: RevokeApiTokenInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        token = ApiToken.objects.filter(guid=str(input.id)).first()
+        if token is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "api token not found")
+        token.is_revoked = True
+        token.save(update_fields=["is_revoked", "updated_at", "version"])
+        return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
 
 def _resolve_scope_pk(scope_kind: str, scope_guid: str) -> int | None:
     """Map a (scope_kind, guid) pair to the corresponding integer PK."""
@@ -402,3 +487,14 @@ def _resolve_scope_pk(scope_kind: str, scope_guid: str) -> int | None:
     else:
         return None
     return row.pk if row else None
+
+
+def _make_token_secret() -> tuple[str, str, str]:
+    """Generate a token; return (plaintext, hash, last4)."""
+    import hashlib
+    import secrets
+
+    plaintext = "alft_" + secrets.token_urlsafe(32)
+    digest = hashlib.sha256(plaintext.encode()).hexdigest()
+    last4 = plaintext[-4:]
+    return plaintext, digest, last4

@@ -192,3 +192,40 @@ def role_binding_to_type(binding) -> RoleBindingType:
         expires_at=binding.expires_at,
         inherits=binding.inherits,
     )
+
+
+@strawberry.type(name="AstroliftApiToken")
+class ApiTokenType:
+    id: GUID
+    name: str
+    user: UserType
+    team_slug: str | None
+    token_last_4: str
+    scopes: list[str]
+    expires_at: dt.datetime | None
+    last_used_at: dt.datetime | None
+    is_revoked: bool
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftApiTokenPlaintext")
+class ApiTokenPlaintextType:
+    """Returned exactly once on creation — the raw token never lives in the DB."""
+
+    api_token: ApiTokenType
+    plaintext: str
+
+
+def api_token_to_type(token) -> ApiTokenType:
+    return ApiTokenType(
+        id=GUID(str(token.guid)),
+        name=token.name,
+        user=user_to_type(token.user),
+        team_slug=token.team.slug if token.team_id else None,
+        token_last_4=token.token_last_4,
+        scopes=list(token.scopes or []),
+        expires_at=token.expires_at,
+        last_used_at=token.last_used_at,
+        is_revoked=token.is_revoked,
+        created_at=token.created_at,
+    )
