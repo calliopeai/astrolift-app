@@ -23,6 +23,7 @@ from core.schema.types.user import UserType
 # ---------------------------------------------------------------------------
 import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
 import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
+import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 
 _query_bases = [
     PermissionAnalysisQuery,
@@ -30,11 +31,13 @@ _query_bases = [
     OrganizationSchema.Query,
     AstroliftIdentitySchema.IdentityQuery,
     AstroliftOperationsSchema.OperationsQuery,
+    AstroliftRegistrySchema.RegistryQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
     OrganizationSchema.Mutation,
     AstroliftIdentitySchema.IdentityMutation,
+    AstroliftRegistrySchema.RegistryMutation,
 ]
 
 if is_enabled(Feature.WORKFLOWS):

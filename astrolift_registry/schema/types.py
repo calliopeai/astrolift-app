@@ -1,0 +1,162 @@
+"""GraphQL types for RegisteredApp, Workload, Container, Template."""
+
+from __future__ import annotations
+
+import datetime as dt
+
+import strawberry
+
+from astrolift_graphql import GUID
+
+JSON = strawberry.scalars.JSON
+
+
+@strawberry.type(name="AstroliftRegisteredApp")
+class RegisteredAppType:
+    id: GUID
+    slug: str
+    name: str
+    description: str
+
+    organization_slug: str
+    team_slug: str
+    project_slug: str
+
+    source_kind: str
+    source_repo: str
+    source_url: str
+    manifest_path: str
+    default_branch: str
+
+    manifest_hash: str
+
+    registry_repo_uri: str
+    k8s_namespace: str
+    subdomain: str
+    is_active: bool
+    provisioning_status: str
+    provisioning_error: str
+    deploy_token_last_4: str
+
+    log_retention_days: int
+    preview_max_active: int
+    preview_enabled: bool
+    trigger_mode: str
+    deploy_branch: str
+
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    deleted_at: dt.datetime | None
+
+
+@strawberry.type(name="AstroliftWorkload")
+class WorkloadType:
+    id: GUID
+    slug: str
+    name: str
+    kind: str
+    is_public: bool
+    schedule: str
+    replicas: int
+    cpu_request: str
+    cpu_limit: str
+    memory_request: str
+    memory_limit: str
+    hpa_min_replicas: int | None
+    hpa_max_replicas: int | None
+    hpa_target_cpu_pct: int
+    storage_class: str
+    storage_size: str
+    registered_app_slug: str
+
+
+@strawberry.type(name="AstroliftContainer")
+class ContainerType:
+    id: GUID
+    name: str
+    is_primary: bool
+    image_ref: str
+    dockerfile_path: str
+    build_context: str
+    port: int
+    command: list[str]
+    args: list[str]
+    env: JSON
+    healthcheck_kind: str
+    healthcheck_value: str
+    healthcheck_port: int | None
+    workload_slug: str
+
+
+def app_to_type(app) -> RegisteredAppType:
+    return RegisteredAppType(
+        id=GUID(str(app.guid)),
+        slug=app.slug,
+        name=app.name,
+        description=app.description or "",
+        organization_slug=app.organization.slug,
+        team_slug=app.team.slug,
+        project_slug=app.project.slug,
+        source_kind=app.source_kind,
+        source_repo=app.source_repo,
+        source_url=app.source_url,
+        manifest_path=app.manifest_path,
+        default_branch=app.default_branch,
+        manifest_hash=app.manifest_hash,
+        registry_repo_uri=app.registry_repo_uri,
+        k8s_namespace=app.k8s_namespace,
+        subdomain=app.subdomain,
+        is_active=app.is_active,
+        provisioning_status=app.provisioning_status,
+        provisioning_error=app.provisioning_error,
+        deploy_token_last_4=app.deploy_token_last_4,
+        log_retention_days=app.log_retention_days,
+        preview_max_active=app.preview_max_active,
+        preview_enabled=app.preview_enabled,
+        trigger_mode=app.trigger_mode,
+        deploy_branch=app.deploy_branch,
+        created_at=app.created_at,
+        updated_at=app.updated_at,
+        deleted_at=app.deleted_at,
+    )
+
+
+def workload_to_type(workload) -> WorkloadType:
+    return WorkloadType(
+        id=GUID(str(workload.guid)),
+        slug=workload.slug,
+        name=workload.name,
+        kind=workload.kind,
+        is_public=workload.is_public,
+        schedule=workload.schedule or "",
+        replicas=workload.replicas,
+        cpu_request=workload.cpu_request or "",
+        cpu_limit=workload.cpu_limit or "",
+        memory_request=workload.memory_request or "",
+        memory_limit=workload.memory_limit or "",
+        hpa_min_replicas=workload.hpa_min_replicas,
+        hpa_max_replicas=workload.hpa_max_replicas,
+        hpa_target_cpu_pct=workload.hpa_target_cpu_pct,
+        storage_class=workload.storage_class or "",
+        storage_size=workload.storage_size or "",
+        registered_app_slug=workload.registered_app.slug,
+    )
+
+
+def container_to_type(container) -> ContainerType:
+    return ContainerType(
+        id=GUID(str(container.guid)),
+        name=container.name,
+        is_primary=container.is_primary,
+        image_ref=container.image_ref or "",
+        dockerfile_path=container.dockerfile_path,
+        build_context=container.build_context,
+        port=container.port,
+        command=list(container.command or []),
+        args=list(container.args or []),
+        env=container.env or {},
+        healthcheck_kind=container.healthcheck_kind,
+        healthcheck_value=container.healthcheck_value or "",
+        healthcheck_port=container.healthcheck_port,
+        workload_slug=container.workload.slug,
+    )
