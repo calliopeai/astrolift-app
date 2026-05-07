@@ -1,0 +1,211 @@
+"use client";
+
+import { useMutation, useQuery } from "@apollo/client/react";
+import {
+  CheckCircle2Icon,
+  KeyRoundIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
+
+import { EmptyState } from "@/components/EmptyState";
+import { PageShell } from "@/components/PageShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  SET_ACTIVE_IDENTITY_PROVIDER,
+  SOFT_DELETE_IDENTITY_PROVIDER,
+} from "@/graphql/identity/identity.mutations";
+import { LIST_IDENTITY_PROVIDERS } from "@/graphql/identity/identity.queries";
+import type {
+  AstroliftIdentityProvider,
+  MutationResult,
+} from "@/graphql/identity/identity.types";
+
+import { CreateIdentityProviderDialog } from "./create-identity-provider-dialog";
+
+interface Resp {
+  astroliftIdentityProviders: AstroliftIdentityProvider[];
+}
+
+const KIND_LABEL: Record<string, string> = {
+  oidc: "Generic OIDC",
+  saml: "SAML 2.0",
+  cognito: "Amazon Cognito",
+  auth0: "Auth0",
+  okta: "Okta",
+  azure_ad: "Azure AD / Entra ID",
+  google: "Google Workspace",
+  github: "GitHub OAuth",
+  local: "Local accounts",
+};
+
+export function IdentityProviderClient() {
+  const [open, setOpen] = React.useState(false);
+  const { data, loading } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);
+
+  const [setActive, { loading: switching }] = useMutation<{
+    setActiveIdentityProvider: MutationResult<AstroliftIdentityProvider>;
+  }>(SET_ACTIVE_IDENTITY_PROVIDER, {
+    refetchQueries: [{ query: LIST_IDENTITY_PROVIDERS }],
+    awaitRefetchQueries: true,
+  });
+
+  const [softDelete, { loading: deleting }] = useMutation<{
+    softDeleteIdentityProvider: MutationResult<{ id: string; deleted: boolean }>;
+  }>(SOFT_DELETE_IDENTITY_PROVIDER, {
+    refetchQueries: [{ query: LIST_IDENTITY_PROVIDERS }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleSetActive(idp: AstroliftIdentityProvider) {
+    if (idp.isActive) return;
+    if (
+      !confirm(
+        `Switch the active identity provider to ${idp.name}? Users with active sessions stay logged in; the next sign-in goes through this provider.`,
+      )
+    ) {
+      return;
+    }
+    const { data } = await setActive({ variables: { input: { id: idp.id } } });
+    if (data?.setActiveIdentityProvider.ok) {
+      toast.success(`Active provider: ${idp.name}`);
+    } else {
+      toast.error(
+        data?.setActiveIdentityProvider.errors?.[0]?.message ?? "Failed",
+      );
+    }
+  }
+
+  async function handleDelete(idp: AstroliftIdentityProvider) {
+    if (idp.isActive) {
+      toast.error("Cannot delete the active provider — set a different one first.");
+      return;
+    }
+    if (!confirm(`Delete ${idp.name}? Users tied only to this IdP can no longer log in.`)) {
+      return;
+    }
+    const { data } = await softDelete({ variables: { input: { id: idp.id } } });
+    if (data?.softDeleteIdentityProvider.ok) {
+      toast.success(`Deleted ${idp.name}`);
+    } else {
+      toast.error(
+        data?.softDeleteIdentityProvider.errors?.[0]?.message ?? "Failed",
+      );
+    }
+  }
+
+  const list = data?.astroliftIdentityProviders ?? [];
+
+  return (
+    <PageShell
+      title="Identity providers"
+      description="Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time."
+      actions={
+        <Button onClick={() => setOpen(true)}>
+          <PlusIcon className="size-4" />
+          New provider
+        </Button>
+      }
+    >
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : list.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<KeyRoundIcon className="size-5" />}
+                title="No identity providers configured"
+                description="Configure at least one provider so users can sign in. Local accounts are useful for first-run; production installs typically wire OIDC or Cognito."
+                actionHref={undefined}
+              />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Kind</TableHead>
+                  <TableHead>Endpoint</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.map((idp) => (
+                  <TableRow key={idp.id}>
+                    <TableCell>
+                      <div className="font-medium">{idp.name}</div>
+                      {idp.clientId && (
+                        <div className="text-muted-foreground font-mono text-xs">
+                          client {idp.clientId.slice(0, 12)}…
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{KIND_LABEL[idp.kind] ?? idp.kind}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {idp.oidcDiscoveryUrl || idp.metadataUrl || "—"}
+                    </TableCell>
+                    <TableCell>
+                      {idp.isActive ? (
+                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 gap-1" variant="secondary">
+                          <CheckCircle2Icon className="size-3" />
+                          active
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">configured</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {!idp.isActive && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSetActive(idp)}
+                            disabled={switching}
+                          >
+                            Make active
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(idp)}
+                          disabled={deleting || idp.isActive}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <CreateIdentityProviderDialog open={open} onOpenChange={setOpen} />
+    </PageShell>
+  );
+}

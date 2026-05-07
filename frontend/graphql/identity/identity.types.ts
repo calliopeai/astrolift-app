@@ -106,6 +106,32 @@ export interface AstroliftPolicy {
   deletedAt: string | null;
 }
 
+export type IdpKind =
+  | "oidc"
+  | "saml"
+  | "cognito"
+  | "auth0"
+  | "okta"
+  | "azure_ad"
+  | "google"
+  | "github"
+  | "local";
+
+export interface AstroliftIdentityProvider {
+  id: AstroliftGuid;
+  organizationSlug: string;
+  kind: IdpKind;
+  name: string;
+  config: Record<string, unknown>;
+  metadataUrl: string;
+  oidcDiscoveryUrl: string;
+  clientId: string;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AstroliftApiToken {
   id: AstroliftGuid;
   name: string;

@@ -167,6 +167,37 @@ export const LIST_POLICIES = gql`
   }
 `;
 
+const IDP_FIELDS = `
+  id
+  organizationSlug
+  kind
+  name
+  config
+  metadataUrl
+  oidcDiscoveryUrl
+  clientId
+  isDefault
+  isActive
+  createdAt
+  updatedAt
+`;
+
+export const LIST_IDENTITY_PROVIDERS = gql`
+  query ListIdentityProviders {
+    astroliftIdentityProviders {
+      ${IDP_FIELDS}
+    }
+  }
+`;
+
+export const GET_ACTIVE_IDENTITY_PROVIDER = gql`
+  query GetActiveIdentityProvider {
+    astroliftActiveIdentityProvider {
+      ${IDP_FIELDS}
+    }
+  }
+`;
+
 export const LIST_API_TOKENS = gql`
   query ListApiTokens {
     astroliftApiTokens {

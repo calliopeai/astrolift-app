@@ -169,6 +169,84 @@ export const SOFT_DELETE_POLICY = gql`
   }
 `;
 
+export const CREATE_IDENTITY_PROVIDER = gql`
+  mutation CreateIdentityProvider($input: CreateIdentityProviderInput!) {
+    createIdentityProvider(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        kind
+        name
+        clientId
+        oidcDiscoveryUrl
+        metadataUrl
+        isActive
+      }
+    }
+  }
+`;
+
+export const UPDATE_IDENTITY_PROVIDER = gql`
+  mutation UpdateIdentityProvider($input: UpdateIdentityProviderInput!) {
+    updateIdentityProvider(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        kind
+        name
+        clientId
+        oidcDiscoveryUrl
+        metadataUrl
+        isActive
+      }
+    }
+  }
+`;
+
+export const SET_ACTIVE_IDENTITY_PROVIDER = gql`
+  mutation SetActiveIdentityProvider($input: SetActiveIdentityProviderInput!) {
+    setActiveIdentityProvider(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        kind
+        name
+        isActive
+      }
+    }
+  }
+`;
+
+export const SOFT_DELETE_IDENTITY_PROVIDER = gql`
+  mutation SoftDeleteIdentityProvider($input: SoftDeleteByGuidInput!) {
+    softDeleteIdentityProvider(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
 export const CREATE_API_TOKEN = gql`
   mutation CreateApiToken($input: CreateApiTokenInput!) {
     createApiToken(input: $input) {
