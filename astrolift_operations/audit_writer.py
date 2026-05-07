@@ -13,7 +13,6 @@ import logging
 
 from core.mutations import AuditEntry
 
-
 log = logging.getLogger("astrolift_operations.audit")
 
 

@@ -376,11 +376,14 @@ class Auth1SessionWorkflow:
         """
         _rl_login = ratelimit(key='ip', rate='10/m', block=True)(cls.login)
         _rl_session = ratelimit(key='ip', rate='5/m', method='POST', block=True)(cls.session)
+        from auth1.dev_login import dev_login
+
         return [
             path("login", _rl_login, name="login"),
             path("logout", cls.logout, name="logout"),
             path("callback", cls.callback, name="callback"),
             path("session", csrf_exempt(_rl_session), name="session"),
+            path("dev-login", dev_login, name="dev-login"),
         ]
 
     @classmethod
