@@ -1,0 +1,59 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = [
+  "migrations",
+  "**/migrations/**",
+  "static",
+  "templates",
+]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",  # pycodestyle / pyflakes
+  "I",            # isort
+  "UP",           # pyupgrade
+  "B",            # flake8-bugbear
+  "C4",           # comprehensions
+  "DJ",           # django
+  "PIE",
+]
+ignore = [
+  "E501",  # line length is enforced by formatter
+  "B008",  # function call in default arg (Django pattern)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401", "F403"]
+"**/tests/**" = ["B011", "DJ"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+  "migrations/",
+  "static/",
+  "templates/",
+  "docker/",
+]
+
+[[tool.mypy.overrides]]
+module = "core.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py", "*_tests.py"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+  "ignore::DeprecationWarning",
+  "ignore::PendingDeprecationWarning",
+]
+markers = [
+  "integration: tests that require external services",
+  "slow: marks slow tests",
+]

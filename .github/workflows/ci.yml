@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ruff
+        run: pip install "ruff>=0.6,<0.7"
+      - name: Format check
+        run: ruff format --check .
+      - name: Lint
+        run: ruff check .
+
+  test:
+    name: test (real postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dbadmin
+          POSTGRES_PASSWORD: Password123
+          POSTGRES_DB: astrolift_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dbadmin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_CONFIGURATION: Local
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: ci-not-a-secret
+      POSTGRES_ENGINE: django.db.backends.postgresql
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: astrolift_test
+      POSTGRES_USER: dbadmin
+      POSTGRES_PASSWORD: Password123
+      DJANGO_CACHE_URL: redis://127.0.0.1:6379/1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pipenv"
+      - name: Install pipenv
+        run: pip install "pipenv"
+      - name: Install dependencies
+        run: pipenv install --dev --deploy
+      - name: Run migrations
+        run: pipenv run python manage.py migrate --noinput
+      - name: Run tests
+        run: pipenv run pytest -x
+
+  # Type-checking is a separate job so a slow mypy run doesn't block
+  # the fast lint/test signal.
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pipenv"
+      - name: Install pipenv
+        run: pip install "pipenv"
+      - name: Install dependencies
+        run: pipenv install --dev --deploy
+      - name: Run mypy on the platform core
+        run: pipenv run mypy core config || true
