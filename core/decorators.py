@@ -33,6 +33,8 @@ def tenant_scoped(
     """
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        import inspect
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             tenant = get_current_tenant()
@@ -50,6 +52,7 @@ def tenant_scoped(
                 )
             return fn(*args, **kwargs)
 
+        wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
         return wrapper
 
     return decorator

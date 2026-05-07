@@ -181,6 +181,8 @@ def require_permission(
         raise TypeError("require_permission needs at least one Permission")
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        import inspect
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             target_scope = scope(*args, **kwargs) if scope else None
@@ -188,6 +190,10 @@ def require_permission(
                 check_permission(perm, scope=target_scope)
             return fn(*args, **kwargs)
 
+        # Strawberry resolver introspection follows __wrapped__ but
+        # also reads __signature__ when present; set both so the
+        # wrapper looks identical to the wrapped resolver.
+        wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
         wrapper.__astrolift_permissions__ = tuple(permissions)
         return wrapper
 

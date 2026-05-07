@@ -16,6 +16,7 @@ returns the new entity inside ``data``; `softDelete` returns a
 from __future__ import annotations
 
 import strawberry
+from strawberry.types import Info
 
 from astrolift_graphql import (
     GUID,
@@ -55,10 +56,10 @@ class _SoftDeletePayload:
 @strawberry.type
 class IdentityMutation:
     @strawberry.field
-    @require_permission(Permission.ORG_UPDATE)
     @mutation_audit(action="org.create")
+    @require_permission(Permission.ORG_UPDATE)
     def create_organization(
-        self, info, input: CreateOrganizationInput
+        self, info: Info, input: CreateOrganizationInput
     ) -> MutationResultType[OrganizationType]:
         if Organization.objects.filter(slug=input.slug).exists():
             return gql_failure(
@@ -75,10 +76,10 @@ class IdentityMutation:
         return gql_success(organization_to_type(org))
 
     @strawberry.field
-    @require_permission(Permission.ORG_DELETE)
     @mutation_audit(action="org.delete")
+    @require_permission(Permission.ORG_DELETE)
     def soft_delete_organization(
-        self, info, input: SoftDeleteOrganizationInput
+        self, info: Info, input: SoftDeleteOrganizationInput
     ) -> MutationResultType[_SoftDeletePayload]:
         try:
             org = Organization.objects.get(guid=str(input.id))

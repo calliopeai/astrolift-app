@@ -16,7 +16,7 @@ import strawberry
 from astrolift_graphql import GUID
 
 
-@strawberry.type(name="Organization")
+@strawberry.type(name="AstroliftOrganization")
 class OrganizationType:
     id: GUID
     slug: str
@@ -31,7 +31,7 @@ class OrganizationType:
     deleted_at: dt.datetime | None
 
 
-@strawberry.type(name="Team")
+@strawberry.type(name="AstroliftTeam")
 class TeamType:
     id: GUID
     slug: str
@@ -42,7 +42,7 @@ class TeamType:
     deleted_at: dt.datetime | None
 
 
-@strawberry.type(name="Project")
+@strawberry.type(name="AstroliftProject")
 class ProjectType:
     id: GUID
     slug: str

@@ -21,8 +21,19 @@ from core.schema.types.user import UserType
 # ---------------------------------------------------------------------------
 # Feature-gated imports
 # ---------------------------------------------------------------------------
-_query_bases = [PermissionAnalysisQuery, AuditLogQuery, OrganizationSchema.Query]
-_mutation_bases = [CoreMutations.Mutation, OrganizationSchema.Mutation]
+import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
+
+_query_bases = [
+    PermissionAnalysisQuery,
+    AuditLogQuery,
+    OrganizationSchema.Query,
+    AstroliftIdentitySchema.IdentityQuery,
+]
+_mutation_bases = [
+    CoreMutations.Mutation,
+    OrganizationSchema.Mutation,
+    AstroliftIdentitySchema.IdentityMutation,
+]
 
 if is_enabled(Feature.WORKFLOWS):
     import workflows.schema as WorkflowsSchema

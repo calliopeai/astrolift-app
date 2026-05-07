@@ -11,6 +11,7 @@ resolver runs at all.
 from __future__ import annotations
 
 import strawberry
+from strawberry.types import Info
 
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_identity.schema.types import (
@@ -30,7 +31,7 @@ class IdentityQuery:
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
-    def organization(self, info, slug: str) -> OrganizationType | None:
+    def organization(self, info: Info, slug: str) -> OrganizationType | None:
         org = Organization.objects.filter(slug=slug).first()
         if org is None:
             return None
@@ -39,18 +40,18 @@ class IdentityQuery:
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
-    def organizations(self, info) -> list[OrganizationType]:
+    def organizations(self, info: Info) -> list[OrganizationType]:
         return [organization_to_type(o) for o in Organization.objects.all()[:100]]
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
     @tenant_scoped()
-    def teams(self, info) -> list[TeamType]:
+    def teams(self, info: Info) -> list[TeamType]:
         return [team_to_type(t) for t in Team.objects.select_related("organization")[:200]]
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ)
     @tenant_scoped()
-    def projects(self, info) -> list[ProjectType]:
+    def projects(self, info: Info) -> list[ProjectType]:
         qs = Project.objects.select_related("organization", "team")[:200]
         return [project_to_type(p) for p in qs]

@@ -129,6 +129,8 @@ def mutation_audit(
     """
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        import inspect
+
         permissions = getattr(fn, "__astrolift_permissions__", ())
 
         @functools.wraps(fn)
@@ -182,6 +184,7 @@ def mutation_audit(
             emit_audit(entry)
             return result
 
+        wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
         return wrapper
 
     return decorator
