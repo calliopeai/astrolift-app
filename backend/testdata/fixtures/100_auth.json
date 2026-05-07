@@ -1,0 +1,52 @@
+[
+  {
+    "model": "auth.group",
+    "fields": {
+      "name": "administrator",
+      "permissions": []
+    }
+  },
+  {
+    "model": "auth.group",
+    "fields": {
+      "name": "editor",
+      "permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 2,
+    "fields": {
+      "is_superuser": true,
+      "username": "test_superuser",
+      "first_name": "test",
+      "last_name": "superuser",
+      "email": "superuser@astrolift.dev",
+      "is_staff": true,
+      "is_active": true,
+      "groups": [
+        [
+          "administrator"
+        ]
+      ]
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 3,
+    "fields": {
+      "is_superuser": true,
+      "username": "test_second_superuser",
+      "first_name": "test",
+      "last_name": "second_superuser",
+      "email": "secondsuperuser@astrolift.dev",
+      "is_staff": true,
+      "is_active": true,
+      "groups": [
+        [
+          "administrator"
+        ]
+      ]
+    }
+  }
+]

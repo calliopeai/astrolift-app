@@ -1,0 +1,663 @@
+type AstroliftOrganization {
+  id: GUID!
+  slug: String!
+  name: String!
+  website: String!
+  scimEnabled: Boolean!
+  auditLogRetentionDays: Int!
+  previewMaxActiveDefault: Int!
+  logRetentionDaysDefault: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+type AstroliftOrganizationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftOrganization
+}
+
+type AstroliftProject {
+  id: GUID!
+  slug: String!
+  name: String!
+  organization: AstroliftOrganization!
+  team: AstroliftTeam!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+type AstroliftProjectMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftProject
+}
+
+type AstroliftTeam {
+  id: GUID!
+  slug: String!
+  name: String!
+  organization: AstroliftOrganization!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+type AstroliftTeamMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftTeam
+}
+
+type AuditLogEntry {
+  operation: String!
+  variables: JSON!
+  success: Boolean!
+  errors: [String!]!
+  ipAddress: String
+  timestamp: DateTime!
+  username: String
+}
+
+type AvailableTransition {
+  fromState: String!
+  toState: String!
+  label: String!
+  conditionsMet: Boolean!
+}
+
+type ConfirmUploadResult {
+  ack: Boolean!
+}
+
+input CreateOrganizationInput {
+  name: String!
+  slug: String!
+  website: String = null
+}
+
+input CreateProjectInput {
+  teamId: GUID!
+  name: String!
+  slug: String!
+  description: String = null
+}
+
+input CreateTeamInput {
+  organizationId: GUID!
+  name: String!
+  slug: String!
+  description: String = null
+}
+
+type DataImportUploadResult {
+  preSignedUrl: String
+  publicUrl: String
+  id: ID
+}
+
+"""Date (isoformat)"""
+scalar Date
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+type EmployeeAvatarType {
+  publicPermanentUrl: String
+}
+
+type EmployeeEdge {
+  cursor: String!
+  node: EmployeeNode!
+}
+
+type EmployeeNode {
+  id: ID!
+  user: EmployeeUserType!
+}
+
+type EmployeeProfileType {
+  id: ID!
+  displayName: String
+  firstName: String
+  lastName: String
+  avatar: EmployeeAvatarType
+}
+
+type EmployeeUserType {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  email: String!
+  isActive: Boolean!
+  profile: EmployeeProfileType
+}
+
+type EmployeesConnection {
+  totalCount: Int!
+  edges: [EmployeeEdge!]!
+  pageInfo: EmployeesPageInfo!
+}
+
+type EmployeesPageInfo {
+  hasNextPage: Boolean!
+}
+
+enum EntityType {
+  EMPLOYEE
+  FIELDFLO
+  SITE_LABEL
+  PERMISSIONS
+  COMPONENTS
+}
+
+type FileUploadResult {
+  preSignedUrl: String
+  publicUrl: String
+  id: ID
+}
+
+"""UUID v7 — the platform's external identifier."""
+scalar GUID
+
+input GroupOperationInput {
+  userIds: [ID!]!
+  groupId: ID!
+  operation: String!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+type LibraryMkdirResult {
+  ok: Boolean!
+  directory: SharedDirectoryType
+}
+
+type LibraryRenameDirectoryResult {
+  ok: Boolean!
+  directory: SharedDirectoryType
+}
+
+type LibraryRenameFileResult {
+  ok: Boolean!
+  file: UploadType
+}
+
+type LibraryRmFileResult {
+  ok: Boolean!
+  directory: SharedDirectoryType
+}
+
+type LibrarySetIconResult {
+  ok: Boolean!
+  directory: SharedDirectoryType
+}
+
+type LoginResult {
+  user: UserType
+}
+
+type Mutation {
+  """Authenticate a user with username and password."""
+  login(username: String!, password: String!): LoginResult!
+
+  """Logout the current user."""
+  logout: Boolean!
+
+  """Switch the active user (impersonation)."""
+  switchUser(id: ID!): SwitchUserResult!
+
+  """Upsert user profile via UtilityForm.apply_forms."""
+  upsertUser(input: UserInput!): UpsertUserResult!
+
+  """Update user profile via ProfileSerializer (restricted)."""
+  profile(input: JSON!): MutationResult!
+
+  """
+  Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users.
+  """
+  profileRequestPwdChange(userGid: ID = null): Boolean!
+
+  """
+  Request deletion of a user account. Requires PROFILE_DELETE_USERS permission to delete other users.
+  """
+  profileRequestDeleteUser(userGid: ID = null): Boolean!
+
+  """Update or set the user's PIN."""
+  pinUpdate(pin: String!): Boolean!
+
+  """
+  Authenticate a PIN transaction. The proxy_user parameter allows acting on behalf of another user.
+  """
+  pinTransaction(pin: String!, proxyUser: ID = null): Boolean!
+
+  """
+  Request a sign from a user. The user must have SIGNREQUEST_CHANGE_SIGN permission.
+  """
+  signRequestUser(gid: String!, userToRequest: ID!): Boolean!
+
+  """
+  Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED.
+  """
+  signRequestSign(gid: String!): Boolean!
+
+  """Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission."""
+  signRequestCancel(gid: String!, note: String!): Boolean!
+
+  """Create or update a notification via NotificationSerializer."""
+  notification(input: JSON!): MutationResult!
+
+  """Mark a notification as read."""
+  notificationRead(gid: ID!): Boolean!
+
+  """Add or remove users from a permission group."""
+  permissionGroupOperation(input: GroupOperationInput!): MutationResult!
+
+  """Create a new directory in the library."""
+  libraryMkdir(name: String!, parentGuid: ID = null, icon: ID = null): LibraryMkdirResult!
+
+  """Remove a directory from the library."""
+  libraryRmdir(directoryGuid: ID!): Boolean!
+
+  """Rename a directory in the library."""
+  libraryRenameDir(name: String!, guid: ID!): LibraryRenameDirectoryResult!
+
+  """Rename a file in the library."""
+  libraryRenameFile(name: String!, guid: ID!): LibraryRenameFileResult!
+
+  """Remove a file from a library directory."""
+  libraryRmFile(directory: ID!, file: ID!): LibraryRmFileResult!
+
+  """Set the icon for a library directory."""
+  librarySetIcon(directory: ID!, file: ID!): LibrarySetIconResult!
+
+  """
+  Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server.
+  """
+  generateRocketChatToken: String!
+
+  """Create or update a Metabase chart via MetabaseChartSerializer."""
+  metabaseChart(input: JSON!): MutationResult!
+
+  """
+  Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property.
+  """
+  preSignedUrlImageUpload(globalId: ID!, mimetype: String!, uuid: UUID = null, metadata: JSON = null, location: UploadLocation = null, description: String = null, name: String = null, ownerContainerProperty: String = null): PreSignedUrlUploadResult!
+
+  """
+  Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload.
+  """
+  confirmPreSignedUrlImageUpload(publicUrl: String = null, metadata: JSON = null, delete: Boolean = null, uploadId: ID = null, expirationDate: Date = null): ConfirmUploadResult!
+
+  """Upload a data import file and get a pre-signed URL."""
+  uploadTextFile(mimetype: String!, metadata: JSON = null): DataImportUploadResult!
+
+  """Process a previously uploaded data import file."""
+  processFile(entityType: EntityType!, uploadedFileId: ID!, processId: ID = null): ProcessFileResult!
+
+  """
+  Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload.
+  """
+  fileUpload(mimetype: String!, fileUploadGid: ID = null, metadata: JSON = null, name: String = null, description: String = null, isPublic: Boolean = false): FileUploadResult!
+
+  """
+  Upload an image for a specific profile image field (avatar, signature). Supports the approval request workflow for non-whitelisted fields.
+  """
+  profileImageFieldUpload(globalId: ID!, mimetype: String!, field: ProfileImageField = null, metadata: JSON = null): ProfileImageFieldUploadResult!
+
+  """Delete an object by its global ID (soft-delete via delete_check)."""
+  delete(gid: ID!): Boolean!
+
+  """Activate or deactivate an object by its global ID."""
+  activate(gid: ID!, active: Boolean! = true): Boolean!
+  organization(input: OrganizationInput!): OrganizationMutationResult!
+  upsertOrganization(input: UpsertOrganizationInput!): OrganizationMutationResult!
+  organizationMemberStatus(input: OrganizationMemberStatusInput!): MutationResult!
+  createOrganization(input: CreateOrganizationInput!): AstroliftOrganizationMutationResult!
+  updateOrganization(input: UpdateOrganizationInput!): AstroliftOrganizationMutationResult!
+  softDeleteOrganization(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
+  createTeam(input: CreateTeamInput!): AstroliftTeamMutationResult!
+  updateTeam(input: UpdateTeamInput!): AstroliftTeamMutationResult!
+  softDeleteTeam(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
+  createProject(input: CreateProjectInput!): AstroliftProjectMutationResult!
+  updateProject(input: UpdateProjectInput!): AstroliftProjectMutationResult!
+  softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
+
+  """Start a workflow for an object."""
+  startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
+
+  """Transition a workflow instance to a new state."""
+  transitionWorkflow(instanceId: ID!, toState: String!, note: String! = ""): MutationResult!
+
+  """Force a workflow instance to a specific state (admin override)."""
+  overrideWorkflowState(instanceId: ID!, toState: String!, note: String! = ""): MutationResult!
+
+  """Create a new workflow definition (staff only)."""
+  createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false): MutationResult!
+
+  """Update an existing workflow definition (staff only)."""
+  updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null): MutationResult!
+
+  """Delete a workflow definition by slug (staff only)."""
+  deleteWorkflowDefinition(slug: String!): MutationResult!
+}
+
+type MutationError {
+  code: String!
+  message: String!
+  field: String
+}
+
+"""Standard mutation result with ok flag and validation errors."""
+type MutationResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+}
+
+input OrganizationInput {
+  id: ID = null
+  website: String = null
+}
+
+input OrganizationMemberStatusInput {
+  userId: ID!
+  isActive: Boolean!
+  organizationId: ID = null
+}
+
+type OrganizationMemberType {
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+  organization: OrganizationType
+  member: JSON
+}
+
+type OrganizationMutationResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  id: ID
+}
+
+type OrganizationType {
+  name: String!
+  slug: String!
+  description: String
+  website: String
+  guid: UUID!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+type PermissionComparison {
+  userAUsername: String!
+  userBUsername: String!
+  onlyA: [String!]!
+  onlyB: [String!]!
+  shared: [String!]!
+  differences: [PermissionDiff!]!
+}
+
+type PermissionDiagnosis {
+  userId: ID!
+  username: String!
+  permission: String!
+  granted: Boolean!
+  isSuperuser: Boolean!
+  steps: [PermissionTraceStep!]!
+}
+
+type PermissionDiff {
+  codename: String!
+  name: String!
+  userAHas: Boolean!
+  userBHas: Boolean!
+}
+
+type PermissionEntry {
+  codename: String!
+  name: String!
+  appLabel: String!
+  model: String!
+  grantedViaGroups: [String!]!
+}
+
+type PermissionTraceStep {
+  check: String!
+  result: Boolean!
+  detail: String!
+}
+
+type PreSignedUrlUploadResult {
+  preSignedUrl: String
+  publicUrl: String
+  fileUrl: String
+  uuid: UUID
+}
+
+type ProcessFileResult {
+  errors: Int
+  processId: ID
+  successful: Int
+  status: String
+}
+
+enum ProfileImageField {
+  AVATAR
+  SIGNATURE
+}
+
+type ProfileImageFieldUploadResult {
+  upload: UploadType
+}
+
+input ProfileInput {
+  avatar: String = null
+}
+
+type ProfileType {
+  guid: UUID!
+  displayName: String
+  nickname: String
+  birthDate: DateTime
+  preferredLanguage: String
+  timezone: String
+  isActive: Boolean!
+
+  """Direct reference to User.email."""
+  email: String
+  firstName: String
+  lastName: String
+  username: String
+  hasPin: Boolean!
+  avatar: UploadType
+  signature: UploadType
+}
+
+type Query {
+  """
+  List all effective permissions for a user, with the groups that grant each one.
+  """
+  effectivePermissions(userId: ID!): [PermissionEntry!]!
+
+  """Diagnose why a user can or can't perform a specific permission."""
+  permissionDiagnose(userId: ID!, permission: String!): PermissionDiagnosis
+
+  """Compare effective permissions between two users."""
+  permissionCompare(userIdA: ID!, userIdB: ID!): PermissionComparison
+
+  """Query mutation audit logs. Admin only."""
+  auditLogs(operation: String = null, userId: String = null, limit: Int! = 50): [AuditLogEntry!]!
+  organization(id: ID!): OrganizationType
+  organizations(query: String = null): [OrganizationType!]!
+  members: [OrganizationMemberType!]!
+  employees(first: Int = 10, offset: Int = 0, search: String = null, showDeactivated: Boolean = null, departmentsDepartmentNameIcontains: String = null, departmentsPositionNameIcontains: String = null): EmployeesConnection!
+  astroliftOrganization(slug: String!): AstroliftOrganization
+  astroliftOrganizations: [AstroliftOrganization!]!
+  astroliftTeams: [AstroliftTeam!]!
+  astroliftProjects: [AstroliftProject!]!
+
+  """List all workflow definitions."""
+  workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
+
+  """Get a workflow definition by slug."""
+  workflowDefinition(slug: String!): WorkflowDefinitionType
+
+  """Get a workflow instance by ID."""
+  workflowInstance(id: ID!): WorkflowInstanceType
+
+  """List workflow instances for a specific object."""
+  workflowInstances(objectId: Int!, modelLabel: String = null): [WorkflowInstanceType!]!
+}
+
+type SharedDirectoryType {
+  fileCount: Int!
+  directoryCount: Int!
+}
+
+input SoftDeleteByGuidInput {
+  id: GUID!
+}
+
+type Softdeletepayload {
+  id: GUID!
+  deleted: Boolean!
+}
+
+type SoftdeletepayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Softdeletepayload
+}
+
+type StartWorkflowResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  instanceId: ID
+}
+
+type Subscription {
+  notificationReceived: String!
+  formSubmissionReceived(slug: String!): String!
+}
+
+type SwitchUserResult {
+  user: UserType
+}
+
+type TransitionLogEntry {
+  fromState: String!
+  toState: String!
+  note: String!
+  timestamp: DateTime!
+  username: String
+}
+
+scalar UUID
+
+input UpdateOrganizationInput {
+  id: GUID!
+  name: String = null
+  website: String = null
+  auditLogRetentionDays: Int = null
+}
+
+input UpdateProjectInput {
+  id: GUID!
+  name: String = null
+  description: String = null
+}
+
+input UpdateTeamInput {
+  id: GUID!
+  name: String = null
+  description: String = null
+}
+
+enum UploadLocation {
+  STATIC
+  PUBLIC
+}
+
+type UploadType {
+  name: String
+  description: String
+  contentType: String
+  metadata: JSON
+  location: String
+  targetGlobalId: String!
+  publicTransientUrl: String @deprecated(reason: "Use file_url instead.")
+  preSignedUrl: String
+  fileUrl: String
+  publicPermanentUrl: String @deprecated(reason: "Use file_url instead.")
+}
+
+input UpsertOrganizationInput {
+  id: ID = null
+  website: String = null
+}
+
+type UpsertUserResult {
+  instance: UserType
+}
+
+input UserInput {
+  id: ID = null
+  username: String!
+  firstName: String = null
+  lastName: String = null
+  profile: ProfileInput = null
+}
+
+type UserType {
+  isAnonymous: Boolean!
+  email: String!
+  isNewUser: Boolean!
+  firstName: String!
+  lastName: String!
+  profile: ProfileType
+  memberships: [JSON!]!
+  username: String!
+  employeeId: String
+}
+
+"""A field-level validation error."""
+type ValidationError {
+  field: String!
+  messages: [String!]!
+}
+
+type WorkflowDefinitionType {
+  name: String!
+  slug: String!
+  description: String
+  modelLabel: String!
+  states: JSON!
+  transitions: JSON!
+  isEnabled: Boolean!
+  createdAt: DateTime!
+  instanceCount: Int!
+  activeInstanceCount: Int!
+}
+
+type WorkflowInstanceType {
+  currentState: String!
+  startedAt: DateTime!
+  completedAt: DateTime
+  objectId: Int!
+  workflowName: String!
+  workflowSlug: String!
+  isCompleted: Boolean!
+  stateLabel: String!
+  availableTransitions: [AvailableTransition!]!
+  history: [TransitionLogEntry!]!
+}

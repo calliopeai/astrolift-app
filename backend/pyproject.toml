@@ -1,0 +1,116 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+# The Astrolift platform code lives in ``astrolift_*`` apps and the
+# new ``core`` infrastructure modules. The legacy boilerworks scaffold
+# in this tree is excluded from automatic formatting until it is
+# refactored or removed; touching it churns diffs without value.
+extend-exclude = [
+  "migrations",
+  "**/migrations/**",
+  "static",
+  "templates",
+  # legacy scaffold (boilerworks-django-nextjs) — untouched here
+  "auth1",
+  "config/config_merger.py",
+  "config/permissions.py",
+  "config/schema.py",
+  "config/urls.py",
+  "config/views.py",
+  "core/admin.py",
+  "core/apps.py",
+  "core/collections",
+  "core/db",
+  "core/documents.py",
+  "core/fields/hash_field.py",
+  "core/loaders",
+  "core/management/commands/dev_utils.py",
+  "core/management/commands/scaffold.py",
+  "core/middleware/current_user.py",
+  "core/models/address.py",
+  "core/models/application.py",
+  "core/models/authorization",
+  "core/models/common.py",
+  "core/models/dfa.py",
+  "core/models/email.py",
+  "core/models/enum.py",
+  "core/models/fields",
+  "core/models/internationalization.py",
+  "core/models/interval.py",
+  "core/models/library",
+  "core/models/metabase.py",
+  "core/models/metabase_unimported_chart.py",
+  "core/models/notification.py",
+  "core/models/permissions.py",
+  "core/models/process.py",
+  "core/models/template.py",
+  "core/models/upload.py",
+  "core/models/user.py",
+  "core/schema",
+  "core/serializers",
+  "core/systems",
+  "core/tests/helper.py",
+  "core/tests/test_opensearch.py",
+  "core/tests/test_rocketchat_rest_client.py",
+  "core/tests/test_signal_heper.py",
+  "core/tests/test_tracking.py",
+  "core/tests/utils",
+  "core/urls.py",
+  "core/utils",
+  "core/views.py",
+  "core_logs",
+  "organization",
+  "scheduled_task",
+  "testdata",
+  "workflows",
+]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",  # pycodestyle / pyflakes
+  "I",            # isort
+  "UP",           # pyupgrade
+  "B",            # flake8-bugbear
+  "C4",           # comprehensions
+  "DJ",           # django
+  "PIE",
+]
+ignore = [
+  "E501",  # line length is enforced by formatter
+  "B008",  # function call in default arg (Django pattern)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401", "F403"]
+"**/tests/**" = ["B011", "DJ"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+  "migrations/",
+  "static/",
+  "templates/",
+  "docker/",
+]
+
+[[tool.mypy.overrides]]
+module = "core.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py", "*_tests.py"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+  "ignore::DeprecationWarning",
+  "ignore::PendingDeprecationWarning",
+]
+markers = [
+  "integration: tests that require external services",
+  "slow: marks slow tests",
+]

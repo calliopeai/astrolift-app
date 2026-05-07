@@ -1,0 +1,157 @@
+"""GraphQL types for Event, AuditEvent, WorkflowRun, Notification."""
+
+from __future__ import annotations
+
+import datetime as dt
+from typing import Any
+
+import strawberry
+
+from astrolift_graphql import GUID
+
+# Strawberry needs a concrete scalar for arbitrary JSON; we re-use
+# the standard JSONScalar shipped with strawberry.
+JSON = strawberry.scalars.JSON
+
+
+@strawberry.type(name="AstroliftEvent")
+class EventType:
+    id: GUID
+    event_type: str
+    payload: JSON
+    organization_id: str | None
+    team_id: str | None
+    project_id: str | None
+    registered_app_id: str | None
+    occurred_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAuditEvent")
+class AuditEventType:
+    id: GUID
+    organization_id: str | None
+    occurred_at: dt.datetime
+    actor_kind: str
+    actor_id: str
+    actor_display: str
+    action: str
+    decision: str
+    target_kind: str
+    target_id: str
+    target_slug: str
+    request_id: str
+    data: JSON
+
+
+@strawberry.type(name="AstroliftWorkflowRun")
+class WorkflowRunType:
+    id: GUID
+    workflow_kind: str
+    workflow_id: str
+    run_id: str
+    status: str
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    organization_id: str | None
+    registered_app_id: str | None
+    failure: JSON
+
+
+def _maybe_str(value: Any) -> str | None:
+    return str(value) if value is not None else None
+
+
+def event_to_type(e) -> EventType:
+    return EventType(
+        id=GUID(str(e.guid)),
+        event_type=e.event_type,
+        payload=e.payload or {},
+        organization_id=_maybe_str(e.organization_id),
+        team_id=_maybe_str(e.team_id),
+        project_id=_maybe_str(e.project_id),
+        registered_app_id=_maybe_str(e.registered_app_id),
+        occurred_at=e.occurred_at,
+    )
+
+
+def audit_to_type(a) -> AuditEventType:
+    return AuditEventType(
+        id=GUID(str(a.guid)),
+        organization_id=_maybe_str(a.organization_id),
+        occurred_at=a.occurred_at,
+        actor_kind=a.actor_kind,
+        actor_id=a.actor_id or "",
+        actor_display=a.actor_display or "",
+        action=a.action,
+        decision=a.decision,
+        target_kind=a.target_kind or "",
+        target_id=a.target_id or "",
+        target_slug=a.target_slug or "",
+        request_id=a.request_id or "",
+        data=a.data or {},
+    )
+
+
+def workflow_run_to_type(w) -> WorkflowRunType:
+    return WorkflowRunType(
+        id=GUID(str(w.guid)),
+        workflow_kind=w.workflow_kind,
+        workflow_id=w.workflow_id,
+        run_id=w.run_id,
+        status=w.status,
+        started_at=w.started_at,
+        ended_at=w.ended_at,
+        organization_id=_maybe_str(w.organization_id),
+        registered_app_id=_maybe_str(w.registered_app_id),
+        failure=w.failure or {},
+    )
+
+
+@strawberry.type(name="AstroliftWebhookSubscription")
+class WebhookSubscriptionType:
+    id: GUID
+    url: str
+    events: list[str]
+    is_active: bool
+    last_delivery_at: dt.datetime | None
+    last_response_status: int | None
+    failure_count: int
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftNotification")
+class NotificationType:
+    id: GUID
+    user_id: str
+    kind: str
+    title: str
+    body: str
+    link: str
+    read_at: dt.datetime | None
+    created_at: dt.datetime
+
+
+def webhook_to_type(w) -> WebhookSubscriptionType:
+    return WebhookSubscriptionType(
+        id=GUID(str(w.guid)),
+        url=w.url,
+        events=list(w.events or []),
+        is_active=w.is_active,
+        last_delivery_at=w.last_delivery_at,
+        last_response_status=w.last_response_status,
+        failure_count=w.failure_count,
+        created_at=w.created_at,
+    )
+
+
+def notification_to_type(n) -> NotificationType:
+    return NotificationType(
+        id=GUID(str(n.guid)),
+        user_id=str(n.user_id) if n.user_id else "",
+        kind=n.kind,
+        title=n.title,
+        body=n.body or "",
+        link=n.link or "",
+        read_at=n.read_at,
+        created_at=n.created_at,
+    )

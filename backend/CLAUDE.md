@@ -1,0 +1,23 @@
+# CLAUDE.md - astrolift-api
+
+Read [`bootstrap.md`](./bootstrap.md) first. It is the law.
+
+## Key Rules
+
+- No co-authorship messages in commits. Ever.
+- No rebases. New commits only.
+- Soft delete only on business objects. Never hard delete.
+- MutationResult envelope on every mutation. `{ ok, errors, data? }`. Never raise from a mutation.
+- Permission check at the top of every resolver and mutation. First line. No exceptions.
+- No integer PKs in APIs. Use UUID (guid), slug, or content-addressed keys.
+- Validate at boundaries. All input validated at API entry points.
+
+## Patterns
+
+- Models inherit `Tracking` or `BaseCoreModel` from `core.models`
+- Admin classes inherit `BaseCoreAdmin` from `core.utils.admin`
+- GraphQL schema per app: `appname/schema/{types,queries,mutations}.py`
+- Schema merged in `config/schema.py`
+- Workflows use Temporal Python SDK (`workflows/temporal/`)
+- Feature toggles via `config/features.py` and environment variables
+- Domain app config discovery via `astrolift_config/settings.py` pattern
