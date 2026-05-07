@@ -123,7 +123,7 @@ class RegisteredApp(NamedBaseCoreModel):
         ProvisioningStatus.FAILED: {ProvisioningStatus.PROVISIONING},
     }
 
-    def transition_provisioning(self, new_status: "RegisteredApp.ProvisioningStatus") -> None:
+    def transition_provisioning(self, new_status: RegisteredApp.ProvisioningStatus) -> None:
         current = RegisteredApp.ProvisioningStatus(self.provisioning_status)
         allowed = self._PROVISIONING_TRANSITIONS.get(current, set())
         if new_status not in allowed:

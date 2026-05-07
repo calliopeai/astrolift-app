@@ -1,0 +1,37 @@
+"""
+DeployToken — bearer credential bound to one app, scoped narrowly.
+
+Used by CI runners. Default 1y TTL, max 5y. Stored hashed; plaintext
+is shown to the user once on creation. Default scope is
+``["app.deploy"]``; rotation creates a new row and revokes the old.
+"""
+
+from __future__ import annotations
+
+from django.conf import settings
+from django.db import models
+
+from core.models.base import BaseCoreModel
+
+
+class DeployToken(BaseCoreModel):
+    registered_app = models.ForeignKey(
+        "astrolift_registry.RegisteredApp",
+        related_name="deploy_tokens",
+        on_delete=models.CASCADE,
+    )
+    name = models.CharField(max_length=200)
+    token_hash = models.CharField(max_length=128, db_index=True)
+    token_last_4 = models.CharField(max_length=4, blank=True, default="")
+    scopes = models.JSONField(default=list, blank=True)
+
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="created_deploy_tokens",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    is_revoked = models.BooleanField(default=False)
