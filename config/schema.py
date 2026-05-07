@@ -22,12 +22,14 @@ from core.schema.types.user import UserType
 # Feature-gated imports
 # ---------------------------------------------------------------------------
 import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
+import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
 
 _query_bases = [
     PermissionAnalysisQuery,
     AuditLogQuery,
     OrganizationSchema.Query,
     AstroliftIdentitySchema.IdentityQuery,
+    AstroliftOperationsSchema.OperationsQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
