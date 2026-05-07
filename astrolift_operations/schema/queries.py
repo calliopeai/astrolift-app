@@ -8,18 +8,25 @@ from strawberry.types import Info
 from astrolift_operations.models import (
     AuditEvent,
     Event,
+    Notification,
+    WebhookSubscription,
     WorkflowRun,
 )
 from astrolift_operations.schema.types import (
     AuditEventType,
     EventType,
+    NotificationType,
+    WebhookSubscriptionType,
     WorkflowRunType,
     audit_to_type,
     event_to_type,
+    notification_to_type,
+    webhook_to_type,
     workflow_run_to_type,
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
 
 
 @strawberry.type
@@ -65,3 +72,28 @@ class OperationsQuery:
     ) -> list[WorkflowRunType]:
         qs = WorkflowRun.objects.order_by("-started_at")[: max(1, min(limit, 200))]
         return [workflow_run_to_type(w) for w in qs]
+
+    @strawberry.field
+    @require_permission(Permission.WEBHOOK_CREATE)
+    @tenant_scoped()
+    def astrolift_webhook_subscriptions(self, info: Info) -> list[WebhookSubscriptionType]:
+        qs = WebhookSubscription.objects.order_by("-created_at")[:200]
+        return [webhook_to_type(w) for w in qs]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_notifications(
+        self,
+        info: Info,
+        unread_only: bool = False,
+        limit: int = 50,
+    ) -> list[NotificationType]:
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+        qs = Notification.objects.filter(user_id=tenant.actor_user_id).order_by(
+            "-created_at"
+        )
+        if unread_only:
+            qs = qs.filter(read_at__isnull=True)
+        return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]

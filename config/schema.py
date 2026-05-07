@@ -42,6 +42,7 @@ _mutation_bases = [
     OrganizationSchema.Mutation,
     AstroliftIdentitySchema.IdentityMutation,
     AstroliftRegistrySchema.RegistryMutation,
+    AstroliftOperationsSchema.OperationsMutation,
 ]
 
 if is_enabled(Feature.WORKFLOWS):

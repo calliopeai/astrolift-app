@@ -105,3 +105,53 @@ def workflow_run_to_type(w) -> WorkflowRunType:
         registered_app_id=_maybe_str(w.registered_app_id),
         failure=w.failure or {},
     )
+
+
+@strawberry.type(name="AstroliftWebhookSubscription")
+class WebhookSubscriptionType:
+    id: GUID
+    url: str
+    events: list[str]
+    is_active: bool
+    last_delivery_at: dt.datetime | None
+    last_response_status: int | None
+    failure_count: int
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftNotification")
+class NotificationType:
+    id: GUID
+    user_id: str
+    kind: str
+    title: str
+    body: str
+    link: str
+    read_at: dt.datetime | None
+    created_at: dt.datetime
+
+
+def webhook_to_type(w) -> WebhookSubscriptionType:
+    return WebhookSubscriptionType(
+        id=GUID(str(w.guid)),
+        url=w.url,
+        events=list(w.events or []),
+        is_active=w.is_active,
+        last_delivery_at=w.last_delivery_at,
+        last_response_status=w.last_response_status,
+        failure_count=w.failure_count,
+        created_at=w.created_at,
+    )
+
+
+def notification_to_type(n) -> NotificationType:
+    return NotificationType(
+        id=GUID(str(n.guid)),
+        user_id=str(n.user_id) if n.user_id else "",
+        kind=n.kind,
+        title=n.title,
+        body=n.body or "",
+        link=n.link or "",
+        read_at=n.read_at,
+        created_at=n.created_at,
+    )
