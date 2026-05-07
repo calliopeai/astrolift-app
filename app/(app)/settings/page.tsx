@@ -1,6 +1,9 @@
 import {
+  BellIcon,
   BuildingIcon,
   KeyIcon,
+  KeyRoundIcon,
+  ScaleIcon,
   ShieldIcon,
   UserCircleIcon,
 } from "lucide-react";
@@ -20,20 +23,37 @@ const sections = [
     href: "/settings/organization",
     icon: BuildingIcon,
     title: "Organization",
-    description:
-      "Display name, website, retention defaults, identity provider, JIT domains, ABAC policies.",
+    description: "Display name, website, retention defaults.",
+  },
+  {
+    href: "/settings/identity-provider",
+    icon: KeyRoundIcon,
+    title: "Identity provider",
+    description: "OIDC / SAML config + SCIM provisioning.",
+  },
+  {
+    href: "/settings/policies",
+    icon: ScaleIcon,
+    title: "ABAC policies",
+    description: "Runtime predicates layered on top of RBAC.",
   },
   {
     href: "/settings/profile",
     icon: UserCircleIcon,
     title: "Profile",
-    description: "Display name, locale, theme.",
+    description: "Theme + locale.",
   },
   {
     href: "/settings/security",
     icon: ShieldIcon,
     title: "Security",
-    description: "Active sessions, MFA, API tokens.",
+    description: "Active sessions, MFA, admin elevation.",
+  },
+  {
+    href: "/settings/notifications",
+    icon: BellIcon,
+    title: "Notifications",
+    description: "Inbox of approvals, alerts, invitations.",
   },
   {
     href: "/tokens",
@@ -51,7 +71,7 @@ export default function SettingsPage() {
       title="Settings"
       description="Configure the platform's identity, security, and surfaces."
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {sections.map((s) => (
           <Link key={s.href} href={s.href} className="contents">
             <Card className="hover:bg-accent/40 transition-colors">
