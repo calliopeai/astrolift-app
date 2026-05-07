@@ -33,6 +33,7 @@ from astrolift_identity.models import (
     ApiToken,
     Member,
     Organization,
+    Policy,
     Project,
     Role,
     RoleBinding,
@@ -41,11 +42,13 @@ from astrolift_identity.models import (
 from astrolift_identity.schema.types import (
     ApiTokenPlaintextType,
     OrganizationType,
+    PolicyType,
     ProjectType,
     RoleBindingType,
     TeamType,
     api_token_to_type,
     organization_to_type,
+    policy_to_type,
     project_to_type,
     role_binding_to_type,
     team_to_type,
@@ -134,6 +137,32 @@ class CreateApiTokenInput:
 @strawberry.input
 class RevokeApiTokenInput:
     id: GUID
+
+
+@strawberry.input
+class CreatePolicyInput:
+    name: str
+    slug: str
+    description: str | None = None
+    scope_level: str = "ORG"
+    scope_id: int | None = None
+    effect: str = "DENY"
+    action_pattern: str = "*"
+    resource_pattern: strawberry.scalars.JSON | None = None
+    conditions: strawberry.scalars.JSON | None = None
+    actor_pattern: strawberry.scalars.JSON | None = None
+
+
+@strawberry.input
+class UpdatePolicyInput:
+    id: GUID
+    name: str | None = None
+    description: str | None = None
+    effect: str | None = None
+    action_pattern: str | None = None
+    resource_pattern: strawberry.scalars.JSON | None = None
+    conditions: strawberry.scalars.JSON | None = None
+    actor_pattern: strawberry.scalars.JSON | None = None
 
 
 @strawberry.type
@@ -472,6 +501,93 @@ class IdentityMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "api token not found")
         token.is_revoked = True
         token.save(update_fields=["is_revoked", "updated_at", "version"])
+        return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    # ---- ABAC Policy -------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="policy.create")
+    @require_permission(Permission.ORG_UPDATE)
+    def create_policy(
+        self, info: Info, input: CreatePolicyInput
+    ) -> MutationResultType[PolicyType]:
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        if input.scope_level not in {"ORG", "TEAM", "PROJECT", "APP"}:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "scopeLevel must be ORG / TEAM / PROJECT / APP",
+                field="scopeLevel",
+            )
+        if input.effect not in {"ALLOW", "DENY"}:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "effect must be ALLOW or DENY",
+                field="effect",
+            )
+        if Policy.objects.filter(organization=org, slug=input.slug).exists():
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"policy with slug {input.slug!r} already exists",
+                field="slug",
+            )
+
+        policy = Policy.objects.create(
+            organization=org,
+            name=input.name.strip(),
+            slug=input.slug,
+            description=input.description or "",
+            scope_level=input.scope_level,
+            scope_id=input.scope_id,
+            effect=input.effect,
+            action_pattern=input.action_pattern or "*",
+            resource_pattern=input.resource_pattern or {},
+            conditions=input.conditions or [],
+            actor_pattern=input.actor_pattern or {},
+        )
+        return gql_success(policy_to_type(policy))
+
+    @strawberry.field
+    @mutation_audit(action="policy.update")
+    @require_permission(Permission.ORG_UPDATE)
+    def update_policy(
+        self, info: Info, input: UpdatePolicyInput
+    ) -> MutationResultType[PolicyType]:
+        policy = Policy.objects.filter(guid=str(input.id)).first()
+        if policy is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
+
+        for field in (
+            "name",
+            "description",
+            "effect",
+            "action_pattern",
+            "resource_pattern",
+            "conditions",
+            "actor_pattern",
+        ):
+            new_value = getattr(input, field)
+            if new_value is not None:
+                setattr(policy, field, new_value)
+        policy.save()
+        return gql_success(policy_to_type(policy))
+
+    @strawberry.field
+    @mutation_audit(action="policy.delete")
+    @require_permission(Permission.ORG_UPDATE)
+    def soft_delete_policy(
+        self, info: Info, input: SoftDeleteByGuidInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        policy = Policy.objects.filter(guid=str(input.id)).first()
+        if policy is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
+        policy.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
 

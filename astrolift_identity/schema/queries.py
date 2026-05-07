@@ -19,6 +19,7 @@ from astrolift_identity.models import (
     ApiToken,
     Member,
     Organization,
+    Policy,
     Project,
     Role,
     RoleBinding,
@@ -28,6 +29,7 @@ from astrolift_identity.schema.types import (
     ApiTokenType,
     MemberType,
     OrganizationType,
+    PolicyType,
     ProjectType,
     RoleBindingType,
     RoleType,
@@ -35,6 +37,7 @@ from astrolift_identity.schema.types import (
     api_token_to_type,
     member_to_type,
     organization_to_type,
+    policy_to_type,
     project_to_type,
     role_binding_to_type,
     role_to_type,
@@ -109,3 +112,10 @@ class IdentityQuery:
             .order_by("-created_at")[:200]
         )
         return [api_token_to_type(t) for t in qs]
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_policies(self, info: Info) -> list[PolicyType]:
+        qs = Policy.objects.order_by("scope_level", "slug")[:200]
+        return [policy_to_type(p) for p in qs]
