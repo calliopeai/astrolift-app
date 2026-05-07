@@ -35,6 +35,11 @@ def write_event_envelope(envelope: EventEnvelope) -> None:
             registered_app_id=envelope.registered_app_id,
             event_type=envelope.event_type,
             payload=envelope.payload,
+            actor_user_id=envelope.actor_user_id,
+            resource_kind=envelope.resource_kind or "",
+            resource_id=envelope.resource_id or "",
+            request_id=envelope.request_id or "",
+            trace_id=envelope.trace_id or "",
         )
     except Exception:  # event writes must not break mutations
         log.exception(
