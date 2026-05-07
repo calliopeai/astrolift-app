@@ -1,14 +1,31 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-import { BoxIcon, ClockIcon } from "lucide-react";
+import { useMutation, useQuery } from "@apollo/client/react";
+import {
+  BoxIcon,
+  CheckIcon,
+  ClockIcon,
+  MoreHorizontalIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  StopCircleIcon,
+  UndoIcon,
+} from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -18,11 +35,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ABORT_DEPLOYMENT,
+  APPROVE_DEPLOYMENT,
+  REDEPLOY_APP,
+  ROLLBACK_DEPLOYMENT,
+} from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftDeployment,
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
+
+import { StartDeploymentDialog } from "./start-deployment-dialog";
+
+interface MutationResultLite<T> {
+  ok: boolean;
+  errors: { code: string; message: string }[];
+  data: T | null;
+}
 
 interface Resp {
   astroliftDeployments: AstroliftDeployment[];
@@ -47,17 +78,104 @@ function formatDuration(seconds: number | null): string {
   return `${m}m ${s}s`;
 }
 
+const IN_FLIGHT: DeploymentStatus[] = [
+  "pending_approval",
+  "pending",
+  "deploying",
+  "redeploying",
+];
+
 export function DeploymentsClient() {
+  const [openCreate, setOpenCreate] = React.useState(false);
   const { data, loading } = useQuery<Resp>(LIST_DEPLOYMENTS, {
     variables: { limit: 100 },
     pollInterval: 5000,
   });
   const list = data?.astroliftDeployments ?? [];
 
+  const refetch = [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }];
+  const [approve, approveState] = useMutation<{
+    approveDeployment: MutationResultLite<AstroliftDeployment>;
+  }>(APPROVE_DEPLOYMENT, { refetchQueries: refetch });
+  const [abort, abortState] = useMutation<{
+    abortDeployment: MutationResultLite<AstroliftDeployment>;
+  }>(ABORT_DEPLOYMENT, { refetchQueries: refetch });
+  const [rollback, rollbackState] = useMutation<{
+    rollbackDeployment: MutationResultLite<AstroliftDeployment>;
+  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: refetch });
+  const [redeploy, redeployState] = useMutation<{
+    redeployApp: MutationResultLite<AstroliftDeployment>;
+  }>(REDEPLOY_APP, { refetchQueries: refetch });
+
+  const busy =
+    approveState.loading ||
+    abortState.loading ||
+    rollbackState.loading ||
+    redeployState.loading;
+
+  function reportResult(
+    label: string,
+    result: MutationResultLite<AstroliftDeployment> | null | undefined,
+  ) {
+    if (!result) return;
+    if (result.ok) {
+      toast.success(`${label}: ${result.data?.status ?? "ok"}`);
+    } else {
+      toast.error(result.errors[0]?.message ?? `${label} failed`);
+    }
+  }
+
+  async function handleApprove(d: AstroliftDeployment) {
+    if (
+      !confirm(
+        `Approve deploy of ${d.imageTag} to ${d.registeredAppSlug}/${d.environmentName}?`,
+      )
+    )
+      return;
+    const { data } = await approve({ variables: { input: { id: d.id } } });
+    reportResult("approveDeployment", data?.approveDeployment);
+  }
+  async function handleAbort(d: AstroliftDeployment) {
+    if (
+      !confirm(
+        `Abort in-flight deploy of ${d.registeredAppSlug}/${d.environmentName}? This signals the workflow and marks the deployment failed.`,
+      )
+    )
+      return;
+    const { data } = await abort({ variables: { input: { id: d.id } } });
+    reportResult("abortDeployment", data?.abortDeployment);
+  }
+  async function handleRollback(d: AstroliftDeployment) {
+    if (
+      !confirm(
+        `Rollback ${d.registeredAppSlug}/${d.environmentName} to the previous revision? Creates a new rollback deployment.`,
+      )
+    )
+      return;
+    const { data } = await rollback({ variables: { input: { id: d.id } } });
+    reportResult("rollbackDeployment", data?.rollbackDeployment);
+  }
+  async function handleRedeploy(d: AstroliftDeployment) {
+    if (
+      !confirm(
+        `Redeploy ${d.imageTag} to ${d.registeredAppSlug}/${d.environmentName}?`,
+      )
+    )
+      return;
+    const { data } = await redeploy({ variables: { input: { id: d.id } } });
+    reportResult("redeployApp", data?.redeployApp);
+  }
+
   return (
     <PageShell
       title="Deployments"
       description="Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs."
+      actions={
+        <Button onClick={() => setOpenCreate(true)}>
+          <PlusIcon className="size-4" />
+          Start deployment
+        </Button>
+      }
     >
       <Card>
         <CardContent className="p-0">
@@ -87,6 +205,7 @@ export function DeploymentsClient() {
                   <TableHead>Status</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Started</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -135,6 +254,53 @@ export function DeploymentsClient() {
                         ? new Date(d.startedAt).toLocaleString()
                         : new Date(d.createdAt).toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            disabled={busy}
+                          >
+                            <MoreHorizontalIcon className="size-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {d.status === "pending_approval" && (
+                            <DropdownMenuItem onClick={() => handleApprove(d)}>
+                              <CheckIcon className="size-4" />
+                              Approve
+                            </DropdownMenuItem>
+                          )}
+                          {IN_FLIGHT.includes(d.status) && (
+                            <DropdownMenuItem
+                              onClick={() => handleAbort(d)}
+                              variant="destructive"
+                            >
+                              <StopCircleIcon className="size-4" />
+                              Abort
+                            </DropdownMenuItem>
+                          )}
+                          {d.status === "running" && (
+                            <DropdownMenuItem onClick={() => handleRollback(d)}>
+                              <UndoIcon className="size-4" />
+                              Rollback
+                            </DropdownMenuItem>
+                          )}
+                          {(d.status === "running" ||
+                            d.status === "failed" ||
+                            d.status === "rolled_back" ||
+                            d.status === "superseded") && (
+                            <DropdownMenuItem onClick={() => handleRedeploy(d)}>
+                              <RotateCcwIcon className="size-4" />
+                              Redeploy
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -142,6 +308,8 @@ export function DeploymentsClient() {
           )}
         </CardContent>
       </Card>
+
+      <StartDeploymentDialog open={openCreate} onOpenChange={setOpenCreate} />
     </PageShell>
   );
 }
