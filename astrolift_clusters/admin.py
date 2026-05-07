@@ -4,6 +4,7 @@ from django.contrib import admin
 
 from astrolift_clusters.models import (
     ManagedDomain,
+    ManagedServiceCatalogEntry,
     ProviderPlugin,
     ProviderPluginConfig,
     TenantCluster,
@@ -51,3 +52,10 @@ class ManagedDomainAdmin(_AllObjectsAdmin):
     list_filter = ("dns_driver", "default_for")
     search_fields = ("zone",)
     readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(ManagedServiceCatalogEntry)
+class ManagedServiceCatalogEntryAdmin(_AllObjectsAdmin):
+    list_display = ("kind", "variant", "provider_plugin", "is_default_for_kind")
+    list_filter = ("kind", "provider_plugin", "is_default_for_kind")
+    search_fields = ("kind", "variant", "display_name")

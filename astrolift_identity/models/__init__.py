@@ -5,6 +5,7 @@ from astrolift_identity.models.invitation import Invitation
 from astrolift_identity.models.member import Member
 from astrolift_identity.models.org_domain import OrgDomain
 from astrolift_identity.models.organization import Organization
+from astrolift_identity.models.policy import Policy
 from astrolift_identity.models.project import Project
 from astrolift_identity.models.role import Role
 from astrolift_identity.models.role_binding import RoleBinding
@@ -18,6 +19,7 @@ __all__ = [
     "Member",
     "OrgDomain",
     "Organization",
+    "Policy",
     "Project",
     "Role",
     "RoleBinding",

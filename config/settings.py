@@ -293,6 +293,8 @@ INSTALLED_APPS = [
     'astrolift_registry',
     'astrolift_lifecycle',
     'astrolift_services',
+    'astrolift_operations',
+    'astrolift_billing',
     # End of Astrolift
 
     'constance',

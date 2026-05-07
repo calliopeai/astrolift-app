@@ -130,7 +130,7 @@ class Deployment(BaseCoreModel):
         Status.ROLLED_BACK: set(),
     }
 
-    def transition_to(self, new_status: "Deployment.Status") -> None:
+    def transition_to(self, new_status: Deployment.Status) -> None:
         current = Deployment.Status(self.status)
         allowed = self._TRANSITIONS.get(current, set())
         if new_status not in allowed:

@@ -19,6 +19,7 @@ from astrolift_identity.models import (
     Member,
     Organization,
     OrgDomain,
+    Policy,
     Project,
     Role,
     RoleBinding,
@@ -118,3 +119,11 @@ class ApiTokenAdmin(_TenantAdminMixin, admin.ModelAdmin):
     list_filter = ("is_revoked",)
     search_fields = ("name", "user__username", "user__email")
     readonly_fields = ("guid", "created_at", "updated_at", "version", "token_hash")
+
+
+@admin.register(Policy)
+class PolicyAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "slug", "scope_level", "scope_id", "effect", "action_pattern")
+    list_filter = ("scope_level", "effect")
+    search_fields = ("name", "slug", "action_pattern")
+    readonly_fields = ("guid", "created_at", "updated_at", "version")

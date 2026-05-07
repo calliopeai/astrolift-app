@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from django.db import models
 
-from core.models.base import NamedBaseCoreModel, BaseCoreModel
+from core.models.base import BaseCoreModel, NamedBaseCoreModel
 
 
 class SecretBundle(NamedBaseCoreModel):
