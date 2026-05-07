@@ -21,6 +21,7 @@ from core.schema.types.user import UserType
 # ---------------------------------------------------------------------------
 # Feature-gated imports
 # ---------------------------------------------------------------------------
+import astrolift_billing.schema as AstroliftBillingSchema  # noqa: E402
 import astrolift_clusters.schema as AstroliftClustersSchema  # noqa: E402
 import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
 import astrolift_lifecycle.schema as AstroliftLifecycleSchema  # noqa: E402
@@ -36,6 +37,7 @@ _query_bases = [
     AstroliftRegistrySchema.RegistryQuery,
     AstroliftLifecycleSchema.LifecycleQuery,
     AstroliftClustersSchema.ClustersQuery,
+    AstroliftBillingSchema.BillingQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
