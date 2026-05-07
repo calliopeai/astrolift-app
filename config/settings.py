@@ -13,7 +13,6 @@ from typing import overload
 
 import django
 import django.utils.encoding
-import ecs_logging
 import sentry_sdk
 
 # patch https://stackoverflow.com/questions/70382084/import-error-force-text-from-django-utils-encoding
@@ -474,56 +473,23 @@ TEMPORAL_NAMESPACE = env_str('TEMPORAL_NAMESPACE', 'default')
 TEMPORAL_TASK_QUEUE = env_str('TEMPORAL_TASK_QUEUE', 'astrolift-main')
 
 
-class CoreStdlibFormatter(ecs_logging.StdlibFormatter):
-    def format_to_ecs(self, record):
-        result = super().format_to_ecs(record)
-
-        # Inject OTel trace context as proper ECS nested fields:
-        #   {"trace": {"id": "<32-char hex>"}, "span": {"id": "<16-char hex>"}}
-        from opentelemetry import trace
-        span = trace.get_current_span()
-        if span.is_recording():
-            ctx = span.get_span_context()
-            if ctx.is_valid:
-                result["trace"] = {"id": format(ctx.trace_id, "032x")}
-                result["span"] = {"id": format(ctx.span_id, "016x")}
-
-        return result
-
-
+# Structured logging: JSON in non-local envs, human-readable text
+# locally. ``core.logging.build_logging_config`` is the single source
+# of truth — set ``LOG_FORMAT`` (``json`` | ``text`` | ``ecs``),
+# ``LOG_LEVEL`` (default ``INFO``), and ``LOG_DESTINATION``
+# (``stdout`` | ``stderr``) to override.
 TELEMETRY_LOGS = env_bool('TELEMETRY_LOGS', True)
-# ECS JSON logging for all non-local environments.
-# Local/LocalPG/LocalVerbose override this below with plain text.
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        "ecs_formatter": {
-            "()": CoreStdlibFormatter,
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'ecs_formatter',
-        },
-        'ecs': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'ecs_formatter',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['ecs'],
-            'level': env_str('DJANGO_LOG_LEVEL', 'INFO'),
-            'propagate': False,
-        },
-    },
-}
+LOG_LEVEL = env_str('LOG_LEVEL', env_str('DJANGO_LOG_LEVEL', 'INFO'))
+LOG_FORMAT = env_str('LOG_FORMAT', 'json')
+LOG_DESTINATION = env_str('LOG_DESTINATION', 'stdout')
+
+from core.logging import build_logging_config  # noqa: E402
+
+LOGGING = build_logging_config(
+    level=LOG_LEVEL,
+    format_=LOG_FORMAT,
+    destination=LOG_DESTINATION,
+)
 
 # ================ DEV
 CONFIGURATION = env_str('DJANGO_CONFIGURATION', "Dev")
@@ -610,53 +576,22 @@ elif CONFIGURATION.lower() == "Local".lower() or CONFIGURATION.lower() == "Local
     DEFAULT_USER_TEST = env_str('DJANGO_', 'admin')  # only for local login the user if there is no user logged in
     TELEMETRY_LOGS = False
     INSTALLED_APPS.append('testdata')
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-            },
-        },
-        'root': {
-            'handlers': ['console'],
-            'level': 'INFO',
-        },
-        'loggers': {
-            'django': {
-                'handlers': ['console'],
-                'level': env_str('DJANGO_LOG_LEVEL', 'INFO'),
-                'propagate': False,
-            },
-        },
-    }
+    LOGGING = build_logging_config(
+        level=LOG_LEVEL,
+        format_=env_str('LOG_FORMAT', 'text'),
+        destination=LOG_DESTINATION,
+    )
 elif CONFIGURATION.lower() == "LocalVerbose".lower():
     DEBUG = True
     ALLOWED_HOSTS = ['*', ]
     AUTH_PASSWORD_VALIDATORS = []
     DEFAULT_USER_TEST = env_str('DJANGO_', 'admin')  # only for local login the user if there is no user logged in
     TELEMETRY_LOGS = False
-
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-            },
-        },
-        'root': {
-            'handlers': ['console'],
-            'level': 'INFO',
-        },
-        'loggers': {
-            'django': {
-                'handlers': ['console'],
-                'level': env_str('DJANGO_LOG_LEVEL', 'INFO'),
-                'propagate': False,
-            },
-        },
-    }
+    LOGGING = build_logging_config(
+        level=env_str('LOG_LEVEL', 'DEBUG'),
+        format_=env_str('LOG_FORMAT', 'text'),
+        destination=LOG_DESTINATION,
+    )
 else:
     DEBUG = True
     SECRET_KEY = 'not-a-secret'
