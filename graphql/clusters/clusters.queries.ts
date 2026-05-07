@@ -1,5 +1,80 @@
 import { gql } from "@apollo/client";
 
+export const REGISTER_TENANT_CLUSTER = gql`
+  mutation RegisterTenantCluster($input: RegisterTenantClusterInput!) {
+    registerTenantCluster(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        providerPluginSlug
+        region
+        authMethod
+        ingressClass
+        isActive
+      }
+    }
+  }
+`;
+
+export const UNREGISTER_TENANT_CLUSTER = gql`
+  mutation UnregisterTenantCluster($input: UnregisterTenantClusterInput!) {
+    unregisterTenantCluster(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
+export const CREATE_MANAGED_DOMAIN = gql`
+  mutation CreateManagedDomain($input: CreateManagedDomainInput!) {
+    createManagedDomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        zone
+        dnsDriver
+        defaultFor
+        isWildcardManaged
+      }
+    }
+  }
+`;
+
+export const SOFT_DELETE_MANAGED_DOMAIN = gql`
+  mutation SoftDeleteManagedDomain($input: SoftDeleteManagedDomainInput!) {
+    softDeleteManagedDomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
 export const LIST_CLUSTERS = gql`
   query ListClusters {
     astroliftClusters {

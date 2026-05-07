@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+
+import { NotificationsBell } from "@/components/NotificationsBell";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -29,13 +31,13 @@ export const PageHeader = () => {
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-      <div className="flex items-center gap-2 px-4">
+      <div className="flex flex-1 items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1" />
         <Separator
           orientation="vertical"
           className="mr-2 data-vertical:h-4 data-vertical:self-auto"
         />
-        <Breadcrumb>
+        <Breadcrumb className="flex-1">
           <BreadcrumbList>
             {crumbs.map((crumb, i) => (
               <span key={crumb.href} className="flex items-center gap-1.5">
@@ -51,6 +53,7 @@ export const PageHeader = () => {
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+        <NotificationsBell />
       </div>
     </header>
   );

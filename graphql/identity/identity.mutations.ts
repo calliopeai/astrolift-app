@@ -112,6 +112,63 @@ export const UPDATE_ORGANIZATION = gql`
   }
 `;
 
+export const CREATE_POLICY = gql`
+  mutation CreatePolicy($input: CreatePolicyInput!) {
+    createPolicy(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        scopeLevel
+        effect
+        actionPattern
+      }
+    }
+  }
+`;
+
+export const UPDATE_POLICY = gql`
+  mutation UpdatePolicy($input: UpdatePolicyInput!) {
+    updatePolicy(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        slug
+        name
+        effect
+        actionPattern
+        conditions
+      }
+    }
+  }
+`;
+
+export const SOFT_DELETE_POLICY = gql`
+  mutation SoftDeletePolicy($input: SoftDeleteByGuidInput!) {
+    softDeletePolicy(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
 export const CREATE_API_TOKEN = gql`
   mutation CreateApiToken($input: CreateApiTokenInput!) {
     createApiToken(input: $input) {
