@@ -50,6 +50,11 @@ class MarkNotificationReadInput:
 
 
 @strawberry.type
+class _MarkAllReadPayload:
+    marked: int
+
+
+@strawberry.type
 class _SoftDeletePayload:
     id: GUID
     deleted: bool
@@ -152,3 +157,17 @@ class OperationsMutation:
         notif.read_at = timezone.now()
         notif.save(update_fields=["read_at", "updated_at", "version"])
         return gql_success(notification_to_type(notif))
+
+    @strawberry.field
+    def mark_all_notifications_read(
+        self, info: Info
+    ) -> MutationResultType[_MarkAllReadPayload]:
+        from django.utils import timezone
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        marked = Notification.objects.filter(
+            user_id=tenant.actor_user_id, read_at__isnull=True
+        ).update(read_at=timezone.now())
+        return gql_success(_MarkAllReadPayload(marked=marked))

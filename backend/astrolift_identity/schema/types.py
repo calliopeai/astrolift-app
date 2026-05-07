@@ -229,3 +229,40 @@ def api_token_to_type(token) -> ApiTokenType:
         is_revoked=token.is_revoked,
         created_at=token.created_at,
     )
+
+
+@strawberry.type(name="AstroliftPolicy")
+class PolicyType:
+    id: GUID
+    slug: str
+    name: str
+    description: str
+    scope_level: str
+    scope_id: str | None
+    effect: str
+    action_pattern: str
+    resource_pattern: strawberry.scalars.JSON
+    conditions: strawberry.scalars.JSON
+    actor_pattern: strawberry.scalars.JSON
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    deleted_at: dt.datetime | None
+
+
+def policy_to_type(policy) -> PolicyType:
+    return PolicyType(
+        id=GUID(str(policy.guid)),
+        slug=policy.slug,
+        name=policy.name,
+        description=policy.description or "",
+        scope_level=policy.scope_level,
+        scope_id=str(policy.scope_id) if policy.scope_id else None,
+        effect=policy.effect,
+        action_pattern=policy.action_pattern,
+        resource_pattern=policy.resource_pattern or {},
+        conditions=policy.conditions or [],
+        actor_pattern=policy.actor_pattern or {},
+        created_at=policy.created_at,
+        updated_at=policy.updated_at,
+        deleted_at=policy.deleted_at,
+    )
