@@ -40,7 +40,6 @@ from astrolift_identity.models import (
 )
 from astrolift_identity.schema.types import (
     ApiTokenPlaintextType,
-    ApiTokenType,
     OrganizationType,
     ProjectType,
     RoleBindingType,
