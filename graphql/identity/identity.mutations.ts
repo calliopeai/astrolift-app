@@ -89,6 +89,29 @@ export const SOFT_DELETE_PROJECT = gql`
   }
 `;
 
+export const UPDATE_ORGANIZATION = gql`
+  mutation UpdateOrganization($input: UpdateOrganizationInput!) {
+    updateOrganization(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        name
+        website
+        scimEnabled
+        auditLogRetentionDays
+        previewMaxActiveDefault
+        logRetentionDaysDefault
+      }
+    }
+  }
+`;
+
 export const GRANT_ROLE = gql`
   mutation GrantRole($input: GrantRoleInput!) {
     grantRole(input: $input) {
