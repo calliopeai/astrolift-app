@@ -87,6 +87,25 @@ export interface AstroliftRoleBinding {
   inherits: boolean;
 }
 
+export type PolicyEffect = "ALLOW" | "DENY";
+
+export interface AstroliftPolicy {
+  id: AstroliftGuid;
+  slug: string;
+  name: string;
+  description: string;
+  scopeLevel: ScopeKind;
+  scopeId: string | null;
+  effect: PolicyEffect;
+  actionPattern: string;
+  resourcePattern: Record<string, unknown>;
+  conditions: unknown[];
+  actorPattern: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface AstroliftApiToken {
   id: AstroliftGuid;
   name: string;

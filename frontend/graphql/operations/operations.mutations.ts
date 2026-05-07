@@ -58,6 +58,21 @@ export const DELETE_WEBHOOK = gql`
   }
 `;
 
+export const MARK_ALL_NOTIFICATIONS_READ = gql`
+  mutation MarkAllNotificationsRead {
+    markAllNotificationsRead {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        marked
+      }
+    }
+  }
+`;
+
 export const MARK_NOTIFICATION_READ = gql`
   mutation MarkNotificationRead($input: MarkNotificationReadInput!) {
     markNotificationRead(input: $input) {

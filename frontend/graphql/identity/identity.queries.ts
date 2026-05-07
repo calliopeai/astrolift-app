@@ -146,6 +146,27 @@ export const LIST_ROLE_BINDINGS = gql`
   }
 `;
 
+export const LIST_POLICIES = gql`
+  query ListPolicies {
+    astroliftPolicies {
+      id
+      slug
+      name
+      description
+      scopeLevel
+      scopeId
+      effect
+      actionPattern
+      resourcePattern
+      conditions
+      actorPattern
+      createdAt
+      updatedAt
+      deletedAt
+    }
+  }
+`;
+
 export const LIST_API_TOKENS = gql`
   query ListApiTokens {
     astroliftApiTokens {

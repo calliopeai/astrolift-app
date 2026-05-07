@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { BellIcon, BellOffIcon } from "lucide-react";
+import { BellIcon, BellOffIcon, CheckCheckIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -10,7 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import { MARK_NOTIFICATION_READ } from "@/graphql/operations/operations.mutations";
+import {
+  MARK_ALL_NOTIFICATIONS_READ,
+  MARK_NOTIFICATION_READ,
+} from "@/graphql/operations/operations.mutations";
 import { LIST_MY_NOTIFICATIONS } from "@/graphql/operations/operations.queries";
 import type { AstroliftNotification } from "@/graphql/operations/operations.types";
 
@@ -31,6 +35,20 @@ export default function NotificationsPage() {
     awaitRefetchQueries: true,
   });
 
+  const [markAll, { loading: markingAll }] = useMutation<{
+    markAllNotificationsRead: { ok: boolean; data: { marked: number } | null };
+  }>(MARK_ALL_NOTIFICATIONS_READ, {
+    refetchQueries: [{ query: LIST_MY_NOTIFICATIONS }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleMarkAll() {
+    const { data } = await markAll();
+    if (data?.markAllNotificationsRead.ok) {
+      toast.success(`Cleared ${data.markAllNotificationsRead.data?.marked ?? 0}`);
+    }
+  }
+
   const list = data?.astroliftMyNotifications ?? [];
   const unread = list.filter((n) => !n.readAt);
 
@@ -39,11 +57,22 @@ export default function NotificationsPage() {
       title="Notifications"
       description="Your inbox: deploy approvals, failure alerts, invitations, quota warnings."
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         <Badge variant="outline" className="gap-1">
           <BellIcon className="size-3" />
           {unread.length} unread
         </Badge>
+        {unread.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleMarkAll}
+            disabled={markingAll}
+          >
+            <CheckCheckIcon className="size-4" />
+            Mark all as read
+          </Button>
+        )}
       </div>
 
       <Card>
