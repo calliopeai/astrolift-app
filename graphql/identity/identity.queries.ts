@@ -146,6 +146,27 @@ export const LIST_ROLE_BINDINGS = gql`
   }
 `;
 
+export const LIST_API_TOKENS = gql`
+  query ListApiTokens {
+    astroliftApiTokens {
+      id
+      name
+      user {
+        id
+        username
+        email
+      }
+      teamSlug
+      tokenLast4
+      scopes
+      expiresAt
+      lastUsedAt
+      isRevoked
+      createdAt
+    }
+  }
+`;
+
 // Suppress the unused import warning — fragment is referenced from
 // other domain files once they're written.
 void IDENTITY_TIMESTAMPS;

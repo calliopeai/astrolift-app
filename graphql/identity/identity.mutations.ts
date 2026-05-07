@@ -112,6 +112,47 @@ export const UPDATE_ORGANIZATION = gql`
   }
 `;
 
+export const CREATE_API_TOKEN = gql`
+  mutation CreateApiToken($input: CreateApiTokenInput!) {
+    createApiToken(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        plaintext
+        apiToken {
+          id
+          name
+          tokenLast4
+          scopes
+          expiresAt
+          createdAt
+          isRevoked
+        }
+      }
+    }
+  }
+`;
+
+export const REVOKE_API_TOKEN = gql`
+  mutation RevokeApiToken($input: RevokeApiTokenInput!) {
+    revokeApiToken(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
 export const GRANT_ROLE = gql`
   mutation GrantRole($input: GrantRoleInput!) {
     grantRole(input: $input) {

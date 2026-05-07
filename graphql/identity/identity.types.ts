@@ -87,6 +87,24 @@ export interface AstroliftRoleBinding {
   inherits: boolean;
 }
 
+export interface AstroliftApiToken {
+  id: AstroliftGuid;
+  name: string;
+  user: AstroliftUser;
+  teamSlug: string | null;
+  tokenLast4: string;
+  scopes: string[];
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  isRevoked: boolean;
+  createdAt: string;
+}
+
+export interface AstroliftApiTokenPlaintext {
+  apiToken: AstroliftApiToken;
+  plaintext: string;
+}
+
 export interface MutationError {
   code: string;
   message: string;
