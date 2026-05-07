@@ -71,12 +71,16 @@ const sections: NavSection[] = [
     ],
   },
   {
-    label: "Governance",
+    label: "Administration",
+    // Platform-admin concerns — RBAC, tokens, cost/quotas. These are
+    // the platform's own controls. True GRC (compliance frameworks,
+    // attestations, control testing) lives in Zentinelle, which
+    // ingests Astrolift's AuditEvent stream via webhook.
     items: [
-      { label: "Cost", href: "/cost", icon: <CoinsIcon /> },
-      { label: "Quotas", href: "/quotas", icon: <GaugeIcon /> },
       { label: "Members", href: "/members", icon: <ShieldIcon /> },
       { label: "Tokens", href: "/tokens", icon: <KeyIcon /> },
+      { label: "Cost", href: "/cost", icon: <CoinsIcon /> },
+      { label: "Quotas", href: "/quotas", icon: <GaugeIcon /> },
       { label: "Metrics", href: "/metrics", icon: <BarChart3Icon /> },
     ],
   },
