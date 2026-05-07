@@ -9,9 +9,8 @@ from django.contrib.auth import get_user_model
 
 from astrolift_identity.models import Organization, Role, RoleBinding
 from astrolift_identity.permission_resolver import resolve
-from core.permissions import Permission, PermissionScope, ScopeKind
+from core.permissions import Permission
 from core.tenancy import TenantContext
-
 
 pytestmark = pytest.mark.django_db
 

@@ -16,7 +16,6 @@ from django.utils import timezone
 from core.permissions import Permission, PermissionScope
 from core.tenancy import TenantContext
 
-
 # Order matters: when we match a binding at a higher scope, it grants
 # down. The chain is the reverse of the ancestry walk.
 _INHERITANCE_ORDER = ("ORG", "TEAM", "PROJECT", "APP")

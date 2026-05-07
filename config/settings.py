@@ -289,6 +289,8 @@ INSTALLED_APPS = [
     'core_logs',
     # Canonical Astrolift platform apps (control-plane data model)
     'astrolift_identity',
+    'astrolift_clusters',
+    'astrolift_registry',
     # End of Astrolift
 
     'constance',
