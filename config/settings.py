@@ -391,6 +391,8 @@ MIDDLEWARE = [
     'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.auth.middleware.RemoteUserMiddleware',  # Required for Auth0
     'core.middleware.current_user.CurrentUserMiddleware',  # Track current user for signals
+    'core.middleware.request_id.RequestIdMiddleware',  # ULID + W3C traceparent → contextvar
+    'core.middleware.tenant.TenantContextMiddleware',  # Resolve org/team/project, populate TenantContext
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # 'django.middleware.gzip.GZipMiddleware',

@@ -1,11 +1,13 @@
 """
 Identity queries.
 
-Every resolver is decorated with ``@require_permission(...)`` first
-and ``@tenant_scoped(...)`` second so the tenant context is resolved
-before the permission check. Tenant scoping silently filters
-querysets via the manager; the permission check decides whether the
-resolver runs at all.
+Field names are prefixed with ``astrolift`` so they don't shadow (or
+get shadowed by) the legacy ``organization`` app's queries when both
+classes merge into the root schema via multiple inheritance.
+
+Each resolver is decorated with ``@require_permission(...)`` first and
+``@tenant_scoped(...)`` second so the tenant context is resolved before
+the permission check.
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ class IdentityQuery:
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
-    def organization(self, info: Info, slug: str) -> OrganizationType | None:
+    def astrolift_organization(self, info: Info, slug: str) -> OrganizationType | None:
         org = Organization.objects.filter(slug=slug).first()
         if org is None:
             return None
@@ -40,18 +42,18 @@ class IdentityQuery:
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
-    def organizations(self, info: Info) -> list[OrganizationType]:
+    def astrolift_organizations(self, info: Info) -> list[OrganizationType]:
         return [organization_to_type(o) for o in Organization.objects.all()[:100]]
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
     @tenant_scoped()
-    def teams(self, info: Info) -> list[TeamType]:
+    def astrolift_teams(self, info: Info) -> list[TeamType]:
         return [team_to_type(t) for t in Team.objects.select_related("organization")[:200]]
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ)
     @tenant_scoped()
-    def projects(self, info: Info) -> list[ProjectType]:
+    def astrolift_projects(self, info: Info) -> list[ProjectType]:
         qs = Project.objects.select_related("organization", "team")[:200]
         return [project_to_type(p) for p in qs]
