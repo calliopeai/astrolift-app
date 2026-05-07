@@ -16,7 +16,6 @@ from django.db import IntegrityError
 
 from astrolift_identity.models import Organization, Project, Team
 
-
 pytestmark = pytest.mark.django_db
 
 

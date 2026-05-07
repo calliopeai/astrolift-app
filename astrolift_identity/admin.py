@@ -12,10 +12,16 @@ from __future__ import annotations
 from django.contrib import admin
 
 from astrolift_identity.models import (
+    ApiToken,
+    GroupRoleMapping,
     IdentityProvider,
-    OrgDomain,
+    Invitation,
+    Member,
     Organization,
+    OrgDomain,
     Project,
+    Role,
+    RoleBinding,
     Team,
 )
 
@@ -64,3 +70,51 @@ class OrgDomainAdmin(_TenantAdminMixin, admin.ModelAdmin):
     list_filter = ("jit_enabled",)
     search_fields = ("domain",)
     readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(Role)
+class RoleAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "slug", "scope_level", "is_system", "organization")
+    list_filter = ("scope_level", "is_system")
+    search_fields = ("name", "slug")
+    readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(RoleBinding)
+class RoleBindingAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("user", "group_external_id", "role", "scope_kind", "scope_id", "expires_at")
+    list_filter = ("scope_kind", "role")
+    search_fields = ("user__username", "user__email", "group_external_id")
+    readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(Member)
+class MemberAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("user", "scope_kind", "scope_id", "lifecycle", "is_active")
+    list_filter = ("scope_kind", "lifecycle", "is_active")
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(Invitation)
+class InvitationAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("email", "scope_kind", "scope_id", "status", "expires_at")
+    list_filter = ("status", "scope_kind")
+    search_fields = ("email",)
+    readonly_fields = ("guid", "created_at", "updated_at", "version", "token_hash")
+
+
+@admin.register(GroupRoleMapping)
+class GroupRoleMappingAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("organization", "group_external_id", "role", "scope_kind", "scope_id")
+    list_filter = ("scope_kind",)
+    search_fields = ("group_external_id",)
+    readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(ApiToken)
+class ApiTokenAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "user", "organization", "team", "is_revoked", "expires_at", "last_used_at")
+    list_filter = ("is_revoked",)
+    search_fields = ("name", "user__username", "user__email")
+    readonly_fields = ("guid", "created_at", "updated_at", "version", "token_hash")
