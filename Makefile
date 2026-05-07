@@ -61,7 +61,7 @@ superuser:
 	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py createsuperuser
 
 schema:
-	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py export_schema --schema config.schema:schema --path schema.graphql
+	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py export_schema config.schema:schema --path schema.graphql
 
 # ---- quality -------------------------------------------------------
 
