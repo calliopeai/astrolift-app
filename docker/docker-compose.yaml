@@ -1,13 +1,15 @@
 services:
 
   astrolift-local:
-    build: ..
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
     container_name: astrolift-local
     image: astrolift-local
     ports:
       - '8000:8000'
     env_file:
-      - ../config/local.env
+      - ../backend/config/local.env
     environment:
       - COMPOSE_DOCKER_CLI_BUILD=0
       - DOCKER_BUILDKIT=0
@@ -32,7 +34,7 @@ services:
       - TEMPORAL_ADDRESS=temporal-server:7233
       - TEMPORAL_NAMESPACE=default
     volumes:
-      - ..:/astrolift
+      - ../backend:/astrolift
     depends_on:
       postgres-local:
         condition: service_healthy
@@ -70,9 +72,9 @@ services:
     image: postgres:17
     container_name: postgres-local
     volumes:
-      - ../docker/runtime/postgres-local/postgres_data:/var/lib/postgresql/data/
+      - ./runtime/postgres-local/postgres_data:/var/lib/postgresql/data/
     env_file:
-      - ../config/local.env
+      - ../backend/config/local.env
     environment:
       - PGUSER=dbadmin
       - POSTGRES_DB=astrolift
@@ -200,7 +202,12 @@ services:
       - path: ../frontend/.env.local
         required: false
     environment:
-      - NEXT_PUBLIC_API_ROOT=http://localhost:8000
+      # NEXT_PUBLIC_API_ROOT empty → browser hits same-origin localhost:3000,
+      # which Next.js rewrites server-side to NEXT_PUBLIC_API_ORIGIN. Inside
+      # Docker the UI must reach the API by service name, not "localhost".
+      - NEXT_PUBLIC_API_ROOT=
+      - NEXT_PUBLIC_API_ORIGIN=http://astrolift-local:8000
+      - NEXT_PUBLIC_DEV_LOGIN=1
     depends_on:
       - astrolift-local
 
