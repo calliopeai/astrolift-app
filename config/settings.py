@@ -8,7 +8,6 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 import logging
 import os
-from distutils.util import strtobool
 from pathlib import Path
 from typing import overload
 
@@ -19,6 +18,7 @@ import sentry_sdk
 
 # patch https://stackoverflow.com/questions/70382084/import-error-force-text-from-django-utils-encoding
 from corsheaders.defaults import default_headers
+from distutils.util import strtobool
 from django.core.cache import DEFAULT_CACHE_ALIAS
 from django.db import DEFAULT_DB_ALIAS
 from django.utils.encoding import force_str
@@ -287,6 +287,8 @@ INSTALLED_APPS = [
     'config.middleware',
     'organization',
     'core_logs',
+    # Canonical Astrolift platform apps (control-plane data model)
+    'astrolift_identity',
     # End of Astrolift
 
     'constance',
@@ -295,6 +297,7 @@ INSTALLED_APPS = [
 
 # Feature toggles — remove disabled feature apps
 from config.features import filter_installed_apps  # noqa: E402
+
 INSTALLED_APPS = filter_installed_apps(INSTALLED_APPS)
 
 # Discover and merge domain app configurations

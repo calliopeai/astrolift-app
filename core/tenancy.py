@@ -21,7 +21,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import dataclasses
-from typing import Iterator
+from collections.abc import Iterator
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

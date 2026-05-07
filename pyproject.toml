@@ -1,11 +1,68 @@
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-exclude = [
+# The Astrolift platform code lives in ``astrolift_*`` apps and the
+# new ``core`` infrastructure modules. The legacy boilerworks scaffold
+# in this tree is excluded from automatic formatting until it is
+# refactored or removed; touching it churns diffs without value.
+extend-exclude = [
   "migrations",
   "**/migrations/**",
   "static",
   "templates",
+  # legacy scaffold (boilerworks-django-nextjs) — untouched here
+  "auth1",
+  "config/config_merger.py",
+  "config/permissions.py",
+  "config/schema.py",
+  "config/urls.py",
+  "config/views.py",
+  "core/admin.py",
+  "core/apps.py",
+  "core/collections",
+  "core/db",
+  "core/documents.py",
+  "core/fields/hash_field.py",
+  "core/loaders",
+  "core/management/commands/dev_utils.py",
+  "core/management/commands/scaffold.py",
+  "core/middleware/current_user.py",
+  "core/models/address.py",
+  "core/models/application.py",
+  "core/models/authorization",
+  "core/models/common.py",
+  "core/models/dfa.py",
+  "core/models/email.py",
+  "core/models/enum.py",
+  "core/models/fields",
+  "core/models/internationalization.py",
+  "core/models/interval.py",
+  "core/models/library",
+  "core/models/metabase.py",
+  "core/models/metabase_unimported_chart.py",
+  "core/models/notification.py",
+  "core/models/permissions.py",
+  "core/models/process.py",
+  "core/models/template.py",
+  "core/models/upload.py",
+  "core/models/user.py",
+  "core/schema",
+  "core/serializers",
+  "core/systems",
+  "core/tests/helper.py",
+  "core/tests/test_opensearch.py",
+  "core/tests/test_rocketchat_rest_client.py",
+  "core/tests/test_signal_heper.py",
+  "core/tests/test_tracking.py",
+  "core/tests/utils",
+  "core/urls.py",
+  "core/utils",
+  "core/views.py",
+  "core_logs",
+  "organization",
+  "scheduled_task",
+  "testdata",
+  "workflows",
 ]
 
 [tool.ruff.lint]

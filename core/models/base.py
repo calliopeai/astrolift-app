@@ -24,8 +24,6 @@ models keep their existing imports.
 
 from __future__ import annotations
 
-import uuid
-
 from django.db import models
 from django.utils.text import slugify
 
