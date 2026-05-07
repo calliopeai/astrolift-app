@@ -88,3 +88,49 @@ export const SOFT_DELETE_PROJECT = gql`
     }
   }
 `;
+
+export const GRANT_ROLE = gql`
+  mutation GrantRole($input: GrantRoleInput!) {
+    grantRole(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        user {
+          id
+          username
+          email
+        }
+        role {
+          id
+          slug
+          name
+          scopeLevel
+        }
+        scopeKind
+        scopeId
+        grantedAt
+      }
+    }
+  }
+`;
+
+export const REVOKE_ROLE_BINDING = gql`
+  mutation RevokeRoleBinding($input: RevokeRoleBindingInput!) {
+    revokeRoleBinding(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;

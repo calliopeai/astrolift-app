@@ -85,6 +85,67 @@ export const GET_ORGANIZATION = gql`
   }
 `;
 
+export const LIST_ROLES = gql`
+  query ListRoles {
+    astroliftRoles {
+      id
+      slug
+      name
+      description
+      scopeLevel
+      permissions
+      isSystem
+    }
+  }
+`;
+
+export const LIST_MEMBERS = gql`
+  query ListMembers {
+    astroliftMembers {
+      id
+      user {
+        id
+        username
+        email
+        isActive
+      }
+      scopeKind
+      scopeId
+      isActive
+      lifecycle
+      joinedAt
+      lastSeenAt
+      createdAt
+      deletedAt
+    }
+  }
+`;
+
+export const LIST_ROLE_BINDINGS = gql`
+  query ListRoleBindings {
+    astroliftRoleBindings {
+      id
+      user {
+        id
+        username
+        email
+      }
+      groupExternalId
+      role {
+        id
+        slug
+        name
+        scopeLevel
+      }
+      scopeKind
+      scopeId
+      grantedAt
+      expiresAt
+      inherits
+    }
+  }
+`;
+
 // Suppress the unused import warning — fragment is referenced from
 // other domain files once they're written.
 void IDENTITY_TIMESTAMPS;

@@ -43,6 +43,50 @@ export interface AstroliftProject {
   deletedAt: string | null;
 }
 
+export interface AstroliftUser {
+  id: string;
+  username: string;
+  email: string;
+  isActive: boolean;
+}
+
+export type ScopeKind = "ORG" | "TEAM" | "PROJECT" | "APP";
+
+export interface AstroliftRole {
+  id: AstroliftGuid;
+  slug: string;
+  name: string;
+  description: string;
+  scopeLevel: ScopeKind;
+  permissions: string[];
+  isSystem: boolean;
+}
+
+export interface AstroliftMember {
+  id: AstroliftGuid;
+  user: AstroliftUser;
+  scopeKind: ScopeKind;
+  scopeId: string;
+  isActive: boolean;
+  lifecycle: string;
+  joinedAt: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+  deletedAt: string | null;
+}
+
+export interface AstroliftRoleBinding {
+  id: AstroliftGuid;
+  user: AstroliftUser | null;
+  groupExternalId: string;
+  role: AstroliftRole;
+  scopeKind: ScopeKind;
+  scopeId: string;
+  grantedAt: string;
+  expiresAt: string | null;
+  inherits: boolean;
+}
+
 export interface MutationError {
   code: string;
   message: string;
