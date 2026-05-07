@@ -1,0 +1,49 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Docker runtime data — bind-mounted, never committed
+docker/runtime/
+
+# Build output
+dist/
+build/
+
+# Secrets — env files live in subdirs and are sourced from examples
+.env
+.env.*
+!.env.example
+backend/config/local.env
+frontend/.env
+frontend/.env.local
+credentials.json
+*.pem
+*.key
+
+# Sentry
+.sentryclirc
