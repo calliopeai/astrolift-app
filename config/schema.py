@@ -22,6 +22,7 @@ from core.schema.types.user import UserType
 # Feature-gated imports
 # ---------------------------------------------------------------------------
 import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
+import astrolift_lifecycle.schema as AstroliftLifecycleSchema  # noqa: E402
 import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
 import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 
@@ -32,6 +33,7 @@ _query_bases = [
     AstroliftIdentitySchema.IdentityQuery,
     AstroliftOperationsSchema.OperationsQuery,
     AstroliftRegistrySchema.RegistryQuery,
+    AstroliftLifecycleSchema.LifecycleQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
