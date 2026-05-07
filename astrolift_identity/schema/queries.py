@@ -15,13 +15,26 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
-from astrolift_identity.models import Organization, Project, Team
+from astrolift_identity.models import (
+    Member,
+    Organization,
+    Project,
+    Role,
+    RoleBinding,
+    Team,
+)
 from astrolift_identity.schema.types import (
+    MemberType,
     OrganizationType,
     ProjectType,
+    RoleBindingType,
+    RoleType,
     TeamType,
+    member_to_type,
     organization_to_type,
     project_to_type,
+    role_binding_to_type,
+    role_to_type,
     team_to_type,
 )
 from core.decorators import tenant_scoped
@@ -57,3 +70,29 @@ class IdentityQuery:
     def astrolift_projects(self, info: Info) -> list[ProjectType]:
         qs = Project.objects.select_related("organization", "team")[:200]
         return [project_to_type(p) for p in qs]
+
+    # ---- RBAC queries ------------------------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_members(self, info: Info) -> list[MemberType]:
+        qs = Member.objects.select_related("user").order_by("-created_at")[:500]
+        return [member_to_type(m) for m in qs]
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_roles(self, info: Info) -> list[RoleType]:
+        qs = Role.objects.order_by("scope_level", "slug")[:200]
+        return [role_to_type(r) for r in qs]
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_role_bindings(self, info: Info) -> list[RoleBindingType]:
+        qs = (
+            RoleBinding.objects.select_related("user", "role")
+            .order_by("-granted_at")[:500]
+        )
+        return [role_binding_to_type(rb) for rb in qs]

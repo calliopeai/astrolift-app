@@ -29,13 +29,22 @@ from astrolift_graphql import (
 from astrolift_graphql import (
     success as gql_success,
 )
-from astrolift_identity.models import Organization, Project, Team
+from astrolift_identity.models import (
+    Member,
+    Organization,
+    Project,
+    Role,
+    RoleBinding,
+    Team,
+)
 from astrolift_identity.schema.types import (
     OrganizationType,
     ProjectType,
+    RoleBindingType,
     TeamType,
     organization_to_type,
     project_to_type,
+    role_binding_to_type,
     team_to_type,
 )
 from core.mutations import ErrorCode, mutation_audit
@@ -96,6 +105,19 @@ class SoftDeleteByGuidInput:
 
 
 SoftDeleteOrganizationInput = SoftDeleteByGuidInput  # back-compat alias
+
+
+@strawberry.input
+class GrantRoleInput:
+    user_id: str
+    role_id: GUID
+    scope_kind: str
+    scope_guid: GUID  # the target Org/Team/Project/App guid
+
+
+@strawberry.input
+class RevokeRoleBindingInput:
+    id: GUID
 
 
 @strawberry.type
@@ -295,3 +317,88 @@ class IdentityMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found")
         project.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    # ---- RBAC --------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="role_binding.grant")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    def grant_role(
+        self, info: Info, input: GrantRoleInput
+    ) -> MutationResultType[RoleBindingType]:
+        from django.contrib.auth import get_user_model
+
+        try:
+            target_user_pk = int(input.user_id)
+        except ValueError:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "userId must be a numeric pk", field="userId"
+            )
+
+        User = get_user_model()
+        user = User.objects.filter(pk=target_user_pk).first()
+        if user is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
+
+        role = Role.objects.filter(guid=str(input.role_id)).first()
+        if role is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleId")
+
+        scope_kind = input.scope_kind.upper()
+        scope_id = _resolve_scope_pk(scope_kind, str(input.scope_guid))
+        if scope_id is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid"
+            )
+
+        if RoleBinding.objects.filter(
+            user=user, role=role, scope_kind=scope_kind, scope_id=scope_id
+        ).exists():
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                "this user already has this role on this scope",
+            )
+
+        binding = RoleBinding.objects.create(
+            user=user,
+            role=role,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            granted_by=_actor(),
+        )
+
+        # Auto-add a Member row at the target scope so middleware can
+        # resolve the tenant when this user logs in.
+        Member.objects.get_or_create(
+            user=user,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            defaults={"is_active": True, "lifecycle": "active"},
+        )
+
+        return gql_success(role_binding_to_type(binding))
+
+    @strawberry.field
+    @mutation_audit(action="role_binding.revoke")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    def revoke_role_binding(
+        self, info: Info, input: RevokeRoleBindingInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        binding = RoleBinding.objects.filter(guid=str(input.id)).first()
+        if binding is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
+        binding.soft_delete(by=_actor())
+        return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+
+def _resolve_scope_pk(scope_kind: str, scope_guid: str) -> int | None:
+    """Map a (scope_kind, guid) pair to the corresponding integer PK."""
+    if scope_kind == "ORG":
+        row = Organization.objects.filter(guid=scope_guid).first()
+    elif scope_kind == "TEAM":
+        row = Team.objects.filter(guid=scope_guid).first()
+    elif scope_kind == "PROJECT":
+        row = Project.objects.filter(guid=scope_guid).first()
+    else:
+        return None
+    return row.pk if row else None

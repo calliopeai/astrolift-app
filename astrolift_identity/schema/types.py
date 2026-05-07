@@ -93,3 +93,102 @@ def project_to_type(project) -> ProjectType:
         updated_at=project.updated_at,
         deleted_at=project.deleted_at,
     )
+
+
+# ---- RBAC types ------------------------------------------------------
+
+
+@strawberry.type(name="AstroliftUser")
+class UserType:
+    id: str  # Django auth user pk (int rendered as string)
+    username: str
+    email: str
+    is_active: bool
+
+
+@strawberry.type(name="AstroliftRole")
+class RoleType:
+    id: GUID
+    slug: str
+    name: str
+    description: str
+    scope_level: str
+    permissions: list[str]
+    is_system: bool
+
+
+@strawberry.type(name="AstroliftMember")
+class MemberType:
+    id: GUID
+    user: UserType
+    scope_kind: str
+    scope_id: str
+    is_active: bool
+    lifecycle: str
+    joined_at: dt.datetime | None
+    last_seen_at: dt.datetime | None
+    created_at: dt.datetime
+    deleted_at: dt.datetime | None
+
+
+@strawberry.type(name="AstroliftRoleBinding")
+class RoleBindingType:
+    id: GUID
+    user: UserType | None
+    group_external_id: str
+    role: RoleType
+    scope_kind: str
+    scope_id: str
+    granted_at: dt.datetime
+    expires_at: dt.datetime | None
+    inherits: bool
+
+
+def user_to_type(user) -> UserType:
+    return UserType(
+        id=str(user.pk),
+        username=user.get_username(),
+        email=user.email or "",
+        is_active=user.is_active,
+    )
+
+
+def role_to_type(role) -> RoleType:
+    return RoleType(
+        id=GUID(str(role.guid)),
+        slug=role.slug,
+        name=role.name,
+        description=role.description or "",
+        scope_level=role.scope_level,
+        permissions=list(role.permissions or []),
+        is_system=role.is_system,
+    )
+
+
+def member_to_type(member) -> MemberType:
+    return MemberType(
+        id=GUID(str(member.guid)),
+        user=user_to_type(member.user),
+        scope_kind=member.scope_kind,
+        scope_id=str(member.scope_id),
+        is_active=member.is_active,
+        lifecycle=member.lifecycle,
+        joined_at=member.joined_at,
+        last_seen_at=member.last_seen_at,
+        created_at=member.created_at,
+        deleted_at=member.deleted_at,
+    )
+
+
+def role_binding_to_type(binding) -> RoleBindingType:
+    return RoleBindingType(
+        id=GUID(str(binding.guid)),
+        user=user_to_type(binding.user) if binding.user_id else None,
+        group_external_id=binding.group_external_id or "",
+        role=role_to_type(binding.role),
+        scope_kind=binding.scope_kind,
+        scope_id=str(binding.scope_id),
+        granted_at=binding.granted_at,
+        expires_at=binding.expires_at,
+        inherits=binding.inherits,
+    )
