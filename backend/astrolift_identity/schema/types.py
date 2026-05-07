@@ -231,6 +231,46 @@ def api_token_to_type(token) -> ApiTokenType:
     )
 
 
+@strawberry.type(name="AstroliftIdentityProvider")
+class IdentityProviderType:
+    """One configured identity provider (Auth0 / OIDC / Cognito / local / …).
+
+    The org binds exactly one as primary via Organization.identity_provider_id;
+    the ``is_active`` flag mirrors that binding so the UI can render a
+    "currently used" indicator without a second query.
+    """
+
+    id: GUID
+    organization_slug: str
+    kind: str
+    name: str
+    config: strawberry.scalars.JSON
+    metadata_url: str
+    oidc_discovery_url: str
+    client_id: str
+    is_default: bool
+    is_active: bool
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+def identity_provider_to_type(idp, *, is_active: bool = False) -> IdentityProviderType:
+    return IdentityProviderType(
+        id=GUID(str(idp.guid)),
+        organization_slug=idp.organization.slug,
+        kind=idp.kind,
+        name=idp.name or idp.kind,
+        config=idp.config or {},
+        metadata_url=idp.metadata_url or "",
+        oidc_discovery_url=idp.oidc_discovery_url or "",
+        client_id=idp.client_id or "",
+        is_default=idp.is_default,
+        is_active=is_active,
+        created_at=idp.created_at,
+        updated_at=idp.updated_at,
+    )
+
+
 @strawberry.type(name="AstroliftPolicy")
 class PolicyType:
     id: GUID

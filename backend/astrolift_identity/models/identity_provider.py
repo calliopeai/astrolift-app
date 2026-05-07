@@ -33,6 +33,10 @@ class IdentityProvider(BaseCoreModel):
         related_name="identity_providers",
         on_delete=models.CASCADE,
     )
+    # Multiple IdPs of the same kind are allowed (e.g. auth0-staging +
+    # auth0-prod, or oidc-okta + oidc-keycloak as a fallback) so we
+    # carry a human-readable label distinct from the enum.
+    display_name = models.CharField(max_length=200, blank=True, default="")
     kind = models.CharField(max_length=32, choices=Kind.choices)
     config = models.JSONField(default=dict, blank=True)
     metadata_url = models.URLField(blank=True, default="")
@@ -40,6 +44,11 @@ class IdentityProvider(BaseCoreModel):
     client_id = models.CharField(max_length=256, blank=True, default="")
     client_secret_ref = models.CharField(max_length=512, blank=True, default="")
     is_default = models.BooleanField(default=False)
+
+    @property
+    def name(self) -> str:
+        """Best-effort display label: explicit display_name → kind."""
+        return self.display_name or self.kind
 
     class Meta:
         constraints = [

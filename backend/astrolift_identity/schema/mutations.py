@@ -31,6 +31,7 @@ from astrolift_graphql import (
 )
 from astrolift_identity.models import (
     ApiToken,
+    IdentityProvider,
     Member,
     Organization,
     Policy,
@@ -41,12 +42,14 @@ from astrolift_identity.models import (
 )
 from astrolift_identity.schema.types import (
     ApiTokenPlaintextType,
+    IdentityProviderType,
     OrganizationType,
     PolicyType,
     ProjectType,
     RoleBindingType,
     TeamType,
     api_token_to_type,
+    identity_provider_to_type,
     organization_to_type,
     policy_to_type,
     project_to_type,
@@ -163,6 +166,36 @@ class UpdatePolicyInput:
     resource_pattern: strawberry.scalars.JSON | None = None
     conditions: strawberry.scalars.JSON | None = None
     actor_pattern: strawberry.scalars.JSON | None = None
+
+
+@strawberry.input
+class CreateIdentityProviderInput:
+    """Per-kind config validated server-side; see IdentityProviderKindValidator."""
+
+    kind: str  # oidc | saml | cognito | auth0 | okta | azure_ad | google | github | local
+    display_name: str | None = None
+    config: strawberry.scalars.JSON | None = None
+    metadata_url: str | None = None
+    oidc_discovery_url: str | None = None
+    client_id: str | None = None
+    client_secret_ref: str | None = None
+    set_active: bool = False
+
+
+@strawberry.input
+class UpdateIdentityProviderInput:
+    id: GUID
+    display_name: str | None = None
+    config: strawberry.scalars.JSON | None = None
+    metadata_url: str | None = None
+    oidc_discovery_url: str | None = None
+    client_id: str | None = None
+    client_secret_ref: str | None = None
+
+
+@strawberry.input
+class SetActiveIdentityProviderInput:
+    id: GUID
 
 
 @strawberry.type
@@ -589,6 +622,163 @@ class IdentityMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
         policy.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    # ---- Identity providers ------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="identity_provider.create")
+    @require_permission(Permission.ORG_UPDATE)
+    def create_identity_provider(
+        self, info: Info, input: CreateIdentityProviderInput
+    ) -> MutationResultType[IdentityProviderType]:
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        valid_kinds = {k.value for k in IdentityProvider.Kind}
+        if input.kind not in valid_kinds:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"kind must be one of {sorted(valid_kinds)}",
+                field="kind",
+            )
+
+        validated = _validate_idp_config(input)
+        if validated is not None:
+            return validated
+
+        idp = IdentityProvider.objects.create(
+            organization=org,
+            kind=input.kind,
+            display_name=(input.display_name or "").strip(),
+            config=input.config or {},
+            metadata_url=input.metadata_url or "",
+            oidc_discovery_url=input.oidc_discovery_url or "",
+            client_id=input.client_id or "",
+            client_secret_ref=input.client_secret_ref or "",
+            is_default=False,
+        )
+
+        is_active = False
+        if input.set_active:
+            org.identity_provider_id = idp.pk
+            org.save(update_fields=["identity_provider", "updated_at", "version"])
+            is_active = True
+
+        return gql_success(identity_provider_to_type(idp, is_active=is_active))
+
+    @strawberry.field
+    @mutation_audit(action="identity_provider.update")
+    @require_permission(Permission.ORG_UPDATE)
+    def update_identity_provider(
+        self, info: Info, input: UpdateIdentityProviderInput
+    ) -> MutationResultType[IdentityProviderType]:
+        idp = IdentityProvider.objects.select_related("organization").filter(
+            guid=str(input.id)
+        ).first()
+        if idp is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
+
+        for field in (
+            "display_name",
+            "config",
+            "metadata_url",
+            "oidc_discovery_url",
+            "client_id",
+            "client_secret_ref",
+        ):
+            new_value = getattr(input, field)
+            if new_value is not None:
+                setattr(idp, field, new_value)
+        idp.save()
+        active_id = (
+            Organization.objects.filter(pk=idp.organization_id)
+            .values_list("identity_provider_id", flat=True)
+            .first()
+        )
+        return gql_success(
+            identity_provider_to_type(idp, is_active=(idp.pk == active_id))
+        )
+
+    @strawberry.field
+    @mutation_audit(action="identity_provider.set_active")
+    @require_permission(Permission.ORG_UPDATE)
+    def set_active_identity_provider(
+        self, info: Info, input: SetActiveIdentityProviderInput
+    ) -> MutationResultType[IdentityProviderType]:
+        idp = IdentityProvider.objects.select_related("organization").filter(
+            guid=str(input.id)
+        ).first()
+        if idp is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
+        org = idp.organization
+        org.identity_provider_id = idp.pk
+        org.save(update_fields=["identity_provider", "updated_at", "version"])
+        return gql_success(identity_provider_to_type(idp, is_active=True))
+
+    @strawberry.field
+    @mutation_audit(action="identity_provider.delete")
+    @require_permission(Permission.ORG_UPDATE)
+    def soft_delete_identity_provider(
+        self, info: Info, input: SoftDeleteByGuidInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        idp = IdentityProvider.objects.select_related("organization").filter(
+            guid=str(input.id)
+        ).first()
+        if idp is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
+        # Refuse to delete the IdP that's currently active — the operator
+        # must set_active to a different one first, or this install would
+        # be left without a way to log in.
+        if idp.organization.identity_provider_id == idp.pk:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "this provider is currently active; pick a different one before deleting",
+            )
+        idp.soft_delete(by=_actor())
+        return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+
+def _validate_idp_config(input) -> "MutationResultType | None":
+    """Per-kind config validation. Returns a failure envelope or None."""
+    kind = input.kind
+    if kind == "local":
+        return None
+    if kind in {"oidc", "okta", "azure_ad", "auth0", "google", "github"}:
+        if not (input.oidc_discovery_url or input.metadata_url):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"{kind} requires oidcDiscoveryUrl",
+                field="oidcDiscoveryUrl",
+            )
+        if not input.client_id:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"{kind} requires clientId",
+                field="clientId",
+            )
+    if kind == "cognito":
+        # Cognito needs user_pool_id + region in addition to OIDC fields
+        cfg = input.config or {}
+        for required in ("user_pool_id", "region"):
+            if required not in cfg:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"cognito config requires {required!r}",
+                    field=f"config.{required}",
+                )
+    if kind == "saml":
+        if not input.metadata_url:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "saml requires metadataUrl",
+                field="metadataUrl",
+            )
+    return None
 
 
 def _resolve_scope_pk(scope_kind: str, scope_guid: str) -> int | None:

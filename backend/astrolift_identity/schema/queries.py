@@ -17,6 +17,7 @@ from strawberry.types import Info
 
 from astrolift_identity.models import (
     ApiToken,
+    IdentityProvider,
     Member,
     Organization,
     Policy,
@@ -27,6 +28,7 @@ from astrolift_identity.models import (
 )
 from astrolift_identity.schema.types import (
     ApiTokenType,
+    IdentityProviderType,
     MemberType,
     OrganizationType,
     PolicyType,
@@ -35,6 +37,7 @@ from astrolift_identity.schema.types import (
     RoleType,
     TeamType,
     api_token_to_type,
+    identity_provider_to_type,
     member_to_type,
     organization_to_type,
     policy_to_type,
@@ -119,3 +122,57 @@ class IdentityQuery:
     def astrolift_policies(self, info: Info) -> list[PolicyType]:
         qs = Policy.objects.order_by("scope_level", "slug")[:200]
         return [policy_to_type(p) for p in qs]
+
+    # ---- Identity providers ------------------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_identity_providers(self, info: Info) -> list[IdentityProviderType]:
+        qs = (
+            IdentityProvider.objects.select_related("organization")
+            .order_by("-is_default", "kind")[:50]
+        )
+        active_id = _active_idp_pk()
+        return [
+            identity_provider_to_type(idp, is_active=(idp.pk == active_id)) for idp in qs
+        ]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_active_identity_provider(
+        self, info: Info
+    ) -> IdentityProviderType | None:
+        """The IdP currently bound to the active organization (or None).
+
+        Intentionally not gated by a high permission — the login screen
+        needs to call this **before** the user authenticates to know
+        which CTA to render. The response is shape-only (no client
+        secrets, no config that could leak credentials).
+        """
+        active_id = _active_idp_pk()
+        if active_id is None:
+            return None
+        idp = (
+            IdentityProvider.objects.select_related("organization")
+            .filter(pk=active_id)
+            .first()
+        )
+        if idp is None:
+            return None
+        return identity_provider_to_type(idp, is_active=True)
+
+
+def _active_idp_pk() -> int | None:
+    """The Organization.identity_provider_id for the active tenant context."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return None
+    return (
+        Organization.objects.filter(pk=org_id)
+        .values_list("identity_provider_id", flat=True)
+        .first()
+    )

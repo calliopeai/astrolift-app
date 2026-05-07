@@ -376,7 +376,9 @@ class Auth1SessionWorkflow:
         """
         _rl_login = ratelimit(key='ip', rate='10/m', block=True)(cls.login)
         _rl_session = ratelimit(key='ip', rate='5/m', method='POST', block=True)(cls.session)
+        from auth1.active_idp import active_idp
         from auth1.dev_login import dev_login
+        from auth1.local_login import local_login
 
         return [
             path("login", _rl_login, name="login"),
@@ -384,6 +386,8 @@ class Auth1SessionWorkflow:
             path("callback", cls.callback, name="callback"),
             path("session", csrf_exempt(_rl_session), name="session"),
             path("dev-login", dev_login, name="dev-login"),
+            path("local-login", local_login, name="local-login"),
+            path("active-idp.json", active_idp, name="active-idp"),
         ]
 
     @classmethod
