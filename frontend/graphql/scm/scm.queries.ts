@@ -45,3 +45,34 @@ export const LIST_SSH_DEPLOY_KEYS = gql`
     }
   }
 `;
+
+export const LIST_AVAILABLE_REPOS = gql`
+  query ListAvailableRepos(
+    $connectionId: String!
+    $search: String
+    $limit: Int
+  ) {
+    astroliftAvailableRepos(
+      connectionId: $connectionId
+      search: $search
+      limit: $limit
+    ) {
+      repos {
+        fullName
+        name
+        description
+        defaultBranch
+        visibility
+        cloneUrlHttps
+        cloneUrlSsh
+        webUrl
+        isArchived
+        isFork
+        pushedAt
+      }
+      errorCode
+      errorMessage
+      recoverable
+    }
+  }
+`;
