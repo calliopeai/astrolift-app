@@ -60,6 +60,7 @@ pre-commit = "*"
 snapshottest = "*"
 pytest = "*"
 pytest-django = "*"
+pytest-asyncio = "*"
 
 
 [requires]
