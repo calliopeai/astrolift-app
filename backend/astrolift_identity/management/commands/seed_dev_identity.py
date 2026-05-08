@@ -36,14 +36,31 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--email", default="dev@local.astrolift.net")
         parser.add_argument("--password", default="dev")
-        parser.add_argument("--org", default="acme")
+        # 'acme' was the first iteration's placeholder; obvious-placeholder
+        # naming saves OSS users from a confused "why does my Astrolift say
+        # Acme?" moment on first login. Production installs use
+        # bootstrap_admin which requires --org-name explicitly.
+        parser.add_argument("--org", default="local")
+        parser.add_argument(
+            "--org-name", default="Astrolift Local Dev"
+        )
         parser.add_argument("--team", default="eng")
         parser.add_argument("--project", default="api")
 
-    def handle(self, *args, email: str, password: str, org: str, team: str, project: str, **opts):
+    def handle(
+        self,
+        *args,
+        email: str,
+        password: str,
+        org: str,
+        org_name: str,
+        team: str,
+        project: str,
+        **opts,
+    ):
         org_row, _ = Organization.objects.get_or_create(
             slug=org,
-            defaults={"name": org.title(), "website": f"https://{org}.example"},
+            defaults={"name": org_name, "website": f"https://{org}.example"},
         )
         team_row, _ = Team.objects.get_or_create(
             organization=org_row,

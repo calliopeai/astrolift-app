@@ -62,9 +62,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--email", default=_env("ASTROLIFT_ADMIN_EMAIL"))
-        parser.add_argument(
-            "--org", default=_env("ASTROLIFT_ORG_SLUG", "acme")
-        )
+        # No fallback on slug or name — production installs must pick a real
+        # org name; the operator finds out at deploy time, not after a
+        # demo screen ships with "Acme".
+        parser.add_argument("--org", default=_env("ASTROLIFT_ORG_SLUG"))
         parser.add_argument(
             "--org-name", default=_env("ASTROLIFT_ORG_NAME")
         )
@@ -87,7 +88,7 @@ class Command(BaseCommand):
         self,
         *,
         email: str | None,
-        org: str,
+        org: str | None,
         org_name: str | None,
         password: str | None,
         is_superuser: bool,
@@ -97,6 +98,19 @@ class Command(BaseCommand):
             raise CommandError(
                 "missing --email (or ASTROLIFT_ADMIN_EMAIL). "
                 "Provide the operator email; this is who gets org_owner."
+            )
+        if not org:
+            raise CommandError(
+                "missing --org (or ASTROLIFT_ORG_SLUG). "
+                "Pick a slug for your organization (e.g. 'acmecorp'). "
+                "This is what every URL and audit row scopes to."
+            )
+        if not org_name:
+            raise CommandError(
+                "missing --org-name (or ASTROLIFT_ORG_NAME). "
+                "Pick a display name for your organization "
+                "(e.g. 'Acme Corp'). This is what users see in the "
+                "header and on every page."
             )
 
         with transaction.atomic():
