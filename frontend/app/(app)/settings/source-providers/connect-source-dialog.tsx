@@ -184,7 +184,16 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
             Tokens and OAuth client secrets are encrypted at rest via the
             platform secrets backend (default: local Fernet derived from
             <code> SECRET_KEY</code>; switch to AWS Secrets Manager / GCP
-            Secret Manager / Azure Key Vault per install).
+            Secret Manager / Azure Key Vault per install).{" "}
+            <a
+              href="https://github.com/calliopeai/astrolift-app/blob/main/docs/operators/scm-github-oauth.md"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              GitHub OAuth setup guide
+            </a>
+            .
           </SheetDescription>
         </SheetHeader>
         <form
