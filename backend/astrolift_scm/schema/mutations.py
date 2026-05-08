@@ -87,11 +87,15 @@ class RotateWebhookSecretInput:
     connection_id: GUID
 
 
-@strawberry.type
+@strawberry.type(name="AstroliftScmWebhookSecretReveal")
 class WebhookSecretReveal:
     """Plaintext secret returned once on rotation; never re-fetchable.
     Operator copies it into the SCM host's webhook config alongside
-    the URL we surface alongside it."""
+    the URL we surface alongside it.
+
+    Named ``AstroliftScm…`` rather than ``WebhookSecretReveal`` to
+    avoid colliding with the legacy operations-app webhook
+    subscription reveal type at the GraphQL surface."""
 
     connection_id: GUID
     plaintext_secret: str
