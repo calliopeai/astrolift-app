@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from config import settings
 from django.contrib.auth import get_user_model  # type: ignore
-from snapshottest.django import TestCase
+from django.test import TestCase
 
 logger = logging.getLogger(__name__)
 

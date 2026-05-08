@@ -24,6 +24,16 @@ from __future__ import annotations
 
 import os
 
+# pytest-django's pytest_load_initial_conftests checks for
+# ``DJANGO_CONFIGURATION`` and tries to import ``configurations`` when
+# it's set. The platform now uses plain Django (no class-based
+# settings), so unset the variable before pytest-django sees it.
+# Settings.py still reads it as a label via ``CONFIGURATION``, so we
+# preserve the value on a sibling key in case anything else needs it.
+_label = os.environ.pop("DJANGO_CONFIGURATION", None)
+if _label is not None:
+    os.environ.setdefault("ASTROLIFT_ENV_LABEL", _label)
+
 import pytest
 
 from core.permissions import register_permission_resolver

@@ -235,6 +235,10 @@ CACHES = {
 
 # OpenSearch
 OPENSEARCH_URL = os.environ.get('OPENSEARCH_URL', 'http://localhost:9200')
+# Indexing is opt-in; staging/prod set OPENSEARCH_INDEXING=1.
+# Off by default keeps test/local stacks free of NXDOMAIN noise from
+# the indexing signals when no OpenSearch host is reachable.
+OPENSEARCH_INDEXING = os.environ.get('OPENSEARCH_INDEXING', '').lower() in ('1', 'true', 'yes', 'on')
 
 CSRF_TRUSTED_ORIGINS = [
     'https://storage.googleapis.com/',

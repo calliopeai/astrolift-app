@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 async-timeout = "*"
-django-configurations = "*"
 psycopg2-binary = "*"
 redis = "*"
 authlib = "==1.6.9" # Required for Auth0
@@ -63,7 +62,6 @@ websockets = "*"
 django-debug-toolbar = "*"
 jsonpath-ng = "*"
 pre-commit = "*"
-snapshottest = "*"
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"

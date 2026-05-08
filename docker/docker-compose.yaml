@@ -20,6 +20,9 @@ services:
     environment:
       - COMPOSE_DOCKER_CLI_BUILD=0
       - DOCKER_BUILDKIT=0
+      # Settings module reads this as an environment label, not via
+      # django-configurations (which has been removed). Values like
+      # Local/Dev/Tests/Prod drive feature toggles in config/settings.py.
       - DJANGO_CONFIGURATION=Local
       - POSTGRES_ENGINE=django.db.backends.postgresql
       - POSTGRES_DB=astrolift
@@ -29,6 +32,9 @@ services:
       - POSTGRES_PORT=5432
       - DJANGO_CACHE_URL=redis://redis-local:6379/1
       - OPENSEARCH_URL=http://opensearch-local:9200
+      # Indexing is opt-in (off by default everywhere). The docker
+      # stack ships an opensearch-local container, so flip it on here.
+      - OPENSEARCH_INDEXING=1
       - DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
       - EMAIL_HOST=mailpit-local
       - EMAIL_PORT=1025

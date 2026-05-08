@@ -100,7 +100,10 @@ ui-build:
 # Tests run inside the compose stack so they get a real Postgres + real
 # Temporal test environment.
 test:
-	$(COMPOSE) exec -e DJANGO_SETTINGS_MODULE=config.settings $(CONTAINER) pytest -x
+	# pytest-django imports `configurations` whenever DJANGO_CONFIGURATION
+	# is set; we use plain Django settings now, so unset it for the test
+	# run. Settings.py reads it as a label too — falls back to default.
+	$(COMPOSE) exec -e DJANGO_SETTINGS_MODULE=config.settings $(CONTAINER) sh -lc 'unset DJANGO_CONFIGURATION; pytest -x'
 
 fmt:
 	cd backend && ruff format . && ruff check --fix .
