@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  BookOpenIcon,
   CheckCircle2Icon,
   GitBranchIcon,
   KeyRoundIcon,
@@ -173,12 +174,24 @@ export function SourceProvidersClient() {
               surface (e.g. private org repos only).
             </p>
           </div>
-          <Can permission="scm.connect">
-            <Button size="sm" onClick={() => setOpenConnect(true)}>
-              <PlusIcon className="size-4" />
-              Connect host
+          <div className="flex gap-2">
+            <Button asChild size="sm" variant="outline">
+              <a
+                href="https://github.com/calliopeai/astrolift-app/blob/main/docs/operators/scm-github-oauth.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <BookOpenIcon className="size-4" />
+                Setup guide
+              </a>
             </Button>
-          </Can>
+            <Can permission="scm.connect">
+              <Button size="sm" onClick={() => setOpenConnect(true)}>
+                <PlusIcon className="size-4" />
+                Connect host
+              </Button>
+            </Can>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {conns.loading && connectionList.length === 0 ? (
