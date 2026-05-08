@@ -71,6 +71,19 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftCommandRun {
+  id: GUID!
+  registeredAppSlug: String!
+  workloadSlug: String
+  invokedByUsername: String
+  command: JSON!
+  startedAt: DateTime
+  endedAt: DateTime
+  exitCode: Int
+  logExcerpt: String!
+  createdAt: DateTime!
+}
+
 type AstroliftContainer {
   id: GUID!
   name: String!
@@ -425,6 +438,21 @@ type AstroliftRoleBindingMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRoleBinding
+}
+
+type AstroliftScheduledJobRun {
+  id: GUID!
+  registeredAppSlug: String!
+  environmentName: String!
+  workloadSlug: String!
+  k8sJobName: String!
+  status: String!
+  startedAt: DateTime
+  endedAt: DateTime
+  durationSeconds: Int
+  exitCode: Int
+  logExcerpt: String!
+  createdAt: DateTime!
 }
 
 type AstroliftScmWebhookSecretReveal {
@@ -1221,6 +1249,8 @@ type Query {
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
   astroliftDeployment(id: String!): AstroliftDeployment
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
+  astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]!
+  astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]!
   astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!

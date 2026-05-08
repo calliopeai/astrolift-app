@@ -4,6 +4,7 @@ import {
   ActivityIcon,
   BarChart3Icon,
   BoxIcon,
+  CalendarClockIcon,
   ChevronRightIcon,
   CloudIcon,
   CoinsIcon,
@@ -95,6 +96,12 @@ const sections: NavSection[] = [
         href: "/workflows",
         icon: <WorkflowIcon />,
         permission: "app.read",
+      },
+      {
+        label: "Jobs",
+        href: "/jobs",
+        icon: <CalendarClockIcon />,
+        permission: "app.read_logs",
       },
       {
         label: "Events",

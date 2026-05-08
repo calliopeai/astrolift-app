@@ -141,6 +141,68 @@ class AppHealthSummaryType:
     has_recent_failure: bool
 
 
+@strawberry.type(name="AstroliftScheduledJobRun")
+class ScheduledJobRunType:
+    id: GUID
+    registered_app_slug: str
+    environment_name: str
+    workload_slug: str
+    k8s_job_name: str
+    status: str
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    duration_seconds: int | None
+    exit_code: int | None
+    log_excerpt: str
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftCommandRun")
+class CommandRunType:
+    id: GUID
+    registered_app_slug: str
+    workload_slug: str | None
+    invoked_by_username: str | None
+    command: JSON
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    exit_code: int | None
+    log_excerpt: str
+    created_at: dt.datetime
+
+
+def scheduled_job_run_to_type(r) -> ScheduledJobRunType:
+    return ScheduledJobRunType(
+        id=GUID(str(r.guid)),
+        registered_app_slug=r.workload.registered_app.slug,
+        environment_name=r.app_environment.name,
+        workload_slug=r.workload.slug,
+        k8s_job_name=r.k8s_job_name or "",
+        status=r.status,
+        started_at=r.started_at,
+        ended_at=r.ended_at,
+        duration_seconds=r.duration_seconds,
+        exit_code=r.exit_code,
+        log_excerpt=r.log_excerpt or "",
+        created_at=r.created_at,
+    )
+
+
+def command_run_to_type(r) -> CommandRunType:
+    return CommandRunType(
+        id=GUID(str(r.guid)),
+        registered_app_slug=r.registered_app.slug,
+        workload_slug=r.workload.slug if r.workload_id else None,
+        invoked_by_username=r.invoked_by.username if r.invoked_by_id else None,
+        command=r.command or [],
+        started_at=r.started_at,
+        ended_at=r.ended_at,
+        exit_code=r.exit_code,
+        log_excerpt=r.log_excerpt or "",
+        created_at=r.created_at,
+    )
+
+
 def preview_to_type(p) -> PreviewEnvironmentType:
     return PreviewEnvironmentType(
         id=GUID(str(p.guid)),

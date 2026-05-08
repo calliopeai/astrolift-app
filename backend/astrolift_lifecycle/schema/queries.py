@@ -10,21 +10,27 @@ from strawberry.types import Info
 
 from astrolift_lifecycle.models import (
     AppEnvironment,
+    CommandRun,
     Deployment,
     DeploymentLog,
     PreviewEnvironment,
+    ScheduledJobRun,
 )
 from astrolift_lifecycle.schema.types import (
     AppEnvironmentType,
     AppHealthSummaryType,
+    CommandRunType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
     DeploymentType,
     PreviewEnvironmentType,
+    ScheduledJobRunType,
     app_env_to_type,
+    command_run_to_type,
     deployment_log_to_type,
     deployment_to_type,
     preview_to_type,
+    scheduled_job_run_to_type,
 )
 from astrolift_registry.models import RegisteredApp
 from core.decorators import tenant_scoped
@@ -87,6 +93,41 @@ class LifecycleQuery:
             return []
         qs = DeploymentLog.objects.filter(deployment=deployment).order_by("occurred_at")
         return [deployment_log_to_type(e) for e in qs[:1000]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_scheduled_job_runs(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        environment_name: str | None = None,
+        limit: int = 100,
+    ) -> list[ScheduledJobRunType]:
+        qs = ScheduledJobRun.objects.select_related(
+            "workload", "workload__registered_app", "app_environment"
+        ).order_by("-created_at")
+        if app_slug:
+            qs = qs.filter(workload__registered_app__slug=app_slug)
+        if environment_name:
+            qs = qs.filter(app_environment__name=environment_name)
+        return [scheduled_job_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_command_runs(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        limit: int = 100,
+    ) -> list[CommandRunType]:
+        qs = CommandRun.objects.select_related(
+            "registered_app", "workload", "invoked_by"
+        ).order_by("-created_at")
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        return [command_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
