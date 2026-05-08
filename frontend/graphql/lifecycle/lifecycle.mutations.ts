@@ -110,3 +110,45 @@ export const TEAR_DOWN_PREVIEW = gql`
     }
   }
 `;
+
+const ENVIRONMENT_FIELDS = `
+  id
+  name
+  url
+  deploysPaused
+  requiredApprovals
+  registeredAppSlug
+  clusterSlug
+  domainZone
+  createdAt
+`;
+
+export const PAUSE_ENVIRONMENT = gql`
+  mutation PauseEnvironment($input: EnvironmentByIdInput!) {
+    pauseEnvironment(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${ENVIRONMENT_FIELDS}
+      }
+    }
+  }
+`;
+
+export const RESUME_ENVIRONMENT = gql`
+  mutation ResumeEnvironment($input: EnvironmentByIdInput!) {
+    resumeEnvironment(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${ENVIRONMENT_FIELDS}
+      }
+    }
+  }
+`;

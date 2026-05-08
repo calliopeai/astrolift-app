@@ -59,6 +59,12 @@ export type AstroliftAppEnvironment = {
   url: Scalars['String']['output'];
 };
 
+export type AstroliftAppEnvironmentMutationResult = {
+  data?: Maybe<AstroliftAppEnvironment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAppHealthSummary = {
   appName: Scalars['String']['output'];
   appSlug: Scalars['String']['output'];
@@ -817,6 +823,10 @@ export type EntityType =
   | 'PERMISSIONS'
   | 'SITE_LABEL';
 
+export type EnvironmentByIdInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type FileUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
@@ -944,6 +954,7 @@ export type Mutation = {
   organizationMemberStatus: MutationResult;
   /** Force a workflow instance to a specific state (admin override). */
   overrideWorkflowState: MutationResult;
+  pauseEnvironment: AstroliftAppEnvironmentMutationResult;
   /** Add or remove users from a permission group. */
   permissionGroupOperation: MutationResult;
   /** Authenticate a PIN transaction. The proxy_user parameter allows acting on behalf of another user. */
@@ -965,6 +976,7 @@ export type Mutation = {
   redeployApp: AstroliftDeploymentMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
+  resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
@@ -1223,6 +1235,11 @@ export type MutationOverrideWorkflowStateArgs = {
 };
 
 
+export type MutationPauseEnvironmentArgs = {
+  input: EnvironmentByIdInput;
+};
+
+
 export type MutationPermissionGroupOperationArgs = {
   input: GroupOperationInput;
 };
@@ -1293,6 +1310,11 @@ export type MutationRegisterAppArgs = {
 
 export type MutationRegisterTenantClusterArgs = {
   input: RegisterTenantClusterInput;
+};
+
+
+export type MutationResumeEnvironmentArgs = {
+  input: EnvironmentByIdInput;
 };
 
 
