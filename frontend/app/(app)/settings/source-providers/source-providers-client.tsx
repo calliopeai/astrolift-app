@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DOC_LINKS } from "@/lib/docs/urls";
 import {
   DELETE_SSH_DEPLOY_KEY,
   DISCONNECT_SOURCE,
@@ -174,23 +175,33 @@ export function SourceProvidersClient() {
               surface (e.g. private org repos only).
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild size="sm" variant="outline">
-              <a
-                href="https://github.com/calliopeai/astrolift-app/blob/main/docs/operators/scm-github-oauth.md"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <BookOpenIcon className="size-4" />
-                Setup guide
-              </a>
-            </Button>
-            <Can permission="scm.connect">
-              <Button size="sm" onClick={() => setOpenConnect(true)}>
-                <PlusIcon className="size-4" />
-                Connect host
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline">
+                <a
+                  href={DOC_LINKS.scmGithubOauth.primary}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <BookOpenIcon className="size-4" />
+                  Setup guide
+                </a>
               </Button>
-            </Can>
+              <Can permission="scm.connect">
+                <Button size="sm" onClick={() => setOpenConnect(true)}>
+                  <PlusIcon className="size-4" />
+                  Connect host
+                </Button>
+              </Can>
+            </div>
+            <a
+              href={DOC_LINKS.scmGithubOauth.wiki}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground text-[11px] underline"
+            >
+              also on the wiki
+            </a>
           </div>
         </CardHeader>
         <CardContent className="p-0">
