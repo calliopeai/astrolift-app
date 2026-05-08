@@ -29,6 +29,15 @@ def resolve(
     if tenant.actor_user_id is None:
         return False, "no actor"
 
+    # Django superusers bypass the RoleBinding chain. This matches the
+    # convention every Django app inherits from auth.contrib and keeps
+    # the bootstrap admin path simple: a fresh install just needs a
+    # superuser, no role plumbing required for the first operator. The
+    # RoleBinding chain is still the source of truth for every
+    # non-superuser, including JIT'd OIDC users.
+    if _is_superuser(tenant.actor_user_id):
+        return True, "django superuser"
+
     # Lazy import — this resolver is registered before all model apps
     # are guaranteed to be ready in some import paths.
     from astrolift_identity.models import RoleBinding
@@ -82,3 +91,13 @@ def _scope_filter(scopes: list[tuple[str, int]]):
     for kind, ident in scopes:
         q |= Q(scope_kind=kind, scope_id=ident)
     return q
+
+
+def _is_superuser(user_id: int) -> bool:
+    from django.contrib.auth import get_user_model
+
+    return (
+        get_user_model()
+        .objects.filter(pk=user_id, is_superuser=True, is_active=True)
+        .exists()
+    )
