@@ -61,6 +61,28 @@ export interface AstroliftDeploymentLogEntry {
   occurredAt: string;
 }
 
+export interface AstroliftDeploymentMetrics {
+  windowDays: number;
+  total: number;
+  succeeded: number;
+  failed: number;
+  rolledBack: number;
+  inFlight: number;
+  successRate: number; // 0..1, or -1 when total==0
+  meanDurationSeconds: number | null;
+  p95DurationSeconds: number | null;
+}
+
+export interface AstroliftAppHealthSummary {
+  appSlug: string;
+  appName: string;
+  environmentCount: number;
+  latestDeploymentStatus: DeploymentStatus | null;
+  latestImageTag: string;
+  lastDeployedAt: string | null;
+  hasRecentFailure: boolean;
+}
+
 export interface AstroliftPreviewEnvironment {
   id: AstroliftGuid;
   registeredAppSlug: string;

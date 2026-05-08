@@ -117,6 +117,30 @@ def deployment_log_to_type(entry) -> DeploymentLogEntryType:
     )
 
 
+@strawberry.type(name="AstroliftDeploymentMetrics")
+class DeploymentMetricsType:
+    window_days: int
+    total: int
+    succeeded: int
+    failed: int
+    rolled_back: int
+    in_flight: int
+    success_rate: float  # 0.0–1.0; -1 when total==0
+    mean_duration_seconds: float | None
+    p95_duration_seconds: float | None
+
+
+@strawberry.type(name="AstroliftAppHealthSummary")
+class AppHealthSummaryType:
+    app_slug: str
+    app_name: str
+    environment_count: int
+    latest_deployment_status: str | None
+    latest_image_tag: str
+    last_deployed_at: dt.datetime | None
+    has_recent_failure: bool
+
+
 def preview_to_type(p) -> PreviewEnvironmentType:
     return PreviewEnvironmentType(
         id=GUID(str(p.guid)),

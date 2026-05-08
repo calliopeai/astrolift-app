@@ -61,6 +61,36 @@ export const GET_DEPLOYMENT_LOG = gql`
   }
 `;
 
+export const GET_DEPLOYMENT_METRICS = gql`
+  query GetDeploymentMetrics($windowDays: Int = 30) {
+    astroliftDeploymentMetrics(windowDays: $windowDays) {
+      windowDays
+      total
+      succeeded
+      failed
+      rolledBack
+      inFlight
+      successRate
+      meanDurationSeconds
+      p95DurationSeconds
+    }
+  }
+`;
+
+export const LIST_APP_HEALTH_SUMMARY = gql`
+  query ListAppHealthSummary {
+    astroliftAppHealthSummary {
+      appSlug
+      appName
+      environmentCount
+      latestDeploymentStatus
+      latestImageTag
+      lastDeployedAt
+      hasRecentFailure
+    }
+  }
+`;
+
 export const LIST_PREVIEW_ENVIRONMENTS = gql`
   query ListPreviewEnvironments($appSlug: String) {
     astroliftPreviewEnvironments(appSlug: $appSlug) {

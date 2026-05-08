@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import statistics
+from datetime import timedelta
+
 import strawberry
+from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_lifecycle.models import (
@@ -13,7 +17,9 @@ from astrolift_lifecycle.models import (
 )
 from astrolift_lifecycle.schema.types import (
     AppEnvironmentType,
+    AppHealthSummaryType,
     DeploymentLogEntryType,
+    DeploymentMetricsType,
     DeploymentType,
     PreviewEnvironmentType,
     app_env_to_type,
@@ -21,6 +27,7 @@ from astrolift_lifecycle.schema.types import (
     deployment_to_type,
     preview_to_type,
 )
+from astrolift_registry.models import RegisteredApp
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 
@@ -90,3 +97,131 @@ class LifecycleQuery:
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [preview_to_type(p) for p in qs[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_deployment_metrics(
+        self, info: Info, window_days: int = 30
+    ) -> DeploymentMetricsType:
+        """Aggregate rollout health for the last N days.
+
+        Inputs are clamped to [1, 365] so callers can't ask for an
+        unbounded scan. ``mean`` and ``p95`` use durations from
+        terminal-state deployments only — in-flight rows have no
+        duration yet.
+        """
+        window_days = max(1, min(int(window_days), 365))
+        since = timezone.now() - timedelta(days=window_days)
+
+        qs = Deployment.objects.filter(
+            created_at__gte=since, deleted_at__isnull=True
+        )
+
+        in_flight_statuses = {
+            Deployment.Status.PENDING_APPROVAL.value,
+            Deployment.Status.PENDING.value,
+            Deployment.Status.DEPLOYING.value,
+            Deployment.Status.REDEPLOYING.value,
+        }
+        terminal_succeeded = {Deployment.Status.RUNNING.value}
+        terminal_failed = {Deployment.Status.FAILED.value}
+        terminal_rollback = {Deployment.Status.ROLLED_BACK.value}
+
+        # Single pass over the queryset; we need both counts and
+        # duration samples so a values_list is the right shape.
+        rows = list(qs.values_list("status", "duration_seconds"))
+        total = len(rows)
+        succeeded = sum(1 for s, _ in rows if s in terminal_succeeded)
+        failed = sum(1 for s, _ in rows if s in terminal_failed)
+        rolled_back = sum(1 for s, _ in rows if s in terminal_rollback)
+        in_flight = sum(1 for s, _ in rows if s in in_flight_statuses)
+
+        durations = [d for s, d in rows if d is not None and d >= 0]
+        mean_duration = (
+            sum(durations) / len(durations) if durations else None
+        )
+        p95_duration: float | None = None
+        if len(durations) >= 5:
+            ordered = sorted(durations)
+            idx = max(0, int(round(0.95 * (len(ordered) - 1))))
+            p95_duration = float(ordered[idx])
+        elif durations:
+            # Small sample: fall back to the slowest observed value.
+            p95_duration = float(max(durations))
+
+        if total == 0:
+            success_rate = -1.0
+        else:
+            success_rate = succeeded / total
+
+        return DeploymentMetricsType(
+            window_days=window_days,
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            rolled_back=rolled_back,
+            in_flight=in_flight,
+            success_rate=success_rate,
+            mean_duration_seconds=mean_duration,
+            p95_duration_seconds=p95_duration,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_health_summary(
+        self, info: Info
+    ) -> list[AppHealthSummaryType]:
+        """Per-app health rollup for the metrics dashboard.
+
+        For every registered app in the org, returns the latest
+        deployment's status + image tag, the env count, and a
+        recent-failure flag (any non-running terminal deploy in the
+        last 7 days). Apps with no deployments still appear, marked
+        ``latest_deployment_status=None``.
+        """
+        recent_window = timezone.now() - timedelta(days=7)
+        out: list[AppHealthSummaryType] = []
+        apps = (
+            RegisteredApp.objects.filter(deleted_at__isnull=True)
+            .order_by("slug")
+        )
+        for app in apps[:300]:
+            env_count = AppEnvironment.objects.filter(
+                registered_app=app, deleted_at__isnull=True
+            ).count()
+            latest = (
+                Deployment.objects.filter(
+                    registered_app=app, deleted_at__isnull=True
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            has_recent_failure = Deployment.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+                created_at__gte=recent_window,
+                status__in=[
+                    Deployment.Status.FAILED.value,
+                    Deployment.Status.ROLLED_BACK.value,
+                ],
+            ).exists()
+            out.append(
+                AppHealthSummaryType(
+                    app_slug=app.slug,
+                    app_name=app.name,
+                    environment_count=env_count,
+                    latest_deployment_status=(
+                        latest.status if latest else None
+                    ),
+                    latest_image_tag=(
+                        latest.image_tag if latest else ""
+                    ),
+                    last_deployed_at=(
+                        latest.created_at if latest else None
+                    ),
+                    has_recent_failure=has_recent_failure,
+                )
+            )
+        return out
