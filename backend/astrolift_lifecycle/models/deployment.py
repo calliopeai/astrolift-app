@@ -168,3 +168,40 @@ class Deployment(BaseCoreModel):
                 "version",
             ]
         )
+
+        # Publish the lifecycle event to any active subscribers.
+        # In-process for now; multi-worker deployments swap the
+        # broker for Redis without touching this call site.
+        # Wrapped so a broker error never breaks a transition.
+        try:
+            from core.pubsub import publish_sync
+
+            event = {
+                "deployment_id": str(self.guid),
+                "registered_app_slug": (
+                    self.registered_app.slug if self.registered_app_id else ""
+                ),
+                "environment_name": (
+                    self.app_environment.name if self.app_environment_id else ""
+                ),
+                "status": self.status,
+                "occurred_at": now.isoformat(),
+            }
+            org_id = (
+                self.registered_app.organization_id
+                if self.registered_app_id
+                else None
+            )
+            if org_id is not None:
+                publish_sync(f"deployment.lifecycle.{org_id}", event)
+            if self.registered_app_id:
+                publish_sync(
+                    f"deployment.lifecycle.app.{self.registered_app.guid}",
+                    event,
+                )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "deployment.lifecycle publish failed", exc_info=True
+            )
