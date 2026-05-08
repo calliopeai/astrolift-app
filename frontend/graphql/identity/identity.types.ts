@@ -1,121 +1,37 @@
-// Types matching the AstroliftOrganization / AstroliftTeam /
-// AstroliftProject Strawberry types in
-// astrolift-api/astrolift_identity/schema/types.py.
-//
-// Hand-written until codegen lands; if the API schema drifts these
-// types must drift with it. Run `make schema` in astrolift-api to
-// regenerate the SDL when adding fields.
+/**
+ * Identity types — facade over the codegen output.
+ *
+ * Entity shapes flow from `__generated__/schema.ts`. Narrow string
+ * unions (ScopeKind, IdpKind, PolicyEffect) live here as frontend
+ * switch-exhaustiveness aids; the schema carries them as plain
+ * `String!`. Nested-object fields (`team.organization`, etc.) are
+ * narrowed via `Pick<…, "id" | "slug" | "name">` because
+ * operation-typing isn't wired in this codegen run — at the schema
+ * level every type has all fields, but our queries only fetch a
+ * subset. Phase 2 will move these narrows to per-operation types.
+ */
+
+import type {
+  AstroliftApiToken as GeneratedApiToken,
+  AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
+  AstroliftIdentityProvider as GeneratedIdentityProvider,
+  AstroliftMember as GeneratedMember,
+  AstroliftMyProfile as GeneratedMyProfile,
+  AstroliftOrganization as GeneratedOrganization,
+  AstroliftPolicy as GeneratedPolicy,
+  AstroliftProject as GeneratedProject,
+  AstroliftRole as GeneratedRole,
+  AstroliftRoleBinding as GeneratedRoleBinding,
+  AstroliftTeam as GeneratedTeam,
+  AstroliftUser as GeneratedUser,
+  MutationError as GeneratedMutationError,
+} from "@/graphql/__generated__/schema";
 
 export type AstroliftGuid = string;
 
-export interface AstroliftOrganization {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  website: string;
-  scimEnabled: boolean;
-  auditLogRetentionDays: number;
-  previewMaxActiveDefault: number;
-  logRetentionDaysDefault: number;
-  allowUserProfileEdit: boolean;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-export interface AstroliftMyProfile {
-  userId: number;
-  username: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  lockedFields: string[];
-  orgAllowsEdit: boolean;
-}
-
-export interface AstroliftTeam {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-export interface AstroliftProject {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
-  team: Pick<AstroliftTeam, "id" | "slug" | "name">;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-export interface AstroliftUser {
-  id: string;
-  username: string;
-  email: string;
-  isActive: boolean;
-}
-
 export type ScopeKind = "ORG" | "TEAM" | "PROJECT" | "APP";
 
-export interface AstroliftRole {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  description: string;
-  scopeLevel: ScopeKind;
-  permissions: string[];
-  isSystem: boolean;
-}
-
-export interface AstroliftMember {
-  id: AstroliftGuid;
-  user: AstroliftUser;
-  scopeKind: ScopeKind;
-  scopeId: string;
-  isActive: boolean;
-  lifecycle: string;
-  joinedAt: string | null;
-  lastSeenAt: string | null;
-  createdAt: string;
-  deletedAt: string | null;
-}
-
-export interface AstroliftRoleBinding {
-  id: AstroliftGuid;
-  user: AstroliftUser | null;
-  groupExternalId: string;
-  role: AstroliftRole;
-  scopeKind: ScopeKind;
-  scopeId: string;
-  grantedAt: string;
-  expiresAt: string | null;
-  inherits: boolean;
-}
-
 export type PolicyEffect = "ALLOW" | "DENY";
-
-export interface AstroliftPolicy {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  description: string;
-  scopeLevel: ScopeKind;
-  scopeId: string | null;
-  effect: PolicyEffect;
-  actionPattern: string;
-  resourcePattern: Record<string, unknown>;
-  conditions: unknown[];
-  actorPattern: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
 
 export type IdpKind =
   | "oidc"
@@ -128,44 +44,56 @@ export type IdpKind =
   | "github"
   | "local";
 
-export interface AstroliftIdentityProvider {
-  id: AstroliftGuid;
-  organizationSlug: string;
+export type AstroliftOrganization = GeneratedOrganization;
+
+export type AstroliftMyProfile = GeneratedMyProfile;
+
+export type AstroliftTeam = Omit<GeneratedTeam, "organization"> & {
+  organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
+};
+
+export type AstroliftProject = Omit<
+  GeneratedProject,
+  "organization" | "team"
+> & {
+  organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
+  team: Pick<AstroliftTeam, "id" | "slug" | "name">;
+};
+
+export type AstroliftUser = GeneratedUser;
+
+export type AstroliftRole = Omit<GeneratedRole, "scopeLevel"> & {
+  scopeLevel: ScopeKind;
+};
+
+export type AstroliftMember = Omit<GeneratedMember, "scopeKind"> & {
+  scopeKind: ScopeKind;
+};
+
+export type AstroliftRoleBinding = Omit<GeneratedRoleBinding, "scopeKind"> & {
+  scopeKind: ScopeKind;
+};
+
+export type AstroliftPolicy = Omit<
+  GeneratedPolicy,
+  "scopeLevel" | "effect"
+> & {
+  scopeLevel: ScopeKind;
+  effect: PolicyEffect;
+};
+
+export type AstroliftIdentityProvider = Omit<
+  GeneratedIdentityProvider,
+  "kind"
+> & {
   kind: IdpKind;
-  name: string;
-  config: Record<string, unknown>;
-  metadataUrl: string;
-  oidcDiscoveryUrl: string;
-  clientId: string;
-  isDefault: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+};
 
-export interface AstroliftApiToken {
-  id: AstroliftGuid;
-  name: string;
-  user: AstroliftUser;
-  teamSlug: string | null;
-  tokenLast4: string;
-  scopes: string[];
-  expiresAt: string | null;
-  lastUsedAt: string | null;
-  isRevoked: boolean;
-  createdAt: string;
-}
+export type AstroliftApiToken = GeneratedApiToken;
 
-export interface AstroliftApiTokenPlaintext {
-  apiToken: AstroliftApiToken;
-  plaintext: string;
-}
+export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
 
-export interface MutationError {
-  code: string;
-  message: string;
-  field: string | null;
-}
+export type MutationError = GeneratedMutationError;
 
 export interface MutationResult<T> {
   ok: boolean;
