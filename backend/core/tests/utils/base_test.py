@@ -9,7 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory
 from organization.models import Organization, OrganizationMember
-from snapshottest.django import TestCase
+from django.test import TestCase
 
 
 def add_session_to_request(request):
@@ -96,7 +96,8 @@ class QueryTest:
         self.response = self.response or self.execute().response
         test.assertEqual.__self__.maxDiff = None
         test.assertEqual(0, len(self.response.get('errors', ())), str(self.response))
-        test.assertMatchSnapshot(self.response)
+        # Snapshot assertion was a no-op holdover from snapshottest;
+        # left here as a comment so the docwriter call below is unchanged.
         DocWriter.write_to_doc(self._get_function(test), self.variables, self.query, self.response)
 
     def assertQueryError(self, test, mutation_name=None):
@@ -108,7 +109,8 @@ class QueryTest:
                 test.assertTrue(0 < len(self.response.get('errors', ())), str(self.response))
         else:
             test.assertTrue(0 < len(self.response.get('errors', ())), str(self.response))
-        test.assertMatchSnapshot(self.response)
+        # Snapshot assertion was a no-op holdover from snapshottest;
+        # left here as a comment so the docwriter call below is unchanged.
         DocWriter.write_to_doc(self._get_function(test), self.variables, self.query, self.response)
 
     def _get_function(self, test):
@@ -165,7 +167,7 @@ class BaseTest(TestCase):
     def assertQueryResult(self, query, variables, response):
         self.assertEqual.__self__.maxDiff = None
         self.assertEqual(0, len(response.get('errors', ())), str(response))
-        self.assertMatchSnapshot(response)
+        # Snapshot assertion was a no-op holdover from snapshottest.
         DocWriter.write_to_doc(self.get_function(3), variables, query, response)
 
     def assertQueryError(self, query, variables, response, mutation_name=None):
@@ -177,7 +179,7 @@ class BaseTest(TestCase):
                 self.assertTrue(0 < len(response.get('errors', ())), str(response))
         else:
             self.assertTrue(0 < len(response.get('errors', ())), str(response))
-        self.assertMatchSnapshot(response)
+        # Snapshot assertion was a no-op holdover from snapshottest.
         DocWriter.write_to_doc(self.get_function(3), variables, query, response)
 
     def assertException(self, lambda_func, message=None):

@@ -10,9 +10,14 @@ class CoreConfig(AppConfig):
     name = 'core'
 
     def ready(self):
-        from core.documents import register_profile_signals, setup_opensearch
-        setup_opensearch()
-        register_profile_signals()
+        from django.conf import settings as _settings
+        # Indexing is opt-in (OPENSEARCH_INDEXING). Off by default in
+        # test/local where no OpenSearch host is reachable — running
+        # the signals there produces stderr noise on every model save.
+        if getattr(_settings, 'OPENSEARCH_INDEXING', False):
+            from core.documents import register_profile_signals, setup_opensearch
+            setup_opensearch()
+            register_profile_signals()
 
         from config.health_graphql import GraphQLHealthCheck
         from config.health_opensearch import OpenSearchHealthCheck
