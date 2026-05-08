@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "b399b2434fba6aa2877c8cedc4d8fbe0d97d2551a2f49b8d4e572978ff47398f"
+            "sha256": "416e286f53433ff3bc44a97a4641ca46dae34774c26dc1bff4493bd561bbf5f8"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -903,11 +903,11 @@
         },
         "google-auth": {
             "hashes": [
-                "sha256:230bd016f50d4c0b82fda2f50db5d372bc02cfd9bdab4ce5a9ce0d8c0f06bba5",
-                "sha256:a8191008d6aaace30f0823daa3f0073c734f8b4da8b8de074b5151aa9aa732c5"
+                "sha256:01f30e1a9e3638698d89464f5e603ce29d18e1c0e63ec31ac570aba4e164aaf5",
+                "sha256:aee92803ba0ff93a70a3b8a35c7b4797837751cd6380b63ff38372b98f3ed627"
             ],
             "markers": "python_version >= '3.10'",
-            "version": "==2.51.0"
+            "version": "==2.52.0"
         },
         "google-cloud-core": {
             "hashes": [
@@ -2212,12 +2212,12 @@
         },
         "twilio": {
             "hashes": [
-                "sha256:ac6147af1b2fcd9de12fa5b060de48f922cd12d7cd22aeb00e92cfd5c883e8ae",
-                "sha256:c847ff5cd2fdd2abc6285d5a72cacbed615411232769d1176484dd05284333c9"
+                "sha256:1c50bfb394b5dbc044bacab24b2e3b550bee0c08da51c4a1fa4816293303e66c",
+                "sha256:eb74fc026c85a89372836414f57e262119efaa160b9419cf4d05b59056b8e89d"
             ],
             "index": "pypi",
             "markers": "python_full_version >= '3.7.0'",
-            "version": "==9.10.7"
+            "version": "==9.10.9"
         },
         "types-protobuf": {
             "hashes": [
@@ -2237,11 +2237,11 @@
         },
         "urllib3": {
             "hashes": [
-                "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed",
-                "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"
+                "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c",
+                "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"
             ],
-            "markers": "python_version >= '3.9'",
-            "version": "==2.6.3"
+            "markers": "python_version >= '3.10'",
+            "version": "==2.7.0"
         },
         "wrapt": {
             "hashes": [
@@ -2619,6 +2619,15 @@
             "index": "pypi",
             "markers": "python_version >= '3.10'",
             "version": "==9.0.3"
+        },
+        "pytest-django": {
+            "hashes": [
+                "sha256:3ff300c49f8350ba2953b90297d23bf5f589db69545f56f1ec5f8cff5da83e85",
+                "sha256:df94ec819a83c8979c8f6de13d9cdfbe76e8c21d39473cfe2b40c9fc9be3c758"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.10'",
+            "version": "==4.12.0"
         },
         "python-discovery": {
             "hashes": [

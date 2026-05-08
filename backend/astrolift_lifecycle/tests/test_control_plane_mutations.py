@@ -1,0 +1,405 @@
+"""
+GraphQL deployment control plane mutations.
+
+These tests exercise ``LifecycleMutation`` resolver methods directly
+(bypassing the Strawberry runtime). The control-plane logic is what
+matters here: state-machine transitions, single-flight workflow ids,
+approval gates, and the WorkflowRun mirror row. The Temporal facade
+is replaced by ``temporal_recorder`` so we can assert *what* would
+have been enqueued without spinning up a server.
+
+What we don't test here:
+- The Strawberry execution path (covered separately by integration
+  tests that hit /graphql).
+- Real Temporal worker behavior (covered by the Temporal time-skipping
+  test env in workflow tests).
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from astrolift_lifecycle.models import Deployment
+from astrolift_lifecycle.schema.mutations import (
+    DeploymentByIdInput,
+    LifecycleMutation,
+    StartDeploymentInput,
+)
+from astrolift_operations.models import WorkflowRun
+from core.permissions import Permission
+from core.tenancy import TenantContext, tenant_context
+
+pytestmark = pytest.mark.django_db
+
+
+def _grant_all(resolver, org_id):
+    for p in [
+        Permission.APP_DEPLOY,
+        Permission.APP_APPROVE_DEPLOY,
+        Permission.APP_ROLLBACK,
+    ]:
+        resolver.grant(p)
+
+
+def _tenant_for(org, actor):
+    return tenant_context(
+        TenantContext(organization_id=org.id, actor_user_id=actor.id)
+    )
+
+
+# ---------------------------------------------------------------------------
+# start_deployment
+# ---------------------------------------------------------------------------
+
+
+def test_start_deployment_creates_pending_and_enqueues(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+                trigger_kind="manual",
+            ),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == Deployment.Status.PENDING.value
+
+    deploy = Deployment.objects.get(guid=str(result.data.id))
+    assert deploy.image_tag == "v1.0.0"
+    assert deploy.workflow_run_id is not None
+
+    # Single-flight id shape per spec
+    (name, args, workflow_id) = temporal_recorder.starts[0]
+    assert name == "DeployAppWorkflow"
+    assert workflow_id == f"DeployAppWorkflow-{app.guid}-{env.guid}"
+
+
+def test_start_deployment_pending_approval_when_required(
+    org,
+    app,
+    env_requires_approval,
+    actor,
+    fake_info,
+    permission_resolver,
+    temporal_recorder,
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env_requires_approval.name,
+                image_tag="v1.0.0",
+            ),
+        )
+
+    assert result.ok
+    assert result.data.status == Deployment.Status.PENDING_APPROVAL.value
+    # Workflow should NOT be enqueued until approved.
+    assert temporal_recorder.starts == []
+
+
+def test_start_deployment_refuses_when_paused(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    env.deploys_paused = True
+    env.save(update_fields=["deploys_paused"])
+
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+
+
+def test_start_deployment_unknown_trigger_kind(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+                trigger_kind="bogus",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "triggerKind"
+
+
+def test_start_deployment_unknown_app(
+    org, env, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        result = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug="does-not-exist",
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# approve_deployment
+# ---------------------------------------------------------------------------
+
+
+def test_approve_deployment_starts_workflow_when_quorum_met(
+    org,
+    app,
+    env_requires_approval,
+    actor,
+    other_actor,
+    fake_info,
+    fake_info_other,
+    permission_resolver,
+    temporal_recorder,
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    # Original deployer creates a pending_approval deployment.
+    with _tenant_for(org, actor):
+        start = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env_requires_approval.name,
+                image_tag="v1.0.0",
+            ),
+        )
+    assert start.ok
+    assert temporal_recorder.starts == []  # not enqueued yet
+
+    # A different actor approves.
+    with _tenant_for(org, other_actor):
+        approve = mut.approve_deployment(
+            fake_info_other, input=DeploymentByIdInput(id=start.data.id)
+        )
+    assert approve.ok, approve.errors
+    assert approve.data.status == Deployment.Status.PENDING.value
+
+    # Workflow now enqueued exactly once.
+    assert len(temporal_recorder.starts) == 1
+
+
+def test_approve_deployment_refuses_self_approval(
+    org,
+    app,
+    env_requires_approval,
+    actor,
+    fake_info,
+    permission_resolver,
+    no_temporal,
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+    with _tenant_for(org, actor):
+        start = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env_requires_approval.name,
+                image_tag="v1.0.0",
+            ),
+        )
+        approve = mut.approve_deployment(
+            fake_info, input=DeploymentByIdInput(id=start.data.id)
+        )
+
+    assert not approve.ok
+    assert approve.errors[0].code == "PRECONDITION"
+
+
+# ---------------------------------------------------------------------------
+# abort_deployment
+# ---------------------------------------------------------------------------
+
+
+def test_abort_signals_workflow_and_marks_failed(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        start = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+        abort = mut.abort_deployment(
+            fake_info, input=DeploymentByIdInput(id=start.data.id)
+        )
+
+    assert abort.ok, abort.errors
+    assert abort.data.status == Deployment.Status.FAILED.value
+
+    # Should have signalled the in-flight workflow with 'abort'.
+    assert any(s[1] == "abort" for s in temporal_recorder.signals)
+
+
+def test_abort_refuses_when_not_in_flight(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    deploy = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.RUNNING.value,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        abort = mut.abort_deployment(
+            fake_info, input=DeploymentByIdInput(id=deploy.guid)
+        )
+
+    assert not abort.ok
+    assert abort.errors[0].code == "PRECONDITION"
+
+
+# ---------------------------------------------------------------------------
+# rollback_deployment
+# ---------------------------------------------------------------------------
+
+
+def test_rollback_creates_new_deploy_from_prior_revision(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    # Prior superseded deploy: this is what we should roll back to.
+    prior = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.SUPERSEDED.value,
+        image_tag="v0.9.0",
+        config_snapshot={"replicas": 3},
+    )
+    running = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.RUNNING.value,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        result = mut.rollback_deployment(
+            fake_info, input=DeploymentByIdInput(id=running.guid)
+        )
+
+    assert result.ok, result.errors
+    assert result.data.image_tag == "v0.9.0"
+    assert result.data.trigger_kind == "rollback"
+
+    running.refresh_from_db()
+    assert running.status == Deployment.Status.ROLLED_BACK.value
+
+    # RollbackDeploymentWorkflow id includes the new deploy's guid.
+    assert any(
+        s[0] == "RollbackDeploymentWorkflow" for s in temporal_recorder.starts
+    )
+
+
+def test_rollback_refuses_without_prior(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    running = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.RUNNING.value,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        result = mut.rollback_deployment(
+            fake_info, input=DeploymentByIdInput(id=running.guid)
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+
+
+# ---------------------------------------------------------------------------
+# redeploy_app
+# ---------------------------------------------------------------------------
+
+
+def test_redeploy_clones_image_and_starts_workflow(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    source = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.RUNNING.value,
+        image_tag="v1.0.0",
+        image_digest="sha256:abc",
+        config_snapshot={"replicas": 2},
+    )
+
+    with _tenant_for(org, actor):
+        result = mut.redeploy_app(
+            fake_info, input=DeploymentByIdInput(id=source.guid)
+        )
+
+    assert result.ok, result.errors
+    assert result.data.image_tag == "v1.0.0"
+    assert result.data.image_digest == "sha256:abc"
+    assert result.data.status == Deployment.Status.PENDING.value
+    assert WorkflowRun.objects.filter(
+        workflow_kind="DeployAppWorkflow"
+    ).exists()

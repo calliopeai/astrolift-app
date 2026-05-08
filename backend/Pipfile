@@ -59,6 +59,7 @@ jsonpath-ng = "*"
 pre-commit = "*"
 snapshottest = "*"
 pytest = "*"
+pytest-django = "*"
 
 
 [requires]
