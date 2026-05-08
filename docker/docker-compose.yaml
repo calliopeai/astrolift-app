@@ -213,6 +213,11 @@ services:
       # Docker the UI must reach the API by service name, not "localhost".
       - NEXT_PUBLIC_API_ROOT=
       - NEXT_PUBLIC_API_ORIGIN=http://astrolift-local:8000
+      # Browser-resolvable backend for WebSocket subscriptions.
+      # Next.js rewrites only proxy HTTP, so subscriptions must
+      # reach the backend directly — and the browser cannot resolve
+      # the docker-internal "astrolift-local" hostname.
+      - NEXT_PUBLIC_WS_ORIGIN=ws://localhost:${ASTROLIFT_DJANGO_PORT:-8000}
       - NEXT_PUBLIC_DEV_LOGIN=1
     depends_on:
       - astrolift-local
