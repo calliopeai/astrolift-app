@@ -31,6 +31,7 @@ import { DOC_LINKS } from "@/lib/docs/urls";
 import {
   DELETE_SSH_DEPLOY_KEY,
   DISCONNECT_SOURCE,
+  ROTATE_WEBHOOK_SECRET,
 } from "@/graphql/scm/scm.mutations";
 import {
   LIST_SOURCE_CONNECTIONS,
@@ -39,6 +40,7 @@ import {
 import type {
   AstroliftSourceConnection,
   AstroliftSshDeployKey,
+  AstroliftWebhookSecretReveal,
   MutationResult,
 } from "@/graphql/scm/scm.types";
 
@@ -121,6 +123,35 @@ export function SourceProvidersClient() {
     ],
     awaitRefetchQueries: true,
   });
+
+  const [revealedSecret, setRevealedSecret] =
+    React.useState<AstroliftWebhookSecretReveal | null>(null);
+
+  const [rotateSecret, rotateSecretState] = useMutation<{
+    rotateWebhookSecret: MutationResult<AstroliftWebhookSecretReveal>;
+  }>(ROTATE_WEBHOOK_SECRET, {
+    refetchQueries: [{ query: LIST_SOURCE_CONNECTIONS }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleRotateSecret(c: AstroliftSourceConnection) {
+    if (
+      !confirm(
+        `Generate a fresh webhook secret for ${c.name}? Any existing webhook signed with the old secret will start failing immediately — paste the new secret into the SCM host's webhook config.`,
+      )
+    )
+      return;
+    const { data } = await rotateSecret({
+      variables: { input: { connectionId: c.id } },
+    });
+    if (data?.rotateWebhookSecret.ok && data.rotateWebhookSecret.data) {
+      setRevealedSecret(data.rotateWebhookSecret.data);
+    } else {
+      toast.error(
+        data?.rotateWebhookSecret.errors?.[0]?.message ?? "Rotation failed",
+      );
+    }
+  }
 
   const connectionList = conns.data?.astroliftSourceConnections ?? [];
   const keyList = keys.data?.astroliftSshDeployKeys ?? [];
@@ -312,6 +343,20 @@ export function SourceProvidersClient() {
                             </a>
                           </Button>
                         )}
+                        {!c.isPersonal &&
+                          (c.kind.startsWith("github_") ||
+                            c.kind.startsWith("gitlab_")) && (
+                            <Can permission="scm.connect">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleRotateSecret(c)}
+                                disabled={rotateSecretState.loading}
+                              >
+                                Webhook secret
+                              </Button>
+                            </Can>
+                          )}
                         <Can permission="scm.disconnect">
                           <Button
                             size="sm"
@@ -424,9 +469,95 @@ export function SourceProvidersClient() {
         open={openGenerateKey}
         onOpenChange={setOpenGenerateKey}
       />
+      {revealedSecret && (
+        <WebhookSecretReveal
+          reveal={revealedSecret}
+          onClose={() => setRevealedSecret(null)}
+        />
+      )}
     </PageShell>
   );
 }
+
+function WebhookSecretReveal({
+  reveal,
+  onClose,
+}: {
+  reveal: AstroliftWebhookSecretReveal;
+  onClose: () => void;
+}) {
+  const fullUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${reveal.webhookUrlPath}`
+      : reveal.webhookUrlPath;
+  async function copy(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Couldn't copy — select the text and copy manually");
+    }
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
+      <div className="bg-background w-full max-w-xl rounded-lg border p-6 shadow-lg">
+        <h2 className="text-lg font-semibold">Webhook secret generated</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Paste these into the SCM host&apos;s webhook config{" "}
+          <span className="font-medium">now</span> — the plaintext secret
+          is shown exactly once, then encrypted at rest.
+        </p>
+        <div className="mt-4 space-y-3">
+          <div>
+            <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+              Webhook URL
+            </span>
+            <div className="mt-1 flex items-center gap-2">
+              <code className="bg-muted flex-1 rounded px-2 py-1 font-mono text-[11px] break-all">
+                {fullUrl}
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copy(fullUrl, "URL")}
+              >
+                copy
+              </Button>
+            </div>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+              Secret
+            </span>
+            <div className="mt-1 flex items-center gap-2">
+              <code className="bg-muted flex-1 rounded px-2 py-1 font-mono text-[11px] break-all">
+                {reveal.plaintextSecret}
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copy(reveal.plaintextSecret, "Secret")}
+              >
+                copy
+              </Button>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            GitHub: <code>Settings → Webhooks → Add webhook</code>. Set
+            <code> Content type: application/json</code>, paste the URL +
+            secret, choose <code>Just the push event</code>. GitLab:{" "}
+            <code>Settings → Webhooks</code>, paste both, tick{" "}
+            <code>Push events</code>.
+          </p>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <Button onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function PublicKeyCell({ value }: { value: string }) {
   const [copied, setCopied] = React.useState(false);

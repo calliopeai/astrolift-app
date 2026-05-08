@@ -128,6 +128,17 @@ class SourceConnection(BaseCoreModel):
     token_expires_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
 
+    # Per-connection webhook secret. Generated on demand; the operator
+    # copies the plaintext into the SCM host's webhook config exactly
+    # once (we show it once and store the ciphertext). The receiver
+    # HMAC-verifies inbound push payloads against this value before
+    # firing DeployAppWorkflow.
+    webhook_secret_backend_kind = models.CharField(
+        max_length=32, blank=True, default=""
+    )
+    webhook_secret_ciphertext = models.BinaryField(blank=True, default=b"")
+    webhook_last_received_at = models.DateTimeField(null=True, blank=True)
+
     is_active = models.BooleanField(default=True)
 
     class Meta:
