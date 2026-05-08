@@ -45,9 +45,11 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from django.db import IntegrityError, transaction
+
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import RegisteredApp
-from astrolift_scm.models import SourceConnection
+from astrolift_scm.models import SourceConnection, WebhookDelivery
 from astrolift_workflows.client import start_workflow
 from astrolift_workflows.inputs import Actor, DeployAppInput
 from core.secrets import EncryptedSecret, decrypt
@@ -218,6 +220,39 @@ def _handle(
 
     full_name, branch, head_sha = parsed
 
+    # Replay protection: every host gives us a delivery identifier
+    # we treat as opaque. Insert under a unique constraint scoped to
+    # (connection, delivery_id); a duplicate INSERT raises IntegrityError
+    # and the receiver bails with 202 + ignored="duplicate" without
+    # firing a second deploy. Records older than 30 days get pruned by
+    # the cron task — see WebhookDelivery docstring.
+    delivery_id = (
+        request.headers.get("X-GitHub-Delivery")
+        or request.headers.get("X-Gitlab-Event-UUID")
+        or ""
+    )
+    delivery_row: WebhookDelivery | None = None
+    if delivery_id:
+        try:
+            with transaction.atomic():
+                delivery_row = WebhookDelivery.objects.create(
+                    connection=conn,
+                    delivery_id=delivery_id,
+                    host_event=request.headers.get(
+                        "X-GitHub-Event"
+                    ) or request.headers.get(
+                        "X-Gitlab-Event"
+                    ) or "",
+                    repo_full_name=full_name,
+                    branch=branch,
+                    head_sha=head_sha,
+                )
+        except IntegrityError:
+            return JsonResponse(
+                {"ok": True, "ignored": "duplicate", "delivery_id": delivery_id},
+                status=202,
+            )
+
     # Touch the connection so the UI can show 'last received'.
     conn.webhook_last_received_at = timezone.now()
     conn.save(update_fields=["webhook_last_received_at"])
@@ -239,12 +274,23 @@ def _handle(
         )
 
     fired = []
+    last_deploy: Deployment | None = None
     for app in apps:
         deploy = _fire_deploy(app, branch, head_sha)
         if deploy is not None:
             fired.append(
                 {"app": app.slug, "deployment": str(deploy.guid)}
             )
+            last_deploy = deploy
+
+    # Stamp the delivery row with the last-fired deployment so the
+    # UI can backtrack from a webhook to whatever it triggered.
+    # If multiple apps shared the repo, this stamp follows the last
+    # one — good enough for breadcrumbs; full fan-out lives in
+    # AuditEvent.
+    if delivery_row is not None and last_deploy is not None:
+        delivery_row.triggered_deployment = last_deploy
+        delivery_row.save(update_fields=["triggered_deployment"])
 
     return JsonResponse(
         {"ok": True, "fired": fired, "repo": full_name, "branch": branch},

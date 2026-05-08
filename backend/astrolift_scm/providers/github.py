@@ -67,10 +67,17 @@ def _token(connection) -> str:
         )
         return plaintext.decode("utf-8")
     if connection.kind == "github_app_install":
-        raise GithubProviderError(
-            "UNSUPPORTED_AUTH",
-            "github_app_install token minting lands in phase 2b",
+        from astrolift_scm.providers.github_app import (
+            GithubAppError,
+            installation_token,
         )
+
+        try:
+            return installation_token(connection)
+        except GithubAppError as exc:
+            raise GithubProviderError(
+                exc.code, exc.message, recoverable=exc.recoverable
+            ) from exc
     if connection.kind == "github_oauth_app":
         raise GithubProviderError(
             "OAUTH_NOT_CONNECTED",
