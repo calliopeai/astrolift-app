@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Can } from "@/components/Can";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,10 +69,12 @@ export function TeamsClient() {
       title="Teams"
       description="Permission boundaries for groups of humans. Each team owns its own projects, API tokens, and ABAC policies."
       actions={
-        <Button onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" />
-          New team
-        </Button>
+        <Can permission="team.create">
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            New team
+          </Button>
+        </Can>
       }
     >
       <Card>
@@ -115,15 +118,17 @@ export function TeamsClient() {
                       })}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(team)}
-                        disabled={deleting}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
+                      <Can permission="team.delete">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(team)}
+                          disabled={deleting}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </Can>
                     </TableCell>
                   </TableRow>
                 ))}

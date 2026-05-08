@@ -140,6 +140,67 @@ class IdentityQuery:
 
     @strawberry.field
     @tenant_scoped()
+    def astrolift_my_permissions(self, info: Info) -> list[str]:
+        """Effective Astrolift permission slugs for the current viewer.
+
+        This is the read-side mirror of the resolver chain used by
+        ``@require_permission`` decorators. The UI calls this once on
+        layout mount to know which nav items to show, which destructive
+        actions to render, and which pages to fail-closed before even
+        firing the page query.
+
+        Intentionally not gated by ``@require_permission`` — every
+        signed-in user is allowed to know what *they* can do. We do
+        require a valid tenant context (organization scoped via
+        ``@tenant_scoped``), so anonymous callers get an empty list
+        instead of leaking the slug catalog.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+
+        # Walk the user's RoleBindings in the current org and union
+        # the permission slugs each role grants. Mirrors the logic in
+        # astrolift_identity.permission_resolver.resolve(), but returns
+        # the full set instead of checking a single permission.
+        from django.utils import timezone
+
+        now = timezone.now()
+        candidate_scopes: list[tuple[str, int]] = []
+        if tenant.project_id is not None:
+            candidate_scopes.append(("PROJECT", tenant.project_id))
+        if tenant.team_id is not None:
+            candidate_scopes.append(("TEAM", tenant.team_id))
+        if tenant.organization_id is not None:
+            candidate_scopes.append(("ORG", tenant.organization_id))
+        if not candidate_scopes:
+            return []
+
+        scope_kinds = {k for k, _ in candidate_scopes}
+        scope_ids_by_kind: dict[str, set[int]] = {}
+        for k, sid in candidate_scopes:
+            scope_ids_by_kind.setdefault(k, set()).add(sid)
+
+        bindings = (
+            RoleBinding.objects.select_related("role")
+            .filter(user_id=tenant.actor_user_id, scope_kind__in=scope_kinds)
+        )
+        effective: set[str] = set()
+        for binding in bindings:
+            if binding.expires_at is not None and binding.expires_at <= now:
+                continue
+            ids = scope_ids_by_kind.get(binding.scope_kind, set())
+            if binding.scope_id not in ids:
+                continue
+            for slug in binding.role.permissions or ():
+                effective.add(slug)
+
+        return sorted(effective)
+
+    @strawberry.field
+    @tenant_scoped()
     def astrolift_active_identity_provider(
         self, info: Info
     ) -> IdentityProviderType | None:

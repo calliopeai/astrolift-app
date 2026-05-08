@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Can } from "@/components/Can";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,10 +72,12 @@ export function ProjectsClient() {
       title="Projects"
       description="Logical groupings of apps that share a deploy cadence, a domain, or a stack. The unit of cost reporting."
       actions={
-        <Button onClick={() => setOpen(true)} disabled={teams.loading}>
-          <PlusIcon className="size-4" />
-          New project
-        </Button>
+        <Can permission="project.create">
+          <Button onClick={() => setOpen(true)} disabled={teams.loading}>
+            <PlusIcon className="size-4" />
+            New project
+          </Button>
+        </Can>
       }
     >
       <Card>
@@ -131,15 +134,17 @@ export function ProjectsClient() {
                       })}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(p)}
-                        disabled={deleting}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
+                      <Can permission="project.delete">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(p)}
+                          disabled={deleting}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </Can>
                     </TableCell>
                   </TableRow>
                 ))}

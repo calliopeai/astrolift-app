@@ -10,6 +10,7 @@ import {
 import * as React from "react";
 import { toast } from "sonner";
 
+import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ import type {
   AstroliftIdentityProvider,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { CreateIdentityProviderDialog } from "./create-identity-provider-dialog";
 
@@ -54,6 +56,8 @@ const KIND_LABEL: Record<string, string> = {
 
 export function IdentityProviderClient() {
   const [open, setOpen] = React.useState(false);
+  const { can } = useMyPermissions();
+  const canManageIdp = can("org.update");
   const { data, loading } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);
 
   const [setActive, { loading: switching }] = useMutation<{
@@ -114,10 +118,12 @@ export function IdentityProviderClient() {
       title="Identity providers"
       description="Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time."
       actions={
-        <Button onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" />
-          New provider
-        </Button>
+        <Can permission="org.update">
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            New provider
+          </Button>
+        </Can>
       }
     >
       <Card>
@@ -175,27 +181,29 @@ export function IdentityProviderClient() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {!idp.isActive && (
+                      {canManageIdp ? (
+                        <div className="flex justify-end gap-1">
+                          {!idp.isActive && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSetActive(idp)}
+                              disabled={switching}
+                            >
+                              Make active
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleSetActive(idp)}
-                            disabled={switching}
+                            onClick={() => handleDelete(idp)}
+                            disabled={deleting || idp.isActive}
                           >
-                            Make active
+                            <Trash2Icon className="size-4" />
+                            <span className="sr-only">Delete</span>
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDelete(idp)}
-                          disabled={deleting || idp.isActive}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </div>
+                        </div>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

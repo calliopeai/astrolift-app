@@ -12,6 +12,7 @@ import {
 import * as React from "react";
 import { toast } from "sonner";
 
+import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -118,10 +119,12 @@ export function TokensClient() {
       title="API tokens"
       description="Long-lived bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest — the plaintext is shown exactly once at creation."
       actions={
-        <Button onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" />
-          New token
-        </Button>
+        <Can permission="api_token.create">
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            New token
+          </Button>
+        </Can>
       }
     >
       {createdToken && (
@@ -208,15 +211,17 @@ export function TokensClient() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRevoke(t)}
-                        disabled={revoking || t.isRevoked}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Revoke</span>
-                      </Button>
+                      <Can permission="api_token.revoke">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRevoke(t)}
+                          disabled={revoking || t.isRevoked}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Revoke</span>
+                        </Button>
+                      </Can>
                     </TableCell>
                   </TableRow>
                 ))}

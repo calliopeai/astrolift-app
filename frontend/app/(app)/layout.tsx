@@ -4,6 +4,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { PreloadQuery, getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
+import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
 import type { CurrentUser, MeQueryData, MeQueryVariables } from "@/graphql/user/user.types";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -29,13 +30,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <PreloadQuery query={GET_ME}>
-      <SidebarProvider>
-        <AppSidebar ssrUser={ssrUser} />
-        <SidebarInset>
-          <PageHeader />
-          {children}
-        </SidebarInset>
-      </SidebarProvider>
+      <PreloadQuery query={GET_MY_PERMISSIONS}>
+        <SidebarProvider>
+          <AppSidebar ssrUser={ssrUser} />
+          <SidebarInset>
+            <PageHeader />
+            {children}
+          </SidebarInset>
+        </SidebarProvider>
+      </PreloadQuery>
     </PreloadQuery>
   );
 }

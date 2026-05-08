@@ -5,6 +5,7 @@ import { LayersIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -68,10 +69,12 @@ export function ClustersClient() {
       title="Clusters"
       description="Tenant Kubernetes clusters registered with the platform. The control plane probes capabilities on register and caches the result."
       actions={
-        <Button onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" />
-          Register cluster
-        </Button>
+        <Can permission="cluster.register">
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            Register cluster
+          </Button>
+        </Can>
       }
     >
       <Card>
@@ -132,15 +135,17 @@ export function ClustersClient() {
                         : "never"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleUnregister(c)}
-                        disabled={deleting}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Unregister</span>
-                      </Button>
+                      <Can permission="cluster.unregister">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleUnregister(c)}
+                          disabled={deleting}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Unregister</span>
+                        </Button>
+                      </Can>
                     </TableCell>
                   </TableRow>
                 ))}

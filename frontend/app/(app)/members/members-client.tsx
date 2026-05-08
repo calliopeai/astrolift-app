@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Can } from "@/components/Can";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,10 +94,12 @@ export function MembersClient() {
       title="Members"
       description="Users with access to this organization, plus the role bindings that grant their permissions."
       actions={
-        <Button onClick={() => setOpen(true)} disabled={roles.loading}>
-          <UserPlusIcon className="size-4" />
-          Grant role
-        </Button>
+        <Can permission="org.manage_members">
+          <Button onClick={() => setOpen(true)} disabled={roles.loading}>
+            <UserPlusIcon className="size-4" />
+            Grant role
+          </Button>
+        </Can>
       }
     >
       <Card>
@@ -234,15 +237,17 @@ export function MembersClient() {
                       {new Date(b.grantedAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRevoke(b)}
-                        disabled={revoking}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Revoke</span>
-                      </Button>
+                      <Can permission="org.manage_members">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRevoke(b)}
+                          disabled={revoking}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Revoke</span>
+                        </Button>
+                      </Can>
                     </TableCell>
                   </TableRow>
                 ))}

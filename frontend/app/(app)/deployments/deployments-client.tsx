@@ -35,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Can } from "@/components/Can";
 import {
   ABORT_DEPLOYMENT,
   APPROVE_DEPLOYMENT,
@@ -46,6 +47,7 @@ import type {
   AstroliftDeployment,
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { StartDeploymentDialog } from "./start-deployment-dialog";
 
@@ -87,11 +89,18 @@ const IN_FLIGHT: DeploymentStatus[] = [
 
 export function DeploymentsClient() {
   const [openCreate, setOpenCreate] = React.useState(false);
+  const { can } = useMyPermissions();
   const { data, loading } = useQuery<Resp>(LIST_DEPLOYMENTS, {
     variables: { limit: 100 },
     pollInterval: 5000,
   });
   const list = data?.astroliftDeployments ?? [];
+
+  // Pre-compute action allowance once to avoid re-checks in render.
+  const canDeploy = can("app.deploy");
+  const canApprove = can("app.approve_deploy");
+  const canRollback = can("app.rollback");
+  const hasAnyAction = canDeploy || canApprove || canRollback;
 
   const refetch = [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }];
   const [approve, approveState] = useMutation<{
@@ -171,10 +180,12 @@ export function DeploymentsClient() {
       title="Deployments"
       description="Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs."
       actions={
-        <Button onClick={() => setOpenCreate(true)}>
-          <PlusIcon className="size-4" />
-          Start deployment
-        </Button>
+        <Can permission="app.deploy">
+          <Button onClick={() => setOpenCreate(true)}>
+            <PlusIcon className="size-4" />
+            Start deployment
+          </Button>
+        </Can>
       }
     >
       <Card>
@@ -255,51 +266,54 @@ export function DeploymentsClient() {
                         : new Date(d.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            disabled={busy}
-                          >
-                            <MoreHorizontalIcon className="size-4" />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {d.status === "pending_approval" && (
-                            <DropdownMenuItem onClick={() => handleApprove(d)}>
-                              <CheckIcon className="size-4" />
-                              Approve
-                            </DropdownMenuItem>
-                          )}
-                          {IN_FLIGHT.includes(d.status) && (
-                            <DropdownMenuItem
-                              onClick={() => handleAbort(d)}
-                              variant="destructive"
+                      {hasAnyAction ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              disabled={busy}
                             >
-                              <StopCircleIcon className="size-4" />
-                              Abort
-                            </DropdownMenuItem>
-                          )}
-                          {d.status === "running" && (
-                            <DropdownMenuItem onClick={() => handleRollback(d)}>
-                              <UndoIcon className="size-4" />
-                              Rollback
-                            </DropdownMenuItem>
-                          )}
-                          {(d.status === "running" ||
-                            d.status === "failed" ||
-                            d.status === "rolled_back" ||
-                            d.status === "superseded") && (
-                            <DropdownMenuItem onClick={() => handleRedeploy(d)}>
-                              <RotateCcwIcon className="size-4" />
-                              Redeploy
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                              <MoreHorizontalIcon className="size-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {d.status === "pending_approval" && canApprove && (
+                              <DropdownMenuItem onClick={() => handleApprove(d)}>
+                                <CheckIcon className="size-4" />
+                                Approve
+                              </DropdownMenuItem>
+                            )}
+                            {IN_FLIGHT.includes(d.status) && canDeploy && (
+                              <DropdownMenuItem
+                                onClick={() => handleAbort(d)}
+                                variant="destructive"
+                              >
+                                <StopCircleIcon className="size-4" />
+                                Abort
+                              </DropdownMenuItem>
+                            )}
+                            {d.status === "running" && canRollback && (
+                              <DropdownMenuItem onClick={() => handleRollback(d)}>
+                                <UndoIcon className="size-4" />
+                                Rollback
+                              </DropdownMenuItem>
+                            )}
+                            {(d.status === "running" ||
+                              d.status === "failed" ||
+                              d.status === "rolled_back" ||
+                              d.status === "superseded") &&
+                              canDeploy && (
+                                <DropdownMenuItem onClick={() => handleRedeploy(d)}>
+                                  <RotateCcwIcon className="size-4" />
+                                  Redeploy
+                                </DropdownMenuItem>
+                              )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

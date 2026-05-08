@@ -13,6 +13,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Can } from "@/components/Can";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,10 +128,12 @@ export function WebhooksClient() {
       title="Webhooks"
       description="Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
       actions={
-        <Button onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" />
-          New webhook
-        </Button>
+        <Can permission="webhook.create">
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            New webhook
+          </Button>
+        </Can>
       }
     >
       {reveal && (
@@ -232,15 +235,17 @@ export function WebhooksClient() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(s)}
-                        disabled={deleting}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
+                      <Can permission="webhook.delete">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(s)}
+                          disabled={deleting}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </Can>
                     </TableCell>
                   </TableRow>
                 ))}

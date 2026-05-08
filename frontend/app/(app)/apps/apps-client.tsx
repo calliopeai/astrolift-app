@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -42,12 +43,14 @@ export function AppsClient() {
       title="Apps"
       description="Repositories registered for deployment. Each app has workloads, environments, deployments, secrets, and managed services attached."
       actions={
-        <Button asChild>
-          <Link href="/apps/new">
-            <PlusIcon className="size-4" />
-            Register app
-          </Link>
-        </Button>
+        <Can permission="app.create">
+          <Button asChild>
+            <Link href="/apps/new">
+              <PlusIcon className="size-4" />
+              Register app
+            </Link>
+          </Button>
+        </Can>
       }
     >
       {loading ? (
