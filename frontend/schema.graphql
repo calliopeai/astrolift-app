@@ -119,6 +119,14 @@ type AstroliftDeployment {
   createdAt: DateTime!
 }
 
+type AstroliftDeploymentLifecycleEvent {
+  deploymentId: String!
+  registeredAppSlug: String!
+  environmentName: String!
+  status: String!
+  occurredAt: String!
+}
+
 type AstroliftDeploymentLogEntry {
   id: GUID!
   deploymentId: String!
@@ -1211,6 +1219,7 @@ type Query {
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
+  astroliftDeployment(id: String!): AstroliftDeployment
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
   astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
@@ -1326,6 +1335,7 @@ type StartWorkflowResult {
 }
 
 type Subscription {
+  astroliftDeploymentLifecycleStream(appSlug: String = null): AstroliftDeploymentLifecycleEvent!
   notificationReceived: String!
   formSubmissionReceived(slug: String!): String!
 }

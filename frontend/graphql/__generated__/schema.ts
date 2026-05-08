@@ -144,6 +144,14 @@ export type AstroliftDeployment = {
   workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftDeploymentLifecycleEvent = {
+  deploymentId: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  occurredAt: Scalars['String']['output'];
+  registeredAppSlug: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type AstroliftDeploymentLogEntry = {
   deploymentId: Scalars['String']['output'];
   detail: Scalars['JSON']['output'];
@@ -1609,6 +1617,7 @@ export type Query = {
   astroliftClusters: Array<AstroliftTenantCluster>;
   astroliftContainers: Array<AstroliftContainer>;
   astroliftCostSnapshots: Array<AstroliftCostSnapshot>;
+  astroliftDeployment?: Maybe<AstroliftDeployment>;
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
   astroliftDeployments: Array<AstroliftDeployment>;
@@ -1685,6 +1694,11 @@ export type QueryAstroliftContainersArgs = {
 export type QueryAstroliftCostSnapshotsArgs = {
   days?: Scalars['Int']['input'];
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftDeploymentArgs = {
+  id: Scalars['String']['input'];
 };
 
 
@@ -1900,8 +1914,14 @@ export type StartWorkflowResult = {
 };
 
 export type Subscription = {
+  astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
   formSubmissionReceived: Scalars['String']['output'];
   notificationReceived: Scalars['String']['output'];
+};
+
+
+export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 

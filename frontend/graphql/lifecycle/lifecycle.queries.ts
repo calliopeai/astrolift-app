@@ -48,6 +48,30 @@ export const LIST_DEPLOYMENTS = gql`
   }
 `;
 
+export const GET_DEPLOYMENT = gql`
+  query GetDeployment($id: String!) {
+    astroliftDeployment(id: $id) {
+      id
+      registeredAppSlug
+      environmentName
+      workloadSlug
+      triggerKind
+      status
+      imageTag
+      imageDigest
+      clusterRevision
+      approvalsRequired
+      approvalsReceived
+      startedAt
+      succeededAt
+      failedAt
+      endedAt
+      durationSeconds
+      createdAt
+    }
+  }
+`;
+
 export const GET_DEPLOYMENT_LOG = gql`
   query GetDeploymentLog($deploymentId: String!) {
     astroliftDeploymentLog(deploymentId: $deploymentId) {

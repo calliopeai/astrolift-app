@@ -244,17 +244,22 @@ export function DeploymentsClient() {
                       <StatusDot status={statusToDot[d.status]} />
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{d.registeredAppSlug}</div>
-                      <div className="text-muted-foreground text-xs">
-                        env <span className="font-mono">{d.environmentName}</span>
-                        {d.workloadSlug && (
-                          <>
-                            {" "}
-                            · workload{" "}
-                            <span className="font-mono">{d.workloadSlug}</span>
-                          </>
-                        )}
-                      </div>
+                      <a
+                        href={`/deployments/${d.id}`}
+                        className="hover:underline"
+                      >
+                        <div className="font-medium">{d.registeredAppSlug}</div>
+                        <div className="text-muted-foreground text-xs">
+                          env <span className="font-mono">{d.environmentName}</span>
+                          {d.workloadSlug && (
+                            <>
+                              {" "}
+                              · workload{" "}
+                              <span className="font-mono">{d.workloadSlug}</span>
+                            </>
+                          )}
+                        </div>
+                      </a>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {d.imageTag || "—"}
