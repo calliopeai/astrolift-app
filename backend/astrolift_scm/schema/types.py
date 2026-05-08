@@ -28,6 +28,12 @@ class SourceConnectionType:
     created_at: dt.datetime
     updated_at: dt.datetime
 
+    # NULL user → org-level credential (PAT, OAuth-app config, App
+    # install). Set → personal credential created by an OAuth dance.
+    is_personal: bool
+    user_username: str | None
+    parent_oauth_app_id: GUID | None
+
 
 @strawberry.type(name="AstroliftSshDeployKey")
 class SshDeployKeyType:
@@ -82,6 +88,12 @@ class SshDeployKeyCreatedType:
 
 
 def source_connection_to_type(c) -> SourceConnectionType:
+    parent_guid: GUID | None = None
+    if c.parent_oauth_app_id:
+        parent_guid = GUID(str(c.parent_oauth_app.guid))
+    user_username: str | None = None
+    if c.user_id:
+        user_username = c.user.username
     return SourceConnectionType(
         id=GUID(str(c.guid)),
         kind=c.kind,
@@ -99,6 +111,9 @@ def source_connection_to_type(c) -> SourceConnectionType:
         last_used_at=c.last_used_at,
         created_at=c.created_at,
         updated_at=c.updated_at,
+        is_personal=c.user_id is not None,
+        user_username=user_username,
+        parent_oauth_app_id=parent_guid,
     )
 
 

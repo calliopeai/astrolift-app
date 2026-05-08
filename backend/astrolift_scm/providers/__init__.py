@@ -62,7 +62,12 @@ def list_repos(
     limit: int = 100,
 ) -> Iterable[RemoteRepo]:
     """Dispatch a list_repos call to the right driver for ``connection.kind``."""
-    if connection.kind in {"github_pat", "github_app_install", "github_oauth_app"}:
+    if connection.kind in {
+        "github_pat",
+        "github_oauth_user",
+        "github_app_install",
+        "github_oauth_app",
+    }:
         try:
             return list_github_repos(connection, search=search, limit=limit)
         except GithubProviderError as exc:

@@ -35,13 +35,20 @@ from core.models.base import BaseCoreModel
 class SourceConnection(BaseCoreModel):
     class Kind(models.TextChoices):
         GITHUB_OAUTH_APP = "github_oauth_app"
+        # Per-user token issued by the OAuth dance against an
+        # operator-registered GITHUB_OAUTH_APP row. The user FK is
+        # set; the row's auth header is "token <token>".
+        GITHUB_OAUTH_USER = "github_oauth_user"
         GITHUB_APP_INSTALL = "github_app_install"
         GITHUB_PAT = "github_pat"
         GITLAB_OAUTH_APP = "gitlab_oauth_app"
+        GITLAB_OAUTH_USER = "gitlab_oauth_user"
         GITLAB_PAT = "gitlab_pat"
         BITBUCKET_OAUTH_APP = "bitbucket_oauth_app"
+        BITBUCKET_OAUTH_USER = "bitbucket_oauth_user"
         BITBUCKET_PAT = "bitbucket_pat"
         GITEA_OAUTH_APP = "gitea_oauth_app"
+        GITEA_OAUTH_USER = "gitea_oauth_user"
         GITEA_PAT = "gitea_pat"
 
     class VisibilityScope(models.TextChoices):
@@ -54,6 +61,31 @@ class SourceConnection(BaseCoreModel):
         "astrolift_identity.Organization",
         related_name="source_connections",
         on_delete=models.CASCADE,
+    )
+    # NULL → org-level credential (PAT shared by everyone in the org,
+    # GitHub-App installation, OAuth-app config row). Set → personal
+    # credential created by an OAuth dance for *this user*.
+    # Per-user rows are scoped to the user *and* the org they were in
+    # when they connected; deactivating an org membership doesn't
+    # automatically nuke the token (that's a separate operator action),
+    # but a user delete cascades.
+    user = models.ForeignKey(
+        "auth.User",
+        related_name="source_connections",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
+    # When this row is a per-user token, it points back to the
+    # GITHUB_OAUTH_APP row whose client credentials produced it. The
+    # backend uses this to find refresh creds and to know which OAuth
+    # app config to revoke against if the user disconnects.
+    parent_oauth_app = models.ForeignKey(
+        "self",
+        related_name="user_tokens",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
     )
     kind = models.CharField(max_length=32, choices=Kind.choices)
     display_name = models.CharField(

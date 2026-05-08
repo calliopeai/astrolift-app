@@ -28,13 +28,31 @@ class ScmQuery:
     def astrolift_source_connections(
         self, info: Info
     ) -> list[SourceConnectionType]:
+        """Org-level connections + the current viewer's own personal
+        connections. Other users' personal tokens never surface — a
+        token belongs to the user that minted it, period."""
+        from django.db.models import Q
+
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
             return []
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        viewer_pk = viewer.pk if viewer is not None and viewer.is_authenticated else None
+
+        scope = Q(user__isnull=True)
+        if viewer_pk is not None:
+            scope = scope | Q(user_id=viewer_pk)
+
         qs = (
-            SourceConnection.objects.filter(organization_id=org_id)
-            .order_by("-is_active", "kind", "account_login")[:200]
+            SourceConnection.objects.filter(
+                organization_id=org_id, deleted_at__isnull=True
+            )
+            .filter(scope)
+            .select_related("user", "parent_oauth_app")
+            .order_by("user_id", "-is_active", "kind", "account_login")[:200]
         )
         return [source_connection_to_type(c) for c in qs]
 

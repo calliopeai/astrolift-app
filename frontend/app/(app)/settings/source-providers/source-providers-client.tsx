@@ -45,13 +45,17 @@ import { GenerateSshKeyDialog } from "./generate-ssh-key-dialog";
 
 const KIND_LABEL: Record<string, string> = {
   github_oauth_app: "GitHub OAuth App",
+  github_oauth_user: "GitHub (OAuth user token)",
   github_app_install: "GitHub App install",
   github_pat: "GitHub PAT",
   gitlab_oauth_app: "GitLab OAuth App",
+  gitlab_oauth_user: "GitLab (OAuth user token)",
   gitlab_pat: "GitLab PAT",
   bitbucket_oauth_app: "Bitbucket OAuth App",
+  bitbucket_oauth_user: "Bitbucket (OAuth user token)",
   bitbucket_pat: "Bitbucket PAT",
   gitea_oauth_app: "Gitea OAuth App",
+  gitea_oauth_user: "Gitea (OAuth user token)",
   gitea_pat: "Gitea PAT",
 };
 
@@ -74,6 +78,28 @@ export function SourceProvidersClient() {
   const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
 
   const conns = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
+
+  // Surface OAuth-callback outcomes from /app/auth1/scm/github/callback
+  // — the dance lands the browser back here with ?scm_connected or
+  // ?scm_error so we can toast and clean up the URL.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const ok = url.searchParams.get("scm_connected");
+    const err = url.searchParams.get("scm_error");
+    if (ok) {
+      toast.success(`Connected GitHub: ${ok}`);
+      void conns.refetch();
+    } else if (err) {
+      toast.error(`GitHub OAuth: ${err.replace(/_/g, " ")}`);
+    }
+    if (ok || err) {
+      url.searchParams.delete("scm_connected");
+      url.searchParams.delete("scm_error");
+      window.history.replaceState({}, "", url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const keys = useQuery<KeysResp>(LIST_SSH_DEPLOY_KEYS, {
     variables: { appSlug: null },
   });
@@ -203,6 +229,14 @@ export function SourceProvidersClient() {
                           OAuth-app config
                         </Badge>
                       )}
+                      {c.isPersonal && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-2 gap-1 text-[10px] bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                        >
+                          personal {c.userUsername ? `· ${c.userUsername}` : ""}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {c.accountLogin || "—"}
@@ -240,17 +274,32 @@ export function SourceProvidersClient() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Can permission="scm.disconnect">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDisconnect(c)}
-                          disabled={disconnectState.loading}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Disconnect</span>
-                        </Button>
-                      </Can>
+                      <div className="flex justify-end gap-1">
+                        {c.kind === "github_oauth_app" && c.isOauthAppConfig && (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                          >
+                            <a
+                              href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
+                            >
+                              Connect my GitHub
+                            </a>
+                          </Button>
+                        )}
+                        <Can permission="scm.disconnect">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDisconnect(c)}
+                            disabled={disconnectState.loading}
+                          >
+                            <Trash2Icon className="size-4" />
+                            <span className="sr-only">Disconnect</span>
+                          </Button>
+                        </Can>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

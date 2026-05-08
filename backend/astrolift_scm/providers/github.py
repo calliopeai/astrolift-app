@@ -58,7 +58,7 @@ def _api_base(connection) -> str:
 
 
 def _token(connection) -> str:
-    if connection.kind == "github_pat":
+    if connection.kind in {"github_pat", "github_oauth_user"}:
         plaintext = decrypt(
             EncryptedSecret(
                 backend_kind=connection.secret_backend_kind,
