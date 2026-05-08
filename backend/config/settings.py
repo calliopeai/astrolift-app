@@ -326,6 +326,13 @@ from config.features import filter_installed_apps  # noqa: E402
 
 INSTALLED_APPS = filter_installed_apps(INSTALLED_APPS)
 
+# `testdata` ships the dev seed fixtures + the `seed` management
+# command. It's harmless in any environment (only adds management
+# commands and fixtures, no migrations of its own) and is needed by
+# the test suite regardless of CONFIGURATION value.
+if "testdata" not in INSTALLED_APPS:
+    INSTALLED_APPS.append("testdata")
+
 # Discover and merge domain app configurations
 # Domain apps declare their configuration
 # in astrolift_config/settings.py files
@@ -558,7 +565,7 @@ elif CONFIGURATION.lower() == "Tests".lower():
             "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         },
     }
-    INSTALLED_APPS.append("testdata")
+    # testdata already appended unconditionally above.
 elif CONFIGURATION.lower() == "Local".lower() or CONFIGURATION.lower() == "LocalPG".lower():
     DEBUG = True
     ALLOWED_HOSTS = [
@@ -569,7 +576,7 @@ elif CONFIGURATION.lower() == "Local".lower() or CONFIGURATION.lower() == "Local
         "DJANGO_", "admin"
     )  # only for local login the user if there is no user logged in
     TELEMETRY_LOGS = False
-    INSTALLED_APPS.append("testdata")
+    # testdata already appended unconditionally above.
     LOGGING = build_logging_config(
         level=LOG_LEVEL,
         format_=env_str("LOG_FORMAT", "text"),
