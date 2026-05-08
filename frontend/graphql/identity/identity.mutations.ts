@@ -107,6 +107,29 @@ export const UPDATE_ORGANIZATION = gql`
         auditLogRetentionDays
         previewMaxActiveDefault
         logRetentionDaysDefault
+        allowUserProfileEdit
+      }
+    }
+  }
+`;
+
+export const UPDATE_MY_PROFILE = gql`
+  mutation UpdateMyProfile($input: UpdateMyProfileInput!) {
+    updateMyProfile(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        userId
+        username
+        firstName
+        lastName
+        email
+        lockedFields
+        orgAllowsEdit
       }
     }
   }

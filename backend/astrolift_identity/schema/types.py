@@ -26,9 +26,30 @@ class OrganizationType:
     audit_log_retention_days: int
     preview_max_active_default: int
     log_retention_days_default: int
+    allow_user_profile_edit: bool
     created_at: dt.datetime
     updated_at: dt.datetime
     deleted_at: dt.datetime | None
+
+
+@strawberry.type(name="AstroliftMyProfile")
+class MyProfileType:
+    """The signed-in viewer's editable profile.
+
+    ``locked_fields`` lists field names whose values came from the
+    IdP at last login. Local edits to a locked field would be
+    overwritten on the next sync, so the UI surfaces them
+    read-only with a tooltip. ``org_allows_edit`` is the outer
+    org-policy gate; when False, the entire form is read-only.
+    """
+
+    user_id: int
+    username: str
+    first_name: str
+    last_name: str
+    email: str
+    locked_fields: list[str]
+    org_allows_edit: bool
 
 
 @strawberry.type(name="AstroliftTeam")
@@ -64,6 +85,7 @@ def organization_to_type(org) -> OrganizationType:
         audit_log_retention_days=org.audit_log_retention_days,
         preview_max_active_default=org.preview_max_active_default,
         log_retention_days_default=org.log_retention_days_default,
+        allow_user_profile_edit=org.allow_user_profile_edit,
         created_at=org.created_at,
         updated_at=org.updated_at,
         deleted_at=org.deleted_at,

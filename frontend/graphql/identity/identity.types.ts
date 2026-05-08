@@ -17,9 +17,20 @@ export interface AstroliftOrganization {
   auditLogRetentionDays: number;
   previewMaxActiveDefault: number;
   logRetentionDaysDefault: number;
+  allowUserProfileEdit: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+}
+
+export interface AstroliftMyProfile {
+  userId: number;
+  username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  lockedFields: string[];
+  orgAllowsEdit: boolean;
 }
 
 export interface AstroliftTeam {

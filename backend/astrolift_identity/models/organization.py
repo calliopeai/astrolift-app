@@ -56,6 +56,15 @@ class Organization(NamedBaseCoreModel):
     preview_max_active_default = models.PositiveIntegerField(default=5)
     log_retention_days_default = models.PositiveIntegerField(default=30)
 
+    # When True, users can edit their own profile fields (display
+    # name, email, avatar, locale) on /settings/profile via
+    # updateMyProfile. When False (default for SSO-only installs),
+    # the IdP is the source of truth and the page renders read-only.
+    # Even when True, fields populated by the IdP at last login stay
+    # locked — local edits would just get overwritten on the next
+    # sync, so we surface them as read-only with a tooltip.
+    allow_user_profile_edit = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

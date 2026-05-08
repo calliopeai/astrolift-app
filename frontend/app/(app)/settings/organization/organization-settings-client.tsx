@@ -37,6 +37,7 @@ export function OrganizationSettingsClient() {
   const [auditDays, setAuditDays] = React.useState("365");
   const [previewMax, setPreviewMax] = React.useState("5");
   const [logDays, setLogDays] = React.useState("30");
+  const [allowProfileEdit, setAllowProfileEdit] = React.useState(true);
 
   React.useEffect(() => {
     if (org) {
@@ -45,6 +46,7 @@ export function OrganizationSettingsClient() {
       setAuditDays(String(org.auditLogRetentionDays));
       setPreviewMax(String(org.previewMaxActiveDefault));
       setLogDays(String(org.logRetentionDaysDefault));
+      setAllowProfileEdit(org.allowUserProfileEdit);
     }
   }, [org]);
 
@@ -65,6 +67,7 @@ export function OrganizationSettingsClient() {
           name: name.trim(),
           website: website.trim(),
           auditLogRetentionDays: Number(auditDays) || 365,
+          allowUserProfileEdit: allowProfileEdit,
         },
       },
     });
@@ -181,6 +184,40 @@ export function OrganizationSettingsClient() {
                   Editable once the App registry surface lands.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>User policies</CardTitle>
+              <CardDescription>
+                Org-wide rules that apply to every member, including the
+                self-service profile editor.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:max-w-xl">
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={allowProfileEdit}
+                  onChange={(e) => setAllowProfileEdit(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">
+                    Allow users to edit their own profile
+                  </span>
+                  <span className="text-muted-foreground block text-xs leading-relaxed mt-0.5">
+                    Lets users update their first name, last name, and
+                    email on{" "}
+                    <code>/settings/profile</code>. Fields managed by the
+                    identity provider stay locked even when this is on —
+                    local edits to IdP-claimed fields would be overwritten
+                    on next sign-in. Turn this off for SSO-only
+                    deployments where the IdP is the source of truth.
+                  </span>
+                </span>
+              </label>
             </CardContent>
           </Card>
 

@@ -219,6 +219,20 @@ export const LIST_API_TOKENS = gql`
   }
 `;
 
+export const GET_MY_PROFILE = gql`
+  query GetMyProfile {
+    astroliftMyProfile {
+      userId
+      username
+      firstName
+      lastName
+      email
+      lockedFields
+      orgAllowsEdit
+    }
+  }
+`;
+
 // Suppress the unused import warning — fragment is referenced from
 // other domain files once they're written.
 void IDENTITY_TIMESTAMPS;
