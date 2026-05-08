@@ -59,6 +59,17 @@ for command in ON_STARTUP:
     execute_and_log(f'python manage.py {command}')
 
 
-os.system('python manage.py runserver 0.0.0.0:8000')
+# Subscriptions need an ASGI server. uvicorn handles HTTP + WS in
+# one process and reloads on source change like runserver does.
+# Falls back to runserver if uvicorn isn't installed (HTTP-only dev
+# without subscription delivery).
+try:
+    import uvicorn  # noqa: F401
+
+    os.system(
+        'uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload'
+    )
+except ImportError:
+    os.system('python manage.py runserver 0.0.0.0:8000')
 
 logger.warning('Setup complete')

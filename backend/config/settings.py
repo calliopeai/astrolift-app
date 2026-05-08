@@ -89,6 +89,7 @@ CORS_ORIGIN_WHITELIST = (
 )
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
 
 LANGUAGE_CODE = env_str('DJANGO_LANGUAGE_CODE', 'en')
 TIME_ZONE = env_str('DJANGO_TIME_ZONE', 'UTC')

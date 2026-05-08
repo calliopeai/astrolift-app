@@ -52,6 +52,12 @@ django-ratelimit = "*"
 strawberry-graphql = {extras = ["django"], version = ">=0.235.0"}
 strawberry-graphql-django = ">=0.47.0"
 jsonschema = "*"
+# Subscriptions need an ASGI server + Strawberry's ASGI integration
+# (which depends on starlette). uvicorn handles HTTP + WebSocket in
+# the same process and reloads on source changes.
+starlette = "*"
+"uvicorn[standard]" = "*"
+websockets = "*"
 
 [dev-packages]
 django-debug-toolbar = "*"
