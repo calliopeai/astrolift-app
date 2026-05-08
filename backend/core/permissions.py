@@ -92,6 +92,13 @@ class Permission(str, enum.Enum):
     PROVIDER_PLUGIN_READ = "provider_plugin.read"
     PROVIDER_PLUGIN_CONFIGURE = "provider_plugin.configure"
 
+    # --- SCM integration ------------------------------------------
+    SCM_READ = "scm.read"
+    SCM_CONNECT = "scm.connect"
+    SCM_DISCONNECT = "scm.disconnect"
+    SCM_KEY_CREATE = "scm.key_create"
+    SCM_KEY_DELETE = "scm.key_delete"
+
     # --- Admin elevation ------------------------------------------
     ADMIN_ELEVATE = "admin.elevate"
 

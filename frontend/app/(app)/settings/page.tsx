@@ -1,6 +1,7 @@
 import {
   BellIcon,
   BuildingIcon,
+  GitBranchIcon,
   KeyIcon,
   KeyRoundIcon,
   ScaleIcon,
@@ -30,6 +31,12 @@ const sections = [
     icon: KeyRoundIcon,
     title: "Identity provider",
     description: "OIDC / SAML config + SCIM provisioning.",
+  },
+  {
+    href: "/settings/source-providers",
+    icon: GitBranchIcon,
+    title: "Source providers",
+    description: "Connect GitHub / GitLab / Gitea + manage SSH deploy keys.",
   },
   {
     href: "/settings/policies",
