@@ -4,6 +4,7 @@ import {
   ActivityIcon,
   BarChart3Icon,
   BoxIcon,
+  ChevronRightIcon,
   CloudIcon,
   CoinsIcon,
   FileBoxIcon,
@@ -23,7 +24,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import * as React from "react";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -35,6 +42,8 @@ import {
   type PermissionCheck,
   useMyPermissions,
 } from "@/lib/permissions/use-my-permissions";
+
+const COLLAPSED_KEY = "astrolift.nav.collapsed.v1";
 
 interface NavItem {
   label: string;
@@ -183,9 +192,47 @@ const sections: NavSection[] = [
   },
 ];
 
+function loadCollapsedState(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCollapsedState(state: Record<string, boolean>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(state));
+  } catch {
+    // localStorage might be disabled — degrade silently.
+  }
+}
+
 export function AstroliftNav() {
   const pathname = usePathname();
   const { can, loading } = useMyPermissions();
+
+  // Collapsed sections persist in localStorage so refreshes keep
+  // the layout the operator chose. Default: every section open.
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>(
+    {},
+  );
+  React.useEffect(() => {
+    setCollapsed(loadCollapsedState());
+  }, []);
+
+  function toggleSection(label: string) {
+    setCollapsed((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      saveCollapsedState(next);
+      return next;
+    });
+  }
 
   return (
     <>
@@ -200,27 +247,57 @@ export function AstroliftNav() {
             can(item.permission),
         );
         if (visibleItems.length === 0) return null;
+
+        // Auto-expand a section when the current path matches one
+        // of its items, so navigating into a collapsed section
+        // doesn't leave the operator without breadcrumb context.
+        const containsActive = visibleItems.some(
+          (item) =>
+            pathname === item.href ||
+            (item.href !== "/" && pathname.startsWith(item.href + "/")),
+        );
+        const isOpen = containsActive || !collapsed[section.label];
+
         return (
-          <SidebarGroup key={section.label}>
-            <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
-            <SidebarMenu>
-              {visibleItems.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  (item.href !== "/" && pathname.startsWith(item.href + "/"));
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                      <Link href={item.href}>
-                        {item.icon}
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
+          <Collapsible
+            key={section.label}
+            open={isOpen}
+            onOpenChange={() => toggleSection(section.label)}
+            asChild
+          >
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="group/section flex w-full items-center justify-between hover:text-sidebar-foreground">
+                  <span>{section.label}</span>
+                  <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarMenu>
+                  {visibleItems.map((item) => {
+                    const active =
+                      pathname === item.href ||
+                      (item.href !== "/" &&
+                        pathname.startsWith(item.href + "/"));
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={active}
+                          tooltip={item.label}
+                        >
+                          <Link href={item.href}>
+                            {item.icon}
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         );
       })}
     </>
