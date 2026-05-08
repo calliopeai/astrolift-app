@@ -58,6 +58,7 @@ from astrolift_identity.schema.types import (
     team_to_type,
 )
 from core.mutations import ErrorCode, mutation_audit
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -302,6 +303,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="team.create")
     @require_permission(Permission.TEAM_CREATE)
+    @tenant_scoped()
     def create_team(self, info: Info, input: CreateTeamInput) -> MutationResultType[TeamType]:
         org = _resolve_org(input.organization_id)
         if org is None:
@@ -323,6 +325,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="team.update")
     @require_permission(Permission.TEAM_UPDATE)
+    @tenant_scoped()
     def update_team(self, info: Info, input: UpdateTeamInput) -> MutationResultType[TeamType]:
         team = _resolve_team(input.id)
         if team is None:
@@ -337,6 +340,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="team.delete")
     @require_permission(Permission.TEAM_DELETE)
+    @tenant_scoped()
     def soft_delete_team(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -351,6 +355,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="project.create")
     @require_permission(Permission.PROJECT_CREATE)
+    @tenant_scoped()
     def create_project(self, info: Info, input: CreateProjectInput) -> MutationResultType[ProjectType]:
         team = _resolve_team(input.team_id)
         if team is None:
@@ -372,6 +377,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="project.update")
     @require_permission(Permission.PROJECT_UPDATE)
+    @tenant_scoped()
     def update_project(self, info: Info, input: UpdateProjectInput) -> MutationResultType[ProjectType]:
         project = _resolve_project(input.id)
         if project is None:
@@ -386,6 +392,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="project.delete")
     @require_permission(Permission.PROJECT_DELETE)
+    @tenant_scoped()
     def soft_delete_project(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -400,6 +407,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="role_binding.grant")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
     def grant_role(self, info: Info, input: GrantRoleInput) -> MutationResultType[RoleBindingType]:
         from django.contrib.auth import get_user_model
 
@@ -452,6 +460,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="role_binding.revoke")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
     def revoke_role_binding(
         self, info: Info, input: RevokeRoleBindingInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -466,6 +475,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="api_token.create")
     @require_permission(Permission.API_TOKEN_CREATE)
+    @tenant_scoped()
     def create_api_token(
         self, info: Info, input: CreateApiTokenInput
     ) -> MutationResultType[ApiTokenPlaintextType]:
@@ -517,6 +527,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="api_token.revoke")
     @require_permission(Permission.API_TOKEN_REVOKE)
+    @tenant_scoped()
     def revoke_api_token(
         self, info: Info, input: RevokeApiTokenInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -532,6 +543,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="policy.create")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def create_policy(self, info: Info, input: CreatePolicyInput) -> MutationResultType[PolicyType]:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
@@ -578,6 +590,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="policy.update")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def update_policy(self, info: Info, input: UpdatePolicyInput) -> MutationResultType[PolicyType]:
         policy = Policy.objects.filter(guid=str(input.id)).first()
         if policy is None:
@@ -601,6 +614,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="policy.delete")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def soft_delete_policy(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -615,6 +629,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="identity_provider.create")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def create_identity_provider(
         self, info: Info, input: CreateIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
@@ -661,6 +676,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="identity_provider.update")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def update_identity_provider(
         self, info: Info, input: UpdateIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
@@ -690,6 +706,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="identity_provider.set_active")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def set_active_identity_provider(
         self, info: Info, input: SetActiveIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
@@ -704,6 +721,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="identity_provider.delete")
     @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
     def soft_delete_identity_provider(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:

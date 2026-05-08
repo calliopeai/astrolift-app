@@ -29,6 +29,7 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
 from core.mutations import ErrorCode, mutation_audit
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -111,6 +112,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="cluster.register")
     @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
     def register_tenant_cluster(
         self, info: Info, input: RegisterTenantClusterInput
     ) -> MutationResultType[TenantClusterType]:
@@ -158,6 +160,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="cluster.update")
     @require_permission(Permission.CLUSTER_UPDATE)
+    @tenant_scoped()
     def update_tenant_cluster(
         self, info: Info, input: UpdateTenantClusterInput
     ) -> MutationResultType[TenantClusterType]:
@@ -178,6 +181,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="cluster.unregister")
     @require_permission(Permission.CLUSTER_UNREGISTER)
+    @tenant_scoped()
     def unregister_tenant_cluster(
         self, info: Info, input: UnregisterTenantClusterInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -202,6 +206,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="domain.create")
     @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @tenant_scoped()
     def create_managed_domain(
         self, info: Info, input: CreateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
@@ -237,6 +242,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="domain.update")
     @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @tenant_scoped()
     def update_managed_domain(
         self, info: Info, input: UpdateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
@@ -255,6 +261,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="domain.delete")
     @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @tenant_scoped()
     def soft_delete_managed_domain(
         self, info: Info, input: SoftDeleteManagedDomainInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -269,6 +276,7 @@ class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="provider_plugin.configure")
     @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @tenant_scoped()
     def configure_provider_plugin(
         self, info: Info, input: ConfigureProviderPluginInput
     ) -> MutationResultType[_ProviderPluginConfigPayload]:

@@ -55,6 +55,7 @@ from astrolift_workflows.inputs import (
     TearDownPreviewInput,
 )
 from core.mutations import ErrorCode, mutation_audit
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -176,6 +177,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.start")
     @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
     def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
         if input.trigger_kind not in _VALID_TRIGGER_KINDS:
             return gql_failure(
@@ -259,6 +261,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.approve")
     @require_permission(Permission.APP_APPROVE_DEPLOY)
+    @tenant_scoped()
     def approve_deployment(
         self, info: Info, input: DeploymentByIdInput
     ) -> MutationResultType[DeploymentType]:
@@ -323,6 +326,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.abort")
     @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
     def abort_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
@@ -358,6 +362,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.rollback")
     @require_permission(Permission.APP_ROLLBACK)
+    @tenant_scoped()
     def rollback_deployment(
         self, info: Info, input: DeploymentByIdInput
     ) -> MutationResultType[DeploymentType]:
@@ -437,6 +442,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.redeploy")
     @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
     def redeploy_app(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         source = (
             Deployment.objects.select_related("registered_app", "app_environment")
@@ -509,6 +515,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="environment.pause")
     @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
     def pause_environment(
         self, info: Info, input: EnvironmentByIdInput
     ) -> MutationResultType[AppEnvironmentType]:
@@ -537,6 +544,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="environment.resume")
     @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
     def resume_environment(
         self, info: Info, input: EnvironmentByIdInput
     ) -> MutationResultType[AppEnvironmentType]:
@@ -560,6 +568,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="preview.tear_down")
     @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
     def tear_down_preview(
         self, info: Info, input: TearDownPreviewInputGql
     ) -> MutationResultType[DeploymentType]:

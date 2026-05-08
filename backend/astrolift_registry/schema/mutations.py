@@ -12,6 +12,7 @@ from astrolift_identity.models import Project
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.types import RegisteredAppType, app_to_type
 from core.mutations import ErrorCode, mutation_audit
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -71,6 +72,7 @@ class RegistryMutation:
     @strawberry.field
     @mutation_audit(action="app.create")
     @require_permission(Permission.APP_CREATE)
+    @tenant_scoped()
     def register_app(self, info: Info, input: RegisterAppInput) -> MutationResultType[RegisteredAppType]:
         project = (
             Project.objects.select_related("organization", "team").filter(guid=str(input.project_id)).first()
@@ -118,6 +120,7 @@ class RegistryMutation:
     @strawberry.field
     @mutation_audit(action="app.update")
     @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
     def update_app(self, info: Info, input: UpdateAppInput) -> MutationResultType[RegisteredAppType]:
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
         if app is None:
@@ -143,6 +146,7 @@ class RegistryMutation:
     @strawberry.field
     @mutation_audit(action="app.delete")
     @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
     def soft_delete_app(
         self, info: Info, input: SoftDeleteAppInput
     ) -> MutationResultType[_SoftDeletePayload]:
