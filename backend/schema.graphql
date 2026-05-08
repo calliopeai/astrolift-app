@@ -184,6 +184,11 @@ type AstroliftEvent {
   occurredAt: DateTime!
 }
 
+type AstroliftEventPage {
+  items: [AstroliftEvent!]!
+  nextCursor: String
+}
+
 type AstroliftIdentityProvider {
   id: GUID!
   organizationSlug: String!
@@ -1249,6 +1254,7 @@ type Query {
   astroliftMyPermissions: [String!]!
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftEvents(limit: Int! = 100, eventType: String = null): [AstroliftEvent!]!
+  astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null): [AstroliftAuditEvent!]!
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions: [AstroliftWebhookSubscription!]!

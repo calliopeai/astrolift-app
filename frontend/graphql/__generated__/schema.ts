@@ -209,6 +209,11 @@ export type AstroliftEvent = {
   teamId?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftEventPage = {
+  items: Array<AstroliftEvent>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftIdentityProvider = {
   clientId: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
@@ -1674,6 +1679,7 @@ export type Query = {
   astroliftDeployments: Array<AstroliftDeployment>;
   astroliftEnvironments: Array<AstroliftAppEnvironment>;
   astroliftEvents: Array<AstroliftEvent>;
+  astroliftEventsPage: AstroliftEventPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftMembers: Array<AstroliftMember>;
@@ -1783,6 +1789,13 @@ export type QueryAstroliftEnvironmentsArgs = {
 
 
 export type QueryAstroliftEventsArgs = {
+  eventType?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftEventsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
   eventType?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
 };

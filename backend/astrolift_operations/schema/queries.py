@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
+
 import strawberry
 from strawberry.types import Info
 
@@ -14,6 +18,7 @@ from astrolift_operations.models import (
 )
 from astrolift_operations.schema.types import (
     AuditEventType,
+    EventPageType,
     EventType,
     NotificationType,
     WebhookSubscriptionType,
@@ -44,6 +49,51 @@ class OperationsQuery:
         if event_type:
             qs = qs.filter(event_type=event_type)
         return [event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ)
+    @tenant_scoped()
+    def astrolift_events_page(
+        self,
+        info: Info,
+        limit: int = 100,
+        after: str | None = None,
+        event_type: str | None = None,
+    ) -> EventPageType:
+        """Cursor-paginated event stream.
+
+        ``after`` is the opaque cursor returned by the previous page;
+        omit it to start from the newest event. Cursor is base64-JSON
+        of ``[occurred_at_iso, guid_str]`` so the (occurred_at, guid)
+        composite is the seek key — guid is a UUIDv7 so the secondary
+        sort is also time-ordered, eliminating tie-break churn.
+        """
+        page_size = max(1, min(limit, 500))
+        qs = Event.objects.order_by("-occurred_at", "-guid")
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+        if after:
+            decoded = _decode_event_cursor(after)
+            if decoded is not None:
+                from django.db.models import Q
+
+                cursor_at, cursor_guid = decoded
+                qs = qs.filter(
+                    Q(occurred_at__lt=cursor_at)
+                    | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
+                )
+        # Fetch one extra to detect end-of-stream cheaply.
+        rows = list(qs[: page_size + 1])
+        items = rows[:page_size]
+        next_cursor = (
+            _encode_event_cursor(items[-1].occurred_at, str(items[-1].guid))
+            if len(rows) > page_size and items
+            else None
+        )
+        return EventPageType(
+            items=[event_to_type(e) for e in items],
+            next_cursor=next_cursor,
+        )
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)
@@ -95,3 +145,28 @@ class OperationsQuery:
         if unread_only:
             qs = qs.filter(read_at__isnull=True)
         return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]
+
+
+# ---------------------------------------------------------------------------
+# Cursor helpers (Event)
+# ---------------------------------------------------------------------------
+
+
+def _encode_event_cursor(occurred_at, guid: str) -> str:
+    payload = json.dumps([occurred_at.isoformat(), guid], separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+
+
+def _decode_event_cursor(token: str):
+    """Return ``(occurred_at_dt, guid_str)`` or ``None`` if the token
+    is malformed. We swallow garbage so a bogus cursor restarts from
+    the top instead of erroring — UX over strictness."""
+    import datetime as dt
+
+    pad = "=" * (-len(token) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(token + pad)
+        ts, guid = json.loads(raw)
+        return dt.datetime.fromisoformat(ts), guid
+    except (binascii.Error, ValueError, TypeError, json.JSONDecodeError):
+        return None

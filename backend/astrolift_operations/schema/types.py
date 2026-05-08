@@ -26,6 +26,15 @@ class EventType:
     occurred_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftEventPage")
+class EventPageType:
+    """Cursor-paginated event slice. ``next_cursor`` is null when the
+    caller has reached the end of the stream."""
+
+    items: list[EventType]
+    next_cursor: str | None
+
+
 @strawberry.type(name="AstroliftAuditEvent")
 class AuditEventType:
     id: GUID
