@@ -1,3 +1,10 @@
+# Host port bindings are localhost-only (127.0.0.1) and individually
+# overridable so this stack coexists cleanly with other dev stacks.
+# To remap, set the variable in docker/.env (or your shell). Examples:
+#   ASTROLIFT_DJANGO_PORT=18000   ASTROLIFT_UI_PORT=13000
+#   ASTROLIFT_POSTGRES_PORT=15432 ASTROLIFT_TEMPORAL_GRPC_PORT=17233
+# Defaults match historical Astrolift conventions.
+
 services:
 
   astrolift-local:
@@ -7,7 +14,7 @@ services:
     container_name: astrolift-local
     image: astrolift-local
     ports:
-      - '8000:8000'
+      - '127.0.0.1:${ASTROLIFT_DJANGO_PORT:-8000}:8000'
     env_file:
       - ../backend/config/local.env
     environment:
@@ -45,7 +52,7 @@ services:
     image: temporalio/auto-setup:latest
     container_name: temporal-server
     ports:
-      - '7233:7233'
+      - '127.0.0.1:${ASTROLIFT_TEMPORAL_GRPC_PORT:-7233}:7233'
     environment:
       - DB=postgresql
       - DB_PORT=5432
@@ -61,10 +68,10 @@ services:
     image: temporalio/ui:latest
     container_name: temporal-ui
     ports:
-      - '8233:8080'
+      - '127.0.0.1:${ASTROLIFT_TEMPORAL_UI_PORT:-8233}:8080'
     environment:
       - TEMPORAL_ADDRESS=temporal-server:7233
-      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+      - TEMPORAL_CORS_ORIGINS=http://localhost:${ASTROLIFT_UI_PORT:-3000}
     depends_on:
       - temporal-server
 
@@ -89,13 +96,13 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${ASTROLIFT_POSTGRES_PORT:-5432}:5432"
 
   redis-local:
     container_name: redis-local
     image: 'redis:7-alpine'
     ports:
-      - '6379:6379'
+      - '127.0.0.1:${ASTROLIFT_REDIS_PORT:-6379}:6379'
     volumes:
       - 'astrolift-redis:/data'
     healthcheck:
@@ -108,7 +115,7 @@ services:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: postgres-exporter
     ports:
-      - '9187:9187'
+      - '127.0.0.1:${ASTROLIFT_POSTGRES_EXPORTER_PORT:-9187}:9187'
     environment:
       - DATA_SOURCE_NAME=postgresql://dbadmin:Password123@postgres-local:5432/astrolift?sslmode=disable
     depends_on:
@@ -120,7 +127,7 @@ services:
     image: oliver006/redis_exporter:latest
     container_name: redis-exporter
     ports:
-      - '9121:9121'
+      - '127.0.0.1:${ASTROLIFT_REDIS_EXPORTER_PORT:-9121}:9121'
     environment:
       - REDIS_ADDR=redis://redis-local:6379
     depends_on:
@@ -136,7 +143,7 @@ services:
       - DISABLE_SECURITY_PLUGIN=true
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - '9200:9200'
+      - '127.0.0.1:${ASTROLIFT_OPENSEARCH_PORT:-9200}:9200'
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     healthcheck:
@@ -150,8 +157,8 @@ services:
     image: minio/minio:latest
     container_name: minio-local
     ports:
-      - '9000:9000'   # S3 API
-      - '9001:9001'   # Console UI
+      - '127.0.0.1:${ASTROLIFT_MINIO_S3_PORT:-9000}:9000'   # S3 API
+      - '127.0.0.1:${ASTROLIFT_MINIO_CONSOLE_PORT:-9001}:9001'   # Console UI
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
@@ -183,8 +190,8 @@ services:
     image: axllent/mailpit:latest
     container_name: mailpit-local
     ports:
-      - '8025:8025'   # web UI
-      - '1025:1025'   # SMTP
+      - '127.0.0.1:${ASTROLIFT_MAILPIT_WEB_PORT:-8025}:8025'   # web UI
+      - '127.0.0.1:${ASTROLIFT_MAILPIT_SMTP_PORT:-1025}:1025'   # SMTP
 
   ui:
     build:
@@ -192,7 +199,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: ui
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${ASTROLIFT_UI_PORT:-3000}:3000"
     volumes:
       - ../frontend:/app
       - /app/node_modules
