@@ -28,6 +28,7 @@ const ROUTES: PaletteRoute[] = [
   { label: "Environments", href: "/environments", group: "Operations", permission: "app.read" },
   { label: "Workflows", href: "/workflows", group: "Operations", permission: "app.read" },
   { label: "Jobs", href: "/jobs", group: "Operations", permission: "app.read_logs", keywords: ["scheduled", "command", "cron"] },
+  { label: "Previews", href: "/previews", group: "Operations", permission: "app.read", keywords: ["pr", "pull request", "ephemeral"] },
   { label: "Events", href: "/events", group: "Operations", permission: "audit_log.read" },
   { label: "Audit log", href: "/audit", group: "Operations", permission: "audit_log.read" },
 
