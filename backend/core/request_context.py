@@ -65,8 +65,23 @@ def get_trace_context() -> TraceContext | None:
 
 
 def reset_request_id(token: contextvars.Token) -> None:
-    _request_id.reset(token)
+    """Reset the request-id contextvar, tolerating cross-context resets.
+
+    Under ASGI, sync middleware gets dispatched via ``sync_to_async``
+    which can land ``process_request`` and ``process_response`` in
+    different task contexts. ``ContextVar.reset`` raises ValueError
+    when the token came from a different context — that's harmless
+    because the request task is exiting anyway and the contextvar
+    goes out of scope with it.
+    """
+    try:
+        _request_id.reset(token)
+    except ValueError:
+        pass
 
 
 def reset_trace_context(token: contextvars.Token) -> None:
-    _trace.reset(token)
+    try:
+        _trace.reset(token)
+    except ValueError:
+        pass
