@@ -2,13 +2,17 @@ import type { AstroliftGuid, MutationResult } from "@/graphql/identity/identity.
 
 export type ScmConnectionKind =
   | "github_oauth_app"
+  | "github_oauth_user"
   | "github_app_install"
   | "github_pat"
   | "gitlab_oauth_app"
+  | "gitlab_oauth_user"
   | "gitlab_pat"
   | "bitbucket_oauth_app"
+  | "bitbucket_oauth_user"
   | "bitbucket_pat"
   | "gitea_oauth_app"
+  | "gitea_oauth_user"
   | "gitea_pat";
 
 export type ScmVisibilityScope =
@@ -34,6 +38,9 @@ export interface AstroliftSourceConnection {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  isPersonal: boolean;
+  userUsername: string | null;
+  parentOauthAppId: AstroliftGuid | null;
 }
 
 export interface AstroliftSshDeployKey {

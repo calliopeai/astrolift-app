@@ -17,6 +17,9 @@ const CONNECTION_FIELDS = `
   lastUsedAt
   createdAt
   updatedAt
+  isPersonal
+  userUsername
+  parentOauthAppId
 `;
 
 const SSH_KEY_FIELDS = `

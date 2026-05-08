@@ -379,6 +379,7 @@ class Auth1SessionWorkflow:
         from auth1.active_idp import active_idp
         from auth1.dev_login import dev_login
         from auth1.local_login import local_login
+        from auth1.scm_oauth import github_callback, github_start
 
         return [
             path("login", _rl_login, name="login"),
@@ -388,6 +389,14 @@ class Auth1SessionWorkflow:
             path("dev-login", dev_login, name="dev-login"),
             path("local-login", local_login, name="local-login"),
             path("active-idp.json", active_idp, name="active-idp"),
+            path(
+                "scm/github/start", github_start, name="scm_github_start"
+            ),
+            path(
+                "scm/github/callback",
+                github_callback,
+                name="scm_github_callback",
+            ),
         ]
 
     @classmethod
