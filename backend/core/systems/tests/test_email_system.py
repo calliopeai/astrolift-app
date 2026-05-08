@@ -1,11 +1,11 @@
 from email.headerregistry import Address
-from unittest import TestCase
 from unittest.mock import patch
 
 from core.emails import Emails
 from core.models import EmailTemplate
 from core.systems import EmailRequest
 from django.apps import apps
+from django.test import TestCase
 
 
 class EmailSystemTests(TestCase):

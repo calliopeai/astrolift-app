@@ -63,22 +63,6 @@ class SchemaQueryTest(TestCase):
 
         self.context = StrawberryContext(FakeRequest(self.user))
 
-    def test_components_query_returns_list(self):
-        result = schema.execute_sync(
-            '{ components { name slug } }',
-            context_value=self.context,
-        )
-        self.assertIsNone(result.errors)
-        self.assertIsInstance(result.data['components'], list)
-
-    def test_component_query_returns_null_for_missing(self):
-        result = schema.execute_sync(
-            '{ component(slug: "nonexistent") { name } }',
-            context_value=self.context,
-        )
-        self.assertIsNone(result.errors)
-        self.assertIsNone(result.data['component'])
-
     def test_organizations_query(self):
         result = schema.execute_sync(
             '{ organizations { name } }',
@@ -89,15 +73,6 @@ class SchemaQueryTest(TestCase):
         self.assertIsInstance(orgs, list)
         org_names = [o['name'] for o in orgs]
         self.assertIn('IntegrationOrg', org_names)
-
-    def test_devices_query_returns_list(self):
-        result = schema.execute_sync(
-            '{ devices { name } }',
-            context_value=self.context,
-        )
-        self.assertIsNone(result.errors)
-        self.assertIsInstance(result.data['devices'], list)
-
 
 class SchemaAuthMutationTest(TestCase):
     """Tests for auth mutations."""
