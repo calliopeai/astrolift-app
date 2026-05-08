@@ -1,36 +1,24 @@
+/**
+ * Clusters types — facade over the codegen output.
+ */
+
+import type {
+  AstroliftManagedDomain as GeneratedManagedDomain,
+  AstroliftProviderPlugin as GeneratedProviderPlugin,
+  AstroliftTenantCluster as GeneratedTenantCluster,
+} from "@/graphql/__generated__/schema";
+
 export type AstroliftGuid = string;
 
-export interface AstroliftTenantCluster {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  organizationSlug: string | null;
-  providerPluginSlug: string;
-  region: string;
-  endpoint: string;
-  authMethod: string;
-  ingressClass: string;
-  isActive: boolean;
-  capabilities: Record<string, unknown>;
-  capabilitiesProbedAt: string | null;
-  createdAt: string;
-}
+type ManagedDomainDefaultFor = "tenant_apps" | "preview_envs" | "both" | "none";
 
-export interface AstroliftManagedDomain {
-  id: AstroliftGuid;
-  zone: string;
-  organizationSlug: string | null;
-  dnsDriver: string;
-  defaultFor: "tenant_apps" | "preview_envs" | "both" | "none";
-  isWildcardManaged: boolean;
-  createdAt: string;
-}
+export type AstroliftTenantCluster = GeneratedTenantCluster;
 
-export interface AstroliftProviderPlugin {
-  id: AstroliftGuid;
-  slug: string;
-  name: string;
-  version: string;
-  capabilitiesManifest: Record<string, unknown>;
-  isEnabled: boolean;
-}
+export type AstroliftManagedDomain = Omit<
+  GeneratedManagedDomain,
+  "defaultFor"
+> & {
+  defaultFor: ManagedDomainDefaultFor;
+};
+
+export type AstroliftProviderPlugin = GeneratedProviderPlugin;
