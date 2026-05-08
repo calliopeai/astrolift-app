@@ -43,6 +43,7 @@ from astrolift_identity.models import (
 from astrolift_identity.schema.types import (
     ApiTokenPlaintextType,
     IdentityProviderType,
+    MyProfileType,
     OrganizationType,
     PolicyType,
     ProjectType,
@@ -76,6 +77,7 @@ class UpdateOrganizationInput:
     name: str | None = None
     website: str | None = None
     audit_log_retention_days: int | None = None
+    allow_user_profile_edit: bool | None = None
 
 
 @strawberry.input
@@ -127,6 +129,13 @@ class GrantRoleInput:
 @strawberry.input
 class RevokeRoleBindingInput:
     id: GUID
+
+
+@strawberry.input
+class UpdateMyProfileInput:
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
 
 
 @strawberry.input
@@ -271,6 +280,8 @@ class IdentityMutation:
             org.website = input.website
         if input.audit_log_retention_days is not None:
             org.audit_log_retention_days = input.audit_log_retention_days
+        if input.allow_user_profile_edit is not None:
+            org.allow_user_profile_edit = input.allow_user_profile_edit
         org.save()
         return gql_success(organization_to_type(org))
 
@@ -742,6 +753,87 @@ class IdentityMutation:
         idp.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
+    @strawberry.field
+    @mutation_audit(action="profile.update_self")
+    def update_my_profile(
+        self, info: Info, input: "UpdateMyProfileInput"
+    ) -> MutationResultType["MyProfileType"]:
+        """Self-service profile edit. Gated by the org-level
+        ``allow_user_profile_edit`` toggle and per-field IdP locks
+        (a field claimed by the IdP at last login can't be edited
+        locally because the next sync would overwrite it).
+
+        Intentionally not gated by ``@require_permission`` — every
+        authenticated user is allowed to edit *their own* profile.
+        Admins can disable the entire feature org-wide via the
+        toggle, which the resolver enforces here.
+        """
+        from astrolift_identity.schema.types import MyProfileType
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value, "not authenticated"
+            )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        org = (
+            Organization.objects.filter(pk=org_id).first()
+            if org_id is not None
+            else None
+        )
+        if org is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value, "no organization"
+            )
+
+        if not org.allow_user_profile_edit:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "profile editing is disabled by your organization administrator",
+            )
+
+        session = getattr(request, "session", None) if request else None
+        locked = _idp_locked_fields(viewer, session=session)
+
+        if input.first_name is not None and "first_name" in locked:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "first_name is managed by your identity provider",
+                field="firstName",
+            )
+        if input.last_name is not None and "last_name" in locked:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "last_name is managed by your identity provider",
+                field="lastName",
+            )
+        if input.email is not None and "email" in locked:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "email is managed by your identity provider",
+                field="email",
+            )
+
+        if input.first_name is not None:
+            viewer.first_name = input.first_name.strip()[:150]
+        if input.last_name is not None:
+            viewer.last_name = input.last_name.strip()[:150]
+        if input.email is not None:
+            email = input.email.strip()[:254]
+            if email and "@" not in email:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "email must be a valid address",
+                    field="email",
+                )
+            viewer.email = email
+        viewer.save(update_fields=["first_name", "last_name", "email"])
+
+        return gql_success(_my_profile_payload(viewer, org, locked))
+
 
 def _validate_idp_config(input) -> "MutationResultType | None":
     """Per-kind config validation. Returns a failure envelope or None."""
@@ -803,3 +895,47 @@ def _make_token_secret() -> tuple[str, str, str]:
     digest = hashlib.sha256(plaintext.encode()).hexdigest()
     last4 = plaintext[-4:]
     return plaintext, digest, last4
+
+
+def _idp_locked_fields(user, session=None) -> list[str]:
+    """Fields whose value came from the IdP at last login.
+
+    Phase 1 logic: when the user signed in via local accounts (the
+    default ``django.contrib.auth.backends.ModelBackend``), nothing
+    is locked — they typed their own credentials, they own the data.
+    When they came through OIDC / SAML / Cognito, ``email`` is
+    locked because it's the IdP's primary identity claim and
+    overwriting locally would just get clobbered on next login.
+
+    The auth backend is read from ``session['_auth_user_backend']``
+    (set by Django's ``login()``); ``user.backend`` is only present
+    during the login request itself, not on subsequent requests.
+
+    Future: per-IdP claim mapping would move this to
+    IdentityProvider.locked_fields so installs that don't get email
+    from their IdP can still let users edit it.
+    """
+    backend = ""
+    if session is not None:
+        backend = session.get("_auth_user_backend", "") or ""
+    if not backend:
+        backend = getattr(user, "backend", "") or ""
+    if not backend:
+        # No backend tag → can't tell, assume local accounts so the
+        # user gets edit access. SSO installs will set the backend.
+        return []
+    if "ModelBackend" in backend:
+        return []
+    return ["email"]
+
+
+def _my_profile_payload(user, org, locked: list[str]) -> "MyProfileType":
+    return MyProfileType(
+        user_id=user.pk,
+        username=user.username or "",
+        first_name=user.first_name or "",
+        last_name=user.last_name or "",
+        email=user.email or "",
+        locked_fields=list(locked),
+        org_allows_edit=org.allow_user_profile_edit,
+    )

@@ -30,6 +30,7 @@ from astrolift_identity.schema.types import (
     ApiTokenType,
     IdentityProviderType,
     MemberType,
+    MyProfileType,
     OrganizationType,
     PolicyType,
     ProjectType,
@@ -137,6 +138,40 @@ class IdentityQuery:
         return [
             identity_provider_to_type(idp, is_active=(idp.pk == active_id)) for idp in qs
         ]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_profile(self, info: Info) -> "MyProfileType | None":
+        """The signed-in viewer's profile + IdP lock policy.
+
+        Returns None for anonymous calls (the @tenant_scoped already
+        rejects them, but this guard keeps the resolver safe). Every
+        authed user gets their own row regardless of permissions —
+        you're always allowed to know what *you* look like."""
+        from astrolift_identity.models import Organization
+        from astrolift_identity.schema.mutations import (
+            _idp_locked_fields,
+            _my_profile_payload,
+        )
+        from astrolift_identity.schema.types import MyProfileType  # noqa: F401
+        from core.tenancy import get_current_tenant
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return None
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        org = (
+            Organization.objects.filter(pk=org_id).first()
+            if org_id is not None
+            else None
+        )
+        if org is None:
+            return None
+        session = getattr(request, "session", None) if request else None
+        locked = _idp_locked_fields(viewer, session=session)
+        return _my_profile_payload(viewer, org, locked)
 
     @strawberry.field
     @tenant_scoped()
