@@ -1,3 +1,28 @@
+/**
+ * Lifecycle types — facade over the codegen output.
+ *
+ * Entity types come from `__generated__/schema.ts` so they stay in
+ * lockstep with the backend. The narrow string-union types
+ * (DeploymentStatus, TriggerKind, PreviewStatus) live here because
+ * they're frontend-side switch-exhaustiveness aids — the schema
+ * carries them as plain `String!` fields. We override those fields
+ * on the generated entity with the narrow unions so consumer code
+ * (e.g. STATUS_DOT[d.status]) typechecks against valid values.
+ *
+ * When the backend grows a new status value, regen the schema and
+ * add it to the union here. Codegen will catch a mismatch the next
+ * time consumers actually use the field.
+ */
+
+import type {
+  AstroliftAppEnvironment as GeneratedAppEnvironment,
+  AstroliftAppHealthSummary as GeneratedAppHealthSummary,
+  AstroliftDeployment as GeneratedDeployment,
+  AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
+  AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
+  AstroliftPreviewEnvironment as GeneratedPreviewEnvironment,
+} from "@/graphql/__generated__/schema";
+
 export type AstroliftGuid = string;
 
 export type DeploymentStatus =
@@ -20,78 +45,30 @@ export type TriggerKind =
 
 export type PreviewStatus = "building" | "running" | "failed" | "torn_down";
 
-export interface AstroliftAppEnvironment {
-  id: AstroliftGuid;
-  name: string;
-  url: string;
-  deploysPaused: boolean;
-  requiredApprovals: number;
-  registeredAppSlug: string;
-  clusterSlug: string | null;
-  domainZone: string | null;
-  createdAt: string;
-}
+export type AstroliftAppEnvironment = GeneratedAppEnvironment;
 
-export interface AstroliftDeployment {
-  id: AstroliftGuid;
-  registeredAppSlug: string;
-  environmentName: string;
-  workloadSlug: string | null;
-  triggerKind: TriggerKind;
+export type AstroliftDeployment = Omit<
+  GeneratedDeployment,
+  "status" | "triggerKind"
+> & {
   status: DeploymentStatus;
-  imageTag: string;
-  imageDigest: string;
-  clusterRevision: string;
-  approvalsRequired: number;
-  approvalsReceived: number;
-  startedAt: string | null;
-  succeededAt: string | null;
-  failedAt: string | null;
-  endedAt: string | null;
-  durationSeconds: number | null;
-  createdAt: string;
-}
+  triggerKind: TriggerKind;
+};
 
-export interface AstroliftDeploymentLogEntry {
-  id: AstroliftGuid;
-  deploymentId: string;
-  status: string;
-  message: string;
-  detail: Record<string, unknown>;
-  occurredAt: string;
-}
+export type AstroliftDeploymentLogEntry = GeneratedDeploymentLogEntry;
 
-export interface AstroliftDeploymentMetrics {
-  windowDays: number;
-  total: number;
-  succeeded: number;
-  failed: number;
-  rolledBack: number;
-  inFlight: number;
-  successRate: number; // 0..1, or -1 when total==0
-  meanDurationSeconds: number | null;
-  p95DurationSeconds: number | null;
-}
-
-export interface AstroliftAppHealthSummary {
-  appSlug: string;
-  appName: string;
-  environmentCount: number;
-  latestDeploymentStatus: DeploymentStatus | null;
-  latestImageTag: string;
-  lastDeployedAt: string | null;
-  hasRecentFailure: boolean;
-}
-
-export interface AstroliftPreviewEnvironment {
-  id: AstroliftGuid;
-  registeredAppSlug: string;
-  prNumber: number;
-  branch: string;
-  commitSha: string;
+export type AstroliftPreviewEnvironment = Omit<
+  GeneratedPreviewEnvironment,
+  "status"
+> & {
   status: PreviewStatus;
-  hostname: string;
-  namespace: string;
-  lastDeployedAt: string | null;
-  tornDownAt: string | null;
-}
+};
+
+export type AstroliftDeploymentMetrics = GeneratedDeploymentMetrics;
+
+export type AstroliftAppHealthSummary = Omit<
+  GeneratedAppHealthSummary,
+  "latestDeploymentStatus"
+> & {
+  latestDeploymentStatus: DeploymentStatus | null;
+};
