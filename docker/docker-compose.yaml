@@ -54,12 +54,11 @@ services:
     ports:
       - '127.0.0.1:${ASTROLIFT_TEMPORAL_GRPC_PORT:-7233}:7233'
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5432
       - POSTGRES_USER=dbadmin
       - POSTGRES_PWD=Password123
       - POSTGRES_SEEDS=postgres-local
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
     depends_on:
       postgres-local:
         condition: service_healthy
