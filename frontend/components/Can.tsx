@@ -12,8 +12,10 @@ interface CanProps {
   children: React.ReactNode;
   /**
    * Rendered while the viewer's permission set is still loading.
-   * Default: nothing — saves an extra layout shift on the common
-   * case where Apollo hits a warm cache primed by PreloadQuery.
+   * Default: the children — optimistic render avoids a flash of
+   * "no buttons" on first paint. The backend still enforces the
+   * permission, so the worst case is a click that toasts a
+   * PERMISSION_DENIED. Pass `null` here for a strict-fail variant.
    */
   loading?: React.ReactNode;
   /** Rendered when the permission check fails. Default: nothing. */
@@ -42,7 +44,13 @@ interface CanProps {
  * gets a real 403, not a flash of UI.
  */
 export function Can({ permission, children, loading, fallback }: CanProps) {
-  const { can, loading: permLoading } = useMyPermissions();
-  if (permLoading) return <>{loading ?? null}</>;
+  const { can, granted, loading: permLoading } = useMyPermissions();
+  // While the permissions query is still flying AND we don't have a
+  // cached set yet, render the children optimistically. Once we have
+  // any data (granted.size > 0 or a confirmed empty set after a
+  // resolved fetch), gate normally.
+  if (permLoading && granted.size === 0) {
+    return <>{loading ?? children}</>;
+  }
   return can(permission) ? <>{children}</> : <>{fallback ?? null}</>;
 }

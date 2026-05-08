@@ -24,9 +24,13 @@ const EMPTY = new Set<string>();
  * PreloadQuery so the first render already has the data.
  */
 export function useMyPermissions() {
+  // cache-and-network: render instantly from the SSR-primed cache,
+  // then refetch on mount so a stale or 401-poisoned SSR result gets
+  // self-healed by the client-side request (which carries the user's
+  // browser cookies regardless of how SSR auth was configured).
   const { data, loading, error } = useQuery<MyPermissionsResp>(
     GET_MY_PERMISSIONS,
-    { fetchPolicy: "cache-first" },
+    { fetchPolicy: "cache-and-network" },
   );
 
   const granted: ReadonlySet<string> = data?.astroliftMyPermissions
