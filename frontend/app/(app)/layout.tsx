@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { CommandPalette } from "@/components/CommandPalette";
 import { PreloadQuery, getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <PageHeader />
             {children}
           </SidebarInset>
+          <CommandPalette />
         </SidebarProvider>
       </PreloadQuery>
     </PreloadQuery>
