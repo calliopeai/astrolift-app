@@ -248,15 +248,11 @@ export function AstroliftNav() {
         );
         if (visibleItems.length === 0) return null;
 
-        // Auto-expand a section when the current path matches one
-        // of its items, so navigating into a collapsed section
-        // doesn't leave the operator without breadcrumb context.
-        const containsActive = visibleItems.some(
-          (item) =>
-            pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href + "/")),
-        );
-        const isOpen = containsActive || !collapsed[section.label];
+        // Trust the operator's explicit toggle. Default is open
+        // (every section appears expanded for new operators).
+        // The PageHeader breadcrumb still shows where you are if
+        // the active item happens to live in a collapsed section.
+        const isOpen = !collapsed[section.label];
 
         return (
           <Collapsible
