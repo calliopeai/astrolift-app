@@ -43,9 +43,7 @@ def _build_websocket_app():
     from config.schema import schema
     from core.schema.ws_views import CookieAwareGraphQLWs
 
-    return CookieAwareGraphQLWs(
-        schema, subscription_protocols=[GRAPHQL_TRANSPORT_WS_PROTOCOL]
-    )
+    return CookieAwareGraphQLWs(schema, subscription_protocols=[GRAPHQL_TRANSPORT_WS_PROTOCOL])
 
 
 _websocket_app = None

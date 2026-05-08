@@ -23,12 +23,12 @@ from django.views.decorators.csrf import csrf_exempt
 from core.logging import JsonFormatter, get_request_id
 from core.middleware.request_id import RequestIdMiddleware
 from core.request_context import (
-    TraceContext,
     generate_ulid,
-    get_request_id as ctx_get_request_id,
     get_trace_context,
 )
-
+from core.request_context import (
+    get_request_id as ctx_get_request_id,
+)
 
 # ---- ULID basic shape -------------------------------------------
 

@@ -29,7 +29,9 @@ def test_role_rejects_unknown_permission():
         is_system=False,
     )
     bogus = Role.objects.get(slug="bogus")
-    with pytest.raises(Exception):  # ValidationError
+    from django.core.exceptions import ValidationError
+
+    with pytest.raises(ValidationError):
         bogus.full_clean()
 
 
@@ -43,9 +45,7 @@ def test_resolver_grants_via_org_binding():
         permissions=[Permission.APP_DEPLOY.value],
         is_system=True,
     )
-    RoleBinding.objects.create(
-        user=user, role=role, scope_kind="ORG", scope_id=org.id
-    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
 
     tenant = TenantContext(organization_id=org.id, actor_user_id=user.id)
     granted, _ = resolve(tenant, Permission.APP_DEPLOY, scope=None)
@@ -66,8 +66,10 @@ def test_resolver_grants_to_django_superuser_without_binding():
     check so they can complete first-run onboarding."""
     User = get_user_model()
     su = User.objects.create(
-        username="root@example", email="root@example",
-        is_superuser=True, is_staff=True,
+        username="root@example",
+        email="root@example",
+        is_superuser=True,
+        is_staff=True,
     )
     org = Organization.objects.create(name="Acme", slug="acme-su")
     tenant = TenantContext(organization_id=org.id, actor_user_id=su.id)
@@ -83,8 +85,10 @@ def test_resolver_grants_to_django_superuser_without_binding():
 def test_resolver_does_not_grant_to_inactive_superuser():
     User = get_user_model()
     su = User.objects.create(
-        username="dormant", email="dormant@example",
-        is_superuser=True, is_active=False,
+        username="dormant",
+        email="dormant@example",
+        is_superuser=True,
+        is_active=False,
     )
     org = Organization.objects.create(name="Acme", slug="acme-dormant")
     tenant = TenantContext(organization_id=org.id, actor_user_id=su.id)

@@ -34,9 +34,7 @@ class SoftDeleteManager(models.Manager):
     _queryset_class = SoftDeleteQuerySet
 
     def get_queryset(self) -> SoftDeleteQuerySet:
-        return self._queryset_class(self.model, using=self._db).filter(
-            deleted_at__isnull=True
-        )
+        return self._queryset_class(self.model, using=self._db).filter(deleted_at__isnull=True)
 
 
 class UnscopedManager(models.Manager):

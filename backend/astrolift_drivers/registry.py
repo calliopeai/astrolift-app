@@ -51,9 +51,7 @@ class PluginRegistry:
 
         impl = manifest.drivers.get(driver)
         if impl is None:
-            raise DriverNotFound(
-                f"plugin {plugin_id!r} does not implement driver {driver!r}"
-            )
+            raise DriverNotFound(f"plugin {plugin_id!r} does not implement driver {driver!r}")
         return impl
 
     def list(self) -> list[PluginManifest]:

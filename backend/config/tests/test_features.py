@@ -19,7 +19,7 @@ def test_default_features_enabled():
     fully-functional platform."""
     with patch.dict(os.environ, {}, clear=False):
         for f in Feature:
-            os.environ.pop(f.value.upper().replace('FEATURE_', '').replace('FEATURE', ''), None)
+            os.environ.pop(f.value.upper().replace("FEATURE_", "").replace("FEATURE", ""), None)
         # Just check the defaults map is consistent
         for f in Feature:
             assert is_enabled(f) is True

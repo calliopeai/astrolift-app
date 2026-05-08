@@ -91,9 +91,7 @@ class OperationsQuery:
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
-        qs = Notification.objects.filter(user_id=tenant.actor_user_id).order_by(
-            "-created_at"
-        )
+        qs = Notification.objects.filter(user_id=tenant.actor_user_id).order_by("-created_at")
         if unread_only:
             qs = qs.filter(read_at__isnull=True)
         return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]

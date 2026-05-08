@@ -61,17 +61,14 @@ def secrets_backend():
     cls = _BACKENDS.get(kind)
     if cls is None:
         raise RuntimeError(
-            f"unknown ASTROLIFT_SECRETS_BACKEND={kind!r}; "
-            f"valid options: {sorted(_BACKENDS)}"
+            f"unknown ASTROLIFT_SECRETS_BACKEND={kind!r}; " f"valid options: {sorted(_BACKENDS)}"
         )
     return cls()
 
 
 def encrypt_at_rest(plaintext: bytes) -> EncryptedSecret:
     backend = secrets_backend()
-    return EncryptedSecret(
-        backend_kind=backend.kind, backend_ref=backend.encrypt(plaintext)
-    )
+    return EncryptedSecret(backend_kind=backend.kind, backend_ref=backend.encrypt(plaintext))
 
 
 def decrypt(secret: EncryptedSecret) -> bytes:
@@ -85,8 +82,7 @@ def decrypt(secret: EncryptedSecret) -> bytes:
     cls = _BACKENDS.get(secret.backend_kind)
     if cls is None:
         raise RuntimeError(
-            f"row was encrypted with unknown backend "
-            f"{secret.backend_kind!r}; cannot decrypt"
+            f"row was encrypted with unknown backend " f"{secret.backend_kind!r}; cannot decrypt"
         )
     return cls().decrypt(secret.backend_ref)
 

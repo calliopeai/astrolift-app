@@ -71,22 +71,14 @@ class RegistryMutation:
     @strawberry.field
     @mutation_audit(action="app.create")
     @require_permission(Permission.APP_CREATE)
-    def register_app(
-        self, info: Info, input: RegisterAppInput
-    ) -> MutationResultType[RegisteredAppType]:
+    def register_app(self, info: Info, input: RegisterAppInput) -> MutationResultType[RegisteredAppType]:
         project = (
-            Project.objects.select_related("organization", "team")
-            .filter(guid=str(input.project_id))
-            .first()
+            Project.objects.select_related("organization", "team").filter(guid=str(input.project_id)).first()
         )
         if project is None:
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value, "project not found", field="projectId"
-            )
+            return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
 
-        if RegisteredApp.objects.filter(
-            organization=project.organization, slug=input.slug
-        ).exists():
+        if RegisteredApp.objects.filter(organization=project.organization, slug=input.slug).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
                 f"app with slug {input.slug!r} already exists in this organization",
@@ -126,9 +118,7 @@ class RegistryMutation:
     @strawberry.field
     @mutation_audit(action="app.update")
     @require_permission(Permission.APP_UPDATE)
-    def update_app(
-        self, info: Info, input: UpdateAppInput
-    ) -> MutationResultType[RegisteredAppType]:
+    def update_app(self, info: Info, input: UpdateAppInput) -> MutationResultType[RegisteredAppType]:
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")

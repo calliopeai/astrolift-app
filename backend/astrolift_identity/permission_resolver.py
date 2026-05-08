@@ -96,8 +96,4 @@ def _scope_filter(scopes: list[tuple[str, int]]):
 def _is_superuser(user_id: int) -> bool:
     from django.contrib.auth import get_user_model
 
-    return (
-        get_user_model()
-        .objects.filter(pk=user_id, is_superuser=True, is_active=True)
-        .exists()
-    )
+    return get_user_model().objects.filter(pk=user_id, is_superuser=True, is_active=True).exists()

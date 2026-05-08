@@ -18,6 +18,7 @@ Usage:
     # In schema.py:
     query_bases, mutation_bases = get_enabled_schema_classes()
 """
+
 import logging
 import os
 from enum import Enum
@@ -26,28 +27,29 @@ logger = logging.getLogger(__name__)
 
 
 def _env_bool(key, default=True):
-    return os.environ.get(key, str(default)).lower() in ('true', '1', 'yes')
+    return os.environ.get(key, str(default)).lower() in ("true", "1", "yes")
 
 
 class Feature(str, Enum):
     """Platform features that can be toggled on/off."""
-    WORKFLOWS = 'workflows'
-    TEMPORAL = 'temporal'
-    OPENSEARCH = 'opensearch'
-    FILE_UPLOADS = 'file_uploads'
+
+    WORKFLOWS = "workflows"
+    TEMPORAL = "temporal"
+    OPENSEARCH = "opensearch"
+    FILE_UPLOADS = "file_uploads"
 
 
 # Feature -> environment variable -> default
 FEATURE_DEFAULTS = {
-    Feature.WORKFLOWS: ('FEATURE_WORKFLOWS', True),
-    Feature.TEMPORAL: ('FEATURE_TEMPORAL', True),
-    Feature.OPENSEARCH: ('FEATURE_OPENSEARCH', True),
-    Feature.FILE_UPLOADS: ('FEATURE_FILE_UPLOADS', True),
+    Feature.WORKFLOWS: ("FEATURE_WORKFLOWS", True),
+    Feature.TEMPORAL: ("FEATURE_TEMPORAL", True),
+    Feature.OPENSEARCH: ("FEATURE_OPENSEARCH", True),
+    Feature.FILE_UPLOADS: ("FEATURE_FILE_UPLOADS", True),
 }
 
 # Feature -> Django apps that belong to it
 FEATURE_APPS = {
-    Feature.WORKFLOWS: ['workflows'],
+    Feature.WORKFLOWS: ["workflows"],
     Feature.TEMPORAL: [],
     Feature.OPENSEARCH: [],  # opensearch is a service, not a Django app
     Feature.FILE_UPLOADS: [],
@@ -55,7 +57,7 @@ FEATURE_APPS = {
 
 # Feature -> GraphQL schema module (app_label.schema)
 FEATURE_SCHEMA_MODULES = {
-    Feature.WORKFLOWS: 'workflows.schema',
+    Feature.WORKFLOWS: "workflows.schema",
 }
 
 
@@ -83,7 +85,7 @@ def filter_installed_apps(apps: list[str]) -> list[str]:
     """Remove disabled feature apps from INSTALLED_APPS."""
     disabled = get_disabled_apps()
     if disabled:
-        logger.info(f'Disabled feature apps: {disabled}')
+        logger.info(f"Disabled feature apps: {disabled}")
     return [app for app in apps if app not in disabled]
 
 
@@ -97,16 +99,17 @@ def get_enabled_schema_classes():
 
     for feature, module_path in FEATURE_SCHEMA_MODULES.items():
         if not is_enabled(feature):
-            logger.info(f'Schema: skipping disabled feature {feature.value}')
+            logger.info(f"Schema: skipping disabled feature {feature.value}")
             continue
         try:
             import importlib
+
             mod = importlib.import_module(module_path)
-            if hasattr(mod, 'Query'):
+            if hasattr(mod, "Query"):
                 query_bases.append(mod.Query)
-            if hasattr(mod, 'Mutation'):
+            if hasattr(mod, "Mutation"):
                 mutation_bases.append(mod.Mutation)
         except ImportError as e:
-            logger.warning(f'Schema: could not import {module_path}: {e}')
+            logger.warning(f"Schema: could not import {module_path}: {e}")
 
     return query_bases, mutation_bases

@@ -39,9 +39,7 @@ class _FakeConn:
         # Encrypt a known PAT so the driver's decrypt path runs end-to-end.
         from core.secrets import encrypt_at_rest
 
-        self.secret_ciphertext = encrypt_at_rest(
-            b"ghp_TestTokenNeverHitsTheNetwork"
-        ).backend_ref
+        self.secret_ciphertext = encrypt_at_rest(b"ghp_TestTokenNeverHitsTheNetwork").backend_ref
 
 
 class _MockResponse:
@@ -192,13 +190,9 @@ def test_auth_failure_is_recoverable(monkeypatch):
     import urllib.error
 
     def _boom(req, timeout=10):
-        raise urllib.error.HTTPError(
-            req.full_url, 401, "Unauthorized", {}, io.BytesIO(b"bad token")
-        )
+        raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", {}, io.BytesIO(b"bad token"))
 
-    monkeypatch.setattr(
-        "astrolift_scm.providers.github.urllib.request.urlopen", _boom
-    )
+    monkeypatch.setattr("astrolift_scm.providers.github.urllib.request.urlopen", _boom)
     conn = _FakeConn()
     with pytest.raises(ProviderError) as exc:
         list_repos(conn)

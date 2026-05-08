@@ -66,12 +66,8 @@ class Command(BaseCommand):
         # org name; the operator finds out at deploy time, not after a
         # demo screen ships with "Acme".
         parser.add_argument("--org", default=_env("ASTROLIFT_ORG_SLUG"))
-        parser.add_argument(
-            "--org-name", default=_env("ASTROLIFT_ORG_NAME")
-        )
-        parser.add_argument(
-            "--password", default=_env("ASTROLIFT_ADMIN_PASSWORD")
-        )
+        parser.add_argument("--org-name", default=_env("ASTROLIFT_ORG_NAME"))
+        parser.add_argument("--password", default=_env("ASTROLIFT_ADMIN_PASSWORD"))
         parser.add_argument(
             "--is-superuser",
             action="store_true",
@@ -149,9 +145,7 @@ class Command(BaseCommand):
             user.save()
 
             try:
-                org_owner = Role.objects.get(
-                    slug="org_owner", is_system=True, organization=None
-                )
+                org_owner = Role.objects.get(slug="org_owner", is_system=True, organization=None)
             except Role.DoesNotExist as exc:
                 raise CommandError(
                     "system role 'org_owner' missing — run `manage.py migrate` first."

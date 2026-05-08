@@ -5,13 +5,13 @@ from netaddr import IPAddress, IPNetwork
 
 class AllowCIDRHostsMiddleware:
     KNOWN_RANGES = {
-        IPNetwork('10.0.0.0/8'),
+        IPNetwork("10.0.0.0/8"),
     }
 
     KNOWN_DOMAINS = {
-        '.amazonaws.com',
-        '.localhost',
-        '.local',
+        ".amazonaws.com",
+        ".localhost",
+        ".local",
     }
 
     def __init__(self, get_response):
@@ -21,7 +21,7 @@ class AllowCIDRHostsMiddleware:
         if settings.CONFIGURATION.lower() == "local" or settings.CONFIGURATION.lower() == "tests":
             return self.get_response(request)
 
-        host = request.get_host().split(':')[0]
+        host = request.get_host().split(":")[0]
         if host in settings.ALLOWED_HOSTS:
             return self.get_response(request)
         try:
@@ -30,6 +30,6 @@ class AllowCIDRHostsMiddleware:
                     break
             else:
                 IPAddress(host)  # Allow any IP Addresses
-        except Exception:
-            raise DisallowedHost(f"Invalid host: {host}")
+        except Exception as exc:
+            raise DisallowedHost(f"Invalid host: {host}") from exc
         return self.get_response(request)

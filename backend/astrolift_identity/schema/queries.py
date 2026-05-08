@@ -101,20 +101,14 @@ class IdentityQuery:
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def astrolift_role_bindings(self, info: Info) -> list[RoleBindingType]:
-        qs = (
-            RoleBinding.objects.select_related("user", "role")
-            .order_by("-granted_at")[:500]
-        )
+        qs = RoleBinding.objects.select_related("user", "role").order_by("-granted_at")[:500]
         return [role_binding_to_type(rb) for rb in qs]
 
     @strawberry.field
     @require_permission(Permission.API_TOKEN_CREATE)
     @tenant_scoped()
     def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
-        qs = (
-            ApiToken.objects.select_related("user", "team")
-            .order_by("-created_at")[:200]
-        )
+        qs = ApiToken.objects.select_related("user", "team").order_by("-created_at")[:200]
         return [api_token_to_type(t) for t in qs]
 
     @strawberry.field
@@ -130,18 +124,13 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_identity_providers(self, info: Info) -> list[IdentityProviderType]:
-        qs = (
-            IdentityProvider.objects.select_related("organization")
-            .order_by("-is_default", "kind")[:50]
-        )
+        qs = IdentityProvider.objects.select_related("organization").order_by("-is_default", "kind")[:50]
         active_id = _active_idp_pk()
-        return [
-            identity_provider_to_type(idp, is_active=(idp.pk == active_id)) for idp in qs
-        ]
+        return [identity_provider_to_type(idp, is_active=(idp.pk == active_id)) for idp in qs]
 
     @strawberry.field
     @tenant_scoped()
-    def astrolift_my_profile(self, info: Info) -> "MyProfileType | None":
+    def astrolift_my_profile(self, info: Info) -> MyProfileType | None:
         """The signed-in viewer's profile + IdP lock policy.
 
         Returns None for anonymous calls (the @tenant_scoped already
@@ -162,11 +151,7 @@ class IdentityQuery:
             return None
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        org = (
-            Organization.objects.filter(pk=org_id).first()
-            if org_id is not None
-            else None
-        )
+        org = Organization.objects.filter(pk=org_id).first() if org_id is not None else None
         if org is None:
             return None
         session = getattr(request, "session", None) if request else None
@@ -194,9 +179,10 @@ class IdentityQuery:
         bypass in ``astrolift_identity.permission_resolver.resolve``
         — the bootstrap admin path doesn't need explicit role bindings.
         """
+        from django.contrib.auth import get_user_model
+
         from core.permissions import Permission
         from core.tenancy import get_current_tenant
-        from django.contrib.auth import get_user_model
 
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
@@ -204,9 +190,7 @@ class IdentityQuery:
 
         if (
             get_user_model()
-            .objects.filter(
-                pk=tenant.actor_user_id, is_superuser=True, is_active=True
-            )
+            .objects.filter(pk=tenant.actor_user_id, is_superuser=True, is_active=True)
             .exists()
         ):
             return sorted(p.value for p in Permission)
@@ -233,9 +217,8 @@ class IdentityQuery:
         for k, sid in candidate_scopes:
             scope_ids_by_kind.setdefault(k, set()).add(sid)
 
-        bindings = (
-            RoleBinding.objects.select_related("role")
-            .filter(user_id=tenant.actor_user_id, scope_kind__in=scope_kinds)
+        bindings = RoleBinding.objects.select_related("role").filter(
+            user_id=tenant.actor_user_id, scope_kind__in=scope_kinds
         )
         effective: set[str] = set()
         for binding in bindings:
@@ -251,9 +234,7 @@ class IdentityQuery:
 
     @strawberry.field
     @tenant_scoped()
-    def astrolift_active_identity_provider(
-        self, info: Info
-    ) -> IdentityProviderType | None:
+    def astrolift_active_identity_provider(self, info: Info) -> IdentityProviderType | None:
         """The IdP currently bound to the active organization (or None).
 
         Intentionally not gated by a high permission — the login screen
@@ -264,11 +245,7 @@ class IdentityQuery:
         active_id = _active_idp_pk()
         if active_id is None:
             return None
-        idp = (
-            IdentityProvider.objects.select_related("organization")
-            .filter(pk=active_id)
-            .first()
-        )
+        idp = IdentityProvider.objects.select_related("organization").filter(pk=active_id).first()
         if idp is None:
             return None
         return identity_provider_to_type(idp, is_active=True)
@@ -282,8 +259,4 @@ def _active_idp_pk() -> int | None:
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return None
-    return (
-        Organization.objects.filter(pk=org_id)
-        .values_list("identity_provider_id", flat=True)
-        .first()
-    )
+    return Organization.objects.filter(pk=org_id).values_list("identity_provider_id", flat=True).first()

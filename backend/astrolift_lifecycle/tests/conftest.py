@@ -56,9 +56,7 @@ def team(org):
 
 @pytest.fixture
 def project(org, team):
-    return Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo"
-    )
+    return Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
 
 
 @pytest.fixture
@@ -178,9 +176,7 @@ def temporal_recorder(monkeypatch, settings):
         rec.starts.append((name, list(args), workflow_id))
         from astrolift_workflows.client import WorkflowHandle
 
-        return WorkflowHandle(
-            workflow_id=workflow_id, run_id=f"run-{len(rec.starts)}", enqueued=True
-        )
+        return WorkflowHandle(workflow_id=workflow_id, run_id=f"run-{len(rec.starts)}", enqueued=True)
 
     def _signal(workflow_id, signal_name, *args):
         rec.signals.append((workflow_id, signal_name, args))
@@ -190,13 +186,7 @@ def temporal_recorder(monkeypatch, settings):
         rec.terminates.append((workflow_id, reason))
         return True
 
-    monkeypatch.setattr(
-        "astrolift_lifecycle.schema.mutations.start_workflow", _start
-    )
-    monkeypatch.setattr(
-        "astrolift_lifecycle.schema.mutations.signal_workflow", _signal
-    )
-    monkeypatch.setattr(
-        "astrolift_lifecycle.schema.mutations.terminate_workflow", _terminate
-    )
+    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.start_workflow", _start)
+    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.signal_workflow", _signal)
+    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.terminate_workflow", _terminate)
     return rec

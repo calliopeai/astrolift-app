@@ -25,7 +25,6 @@ from core.permissions import Permission, require_permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import get_current_tenant
 
-
 # ---------------------------------------------------------------------------
 # Inputs
 # ---------------------------------------------------------------------------
@@ -190,9 +189,7 @@ class ScmMutation:
     def update_source_connection(
         self, info: Info, input: UpdateSourceConnectionInput
     ) -> MutationResultType[SourceConnectionType]:
-        conn = SourceConnection.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True
-        ).first()
+        conn = SourceConnection.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if conn is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
 
@@ -210,9 +207,7 @@ class ScmMutation:
         if input.is_active is not None:
             conn.is_active = input.is_active
         if input.rotate_secret_plaintext:
-            encrypted = encrypt_at_rest(
-                input.rotate_secret_plaintext.encode("utf-8")
-            )
+            encrypted = encrypt_at_rest(input.rotate_secret_plaintext.encode("utf-8"))
             conn.secret_backend_kind = encrypted.backend_kind
             conn.secret_ciphertext = encrypted.backend_ref
         conn.save()
@@ -224,9 +219,7 @@ class ScmMutation:
     def disconnect_source(
         self, info: Info, input: DisconnectSourceInput
     ) -> MutationResultType[SourceConnectionType]:
-        conn = SourceConnection.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True
-        ).first()
+        conn = SourceConnection.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if conn is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
         conn.soft_delete()
@@ -259,9 +252,7 @@ class ScmMutation:
                 )
 
         if not input.name.strip():
-            return gql_failure(
-                ErrorCode.VALIDATION.value, "name is required", field="name"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
 
         comment = f"astrolift:{org.slug}"
         if app is not None:
@@ -304,9 +295,7 @@ class ScmMutation:
         """
         import secrets
 
-        conn = SourceConnection.objects.filter(
-            guid=str(input.connection_id), deleted_at__isnull=True
-        ).first()
+        conn = SourceConnection.objects.filter(guid=str(input.connection_id), deleted_at__isnull=True).first()
         if conn is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
         if not conn.kind.startswith(("github_", "gitlab_")):
@@ -345,9 +334,7 @@ class ScmMutation:
     def delete_ssh_deploy_key(
         self, info: Info, input: DeleteSshDeployKeyInput
     ) -> MutationResultType[SshDeployKeyType]:
-        row = SshDeployKey.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True
-        ).first()
+        row = SshDeployKey.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if row is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "key not found")
         row.soft_delete()

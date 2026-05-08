@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import statistics
 from datetime import timedelta
 
 import strawberry
@@ -37,15 +36,10 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_environments(
-        self, info: Info, app_slug: str | None = None
-    ) -> list[AppEnvironmentType]:
-        qs = (
-            AppEnvironment.objects.select_related(
-                "registered_app", "tenant_cluster", "managed_domain"
-            )
-            .order_by("registered_app__slug", "name")
-        )
+    def astrolift_environments(self, info: Info, app_slug: str | None = None) -> list[AppEnvironmentType]:
+        qs = AppEnvironment.objects.select_related(
+            "registered_app", "tenant_cluster", "managed_domain"
+        ).order_by("registered_app__slug", "name")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [app_env_to_type(e) for e in qs[:300]]
@@ -60,11 +54,8 @@ class LifecycleQuery:
         environment_name: str | None = None,
         limit: int = 50,
     ) -> list[DeploymentType]:
-        qs = (
-            Deployment.objects.select_related(
-                "registered_app", "app_environment", "workload"
-            )
-            .order_by("-created_at")
+        qs = Deployment.objects.select_related("registered_app", "app_environment", "workload").order_by(
+            "-created_at"
         )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
@@ -75,9 +66,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)
     @tenant_scoped()
-    def astrolift_deployment_log(
-        self, info: Info, deployment_id: str
-    ) -> list[DeploymentLogEntryType]:
+    def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
         # Look up the deployment by guid then return its log entries.
         deployment = Deployment.objects.filter(guid=deployment_id).first()
         if deployment is None:
@@ -91,9 +80,7 @@ class LifecycleQuery:
     def astrolift_preview_environments(
         self, info: Info, app_slug: str | None = None
     ) -> list[PreviewEnvironmentType]:
-        qs = PreviewEnvironment.objects.select_related("registered_app").order_by(
-            "-created_at"
-        )
+        qs = PreviewEnvironment.objects.select_related("registered_app").order_by("-created_at")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [preview_to_type(p) for p in qs[:200]]
@@ -101,9 +88,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_deployment_metrics(
-        self, info: Info, window_days: int = 30
-    ) -> DeploymentMetricsType:
+    def astrolift_deployment_metrics(self, info: Info, window_days: int = 30) -> DeploymentMetricsType:
         """Aggregate rollout health for the last N days.
 
         Inputs are clamped to [1, 365] so callers can't ask for an
@@ -114,9 +99,7 @@ class LifecycleQuery:
         window_days = max(1, min(int(window_days), 365))
         since = timezone.now() - timedelta(days=window_days)
 
-        qs = Deployment.objects.filter(
-            created_at__gte=since, deleted_at__isnull=True
-        )
+        qs = Deployment.objects.filter(created_at__gte=since, deleted_at__isnull=True)
 
         in_flight_statuses = {
             Deployment.Status.PENDING_APPROVAL.value,
@@ -138,9 +121,7 @@ class LifecycleQuery:
         in_flight = sum(1 for s, _ in rows if s in in_flight_statuses)
 
         durations = [d for s, d in rows if d is not None and d >= 0]
-        mean_duration = (
-            sum(durations) / len(durations) if durations else None
-        )
+        mean_duration = sum(durations) / len(durations) if durations else None
         p95_duration: float | None = None
         if len(durations) >= 5:
             ordered = sorted(durations)
@@ -170,9 +151,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_app_health_summary(
-        self, info: Info
-    ) -> list[AppHealthSummaryType]:
+    def astrolift_app_health_summary(self, info: Info) -> list[AppHealthSummaryType]:
         """Per-app health rollup for the metrics dashboard.
 
         For every registered app in the org, returns the latest
@@ -183,18 +162,11 @@ class LifecycleQuery:
         """
         recent_window = timezone.now() - timedelta(days=7)
         out: list[AppHealthSummaryType] = []
-        apps = (
-            RegisteredApp.objects.filter(deleted_at__isnull=True)
-            .order_by("slug")
-        )
+        apps = RegisteredApp.objects.filter(deleted_at__isnull=True).order_by("slug")
         for app in apps[:300]:
-            env_count = AppEnvironment.objects.filter(
-                registered_app=app, deleted_at__isnull=True
-            ).count()
+            env_count = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).count()
             latest = (
-                Deployment.objects.filter(
-                    registered_app=app, deleted_at__isnull=True
-                )
+                Deployment.objects.filter(registered_app=app, deleted_at__isnull=True)
                 .order_by("-created_at")
                 .first()
             )
@@ -212,15 +184,9 @@ class LifecycleQuery:
                     app_slug=app.slug,
                     app_name=app.name,
                     environment_count=env_count,
-                    latest_deployment_status=(
-                        latest.status if latest else None
-                    ),
-                    latest_image_tag=(
-                        latest.image_tag if latest else ""
-                    ),
-                    last_deployed_at=(
-                        latest.created_at if latest else None
-                    ),
+                    latest_deployment_status=(latest.status if latest else None),
+                    latest_image_tag=(latest.image_tag if latest else ""),
+                    last_deployed_at=(latest.created_at if latest else None),
                     has_recent_failure=has_recent_failure,
                 )
             )

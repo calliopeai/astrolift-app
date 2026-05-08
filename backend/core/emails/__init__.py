@@ -19,13 +19,12 @@ class WelcomeEmailParameters(EmailParameters):
     Welcome email body.
     """
 
-    first_name: str = 'John'
+    first_name: str = "John"
 
-    last_name: str = 'Doe'
+    last_name: str = "Doe"
 
 
 class Emails(BaseEmail):
-
     WELCOME = EmailDefinition(
         identifier="welcome",
         header_template=EmailResources.welcome_email_header,

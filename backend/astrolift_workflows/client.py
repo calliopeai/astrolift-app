@@ -71,9 +71,7 @@ def _task_queue() -> str:
 
 
 @async_to_sync
-async def _start(
-    workflow: str, *, args: list[Any], workflow_id: str, task_queue: str
-) -> tuple[str, str]:
+async def _start(workflow: str, *, args: list[Any], workflow_id: str, task_queue: str) -> tuple[str, str]:
     client = await _get_client_async()
     handle = await client.start_workflow(
         workflow,
@@ -115,9 +113,7 @@ def start_workflow(
         return WorkflowHandle(workflow_id=workflow_id, run_id="", enqueued=False)
 
     queue = task_queue or _task_queue()
-    wf_id, run_id = _start(
-        workflow_name, args=args, workflow_id=workflow_id, task_queue=queue
-    )
+    wf_id, run_id = _start(workflow_name, args=args, workflow_id=workflow_id, task_queue=queue)
     return WorkflowHandle(workflow_id=wf_id, run_id=run_id, enqueued=True)
 
 

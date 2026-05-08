@@ -62,3 +62,6 @@ class CostSnapshot(AppendOnlyMixin, models.Model):
                 name="cost_org_date_kind_idx",
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"CostSnapshot {self.guid} {self.by} {self.amount}{self.currency}"

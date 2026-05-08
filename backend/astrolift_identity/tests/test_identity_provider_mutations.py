@@ -38,16 +38,16 @@ pytestmark = pytest.mark.django_db
 
 def _input(**kwargs):
     """Build a CreateIdentityProviderInput-shaped object for validation tests."""
-    defaults = dict(
-        kind="oidc",
-        display_name=None,
-        config=None,
-        metadata_url=None,
-        oidc_discovery_url=None,
-        client_id=None,
-        client_secret_ref=None,
-        set_active=False,
-    )
+    defaults = {
+        "kind": "oidc",
+        "display_name": None,
+        "config": None,
+        "metadata_url": None,
+        "oidc_discovery_url": None,
+        "client_id": None,
+        "client_secret_ref": None,
+        "set_active": False,
+    }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
 
@@ -60,9 +60,7 @@ def test_validate_oidc_requires_discovery_and_client_id():
     miss_disc = _validate_idp_config(_input(kind="oidc", client_id="x"))
     assert miss_disc.errors[0].field == "oidcDiscoveryUrl"
 
-    miss_cid = _validate_idp_config(
-        _input(kind="oidc", oidc_discovery_url="https://example.com/.well-known")
-    )
+    miss_cid = _validate_idp_config(_input(kind="oidc", oidc_discovery_url="https://example.com/.well-known"))
     assert miss_cid.errors[0].field == "clientId"
 
 
@@ -113,12 +111,7 @@ def test_validate_saml_requires_metadata_url():
 
 
 def test_validate_saml_passes_with_metadata():
-    assert (
-        _validate_idp_config(
-            _input(kind="saml", metadata_url="https://idp.example/metadata")
-        )
-        is None
-    )
+    assert _validate_idp_config(_input(kind="saml", metadata_url="https://idp.example/metadata")) is None
 
 
 # ---------------------------------------------------------------------------
@@ -159,9 +152,7 @@ def test_create_local_idp_minimal_input(org, fake_info, permission_resolver):
     with tenant_context(TenantContext(organization_id=org.id)):
         result = mut.create_identity_provider(
             fake_info,
-            input=CreateIdentityProviderInput(
-                kind="local", display_name="local accounts"
-            ),
+            input=CreateIdentityProviderInput(kind="local", display_name="local accounts"),
         )
     assert result.ok, result.errors
     assert result.data.kind == "local"
@@ -174,9 +165,7 @@ def test_create_with_set_active_binds_to_org(org, fake_info, permission_resolver
     with tenant_context(TenantContext(organization_id=org.id)):
         result = mut.create_identity_provider(
             fake_info,
-            input=CreateIdentityProviderInput(
-                kind="local", display_name="primary", set_active=True
-            ),
+            input=CreateIdentityProviderInput(kind="local", display_name="primary", set_active=True),
         )
     assert result.ok
     assert result.data.is_active is True
@@ -189,11 +178,9 @@ def test_set_active_switches_org_binding(org, fake_info, permission_resolver):
     _grant(permission_resolver)
     mut = IdentityMutation()
     with tenant_context(TenantContext(organization_id=org.id)):
-        a = mut.create_identity_provider(
+        mut.create_identity_provider(
             fake_info,
-            input=CreateIdentityProviderInput(
-                kind="local", display_name="a", set_active=True
-            ),
+            input=CreateIdentityProviderInput(kind="local", display_name="a", set_active=True),
         )
         b = mut.create_identity_provider(
             fake_info,
@@ -204,10 +191,7 @@ def test_set_active_switches_org_binding(org, fake_info, permission_resolver):
         )
     assert switched.ok, switched.errors
     org.refresh_from_db()
-    assert (
-        IdentityProvider.objects.get(pk=org.identity_provider_id).display_name
-        == "b"
-    )
+    assert IdentityProvider.objects.get(pk=org.identity_provider_id).display_name == "b"
 
 
 def test_soft_delete_refuses_active_provider(org, fake_info, permission_resolver):
@@ -216,34 +200,24 @@ def test_soft_delete_refuses_active_provider(org, fake_info, permission_resolver
     with tenant_context(TenantContext(organization_id=org.id)):
         a = mut.create_identity_provider(
             fake_info,
-            input=CreateIdentityProviderInput(
-                kind="local", display_name="active", set_active=True
-            ),
+            input=CreateIdentityProviderInput(kind="local", display_name="active", set_active=True),
         )
-        result = mut.soft_delete_identity_provider(
-            fake_info, input=SoftDeleteByGuidInput(id=a.data.id)
-        )
+        result = mut.soft_delete_identity_provider(fake_info, input=SoftDeleteByGuidInput(id=a.data.id))
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
 
 
-def test_soft_delete_inactive_provider_succeeds(
-    org, fake_info, permission_resolver
-):
+def test_soft_delete_inactive_provider_succeeds(org, fake_info, permission_resolver):
     _grant(permission_resolver)
     mut = IdentityMutation()
     with tenant_context(TenantContext(organization_id=org.id)):
         mut.create_identity_provider(
             fake_info,
-            input=CreateIdentityProviderInput(
-                kind="local", display_name="active", set_active=True
-            ),
+            input=CreateIdentityProviderInput(kind="local", display_name="active", set_active=True),
         )
         b = mut.create_identity_provider(
             fake_info,
             input=CreateIdentityProviderInput(kind="local", display_name="b"),
         )
-        result = mut.soft_delete_identity_provider(
-            fake_info, input=SoftDeleteByGuidInput(id=b.data.id)
-        )
+        result = mut.soft_delete_identity_provider(fake_info, input=SoftDeleteByGuidInput(id=b.data.id))
     assert result.ok, result.errors

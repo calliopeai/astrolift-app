@@ -24,10 +24,9 @@ class RegistryQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_apps(self, info: Info) -> list[RegisteredAppType]:
-        qs = (
-            RegisteredApp.objects.select_related("organization", "team", "project")
-            .order_by("-created_at")[:200]
-        )
+        qs = RegisteredApp.objects.select_related("organization", "team", "project").order_by("-created_at")[
+            :200
+        ]
         return [app_to_type(a) for a in qs]
 
     @strawberry.field
@@ -35,18 +34,14 @@ class RegistryQuery:
     @tenant_scoped()
     def astrolift_app(self, info: Info, slug: str) -> RegisteredAppType | None:
         app = (
-            RegisteredApp.objects.select_related("organization", "team", "project")
-            .filter(slug=slug)
-            .first()
+            RegisteredApp.objects.select_related("organization", "team", "project").filter(slug=slug).first()
         )
         return app_to_type(app) if app else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_workloads(
-        self, info: Info, app_slug: str | None = None
-    ) -> list[WorkloadType]:
+    def astrolift_workloads(self, info: Info, app_slug: str | None = None) -> list[WorkloadType]:
         qs = Workload.objects.select_related("registered_app")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
@@ -55,9 +50,7 @@ class RegistryQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_containers(
-        self, info: Info, workload_slug: str | None = None
-    ) -> list[ContainerType]:
+    def astrolift_containers(self, info: Info, workload_slug: str | None = None) -> list[ContainerType]:
         qs = Container.objects.select_related("workload")
         if workload_slug:
             qs = qs.filter(workload__slug=workload_slug)

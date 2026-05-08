@@ -32,7 +32,6 @@ from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
-
 JSON = strawberry.scalars.JSON
 
 
@@ -189,9 +188,7 @@ class ClustersMutation:
         # Refuse if active apps still target this cluster.
         from astrolift_registry.models import RegisteredApp
 
-        in_use = RegisteredApp.objects.filter(
-            default_tenant_cluster=cluster, is_active=True
-        ).count()
+        in_use = RegisteredApp.objects.filter(default_tenant_cluster=cluster, is_active=True).count()
         if in_use:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,

@@ -36,11 +36,14 @@ def setup(service_name: str, service_version: str, environment: str, is_local: b
 
 def _resource(service_name, service_version, environment):
     from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_VERSION, Resource
-    return Resource.create({
-        SERVICE_NAME: os.getenv("OTEL_SERVICE_NAME", service_name),
-        SERVICE_VERSION: service_version,
-        DEPLOYMENT_ENVIRONMENT: environment,
-    })
+
+    return Resource.create(
+        {
+            SERVICE_NAME: os.getenv("OTEL_SERVICE_NAME", service_name),
+            SERVICE_VERSION: service_version,
+            DEPLOYMENT_ENVIRONMENT: environment,
+        }
+    )
 
 
 def _setup_tracing(service_name, service_version, environment, is_local):
@@ -54,10 +57,12 @@ def _setup_tracing(service_name, service_version, environment, is_local):
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     if endpoint:
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
         logger.info("OTel tracing → OTLP %s", endpoint)
     elif is_local:
         from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
         logger.info("OTel tracing → ConsoleSpanExporter (local, no OTEL_EXPORTER_OTLP_ENDPOINT)")
     else:

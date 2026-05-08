@@ -59,9 +59,7 @@ def _bind(user, org, role_slug, perms):
         permissions=perms,
         is_system=False,
     )
-    RoleBinding.objects.create(
-        user=user, role=role, scope_kind="ORG", scope_id=org.id
-    )
+    RoleBinding.objects.create(user=user, role=role, scope_kind="ORG", scope_id=org.id)
 
 
 def test_anonymous_rejected_by_tenant_scope(fake_info):
@@ -107,13 +105,17 @@ def test_unions_permissions_across_roles(org, user, fake_info):
 
 def test_expired_binding_excluded(org, user, fake_info):
     role = Role.objects.create(
-        name="ex-role", slug="ex-role",
+        name="ex-role",
+        slug="ex-role",
         scope_level=Role.ScopeLevel.ORG,
         permissions=["app.delete"],
         is_system=False,
     )
     RoleBinding.objects.create(
-        user=user, role=role, scope_kind="ORG", scope_id=org.id,
+        user=user,
+        role=role,
+        scope_kind="ORG",
+        scope_id=org.id,
         expires_at=timezone.now() - timedelta(days=1),
     )
     q = IdentityQuery()
@@ -140,9 +142,7 @@ def test_superuser_bypass_grants_every_permission(org, fake_info):
     from core.permissions import Permission
 
     User = get_user_model()
-    su = User.objects.create_user(
-        username="root@local", email="root@local", is_superuser=True, is_staff=True
-    )
+    su = User.objects.create_user(username="root@local", email="root@local", is_superuser=True, is_staff=True)
 
     q = IdentityQuery()
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=su.id)):

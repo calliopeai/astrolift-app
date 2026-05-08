@@ -64,10 +64,7 @@ async def test_topics_are_isolated():
 
     task_x = asyncio.create_task(consumer("topic.x", seen_x))
     task_y = asyncio.create_task(consumer("topic.y", seen_y))
-    while (
-        pubsub.subscriber_count("topic.x") == 0
-        or pubsub.subscriber_count("topic.y") == 0
-    ):
+    while pubsub.subscriber_count("topic.x") == 0 or pubsub.subscriber_count("topic.y") == 0:
         await asyncio.sleep(0)
 
     await pubsub.publish("topic.x", "x-event")
@@ -86,7 +83,7 @@ async def _wait_for_subscriber(topic: str, timeout: float = 1.0) -> None:
     deadline = asyncio.get_event_loop().time() + timeout
     while pubsub.subscriber_count(topic) == 0:
         if asyncio.get_event_loop().time() > deadline:
-            raise asyncio.TimeoutError(f"no subscriber on {topic}")
+            raise TimeoutError(f"no subscriber on {topic}")
         await asyncio.sleep(0)
 
 
@@ -123,9 +120,7 @@ async def test_slow_consumer_drops_oldest_event():
     queue_size = 4
 
     async def consumer() -> None:
-        async for event in pubsub.subscribe(
-            "topic.slow", max_queue=queue_size
-        ):
+        async for event in pubsub.subscribe("topic.slow", max_queue=queue_size):
             seen.append(event)
             if len(seen) == queue_size:
                 return
@@ -176,9 +171,7 @@ def test_publish_sync_from_sync_context():
 
 
 @pytest.mark.django_db
-def test_transition_publishes_lifecycle_event(
-    org, app, env, actor, monkeypatch
-):
+def test_transition_publishes_lifecycle_event(org, app, env, actor, monkeypatch):
     """Every Deployment status transition publishes to the broker.
 
     We don't run an async loop here — just monkeypatch the publish

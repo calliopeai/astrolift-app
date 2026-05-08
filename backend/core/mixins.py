@@ -87,15 +87,11 @@ class AppendOnlyMixin(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk is not None:
-            raise RuntimeError(
-                f"{type(self).__name__} is append-only; rows cannot be updated"
-            )
+            raise RuntimeError(f"{type(self).__name__} is append-only; rows cannot be updated")
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        raise RuntimeError(
-            f"{type(self).__name__} is append-only; rows cannot be deleted"
-        )
+        raise RuntimeError(f"{type(self).__name__} is append-only; rows cannot be deleted")
 
 
 def utc_now():

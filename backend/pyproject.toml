@@ -78,6 +78,8 @@ select = [
 ignore = [
   "E501",  # line length is enforced by formatter
   "B008",  # function call in default arg (Django pattern)
+  "UP038", # isinstance(x, (a, b)) is preferred here over X|Y unions
+  "DJ012", # Meta-before-fields — pre-existing convention in the codebase
 ]
 
 [tool.ruff.lint.per-file-ignores]
