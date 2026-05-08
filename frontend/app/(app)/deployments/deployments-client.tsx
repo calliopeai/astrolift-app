@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import {
   BoxIcon,
   CheckIcon,
@@ -43,6 +43,7 @@ import {
   ROLLBACK_DEPLOYMENT,
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type {
   AstroliftDeployment,
   DeploymentStatus,
@@ -90,11 +91,28 @@ const IN_FLIGHT: DeploymentStatus[] = [
 export function DeploymentsClient() {
   const [openCreate, setOpenCreate] = React.useState(false);
   const { can } = useMyPermissions();
-  const { data, loading } = useQuery<Resp>(LIST_DEPLOYMENTS, {
-    variables: { limit: 100 },
-    pollInterval: 5000,
-  });
+  const { data, loading, refetch: refetchList } = useQuery<Resp>(
+    LIST_DEPLOYMENTS,
+    {
+      variables: { limit: 100 },
+      // Live push covers freshness; keep a slow safety-net poll
+      // in case the WS drops and we miss reconnect.
+      pollInterval: 30000,
+    },
+  );
   const list = data?.astroliftDeployments ?? [];
+
+  // Live push: any status transition for any deployment in the org
+  // triggers a list refetch. The backend dedupes per-row, and
+  // refetch is cheap because the page is bounded to 100 rows.
+  useSubscription(DEPLOYMENT_LIFECYCLE_STREAM, {
+    onData: () => {
+      refetchList().catch(() => {
+        // swallowed: a failed refetch is recovered by the next push
+        // or by the safety-net poll above.
+      });
+    },
+  });
 
   // Pre-compute action allowance once to avoid re-checks in render.
   const canDeploy = can("app.deploy");
