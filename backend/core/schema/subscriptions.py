@@ -49,12 +49,32 @@ class Subscription:
           - org-wide: ``deployment.lifecycle.<org_id>``
           - per-app:  ``deployment.lifecycle.app.<app_guid>``
 
-        On client disconnect the broker subscriber is cleaned up
-        in ``core.pubsub.subscribe``'s ``finally`` block.
+        Tenant resolution differs between transports:
+          - HTTP: ``TenantContextMiddleware`` set the contextvar
+            before the resolver runs.
+          - WS: the cookie-aware ASGI handler attached the resolved
+            tenant to ``info.context._ws_tenant``; we set the same
+            contextvar here so ``@tenant_scoped`` and the broker
+            topic key both pick up the right org.
         """
+        from asgiref.sync import sync_to_async
+
         from astrolift_registry.models import RegisteredApp
         from core.pubsub import subscribe
-        from core.tenancy import get_current_tenant
+        from core.tenancy import (
+            TenantContext,
+            get_current_tenant,
+            set_current_tenant,
+        )
+
+        # If we came in over WS, the cookie-aware handler stashed the
+        # tenant on the context. Pin it on the contextvar so the rest
+        # of the platform's tenant-aware code sees it.
+        ws_tenant: Optional[TenantContext] = getattr(
+            info.context, "_ws_tenant", None
+        )
+        if ws_tenant is not None:
+            set_current_tenant(ws_tenant)
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
@@ -63,16 +83,16 @@ class Subscription:
 
         topic = f"deployment.lifecycle.{org_id}"
         if app_slug:
-            app = (
-                RegisteredApp.objects.filter(
+            app_guid = await sync_to_async(
+                lambda: RegisteredApp.objects.filter(
                     organization_id=org_id, slug=app_slug
                 )
-                .only("guid")
+                .values_list("guid", flat=True)
                 .first()
-            )
-            if app is None:
+            )()
+            if app_guid is None:
                 return
-            topic = f"deployment.lifecycle.app.{app.guid}"
+            topic = f"deployment.lifecycle.app.{app_guid}"
 
         async for event in subscribe(topic):
             yield DeploymentLifecycleEventType(

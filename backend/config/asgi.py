@@ -33,13 +33,19 @@ def _build_websocket_app():
     Imports happen here (not at module top) so the app loader doesn't
     pull strawberry.asgi (which depends on starlette) into every Django
     management command.
+
+    Uses the cookie-aware subclass so the WS handshake picks up the
+    sessionid cookie and resolves user + tenant — without that the
+    subscription resolver sees an empty tenant context and bails.
     """
-    from strawberry.asgi import GraphQL
     from strawberry.subscriptions import GRAPHQL_TRANSPORT_WS_PROTOCOL
 
     from config.schema import schema
+    from core.schema.ws_views import CookieAwareGraphQLWs
 
-    return GraphQL(schema, subscription_protocols=[GRAPHQL_TRANSPORT_WS_PROTOCOL])
+    return CookieAwareGraphQLWs(
+        schema, subscription_protocols=[GRAPHQL_TRANSPORT_WS_PROTOCOL]
+    )
 
 
 _websocket_app = None
