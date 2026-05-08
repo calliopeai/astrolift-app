@@ -68,7 +68,7 @@ superuser:
 # Dump the live Strawberry schema and copy it next to the frontend
 # so codegen can run without the backend container being up.
 schema:
-	$(COMPOSE) exec $(CONTAINER) $(PYTHON) -c "import django; django.setup() if False else None; \
+	$(COMPOSE) exec $(CONTAINER) $(PYTHON) -c "import django; django.setup(); \
 from config.schema import schema; \
 open('/astrolift/schema.graphql','w').write(schema.as_str())"
 	cp backend/schema.graphql frontend/schema.graphql

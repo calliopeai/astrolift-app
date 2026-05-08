@@ -64,6 +64,20 @@ class LifecycleQuery:
         return [deployment_to_type(d) for d in qs[: max(1, min(limit, 200))]]
 
     @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_deployment(self, info: Info, id: str) -> DeploymentType | None:
+        """Single deployment by guid. Tenant-scoped via the manager."""
+        d = (
+            Deployment.objects.select_related(
+                "registered_app", "app_environment", "workload"
+            )
+            .filter(guid=id)
+            .first()
+        )
+        return deployment_to_type(d) if d else None
+
+    @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
