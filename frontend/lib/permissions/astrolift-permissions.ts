@@ -67,7 +67,13 @@ export type AstroliftPermission =
   | "cluster.register"
   | "cluster.update"
   | "cluster.unregister"
-  | "provider_plugin.read";
+  | "provider_plugin.read"
+  // SCM integration
+  | "scm.read"
+  | "scm.connect"
+  | "scm.disconnect"
+  | "scm.key_create"
+  | "scm.key_delete";
 
 export type PermissionCheck =
   | AstroliftPermission

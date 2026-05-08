@@ -294,6 +294,7 @@ INSTALLED_APPS = [
     'astrolift_services',
     'astrolift_operations',
     'astrolift_billing',
+    'astrolift_scm',
     # End of Astrolift
 
     'constance',
