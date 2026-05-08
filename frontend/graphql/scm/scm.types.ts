@@ -1,3 +1,19 @@
+/**
+ * SCM types — facade over the codegen output.
+ *
+ * Narrow string unions for kind + visibility scope live here so
+ * switch / `?.includes` checks have valid options. The schema
+ * carries them as plain `String!`.
+ */
+
+import type {
+  AstroliftRemoteRepo as GeneratedRemoteRepo,
+  AstroliftRemoteRepoList as GeneratedRemoteRepoList,
+  AstroliftScmWebhookSecretReveal as GeneratedScmWebhookSecretReveal,
+  AstroliftSourceConnection as GeneratedSourceConnection,
+  AstroliftSshDeployKey as GeneratedSshDeployKey,
+  AstroliftSshDeployKeyCreated as GeneratedSshDeployKeyCreated,
+} from "@/graphql/__generated__/schema";
 import type { AstroliftGuid, MutationResult } from "@/graphql/identity/identity.types";
 
 export type ScmConnectionKind =
@@ -21,68 +37,22 @@ export type ScmVisibilityScope =
   | "user_repos"
   | "public_non_org";
 
-export interface AstroliftSourceConnection {
-  id: AstroliftGuid;
+export type AstroliftSourceConnection = Omit<
+  GeneratedSourceConnection,
+  "kind" | "repoVisibilityScopes"
+> & {
   kind: ScmConnectionKind;
-  name: string;
-  displayName: string;
-  accountLogin: string;
-  installationId: string;
-  apiBaseUrl: string;
-  oauthClientId: string;
-  oauthRedirectUri: string;
   repoVisibilityScopes: ScmVisibilityScope[];
-  isOauthAppConfig: boolean;
-  isActive: boolean;
-  tokenExpiresAt: string | null;
-  lastUsedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  isPersonal: boolean;
-  userUsername: string | null;
-  parentOauthAppId: AstroliftGuid | null;
-}
+};
 
-export interface AstroliftSshDeployKey {
-  id: AstroliftGuid;
-  name: string;
-  publicKey: string;
-  fingerprintSha256: string;
-  registeredAppSlug: string | null;
-  lastUsedAt: string | null;
-  isActive: boolean;
-  createdAt: string;
-}
+export type AstroliftSshDeployKey = GeneratedSshDeployKey;
 
-export interface AstroliftSshDeployKeyCreated {
-  key: AstroliftSshDeployKey;
-}
+export type AstroliftSshDeployKeyCreated = GeneratedSshDeployKeyCreated;
 
-export interface AstroliftWebhookSecretReveal {
-  connectionId: AstroliftGuid;
-  plaintextSecret: string;
-  webhookUrlPath: string;
-}
+export type AstroliftWebhookSecretReveal = GeneratedScmWebhookSecretReveal;
 
-export interface AstroliftRemoteRepo {
-  fullName: string;
-  name: string;
-  description: string;
-  defaultBranch: string;
-  visibility: string;
-  cloneUrlHttps: string;
-  cloneUrlSsh: string;
-  webUrl: string;
-  isArchived: boolean;
-  isFork: boolean;
-  pushedAt: string | null;
-}
+export type AstroliftRemoteRepo = GeneratedRemoteRepo;
 
-export interface AstroliftRemoteRepoList {
-  repos: AstroliftRemoteRepo[];
-  errorCode: string | null;
-  errorMessage: string | null;
-  recoverable: boolean;
-}
+export type AstroliftRemoteRepoList = GeneratedRemoteRepoList;
 
-export type { MutationResult };
+export type { AstroliftGuid, MutationResult };
