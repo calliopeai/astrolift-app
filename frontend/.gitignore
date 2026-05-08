@@ -42,8 +42,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# codegen output
-__generated__/
+# Codegen output IS committed so contributors don't need a running
+# backend to typecheck the frontend, and so CI can diff the
+# generated file against the schema to catch drift. Re-run
+# `make codegen-all` after any schema change.
 
 # IDE
 .idea/

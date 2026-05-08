@@ -11,7 +11,7 @@ UI_CONTAINER ?= ui
 PYTHON ?= python
 
 .PHONY: help up build down logs logs-ui shell shell-ui ps \
-        migrate migrations seed superuser schema \
+        migrate migrations seed superuser schema codegen \
         test fmt lint typecheck \
         perms ui-install ui-dev ui-build
 
@@ -20,7 +20,7 @@ help:
 	@echo
 	@echo "  Stack:     up | build | down | logs | logs-ui | shell | shell-ui | ps"
 	@echo "  Backend:   migrate | migrations | seed | superuser | schema | perms"
-	@echo "  Frontend:  ui-install | ui-dev | ui-build"
+	@echo "  Frontend:  ui-install | ui-dev | ui-build | codegen | codegen-all"
 	@echo "  Quality:   test | fmt | lint | typecheck"
 	@echo
 	@echo "  ./run.sh up   — preferred entry point with health checks + URLs"
@@ -65,12 +65,21 @@ seed:
 superuser:
 	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py createsuperuser
 
-# Schema lives at the top level so the frontend can codegen against it.
+# Dump the live Strawberry schema and copy it next to the frontend
+# so codegen can run without the backend container being up.
 schema:
-	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py export_schema config.schema:schema --path /astrolift/../schema.graphql 2>/dev/null || \
-		$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py export_schema config.schema:schema --path schema.graphql
-	@if [ -f backend/schema.graphql ]; then cp backend/schema.graphql schema.graphql; fi
-	@echo "→ schema.graphql"
+	$(COMPOSE) exec $(CONTAINER) $(PYTHON) -c "import django; django.setup() if False else None; \
+from config.schema import schema; \
+open('/astrolift/schema.graphql','w').write(schema.as_str())"
+	cp backend/schema.graphql frontend/schema.graphql
+	@echo "→ backend/schema.graphql + frontend/schema.graphql"
+
+# Regenerate TS types from the dumped schema. Run schema first if
+# the backend changed, then this; or `make codegen-all` for both.
+codegen:
+	$(COMPOSE) exec $(UI_CONTAINER) npm run codegen
+
+codegen-all: schema codegen
 
 perms:
 	$(COMPOSE) exec $(CONTAINER) $(PYTHON) manage.py make_perms
