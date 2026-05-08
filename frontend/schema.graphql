@@ -34,6 +34,12 @@ type AstroliftAppEnvironment {
   createdAt: DateTime!
 }
 
+type AstroliftAppEnvironmentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppEnvironment
+}
+
 type AstroliftAppHealthSummary {
   appSlug: String!
   appName: String!
@@ -799,6 +805,10 @@ enum EntityType {
   COMPONENTS
 }
 
+input EnvironmentByIdInput {
+  id: GUID!
+}
+
 type FileUploadResult {
   preSignedUrl: String
   publicUrl: String
@@ -1031,6 +1041,8 @@ type Mutation {
   abortDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
+  resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   tearDownPreview(input: TearDownPreviewInputGql!): AstroliftDeploymentMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!

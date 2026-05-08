@@ -35,7 +35,12 @@ from astrolift_lifecycle.models import (
     Deployment,
     PreviewEnvironment,
 )
-from astrolift_lifecycle.schema.types import DeploymentType, deployment_to_type
+from astrolift_lifecycle.schema.types import (
+    AppEnvironmentType,
+    DeploymentType,
+    app_env_to_type,
+    deployment_to_type,
+)
 from astrolift_operations.models import WorkflowRun
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.client import (
@@ -75,6 +80,11 @@ class DeploymentByIdInput:
 
 @strawberry.input
 class TearDownPreviewInputGql:
+    id: GUID
+
+
+@strawberry.input
+class EnvironmentByIdInput:
     id: GUID
 
 
@@ -495,6 +505,57 @@ class LifecycleMutation:
                     new_deploy.save(update_fields=["workflow_run", "updated_at", "version"])
 
         return gql_success(deployment_to_type(new_deploy))
+
+    @strawberry.field
+    @mutation_audit(action="environment.pause")
+    @require_permission(Permission.APP_DEPLOY)
+    def pause_environment(
+        self, info: Info, input: EnvironmentByIdInput
+    ) -> MutationResultType[AppEnvironmentType]:
+        """Pause reconciliation for an environment.
+
+        While paused, ``startDeployment`` rejects with PRECONDITION
+        (the same gate the deploy mutation already checks against
+        ``env.deploys_paused``). Operators use this when an env is
+        misconfigured or under maintenance and we don't want CI or
+        push triggers to land deploys mid-investigation.
+        """
+        env = (
+            AppEnvironment.objects.select_related(
+                "registered_app", "tenant_cluster", "managed_domain"
+            )
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if env is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "environment not found")
+        if not env.deploys_paused:
+            env.deploys_paused = True
+            env.save(update_fields=["deploys_paused", "updated_at", "version"])
+        return gql_success(app_env_to_type(env))
+
+    @strawberry.field
+    @mutation_audit(action="environment.resume")
+    @require_permission(Permission.APP_DEPLOY)
+    def resume_environment(
+        self, info: Info, input: EnvironmentByIdInput
+    ) -> MutationResultType[AppEnvironmentType]:
+        """Lift the pause flag — does NOT replay queued deploys; the
+        next CI/push trigger or manual ``startDeployment`` proceeds
+        as usual."""
+        env = (
+            AppEnvironment.objects.select_related(
+                "registered_app", "tenant_cluster", "managed_domain"
+            )
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if env is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "environment not found")
+        if env.deploys_paused:
+            env.deploys_paused = False
+            env.save(update_fields=["deploys_paused", "updated_at", "version"])
+        return gql_success(app_env_to_type(env))
 
     @strawberry.field
     @mutation_audit(action="preview.tear_down")

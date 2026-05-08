@@ -92,6 +92,12 @@ const sections: NavSection[] = [
         permission: "app.read",
       },
       {
+        label: "Environments",
+        href: "/environments",
+        icon: <CloudIcon />,
+        permission: "app.read",
+      },
+      {
         label: "Workflows",
         href: "/workflows",
         icon: <WorkflowIcon />,
