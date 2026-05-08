@@ -7,6 +7,7 @@ ProfileDocument class method — without needing a live OpenSearch instance.
 """
 from unittest.mock import patch
 
+from core.documents import register_profile_signals
 from core.models.user import Profile
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -14,6 +15,16 @@ from django.test import TestCase
 
 class ProfileIndexSignalsTest(TestCase):
     """Post-save and post-delete signals drive ProfileDocument indexing."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Indexing is opt-in via OPENSEARCH_INDEXING (off in test/local
+        # by default). These tests are specifically checking the signal
+        # wiring, so register the handlers explicitly for the duration
+        # of this class. Cleanup isn't strictly needed because the
+        # signals are idempotent and weak-ref'd via the connect call.
+        register_profile_signals()
 
     def setUp(self):
         # User creation triggers Profile.add_profile (post_save on User),

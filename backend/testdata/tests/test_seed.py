@@ -21,13 +21,24 @@ class SeedCommandTest(TestCase):
         return out.getvalue(), mock_mgmt
 
     def test_loads_all_fixture_files(self):
+        # Counts adapt to whatever fixtures live under testdata/fixtures/
+        # so this test doesn't churn every time a fixture is added or
+        # removed. The contract is "every .json under fixtures/ is
+        # passed to loaddata".
+        import glob
+        import os
+        fixtures_dir = os.path.normpath(
+            os.path.join(os.path.dirname(seed_module.__file__), "../../fixtures")
+        )
+        expected = len(sorted(glob.glob(os.path.join(fixtures_dir, "*.json"))))
+
         output, mock_mgmt = self._run_seed()
         loaddata_calls = [
             c for c in mock_mgmt.call_command.call_args_list
             if c.args[0] == 'loaddata'
         ]
-        self.assertEqual(len(loaddata_calls), 6)
-        self.assertIn('Seeded 6', output)
+        self.assertEqual(len(loaddata_calls), expected)
+        self.assertIn(f'Seeded {expected}', output)
 
     def test_fixture_files_loaded_in_sorted_order(self):
         output, mock_mgmt = self._run_seed()
