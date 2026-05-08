@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sheet";
 import { CONNECT_SOURCE } from "@/graphql/scm/scm.mutations";
 import { LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
+import { DOC_LINKS } from "@/lib/docs/urls";
 import type {
   AstroliftSourceConnection,
   MutationResult,
@@ -186,14 +187,23 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
             <code> SECRET_KEY</code>; switch to AWS Secrets Manager / GCP
             Secret Manager / Azure Key Vault per install).{" "}
             <a
-              href="https://github.com/calliopeai/astrolift-app/blob/main/docs/operators/scm-github-oauth.md"
+              href={DOC_LINKS.scmGithubOauth.primary}
               target="_blank"
               rel="noreferrer"
               className="underline"
             >
-              GitHub OAuth setup guide
+              {DOC_LINKS.scmGithubOauth.label}
+            </a>{" "}
+            (
+            <a
+              href={DOC_LINKS.scmGithubOauth.wiki}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              wiki
             </a>
-            .
+            ).
           </SheetDescription>
         </SheetHeader>
         <form

@@ -1,5 +1,11 @@
 # Connecting Astrolift to GitHub via OAuth
 
+> **Canonical URL**: <https://astrolift.dev/scm-github-oauth/>
+> **Wiki mirror**: <https://github.com/calliopeai/astrolift-app/wiki/SCM-GitHub-OAuth-Setup>
+>
+> This file in `docs/operators/` is the source of truth — both
+> destinations sync from here. Edit this, then publish.
+
 Operator setup. Run through this once after deploying Astrolift; users
 can then connect their personal GitHub accounts from the UI without
 operator involvement.
