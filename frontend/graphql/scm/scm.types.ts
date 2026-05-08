@@ -58,6 +58,12 @@ export interface AstroliftSshDeployKeyCreated {
   key: AstroliftSshDeployKey;
 }
 
+export interface AstroliftWebhookSecretReveal {
+  connectionId: AstroliftGuid;
+  plaintextSecret: string;
+  webhookUrlPath: string;
+}
+
 export interface AstroliftRemoteRepo {
   fullName: string;
   name: string;

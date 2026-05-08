@@ -80,6 +80,23 @@ export const GENERATE_SSH_DEPLOY_KEY = gql`
   }
 `;
 
+export const ROTATE_WEBHOOK_SECRET = gql`
+  mutation RotateWebhookSecret($input: RotateWebhookSecretInput!) {
+    rotateWebhookSecret(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        connectionId
+        plaintextSecret
+        webhookUrlPath
+      }
+    }
+  }
+`;
+
 export const DELETE_SSH_DEPLOY_KEY = gql`
   mutation DeleteSshDeployKey($input: DeleteSshDeployKeyInput!) {
     deleteSshDeployKey(input: $input) {

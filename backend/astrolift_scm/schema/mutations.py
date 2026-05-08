@@ -82,6 +82,22 @@ class DeleteSshDeployKeyInput:
     id: GUID
 
 
+@strawberry.input
+class RotateWebhookSecretInput:
+    connection_id: GUID
+
+
+@strawberry.type
+class WebhookSecretReveal:
+    """Plaintext secret returned once on rotation; never re-fetchable.
+    Operator copies it into the SCM host's webhook config alongside
+    the URL we surface alongside it."""
+
+    connection_id: GUID
+    plaintext_secret: str
+    webhook_url_path: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -263,6 +279,61 @@ class ScmMutation:
             )
 
         return gql_success(SshDeployKeyCreatedType(key=ssh_key_to_type(row)))
+
+    @strawberry.field
+    @mutation_audit(action="scm.webhook.rotate")
+    @require_permission(Permission.SCM_CONNECT)
+    def rotate_webhook_secret(
+        self, info: Info, input: RotateWebhookSecretInput
+    ) -> MutationResultType[WebhookSecretReveal]:
+        """Generate a fresh webhook secret for the connection.
+
+        Returns the plaintext exactly once; from that response on,
+        the platform only knows the ciphertext. The operator pastes
+        the plaintext into the SCM host's webhook config along with
+        the URL we surface here.
+
+        Calling this on a connection that already has a secret
+        rotates: any in-flight webhooks signed with the old secret
+        will fail HMAC verification and 401, which is the desired
+        revocation behavior.
+        """
+        import secrets
+
+        conn = SourceConnection.objects.filter(
+            guid=str(input.connection_id), deleted_at__isnull=True
+        ).first()
+        if conn is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found")
+        if not conn.kind.startswith(("github_", "gitlab_")):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"webhooks for {conn.kind!r} aren't supported yet",
+            )
+
+        plaintext = secrets.token_urlsafe(32)
+        encrypted = encrypt_at_rest(plaintext.encode("utf-8"))
+        conn.webhook_secret_backend_kind = encrypted.backend_kind
+        conn.webhook_secret_ciphertext = encrypted.backend_ref
+        conn.save(
+            update_fields=[
+                "webhook_secret_backend_kind",
+                "webhook_secret_ciphertext",
+                "updated_at",
+                "version",
+            ]
+        )
+
+        host = "github" if conn.kind.startswith("github_") else "gitlab"
+        path = f"/app/auth1/scm/{host}/webhook/{conn.guid}/"
+
+        return gql_success(
+            WebhookSecretReveal(
+                connection_id=GUID(str(conn.guid)),
+                plaintext_secret=plaintext,
+                webhook_url_path=path,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="scm.ssh_key.delete")
