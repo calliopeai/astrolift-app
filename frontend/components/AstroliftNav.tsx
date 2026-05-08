@@ -6,6 +6,7 @@ import {
   BoxIcon,
   CalendarClockIcon,
   ChevronRightIcon,
+  GitPullRequestIcon,
   CloudIcon,
   CoinsIcon,
   FileBoxIcon,
@@ -108,6 +109,12 @@ const sections: NavSection[] = [
         href: "/jobs",
         icon: <CalendarClockIcon />,
         permission: "app.read_logs",
+      },
+      {
+        label: "Previews",
+        href: "/previews",
+        icon: <GitPullRequestIcon />,
+        permission: "app.read",
       },
       {
         label: "Events",
