@@ -70,12 +70,15 @@ class BaseCoreModel(TrackingMixin):
         from django.db import transaction
 
         with transaction.atomic():
-            current = type(self).all_objects.select_for_update().filter(pk=self.pk).values_list("version", flat=True)
+            current = (
+                type(self)
+                .all_objects.select_for_update()
+                .filter(pk=self.pk)
+                .values_list("version", flat=True)
+            )
             current_version = next(iter(current), None)
             if current_version is None:
-                raise OptimisticLockError(
-                    f"{type(self).__name__}(pk={self.pk}) has been deleted"
-                )
+                raise OptimisticLockError(f"{type(self).__name__}(pk={self.pk}) has been deleted")
             if current_version != expected_version:
                 raise OptimisticLockError(
                     f"{type(self).__name__}(pk={self.pk}) "

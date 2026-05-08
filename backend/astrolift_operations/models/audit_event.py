@@ -66,3 +66,6 @@ class AuditEvent(AppendOnlyMixin, models.Model):
             ),
             models.Index(fields=["actor_kind", "actor_id"], name="audit_actor_idx"),
         ]
+
+    def __str__(self) -> str:
+        return f"AuditEvent {self.action} ({self.decision}) by {self.actor_kind}:{self.actor_id}"

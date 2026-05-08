@@ -51,6 +51,4 @@ class Role(NamedBaseCoreModel):
         catalog = {p.value for p in Permission}
         bad = [p for p in self.permissions if p not in catalog]
         if bad:
-            raise ValidationError(
-                {"permissions": f"unknown permission(s): {sorted(bad)}"}
-            )
+            raise ValidationError({"permissions": f"unknown permission(s): {sorted(bad)}"})

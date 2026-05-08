@@ -134,9 +134,7 @@ class Deployment(BaseCoreModel):
         current = Deployment.Status(self.status)
         allowed = self._TRANSITIONS.get(current, set())
         if new_status not in allowed:
-            raise ValueError(
-                f"Deployment({self.pk}) cannot transition {current.value} → {new_status.value}"
-            )
+            raise ValueError(f"Deployment({self.pk}) cannot transition {current.value} → {new_status.value}")
         now = timezone.now()
         self.status = new_status.value
         if new_status is Deployment.Status.DEPLOYING and not self.started_at:
@@ -178,20 +176,12 @@ class Deployment(BaseCoreModel):
 
             event = {
                 "deployment_id": str(self.guid),
-                "registered_app_slug": (
-                    self.registered_app.slug if self.registered_app_id else ""
-                ),
-                "environment_name": (
-                    self.app_environment.name if self.app_environment_id else ""
-                ),
+                "registered_app_slug": (self.registered_app.slug if self.registered_app_id else ""),
+                "environment_name": (self.app_environment.name if self.app_environment_id else ""),
                 "status": self.status,
                 "occurred_at": now.isoformat(),
             }
-            org_id = (
-                self.registered_app.organization_id
-                if self.registered_app_id
-                else None
-            )
+            org_id = self.registered_app.organization_id if self.registered_app_id else None
             if org_id is not None:
                 publish_sync(f"deployment.lifecycle.{org_id}", event)
             if self.registered_app_id:
@@ -202,6 +192,4 @@ class Deployment(BaseCoreModel):
         except Exception:
             import logging
 
-            logging.getLogger(__name__).warning(
-                "deployment.lifecycle publish failed", exc_info=True
-            )
+            logging.getLogger(__name__).warning("deployment.lifecycle publish failed", exc_info=True)

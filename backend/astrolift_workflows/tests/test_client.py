@@ -31,9 +31,7 @@ def disabled(settings):
 
 
 def test_start_workflow_disabled_returns_synthetic_handle(disabled):
-    handle = start_workflow(
-        "DeployAppWorkflow", args=[], workflow_id="DeployAppWorkflow-x-y"
-    )
+    handle = start_workflow("DeployAppWorkflow", args=[], workflow_id="DeployAppWorkflow-x-y")
     assert isinstance(handle, WorkflowHandle)
     assert handle.workflow_id == "DeployAppWorkflow-x-y"
     assert handle.run_id == ""

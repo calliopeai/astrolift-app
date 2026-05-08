@@ -17,7 +17,7 @@ Gitea slot in alongside as the same shape.
 from __future__ import annotations
 
 import dataclasses
-from typing import Iterable
+from collections.abc import Iterable
 
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers.github import (
@@ -46,9 +46,7 @@ class RemoteRepo:
 class ProviderError(Exception):
     """Translates to a clean GraphQL error envelope at the resolver."""
 
-    def __init__(
-        self, code: str, message: str, *, recoverable: bool = False
-    ):
+    def __init__(self, code: str, message: str, *, recoverable: bool = False):
         super().__init__(message)
         self.code = code
         self.message = message
@@ -71,9 +69,7 @@ def list_repos(
         try:
             return list_github_repos(connection, search=search, limit=limit)
         except GithubProviderError as exc:
-            raise ProviderError(
-                exc.code, exc.message, recoverable=exc.recoverable
-            ) from exc
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     raise ProviderError(
         "UNSUPPORTED",

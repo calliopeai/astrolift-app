@@ -50,9 +50,7 @@ class SshDeployKey(BaseCoreModel):
     public_key = models.TextField()  # OpenSSH-formatted single line
     fingerprint_sha256 = models.CharField(max_length=128, db_index=True)
 
-    secret_backend_kind = models.CharField(
-        max_length=32, default="local_fernet"
-    )
+    secret_backend_kind = models.CharField(max_length=32, default="local_fernet")
     private_key_ciphertext = models.BinaryField()
 
     last_used_at = models.DateTimeField(null=True, blank=True)

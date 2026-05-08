@@ -39,17 +39,11 @@ def tenant_scoped(
         def wrapper(*args, **kwargs):
             tenant = get_current_tenant()
             if tenant is None or tenant.organization_id is None:
-                raise TenantRequired(
-                    f"{fn.__qualname__} requires a resolved tenant context"
-                )
+                raise TenantRequired(f"{fn.__qualname__} requires a resolved tenant context")
             if require_team and tenant.team_id is None:
-                raise TenantRequired(
-                    f"{fn.__qualname__} requires a team in the tenant context"
-                )
+                raise TenantRequired(f"{fn.__qualname__} requires a team in the tenant context")
             if require_project and tenant.project_id is None:
-                raise TenantRequired(
-                    f"{fn.__qualname__} requires a project in the tenant context"
-                )
+                raise TenantRequired(f"{fn.__qualname__} requires a project in the tenant context")
             return fn(*args, **kwargs)
 
         wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]

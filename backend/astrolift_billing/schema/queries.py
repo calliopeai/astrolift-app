@@ -113,8 +113,7 @@ class BillingQuery:
         from django.utils import timezone
 
         cutoff = (timezone.now() - timedelta(days=max(1, min(days, 365)))).date()
-        qs = (
-            CostSnapshot.objects.filter(taken_at__gte=cutoff)
-            .order_by("-taken_at")[: max(1, min(limit, 1000))]
-        )
+        qs = CostSnapshot.objects.filter(taken_at__gte=cutoff).order_by("-taken_at")[
+            : max(1, min(limit, 1000))
+        ]
         return [cost_to_type(c) for c in qs]

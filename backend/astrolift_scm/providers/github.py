@@ -20,10 +20,8 @@ import dataclasses
 import json
 import urllib.parse
 import urllib.request
-from typing import Iterable
 
 from core.secrets import EncryptedSecret, decrypt
-
 
 GITHUB_API_DEFAULT = "https://api.github.com"
 
@@ -75,9 +73,7 @@ def _token(connection) -> str:
         try:
             return installation_token(connection)
         except GithubAppError as exc:
-            raise GithubProviderError(
-                exc.code, exc.message, recoverable=exc.recoverable
-            ) from exc
+            raise GithubProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
     if connection.kind == "github_oauth_app":
         raise GithubProviderError(
             "OAUTH_NOT_CONNECTED",
@@ -145,14 +141,10 @@ def list_github_repos(
             f"GitHub returned {exc.code}: {body}",
         ) from exc
     except urllib.error.URLError as exc:
-        raise GithubProviderError(
-            "NETWORK", f"Couldn't reach GitHub: {exc.reason}"
-        ) from exc
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
     if not isinstance(payload, list):
-        raise GithubProviderError(
-            "UNEXPECTED_SHAPE", "GitHub returned a non-list payload"
-        )
+        raise GithubProviderError("UNEXPECTED_SHAPE", "GitHub returned a non-list payload")
 
     org_login = (connection.account_login or "").lower()
     scopes = set(connection.repo_visibility_scopes or [])
@@ -172,11 +164,7 @@ def list_github_repos(
                 ("private_org" in scopes and in_org and is_private)
                 or ("public_org" in scopes and in_org and not is_private)
                 or ("user_repos" in scopes and owner_type == "User")
-                or (
-                    "public_non_org" in scopes
-                    and not in_org
-                    and not is_private
-                )
+                or ("public_non_org" in scopes and not in_org and not is_private)
             )
             if not keep:
                 continue

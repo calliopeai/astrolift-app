@@ -51,9 +51,7 @@ class RegisteredApp(NamedBaseCoreModel):
         on_delete=models.CASCADE,
     )
 
-    source_kind = models.CharField(
-        max_length=32, choices=SourceKind.choices, default=SourceKind.GITHUB
-    )
+    source_kind = models.CharField(max_length=32, choices=SourceKind.choices, default=SourceKind.GITHUB)
     source_repo = models.CharField(max_length=255, blank=True, default="")
     source_url = models.URLField(blank=True, default="")
     manifest_path = models.CharField(max_length=255, default="astrolift.toml")
@@ -107,7 +105,8 @@ class RegisteredApp(NamedBaseCoreModel):
                 fields=["source_repo", "manifest_path"],
                 condition=models.Q(
                     deleted_at__isnull=True,
-                ) & ~models.Q(source_repo=""),
+                )
+                & ~models.Q(source_repo=""),
                 name="registered_app_repo_manifest_unique",
             ),
         ]

@@ -123,9 +123,7 @@ def ssh_key_to_type(k) -> SshDeployKeyType:
         name=k.name,
         public_key=k.public_key,
         fingerprint_sha256=k.fingerprint_sha256,
-        registered_app_slug=(
-            k.registered_app.slug if k.registered_app_id else None
-        ),
+        registered_app_slug=(k.registered_app.slug if k.registered_app_id else None),
         last_used_at=k.last_used_at,
         is_active=k.is_active,
         created_at=k.created_at,

@@ -58,9 +58,7 @@ class FakeDriver:
             raise AttributeError(name)
 
         def _missing(*args, **kwargs):
-            raise UnimplementedFakeMethod(
-                f"{type(self).__name__}.{name}() is not stubbed in this test"
-            )
+            raise UnimplementedFakeMethod(f"{type(self).__name__}.{name}() is not stubbed in this test")
 
         return _missing
 
@@ -70,9 +68,7 @@ class FakeDriver:
     def assert_called(self, method: str, *, times: int | None = None) -> list[DriverCall]:
         matching = [c for c in self.calls if c.method == method]
         if times is not None and len(matching) != times:
-            raise AssertionError(
-                f"expected {method} to be called {times} times, got {len(matching)}"
-            )
+            raise AssertionError(f"expected {method} to be called {times} times, got {len(matching)}")
         if times is None and not matching:
             raise AssertionError(f"expected {method} to be called at least once")
         return matching

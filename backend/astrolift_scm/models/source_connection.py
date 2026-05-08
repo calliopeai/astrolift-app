@@ -89,7 +89,9 @@ class SourceConnection(BaseCoreModel):
     )
     kind = models.CharField(max_length=32, choices=Kind.choices)
     display_name = models.CharField(
-        max_length=200, blank=True, default="",
+        max_length=200,
+        blank=True,
+        default="",
         help_text="Operator-friendly label shown in the UI.",
     )
 
@@ -107,9 +109,7 @@ class SourceConnection(BaseCoreModel):
     # The credential. Encrypted via core.secrets; backend_kind tells
     # the migration command which backend produced the bytes so we
     # can re-encrypt cleanly when an install moves to a cloud KMS.
-    secret_backend_kind = models.CharField(
-        max_length=32, default="local_fernet"
-    )
+    secret_backend_kind = models.CharField(max_length=32, default="local_fernet")
     secret_ciphertext = models.BinaryField(blank=True, default=b"")
 
     # OAuth-app config when this row IS the OAuth app (kind ends in
@@ -133,9 +133,7 @@ class SourceConnection(BaseCoreModel):
     # once (we show it once and store the ciphertext). The receiver
     # HMAC-verifies inbound push payloads against this value before
     # firing DeployAppWorkflow.
-    webhook_secret_backend_kind = models.CharField(
-        max_length=32, blank=True, default=""
-    )
+    webhook_secret_backend_kind = models.CharField(max_length=32, blank=True, default="")
     webhook_secret_ciphertext = models.BinaryField(blank=True, default=b"")
     webhook_last_received_at = models.DateTimeField(null=True, blank=True)
 

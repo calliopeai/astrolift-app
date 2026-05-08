@@ -86,9 +86,7 @@ def main() -> None:
     res = gql(CREATE, {"input": {"name": "Acme", "slug": "acme-smoke"}})
     payload = res["data"]["createOrganization"]
     expect("denied", payload["ok"] is False)
-    expect(
-        "PERMISSION_DENIED code", payload["errors"][0]["code"] == "PERMISSION_DENIED"
-    )
+    expect("PERMISSION_DENIED code", payload["errors"][0]["code"] == "PERMISSION_DENIED")
 
     print("step 2: install permissive resolver and create")
     register_permission_resolver(lambda *a, **k: (True, "smoke"))

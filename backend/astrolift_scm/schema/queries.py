@@ -25,9 +25,7 @@ class ScmQuery:
     @strawberry.field
     @require_permission(Permission.SCM_READ)
     @tenant_scoped()
-    def astrolift_source_connections(
-        self, info: Info
-    ) -> list[SourceConnectionType]:
+    def astrolift_source_connections(self, info: Info) -> list[SourceConnectionType]:
         """Org-level connections + the current viewer's own personal
         connections. Other users' personal tokens never surface — a
         token belongs to the user that minted it, period."""
@@ -47,9 +45,7 @@ class ScmQuery:
             scope = scope | Q(user_id=viewer_pk)
 
         qs = (
-            SourceConnection.objects.filter(
-                organization_id=org_id, deleted_at__isnull=True
-            )
+            SourceConnection.objects.filter(organization_id=org_id, deleted_at__isnull=True)
             .filter(scope)
             .select_related("user", "parent_oauth_app")
             .order_by("user_id", "-is_active", "kind", "account_login")[:200]
@@ -59,16 +55,12 @@ class ScmQuery:
     @strawberry.field
     @require_permission(Permission.SCM_READ)
     @tenant_scoped()
-    def astrolift_ssh_deploy_keys(
-        self, info: Info, app_slug: str | None = None
-    ) -> list[SshDeployKeyType]:
+    def astrolift_ssh_deploy_keys(self, info: Info, app_slug: str | None = None) -> list[SshDeployKeyType]:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
             return []
-        qs = SshDeployKey.objects.filter(
-            organization_id=org_id
-        ).select_related("registered_app")
+        qs = SshDeployKey.objects.filter(organization_id=org_id).select_related("registered_app")
         if app_slug == "":
             # Caller asked for org-scoped only.
             qs = qs.filter(registered_app__isnull=True)
@@ -96,7 +88,9 @@ class ScmQuery:
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
             return RemoteRepoListType(
-                repos=[], error_code="NO_ORG", error_message=None,
+                repos=[],
+                error_code="NO_ORG",
+                error_message=None,
                 recoverable=False,
             )
 
@@ -108,7 +102,8 @@ class ScmQuery:
         ).first()
         if conn is None:
             return RemoteRepoListType(
-                repos=[], error_code="NOT_FOUND",
+                repos=[],
+                error_code="NOT_FOUND",
                 error_message="connection not found or inactive",
                 recoverable=False,
             )

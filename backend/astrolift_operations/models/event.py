@@ -84,3 +84,6 @@ class Event(AppendOnlyMixin, models.Model):
                 name="event_resource_idx",
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"Event {self.event_type} {self.resource_kind}:{self.resource_id}"

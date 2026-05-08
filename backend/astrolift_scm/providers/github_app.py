@@ -37,7 +37,6 @@ import jwt
 
 from core.secrets import EncryptedSecret, decrypt
 
-
 GITHUB_API_DEFAULT = "https://api.github.com"
 
 
@@ -86,9 +85,7 @@ def _mint_jwt(app_id: str, private_pem: bytes) -> str:
 def _exchange_for_installation_token(
     api_base: str, jwt_token: str, installation_id: str
 ) -> tuple[str, float]:
-    url = (
-        f"{api_base}/app/installations/{installation_id}/access_tokens"
-    )
+    url = f"{api_base}/app/installations/{installation_id}/access_tokens"
     req = urllib.request.Request(
         url,
         method="POST",
@@ -114,13 +111,9 @@ def _exchange_for_installation_token(
                 f"GitHub rejected the App credentials ({exc.code}): {body}",
                 recoverable=True,
             ) from exc
-        raise GithubAppError(
-            "API_ERROR", f"GitHub returned {exc.code}: {body}"
-        ) from exc
+        raise GithubAppError("API_ERROR", f"GitHub returned {exc.code}: {body}") from exc
     except urllib.error.URLError as exc:
-        raise GithubAppError(
-            "NETWORK", f"Couldn't reach GitHub: {exc.reason}"
-        ) from exc
+        raise GithubAppError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
     token = payload.get("token") or ""
     expires_at_iso = payload.get("expires_at") or ""
@@ -136,9 +129,7 @@ def _exchange_for_installation_token(
     try:
         from datetime import datetime
 
-        expires_at = datetime.fromisoformat(
-            expires_at_iso.replace("Z", "+00:00")
-        ).timestamp()
+        expires_at = datetime.fromisoformat(expires_at_iso.replace("Z", "+00:00")).timestamp()
     except (ValueError, TypeError):
         expires_at = time.time() + 50 * 60  # conservative ~50min
 
@@ -154,8 +145,7 @@ def installation_token(connection) -> str:
     if connection.kind != "github_app_install":
         raise GithubAppError(
             "WRONG_KIND",
-            f"installation_token only works on github_app_install rows, "
-            f"got {connection.kind!r}",
+            f"installation_token only works on github_app_install rows, " f"got {connection.kind!r}",
         )
     app_id = connection.oauth_client_id or ""
     installation_id = connection.installation_id or ""
@@ -176,9 +166,7 @@ def installation_token(connection) -> str:
 
     private_pem = _decrypt_pem(connection)
     jwt_token = _mint_jwt(app_id, private_pem)
-    token, expires_at = _exchange_for_installation_token(
-        _api_base(connection), jwt_token, installation_id
-    )
+    token, expires_at = _exchange_for_installation_token(_api_base(connection), jwt_token, installation_id)
 
     with _LOCK:
         _CACHE[cache_key] = _CachedToken(token=token, expires_at=expires_at)

@@ -26,9 +26,7 @@ class ClustersQuery:
     @require_permission(Permission.CLUSTER_REGISTER)
     @tenant_scoped()
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
-        qs = TenantCluster.objects.select_related(
-            "organization", "provider_plugin"
-        ).order_by("slug")[:200]
+        qs = TenantCluster.objects.select_related("organization", "provider_plugin").order_by("slug")[:200]
         return [cluster_to_type(c) for c in qs]
 
     @strawberry.field

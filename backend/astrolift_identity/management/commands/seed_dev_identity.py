@@ -41,9 +41,7 @@ class Command(BaseCommand):
         # Acme?" moment on first login. Production installs use
         # bootstrap_admin which requires --org-name explicitly.
         parser.add_argument("--org", default="local")
-        parser.add_argument(
-            "--org-name", default="Astrolift Local Dev"
-        )
+        parser.add_argument("--org-name", default="Astrolift Local Dev")
         parser.add_argument("--team", default="eng")
         parser.add_argument("--project", default="api")
 
@@ -87,9 +85,7 @@ class Command(BaseCommand):
         try:
             org_owner = Role.objects.get(slug="org_owner", is_system=True, organization=None)
         except Role.DoesNotExist:
-            self.stderr.write(self.style.ERROR(
-                "system role 'org_owner' missing — run migrate first"
-            ))
+            self.stderr.write(self.style.ERROR("system role 'org_owner' missing — run migrate first"))
             return
 
         RoleBinding.objects.update_or_create(
@@ -109,9 +105,7 @@ class Command(BaseCommand):
             defaults={"is_active": True, "lifecycle": "active"},
         )
 
-        team_viewer = Role.objects.filter(
-            slug="team_viewer", is_system=True, organization=None
-        ).first()
+        team_viewer = Role.objects.filter(slug="team_viewer", is_system=True, organization=None).first()
         if team_viewer is not None:
             domain = email.split("@", 1)[1]
             OrgDomain.objects.update_or_create(
@@ -132,7 +126,5 @@ class Command(BaseCommand):
             )
         )
         self.stdout.write(
-            f"  password: {password}\n"
-            f"  org guid: {org_row.guid}\n"
-            f"  user pk:  {user.pk}\n"
+            f"  password: {password}\n" f"  org guid: {org_row.guid}\n" f"  user pk:  {user.pk}\n"
         )

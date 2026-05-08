@@ -56,8 +56,7 @@ class TenantContextMiddleware(MiddlewareMixin):
         project_id = self._resolve_project_id(request)
         actor_user_id = (
             getattr(request, "user", None).pk
-            if getattr(request, "user", None) is not None
-            and getattr(request.user, "is_authenticated", False)
+            if getattr(request, "user", None) is not None and getattr(request.user, "is_authenticated", False)
             else None
         )
 
@@ -85,11 +84,7 @@ class TenantContextMiddleware(MiddlewareMixin):
         if header is not None:
             return header
 
-        session_id = (
-            request.session.get("organization_id")
-            if hasattr(request, "session")
-            else None
-        )
+        session_id = request.session.get("organization_id") if hasattr(request, "session") else None
         if session_id is not None:
             try:
                 return int(session_id)

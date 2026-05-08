@@ -34,12 +34,12 @@ _label = os.environ.pop("DJANGO_CONFIGURATION", None)
 if _label is not None:
     os.environ.setdefault("ASTROLIFT_ENV_LABEL", _label)
 
-import pytest
+import pytest  # noqa: E402  (must follow the env-pop above)
 
-from core.permissions import register_permission_resolver
-from core.request_context import generate_ulid, set_request_id
-from core.tenancy import TenantContext
-from core.tenancy import tenant_context as _tenant_ctx
+from core.permissions import register_permission_resolver  # noqa: E402
+from core.request_context import generate_ulid, set_request_id  # noqa: E402
+from core.tenancy import TenantContext  # noqa: E402
+from core.tenancy import tenant_context as _tenant_ctx  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

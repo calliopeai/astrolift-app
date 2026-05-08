@@ -77,10 +77,7 @@ def main() -> None:
     # Errors go through resolver-entry check, which raises through Strawberry
     # (queries don't have the MutationResult envelope). Either we get a
     # GraphQL error or an empty list — anything but unauthenticated success.
-    is_denied = (
-        res.get("errors") is not None
-        or res.get("data", {}).get("astroliftOrganizations") is None
-    )
+    is_denied = res.get("errors") is not None or res.get("data", {}).get("astroliftOrganizations") is None
     expect("denied", is_denied, str(res)[:120])
 
     print("step 2: login + RBAC-allowed list")

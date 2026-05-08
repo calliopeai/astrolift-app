@@ -42,10 +42,7 @@ def normalize(
 ) -> NormalizedManifest:
     defaults = defaults or NormalizationDefaults()
     applied: list[str] = []
-    workloads = tuple(
-        _normalize_workload(w, defaults, applied)
-        for w in raw.workloads
-    )
+    workloads = tuple(_normalize_workload(w, defaults, applied) for w in raw.workloads)
     serialized = {
         "name": raw.name,
         "workloads": [_workload_dict(w) for w in workloads],
@@ -75,7 +72,9 @@ def _normalize_workload(
 ) -> WorkloadManifest:
     cpu_request = w.cpu_request or _apply(applied, f"workload.{w.name}.cpu_request", defaults.cpu_request)
     cpu_limit = w.cpu_limit or _apply(applied, f"workload.{w.name}.cpu_limit", defaults.cpu_limit)
-    memory_request = w.memory_request or _apply(applied, f"workload.{w.name}.memory_request", defaults.memory_request)
+    memory_request = w.memory_request or _apply(
+        applied, f"workload.{w.name}.memory_request", defaults.memory_request
+    )
     memory_limit = w.memory_limit or _apply(applied, f"workload.{w.name}.memory_limit", defaults.memory_limit)
 
     containers = tuple(_normalize_container(c, defaults, applied, w.name) for c in w.containers)

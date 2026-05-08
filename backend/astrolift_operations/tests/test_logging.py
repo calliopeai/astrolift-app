@@ -96,9 +96,7 @@ def test_json_formatter_redacts_sensitive_keys_in_extras():
 
 
 def test_json_formatter_includes_tenant_context():
-    token = set_current_tenant(
-        TenantContext(organization_id=42, actor_user_id=7)
-    )
+    token = set_current_tenant(TenantContext(organization_id=42, actor_user_id=7))
     try:
         logger, stream = _capture(JsonFormatter())
         logger.warning("tenant scoped log")

@@ -67,9 +67,7 @@ class Command(BaseCommand):
         if check:
             current = out_path.read_text() if out_path.exists() else ""
             if current != new_text:
-                self.stderr.write(
-                    "permissions_generated.py is out of date; run `make perms`"
-                )
+                self.stderr.write("permissions_generated.py is out of date; run `make perms`")
                 raise SystemExit(1)
             self.stdout.write("permissions_generated.py is up to date")
             return

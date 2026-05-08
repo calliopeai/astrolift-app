@@ -53,7 +53,6 @@ from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
-
 # ---------------------------------------------------------------------------
 # Input types
 # ---------------------------------------------------------------------------
@@ -139,13 +138,8 @@ def _record_workflow_run(
     )
 
 
-def _resolve_app_env(
-    app_slug: str, environment_name: str
-) -> tuple[RegisteredApp, AppEnvironment] | None:
-    app = (
-        RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-        .first()
-    )
+def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredApp, AppEnvironment] | None:
+    app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).first()
     if app is None:
         return None
     env = (
@@ -172,9 +166,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.start")
     @require_permission(Permission.APP_DEPLOY)
-    def start_deployment(
-        self, info: Info, input: StartDeploymentInput
-    ) -> MutationResultType[DeploymentType]:
+    def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
         if input.trigger_kind not in _VALID_TRIGGER_KINDS:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -261,9 +253,7 @@ class LifecycleMutation:
         self, info: Info, input: DeploymentByIdInput
     ) -> MutationResultType[DeploymentType]:
         deployment = (
-            Deployment.objects.select_related(
-                "registered_app", "app_environment", "workload"
-            )
+            Deployment.objects.select_related("registered_app", "app_environment", "workload")
             .filter(guid=str(input.id), deleted_at__isnull=True)
             .first()
         )
@@ -316,18 +306,14 @@ class LifecycleMutation:
                     deployment.workflow_run = run
                     deployment.save(update_fields=["workflow_run", "updated_at", "version"])
             else:
-                deployment.save(
-                    update_fields=["approvals_received", "updated_at", "version"]
-                )
+                deployment.save(update_fields=["approvals_received", "updated_at", "version"])
 
         return gql_success(deployment_to_type(deployment))
 
     @strawberry.field
     @mutation_audit(action="deployment.abort")
     @require_permission(Permission.APP_DEPLOY)
-    def abort_deployment(
-        self, info: Info, input: DeploymentByIdInput
-    ) -> MutationResultType[DeploymentType]:
+    def abort_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True)
@@ -441,9 +427,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(action="deployment.redeploy")
     @require_permission(Permission.APP_DEPLOY)
-    def redeploy_app(
-        self, info: Info, input: DeploymentByIdInput
-    ) -> MutationResultType[DeploymentType]:
+    def redeploy_app(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
         source = (
             Deployment.objects.select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True)
@@ -463,9 +447,7 @@ class LifecycleMutation:
             )
 
         initial_status = (
-            Deployment.Status.PENDING_APPROVAL
-            if env.required_approvals > 0
-            else Deployment.Status.PENDING
+            Deployment.Status.PENDING_APPROVAL if env.required_approvals > 0 else Deployment.Status.PENDING
         )
 
         with transaction.atomic():
@@ -485,9 +467,7 @@ class LifecycleMutation:
             )
 
             if initial_status is Deployment.Status.PENDING:
-                wf_id = _deploy_workflow_id(
-                    str(source.registered_app.guid), str(env.guid)
-                )
+                wf_id = _deploy_workflow_id(str(source.registered_app.guid), str(env.guid))
                 handle = start_workflow(
                     "DeployAppWorkflow",
                     args=[

@@ -302,14 +302,10 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="team.create")
     @require_permission(Permission.TEAM_CREATE)
-    def create_team(
-        self, info: Info, input: CreateTeamInput
-    ) -> MutationResultType[TeamType]:
+    def create_team(self, info: Info, input: CreateTeamInput) -> MutationResultType[TeamType]:
         org = _resolve_org(input.organization_id)
         if org is None:
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value, "organization not found", field="organizationId"
-            )
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found", field="organizationId")
         if Team.objects.filter(organization=org, slug=input.slug).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
@@ -327,9 +323,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="team.update")
     @require_permission(Permission.TEAM_UPDATE)
-    def update_team(
-        self, info: Info, input: UpdateTeamInput
-    ) -> MutationResultType[TeamType]:
+    def update_team(self, info: Info, input: UpdateTeamInput) -> MutationResultType[TeamType]:
         team = _resolve_team(input.id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found")
@@ -357,14 +351,10 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="project.create")
     @require_permission(Permission.PROJECT_CREATE)
-    def create_project(
-        self, info: Info, input: CreateProjectInput
-    ) -> MutationResultType[ProjectType]:
+    def create_project(self, info: Info, input: CreateProjectInput) -> MutationResultType[ProjectType]:
         team = _resolve_team(input.team_id)
         if team is None:
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value, "team not found", field="teamId"
-            )
+            return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
         if Project.objects.filter(team=team, slug=input.slug).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
@@ -382,9 +372,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="project.update")
     @require_permission(Permission.PROJECT_UPDATE)
-    def update_project(
-        self, info: Info, input: UpdateProjectInput
-    ) -> MutationResultType[ProjectType]:
+    def update_project(self, info: Info, input: UpdateProjectInput) -> MutationResultType[ProjectType]:
         project = _resolve_project(input.id)
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found")
@@ -412,17 +400,13 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="role_binding.grant")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
-    def grant_role(
-        self, info: Info, input: GrantRoleInput
-    ) -> MutationResultType[RoleBindingType]:
+    def grant_role(self, info: Info, input: GrantRoleInput) -> MutationResultType[RoleBindingType]:
         from django.contrib.auth import get_user_model
 
         try:
             target_user_pk = int(input.user_id)
         except ValueError:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, "userId must be a numeric pk", field="userId"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, "userId must be a numeric pk", field="userId")
 
         User = get_user_model()
         user = User.objects.filter(pk=target_user_pk).first()
@@ -436,9 +420,7 @@ class IdentityMutation:
         scope_kind = input.scope_kind.upper()
         scope_id = _resolve_scope_pk(scope_kind, str(input.scope_guid))
         if scope_id is None:
-            return gql_failure(
-                ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid"
-            )
+            return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
 
         if RoleBinding.objects.filter(
             user=user, role=role, scope_kind=scope_kind, scope_id=scope_id
@@ -503,9 +485,7 @@ class IdentityMutation:
         if input.team_slug:
             team = Team.objects.filter(organization=org, slug=input.team_slug).first()
             if team is None:
-                return gql_failure(
-                    ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug"
-                )
+                return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
 
         plaintext, digest, last4 = _make_token_secret()
 
@@ -552,9 +532,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="policy.create")
     @require_permission(Permission.ORG_UPDATE)
-    def create_policy(
-        self, info: Info, input: CreatePolicyInput
-    ) -> MutationResultType[PolicyType]:
+    def create_policy(self, info: Info, input: CreatePolicyInput) -> MutationResultType[PolicyType]:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
@@ -600,9 +578,7 @@ class IdentityMutation:
     @strawberry.field
     @mutation_audit(action="policy.update")
     @require_permission(Permission.ORG_UPDATE)
-    def update_policy(
-        self, info: Info, input: UpdatePolicyInput
-    ) -> MutationResultType[PolicyType]:
+    def update_policy(self, info: Info, input: UpdatePolicyInput) -> MutationResultType[PolicyType]:
         policy = Policy.objects.filter(guid=str(input.id)).first()
         if policy is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
@@ -688,9 +664,7 @@ class IdentityMutation:
     def update_identity_provider(
         self, info: Info, input: UpdateIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
-        idp = IdentityProvider.objects.select_related("organization").filter(
-            guid=str(input.id)
-        ).first()
+        idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
 
@@ -711,9 +685,7 @@ class IdentityMutation:
             .values_list("identity_provider_id", flat=True)
             .first()
         )
-        return gql_success(
-            identity_provider_to_type(idp, is_active=(idp.pk == active_id))
-        )
+        return gql_success(identity_provider_to_type(idp, is_active=(idp.pk == active_id)))
 
     @strawberry.field
     @mutation_audit(action="identity_provider.set_active")
@@ -721,9 +693,7 @@ class IdentityMutation:
     def set_active_identity_provider(
         self, info: Info, input: SetActiveIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
-        idp = IdentityProvider.objects.select_related("organization").filter(
-            guid=str(input.id)
-        ).first()
+        idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
         org = idp.organization
@@ -737,9 +707,7 @@ class IdentityMutation:
     def soft_delete_identity_provider(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
-        idp = IdentityProvider.objects.select_related("organization").filter(
-            guid=str(input.id)
-        ).first()
+        idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
         # Refuse to delete the IdP that's currently active — the operator
@@ -755,9 +723,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="profile.update_self")
-    def update_my_profile(
-        self, info: Info, input: "UpdateMyProfileInput"
-    ) -> MutationResultType["MyProfileType"]:
+    def update_my_profile(self, info: Info, input: UpdateMyProfileInput) -> MutationResultType[MyProfileType]:
         """Self-service profile edit. Gated by the org-level
         ``allow_user_profile_edit`` toggle and per-field IdP locks
         (a field claimed by the IdP at last login can't be edited
@@ -768,26 +734,17 @@ class IdentityMutation:
         Admins can disable the entire feature org-wide via the
         toggle, which the resolver enforces here.
         """
-        from astrolift_identity.schema.types import MyProfileType
 
         request = getattr(info.context, "request", None)
         viewer = getattr(request, "user", None) if request else None
         if viewer is None or not viewer.is_authenticated:
-            return gql_failure(
-                ErrorCode.PERMISSION_DENIED.value, "not authenticated"
-            )
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        org = (
-            Organization.objects.filter(pk=org_id).first()
-            if org_id is not None
-            else None
-        )
+        org = Organization.objects.filter(pk=org_id).first() if org_id is not None else None
         if org is None:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value, "no organization"
-            )
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
 
         if not org.allow_user_profile_edit:
             return gql_failure(
@@ -835,7 +792,7 @@ class IdentityMutation:
         return gql_success(_my_profile_payload(viewer, org, locked))
 
 
-def _validate_idp_config(input) -> "MutationResultType | None":
+def _validate_idp_config(input) -> MutationResultType | None:
     """Per-kind config validation. Returns a failure envelope or None."""
     kind = input.kind
     if kind == "local":
@@ -929,7 +886,7 @@ def _idp_locked_fields(user, session=None) -> list[str]:
     return ["email"]
 
 
-def _my_profile_payload(user, org, locked: list[str]) -> "MyProfileType":
+def _my_profile_payload(user, org, locked: list[str]) -> MyProfileType:
     return MyProfileType(
         user_id=user.pk,
         username=user.username or "",

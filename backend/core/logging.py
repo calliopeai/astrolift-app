@@ -123,10 +123,7 @@ class SensitiveFieldRedactor:
 
     def redact(self, value: Any) -> Any:
         if isinstance(value, dict):
-            return {
-                k: (_REDACTED if self.is_sensitive(str(k)) else self.redact(v))
-                for k, v in value.items()
-            }
+            return {k: (_REDACTED if self.is_sensitive(str(k)) else self.redact(v)) for k, v in value.items()}
         if isinstance(value, (list, tuple)):
             redacted = [self.redact(v) for v in value]
             return type(value)(redacted) if isinstance(value, tuple) else redacted
@@ -363,5 +360,3 @@ def build_logging_config(
 # module-level constant). Mirrors what build_logging_config() returns
 # for the json/INFO/stdout combination.
 LOGGING_CONFIG: dict[str, Any] = build_logging_config()
-
-

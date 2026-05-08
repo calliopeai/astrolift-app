@@ -30,9 +30,7 @@ def test_decrypt_uses_backend_kind_for_dispatch():
     cloud-KMS backends can coexist. Decrypt picks the registered
     backend by ``backend_kind`` rather than assuming local."""
     enc = encrypt_at_rest(b"x")
-    same = EncryptedSecret(
-        backend_kind=enc.backend_kind, backend_ref=enc.backend_ref
-    )
+    same = EncryptedSecret(backend_kind=enc.backend_kind, backend_ref=enc.backend_ref)
     assert decrypt(same) == b"x"
 
 

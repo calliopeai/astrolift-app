@@ -153,9 +153,7 @@ def mutation_audit(
                 decision = "DENY"
                 error_code = ErrorCode.PERMISSION_DENIED.value
                 error_message = exc.reason
-                result = MutationResult.failure(
-                    ErrorCode.PERMISSION_DENIED, exc.reason
-                )
+                result = MutationResult.failure(ErrorCode.PERMISSION_DENIED, exc.reason)
             except Exception as exc:  # surface unexpected errors as INTERNAL
                 log.exception("mutation %s failed unexpectedly", action)
                 error_code = ErrorCode.INTERNAL.value

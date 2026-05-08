@@ -40,12 +40,8 @@ class TraceContext:
     flags: int = 0
 
 
-_request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "astrolift_request_id", default=None
-)
-_trace: contextvars.ContextVar[TraceContext | None] = contextvars.ContextVar(
-    "astrolift_trace", default=None
-)
+_request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("astrolift_request_id", default=None)
+_trace: contextvars.ContextVar[TraceContext | None] = contextvars.ContextVar("astrolift_trace", default=None)
 
 
 def set_request_id(value: str | None) -> contextvars.Token:

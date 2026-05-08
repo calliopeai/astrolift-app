@@ -40,8 +40,7 @@ def parse_raw(toml_text: str) -> RawManifest:
 
     name = _require_str(data, "name", "name")
     workloads = tuple(
-        _parse_workload(item, f"workloads[{i}]")
-        for i, item in enumerate(data.get("workloads", []))
+        _parse_workload(item, f"workloads[{i}]") for i, item in enumerate(data.get("workloads", []))
     )
     managed = tuple(
         _parse_managed_service(item, f"managed_services[{i}]")
@@ -71,8 +70,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         raise ManifestError("cronjob workload requires a 'schedule'", path=f"{path}.schedule")
 
     containers = tuple(
-        _parse_container(item, f"{path}.containers[{i}]")
-        for i, item in enumerate(d.get("containers", []))
+        _parse_container(item, f"{path}.containers[{i}]") for i, item in enumerate(d.get("containers", []))
     )
 
     return WorkloadManifest(

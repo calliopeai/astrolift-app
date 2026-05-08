@@ -46,18 +46,14 @@ def _direct_delete(table: str, guid: str) -> Exception | None:
 
 
 def test_event_table_refuses_update(org):
-    e = Event.objects.create(
-        organization=org, event_type="UNIT_TEST", payload={"x": 1}
-    )
+    e = Event.objects.create(organization=org, event_type="UNIT_TEST", payload={"x": 1})
     err = _direct_update("astrolift_operations_event", str(e.guid))
     assert err is not None, "UPDATE on Event should have raised"
     assert "append-only" in str(err)
 
 
 def test_event_table_refuses_delete(org):
-    e = Event.objects.create(
-        organization=org, event_type="UNIT_TEST", payload={}
-    )
+    e = Event.objects.create(organization=org, event_type="UNIT_TEST", payload={})
     err = _direct_delete("astrolift_operations_event", str(e.guid))
     assert err is not None, "DELETE on Event should have raised"
     assert "append-only" in str(err)

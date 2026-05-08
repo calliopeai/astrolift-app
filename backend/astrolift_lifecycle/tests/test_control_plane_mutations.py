@@ -42,9 +42,7 @@ def _grant_all(resolver, org_id):
 
 
 def _tenant_for(org, actor):
-    return tenant_context(
-        TenantContext(organization_id=org.id, actor_user_id=actor.id)
-    )
+    return tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id))
 
 
 # ---------------------------------------------------------------------------
@@ -152,9 +150,7 @@ def test_start_deployment_unknown_trigger_kind(
     assert result.errors[0].field == "triggerKind"
 
 
-def test_start_deployment_unknown_app(
-    org, env, actor, fake_info, permission_resolver, no_temporal
-):
+def test_start_deployment_unknown_app(org, env, actor, fake_info, permission_resolver, no_temporal):
     _grant_all(permission_resolver, org.id)
     mut = LifecycleMutation()
     with _tenant_for(org, actor):
@@ -204,9 +200,7 @@ def test_approve_deployment_starts_workflow_when_quorum_met(
 
     # A different actor approves.
     with _tenant_for(org, other_actor):
-        approve = mut.approve_deployment(
-            fake_info_other, input=DeploymentByIdInput(id=start.data.id)
-        )
+        approve = mut.approve_deployment(fake_info_other, input=DeploymentByIdInput(id=start.data.id))
     assert approve.ok, approve.errors
     assert approve.data.status == Deployment.Status.PENDING.value
 
@@ -234,9 +228,7 @@ def test_approve_deployment_refuses_self_approval(
                 image_tag="v1.0.0",
             ),
         )
-        approve = mut.approve_deployment(
-            fake_info, input=DeploymentByIdInput(id=start.data.id)
-        )
+        approve = mut.approve_deployment(fake_info, input=DeploymentByIdInput(id=start.data.id))
 
     assert not approve.ok
     assert approve.errors[0].code == "PRECONDITION"
@@ -262,9 +254,7 @@ def test_abort_signals_workflow_and_marks_failed(
                 image_tag="v1.0.0",
             ),
         )
-        abort = mut.abort_deployment(
-            fake_info, input=DeploymentByIdInput(id=start.data.id)
-        )
+        abort = mut.abort_deployment(fake_info, input=DeploymentByIdInput(id=start.data.id))
 
     assert abort.ok, abort.errors
     assert abort.data.status == Deployment.Status.FAILED.value
@@ -289,9 +279,7 @@ def test_abort_refuses_when_not_in_flight(
     )
 
     with _tenant_for(org, actor):
-        abort = mut.abort_deployment(
-            fake_info, input=DeploymentByIdInput(id=deploy.guid)
-        )
+        abort = mut.abort_deployment(fake_info, input=DeploymentByIdInput(id=deploy.guid))
 
     assert not abort.ok
     assert abort.errors[0].code == "PRECONDITION"
@@ -309,7 +297,7 @@ def test_rollback_creates_new_deploy_from_prior_revision(
     mut = LifecycleMutation()
 
     # Prior superseded deploy: this is what we should roll back to.
-    prior = Deployment.objects.create(
+    Deployment.objects.create(
         registered_app=app,
         app_environment=env,
         triggered_by_user=actor,
@@ -328,9 +316,7 @@ def test_rollback_creates_new_deploy_from_prior_revision(
     )
 
     with _tenant_for(org, actor):
-        result = mut.rollback_deployment(
-            fake_info, input=DeploymentByIdInput(id=running.guid)
-        )
+        result = mut.rollback_deployment(fake_info, input=DeploymentByIdInput(id=running.guid))
 
     assert result.ok, result.errors
     assert result.data.image_tag == "v0.9.0"
@@ -340,14 +326,10 @@ def test_rollback_creates_new_deploy_from_prior_revision(
     assert running.status == Deployment.Status.ROLLED_BACK.value
 
     # RollbackDeploymentWorkflow id includes the new deploy's guid.
-    assert any(
-        s[0] == "RollbackDeploymentWorkflow" for s in temporal_recorder.starts
-    )
+    assert any(s[0] == "RollbackDeploymentWorkflow" for s in temporal_recorder.starts)
 
 
-def test_rollback_refuses_without_prior(
-    org, app, env, actor, fake_info, permission_resolver, no_temporal
-):
+def test_rollback_refuses_without_prior(org, app, env, actor, fake_info, permission_resolver, no_temporal):
     _grant_all(permission_resolver, org.id)
     mut = LifecycleMutation()
 
@@ -361,9 +343,7 @@ def test_rollback_refuses_without_prior(
     )
 
     with _tenant_for(org, actor):
-        result = mut.rollback_deployment(
-            fake_info, input=DeploymentByIdInput(id=running.guid)
-        )
+        result = mut.rollback_deployment(fake_info, input=DeploymentByIdInput(id=running.guid))
 
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
@@ -392,14 +372,10 @@ def test_redeploy_clones_image_and_starts_workflow(
     )
 
     with _tenant_for(org, actor):
-        result = mut.redeploy_app(
-            fake_info, input=DeploymentByIdInput(id=source.guid)
-        )
+        result = mut.redeploy_app(fake_info, input=DeploymentByIdInput(id=source.guid))
 
     assert result.ok, result.errors
     assert result.data.image_tag == "v1.0.0"
     assert result.data.image_digest == "sha256:abc"
     assert result.data.status == Deployment.Status.PENDING.value
-    assert WorkflowRun.objects.filter(
-        workflow_kind="DeployAppWorkflow"
-    ).exists()
+    assert WorkflowRun.objects.filter(workflow_kind="DeployAppWorkflow").exists()

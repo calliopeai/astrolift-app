@@ -88,9 +88,7 @@ class OperationsMutation:
         if input.team_slug:
             team = Team.objects.filter(organization=org, slug=input.team_slug).first()
             if team is None:
-                return gql_failure(
-                    ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug"
-                )
+                return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
 
         plaintext_secret = "alfthk_" + secrets.token_urlsafe(24)
         digest = hashlib.sha256(plaintext_secret.encode()).hexdigest()
@@ -149,9 +147,7 @@ class OperationsMutation:
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
-        notif = Notification.objects.filter(
-            guid=str(input.id), user_id=tenant.actor_user_id
-        ).first()
+        notif = Notification.objects.filter(guid=str(input.id), user_id=tenant.actor_user_id).first()
         if notif is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "notification not found")
         notif.read_at = timezone.now()
@@ -159,15 +155,13 @@ class OperationsMutation:
         return gql_success(notification_to_type(notif))
 
     @strawberry.field
-    def mark_all_notifications_read(
-        self, info: Info
-    ) -> MutationResultType[_MarkAllReadPayload]:
+    def mark_all_notifications_read(self, info: Info) -> MutationResultType[_MarkAllReadPayload]:
         from django.utils import timezone
 
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
-        marked = Notification.objects.filter(
-            user_id=tenant.actor_user_id, read_at__isnull=True
-        ).update(read_at=timezone.now())
+        marked = Notification.objects.filter(user_id=tenant.actor_user_id, read_at__isnull=True).update(
+            read_at=timezone.now()
+        )
         return gql_success(_MarkAllReadPayload(marked=marked))

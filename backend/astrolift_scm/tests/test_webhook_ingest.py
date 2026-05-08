@@ -11,11 +11,9 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from unittest.mock import patch
 
 import pytest
 from django.test import Client
-from django.utils import timezone
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -23,7 +21,6 @@ from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
 from core.secrets import encrypt_at_rest
-
 
 pytestmark = pytest.mark.django_db
 
@@ -48,9 +45,7 @@ def _no_debug_toolbar(settings):
     (which it isn't, under the test runner). Strip it for the
     duration of the test so the receiver's actual responses get
     through to the assertions."""
-    settings.MIDDLEWARE = [
-        m for m in settings.MIDDLEWARE if "DebugToolbar" not in m
-    ]
+    settings.MIDDLEWARE = [m for m in settings.MIDDLEWARE if "DebugToolbar" not in m]
     settings.DEBUG = False
 
 
@@ -58,23 +53,31 @@ def _no_debug_toolbar(settings):
 def stack():
     org = Organization.objects.create(name="Acme", slug="acme-wh")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     plugin = ProviderPlugin(
-        name="P", slug="p-wh", version="0.0.1",
-        capabilities_manifest={}, config_schema={},
+        name="P",
+        slug="p-wh",
+        version="0.0.1",
+        capabilities_manifest={},
+        config_schema={},
     )
     ProviderPlugin.objects.bulk_create([plugin])
     cluster = TenantCluster.objects.create(
-        organization=org, name="c", slug="c-wh",
+        organization=org,
+        name="c",
+        slug="c-wh",
         provider_plugin=ProviderPlugin.objects.get(slug="p-wh"),
-        provider_config={}, endpoint="https://c", auth_method="kubeconfig",
+        provider_config={},
+        endpoint="https://c",
+        auth_method="kubeconfig",
         auth_config={},
     )
     app = RegisteredApp.objects.create(
-        organization=org, project=project, team=team,
-        name="Hello", slug="hello-wh",
+        organization=org,
+        project=project,
+        team=team,
+        name="Hello",
+        slug="hello-wh",
         provisioning_status="ready",
         source_kind="github",
         source_repo="acme-org/hello",
@@ -106,9 +109,7 @@ def stack():
 
 
 def _github_sig(secret: str, body: bytes) -> str:
-    return "sha256=" + hmac.new(
-        secret.encode("utf-8"), body, hashlib.sha256
-    ).hexdigest()
+    return "sha256=" + hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
 
 
 def _push_payload(repo: str, branch: str = "main", sha: str = "abc123"):

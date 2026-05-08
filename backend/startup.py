@@ -1,5 +1,3 @@
-
-
 import logging
 import os
 import subprocess
@@ -9,29 +7,29 @@ logger = logging.getLogger(__name__)
 
 
 variables = [
-    'DJANGO_SETTINGS_MODULE',
-    'DJANGO_CONFIGURATION',
-    'POSTGRES_ENGINE',
-    'POSTGRES_DB',
-    'POSTGRES_USER',
-    'POSTGRES_HOST',
-    'POSTGRES_PORT',
+    "DJANGO_SETTINGS_MODULE",
+    "DJANGO_CONFIGURATION",
+    "POSTGRES_ENGINE",
+    "POSTGRES_DB",
+    "POSTGRES_USER",
+    "POSTGRES_HOST",
+    "POSTGRES_PORT",
 ]
 
-logger.warning('[STARTUP] Env Variables v1 ==================================')
+logger.warning("[STARTUP] Env Variables v1 ==================================")
 
 for name in variables:
     value = os.getenv(name)
     if value:
-        logging.warning(f'[STARTUP] Variables {name} value found {value}')
+        logging.warning(f"[STARTUP] Variables {name} value found {value}")
     else:
-        logging.warning(f'[STARTUP] Missing value for {name}')
+        logging.warning(f"[STARTUP] Missing value for {name}")
 
-logger.warning('[STARTUP] Env Variables ==================================')
+logger.warning("[STARTUP] Env Variables ==================================")
 
 
 def execute_and_log(command):
-    logger.warning(f'[STARTUP] Running command {command}')
+    logger.warning(f"[STARTUP] Running command {command}")
     # Run the command and capture the output
     result = subprocess.run(command, shell=True, text=True, capture_output=True)
 
@@ -44,19 +42,16 @@ def execute_and_log(command):
     return result.returncode
 
 
-ON_STARTUP = [
-    'showmigrations',
-    'migrate'
-]
+ON_STARTUP = ["showmigrations", "migrate"]
 
-logger.warning('[STARTUP] Running startup... ==================================')
+logger.warning("[STARTUP] Running startup... ==================================")
 
-os.system('service cron start')
+os.system("service cron start")
 
 BASE_DIR = Path(__file__).resolve().parent
 os.chdir(BASE_DIR)
 for command in ON_STARTUP:
-    execute_and_log(f'python manage.py {command}')
+    execute_and_log(f"python manage.py {command}")
 
 
 # Subscriptions need an ASGI server. uvicorn handles HTTP + WS in
@@ -66,10 +61,8 @@ for command in ON_STARTUP:
 try:
     import uvicorn  # noqa: F401
 
-    os.system(
-        'uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload'
-    )
+    os.system("uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload")
 except ImportError:
-    os.system('python manage.py runserver 0.0.0.0:8000')
+    os.system("python manage.py runserver 0.0.0.0:8000")
 
-logger.warning('Setup complete')
+logger.warning("Setup complete")

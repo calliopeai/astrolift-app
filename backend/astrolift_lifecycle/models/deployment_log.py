@@ -41,3 +41,6 @@ class DeploymentLog(AppendOnlyMixin, models.Model):
         indexes = [
             models.Index(fields=["deployment", "occurred_at"], name="deploylog_deploy_idx"),
         ]
+
+    def __str__(self) -> str:
+        return f"DeploymentLog {self.deployment_id} → {self.status}"

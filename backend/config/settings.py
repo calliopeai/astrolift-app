@@ -6,6 +6,7 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
+
 import logging
 import os
 from pathlib import Path
@@ -17,7 +18,6 @@ import sentry_sdk
 
 # patch https://stackoverflow.com/questions/70382084/import-error-force-text-from-django-utils-encoding
 from corsheaders.defaults import default_headers
-from distutils.util import strtobool
 from django.core.cache import DEFAULT_CACHE_ALIAS
 from django.db import DEFAULT_DB_ALIAS
 from django.utils.encoding import force_str
@@ -25,13 +25,24 @@ from dotenv import load_dotenv
 from import_export.formats.base_formats import CSV, JSON, TSV, XLSX
 
 
+def _strtobool(val: str) -> int:
+    """Stand-in for the removed ``distutils.util.strtobool`` (gone in 3.12)."""
+    val = val.lower()
+    if val in ("y", "yes", "t", "true", "on", "1"):
+        return 1
+    if val in ("n", "no", "f", "false", "off", "0"):
+        return 0
+    raise ValueError(f"invalid truth value {val!r}")
+
+
 def env_bool(name: str, default: bool = False) -> bool:
     val = env_str(name, str(default)) or str(default)
-    return strtobool(val) == 1
+    return _strtobool(val) == 1
 
 
 @overload
 def env_str(name: str, default: str) -> str: ...
+
 
 @overload  # noqa: E302
 def env_str(name: str, default: None = None) -> str | None: ...
@@ -43,101 +54,111 @@ def env_str(name: str, default: str | None = None) -> str | None:
 
 logger = logging.getLogger(__name__)
 
-VERSION = '0.0.40'
-logger.warning(f'Settings Version - Start: {VERSION}')
+VERSION = "0.0.40"
+logger.warning(f"Settings Version - Start: {VERSION}")
 
 django.utils.encoding.force_text = force_str  # type: ignore[attr-defined]
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-DOTENV_FILE = env_str('DOTENV', os.path.join(BASE_DIR, 'config/local.env'))
+DOTENV_FILE = env_str("DOTENV", os.path.join(BASE_DIR, "config/local.env"))
 
 if os.path.exists(DOTENV_FILE):
-    logger.warning(f'Loading environment from DOTENV={DOTENV_FILE}')
+    logger.warning(f"Loading environment from DOTENV={DOTENV_FILE}")
     load_dotenv(DOTENV_FILE)
 else:
-    logger.warning(f'DOTENV - No environment file found at DOTENV={DOTENV_FILE}')
+    logger.warning(f"DOTENV - No environment file found at DOTENV={DOTENV_FILE}")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 # SECURITY WARNING: keep the secret key used in production secret!
 
-DEBUG = env_bool('DJANGO_DEBUG', False)
-DEFAULT_USER_TEST = env_str('DJANGO_DEFAULT_USER_TEST', 'admin')  # only for local login the user if there is no user logged in
+DEBUG = env_bool("DJANGO_DEBUG", False)
+DEFAULT_USER_TEST = env_str(
+    "DJANGO_DEFAULT_USER_TEST", "admin"
+)  # only for local login the user if there is no user logged in
 
 # The default user to execute automatic system operations. i.e. scheduled tasks, automatic signatures...
 # The default set of permissions available for the system user(s). For instance, the permission to sign documents.
-FRONTEND_URL = env_str('FRONTEND_URL', 'http://localhost:3000')
-API_SYSTEM_USER = env_str('API_SYSTEM_USER', 'system')
-API_SYSTEM_PERMISSION_GROUP = env_str('API_SYSTEM_PERMISSION_GROUP', 'astrolift_automatic_system_operations')
+FRONTEND_URL = env_str("FRONTEND_URL", "http://localhost:3000")
+API_SYSTEM_USER = env_str("API_SYSTEM_USER", "system")
+API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_automatic_system_operations")
 
 # Django
-SECRET_KEY = env_str('DJANGO_SECRET_KEY', 'not-a-secret')
-ROOT_URLCONF = env_str('DJANGO_ROOT_URLCONF', 'config.urls')
-BASE_URL = env_str('DJANGO_BASE_URL', 'app/')
-LOGIN_REDIRECT_URL = env_str('DJANGO_LOGIN_REDIRECT_URL', f'/{BASE_URL}admin/')
-SWITCHED_FROM_USER = 'switched_from_user'
+SECRET_KEY = env_str("DJANGO_SECRET_KEY", "not-a-secret")
+ROOT_URLCONF = env_str("DJANGO_ROOT_URLCONF", "config.urls")
+BASE_URL = env_str("DJANGO_BASE_URL", "app/")
+LOGIN_REDIRECT_URL = env_str("DJANGO_LOGIN_REDIRECT_URL", f"/{BASE_URL}admin/")
+SWITCHED_FROM_USER = "switched_from_user"
 
-CORS_ALLOW_CREDENTIALS = env_bool('DJANGO_CORS_ALLOW_CREDENTIALS', True)
-CORS_ALLOW_ALL_ORIGINS = env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS', True)
-CORS_ALLOW_HEADERS = default_headers + ('sentry-trace', 'baggage', 'x-platform',)
-CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
-CONSTANCE_DATABASE_CACHE_BACKEND = 'default'
-
-CORS_ORIGIN_WHITELIST = (
-    'https://storage.googleapis.com',
+CORS_ALLOW_CREDENTIALS = env_bool("DJANGO_CORS_ALLOW_CREDENTIALS", True)
+CORS_ALLOW_ALL_ORIGINS = env_bool("DJANGO_CORS_ALLOW_ALL_ORIGINS", True)
+CORS_ALLOW_HEADERS = default_headers + (
+    "sentry-trace",
+    "baggage",
+    "x-platform",
 )
+CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
+CONSTANCE_DATABASE_CACHE_BACKEND = "default"
 
-WSGI_APPLICATION = 'config.wsgi.application'
-ASGI_APPLICATION = 'config.asgi.application'
+CORS_ORIGIN_WHITELIST = ("https://storage.googleapis.com",)
 
-LANGUAGE_CODE = env_str('DJANGO_LANGUAGE_CODE', 'en')
-TIME_ZONE = env_str('DJANGO_TIME_ZONE', 'UTC')
-SYSTEM_TIME_ZONE = env_str('SYSTEM_TIME_ZONE', 'UTC')
-USE_I18N = env_bool('DJANGO_USE_I18N', True)
-USE_L10N = env_bool('DJANGO_USE_L10N', True)
-USE_TZ = env_bool('DJANGO_USE_TZ', True)
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
+LANGUAGE_CODE = env_str("DJANGO_LANGUAGE_CODE", "en")
+TIME_ZONE = env_str("DJANGO_TIME_ZONE", "UTC")
+SYSTEM_TIME_ZONE = env_str("SYSTEM_TIME_ZONE", "UTC")
+USE_I18N = env_bool("DJANGO_USE_I18N", True)
+USE_L10N = env_bool("DJANGO_USE_L10N", True)
+USE_TZ = env_bool("DJANGO_USE_TZ", True)
 
 LANGUAGES = [
-    ('en', "English"),
-    ('es', "Spanish"),
+    ("en", "English"),
+    ("es", "Spanish"),
 ]
 
-CONFIGURATION = env_str('DJANGO_CONFIGURATION', )
+CONFIGURATION = env_str(
+    "DJANGO_CONFIGURATION",
+)
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
-STATIC_URL = env_str('DJANGO_STATIC_URL', '/static/')
+STATIC_URL = env_str("DJANGO_STATIC_URL", "/static/")
 
 # Google
-GOOGLE_API_KEY = env_str('DJANGO_GOOGLE_API_KEY')
+GOOGLE_API_KEY = env_str("DJANGO_GOOGLE_API_KEY")
 # DEFAULT_FILE_STORAGE = env_str('DJANGO_', )
-GS_BUCKET_NAME = env_str('DJANGO_GS_BUCKET_NAME')
-GS_DIR = env_str('DJANGO_GS_DIR')
+GS_BUCKET_NAME = env_str("DJANGO_GS_BUCKET_NAME")
+GS_DIR = env_str("DJANGO_GS_DIR")
 
-GOOGLE_APPLICATION_CREDENTIALS = env_str('GOOGLE_APPLICATION_CREDENTIALS')
-GOOGLE_MAPS_API_KEY = env_str('GOOGLE_MAPS_API_KEY')
+GOOGLE_APPLICATION_CREDENTIALS = env_str("GOOGLE_APPLICATION_CREDENTIALS")
+GOOGLE_MAPS_API_KEY = env_str("GOOGLE_MAPS_API_KEY")
 
-ROCKETCHAT_URL = env_str('ROCKETCHAT_URL', '')
-ROCKETCHAT_API_USER_ID = env_str('ROCKETCHAT_API_USER_ID', '')
-ROCKETCHAT_API_AUTH_TOKEN = env_str('ROCKETCHAT_API_AUTH_TOKEN', '')
+ROCKETCHAT_URL = env_str("ROCKETCHAT_URL", "")
+ROCKETCHAT_API_USER_ID = env_str("ROCKETCHAT_API_USER_ID", "")
+ROCKETCHAT_API_AUTH_TOKEN = env_str("ROCKETCHAT_API_AUTH_TOKEN", "")
 
 # Load Auth0 application settings into memory
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID")
 AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET")
-AUTH0_CLIENT_SCOPES = os.environ.get("AUTH0_CLIENT_SCOPES", "openid profile email read:users create:users update:users")
-AUTH0_DATABASE_CONNECTION_ID = os.environ.get("AUTH0_DATABASE_CONNECTION_ID", "Username-Password-Authentication")
+AUTH0_CLIENT_SCOPES = os.environ.get(
+    "AUTH0_CLIENT_SCOPES", "openid profile email read:users create:users update:users"
+)
+AUTH0_DATABASE_CONNECTION_ID = os.environ.get(
+    "AUTH0_DATABASE_CONNECTION_ID", "Username-Password-Authentication"
+)
 CLIENT_SESSION_API_KEY = os.environ.get("CLIENT_SESSION_API_KEY")
 
 # EMail Configuration
-AWS_SES_REGION_NAME = os.environ.get('AWS_SES_REGION_NAME', 'us-west-2')
-AWS_SES_REGION_ENDPOINT = os.environ.get('AWS_SES_REGION_ENDPOINT', 'email.us-west-2.amazonaws.com')
-EMAIL_BACKEND = env_str('DJANGO_EMAIL_BACKEND', "django_ses.SESBackend")
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
+AWS_SES_REGION_NAME = os.environ.get("AWS_SES_REGION_NAME", "us-west-2")
+AWS_SES_REGION_ENDPOINT = os.environ.get("AWS_SES_REGION_ENDPOINT", "email.us-west-2.amazonaws.com")
+EMAIL_BACKEND = env_str("DJANGO_EMAIL_BACKEND", "django_ses.SESBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
 
 
@@ -147,8 +168,8 @@ def var2file(variable):
         return None
     if os.path.exists(content):
         return content
-    filename = f'/tmp/{variable}'
-    with open(filename, 'w') as stream:
+    filename = f"/tmp/{variable}"
+    with open(filename, "w") as stream:
         stream.write(content)
     return filename
 
@@ -157,47 +178,47 @@ def var2file(variable):
 FIREBASE_ADMIN_SDK = var2file("FIREBASE_ADMIN_SDK")
 
 # Start of AWS Buckets
-USE_S3 = env_bool('USE_S3', True)
+USE_S3 = env_bool("USE_S3", True)
 
 if USE_S3:
     # aws / s3-compatible settings (works with AWS S3, MinIO, etc.)
-    SERVER_NAME = env_str('SERVER_NAME', 'localhost')
-    AWS_ACCESS_KEY_ID = env_str('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = env_str('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = env_str('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_ENDPOINT_URL = env_str('AWS_S3_ENDPOINT_URL', '')  # MinIO: http://minio-local:9000
-    AWS_S3_CUSTOM_DOMAIN = env_str('AWS_S3_CUSTOM_DOMAIN', '')
+    SERVER_NAME = env_str("SERVER_NAME", "localhost")
+    AWS_ACCESS_KEY_ID = env_str("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = env_str("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = env_str("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = env_str("AWS_S3_ENDPOINT_URL", "")  # MinIO: http://minio-local:9000
+    AWS_S3_CUSTOM_DOMAIN = env_str("AWS_S3_CUSTOM_DOMAIN", "")
     if not AWS_S3_CUSTOM_DOMAIN:
         if AWS_S3_ENDPOINT_URL:
             AWS_S3_CUSTOM_DOMAIN = None  # Let boto3 use endpoint URL directly
         else:
             AWS_S3_CUSTOM_DOMAIN = f'static.{SERVER_NAME.replace("local", "dev")}'
     AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
+        "CacheControl": "max-age=86400",
     }
     AWS_S3_FILE_OVERWRITE = False
     AWS_QUERYSTRING_AUTH = True  # Required for pre-signed URLs with MinIO
 
     # s3 static settings
-    AWS_LOCATION = ''
-    STATIC_URL = '/static/'
+    AWS_LOCATION = ""
+    STATIC_URL = "/static/"
     STORAGES = {
         "default": {
-            "BACKEND": 'storages.backends.s3boto3.S3Boto3Storage',
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
         },
         "staticfiles": {
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
-    STATIC_ROOT = os.path.join(BASE_DIR, 'assets')
+    STATIC_ROOT = os.path.join(BASE_DIR, "assets")
 else:
-    STATIC_URL = '/staticfiles/'
-    STATIC_ROOT = os.path.join(BASE_DIR, 'assets')
+    STATIC_URL = "/staticfiles/"
+    STATIC_ROOT = os.path.join(BASE_DIR, "assets")
 
-STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'),)
+STATICFILES_DIRS = (os.path.join(BASE_DIR, "static"),)
 
-MEDIA_URL = '/mediafiles/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'mediafiles')
+MEDIA_URL = "/mediafiles/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
 
 # MEDIA_URL = "https://%s/" % AWS_S3_CUSTOM_DOMAIN
 # DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
@@ -208,15 +229,13 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'mediafiles')
 
 DATABASES = {
     DEFAULT_DB_ALIAS: {
-        'ENGINE': env_str('POSTGRES_ENGINE'),
-        'NAME': env_str('POSTGRES_DB'),
-        'USER': env_str('POSTGRES_USER'),
-        'PASSWORD': env_str('POSTGRES_PASSWORD'),
-        'HOST': env_str('POSTGRES_HOST'),
-        'PORT': env_str('POSTGRES_PORT'),
-        'OPTIONS': {
-            'options': '-c search_path=public'
-        },
+        "ENGINE": env_str("POSTGRES_ENGINE"),
+        "NAME": env_str("POSTGRES_DB"),
+        "USER": env_str("POSTGRES_USER"),
+        "PASSWORD": env_str("POSTGRES_PASSWORD"),
+        "HOST": env_str("POSTGRES_HOST"),
+        "PORT": env_str("POSTGRES_PORT"),
+        "OPTIONS": {"options": "-c search_path=public"},
     },
 }
 
@@ -228,82 +247,78 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": os.getenv("DJANGO_CACHE_URL"),
     },
-    'memory_cache': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-    }
+    "memory_cache": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
 }
 
 # OpenSearch
-OPENSEARCH_URL = os.environ.get('OPENSEARCH_URL', 'http://localhost:9200')
+OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
 # Indexing is opt-in; staging/prod set OPENSEARCH_INDEXING=1.
 # Off by default keeps test/local stacks free of NXDOMAIN noise from
 # the indexing signals when no OpenSearch host is reachable.
-OPENSEARCH_INDEXING = os.environ.get('OPENSEARCH_INDEXING', '').lower() in ('1', 'true', 'yes', 'on')
+OPENSEARCH_INDEXING = os.environ.get("OPENSEARCH_INDEXING", "").lower() in ("1", "true", "yes", "on")
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://storage.googleapis.com/',
-    'http://localhost:3000',
-    'http://localhost:80',
-    'https://localhost:443',
-    'https://localhost:8443',
+    "https://storage.googleapis.com/",
+    "http://localhost:3000",
+    "http://localhost:80",
+    "https://localhost:443",
+    "https://localhost:8443",
 ]
 
 # Application definition
 INSTALLED_APPS = [
     # Start of Django Standard
-    'corsheaders',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'debug_toolbar',
-    'strawberry_django',
-    'phonenumber_field',
-    'core',
-    'rolepermissions',
-    'django_filters',
-    'djmoney',
-    'nested_admin',
+    "corsheaders",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "debug_toolbar",
+    "strawberry_django",
+    "phonenumber_field",
+    "core",
+    "rolepermissions",
+    "django_filters",
+    "djmoney",
+    "nested_admin",
     "sslserver",
-    'storages',
-    'django_crontab',
-    'import_export',
-    'simple_history',
-    'workflows',
+    "storages",
+    "django_crontab",
+    "import_export",
+    "simple_history",
+    "workflows",
     # End of Django Standard
-
     # Start of Email
-    'django_ses',
+    "django_ses",
     # End of Email
-
     # Start of health_check
-    'health_check',  # required
-    'health_check.db',  # stock Django health checkers
-    'health_check.cache',
-    'health_check.storage',
-    'health_check.contrib.migrations',
+    "health_check",  # required
+    "health_check.db",  # stock Django health checkers
+    "health_check.cache",
+    "health_check.storage",
+    "health_check.contrib.migrations",
     # End of health_check
-
     # Start of Astrolift
-    'auth1',
-    'config.middleware',
-    'organization',
-    'core_logs',
+    "auth1",
+    "config.middleware",
+    "organization",
+    "core_logs",
     # Canonical Astrolift platform apps (control-plane data model)
-    'astrolift_identity',
-    'astrolift_clusters',
-    'astrolift_registry',
-    'astrolift_lifecycle',
-    'astrolift_services',
-    'astrolift_operations',
-    'astrolift_billing',
-    'astrolift_scm',
+    "astrolift_identity",
+    "astrolift_clusters",
+    "astrolift_registry",
+    "astrolift_lifecycle",
+    "astrolift_services",
+    "astrolift_operations",
+    "astrolift_billing",
+    "astrolift_scm",
     # End of Astrolift
-
-    'constance',
-    'constance.backends.database',
+    "constance",
+    "constance.backends.database",
 ]
 
 # Feature toggles — remove disabled feature apps
@@ -314,7 +329,7 @@ INSTALLED_APPS = filter_installed_apps(INSTALLED_APPS)
 # Discover and merge domain app configurations
 # Domain apps declare their configuration
 # in astrolift_config/settings.py files
-logger.info('Discovering domain apps...')
+logger.info("Discovering domain apps...")
 from config.config_merger import ConfigMerger  # noqa: E402
 
 config_merger = ConfigMerger(BASE_DIR)
@@ -323,7 +338,7 @@ config_merger.discover()
 # Merge INSTALLED_APPS from domain apps
 DOMAIN_APPS = config_merger.get_installed_apps()
 INSTALLED_APPS.extend(DOMAIN_APPS)
-logger.info(f'Added {len(DOMAIN_APPS)} domain app(s) to INSTALLED_APPS')
+logger.info(f"Added {len(DOMAIN_APPS)} domain app(s) to INSTALLED_APPS")
 
 # Merge MIDDLEWARE from domain apps
 DOMAIN_MIDDLEWARE = config_merger.get_middleware()
@@ -334,36 +349,25 @@ if DOMAIN_MIDDLEWARE:
 # Merge custom settings from domain apps
 config_merger.merge_settings(globals())
 
-CRONJOBS = [
+CRONJOBS = []
 
-]
-
-CONSTANCE_CONFIG = dict(
-    TIME_ZONE=(TIME_ZONE, 'System timezone'),
-    PUT_PRESIGNED_URL_EXPIRATION=(60, 'Time to live in seconds of presigned urls for uploading.'),
-    GET_PRESIGNED_URL_EXPIRATION=(3600, 'Time to live in seconds of presigned urls for downloading.'),
-    AUTH0_REGISTER_NEW_USER=(False, 'Register new users in Auth0'),
-    SEARCH_PROFILE_ENABLED=(False, 'Enables opensearch for profile search'),
-    EMAIL_NOTIFICATIONS=(False, 'Enables the platform to send Email Notifications'),
-)
+CONSTANCE_CONFIG = {
+    "TIME_ZONE": (TIME_ZONE, "System timezone"),
+    "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
+    "GET_PRESIGNED_URL_EXPIRATION": (3600, "Time to live in seconds of presigned urls for downloading."),
+    "AUTH0_REGISTER_NEW_USER": (False, "Register new users in Auth0"),
+    "SEARCH_PROFILE_ENABLED": (False, "Enables opensearch for profile search"),
+    "EMAIL_NOTIFICATIONS": (False, "Enables the platform to send Email Notifications"),
+}
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'System': {
-        'fields': ('TIME_ZONE', 'PUT_PRESIGNED_URL_EXPIRATION', 'GET_PRESIGNED_URL_EXPIRATION'),
-        'collapse': False
+    "System": {
+        "fields": ("TIME_ZONE", "PUT_PRESIGNED_URL_EXPIRATION", "GET_PRESIGNED_URL_EXPIRATION"),
+        "collapse": False,
     },
-    'Auth0': {
-        'fields': ('AUTH0_REGISTER_NEW_USER',),
-        'collapse': False
-    },
-    'Search': {
-        'fields': ('SEARCH_PROFILE_ENABLED',),
-        'collapse': False
-    },
-    'Notifications': {
-        'fields': ('EMAIL_NOTIFICATIONS',),
-        'collapse': False
-    },
+    "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
+    "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
+    "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
 }
 
 INTERNAL_IPS = [
@@ -382,40 +386,39 @@ DEBUG_TOOLBAR_CONFIG = {
 MIDDLEWARE = [
     "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    'django_ratelimit.middleware.RatelimitMiddleware',
+    "django_ratelimit.middleware.RatelimitMiddleware",
     # Determines Ip ranges supported, specific hosts are managed via the ALLOWED_HOSTS setting in each env
-    'config.middleware.allow_cidr_hosts.AllowCIDRHostsMiddleware',
+    "config.middleware.allow_cidr_hosts.AllowCIDRHostsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'auth1.middleware.Auth0SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'simple_history.middleware.HistoryRequestMiddleware',
-    'django.contrib.auth.middleware.RemoteUserMiddleware',  # Required for Auth0
-    'core.middleware.current_user.CurrentUserMiddleware',  # Track current user for signals
-    'core.middleware.request_id.RequestIdMiddleware',  # ULID + W3C traceparent → contextvar
-    'core.middleware.tenant.TenantContextMiddleware',  # Resolve org/team/project, populate TenantContext
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "auth1.middleware.Auth0SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
+    "django.contrib.auth.middleware.RemoteUserMiddleware",  # Required for Auth0
+    "core.middleware.current_user.CurrentUserMiddleware",  # Track current user for signals
+    "core.middleware.request_id.RequestIdMiddleware",  # ULID + W3C traceparent → contextvar
+    "core.middleware.tenant.TenantContextMiddleware",  # Resolve org/team/project, populate TenantContext
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # 'django.middleware.gzip.GZipMiddleware',
-
 ]
 
 TEMPLATES_CACHE_BACKEND = DEFAULT_CACHE_ALIAS
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'config/templates/')],
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [os.path.join(BASE_DIR, "config/templates/")],
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
             "loaders": [
                 (
@@ -432,7 +435,7 @@ TEMPLATES = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
+    "django.contrib.auth.backends.ModelBackend",
     # 'config.backend.MagicBackend',
 ]
 
@@ -441,28 +444,28 @@ AUTHENTICATION_BACKENDS = [
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DATE_INPUT_FORMATS": [
-        "%Y-%m-%d",           # 1962-08-15
+        "%Y-%m-%d",  # 1962-08-15
         "%Y-%m-%dT%H:%M:%S",  # 1962-08-15T00:00:00
-        "iso-8601",           # keep DRF's default
+        "iso-8601",  # keep DRF's default
     ],
     "DATETIME_INPUT_FORMATS": [
         "%Y-%m-%dT%H:%M:%S",  # 1962-08-15T00:00:00
@@ -471,12 +474,12 @@ REST_FRAMEWORK = {
 }
 
 # Rate limiting
-RATELIMIT_VIEW = 'django.views.defaults.permission_denied'
+RATELIMIT_VIEW = "django.views.defaults.permission_denied"
 
 # Temporal — durable workflow runtime
-TEMPORAL_ADDRESS = env_str('TEMPORAL_ADDRESS', 'localhost:7233')
-TEMPORAL_NAMESPACE = env_str('TEMPORAL_NAMESPACE', 'default')
-TEMPORAL_TASK_QUEUE = env_str('TEMPORAL_TASK_QUEUE', 'astrolift-main')
+TEMPORAL_ADDRESS = env_str("TEMPORAL_ADDRESS", "localhost:7233")
+TEMPORAL_NAMESPACE = env_str("TEMPORAL_NAMESPACE", "default")
+TEMPORAL_TASK_QUEUE = env_str("TEMPORAL_TASK_QUEUE", "astrolift-main")
 
 
 # Structured logging: JSON in non-local envs, human-readable text
@@ -484,10 +487,10 @@ TEMPORAL_TASK_QUEUE = env_str('TEMPORAL_TASK_QUEUE', 'astrolift-main')
 # of truth — set ``LOG_FORMAT`` (``json`` | ``text`` | ``ecs``),
 # ``LOG_LEVEL`` (default ``INFO``), and ``LOG_DESTINATION``
 # (``stdout`` | ``stderr``) to override.
-TELEMETRY_LOGS = env_bool('TELEMETRY_LOGS', True)
-LOG_LEVEL = env_str('LOG_LEVEL', env_str('DJANGO_LOG_LEVEL', 'INFO'))
-LOG_FORMAT = env_str('LOG_FORMAT', 'json')
-LOG_DESTINATION = env_str('LOG_DESTINATION', 'stdout')
+TELEMETRY_LOGS = env_bool("TELEMETRY_LOGS", True)
+LOG_LEVEL = env_str("LOG_LEVEL", env_str("DJANGO_LOG_LEVEL", "INFO"))
+LOG_FORMAT = env_str("LOG_FORMAT", "json")
+LOG_DESTINATION = env_str("LOG_DESTINATION", "stdout")
 
 from core.logging import build_logging_config  # noqa: E402
 
@@ -498,13 +501,13 @@ LOGGING = build_logging_config(
 )
 
 # ================ DEV
-CONFIGURATION = env_str('DJANGO_CONFIGURATION', "Dev")
-logger.warning(f'DJANGO_CONFIGURATION: {CONFIGURATION}')
+CONFIGURATION = env_str("DJANGO_CONFIGURATION", "Dev")
+logger.warning(f"DJANGO_CONFIGURATION: {CONFIGURATION}")
 
-SENTRY_DSN = env_str('SENTRY_DSN')
+SENTRY_DSN = env_str("SENTRY_DSN")
 
 match CONFIGURATION.lower():
-    case 'stg' | 'dev' | 'prd' | 'prod':
+    case "stg" | "dev" | "prd" | "prod":
         if SENTRY_DSN:
             sentry_sdk.init(
                 dsn=SENTRY_DSN,
@@ -513,11 +516,13 @@ match CONFIGURATION.lower():
                 environment=CONFIGURATION,
             )
         else:
-            logger.info('Sentry DSN not configured; skipping Sentry init')
+            logger.info("Sentry DSN not configured; skipping Sentry init")
     case _:
-        logger.info(f'Sentry is not enabled for configuration: {CONFIGURATION}')
+        logger.info(f"Sentry is not enabled for configuration: {CONFIGURATION}")
 
-ALLOWED_HOSTS = ['*', ]
+ALLOWED_HOSTS = [
+    "*",
+]
 
 IS_PROD = CONFIGURATION.lower() == "prd"
 IS_DEV = CONFIGURATION.lower() == "dev" or CONFIGURATION.lower() == "local"
@@ -526,102 +531,84 @@ IS_LOCAL = CONFIGURATION.lower() in ("local", "localpg", "localverbose")
 if CONFIGURATION.lower() == "Prd".lower():
     DEBUG = True
     AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = [
-        '127.0.0.1',
-        'localhost',
-        '*'
-    ]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 elif CONFIGURATION.lower() == "Dev".lower():
     DEBUG = True
     AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = [
-        '127.0.0.1',
-        'localhost',
-        '*'
-    ]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 
 elif CONFIGURATION.lower() == "int":
     DEBUG = True
     AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = [
-        '127.0.0.1',
-        'localhost',
-        '*'
-    ]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 
 elif CONFIGURATION.lower() == "stg":
     DEBUG = True
     AUTH_PASSWORD_VALIDATORS = []
-    ALLOWED_HOSTS = [
-        '127.0.0.1',
-        'localhost',
-        '*'
-    ]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 elif CONFIGURATION.lower() == "Tests".lower():
     DEBUG = True
-    SECRET_KEY = 'not-a-secret'
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:'
-        }
-    }
+    SECRET_KEY = "not-a-secret"
+    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
     CACHES = {
         DEFAULT_CACHE_ALIAS: {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         },
-        'memory_cache': {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
-        }
+        "memory_cache": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        },
     }
-    INSTALLED_APPS.append('testdata')
+    INSTALLED_APPS.append("testdata")
 elif CONFIGURATION.lower() == "Local".lower() or CONFIGURATION.lower() == "LocalPG".lower():
     DEBUG = True
-    ALLOWED_HOSTS = ['*', ]
+    ALLOWED_HOSTS = [
+        "*",
+    ]
     AUTH_PASSWORD_VALIDATORS = []
-    DEFAULT_USER_TEST = env_str('DJANGO_', 'admin')  # only for local login the user if there is no user logged in
+    DEFAULT_USER_TEST = env_str(
+        "DJANGO_", "admin"
+    )  # only for local login the user if there is no user logged in
     TELEMETRY_LOGS = False
-    INSTALLED_APPS.append('testdata')
+    INSTALLED_APPS.append("testdata")
     LOGGING = build_logging_config(
         level=LOG_LEVEL,
-        format_=env_str('LOG_FORMAT', 'text'),
+        format_=env_str("LOG_FORMAT", "text"),
         destination=LOG_DESTINATION,
     )
 elif CONFIGURATION.lower() == "LocalVerbose".lower():
     DEBUG = True
-    ALLOWED_HOSTS = ['*', ]
+    ALLOWED_HOSTS = [
+        "*",
+    ]
     AUTH_PASSWORD_VALIDATORS = []
-    DEFAULT_USER_TEST = env_str('DJANGO_', 'admin')  # only for local login the user if there is no user logged in
+    DEFAULT_USER_TEST = env_str(
+        "DJANGO_", "admin"
+    )  # only for local login the user if there is no user logged in
     TELEMETRY_LOGS = False
     LOGGING = build_logging_config(
-        level=env_str('LOG_LEVEL', 'DEBUG'),
-        format_=env_str('LOG_FORMAT', 'text'),
+        level=env_str("LOG_LEVEL", "DEBUG"),
+        format_=env_str("LOG_FORMAT", "text"),
         destination=LOG_DESTINATION,
     )
 else:
     DEBUG = True
-    SECRET_KEY = 'not-a-secret'
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:'
-        }
-    }
+    SECRET_KEY = "not-a-secret"
+    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
     CACHES = {
         DEFAULT_CACHE_ALIAS: {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         },
-        'memory_cache': {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
-        }
+        "memory_cache": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        },
     }
 
-logger.warning(f'Settings Version - End: {VERSION}')
+logger.warning(f"Settings Version - End: {VERSION}")
 logger.warning(f'DATABASE: {DATABASES[DEFAULT_DB_ALIAS]["ENGINE"]}')
 logger.warning(f'DB NAME: {DATABASES[DEFAULT_DB_ALIAS]["NAME"]}')
 if "USER" in DATABASES[DEFAULT_DB_ALIAS]:
     logger.warning(f'DB USER: {DATABASES[DEFAULT_DB_ALIAS]["USER"]}')
-logger.warning(f'ALLOWED_HOSTS: {ALLOWED_HOSTS}')
+logger.warning(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 
 # multiple import options
@@ -631,15 +618,15 @@ IMPORT_FORMATS = [JSON]
 EXPORT_FORMATS = [JSON, TSV, CSV, XLSX]
 
 # Twilio Settings
-TWILIO_SID = os.getenv('TWILIO_SID', '')
-TWILIO_SECRET = os.getenv('TWILIO_SECRET', '')
-TWILIO_FROM_NUMBER = os.getenv('TWILIO_FROM_NUMBER', '')
-TWILIO_CALLBACK = os.getenv('TWILIO_CALLBACK', '')
+TWILIO_SID = os.getenv("TWILIO_SID", "")
+TWILIO_SECRET = os.getenv("TWILIO_SECRET", "")
+TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
+TWILIO_CALLBACK = os.getenv("TWILIO_CALLBACK", "")
 
 # Start of Metabase Config
-METABASE_SITE_URL = env_str('METABASE_SITE_URL', '')
-METABASE_SECRET_KEY = env_str('METABASE_SECRET_KEY', '')
-METABASE_BACKEND_API_KEY = env_str('METABASE_BACKEND_API_KEY', '')
+METABASE_SITE_URL = env_str("METABASE_SITE_URL", "")
+METABASE_SECRET_KEY = env_str("METABASE_SECRET_KEY", "")
+METABASE_BACKEND_API_KEY = env_str("METABASE_BACKEND_API_KEY", "")
 
 logger.warning(f"METABASE_URL = {METABASE_SITE_URL}")
 logger.warning(f"METABASE_SECRET_KEY = {METABASE_SECRET_KEY}")

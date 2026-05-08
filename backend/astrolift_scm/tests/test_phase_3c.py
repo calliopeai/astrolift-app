@@ -12,8 +12,6 @@ import hashlib
 import hmac
 import json
 import time
-from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -26,7 +24,6 @@ from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection, WebhookDelivery
 from core.secrets import encrypt_at_rest
-
 
 pytestmark = pytest.mark.django_db
 
@@ -45,9 +42,7 @@ def _no_opensearch(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_debug_toolbar(settings):
-    settings.MIDDLEWARE = [
-        m for m in settings.MIDDLEWARE if "DebugToolbar" not in m
-    ]
+    settings.MIDDLEWARE = [m for m in settings.MIDDLEWARE if "DebugToolbar" not in m]
     settings.DEBUG = False
 
 
@@ -76,12 +71,10 @@ def app_install_connection():
     )
 
 
-def test_app_install_token_caches_until_near_expiry(
-    app_install_connection, monkeypatch
-):
+def test_app_install_token_caches_until_near_expiry(app_install_connection, monkeypatch):
     """First call hits the network; second call within the cache
     window returns the cached token without a second request."""
-    from astrolift_scm.providers.github_app import installation_token, _CACHE
+    from astrolift_scm.providers.github_app import _CACHE, installation_token
 
     _CACHE.clear()  # isolate from previous tests in the same process
 
@@ -102,9 +95,7 @@ def test_app_install_token_caches_until_near_expiry(
     assert call_count["n"] == 1
 
 
-def test_app_install_token_refreshes_when_within_margin(
-    app_install_connection, monkeypatch
-):
+def test_app_install_token_refreshes_when_within_margin(app_install_connection, monkeypatch):
     """When the cached token is < refresh-margin seconds from
     expiry, a fresh exchange runs."""
     from astrolift_scm.providers import github_app
@@ -165,23 +156,31 @@ def test_app_install_token_rejects_incomplete_config(monkeypatch):
 def push_stack():
     org = Organization.objects.create(name="Acme", slug="acme-push3c")
     team = Team.objects.create(organization=org, name="Eng", slug="eng3c")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo3c"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo3c")
     plugin = ProviderPlugin(
-        name="P3c", slug="p-3c", version="0.0.1",
-        capabilities_manifest={}, config_schema={},
+        name="P3c",
+        slug="p-3c",
+        version="0.0.1",
+        capabilities_manifest={},
+        config_schema={},
     )
     ProviderPlugin.objects.bulk_create([plugin])
     cluster = TenantCluster.objects.create(
-        organization=org, name="c3c", slug="c-3c",
+        organization=org,
+        name="c3c",
+        slug="c-3c",
         provider_plugin=ProviderPlugin.objects.get(slug="p-3c"),
-        provider_config={}, endpoint="https://c", auth_method="kubeconfig",
+        provider_config={},
+        endpoint="https://c",
+        auth_method="kubeconfig",
         auth_config={},
     )
     app = RegisteredApp.objects.create(
-        organization=org, project=project, team=team,
-        name="H3c", slug="hello-3c",
+        organization=org,
+        project=project,
+        team=team,
+        name="H3c",
+        slug="hello-3c",
         provisioning_status="ready",
         source_kind="github",
         source_repo="acme-org/hello",
@@ -222,9 +221,7 @@ def _push_payload(repo: str, branch: str = "main", sha: str = "abc123"):
 
 
 def _sig(secret: str, body: bytes) -> str:
-    return "sha256=" + hmac.new(
-        secret.encode("utf-8"), body, hashlib.sha256
-    ).hexdigest()
+    return "sha256=" + hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
 
 
 def test_replay_with_same_delivery_id_is_ignored(push_stack, settings):
@@ -236,7 +233,8 @@ def test_replay_with_same_delivery_id_is_ignored(push_stack, settings):
 
     first = client.post(
         f"/app/auth1/scm/github/webhook/{push_stack['conn'].guid}/",
-        data=body, content_type="application/json",
+        data=body,
+        content_type="application/json",
         HTTP_X_HUB_SIGNATURE_256=sig,
         HTTP_X_GITHUB_DELIVERY=delivery_id,
         HTTP_X_GITHUB_EVENT="push",
@@ -249,7 +247,8 @@ def test_replay_with_same_delivery_id_is_ignored(push_stack, settings):
     # Resending the exact same payload + delivery_id must not fire again.
     second = client.post(
         f"/app/auth1/scm/github/webhook/{push_stack['conn'].guid}/",
-        data=body, content_type="application/json",
+        data=body,
+        content_type="application/json",
         HTTP_X_HUB_SIGNATURE_256=sig,
         HTTP_X_GITHUB_DELIVERY=delivery_id,
         HTTP_X_GITHUB_EVENT="push",
@@ -271,7 +270,8 @@ def test_different_delivery_ids_both_fire(push_stack, settings):
     for delivery in ("aaa", "bbb"):
         resp = client.post(
             f"/app/auth1/scm/github/webhook/{push_stack['conn'].guid}/",
-            data=body, content_type="application/json",
+            data=body,
+            content_type="application/json",
             HTTP_X_HUB_SIGNATURE_256=sig,
             HTTP_X_GITHUB_DELIVERY=delivery,
             HTTP_X_GITHUB_EVENT="push",
@@ -290,7 +290,8 @@ def test_delivery_row_links_to_triggered_deployment(push_stack, settings):
     client = Client()
     resp = client.post(
         f"/app/auth1/scm/github/webhook/{push_stack['conn'].guid}/",
-        data=body, content_type="application/json",
+        data=body,
+        content_type="application/json",
         HTTP_X_HUB_SIGNATURE_256=sig,
         HTTP_X_GITHUB_DELIVERY="link-test",
         HTTP_X_GITHUB_EVENT="push",

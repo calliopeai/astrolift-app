@@ -103,13 +103,11 @@ class Event:
         envelope = EventEnvelope(
             event_type=event_type,
             payload=payload or {},
-            organization_id=organization_id
-            or (tenant.organization_id if tenant else None),
+            organization_id=organization_id or (tenant.organization_id if tenant else None),
             team_id=team_id or (tenant.team_id if tenant else None),
             project_id=project_id or (tenant.project_id if tenant else None),
             registered_app_id=registered_app_id,
-            actor_user_id=actor_user_id
-            or (tenant.actor_user_id if tenant else None),
+            actor_user_id=actor_user_id or (tenant.actor_user_id if tenant else None),
             resource_kind=resource_kind or "",
             resource_id=str(resource_id) if resource_id is not None else "",
             request_id=request_id or "",
