@@ -101,6 +101,50 @@ export const GET_DEPLOYMENT_METRICS = gql`
   }
 `;
 
+export const LIST_SCHEDULED_JOB_RUNS = gql`
+  query ListScheduledJobRuns(
+    $appSlug: String
+    $environmentName: String
+    $limit: Int
+  ) {
+    astroliftScheduledJobRuns(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      limit: $limit
+    ) {
+      id
+      registeredAppSlug
+      environmentName
+      workloadSlug
+      k8sJobName
+      status
+      startedAt
+      endedAt
+      durationSeconds
+      exitCode
+      logExcerpt
+      createdAt
+    }
+  }
+`;
+
+export const LIST_COMMAND_RUNS = gql`
+  query ListCommandRuns($appSlug: String, $limit: Int) {
+    astroliftCommandRuns(appSlug: $appSlug, limit: $limit) {
+      id
+      registeredAppSlug
+      workloadSlug
+      invokedByUsername
+      command
+      startedAt
+      endedAt
+      exitCode
+      logExcerpt
+      createdAt
+    }
+  }
+`;
+
 export const LIST_APP_HEALTH_SUMMARY = gql`
   query ListAppHealthSummary {
     astroliftAppHealthSummary {

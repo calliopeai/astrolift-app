@@ -96,6 +96,19 @@ export type AstroliftBudget = {
   scopeKind: Scalars['String']['output'];
 };
 
+export type AstroliftCommandRun = {
+  command: Scalars['JSON']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  exitCode?: Maybe<Scalars['Int']['output']>;
+  id: Scalars['GUID']['output'];
+  invokedByUsername?: Maybe<Scalars['String']['output']>;
+  logExcerpt: Scalars['String']['output'];
+  registeredAppSlug: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  workloadSlug?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftContainer = {
   args: Array<Scalars['String']['output']>;
   buildContext: Scalars['String']['output'];
@@ -450,6 +463,21 @@ export type AstroliftRoleBindingMutationResult = {
   data?: Maybe<AstroliftRoleBinding>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftScheduledJobRun = {
+  createdAt: Scalars['DateTime']['output'];
+  durationSeconds?: Maybe<Scalars['Int']['output']>;
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
+  exitCode?: Maybe<Scalars['Int']['output']>;
+  id: Scalars['GUID']['output'];
+  k8sJobName: Scalars['String']['output'];
+  logExcerpt: Scalars['String']['output'];
+  registeredAppSlug: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  workloadSlug: Scalars['String']['output'];
 };
 
 export type AstroliftScmWebhookSecretReveal = {
@@ -1615,6 +1643,7 @@ export type Query = {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftClusters: Array<AstroliftTenantCluster>;
+  astroliftCommandRuns: Array<AstroliftCommandRun>;
   astroliftContainers: Array<AstroliftContainer>;
   astroliftCostSnapshots: Array<AstroliftCostSnapshot>;
   astroliftDeployment?: Maybe<AstroliftDeployment>;
@@ -1638,6 +1667,7 @@ export type Query = {
   astroliftQuotas: Array<AstroliftQuota>;
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
   astroliftRoles: Array<AstroliftRole>;
+  astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
   astroliftTeams: Array<AstroliftTeam>;
@@ -1683,6 +1713,12 @@ export type QueryAstroliftAvailableReposArgs = {
   connectionId: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftCommandRunsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -1743,6 +1779,13 @@ export type QueryAstroliftOrganizationArgs = {
 
 export type QueryAstroliftPreviewEnvironmentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftScheduledJobRunsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 

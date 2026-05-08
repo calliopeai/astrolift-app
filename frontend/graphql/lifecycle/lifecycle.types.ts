@@ -17,10 +17,12 @@
 import type {
   AstroliftAppEnvironment as GeneratedAppEnvironment,
   AstroliftAppHealthSummary as GeneratedAppHealthSummary,
+  AstroliftCommandRun as GeneratedCommandRun,
   AstroliftDeployment as GeneratedDeployment,
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
   AstroliftPreviewEnvironment as GeneratedPreviewEnvironment,
+  AstroliftScheduledJobRun as GeneratedScheduledJobRun,
 } from "@/graphql/__generated__/schema";
 
 export type AstroliftGuid = string;
@@ -72,3 +74,18 @@ export type AstroliftAppHealthSummary = Omit<
 > & {
   latestDeploymentStatus: DeploymentStatus | null;
 };
+
+export type ScheduledJobRunStatus =
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "superseded";
+
+export type AstroliftScheduledJobRun = Omit<
+  GeneratedScheduledJobRun,
+  "status"
+> & {
+  status: ScheduledJobRunStatus;
+};
+
+export type AstroliftCommandRun = GeneratedCommandRun;
