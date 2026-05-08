@@ -51,4 +51,25 @@ export interface AstroliftSshDeployKeyCreated {
   key: AstroliftSshDeployKey;
 }
 
+export interface AstroliftRemoteRepo {
+  fullName: string;
+  name: string;
+  description: string;
+  defaultBranch: string;
+  visibility: string;
+  cloneUrlHttps: string;
+  cloneUrlSsh: string;
+  webUrl: string;
+  isArchived: boolean;
+  isFork: boolean;
+  pushedAt: string | null;
+}
+
+export interface AstroliftRemoteRepoList {
+  repos: AstroliftRemoteRepo[];
+  errorCode: string | null;
+  errorMessage: string | null;
+  recoverable: boolean;
+}
+
 export type { MutationResult };

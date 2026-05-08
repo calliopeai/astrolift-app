@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { GitBranchIcon, RocketIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -34,10 +35,38 @@ import type {
   SourceKind,
 } from "@/graphql/registry/registry.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import {
+  LIST_AVAILABLE_REPOS,
+  LIST_SOURCE_CONNECTIONS,
+} from "@/graphql/scm/scm.queries";
+import type {
+  AstroliftRemoteRepoList,
+  AstroliftSourceConnection,
+} from "@/graphql/scm/scm.types";
 
 interface ProjectsResp {
   astroliftProjects: AstroliftProject[];
 }
+
+interface ConnectionsResp {
+  astroliftSourceConnections: AstroliftSourceConnection[];
+}
+
+interface ReposResp {
+  astroliftAvailableRepos: AstroliftRemoteRepoList;
+}
+
+const KIND_TO_SOURCE_KIND: Record<string, SourceKind> = {
+  github_pat: "github",
+  github_app_install: "github",
+  github_oauth_app: "github",
+  gitlab_pat: "gitlab",
+  gitlab_oauth_app: "gitlab",
+  bitbucket_pat: "bitbucket",
+  bitbucket_oauth_app: "bitbucket",
+  gitea_pat: "gitea",
+  gitea_oauth_app: "gitea",
+};
 
 const slugify = (s: string) =>
   s
@@ -58,6 +87,7 @@ const SOURCE_KINDS: { value: SourceKind; label: string }[] = [
 export function RegisterAppClient() {
   const router = useRouter();
   const projects = useQuery<ProjectsResp>(LIST_PROJECTS);
+  const connections = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
 
   const [projectId, setProjectId] = React.useState("");
   const [name, setName] = React.useState("");
@@ -70,6 +100,48 @@ export function RegisterAppClient() {
   const [manifestPath, setManifestPath] = React.useState("astrolift.toml");
   const [defaultBranch, setDefaultBranch] = React.useState("main");
   const [deployBranch, setDeployBranch] = React.useState("main");
+
+  // Connected-host picker. The operator can paste a clone URL the
+  // old way OR pick a stored connection and choose a repo from it.
+  // Picking a connection auto-fills sourceKind/sourceRepo/sourceUrl/
+  // defaultBranch from the chosen repo.
+  const [pickerConnectionId, setPickerConnectionId] = React.useState("");
+  const [pickerSearch, setPickerSearch] = React.useState("");
+
+  const repoListable = pickerConnectionId !== "";
+  const repos = useQuery<ReposResp>(LIST_AVAILABLE_REPOS, {
+    variables: {
+      connectionId: pickerConnectionId,
+      search: pickerSearch || null,
+      limit: 100,
+    },
+    skip: !repoListable,
+  });
+
+  const usableConnections = (
+    connections.data?.astroliftSourceConnections ?? []
+  ).filter((c) => c.isActive && !c.isOauthAppConfig);
+  const repoList = repos.data?.astroliftAvailableRepos;
+
+  function pickRepo(fullName: string) {
+    const repo = repoList?.repos.find((r) => r.fullName === fullName);
+    if (!repo) return;
+    const conn = usableConnections.find((c) => c.id === pickerConnectionId);
+    const inferredKind = conn
+      ? (KIND_TO_SOURCE_KIND[conn.kind] ?? "git_url")
+      : "git_url";
+    setSourceKind(inferredKind);
+    setSourceRepo(repo.fullName);
+    setSourceUrl(repo.cloneUrlHttps || repo.cloneUrlSsh || "");
+    setDefaultBranch(repo.defaultBranch || "main");
+    setDeployBranch(repo.defaultBranch || "main");
+    if (!name) {
+      setName(repo.name);
+    }
+    if (!slugTouched && !slug) {
+      setSlug(slugify(repo.name));
+    }
+  }
 
   React.useEffect(() => {
     const list = projects.data?.astroliftProjects;
@@ -199,10 +271,120 @@ export function RegisterAppClient() {
           <CardHeader>
             <CardTitle>Source</CardTitle>
             <CardDescription>
-              The Git repository the platform watches for pushes.
+              The Git repository the platform watches for pushes. Pick from
+              a connected host below, or paste a clone URL manually.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:max-w-2xl">
+            {usableConnections.length > 0 ? (
+              <div className="rounded-md border bg-muted/30 p-4">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Pick from a connected host
+                </Label>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <Select
+                    value={pickerConnectionId}
+                    onValueChange={(v) => {
+                      setPickerConnectionId(v);
+                      setPickerSearch("");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a connection" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {usableConnections.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}{" "}
+                          <span className="text-muted-foreground text-xs">
+                            ({c.kind})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="filter repos…"
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
+                    disabled={!repoListable}
+                    className="text-xs"
+                  />
+                </div>
+                {repoListable && (
+                  <div className="mt-3">
+                    {repos.loading ? (
+                      <p className="text-muted-foreground text-xs">
+                        Loading repos…
+                      </p>
+                    ) : repoList?.errorCode ? (
+                      <p className="text-destructive text-xs">
+                        {repoList.errorMessage ?? repoList.errorCode}
+                        {repoList.recoverable && (
+                          <>
+                            {" "}
+                            <Link
+                              href="/settings/source-providers"
+                              className="underline"
+                            >
+                              reconnect
+                            </Link>
+                          </>
+                        )}
+                      </p>
+                    ) : repoList && repoList.repos.length > 0 ? (
+                      <Select
+                        value={sourceRepo || ""}
+                        onValueChange={pickRepo}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={`Pick from ${repoList.repos.length} repo${repoList.repos.length === 1 ? "" : "s"}`}
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {repoList.repos.map((r) => (
+                            <SelectItem key={r.fullName} value={r.fullName}>
+                              {r.fullName}{" "}
+                              <span className="text-muted-foreground text-xs">
+                                ({r.visibility}
+                                {r.isFork && ", fork"}
+                                {r.isArchived && ", archived"})
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-muted-foreground text-xs">
+                        No repos visible to this connection. Adjust the
+                        visibility scopes on{" "}
+                        <Link
+                          href="/settings/source-providers"
+                          className="underline"
+                        >
+                          /settings/source-providers
+                        </Link>
+                        .
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                No source connections yet.{" "}
+                <Link
+                  href="/settings/source-providers"
+                  className="underline"
+                >
+                  Connect a host
+                </Link>{" "}
+                to pick from a repo list, or fill in the form below
+                manually.
+              </p>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="source-kind">Provider</Label>

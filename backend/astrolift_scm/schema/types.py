@@ -41,6 +41,37 @@ class SshDeployKeyType:
     created_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftRemoteRepo")
+class RemoteRepoType:
+    """One row of a SCM-host's repo list, as the operator picks
+    in /apps/new. Normalized across hosts so the picker UI is the
+    same shape regardless of provider."""
+
+    full_name: str
+    name: str
+    description: str
+    default_branch: str
+    visibility: str
+    clone_url_https: str
+    clone_url_ssh: str
+    web_url: str
+    is_archived: bool
+    is_fork: bool
+    pushed_at: str | None
+
+
+@strawberry.type(name="AstroliftRemoteRepoList")
+class RemoteRepoListType:
+    """Wrapper carrying either a successful list or a recoverable
+    error code so the UI can show 'reconnect' affordances inline
+    instead of treating every transient API blip as a 500."""
+
+    repos: list[RemoteRepoType]
+    error_code: str | None
+    error_message: str | None
+    recoverable: bool
+
+
 @strawberry.type(name="AstroliftSshDeployKeyCreated")
 class SshDeployKeyCreatedType:
     """Returned exactly once on creation. Same shape as
@@ -83,4 +114,20 @@ def ssh_key_to_type(k) -> SshDeployKeyType:
         last_used_at=k.last_used_at,
         is_active=k.is_active,
         created_at=k.created_at,
+    )
+
+
+def remote_repo_to_type(r) -> RemoteRepoType:
+    return RemoteRepoType(
+        full_name=r.full_name,
+        name=r.name,
+        description=r.description,
+        default_branch=r.default_branch,
+        visibility=r.visibility,
+        clone_url_https=r.clone_url_https,
+        clone_url_ssh=r.clone_url_ssh,
+        web_url=r.web_url,
+        is_archived=r.is_archived,
+        is_fork=r.is_fork,
+        pushed_at=r.pushed_at,
     )
