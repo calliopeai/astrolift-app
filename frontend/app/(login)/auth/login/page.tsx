@@ -44,6 +44,14 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (useDevLogin) {
+      // Wipe any stale JWT from a prior session — dev-login uses a
+      // sessionid cookie, and a leftover Bearer JWT will trip the
+      // backend's Auth0SessionMiddleware and 401 every GraphQL call.
+      try {
+        window.localStorage.removeItem("jwt");
+      } catch {
+        // localStorage may be unavailable in some browser modes.
+      }
       window.location.href = `${apiRoot}/app/auth1/dev-login?next=/dashboard`;
       return;
     }
