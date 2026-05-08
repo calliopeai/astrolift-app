@@ -58,3 +58,36 @@ def test_resolver_denies_when_no_binding():
     tenant = TenantContext(organization_id=org.id, actor_user_id=user.id)
     granted, _ = resolve(tenant, Permission.APP_DEPLOY, scope=None)
     assert granted is False
+
+
+def test_resolver_grants_to_django_superuser_without_binding():
+    """Bootstrap-admin path: a fresh install has a Django superuser
+    but no RoleBindings yet. They should still pass every permission
+    check so they can complete first-run onboarding."""
+    User = get_user_model()
+    su = User.objects.create(
+        username="root@example", email="root@example",
+        is_superuser=True, is_staff=True,
+    )
+    org = Organization.objects.create(name="Acme", slug="acme-su")
+    tenant = TenantContext(organization_id=org.id, actor_user_id=su.id)
+
+    granted, reason = resolve(tenant, Permission.APP_DEPLOY, scope=None)
+    assert granted is True
+    assert "superuser" in reason
+
+    granted2, _ = resolve(tenant, Permission.ORG_DELETE, scope=None)
+    assert granted2 is True
+
+
+def test_resolver_does_not_grant_to_inactive_superuser():
+    User = get_user_model()
+    su = User.objects.create(
+        username="dormant", email="dormant@example",
+        is_superuser=True, is_active=False,
+    )
+    org = Organization.objects.create(name="Acme", slug="acme-dormant")
+    tenant = TenantContext(organization_id=org.id, actor_user_id=su.id)
+
+    granted, _ = resolve(tenant, Permission.APP_DEPLOY, scope=None)
+    assert granted is False

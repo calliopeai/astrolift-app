@@ -131,3 +131,45 @@ def test_other_org_binding_not_visible(org, user, fake_info):
         result = q.astrolift_my_permissions(fake_info)
     # Tenant-scoped to org, so the other-org binding doesn't bleed in.
     assert result == []
+
+
+def test_superuser_bypass_grants_every_permission(org, fake_info):
+    """Django superusers see the full slug catalog without explicit
+    bindings — matches the resolver's bypass and keeps the bootstrap
+    admin path simple (one Django superuser, no role plumbing)."""
+    from core.permissions import Permission
+
+    User = get_user_model()
+    su = User.objects.create_user(
+        username="root@local", email="root@local", is_superuser=True, is_staff=True
+    )
+
+    q = IdentityQuery()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=su.id)):
+        result = q.astrolift_my_permissions(fake_info)
+
+    expected = sorted(p.value for p in Permission)
+    assert result == expected
+    # Sanity check on a few critical slugs.
+    for slug in ("app.deploy", "org.delete", "cluster.unregister"):
+        assert slug in result
+
+
+def test_inactive_superuser_does_not_bypass(org, fake_info):
+    """is_active=False superusers are dormant accounts; the bypass
+    must not grant anything to them. Real RoleBindings still apply
+    (none here, so the result is empty)."""
+    User = get_user_model()
+    su = User.objects.create_user(
+        username="dormant@local",
+        email="dormant@local",
+        is_superuser=True,
+        is_staff=True,
+        is_active=False,
+    )
+
+    q = IdentityQuery()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=su.id)):
+        result = q.astrolift_my_permissions(fake_info)
+
+    assert result == []

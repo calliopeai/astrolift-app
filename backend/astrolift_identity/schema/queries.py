@@ -154,12 +154,27 @@ class IdentityQuery:
         require a valid tenant context (organization scoped via
         ``@tenant_scoped``), so anonymous callers get an empty list
         instead of leaking the slug catalog.
+
+        Django superusers get every permission slug, mirroring the
+        bypass in ``astrolift_identity.permission_resolver.resolve``
+        — the bootstrap admin path doesn't need explicit role bindings.
         """
+        from core.permissions import Permission
         from core.tenancy import get_current_tenant
+        from django.contrib.auth import get_user_model
 
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
+
+        if (
+            get_user_model()
+            .objects.filter(
+                pk=tenant.actor_user_id, is_superuser=True, is_active=True
+            )
+            .exists()
+        ):
+            return sorted(p.value for p in Permission)
 
         # Walk the user's RoleBindings in the current org and union
         # the permission slugs each role grants. Mirrors the logic in
