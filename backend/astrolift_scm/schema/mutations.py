@@ -21,6 +21,7 @@ from astrolift_scm.schema.types import (
     ssh_key_to_type,
 )
 from core.mutations import ErrorCode, mutation_audit
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import get_current_tenant
@@ -148,6 +149,7 @@ class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.connect")
     @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
     def connect_source(
         self, info: Info, input: ConnectSourceInput
     ) -> MutationResultType[SourceConnectionType]:
@@ -186,6 +188,7 @@ class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.update")
     @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
     def update_source_connection(
         self, info: Info, input: UpdateSourceConnectionInput
     ) -> MutationResultType[SourceConnectionType]:
@@ -216,6 +219,7 @@ class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.disconnect")
     @require_permission(Permission.SCM_DISCONNECT)
+    @tenant_scoped()
     def disconnect_source(
         self, info: Info, input: DisconnectSourceInput
     ) -> MutationResultType[SourceConnectionType]:
@@ -228,6 +232,7 @@ class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.ssh_key.generate")
     @require_permission(Permission.SCM_KEY_CREATE)
+    @tenant_scoped()
     def generate_ssh_deploy_key(
         self, info: Info, input: GenerateSshDeployKeyInput
     ) -> MutationResultType[SshDeployKeyCreatedType]:
@@ -278,6 +283,7 @@ class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.webhook.rotate")
     @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
     def rotate_webhook_secret(
         self, info: Info, input: RotateWebhookSecretInput
     ) -> MutationResultType[WebhookSecretReveal]:
@@ -331,6 +337,7 @@ class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.ssh_key.delete")
     @require_permission(Permission.SCM_KEY_DELETE)
+    @tenant_scoped()
     def delete_ssh_deploy_key(
         self, info: Info, input: DeleteSshDeployKeyInput
     ) -> MutationResultType[SshDeployKeyType]:

@@ -20,6 +20,7 @@ from astrolift_operations.schema.types import (
     webhook_to_type,
 )
 from core.mutations import ErrorCode, mutation_audit
+from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -73,6 +74,7 @@ class OperationsMutation:
     @strawberry.field
     @mutation_audit(action="webhook.create")
     @require_permission(Permission.WEBHOOK_CREATE)
+    @tenant_scoped()
     def create_webhook_subscription(
         self, info: Info, input: CreateWebhookSubscriptionInput
     ) -> MutationResultType[WebhookSecretReveal]:
@@ -111,6 +113,7 @@ class OperationsMutation:
     @strawberry.field
     @mutation_audit(action="webhook.update")
     @require_permission(Permission.WEBHOOK_UPDATE)
+    @tenant_scoped()
     def update_webhook_subscription(
         self, info: Info, input: UpdateWebhookSubscriptionInput
     ) -> MutationResultType[WebhookSubscriptionType]:
@@ -129,6 +132,7 @@ class OperationsMutation:
     @strawberry.field
     @mutation_audit(action="webhook.delete")
     @require_permission(Permission.WEBHOOK_DELETE)
+    @tenant_scoped()
     def delete_webhook_subscription(
         self, info: Info, input: DeleteWebhookSubscriptionInput
     ) -> MutationResultType[_SoftDeletePayload]:
