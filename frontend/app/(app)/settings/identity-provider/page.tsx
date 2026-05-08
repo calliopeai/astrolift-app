@@ -1,3 +1,6 @@
+import { LIST_IDENTITY_PROVIDERS } from "@/graphql/identity/identity.queries";
+import { PreloadQuery } from "@/lib/apollo";
+
 import { IdentityProviderClient } from "./identity-provider-client";
 
 export const metadata = {
@@ -5,5 +8,9 @@ export const metadata = {
 };
 
 export default function IdentityProviderSettingsPage() {
-  return <IdentityProviderClient />;
+  return (
+    <PreloadQuery query={LIST_IDENTITY_PROVIDERS}>
+      <IdentityProviderClient />
+    </PreloadQuery>
+  );
 }

@@ -1,3 +1,9 @@
+import {
+  LIST_PROJECTS,
+  LIST_TEAMS,
+} from "@/graphql/identity/identity.queries";
+import { PreloadQuery } from "@/lib/apollo";
+
 import { ProjectsClient } from "./projects-client";
 
 export const metadata = {
@@ -5,5 +11,11 @@ export const metadata = {
 };
 
 export default function ProjectsPage() {
-  return <ProjectsClient />;
+  return (
+    <PreloadQuery query={LIST_PROJECTS}>
+      <PreloadQuery query={LIST_TEAMS}>
+        <ProjectsClient />
+      </PreloadQuery>
+    </PreloadQuery>
+  );
 }
