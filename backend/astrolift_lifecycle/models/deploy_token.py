@@ -35,3 +35,13 @@ class DeployToken(BaseCoreModel):
     expires_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
     is_revoked = models.BooleanField(default=False)
+
+    # Rotation grace window (#143). When ``rotate_deploy_token``
+    # issues a new secret, the previous SHA-256 hash is parked here
+    # for a configurable grace period so CI runners holding the old
+    # token keep working until they're updated. ``last_rotated_at``
+    # is the rotation event timestamp; ``previous_token_expires_at``
+    # is the moment the old hash stops being accepted.
+    previous_token_hash = models.CharField(max_length=128, blank=True, default="")
+    previous_token_expires_at = models.DateTimeField(null=True, blank=True)
+    last_rotated_at = models.DateTimeField(null=True, blank=True)
