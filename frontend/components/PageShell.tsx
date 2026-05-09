@@ -3,8 +3,8 @@
 import * as React from "react";
 
 interface PageShellProps {
-  title: string;
-  description?: string;
+  title: React.ReactNode;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }
