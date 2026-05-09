@@ -52,6 +52,25 @@ class RegistryQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
+    def astrolift_workload(
+        self, info: Info, app_slug: str, slug: str
+    ) -> WorkloadType | None:
+        """Single workload by (app_slug, slug).
+
+        Workloads are scoped under the registered app — the same
+        workload slug can recur across orgs without colliding because
+        the app+slug compound is unique within tenant.
+        """
+        w = (
+            Workload.objects.select_related("registered_app")
+            .filter(registered_app__slug=app_slug, slug=slug)
+            .first()
+        )
+        return workload_to_type(w) if w else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
     def astrolift_containers(self, info: Info, workload_slug: str | None = None) -> list[ContainerType]:
         qs = Container.objects.select_related("workload")
         if workload_slug:

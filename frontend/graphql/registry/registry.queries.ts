@@ -92,3 +92,48 @@ export const GET_RENDERED_MANIFEST = gql`
     }
   }
 `;
+
+export const GET_WORKLOAD = gql`
+  query GetWorkload($appSlug: String!, $slug: String!) {
+    astroliftWorkload(appSlug: $appSlug, slug: $slug) {
+      id
+      name
+      slug
+      kind
+      isPublic
+      schedule
+      replicas
+      cpuRequest
+      cpuLimit
+      memoryRequest
+      memoryLimit
+      hpaMinReplicas
+      hpaMaxReplicas
+      hpaTargetCpuPct
+      storageClass
+      storageSize
+      registeredAppSlug
+    }
+  }
+`;
+
+export const LIST_CONTAINERS = gql`
+  query ListContainers($workloadSlug: String) {
+    astroliftContainers(workloadSlug: $workloadSlug) {
+      id
+      name
+      isPrimary
+      imageRef
+      dockerfilePath
+      buildContext
+      port
+      command
+      args
+      env
+      healthcheckKind
+      healthcheckValue
+      healthcheckPort
+      workloadSlug
+    }
+  }
+`;
