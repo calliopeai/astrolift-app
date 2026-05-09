@@ -43,15 +43,16 @@ interface Resp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
 
-export function EnvironmentsClient() {
+export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
   const { can } = useMyPermissions();
+  const variables = { appSlug: appSlug ?? null };
   const { data, loading } = useQuery<Resp>(LIST_ENVIRONMENTS, {
-    variables: { appSlug: null },
+    variables,
     pollInterval: 30000,
   });
   const list = data?.astroliftEnvironments ?? [];
 
-  const refetch = [{ query: LIST_ENVIRONMENTS, variables: { appSlug: null } }];
+  const refetch = [{ query: LIST_ENVIRONMENTS, variables }];
   const [pause, pauseState] = useMutation<{
     pauseEnvironment: MutationResultLite<AstroliftAppEnvironment>;
   }>(PAUSE_ENVIRONMENT, { refetchQueries: refetch });
@@ -79,7 +80,11 @@ export function EnvironmentsClient() {
   return (
     <PageShell
       title="Environments"
-      description="Deploy targets across your apps. Pause an environment to halt CI/push triggers and require explicit operator action to resume."
+      description={
+        appSlug
+          ? `Deploy targets for ${appSlug}. Pause an environment to halt CI/push triggers and require explicit operator action to resume.`
+          : "Deploy targets across your apps. Pause an environment to halt CI/push triggers and require explicit operator action to resume."
+      }
     >
       <Card>
         <CardContent className="p-0">
