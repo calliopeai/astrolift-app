@@ -36,8 +36,8 @@ export const LIST_AUDIT_EVENTS = gql`
 `;
 
 export const LIST_WEBHOOKS = gql`
-  query ListWebhooks {
-    astroliftWebhookSubscriptions {
+  query ListWebhooks($appSlug: String) {
+    astroliftWebhookSubscriptions(appSlug: $appSlug) {
       id
       url
       events
