@@ -1317,6 +1317,7 @@ type Query {
   astroliftApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
+  astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!

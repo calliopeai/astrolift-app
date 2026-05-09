@@ -250,10 +250,15 @@ export function AppDetailClient({ slug }: { slug: string }) {
                 {wlList.map((w) => (
                   <TableRow key={w.id}>
                     <TableCell>
-                      <div className="font-medium">{w.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        {w.slug}
-                      </div>
+                      <a
+                        href={`/apps/${a.slug}/workloads/${w.slug}`}
+                        className="hover:underline"
+                      >
+                        <div className="font-medium">{w.name}</div>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {w.slug}
+                        </div>
+                      </a>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{w.kind}</Badge>

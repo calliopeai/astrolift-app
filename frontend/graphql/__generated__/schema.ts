@@ -1772,6 +1772,7 @@ export type Query = {
   astroliftTeams: Array<AstroliftTeam>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
+  astroliftWorkload?: Maybe<AstroliftWorkload>;
   astroliftWorkloads: Array<AstroliftWorkload>;
   /** Query mutation audit logs. Admin only. */
   auditLogs: Array<AuditLogEntry>;
@@ -1914,6 +1915,12 @@ export type QueryAstroliftSshDeployKeysArgs = {
 
 export type QueryAstroliftWorkflowRunsArgs = {
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftWorkloadArgs = {
+  appSlug: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
 };
 
 
