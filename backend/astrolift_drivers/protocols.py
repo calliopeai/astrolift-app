@@ -164,13 +164,101 @@ class ObjectStoreDriver(Protocol):
     async def delete_bucket(self, *, bucket: str) -> None: ...
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class ProvisionSpec:
+    """Spec 11 §2 provision input. ``isolation`` is one of
+    ``"shared"`` / ``"dedicated"`` (mirrors astrolift_drivers.isolation
+    Isolation enum but kept as a string here so the protocol module
+    doesn't pull in the policy module)."""
+
+    organization: str
+    app: str
+    environment: str
+    kind: str
+    size: str
+    config: dict[str, Any]
+    isolation: str
+    tags: dict[str, str] = dataclasses.field(default_factory=dict)
+    service_handle_hint: str = ""
+    desired_extensions: tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ServiceStatus:
+    """Result of ``status(handle)``."""
+
+    handle: "ManagedServiceHandle"
+    state: str        # 'provisioning' | 'ready' | 'updating' | 'failed' | 'deprovisioning' | 'gone'
+    message: str = ""
+    last_observed_at: str = ""  # ISO-8601
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Binding:
+    """Spec 11 §2 binding output: what a workload sees and what
+    cloud-side grants it needs."""
+
+    env_vars: dict[str, str]
+    """Concrete values OR ``secret_ref://...`` placeholders the
+    secret materializer resolves at pod start."""
+
+    pod_volume_mounts: tuple[dict[str, str], ...] = ()
+    """For NFS-shaped services."""
+
+    iam_grants: tuple[dict[str, Any], ...] = ()
+    """For object-store-shaped services — list of grants the workload
+    identity needs (e.g. ``s3:GetObject`` on this bucket)."""
+
+    notes: str = ""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SnapshotHandle:
+    snapshot_id: str
+    handle: "ManagedServiceHandle"
+    created_at: str = ""
+
+
 @runtime_checkable
 class ManagedServiceDriver(Protocol):
-    async def provision(self, plan: ManagedServiceProvisionPlan) -> ManagedServiceHandle: ...
+    """Spec 11 §2 driver interface. Plugins implement this; the
+    activity layer calls into it.
+
+    ``provision`` and ``update`` are idempotent — re-running with the
+    same spec is a no-op. ``deprovision`` carries an explicit
+    ``delete_data`` flag so a dropped binding can preserve the
+    backing data (per spec 11 §2; recovery from accidental detach).
+
+    ``snapshot`` / ``restore`` are optional — drivers raise
+    ``NotImplementedError`` if the underlying service has no
+    snapshot semantics. The activity catches that and records a
+    'snapshot unsupported' event without failing the deploy.
+    """
+
+    async def provision(self, spec: ProvisionSpec) -> ManagedServiceHandle: ...
     async def update(
-        self, handle: ManagedServiceHandle, plan: ManagedServiceProvisionPlan
+        self, handle: ManagedServiceHandle, spec: ProvisionSpec
     ) -> ManagedServiceHandle: ...
-    async def deprovision(self, handle: ManagedServiceHandle) -> None: ...
+    async def deprovision(
+        self, handle: ManagedServiceHandle, *, delete_data: bool
+    ) -> None: ...
+
+    async def status(self, handle: ManagedServiceHandle) -> ServiceStatus: ...
+    async def binding(self, handle: ManagedServiceHandle) -> Binding: ...
+
+    async def snapshot(self, handle: ManagedServiceHandle) -> SnapshotHandle: ...
+    async def restore(
+        self, snapshot: SnapshotHandle, target: ProvisionSpec
+    ) -> ManagedServiceHandle: ...
+
+    def config_schema(self) -> dict[str, Any]:
+        """JSON Schema describing ``ProvisionSpec.config`` shape this
+        driver accepts."""
+
+    def binding_schema(self) -> dict[str, Any]:
+        """JSON Schema describing the ``Binding.env_vars`` shape this
+        driver produces. Mirrors the env_injection.py envelope for
+        the kind, but per-driver may add extras."""
 
 
 @runtime_checkable
