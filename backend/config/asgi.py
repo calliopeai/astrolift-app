@@ -57,6 +57,10 @@ async def application(scope, receive, send):
             if _websocket_app is None:
                 _websocket_app = _build_websocket_app()
             return await _websocket_app(scope, receive, send)
+        if path.startswith("/app/exec/"):
+            from core.schema.exec_ws import exec_ws_application
+
+            return await exec_ws_application(scope, receive, send)
         # Unknown WS path — close politely.
         await send({"type": "websocket.close", "code": 4404})
         return
