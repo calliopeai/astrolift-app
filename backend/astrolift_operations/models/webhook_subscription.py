@@ -33,6 +33,11 @@ class WebhookSubscription(BaseCoreModel):
     last_delivery_at = models.DateTimeField(null=True, blank=True)
     last_response_status = models.IntegerField(null=True, blank=True)
     failure_count = models.PositiveIntegerField(default=0)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    # Free-form reason set by the auto-disable code or operators —
+    # surfaces on the UI alongside the disabled badge so re-enable
+    # flows can show what tripped.
+    disabled_reason = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         indexes = [
