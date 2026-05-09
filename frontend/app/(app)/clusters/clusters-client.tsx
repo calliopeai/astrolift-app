@@ -112,10 +112,15 @@ export function ClustersClient() {
                       <StatusDot status={c.isActive ? "ok" : "muted"} />
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{c.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        {c.slug}
-                      </div>
+                      <a
+                        href={`/clusters/${c.slug}`}
+                        className="hover:underline"
+                      >
+                        <div className="font-medium">{c.name}</div>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {c.slug}
+                        </div>
+                      </a>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{c.providerPluginSlug}</Badge>
