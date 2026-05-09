@@ -487,6 +487,8 @@ export type AstroliftRenderedManifest = {
   appSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
   error?: Maybe<Scalars['String']['output']>;
+  errorColumn?: Maybe<Scalars['Int']['output']>;
+  errorLine?: Maybe<Scalars['Int']['output']>;
   errorPath?: Maybe<Scalars['String']['output']>;
   imageTag: Scalars['String']['output'];
   namespace: Scalars['String']['output'];

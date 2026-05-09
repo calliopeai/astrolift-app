@@ -89,6 +89,8 @@ export const GET_RENDERED_MANIFEST = gql`
       resources
       error
       errorPath
+      errorLine
+      errorColumn
     }
   }
 `;

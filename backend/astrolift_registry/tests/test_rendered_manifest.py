@@ -220,3 +220,29 @@ kind = "spaceship"
     assert result.error is not None
     assert "kind" in result.error.lower()
     assert result.error_path  # path tells the UI which key was bad
+    # The semantic-error locator finds the offending `kind = ...` line
+    # so editors can highlight it without re-parsing the source.
+    assert result.error_line is not None and result.error_line >= 1
+
+
+def test_toml_syntax_error_carries_line_and_column(permission_resolver):
+    """Bad TOML surfaces lineno + colno from tomllib so the editor
+    UI can red-squiggle the offending position."""
+    org, team, project, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_READ)
+    app = _make_app(
+        org,
+        team,
+        project,
+        manifest='name = "hello"\n[[workloads]]\nkind = (\n',
+    )
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = RegistryQuery().astrolift_rendered_manifest(
+            _info(), app_slug=app.slug
+        )
+
+    assert result.error is not None
+    assert "TOML" in result.error
+    assert result.error_line is not None
+    assert result.error_column is not None

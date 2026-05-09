@@ -20,23 +20,48 @@ from astrolift_manifest.types import (
 
 
 class ManifestError(ValueError):
-    """Raised when a manifest fails parsing or validation."""
+    """Raised when a manifest fails parsing or validation.
 
-    def __init__(self, message: str, *, path: str = ""):
+    ``path`` is the dotted key path that triggered the error
+    (e.g. ``workloads[0].kind``). ``line`` and ``column`` are the
+    1-based source positions when known — set automatically for
+    TOML syntax errors; left ``None`` for semantic errors that
+    didn't go through a position-aware path.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: str = "",
+        line: int | None = None,
+        column: int | None = None,
+    ):
         prefix = f"{path}: " if path else ""
         super().__init__(prefix + message)
         self.path = path
+        self.line = line
+        self.column = column
 
 
 _VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob"}
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 
 
+_TOML_POS_RE = __import__("re").compile(r"line\s+(\d+),\s+column\s+(\d+)")
+
+
 def parse_raw(toml_text: str) -> RawManifest:
     try:
         data: dict[str, Any] = tomllib.loads(toml_text)
     except tomllib.TOMLDecodeError as exc:
-        raise ManifestError(f"invalid TOML: {exc}") from exc
+        # tomllib in 3.11+ doesn't expose structured position attrs;
+        # the message embeds "(at line N, column M)" so we regex it
+        # out. Still surfaces the original message in str(exc).
+        line, col = _line_col_from_message(str(exc))
+        raise ManifestError(
+            f"invalid TOML: {exc}", line=line, column=col
+        ) from exc
 
     name = _require_str(data, "name", "name")
     workloads = tuple(
@@ -134,3 +159,55 @@ def _require_str(d: dict[str, Any], key: str, path: str) -> str:
     if not isinstance(value, str) or not value:
         raise ManifestError(f"required string {key!r} is missing or empty", path=path)
     return value
+
+
+def _line_col_from_message(message: str) -> tuple[int | None, int | None]:
+    m = _TOML_POS_RE.search(message)
+    if not m:
+        return None, None
+    return int(m.group(1)), int(m.group(2))
+
+
+def _line_col_from_pos(text: str, pos: int | None) -> tuple[int | None, int | None]:
+    """Convert a 0-based byte offset into 1-based (line, column).
+
+    Returns (None, None) when the offset is unknown or out of range.
+    Tomllib's ``pos`` is a character index, not byte offset, but the
+    distinction only matters for non-ASCII keys — TOML keys are
+    typically ASCII so the simple approach is fine.
+    """
+    if pos is None or pos < 0:
+        return None, None
+    line_start = text.rfind("\n", 0, pos) + 1
+    line = text.count("\n", 0, pos) + 1
+    column = pos - line_start + 1
+    return line, column
+
+
+def locate_in_source(toml_text: str, path: str) -> tuple[int | None, int | None]:
+    """Best-effort lookup of (line, column) for a dotted key path.
+
+    Used by callers that catch a semantic ``ManifestError`` and want
+    to enrich it with source position. The implementation is a simple
+    last-segment scan — exact for unique leaf names in small
+    manifests, ambiguous for repeated keys (e.g. ``name`` appearing
+    on every container). When the path can't be located we return
+    ``(None, None)`` and callers display the dotted path on its own.
+    """
+    if not path:
+        return None, None
+    leaf = path.rsplit(".", 1)[-1]
+    # Strip array indices like "containers[0]".
+    if "[" in leaf:
+        leaf = leaf.split("[", 1)[0]
+    if not leaf:
+        return None, None
+    needle = f"{leaf}"
+    # Match `<leaf> =` so we don't catch the leaf inside string values.
+    import re
+
+    pattern = re.compile(rf"^\s*{re.escape(needle)}\s*=", re.MULTILINE)
+    m = pattern.search(toml_text)
+    if not m:
+        return None, None
+    return _line_col_from_pos(toml_text, m.start())
