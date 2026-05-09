@@ -164,3 +164,63 @@ def notification_to_type(n) -> NotificationType:
         read_at=n.read_at,
         created_at=n.created_at,
     )
+
+
+@strawberry.type(name="AstroliftAlertRule")
+class AlertRuleType:
+    id: GUID
+    name: str
+    target: str
+    """app | env | workload | global"""
+
+    target_id: str
+    severity: str
+    """info | warn | critical"""
+
+    predicate: JSON
+    notify_channels: JSON
+    is_active: bool
+    organization_slug: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAlertEvent")
+class AlertEventType:
+    id: GUID
+    rule_id: GUID
+    severity: str
+    fired_at: dt.datetime
+    resolved_at: dt.datetime | None
+    acknowledged_at: dt.datetime | None
+    summary: str
+    detail: JSON
+
+
+def alert_rule_to_type(r) -> AlertRuleType:
+    return AlertRuleType(
+        id=GUID(str(r.guid)),
+        name=r.name,
+        target=r.target,
+        target_id=r.target_id or "",
+        severity=r.severity,
+        predicate=r.predicate or {},
+        notify_channels=list(r.notify_channels or []),
+        is_active=r.is_active,
+        organization_slug=r.organization.slug,
+        created_at=r.created_at,
+        updated_at=r.updated_at,
+    )
+
+
+def alert_event_to_type(e) -> AlertEventType:
+    return AlertEventType(
+        id=GUID(str(e.guid)),
+        rule_id=GUID(str(e.rule.guid)),
+        severity=e.severity,
+        fired_at=e.fired_at,
+        resolved_at=e.resolved_at,
+        acknowledged_at=e.acknowledged_at,
+        summary=e.summary or "",
+        detail=e.detail or {},
+    )
