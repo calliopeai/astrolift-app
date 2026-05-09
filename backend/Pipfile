@@ -57,6 +57,10 @@ jsonschema = "*"
 starlette = "*"
 "uvicorn[standard]" = "*"
 websockets = "*"
+# tomllib (stdlib) reads TOML; emitting requires a separate lib.
+# Used by the manifest auto-discoverer (#119) to serialise the
+# inferred manifest dict into a TOML string for the UI / SCM PR.
+tomli-w = "*"
 
 [dev-packages]
 django-debug-toolbar = "*"
