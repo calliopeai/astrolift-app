@@ -1,0 +1,200 @@
+"""
+Env-var injection with precedence + provenance (#117).
+
+The platform composes the env passed into a container from up to six
+sources. Per spec 05 §10, later sources override earlier:
+
+  1. App-wide ``[env]`` literals
+  2. App-level secret bundles (``AppSecretBundleRef``)
+  3. Managed-service connection envelopes (per kind, see below)
+  4. Workload-level env (reserved for future overrides)
+  5. Container-level ``[workloads.containers.env]`` literals
+  6. Container-level ``env_from`` references (with optional prefix)
+
+This module is the merge engine. It returns both the resolved env
+dict and a per-key provenance map that we snapshot onto the
+Deployment row — so when a user wonders "where did MY_VAR come
+from?", the answer is one query away.
+
+Connection envelopes per managed service kind: for each binding,
+emit a stable set of keys. When two bindings share a kind, the
+second is prefixed with its uppercased manifest name to avoid the
+collision (e.g. ``CACHE_REDIS_HOST`` for ``name = "cache"``).
+"""
+
+from __future__ import annotations
+
+import dataclasses
+from collections.abc import Iterable, Mapping
+from typing import Any
+
+
+# Source labels used in the provenance map. Values are stable so
+# UI / audit log can carry them around safely; keep them sorted by
+# precedence (earliest → latest, matching the merge order).
+SOURCE_APP_LITERAL = "app.env"
+SOURCE_APP_SECRET_BUNDLE = "app.secret_bundle"
+SOURCE_MANAGED_SERVICE = "managed_service"
+SOURCE_WORKLOAD_LITERAL = "workload.env"
+SOURCE_CONTAINER_LITERAL = "container.env"
+SOURCE_CONTAINER_ENV_FROM = "container.env_from"
+
+
+# Connection envelopes the platform auto-injects per managed
+# service kind. Stable contract — the values themselves come from
+# the binding's ``connection_secret``, but the *key set* is fixed
+# so consumer code can rely on ``DATABASE_URL`` always being set
+# when there's a postgres binding.
+_ENVELOPES: dict[str, tuple[str, ...]] = {
+    "postgres": (
+        "POSTGRES_HOST",
+        "POSTGRES_PORT",
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "DATABASE_URL",
+    ),
+    "mysql": (
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_DB",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
+        "DATABASE_URL",
+    ),
+    "redis": ("REDIS_HOST", "REDIS_PORT", "REDIS_URL"),
+    "queue": ("QUEUE_URL", "QUEUE_ARN", "QUEUE_NAME"),
+    "topic": ("TOPIC_ARN", "TOPIC_NAME"),
+    "kv_store": ("KV_TABLE_NAME", "KV_PARTITION_KEY", "KV_SORT_KEY"),
+    "search": ("SEARCH_ENDPOINT", "SEARCH_USER", "SEARCH_PASSWORD"),
+    "object_store": ("BUCKET_NAME", "BUCKET_ENDPOINT", "BUCKET_REGION"),
+    "nfs": ("NFS_VOLUME",),
+    "vector_index": ("VECTOR_ENDPOINT", "VECTOR_API_KEY"),
+}
+
+
+def envelope_keys_for(kind: str) -> tuple[str, ...]:
+    """Return the stable env-key set the platform injects for a
+    managed service of ``kind``. Empty tuple for unknown kinds —
+    the merger short-circuits cleanly when there's nothing to add."""
+    return _ENVELOPES.get(kind, ())
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ManagedServiceBinding:
+    """Inputs the merger needs from a single binding row.
+
+    Kept as a plain dataclass so callers can synthesize one in tests
+    without standing up the full ManagedServiceBinding model.
+    ``connection_secret`` is the dict we pull values from — keys
+    are the envelope names; the merger doesn't second-guess.
+    """
+
+    kind: str
+    name: str
+    connection_secret: Mapping[str, str]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class EnvFromRef:
+    """Container-level ``env_from`` reference. ``prefix`` is
+    optional and is concatenated with the source key
+    (``prefix + key``) at merge time; this matches k8s envFrom
+    semantics. The pulled values come from a SecretBundle row,
+    represented here as a plain dict for testability."""
+
+    values: Mapping[str, str]
+    prefix: str = ""
+
+
+@dataclasses.dataclass(slots=True)
+class MergedEnv:
+    """Merge result. ``values`` is the ordered final dict (insertion
+    order matches first-seen, which keeps deterministic Deployment
+    snapshots). ``provenance`` is per-key 'which source set this'
+    using the ``SOURCE_*`` constants."""
+
+    values: dict[str, str]
+    provenance: dict[str, str]
+
+
+def _bind_envelope(binding: ManagedServiceBinding, *, taken_kinds: set[str]) -> dict[str, str]:
+    """Materialise a single binding's envelope as ``{key: value}``.
+
+    When the kind has already been seen for this app, prefix every
+    emitted key with the binding's name (uppercased) to avoid the
+    collision: two postgres bindings → DATABASE_URL plus
+    CACHE_DATABASE_URL (or whichever name).
+    """
+    keys = envelope_keys_for(binding.kind)
+    if not keys:
+        return {}
+    use_prefix = binding.kind in taken_kinds
+    prefix = f"{binding.name.upper().replace('-', '_')}_" if use_prefix else ""
+    out: dict[str, str] = {}
+    for key in keys:
+        secret_value = binding.connection_secret.get(key)
+        if secret_value is None:
+            # Caller chose not to wire this key — fine, skip rather
+            # than emit an empty string which masks a missing binding.
+            continue
+        out[f"{prefix}{key}"] = str(secret_value)
+    return out
+
+
+def merge_env(
+    *,
+    app_env: Mapping[str, str] | None = None,
+    app_secret_bundles: Iterable[Mapping[str, str]] = (),
+    managed_service_bindings: Iterable[ManagedServiceBinding] = (),
+    workload_env: Mapping[str, str] | None = None,
+    container_env: Mapping[str, str] | None = None,
+    container_env_from: Iterable[EnvFromRef] = (),
+) -> MergedEnv:
+    """Merge env sources in spec order; later sources win.
+
+    Returns ``MergedEnv(values, provenance)``. Callers persist the
+    provenance dict alongside the deployment snapshot so the UI
+    can show 'env DATABASE_URL came from managed_service' next to
+    each entry.
+    """
+    values: dict[str, str] = {}
+    provenance: dict[str, str] = {}
+
+    def _apply(source: str, mapping: Mapping[str, str] | None) -> None:
+        if not mapping:
+            return
+        for k, v in mapping.items():
+            values[k] = str(v)
+            provenance[k] = source
+
+    # 1. app-wide [env]
+    _apply(SOURCE_APP_LITERAL, app_env)
+
+    # 2. app-level secret bundles (multiple allowed; later overrides
+    # earlier within this layer too — same semantic as Kubernetes
+    # envFrom references in declared order).
+    for bundle in app_secret_bundles:
+        _apply(SOURCE_APP_SECRET_BUNDLE, bundle)
+
+    # 3. managed-service connection envelopes.
+    seen_kinds: set[str] = set()
+    for binding in managed_service_bindings:
+        materialised = _bind_envelope(binding, taken_kinds=seen_kinds)
+        seen_kinds.add(binding.kind)
+        _apply(SOURCE_MANAGED_SERVICE, materialised)
+
+    # 4. workload-level (reserved per spec; pass-through today)
+    _apply(SOURCE_WORKLOAD_LITERAL, workload_env)
+
+    # 5. container-level literals
+    _apply(SOURCE_CONTAINER_LITERAL, container_env)
+
+    # 6. container-level env_from (prefix applies per-ref)
+    for ref in container_env_from:
+        if not ref.values:
+            continue
+        prefixed = {f"{ref.prefix}{k}": v for k, v in ref.values.items()}
+        _apply(SOURCE_CONTAINER_ENV_FROM, prefixed)
+
+    return MergedEnv(values=values, provenance=provenance)
