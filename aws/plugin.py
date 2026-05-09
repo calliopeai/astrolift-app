@@ -1,34 +1,120 @@
 """AWS provider plugin manifest.
 
-This plugin will implement drivers for EKS, ALB ingress, Route 53 DNS,
-ACM TLS, Secrets Manager, IRSA workload identity, ECR, S3, CloudWatch
-logs, and CloudWatch metrics.
+Registers the AWS-implemented drivers with the Astrolift control
+plane. The control plane loads this via the ``astrolift.providers``
+entry point at boot.
 
-Each driver will be implemented in a separate module (e.g. cluster.py,
-ingress_alb.py, dns_route53.py) and registered in the PLUGIN manifest
-below.
+Drivers shipped:
+- ECRDriver (#34) — ImageRegistryDriver
+- AWSSecretsBackend (#32) — SecretsBackend (Secrets Manager + SSM)
+- IRSADriver (#33) — WorkloadIdentityDriver
+- Route53Driver (#31) — DnsDriver
+- ACMDriver (#31) — TlsDriver
+
+Pending (separate tickets):
+- EKSClusterDriver (#29)
+- ALBIngressDriver (#30)
+- AWS managed-service drivers (#35) — RDS, Aurora, ElastiCache,
+  DynamoDB, SQS, SNS, S3, EFS
+
+The PLUGIN constant is what the control plane consumes; absence
+of a driver entry signals that the plugin doesn't cover that
+capability and the cluster validator will refuse to bind a
+cluster to this plugin until either the missing driver is added
+or another plugin contributes the missing role.
 """
 
 from _sdk.base import ProviderPlugin
 
-
-class AWSProviderPlugin:
-    """AWS provider plugin -- stub.
-
-    Individual driver implementations will be added as separate modules
-    and registered in the PLUGIN manifest.
-    """
-
-    def __init__(self) -> None:
-        raise NotImplementedError("AWS provider plugin is not yet implemented")
+from aws.dns_route53 import Route53Driver
+from aws.identity_irsa import IRSADriver
+from aws.registry_ecr import ECRDriver
+from aws.secrets import AWSSecretsBackend
+from aws.tls_acm import ACMDriver
 
 
-# Plugin manifest. Drivers will be populated as they are implemented.
-# See specs/23-provider-plugin-aws.md for the full driver catalog.
+# Plugin manifest. Drivers map a canonical role name → concrete
+# class implementing that role's protocol.
 PLUGIN = ProviderPlugin(
     id="aws",
     display_name="Amazon Web Services",
-    drivers={},
-    managed_service_drivers={},
-    config_schema={},
+    drivers={
+        "registry": ECRDriver,
+        "secrets": AWSSecretsBackend,
+        "identity": IRSADriver,
+        "dns": Route53Driver,
+        "tls": ACMDriver,
+        # "cluster": EKSClusterDriver,    # #29
+        # "ingress": ALBIngressDriver,    # #30
+    },
+    managed_service_drivers={
+        # Filled in by #35 (RDS, Aurora, ElastiCache, DynamoDB,
+        # SQS, SNS, S3, EFS).
+    },
+    config_schema={
+        "type": "object",
+        "required": ["region", "account_id"],
+        "properties": {
+            "region": {
+                "type": "string",
+                "description": "Default AWS region for this binding.",
+            },
+            "account_id": {
+                "type": "string",
+                "pattern": "^[0-9]{12}$",
+                "description": "12-digit AWS account ID.",
+            },
+            "cluster_oidc_issuer": {
+                "type": "string",
+                "description": (
+                    "EKS cluster's OIDC issuer URL (without https://). "
+                    "Required for IRSA workload identity."
+                ),
+            },
+            "ecr_image_tag_mutability": {
+                "type": "string",
+                "enum": ["IMMUTABLE", "MUTABLE"],
+                "default": "IMMUTABLE",
+                "description": (
+                    "ECR tag mutability. IMMUTABLE prevents tag "
+                    "overwrites and is recommended for production."
+                ),
+            },
+            "ecr_image_scanning_enabled": {
+                "type": "boolean",
+                "default": True,
+                "description": "Enable ECR's built-in vuln scanning.",
+            },
+            "kms_key_id": {
+                "type": "string",
+                "description": (
+                    "Optional customer-managed KMS key ARN for "
+                    "secrets + ECR encryption. Defaults to AWS-"
+                    "managed keys when absent."
+                ),
+            },
+            "secrets_manager_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": (
+                    "Prefix for platform-managed Secrets Manager "
+                    "names. Lets operators filter via tag-based "
+                    "IAM policies."
+                ),
+            },
+            "ssm_prefix": {
+                "type": "string",
+                "default": "/astrolift",
+                "description": "SSM Parameter Store path prefix.",
+            },
+            "irsa_role_path": {
+                "type": "string",
+                "default": "/astrolift/",
+                "description": (
+                    "IAM role path for platform-created roles. "
+                    "Helps operators apply tag-based budgets."
+                ),
+            },
+        },
+    },
 )
