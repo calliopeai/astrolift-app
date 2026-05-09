@@ -29,6 +29,61 @@ from astrolift_manifest.types import NormalizedManifest, WorkloadManifest
 
 _VALID_DNS_LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 
+# Subdomains the platform reserves for itself — users cannot register
+# an app under any of these. The list is intentionally inclusive of
+# common operational hostnames; we'd rather refuse a legitimate
+# request and have the user pick another label than leak control over
+# something like ``api.<org>.<base>`` that's likely to clash with a
+# platform endpoint someday. Per spec 13 §6.2.
+RESERVED_SUBDOMAINS: frozenset[str] = frozenset(
+    {
+        "admin",
+        "api",
+        "app",
+        "auth",
+        "console",
+        "dashboard",
+        "docs",
+        "download",
+        "health",
+        "login",
+        "logout",
+        "metrics",
+        "register",
+        "signup",
+        "status",
+        "webhook",
+        "webhooks",
+        "www",
+    }
+)
+
+
+def is_reserved_subdomain(value: str) -> bool:
+    """Return True if ``value`` collides with the platform's reserved
+    name list (case-insensitive)."""
+    return value.strip().lower() in RESERVED_SUBDOMAINS
+
+
+def validate_subdomain_label(value: str) -> str:
+    """Normalize + validate a user-supplied subdomain.
+
+    Returns the lowered + stripped form on success, raises
+    :class:`ValueError` with a precise reason on failure. The caller
+    handles the GraphQL-side error envelope.
+    """
+    s = (value or "").strip().lower()
+    if not s:
+        raise ValueError("subdomain is empty")
+    if not _VALID_DNS_LABEL.match(s):
+        raise ValueError(
+            f"{s!r} is not a valid DNS label (lowercase letters, digits, "
+            "and hyphens; 1-63 chars; no leading/trailing hyphen)"
+        )
+    if is_reserved_subdomain(s):
+        raise ValueError(f"{s!r} is a reserved platform subdomain")
+    return s
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class HostnameInputs:
