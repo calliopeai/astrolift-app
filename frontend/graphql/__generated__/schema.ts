@@ -447,6 +447,7 @@ export type AstroliftRegisteredApp = {
   organizationSlug: Scalars['String']['output'];
   previewEnabled: Scalars['Boolean']['output'];
   previewMaxActive: Scalars['Int']['output'];
+  previewScreenshotUrl: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
   provisioningError: Scalars['String']['output'];
   provisioningStatus: Scalars['String']['output'];
@@ -1067,6 +1068,7 @@ export type Mutation = {
   rollbackDeployment: AstroliftDeploymentMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
+  setAppSubdomain: AstroliftRegisteredAppMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED. */
@@ -1447,6 +1449,11 @@ export type MutationRotateWebhookSecretArgs = {
 
 export type MutationSetActiveIdentityProviderArgs = {
   input: SetActiveIdentityProviderInput;
+};
+
+
+export type MutationSetAppSubdomainArgs = {
+  input: SetAppSubdomainInput;
 };
 
 
@@ -2083,6 +2090,11 @@ export type RotateWebhookSecretInput = {
 
 export type SetActiveIdentityProviderInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type SetAppSubdomainInput = {
+  id: Scalars['GUID']['input'];
+  subdomain: Scalars['String']['input'];
 };
 
 export type SharedDirectoryType = {

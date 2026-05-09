@@ -86,6 +86,12 @@ class RegisteredApp(NamedBaseCoreModel):
     )
     deploy_branch = models.CharField(max_length=128, default="main")
 
+    # Latest preview screenshot URL for this app, written by the
+    # platform's screenshotter service (spec 09 §4.21). Stays empty
+    # until the service captures and uploads its first frame; the UI
+    # falls back to a branded placeholder while empty.
+    preview_screenshot_url = models.URLField(blank=True, default="", max_length=1024)
+
     default_tenant_cluster = models.ForeignKey(
         "astrolift_clusters.TenantCluster",
         related_name="registered_apps",

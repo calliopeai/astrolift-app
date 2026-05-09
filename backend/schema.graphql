@@ -431,6 +431,7 @@ type AstroliftRegisteredApp {
   previewEnabled: Boolean!
   triggerMode: String!
   deployBranch: String!
+  previewScreenshotUrl: String!
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime

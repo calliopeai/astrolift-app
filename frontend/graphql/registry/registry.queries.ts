@@ -26,6 +26,7 @@ const APP_FIELDS = `
   previewEnabled
   triggerMode
   deployBranch
+  previewScreenshotUrl
   createdAt
   updatedAt
   deletedAt

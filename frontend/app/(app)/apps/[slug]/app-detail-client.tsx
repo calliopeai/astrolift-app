@@ -249,7 +249,20 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={a.name}
+      title={
+        a.previewScreenshotUrl ? (
+          <span className="flex items-center gap-3">
+            <img
+              src={a.previewScreenshotUrl}
+              alt={`${a.name} preview`}
+              className="size-10 rounded border object-cover"
+            />
+            <span>{a.name}</span>
+          </span>
+        ) : (
+          a.name
+        )
+      }
       description={a.description || `Registered app · ${a.slug}`}
       actions={
         <>

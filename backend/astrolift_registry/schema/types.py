@@ -43,6 +43,7 @@ class RegisteredAppType:
     preview_enabled: bool
     trigger_mode: str
     deploy_branch: str
+    preview_screenshot_url: str
 
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -115,6 +116,7 @@ def app_to_type(app) -> RegisteredAppType:
         preview_enabled=app.preview_enabled,
         trigger_mode=app.trigger_mode,
         deploy_branch=app.deploy_branch,
+        preview_screenshot_url=app.preview_screenshot_url or "",
         created_at=app.created_at,
         updated_at=app.updated_at,
         deleted_at=app.deleted_at,
