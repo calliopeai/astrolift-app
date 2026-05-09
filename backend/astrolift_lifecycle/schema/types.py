@@ -227,3 +227,68 @@ def preview_to_type(p) -> PreviewEnvironmentType:
         last_deployed_at=p.last_deployed_at,
         torn_down_at=p.torn_down_at,
     )
+
+
+@strawberry.type(name="AstroliftAppDomain")
+class AppDomainType:
+    """A custom domain bound to a registered app. ``cert_state``
+    reflects the current ACME / cloud-cert validation state."""
+
+    id: GUID
+    hostname: str
+    cert_state: str
+    """pending | validated | failed (mirrors CustomDomain.ValidationStatus)"""
+
+    validation_method: str
+    validation_token: str
+    last_checked_at: dt.datetime | None
+    is_active: bool
+    registered_app_slug: str
+    created_at: dt.datetime
+
+
+def app_domain_to_type(d) -> AppDomainType:
+    return AppDomainType(
+        id=GUID(str(d.guid)),
+        hostname=d.hostname,
+        cert_state=d.validation_status,
+        validation_method=d.validation_method,
+        validation_token=d.validation_value or "",
+        last_checked_at=d.updated_at,
+        is_active=d.is_active,
+        registered_app_slug=d.registered_app.slug,
+        created_at=d.created_at,
+    )
+
+
+@strawberry.type(name="AstroliftDeployToken")
+class DeployTokenType:
+    """Bearer credential bound to one app, scoped narrowly. The
+    plaintext token is only returned on creation/rotation — at any
+    other time, only ``last_4`` is exposed."""
+
+    id: GUID
+    name: str
+    last_4: str
+    scopes: list[str]
+    expires_at: dt.datetime | None
+    last_used_at: dt.datetime | None
+    is_revoked: bool
+    last_rotated_at: dt.datetime | None
+    registered_app_slug: str
+    created_at: dt.datetime
+
+
+def deploy_token_to_type(t) -> DeployTokenType:
+    return DeployTokenType(
+        id=GUID(str(t.guid)),
+        name=t.name,
+        last_4=t.token_last_4 or "",
+        scopes=list(t.scopes or []),
+        expires_at=t.expires_at,
+        last_used_at=t.last_used_at,
+        is_revoked=t.is_revoked,
+        last_rotated_at=t.last_rotated_at,
+        registered_app_slug=t.registered_app.slug,
+        created_at=t.created_at,
+    )

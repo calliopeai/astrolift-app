@@ -2,6 +2,23 @@ input AcceptInvitationInput {
   token: String!
 }
 
+input AddAppDomainInput {
+  appSlug: String!
+  hostname: String!
+  validationMethod: String = null
+}
+
+type Appdomainremovedpayload {
+  id: GUID!
+  deleted: Boolean!
+}
+
+type AppdomainremovedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Appdomainremovedpayload
+}
+
 type Appsecretwritepayload {
   appSlug: String!
   key: String!
@@ -36,6 +53,24 @@ type AstroliftApiTokenPlaintextMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftApiTokenPlaintext
+}
+
+type AstroliftAppDomain {
+  id: GUID!
+  hostname: String!
+  certState: String!
+  validationMethod: String!
+  validationToken: String!
+  lastCheckedAt: DateTime
+  isActive: Boolean!
+  registeredAppSlug: String!
+  createdAt: DateTime!
+}
+
+type AstroliftAppDomainMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppDomain
 }
 
 type AstroliftAppEnvironment {
@@ -158,6 +193,19 @@ type AstroliftCostSnapshot {
   amountCents: Int!
   currency: String!
   source: String!
+}
+
+type AstroliftDeployToken {
+  id: GUID!
+  name: String!
+  last4: String!
+  scopes: [String!]!
+  expiresAt: DateTime
+  lastUsedAt: DateTime
+  isRevoked: Boolean!
+  lastRotatedAt: DateTime
+  registeredAppSlug: String!
+  createdAt: DateTime!
 }
 
 type AstroliftDeployment {
@@ -315,6 +363,12 @@ type AstroliftManagedService {
   environmentName: String!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+type AstroliftManagedServiceMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedService
 }
 
 type AstroliftMember {
@@ -833,6 +887,13 @@ input CreateApiTokenInput {
   teamSlug: String = null
 }
 
+input CreateDeployTokenInput {
+  appSlug: String!
+  name: String!
+  scopes: [String!] = null
+  expiresAtIso: String = null
+}
+
 input CreateIdentityProviderInput {
   kind: String!
   displayName: String = null
@@ -904,6 +965,7 @@ input CreateWebhookSubscriptionInput {
   url: String!
   events: [String!]!
   teamSlug: String = null
+  appSlug: String = null
 }
 
 type DataImportUploadResult {
@@ -935,7 +997,33 @@ input DeleteWebhookSubscriptionInput {
   id: GUID!
 }
 
+type DeployTokenSecretReveal {
+  token: AstroliftDeployToken!
+  plaintextSecret: String!
+}
+
+type DeployTokenSecretRevealMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: DeployTokenSecretReveal
+}
+
 input DeploymentByIdInput {
+  id: GUID!
+}
+
+type Deploytokenrevokedpayload {
+  id: GUID!
+  revoked: Boolean!
+}
+
+type DeploytokenrevokedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Deploytokenrevokedpayload
+}
+
+input DeprovisionManagedServiceInput {
   id: GUID!
 }
 
@@ -1059,6 +1147,17 @@ type LibrarySetIconResult {
 
 type LoginResult {
   user: UserType
+}
+
+type Managedservicedeletedpayload {
+  id: GUID!
+  deleted: Boolean!
+}
+
+type ManagedservicedeletedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Managedservicedeletedpayload
 }
 
 type Manifestpushpayload {
@@ -1271,6 +1370,12 @@ type Mutation {
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   tearDownPreview(input: TearDownPreviewInputGql!): AstroliftDeploymentMutationResult!
+  addAppDomain(input: AddAppDomainInput!): AstroliftAppDomainMutationResult!
+  removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!
+  recheckDomainValidation(input: RecheckDomainValidationInput!): AstroliftAppDomainMutationResult!
+  createDeployToken(input: CreateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
+  rotateDeployToken(input: RotateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
+  revokeDeployToken(input: RevokeDeployTokenInput!): DeploytokenrevokedpayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -1282,6 +1387,9 @@ type Mutation {
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
   attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
   detachSecretBundle(input: DetachSecretBundleInput!): AttachmentremovedpayloadMutationResult!
+  provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -1449,6 +1557,15 @@ type ProviderpluginconfigpayloadMutationResult {
   data: Providerpluginconfigpayload
 }
 
+input ProvisionManagedServiceInput {
+  appSlug: String!
+  environmentName: String!
+  kind: String!
+  name: String = null
+  variant: String = null
+  config: JSON = null
+}
+
 input PushManifestToRepoInput {
   id: GUID!
   prTitle: String = null
@@ -1492,7 +1609,7 @@ type Query {
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null): [AstroliftAuditEvent!]!
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
-  astroliftWebhookSubscriptions: [AstroliftWebhookSubscription!]!
+  astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
   astroliftApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
@@ -1509,6 +1626,8 @@ type Query {
   astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
+  astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
+  astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
@@ -1534,6 +1653,10 @@ type Query {
 
   """List workflow instances for a specific object."""
   workflowInstances(objectId: Int!, modelLabel: String = null): [WorkflowInstanceType!]!
+}
+
+input RecheckDomainValidationInput {
+  id: GUID!
 }
 
 input RegisterAppInput {
@@ -1564,7 +1687,15 @@ input RegisterTenantClusterInput {
   organizationScoped: Boolean! = true
 }
 
+input RemoveAppDomainInput {
+  id: GUID!
+}
+
 input RevokeApiTokenInput {
+  id: GUID!
+}
+
+input RevokeDeployTokenInput {
   id: GUID!
 }
 
@@ -1573,6 +1704,10 @@ input RevokeInvitationInput {
 }
 
 input RevokeRoleBindingInput {
+  id: GUID!
+}
+
+input RotateDeployTokenInput {
   id: GUID!
 }
 
@@ -1703,6 +1838,12 @@ input UpdateManagedDomainInput {
   defaultFor: String = null
   isWildcardManaged: Boolean = null
   dnsConfig: JSON = null
+}
+
+input UpdateManagedServiceInput {
+  id: GUID!
+  config: JSON = null
+  name: String = null
 }
 
 input UpdateManifestInput {

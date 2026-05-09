@@ -30,6 +30,9 @@ class CreateWebhookSubscriptionInput:
     url: str
     events: list[str]
     team_slug: str | None = None
+    app_slug: str | None = None
+    """When set, scopes the subscription to a single app (#281).
+    Empty / null = org-wide subscription, same as before."""
 
 
 @strawberry.input
@@ -92,12 +95,29 @@ class OperationsMutation:
             if team is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
 
+        registered_app = None
+        if input.app_slug:
+            from astrolift_registry.models import RegisteredApp
+
+            registered_app = (
+                RegisteredApp.objects
+                .filter(organization=org, slug=input.app_slug)
+                .first()
+            )
+            if registered_app is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"app {input.app_slug!r} not found",
+                    field="appSlug",
+                )
+
         plaintext_secret = "alfthk_" + secrets.token_urlsafe(24)
         digest = hashlib.sha256(plaintext_secret.encode()).hexdigest()
 
         sub = WebhookSubscription.objects.create(
             organization=org,
             team=team,
+            registered_app=registered_app,
             url=input.url.strip(),
             secret_hash=digest,
             events=list(input.events or []),

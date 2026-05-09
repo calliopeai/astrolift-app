@@ -32,13 +32,19 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_lifecycle.models import (
     AppEnvironment,
+    CustomDomain,
+    DeployToken,
     Deployment,
     PreviewEnvironment,
 )
 from astrolift_lifecycle.schema.types import (
+    AppDomainType,
     AppEnvironmentType,
     DeploymentType,
+    DeployTokenType,
+    app_domain_to_type,
     app_env_to_type,
+    deploy_token_to_type,
     deployment_to_type,
 )
 from astrolift_operations.models import WorkflowRun
@@ -95,6 +101,71 @@ class TearDownPreviewInputGql:
 @strawberry.input
 class EnvironmentByIdInput:
     id: GUID
+
+
+# Custom domain CRUD (#281) ------------------------------------------
+
+
+@strawberry.input
+class AddAppDomainInput:
+    app_slug: str
+    hostname: str
+    validation_method: str | None = None
+    """dns_txt | http_01 | dns_01 (default: dns_txt)"""
+
+
+@strawberry.input
+class RemoveAppDomainInput:
+    id: GUID
+
+
+@strawberry.input
+class RecheckDomainValidationInput:
+    id: GUID
+
+
+@strawberry.type
+class _AppDomainRemovedPayload:
+    id: GUID
+    deleted: bool
+
+
+# Deploy token CRUD (#281) -------------------------------------------
+
+
+@strawberry.input
+class CreateDeployTokenInput:
+    app_slug: str
+    name: str
+    scopes: list[str] | None = None
+    expires_at_iso: str | None = None
+    """ISO-8601; if absent the token defaults to the platform's
+    1-year TTL."""
+
+
+@strawberry.input
+class RotateDeployTokenInput:
+    id: GUID
+
+
+@strawberry.input
+class RevokeDeployTokenInput:
+    id: GUID
+
+
+@strawberry.type
+class DeployTokenSecretReveal:
+    """Returned exactly once on creation/rotation; the plaintext
+    token never lives in DB."""
+
+    token: DeployTokenType
+    plaintext_secret: str
+
+
+@strawberry.type
+class _DeployTokenRevokedPayload:
+    id: GUID
+    revoked: bool
 
 
 # ---------------------------------------------------------------------------
@@ -631,3 +702,217 @@ class LifecycleMutation:
                 "no deployment exists for this app yet",
             )
         return gql_success(deployment_to_type(latest))
+
+    # ---- Custom domain (#281) -----------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.domain.add")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def add_app_domain(
+        self, info: Info, input: AddAppDomainInput,
+    ) -> MutationResultType[AppDomainType]:
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug).first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        host = (input.hostname or "").strip().lower()
+        if not host or "." not in host:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "hostname must be a fully-qualified domain",
+                field="hostname",
+            )
+        method = (input.validation_method or "dns_txt").lower()
+        valid_methods = {"dns_txt", "http_01", "dns_01"}
+        if method not in valid_methods:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"validation_method must be one of {sorted(valid_methods)}",
+                field="validationMethod",
+            )
+        # Idempotent re-add: an active row with the same hostname is
+        # treated as success rather than a 409.
+        existing = (
+            CustomDomain.objects
+            .filter(hostname=host, deleted_at__isnull=True)
+            .first()
+        )
+        if existing is not None:
+            if existing.registered_app_id != app.id:
+                return gql_failure(
+                    ErrorCode.CONFLICT.value,
+                    f"domain {host!r} already bound to another app",
+                    field="hostname",
+                )
+            return gql_success(app_domain_to_type(existing))
+        domain = CustomDomain.objects.create(
+            registered_app=app,
+            hostname=host,
+            validation_method=method,
+        )
+        return gql_success(app_domain_to_type(domain))
+
+    @strawberry.field
+    @mutation_audit(action="app.domain.remove")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def remove_app_domain(
+        self, info: Info, input: RemoveAppDomainInput,
+    ) -> MutationResultType[_AppDomainRemovedPayload]:
+        domain = (
+            CustomDomain.objects
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if domain is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "domain not found",
+            )
+        domain.soft_delete()
+        return gql_success(_AppDomainRemovedPayload(
+            id=input.id, deleted=True,
+        ))
+
+    @strawberry.field
+    @mutation_audit(action="app.domain.recheck")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def recheck_domain_validation(
+        self, info: Info, input: RecheckDomainValidationInput,
+    ) -> MutationResultType[AppDomainType]:
+        """Trigger a re-check of cert / DNS validation. The DNS
+        polling loop runs out-of-band; this mutation just bumps
+        ``updated_at`` so the UI can show 'last_checked_at' moved
+        forward and pick up state changes from the polling loop."""
+        domain = (
+            CustomDomain.objects
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if domain is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "domain not found",
+            )
+        domain.save(update_fields=["updated_at", "version"])
+        return gql_success(app_domain_to_type(domain))
+
+    # ---- Deploy tokens (#281) ------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.deploy_token.create")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def create_deploy_token(
+        self, info: Info, input: CreateDeployTokenInput,
+    ) -> MutationResultType[DeployTokenSecretReveal]:
+        import hashlib
+        import secrets as secrets_lib
+        from datetime import datetime, timedelta, timezone as dt_tz
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug).first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        plaintext = "alfdt_" + secrets_lib.token_urlsafe(32)
+        digest = hashlib.sha256(plaintext.encode()).hexdigest()
+        expires_at = None
+        if input.expires_at_iso:
+            try:
+                expires_at = datetime.fromisoformat(
+                    input.expires_at_iso,
+                )
+            except ValueError:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "expires_at_iso must be ISO-8601",
+                    field="expiresAtIso",
+                )
+        else:
+            expires_at = datetime.now(tz=dt_tz.utc) + timedelta(days=365)
+        token = DeployToken.objects.create(
+            registered_app=app,
+            name=input.name,
+            token_hash=digest,
+            token_last_4=plaintext[-4:],
+            scopes=list(input.scopes or ["app.deploy"]),
+            expires_at=expires_at,
+        )
+        return gql_success(DeployTokenSecretReveal(
+            token=deploy_token_to_type(token),
+            plaintext_secret=plaintext,
+        ))
+
+    @strawberry.field
+    @mutation_audit(action="app.deploy_token.rotate")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def rotate_deploy_token(
+        self, info: Info, input: RotateDeployTokenInput,
+    ) -> MutationResultType[DeployTokenSecretReveal]:
+        import hashlib
+        import secrets as secrets_lib
+        from datetime import datetime, timedelta, timezone as dt_tz
+
+        token = (
+            DeployToken.objects
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if token is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "deploy token not found",
+            )
+        if token.is_revoked:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cannot rotate a revoked token; create a new one",
+            )
+        plaintext = "alfdt_" + secrets_lib.token_urlsafe(32)
+        digest = hashlib.sha256(plaintext.encode()).hexdigest()
+        # Park the previous hash for a 24h grace window so CI
+        # runners holding the old token keep working until they're
+        # updated (matches the model's documented rotation flow).
+        token.previous_token_hash = token.token_hash
+        token.previous_token_expires_at = (
+            datetime.now(tz=dt_tz.utc) + timedelta(hours=24)
+        )
+        token.token_hash = digest
+        token.token_last_4 = plaintext[-4:]
+        token.last_rotated_at = datetime.now(tz=dt_tz.utc)
+        token.save(update_fields=[
+            "previous_token_hash", "previous_token_expires_at",
+            "token_hash", "token_last_4", "last_rotated_at",
+            "updated_at", "version",
+        ])
+        return gql_success(DeployTokenSecretReveal(
+            token=deploy_token_to_type(token),
+            plaintext_secret=plaintext,
+        ))
+
+    @strawberry.field
+    @mutation_audit(action="app.deploy_token.revoke")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def revoke_deploy_token(
+        self, info: Info, input: RevokeDeployTokenInput,
+    ) -> MutationResultType[_DeployTokenRevokedPayload]:
+        token = (
+            DeployToken.objects
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if token is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "deploy token not found",
+            )
+        if not token.is_revoked:
+            token.is_revoked = True
+            token.save(update_fields=[
+                "is_revoked", "updated_at", "version",
+            ])
+        return gql_success(_DeployTokenRevokedPayload(
+            id=input.id, revoked=True,
+        ))

@@ -26,6 +26,16 @@ class WebhookSubscription(BaseCoreModel):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    # Optional app scoping: when set, the subscription fires only on
+    # events from this app and surfaces under the app's UI sub-page;
+    # when null the subscription is org-wide as before.
+    registered_app = models.ForeignKey(
+        "astrolift_registry.RegisteredApp",
+        related_name="webhook_subscriptions",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
     url = models.URLField()
     secret_hash = models.CharField(max_length=128)
     events = models.JSONField(default=list, blank=True)

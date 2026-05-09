@@ -76,6 +76,39 @@ class DetachSecretBundleInput:
     attachment_id: GUID
 
 
+# Managed services CRUD (#281) ---------------------------------------
+
+
+@strawberry.input
+class ProvisionManagedServiceInput:
+    app_slug: str
+    environment_name: str
+    kind: str
+    """Catalog kind: postgres | redis | object_store | queue | ..."""
+
+    name: str | None = None
+    variant: str | None = None
+    config: strawberry.scalars.JSON | None = None
+
+
+@strawberry.input
+class UpdateManagedServiceInput:
+    id: GUID
+    config: strawberry.scalars.JSON | None = None
+    name: str | None = None
+
+
+@strawberry.input
+class DeprovisionManagedServiceInput:
+    id: GUID
+
+
+@strawberry.type
+class _ManagedServiceDeletedPayload:
+    id: GUID
+    deleted: bool
+
+
 @strawberry.type
 class _AppSecretWritePayload:
     app_slug: str
@@ -334,4 +367,128 @@ class ServicesMutation:
         ref.soft_delete()
         return gql_success(_AttachmentRemovedPayload(
             attachment_id=input.attachment_id, deleted=True,
+        ))
+
+    # ---- Managed services CRUD (#281) ----------------------------
+
+    @strawberry.field
+    @mutation_audit(action="managed_service.provision")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def provision_managed_service(
+        self, info: Info, input: ProvisionManagedServiceInput,
+    ) -> MutationResultType[ManagedServiceType]:
+        """Provision a managed-service binding.
+
+        DB-side write only — the actual workflow that drives the
+        provider plugin's provision() lives in
+        ``astrolift_workflows`` and reads from this row. The
+        mutation creates the row in PENDING state; the workflow
+        loop transitions it through PROVISIONING → ACTIVE."""
+        app = (
+            RegisteredApp.objects
+            .filter(slug=input.app_slug)
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        env = (
+            AppEnvironment.objects
+            .filter(
+                registered_app=app,
+                name=input.environment_name,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if env is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"environment {input.environment_name!r} not found",
+                field="environmentName",
+            )
+        valid_kinds = {k for k, _ in ManagedService.Kind.choices}
+        if input.kind not in valid_kinds:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"kind must be one of {sorted(valid_kinds)}",
+                field="kind",
+            )
+        name = (input.name or input.kind).strip()
+        if (
+            ManagedService.objects.filter(
+                registered_app=app,
+                kind=input.kind,
+                name=name,
+                deleted_at__isnull=True,
+            ).exists()
+        ):
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"managed service ({input.kind}, {name!r}) already exists for this app",
+                field="name",
+            )
+        svc = ManagedService.objects.create(
+            registered_app=app,
+            app_environment=env,
+            kind=input.kind,
+            name=name,
+            variant=input.variant or "",
+            config=dict(input.config or {}),
+            status=ManagedService.Status.PENDING,
+        )
+        return gql_success(managed_service_to_type(svc))
+
+    @strawberry.field
+    @mutation_audit(action="managed_service.update")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def update_managed_service(
+        self, info: Info, input: UpdateManagedServiceInput,
+    ) -> MutationResultType[ManagedServiceType]:
+        svc = (
+            ManagedService.objects
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "managed service not found",
+            )
+        if input.name is not None:
+            svc.name = input.name.strip()
+        if input.config is not None:
+            svc.config = dict(input.config)
+        # Re-applying config kicks the workflow back to UPDATING;
+        # the workflow loop will roll it forward to ACTIVE.
+        if svc.status == ManagedService.Status.ACTIVE:
+            svc.status = ManagedService.Status.UPDATING
+        svc.save(update_fields=[
+            "name", "config", "status", "updated_at", "version",
+        ])
+        return gql_success(managed_service_to_type(svc))
+
+    @strawberry.field
+    @mutation_audit(action="managed_service.deprovision")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def deprovision_managed_service(
+        self, info: Info, input: DeprovisionManagedServiceInput,
+    ) -> MutationResultType[_ManagedServiceDeletedPayload]:
+        svc = (
+            ManagedService.objects
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "managed service not found",
+            )
+        svc.status = ManagedService.Status.DEPROVISIONING
+        svc.save(update_fields=[
+            "status", "updated_at", "version",
+        ])
+        svc.soft_delete()
+        return gql_success(_ManagedServiceDeletedPayload(
+            id=input.id, deleted=True,
         ))
