@@ -22,8 +22,8 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Sequence
 
-from astrolift_clusters.egress import EgressPolicy, render as render_egress
-
+from astrolift_clusters.egress import EgressPolicy
+from astrolift_clusters.egress import render as render_egress
 
 # Standard cluster DNS port + protocol — covers CoreDNS / kube-dns.
 _DNS_PORTS = (

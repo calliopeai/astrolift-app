@@ -18,7 +18,6 @@ from astrolift_registry.schema.queries import RegistryQuery
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
-
 pytestmark = pytest.mark.django_db
 
 

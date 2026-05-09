@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from astrolift_manifest.discover import infer_manifest_from_signals
 
-
 # ---- runtime detection ------------------------------------------------
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from astrolift_manifest.sync_state import (
-    SyncEvent,
     SyncReconcileError,
     SyncSnapshot,
     SyncState,
@@ -15,7 +14,6 @@ from astrolift_manifest.sync_state import (
     reconcile_to_db,
     reconcile_to_repo,
 )
-
 
 # ---- classify_state ------------------------------------------------
 

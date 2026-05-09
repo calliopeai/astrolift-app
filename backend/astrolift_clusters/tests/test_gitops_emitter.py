@@ -13,7 +13,6 @@ from astrolift_clusters.gitops_emitter import (
     repo_path_for,
 )
 
-
 # ---- repo path layout ----------------------------------------------
 
 

@@ -6,14 +6,11 @@ import pytest
 
 from astrolift_lifecycle.preview_managed_services import (
     PreviewPolicy,
-    SharedPlan,
-    SharedResource,
     default_policy_for,
     resolve_policy,
     shared_plan_for,
     teardown_plan_for,
 )
-
 
 # ---- defaults -------------------------------------------------------
 

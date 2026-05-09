@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 
 

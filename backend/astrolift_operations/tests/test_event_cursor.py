@@ -18,7 +18,6 @@ from astrolift_operations.schema.queries import (
 )
 from core.tenancy import TenantContext, tenant_context
 
-
 pytestmark = pytest.mark.django_db
 
 

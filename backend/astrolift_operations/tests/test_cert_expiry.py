@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -14,8 +14,7 @@ from astrolift_operations.cert_expiry import (
     evaluate,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _expires_in(days: int, **kw) -> CertSnapshot:

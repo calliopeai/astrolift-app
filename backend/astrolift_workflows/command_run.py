@@ -16,9 +16,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
 from enum import Enum
-
 
 # Spec 06 §4.20 timeout bounds.
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 5 * 60

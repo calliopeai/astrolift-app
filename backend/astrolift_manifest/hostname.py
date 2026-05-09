@@ -26,7 +26,6 @@ import re
 
 from astrolift_manifest.types import NormalizedManifest, WorkloadManifest
 
-
 _VALID_DNS_LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 
 # Subdomains the platform reserves for itself — users cannot register

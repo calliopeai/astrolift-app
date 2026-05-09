@@ -15,7 +15,6 @@ from core.testing.fakes import (
     UnimplementedFakeMethod,
 )
 
-
 # ---- spy --------------------------------------------------------------
 
 

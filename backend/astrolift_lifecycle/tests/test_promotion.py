@@ -17,7 +17,6 @@ from astrolift_lifecycle.promotion import (
     walk_lineage,
 )
 
-
 GOOD_DIGEST = "sha256:" + "a" * 64
 
 

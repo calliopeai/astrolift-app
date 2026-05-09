@@ -22,7 +22,6 @@ import dataclasses
 import re
 from collections.abc import Mapping
 
-
 # ---- hostname pattern -----------------------------------------------
 
 

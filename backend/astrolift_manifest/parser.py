@@ -85,7 +85,7 @@ def parse_raw(toml_text: str) -> RawManifest:
         if j.name in workload_names:
             raise ManifestError(
                 f"job name {j.name!r} collides with an existing workload",
-                path=f"jobs",
+                path="jobs",
             )
     workloads = workloads + desugared_jobs
 

@@ -20,7 +20,6 @@ from astrolift_operations.webhook_delivery import (
     verify_signature,
 )
 
-
 SECRET = b"k" * 32
 BODY = b'{"event":"app.deployed"}'
 TS = 1_700_000_000

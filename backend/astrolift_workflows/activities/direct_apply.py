@@ -28,7 +28,6 @@ import hashlib
 import json
 from collections.abc import Iterable, Mapping
 
-
 # Spec 07 §4 — fieldManager string. Must be stable across re-applies
 # because k8s tracks ownership by this string. Renaming would re-own
 # every field every release — silent flapping with other controllers.

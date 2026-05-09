@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -143,7 +143,7 @@ def test_supported_transports_locked():
 def _entry(addr: str, reason: SuppressionReason) -> SuppressionEntry:
     return SuppressionEntry(
         address=addr, reason=reason,
-        suppressed_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        suppressed_at=datetime(2026, 5, 1, tzinfo=UTC),
     )
 
 

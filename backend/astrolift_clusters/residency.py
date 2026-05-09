@@ -27,7 +27,6 @@ import dataclasses
 from collections.abc import Sequence
 from typing import Final
 
-
 # Sentinel for "no constraint" — explicit so callers don't confuse
 # an empty list ('nothing allowed') with absence of a policy
 # ('no constraint at all'). The UI surfaces both states differently.

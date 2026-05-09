@@ -39,8 +39,6 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Mapping
-from enum import Enum
-
 
 # Reserved namespace. Operators set custom tags on resources via
 # their own keys; the platform owns ``astrolift.io/*``.

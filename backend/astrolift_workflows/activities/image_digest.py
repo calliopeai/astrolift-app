@@ -17,7 +17,6 @@ from __future__ import annotations
 import dataclasses
 import re
 
-
 # Strict digest pattern: sha256: prefix + 64 lowercase hex chars.
 # Mirrors OCI distribution spec — anything else is junk we won't
 # trust to deploy.

@@ -19,11 +19,10 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Sequence
 from enum import Enum
 
 from astrolift_operations.metrics_logs_api import LogFilter, Severity
-
 
 _TAG_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_.\-]*$")
 _LABEL_VALUE_RE = re.compile(r"^[A-Za-z0-9_\-./:]+$")

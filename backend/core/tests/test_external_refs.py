@@ -15,7 +15,6 @@ from core.secrets.external_refs import (
     unregister_resolver,
 )
 
-
 # ---- parser -----------------------------------------------------------
 
 

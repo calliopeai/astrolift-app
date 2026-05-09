@@ -13,7 +13,6 @@ from astrolift_clusters.residency import (
     is_constrained,
 )
 
-
 # ---- defaults / shape ------------------------------------------------
 
 

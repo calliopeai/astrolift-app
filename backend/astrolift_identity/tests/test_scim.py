@@ -13,7 +13,6 @@ from astrolift_identity.scim import (
     GroupRoleMapping,
     ScimError,
     ScimFilter,
-    ScimGroup,
     ScimUser,
     ScopeKind,
     filter_matches,
@@ -24,7 +23,6 @@ from astrolift_identity.scim import (
     parse_user_payload,
     role_assignments_for_user,
 )
-
 
 # ---- payload parsing -----------------------------------------------
 

@@ -22,7 +22,6 @@ import re
 from collections.abc import Sequence
 from enum import Enum
 
-
 # Spec 07 §3.1 path layout. The cluster name is the prefix the
 # GitOps tool watches; nesting under ``apps/`` keeps shared
 # directories (CRDs, RBAC) at the cluster level distinct from

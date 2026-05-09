@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 # Maps platform deploy status → GitHub commit-status state. GitHub
 # accepts: error, failure, pending, success.
 _STATE_MAP: dict[str, str] = {

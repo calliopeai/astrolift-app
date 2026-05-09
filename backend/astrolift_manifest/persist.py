@@ -70,7 +70,7 @@ def persist_manifest(
     onto ``RegisteredApp.manifest_raw`` (caller may already have it
     handy). If omitted, the field is left unchanged.
     """
-    from astrolift_registry.models import Container, Workload
+    from astrolift_registry.models import Workload
 
     new_hash = manifest_hash(manifest.serialized)
     result = PersistResult(hash_changed=app.manifest_hash != new_hash)

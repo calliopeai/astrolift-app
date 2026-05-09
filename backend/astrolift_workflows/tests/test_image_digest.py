@@ -6,13 +6,11 @@ import pytest
 
 from astrolift_workflows.activities.image_digest import (
     ImageRefError,
-    PinnedRef,
     is_digest,
     is_pinned,
     parse_pinned_ref,
     pin_to_digest,
 )
-
 
 GOOD_DIGEST = "sha256:" + "a" * 64
 ANOTHER_DIGEST = "sha256:" + "b" * 64

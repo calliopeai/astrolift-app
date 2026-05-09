@@ -16,7 +16,6 @@ from astrolift_scm.orphan import (
     reconnect_connection,
 )
 
-
 pytestmark = pytest.mark.django_db
 
 

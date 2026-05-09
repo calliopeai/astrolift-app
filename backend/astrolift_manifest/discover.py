@@ -26,7 +26,6 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-
 # ---- runtime detection --------------------------------------------------
 
 

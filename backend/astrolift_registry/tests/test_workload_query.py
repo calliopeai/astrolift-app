@@ -7,11 +7,10 @@ from types import SimpleNamespace
 import pytest
 
 from astrolift_identity.models import Organization, Project, Team
-from astrolift_registry.models import Container, RegisteredApp, Workload
+from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.queries import RegistryQuery
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
-
 
 pytestmark = pytest.mark.django_db
 

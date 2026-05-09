@@ -16,7 +16,6 @@ from astrolift_workflows.activities.secret_materialization import (
     service_secret_name,
 )
 
-
 # ---- naming convention ---------------------------------------------
 
 

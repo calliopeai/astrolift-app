@@ -14,7 +14,6 @@ import pytest
 
 from astrolift_lifecycle.models import Deployment
 
-
 pytestmark = pytest.mark.django_db
 
 

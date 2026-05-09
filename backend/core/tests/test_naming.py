@@ -12,15 +12,13 @@ from core.naming import (
     IAM_ROLE,
     K8S_NAMESPACE,
     K8S_RESOURCE,
-    NamingViolation,
     ORG_SLUG,
-    PROJECT_SLUG,
     S3_BUCKET,
+    NamingViolation,
     validate_all,
     validate_app_namespace,
     validate_app_subdomain,
 )
-
 
 # ---- single-rule validators ------------------------------------------
 

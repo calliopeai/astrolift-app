@@ -7,7 +7,6 @@ import pytest
 from astrolift_operations.llm_usage import (
     DEFAULT_FALLBACK,
     DEFAULT_PRICING,
-    LLMKeyDetection,
     LLMProvider,
     ModelPricing,
     TokenUsage,
@@ -18,7 +17,6 @@ from astrolift_operations.llm_usage import (
     register_usage_source,
     unregister_usage_source,
 )
-
 
 # ---- key detection (env-name only) ---------------------------------
 

@@ -24,7 +24,6 @@ from collections.abc import Iterable
 
 from astrolift_manifest.env_injection import envelope_keys_for
 
-
 # Per spec 11 §3, every abstract kind has a stable description. The
 # UI's catalog page reads this; the manifest validator verifies the
 # user's [[managed_services]] kind is one of these.

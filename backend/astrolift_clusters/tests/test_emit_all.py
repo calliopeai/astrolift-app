@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-
 from astrolift_clusters.emit_all import (
+    GITOPS_MODES,
     ActiveDeployment,
     DeliveryMode,
-    GITOPS_MODES,
     commits_per_cluster,
     plan_emit_all,
     repo_path_for,

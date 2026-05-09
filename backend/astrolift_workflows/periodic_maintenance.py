@@ -19,9 +19,8 @@ are thin orchestrators on top.
 from __future__ import annotations
 
 import dataclasses
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from enum import Enum
-
 
 # ---- webhook reheal ------------------------------------------------
 

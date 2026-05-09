@@ -18,7 +18,6 @@ from astrolift_clusters.custom_domain import (
     verify_txt_challenge,
 )
 
-
 # ---- hostname validation -------------------------------------------
 
 

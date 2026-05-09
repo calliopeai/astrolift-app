@@ -25,7 +25,7 @@ Defaults match spec 12 §6.3: 90-day default rotation; reminders at
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 # Spec 12 §6.3 defaults — overridable per RotationPolicy row.
 DEFAULT_ROTATION_PERIOD_DAYS = 90
@@ -155,4 +155,4 @@ def evaluate(
 def utcnow() -> datetime:
     """Tiny helper so callers don't have to remember the tzinfo dance.
     Tests pass a fixed datetime instead — never call this from tests."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

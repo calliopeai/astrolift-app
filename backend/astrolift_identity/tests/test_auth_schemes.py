@@ -11,7 +11,6 @@ from astrolift_identity.auth_schemes import (
     is_introspection_authorized,
 )
 
-
 # ---- single-scheme rule --------------------------------------------
 
 

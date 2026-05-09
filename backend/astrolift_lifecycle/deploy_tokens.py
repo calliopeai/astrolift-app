@@ -29,7 +29,6 @@ import secrets
 from django.db.models import Q
 from django.utils import timezone
 
-
 DEFAULT_GRACE_PERIOD_SECONDS = 60 * 60  # 1 hour
 DEFAULT_TTL_DAYS = 365
 MAX_TTL_DAYS = 365 * 5

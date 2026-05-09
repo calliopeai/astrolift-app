@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections.abc import Sequence
 from enum import Enum
 
 
@@ -159,7 +158,7 @@ class LogFilter:
                 _check_label_value(opt)
         if self.search and any(c in self.search for c in '\n\r"\''):
             raise FilterError(
-                f"search string contains forbidden characters "
+                "search string contains forbidden characters "
                 "(newline / quote)"
             )
         if self.end_unix and self.start_unix > self.end_unix:

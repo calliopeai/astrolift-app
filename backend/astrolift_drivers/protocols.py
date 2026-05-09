@@ -187,7 +187,7 @@ class ProvisionSpec:
 class ServiceStatus:
     """Result of ``status(handle)``."""
 
-    handle: "ManagedServiceHandle"
+    handle: ManagedServiceHandle
     state: str        # 'provisioning' | 'ready' | 'updating' | 'failed' | 'deprovisioning' | 'gone'
     message: str = ""
     last_observed_at: str = ""  # ISO-8601
@@ -215,7 +215,7 @@ class Binding:
 @dataclasses.dataclass(frozen=True, slots=True)
 class SnapshotHandle:
     snapshot_id: str
-    handle: "ManagedServiceHandle"
+    handle: ManagedServiceHandle
     created_at: str = ""
 
 

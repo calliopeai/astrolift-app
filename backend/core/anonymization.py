@@ -28,7 +28,6 @@ import dataclasses
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-
 # Spec 04 §11 default — 30-day grace period before anonymization
 # kicks in after a deletion request. Lets the user reverse course.
 DEFAULT_GRACE_DAYS = 30

@@ -7,7 +7,6 @@ import pytest
 from astrolift_clusters.status_routing import (
     AppLookup,
     DomainLookup,
-    HostState,
     IngressDriver,
     StatusState,
     catch_all_recipe,

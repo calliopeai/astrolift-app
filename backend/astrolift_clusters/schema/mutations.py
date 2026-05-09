@@ -28,8 +28,8 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
-from core.mutations import ErrorCode, mutation_audit
 from core.decorators import tenant_scoped
+from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 

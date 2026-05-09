@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from astrolift_operations.alert_rules import (
     DEFAULT_RULES,
     ChannelRoute,
-    DeliveryDecision,
     Severity,
     SuppressionWindow,
     evaluate,
@@ -17,8 +16,7 @@ from astrolift_operations.alert_rules import (
     should_fire,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _now(*, off: int = 0) -> datetime:

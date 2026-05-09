@@ -7,7 +7,6 @@ import pytest
 from astrolift_operations.trace_explorer import (
     Span,
     SpanStatus,
-    TraceComparison,
     TraceFilterError,
     TraceSearchFilter,
     compare_traces,
@@ -15,7 +14,6 @@ from astrolift_operations.trace_explorer import (
     log_filter_for_trace,
     self_times,
 )
-
 
 # ---- search filter -------------------------------------------------
 
