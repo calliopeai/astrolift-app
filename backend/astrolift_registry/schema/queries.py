@@ -137,6 +137,14 @@ class RegistryQuery:
                 defaults=NormalizationDefaults(),
             )
         except ManifestError as exc:
+            from astrolift_manifest.parser import locate_in_source
+
+            error_path = getattr(exc, "path", None) or None
+            line, column = exc.line, exc.column
+            # Semantic errors (kind=spaceship, healthcheck typo) don't
+            # carry source positions — best-effort locate by leaf key.
+            if line is None and error_path:
+                line, column = locate_in_source(app.manifest_raw, error_path)
             return RenderedManifestType(
                 app_slug=app.slug,
                 environment_name=env_name,
@@ -144,7 +152,9 @@ class RegistryQuery:
                 namespace=namespace,
                 resources=[],
                 error=str(exc),
-                error_path=getattr(exc, "path", None) or None,
+                error_path=error_path,
+                error_line=line,
+                error_column=column,
             )
         except Exception as exc:  # defensive: never blow up the resolver
             return RenderedManifestType(
@@ -155,6 +165,8 @@ class RegistryQuery:
                 resources=[],
                 error=f"unexpected error: {exc}",
                 error_path=None,
+                error_line=None,
+                error_column=None,
             )
 
         resources = render_manifests(
@@ -172,4 +184,6 @@ class RegistryQuery:
             resources=resources,
             error=None,
             error_path=None,
+            error_line=None,
+            error_column=None,
         )

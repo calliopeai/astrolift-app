@@ -151,7 +151,12 @@ class RenderedManifestType:
     ``resources`` is a JSON list of Kubernetes resource dicts
     (apiVersion/kind/metadata/spec). The ``error`` field carries a
     human-readable message when parsing or normalization failed —
-    callers render either the resources or the error, never both."""
+    callers render either the resources or the error, never both.
+
+    ``error_line`` and ``error_column`` are 1-based source positions
+    that point to the offending TOML line so editors can show a red
+    squiggle. Both are ``None`` when the position couldn't be
+    located (e.g. a missing required key has no source position)."""
 
     app_slug: str
     environment_name: str
@@ -160,6 +165,8 @@ class RenderedManifestType:
     resources: JSON
     error: str | None
     error_path: str | None
+    error_line: int | None
+    error_column: int | None
 
 
 def container_to_type(container) -> ContainerType:

@@ -99,6 +99,43 @@ def test_parse_invalid_toml_surfaces_path():
     assert "invalid TOML" in str(exc.value)
 
 
+def test_invalid_toml_carries_line_and_column():
+    """tomllib errors expose a position; we surface it on
+    ManifestError so editors can highlight the offending row."""
+    bad = "name = \"hello\"\n[[workloads]]\nkind = (\nname = \"x\"\n"
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(bad)
+    err = exc.value
+    assert err.line is not None
+    assert err.column is not None
+    # The offending opening paren is on the 3rd line.
+    assert err.line == 3
+
+
+def test_locate_in_source_finds_leaf_key():
+    """Best-effort locator for semantic errors (path → line/col)."""
+    from astrolift_manifest.parser import locate_in_source
+
+    text = (
+        'name = "hello"\n'
+        "\n"
+        "[[workloads]]\n"
+        'name = "web"\n'
+        'kind = "spaceship"\n'
+    )
+    line, col = locate_in_source(text, "workloads[0].kind")
+    assert line == 5
+    assert col == 1
+
+
+def test_locate_in_source_returns_none_when_missing():
+    from astrolift_manifest.parser import locate_in_source
+
+    line, col = locate_in_source('name = "hello"', "workloads[0].kind")
+    assert line is None
+    assert col is None
+
+
 def test_parse_missing_name_is_error():
     toml = """
 [[workloads]]

@@ -466,6 +466,8 @@ type AstroliftRenderedManifest {
   resources: JSON!
   error: String
   errorPath: String
+  errorLine: Int
+  errorColumn: Int
 }
 
 type AstroliftRole {

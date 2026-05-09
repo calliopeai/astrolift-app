@@ -29,6 +29,8 @@ interface RenderedManifest {
   resources: K8sResource[];
   error: string | null;
   errorPath: string | null;
+  errorLine: number | null;
+  errorColumn: number | null;
 }
 
 interface K8sResource {
@@ -129,6 +131,18 @@ export function ManifestPreviewClient({ slug }: { slug: string }) {
               <p className="text-muted-foreground text-xs">
                 offending key:{" "}
                 <span className="font-mono">{result.errorPath}</span>
+                {result.errorLine && (
+                  <>
+                    {" "}— line{" "}
+                    <span className="font-mono">{result.errorLine}</span>
+                    {result.errorColumn && (
+                      <>
+                        , col{" "}
+                        <span className="font-mono">{result.errorColumn}</span>
+                      </>
+                    )}
+                  </>
+                )}
               </p>
             )}
             <p className="text-muted-foreground text-xs">
