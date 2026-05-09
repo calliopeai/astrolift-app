@@ -498,6 +498,12 @@ type AstroliftRoleBindingMutationResult {
   data: AstroliftRoleBinding
 }
 
+type AstroliftRoleMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRole
+}
+
 type AstroliftScheduledJobRun {
   id: GUID!
   registeredAppSlug: String!
@@ -773,6 +779,14 @@ input CreateProjectInput {
   description: String = null
 }
 
+input CreateRoleInput {
+  slug: String!
+  name: String!
+  scopeLevel: String!
+  permissions: [String!]!
+  description: String! = ""
+}
+
 input CreateTeamInput {
   organizationId: GUID!
   name: String!
@@ -797,6 +811,10 @@ scalar Date
 
 """Date with time (isoformat)"""
 scalar DateTime
+
+input DeleteRoleInput {
+  id: GUID!
+}
 
 input DeleteSshDeployKeyInput {
   id: GUID!
@@ -1069,6 +1087,9 @@ type Mutation {
   softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   grantRole(input: GrantRoleInput!): AstroliftRoleBindingMutationResult!
   revokeRoleBinding(input: RevokeRoleBindingInput!): SoftdeletepayloadMutationResult!
+  createRole(input: CreateRoleInput!): AstroliftRoleMutationResult!
+  updateRole(input: UpdateRoleInput!): AstroliftRoleMutationResult!
+  softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
   createInvitation(input: CreateInvitationInput!): AstroliftInvitationCreatedMutationResult!
   revokeInvitation(input: RevokeInvitationInput!): AstroliftInvitationMutationResult!
   acceptInvitation(input: AcceptInvitationInput!): AstroliftInvitationMutationResult!
@@ -1531,6 +1552,13 @@ input UpdatePolicyInput {
 input UpdateProjectInput {
   id: GUID!
   name: String = null
+  description: String = null
+}
+
+input UpdateRoleInput {
+  id: GUID!
+  name: String = null
+  permissions: [String!] = null
   description: String = null
 }
 
