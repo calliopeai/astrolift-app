@@ -28,6 +28,7 @@ import astrolift_lifecycle.schema as AstroliftLifecycleSchema  # noqa: E402
 import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
 import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 import astrolift_scm.schema as AstroliftScmSchema  # noqa: E402
+import astrolift_services.schema as AstroliftServicesSchema  # noqa: E402
 
 _query_bases = [
     PermissionAnalysisQuery,
@@ -40,6 +41,7 @@ _query_bases = [
     AstroliftClustersSchema.ClustersQuery,
     AstroliftBillingSchema.BillingQuery,
     AstroliftScmSchema.ScmQuery,
+    AstroliftServicesSchema.ServicesQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
@@ -50,6 +52,7 @@ _mutation_bases = [
     AstroliftClustersSchema.ClustersMutation,
     AstroliftLifecycleSchema.LifecycleMutation,
     AstroliftScmSchema.ScmMutation,
+    AstroliftServicesSchema.ServicesMutation,
 ]
 
 if is_enabled(Feature.WORKFLOWS):

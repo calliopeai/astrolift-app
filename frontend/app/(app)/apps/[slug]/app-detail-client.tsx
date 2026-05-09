@@ -281,9 +281,9 @@ export function AppDetailClient({ slug }: { slug: string }) {
             </a>
           </Button>
           <Button asChild variant="outline">
-            <a href={`/apps/${a.slug}/manifest`}>
+            <a href={`/apps/${a.slug}/config`}>
               <FileCodeIcon className="size-4" />
-              Manifest
+              Config
             </a>
           </Button>
           {a.sourceUrl && (

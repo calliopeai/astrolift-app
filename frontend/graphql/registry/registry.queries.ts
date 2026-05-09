@@ -27,6 +27,10 @@ const APP_FIELDS = `
   triggerMode
   deployBranch
   previewScreenshotUrl
+  rawManifest
+  rawManifestStaged
+  lastSyncedHash
+  manifestSyncState
   createdAt
   updatedAt
   deletedAt

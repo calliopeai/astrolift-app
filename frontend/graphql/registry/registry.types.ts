@@ -27,15 +27,22 @@ export type TriggerMode = "auto_on_push" | "manual" | "external_ci";
 
 export type WorkloadKind = "deployment" | "statefulset" | "job" | "cronjob";
 
+export type ManifestSyncState =
+  | "in_sync"
+  | "db_ahead"
+  | "repo_ahead"
+  | "diverged";
+
 export type HealthcheckKind = "none" | "http" | "tcp" | "exec";
 
 export type AstroliftRegisteredApp = Omit<
   GeneratedRegisteredApp,
-  "sourceKind" | "provisioningStatus" | "triggerMode"
+  "sourceKind" | "provisioningStatus" | "triggerMode" | "manifestSyncState"
 > & {
   sourceKind: SourceKind;
   provisioningStatus: ProvisioningStatus;
   triggerMode: TriggerMode;
+  manifestSyncState: ManifestSyncState;
 };
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {
