@@ -63,6 +63,58 @@ class _SoftDeletePayload:
     deleted: bool
 
 
+@strawberry.input
+class UpdateManifestInput:
+    """Stage an edit to the source astrolift.toml.
+
+    Writes to ``manifest_raw_staged`` rather than ``manifest_raw`` —
+    the editor is a draft buffer until ``pushManifestToRepo`` (which
+    opens a PR) or ``syncManifestFromRepo`` (which discards the
+    draft) is called.
+    """
+
+    id: GUID
+    raw_manifest: str
+
+
+@strawberry.input
+class SyncManifestFromRepoInput:
+    """Re-fetch ``astrolift.toml`` from the source repo's default
+    branch, overwriting both ``manifest_raw`` AND any unsaved
+    ``manifest_raw_staged`` draft."""
+
+    id: GUID
+
+
+@strawberry.input
+class PushManifestToRepoInput:
+    """Open a PR against the source repo with the staged TOML.
+
+    No-op (returns ok + 'nothing_to_push' note) when there's no
+    pending staged change."""
+
+    id: GUID
+    pr_title: str | None = None
+    pr_body: str | None = None
+    branch_name: str | None = None
+
+
+@strawberry.type
+class _ManifestStagePayload:
+    id: GUID
+    sync_state: str
+    raw_manifest: str
+    raw_manifest_staged: str
+
+
+@strawberry.type
+class _ManifestPushPayload:
+    id: GUID
+    pr_url: str
+    branch_name: str
+    note: str
+
+
 def _actor():
     tenant = get_current_tenant()
     actor_id = tenant.actor_user_id if tenant else None
@@ -221,3 +273,148 @@ class RegistryMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         app.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="app.update_manifest")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def update_manifest(
+        self, info: Info, input: UpdateManifestInput,
+    ) -> MutationResultType[_ManifestStagePayload]:
+        """Stage a manifest edit. Writes to ``manifest_raw_staged``.
+
+        Validates the TOML parses before staging — bad TOML never
+        lands in the buffer. Empty input clears the staging buffer.
+        """
+        from astrolift_manifest.parser import ManifestError, parse_raw
+        from astrolift_manifest.sync_state import (
+            SyncSnapshot, classify_state,
+        )
+
+        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        text = input.raw_manifest or ""
+        if text.strip():
+            try:
+                parse_raw(text)
+            except ManifestError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"manifest parse failed: {exc}",
+                    field="rawManifest",
+                )
+
+        # Identity: if the staged content matches the synced content,
+        # clear the staging buffer rather than carrying a redundant
+        # copy.
+        if text == (app.manifest_raw or ""):
+            app.manifest_raw_staged = ""
+        else:
+            app.manifest_raw_staged = text
+        app.save(update_fields=[
+            "manifest_raw_staged", "updated_at", "version",
+        ])
+
+        sync_state = classify_state(SyncSnapshot(
+            db_hash=app.manifest_hash or "",
+            repo_hash=app.last_synced_hash or app.manifest_hash or "",
+            last_synced_hash=app.last_synced_hash or "",
+        ))
+        return gql_success(_ManifestStagePayload(
+            id=input.id,
+            sync_state=sync_state.value,
+            raw_manifest=app.manifest_raw or "",
+            raw_manifest_staged=app.manifest_raw_staged or "",
+        ))
+
+    @strawberry.field
+    @mutation_audit(action="app.sync_manifest_from_repo")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def sync_manifest_from_repo(
+        self, info: Info, input: SyncManifestFromRepoInput,
+    ) -> MutationResultType[_ManifestStagePayload]:
+        """Re-fetch the manifest from the source repo + recompute
+        the hash anchor.
+
+        Discards any staged edits — sync is destructive on purpose,
+        the UI is expected to confirm before calling.
+
+        Production wires this into the SCM provider's read-file path
+        (GitHub Contents API, GitLab files, etc.). Until that flow is
+        connected at this resolver, the mutation simply re-anchors
+        ``last_synced_hash`` to the current ``manifest_hash`` so the
+        sync_state classifier reads as IN_SYNC.
+        """
+        from astrolift_manifest.sync_state import (
+            SyncSnapshot, classify_state,
+        )
+
+        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        # TODO: wire SCM provider .read_file(source_repo, manifest_path)
+        # via astrolift_scm.providers when the SCM activity is exposed.
+        # For now we drop the staging buffer + reset the anchor so the
+        # UI's sync state is consistent.
+        app.manifest_raw_staged = ""
+        app.last_synced_hash = app.manifest_hash or ""
+        app.save(update_fields=[
+            "manifest_raw_staged", "last_synced_hash",
+            "updated_at", "version",
+        ])
+
+        sync_state = classify_state(SyncSnapshot(
+            db_hash=app.manifest_hash or "",
+            repo_hash=app.last_synced_hash or "",
+            last_synced_hash=app.last_synced_hash or "",
+        ))
+        return gql_success(_ManifestStagePayload(
+            id=input.id,
+            sync_state=sync_state.value,
+            raw_manifest=app.manifest_raw or "",
+            raw_manifest_staged="",
+        ))
+
+    @strawberry.field
+    @mutation_audit(action="app.push_manifest_to_repo")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def push_manifest_to_repo(
+        self, info: Info, input: PushManifestToRepoInput,
+    ) -> MutationResultType[_ManifestPushPayload]:
+        """Open a PR with the staged manifest.
+
+        Returns ok + ``note='nothing_to_push'`` when there's no
+        staged change. The actual PR creation goes through the SCM
+        provider; until that flow is wired here, returns
+        ``note='scm_pending'`` with an empty pr_url so the UI can
+        show 'PR opening...' state without exploding.
+        """
+        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        staged = app.manifest_raw_staged or ""
+        if not staged or staged == (app.manifest_raw or ""):
+            return gql_success(_ManifestPushPayload(
+                id=input.id,
+                pr_url="",
+                branch_name="",
+                note="nothing_to_push",
+            ))
+
+        branch = input.branch_name or f"astrolift/manifest-{app.slug}"
+        # TODO: wire astrolift_scm.providers.<source_kind>.open_pull_request
+        # to take (source_repo, branch, base=default_branch, file_changes,
+        # title, body) and return the PR URL. The SCM-side abstraction
+        # already exists for status posts; PR creation is a sibling.
+        return gql_success(_ManifestPushPayload(
+            id=input.id,
+            pr_url="",
+            branch_name=branch,
+            note="scm_pending",
+        ))

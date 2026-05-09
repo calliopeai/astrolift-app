@@ -419,6 +419,10 @@ type AstroliftRegisteredApp {
   manifestPath: String!
   defaultBranch: String!
   manifestHash: String!
+  rawManifest: String!
+  rawManifestStaged: String!
+  lastSyncedHash: String!
+  manifestSyncState: String!
   registryRepoUri: String!
   k8sNamespace: String!
   subdomain: String!
@@ -952,6 +956,32 @@ type LoginResult {
   user: UserType
 }
 
+type Manifestpushpayload {
+  id: GUID!
+  prUrl: String!
+  branchName: String!
+  note: String!
+}
+
+type ManifestpushpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Manifestpushpayload
+}
+
+type Manifeststagepayload {
+  id: GUID!
+  syncState: String!
+  rawManifest: String!
+  rawManifestStaged: String!
+}
+
+type ManifeststagepayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Manifeststagepayload
+}
+
 input MarkNotificationReadInput {
   id: GUID!
 }
@@ -1113,6 +1143,9 @@ type Mutation {
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
   softDeleteApp(input: SoftDeleteAppInput!): SoftdeletepayloadMutationResult!
+  updateManifest(input: UpdateManifestInput!): ManifeststagepayloadMutationResult!
+  syncManifestFromRepo(input: SyncManifestFromRepoInput!): ManifeststagepayloadMutationResult!
+  pushManifestToRepo(input: PushManifestToRepoInput!): ManifestpushpayloadMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -1306,6 +1339,13 @@ type ProviderpluginconfigpayloadMutationResult {
   data: Providerpluginconfigpayload
 }
 
+input PushManifestToRepoInput {
+  id: GUID!
+  prTitle: String = null
+  prBody: String = null
+  branchName: String = null
+}
+
 type Query {
   """
   List all effective permissions for a user, with the groups that grant each one.
@@ -1493,6 +1533,10 @@ type SwitchUserResult {
   user: UserType
 }
 
+input SyncManifestFromRepoInput {
+  id: GUID!
+}
+
 input TearDownPreviewInputGql {
   id: GUID!
 }
@@ -1539,6 +1583,11 @@ input UpdateManagedDomainInput {
   defaultFor: String = null
   isWildcardManaged: Boolean = null
   dnsConfig: JSON = null
+}
+
+input UpdateManifestInput {
+  id: GUID!
+  rawManifest: String!
 }
 
 input UpdateMyProfileInput {
