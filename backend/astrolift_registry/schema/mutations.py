@@ -47,6 +47,12 @@ class UpdateAppInput:
 
 
 @strawberry.input
+class SetAppSubdomainInput:
+    id: GUID
+    subdomain: str
+
+
+@strawberry.input
 class SoftDeleteAppInput:
     id: GUID
 
@@ -141,6 +147,66 @@ class RegistryMutation:
             if new_value is not None:
                 setattr(app, field, new_value)
         app.save()
+        return gql_success(app_to_type(app))
+
+    @strawberry.field
+    @mutation_audit(action="app.set_subdomain")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def set_app_subdomain(
+        self, info: Info, input: SetAppSubdomainInput
+    ) -> MutationResultType[RegisteredAppType]:
+        """Edit a registered app's subdomain without redeploy.
+
+        The platform's hostname computation re-derives from
+        ``app.subdomain`` on the next render — for live ingress
+        traffic this needs an Ingress patch (handled by the
+        SyncAppDomainWorkflow, separately tracked). This mutation is
+        the source-of-truth update + collision check.
+
+        Validation:
+        - DNS label rules (lowercase letters, digits, hyphens)
+        - Reserved name check (api / admin / etc — see hostname.py)
+        - Within-org collision check (no two active apps in the same
+          org may claim the same subdomain)
+
+        Per spec 13 §6.
+        """
+        from astrolift_manifest.hostname import validate_subdomain_label
+
+        app = RegisteredApp.objects.filter(guid=str(input.id)).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        try:
+            new_subdomain = validate_subdomain_label(input.subdomain)
+        except ValueError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, str(exc), field="subdomain"
+            )
+
+        # Within-org collision: another active app already owning
+        # this subdomain is a footgun (DNS would race for the same
+        # label). Refuse with CONFLICT.
+        clash = (
+            RegisteredApp.objects.filter(
+                organization_id=app.organization_id,
+                subdomain=new_subdomain,
+                deleted_at__isnull=True,
+            )
+            .exclude(pk=app.pk)
+            .first()
+        )
+        if clash is not None:
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"another app in this org already uses {new_subdomain!r}",
+                field="subdomain",
+            )
+
+        if app.subdomain != new_subdomain:
+            app.subdomain = new_subdomain
+            app.save(update_fields=["subdomain", "updated_at", "version"])
         return gql_success(app_to_type(app))
 
     @strawberry.field

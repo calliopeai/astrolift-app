@@ -1110,6 +1110,7 @@ type Mutation {
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
+  setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
   softDeleteApp(input: SoftDeleteAppInput!): SoftdeletepayloadMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
@@ -1426,6 +1427,11 @@ input RotateWebhookSecretInput {
 
 input SetActiveIdentityProviderInput {
   id: GUID!
+}
+
+input SetAppSubdomainInput {
+  id: GUID!
+  subdomain: String!
 }
 
 type SharedDirectoryType {
