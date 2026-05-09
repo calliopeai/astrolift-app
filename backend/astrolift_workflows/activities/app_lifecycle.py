@@ -79,8 +79,54 @@ async def mark_deploying(deployment_id: int) -> None:
 
 @activity.defn(name="astrolift.deploy.render_manifests")
 async def render_manifests(deployment_id: int) -> dict[str, Any]:
-    log.info("render_manifests placeholder", extra={"deployment_id": deployment_id})
-    return {}
+    """Build the list of Kubernetes resource dicts for ``apply_manifests``.
+
+    Reads the Deployment row, normalizes the registered-app's stored
+    manifest, and runs the pure renderer in
+    ``astrolift_manifest.render``. The rendered output is returned as
+    ``{"resources": [...]}`` so the workflow has a single-key Temporal
+    payload (stable across renderer evolution) and so ``apply_manifests``
+    can pick up the same shape unchanged.
+    """
+    from asgiref.sync import sync_to_async
+
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_manifest.normalize import NormalizationDefaults, normalize
+    from astrolift_manifest.parser import parse_raw
+    from astrolift_manifest.render import render_manifests as _render
+
+    activity.heartbeat()
+
+    def _gather():
+        d = (
+            Deployment.all_objects.select_related(
+                "registered_app", "app_environment"
+            )
+            .get(pk=deployment_id)
+        )
+        app = d.registered_app
+        env = d.app_environment
+        # Render off the stored TOML — never re-fetch from the repo at
+        # apply time so deployments are reproducible after force-pushes.
+        manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
+        return manifest, app, env, d
+
+    manifest, app, env, d = await sync_to_async(_gather)()
+
+    namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
+    resources = _render(
+        manifest,
+        namespace=namespace,
+        image_tag=d.image_tag or "latest",
+        image_repository=app.registry_repo_uri or app.slug,
+        environment_name=env.name,
+    )
+    log.info(
+        "render_manifests produced %d resource(s)",
+        len(resources),
+        extra={"deployment_id": deployment_id},
+    )
+    return {"resources": resources}
 
 
 @activity.defn(name="astrolift.deploy.apply_manifests")
