@@ -45,6 +45,9 @@ SOURCE_CONTAINER_ENV_FROM = "container.env_from"
 # the binding's ``connection_secret``, but the *key set* is fixed
 # so consumer code can rely on ``DATABASE_URL`` always being set
 # when there's a postgres binding.
+# Spec 11 §6.1 - §6.16 — full envelope catalogue. Workloads can rely
+# on these key sets being present whenever the matching kind is bound,
+# regardless of which provider variant provisioned the service.
 _ENVELOPES: dict[str, tuple[str, ...]] = {
     "postgres": (
         "POSTGRES_HOST",
@@ -52,7 +55,9 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "POSTGRES_DB",
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
+        "POSTGRES_SSL_MODE",
         "DATABASE_URL",
+        "POSTGRES_MASTER_SECRET_REF",
     ),
     "mysql": (
         "MYSQL_HOST",
@@ -62,14 +67,88 @@ _ENVELOPES: dict[str, tuple[str, ...]] = {
         "MYSQL_PASSWORD",
         "DATABASE_URL",
     ),
-    "redis": ("REDIS_HOST", "REDIS_PORT", "REDIS_URL"),
-    "queue": ("QUEUE_URL", "QUEUE_ARN", "QUEUE_NAME"),
-    "topic": ("TOPIC_ARN", "TOPIC_NAME"),
-    "kv_store": ("KV_TABLE_NAME", "KV_PARTITION_KEY", "KV_SORT_KEY"),
-    "search": ("SEARCH_ENDPOINT", "SEARCH_USER", "SEARCH_PASSWORD"),
-    "object_store": ("BUCKET_NAME", "BUCKET_ENDPOINT", "BUCKET_REGION"),
+    "redis": (
+        "REDIS_HOST",
+        "REDIS_PORT",
+        "REDIS_USER",
+        "REDIS_PASSWORD",
+        "REDIS_TLS",
+        "REDIS_URL",
+    ),
+    "mq": (
+        "KAFKA_BOOTSTRAP_SERVERS",
+        "KAFKA_SECURITY_PROTOCOL",
+        "KAFKA_SASL_MECHANISM",
+        "KAFKA_SASL_USERNAME",
+        "KAFKA_SASL_PASSWORD",
+        "KAFKA_TOPIC_PREFIX",
+    ),
+    "queue": (
+        "QUEUE_URL",
+        "QUEUE_ARN_OR_ID",
+        "QUEUE_NAME",
+        "QUEUE_REGION",
+    ),
+    "topic": (
+        "TOPIC_ARN_OR_ID",
+        "TOPIC_NAME",
+        "TOPIC_REGION",
+    ),
+    "kv_store": (
+        "KV_TABLE_NAME",
+        "KV_PARTITION_KEY",
+        "KV_SORT_KEY",
+        "KV_REGION",
+    ),
+    "document_db": (
+        "DOCDB_URI",
+        "DOCDB_DB",
+        "DOCDB_USER",
+        "DOCDB_PASSWORD",
+    ),
+    "search": (
+        "SEARCH_ENDPOINT",
+        "SEARCH_USER",
+        "SEARCH_PASSWORD",
+        "SEARCH_INDEX_PREFIX",
+    ),
+    "vector_index": (
+        "VECTOR_ENDPOINT",
+        "VECTOR_API_KEY",
+        "VECTOR_INDEX_NAME",
+        "VECTOR_NAMESPACE",
+    ),
+    "time_series": (
+        "TS_ENDPOINT",
+        "TS_DB",
+        "TS_USER",
+        "TS_PASSWORD",
+        "TS_TOKEN",
+        "TS_ORG",
+    ),
+    "object_store": (
+        "BUCKET_NAME",
+        "BUCKET_REGION",
+        "BUCKET_ENDPOINT",
+        "BUCKET_PREFIX",
+    ),
     "nfs": ("NFS_VOLUME",),
-    "vector_index": ("VECTOR_ENDPOINT", "VECTOR_API_KEY"),
+    "cdn": (
+        "CDN_DISTRIBUTION_ID",
+        "CDN_DOMAIN_NAME",
+        "CDN_INVALIDATION_ROLE",
+    ),
+    "email": (
+        "EMAIL_PROVIDER",
+        "EMAIL_API_KEY",
+        "EMAIL_DOMAIN",
+        "EMAIL_FROM",
+    ),
+    "sms": (
+        "SMS_PROVIDER",
+        "SMS_API_KEY",
+        "SMS_FROM",
+    ),
 }
 
 

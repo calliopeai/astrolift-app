@@ -102,6 +102,54 @@ def test_envelope_keys_for_known_kinds():
     assert envelope_keys_for("totally-unknown") == ()
 
 
+def test_envelope_catalog_covers_full_spec_11_set():
+    """Spec 11 §6.1-§6.16 — every kind in the catalogue must
+    expose its declared envelope. Lock-test so additions stay in
+    sync with the spec."""
+    expected_kinds = {
+        "postgres", "mysql", "redis", "mq", "queue", "topic",
+        "kv_store", "document_db", "search", "vector_index",
+        "time_series", "object_store", "nfs", "cdn", "email", "sms",
+    }
+    for kind in expected_kinds:
+        keys = envelope_keys_for(kind)
+        assert keys, f"kind {kind!r} has no envelope keys"
+
+
+def test_postgres_envelope_includes_ssl_mode_and_master_secret_ref():
+    """Spec 11 §6.1 — POSTGRES_SSL_MODE + POSTGRES_MASTER_SECRET_REF
+    are part of the canonical postgres envelope."""
+    keys = envelope_keys_for("postgres")
+    assert "POSTGRES_SSL_MODE" in keys
+    assert "POSTGRES_MASTER_SECRET_REF" in keys
+
+
+def test_kafka_mq_envelope_carries_sasl_keys():
+    keys = envelope_keys_for("mq")
+    assert "KAFKA_BOOTSTRAP_SERVERS" in keys
+    assert "KAFKA_SASL_MECHANISM" in keys
+    assert "KAFKA_SASL_USERNAME" in keys
+    assert "KAFKA_TOPIC_PREFIX" in keys
+
+
+def test_vector_index_envelope_includes_namespace():
+    keys = envelope_keys_for("vector_index")
+    assert "VECTOR_INDEX_NAME" in keys
+    assert "VECTOR_NAMESPACE" in keys
+
+
+def test_object_store_envelope_includes_prefix():
+    keys = envelope_keys_for("object_store")
+    assert "BUCKET_PREFIX" in keys
+
+
+def test_email_and_sms_envelopes_split_provider_from_creds():
+    email = envelope_keys_for("email")
+    assert {"EMAIL_PROVIDER", "EMAIL_API_KEY", "EMAIL_DOMAIN", "EMAIL_FROM"} <= set(email)
+    sms = envelope_keys_for("sms")
+    assert {"SMS_PROVIDER", "SMS_API_KEY", "SMS_FROM"} <= set(sms)
+
+
 def test_managed_service_keys_pull_from_connection_secret():
     out = merge_env(
         managed_service_bindings=[
