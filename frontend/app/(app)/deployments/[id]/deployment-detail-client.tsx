@@ -28,6 +28,8 @@ import {
   GET_DEPLOYMENT,
   GET_DEPLOYMENT_LOG,
 } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
+import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type {
   AstroliftDeployment,
@@ -48,6 +50,30 @@ interface DeploymentResp {
 
 interface LogResp {
   astroliftDeploymentLog: AstroliftDeploymentLogEntry[];
+}
+
+interface ManifestResp {
+  astroliftRenderedManifest: {
+    appSlug: string;
+    environmentName?: string | null;
+    imageTag?: string | null;
+    namespace: string;
+    resources: Record<string, unknown>;
+    error?: string | null;
+    errorPath?: string | null;
+    errorLine?: number | null;
+    errorColumn?: number | null;
+  } | null;
+}
+
+interface EventsResp {
+  astroliftEvents: Array<{
+    id: string;
+    eventType: string;
+    payload: Record<string, unknown>;
+    registeredAppId?: string | null;
+    occurredAt: string;
+  }>;
 }
 
 const statusToDot: Record<
@@ -98,6 +124,23 @@ export function DeploymentDetailClient({ id }: { id: string }) {
     refetch: refetchLog,
   } = useQuery<LogResp>(GET_DEPLOYMENT_LOG, {
     variables: { deploymentId: id },
+  });
+
+  const deployment = dData?.astroliftDeployment ?? null;
+  const manifest = useQuery<ManifestResp>(GET_RENDERED_MANIFEST, {
+    variables: {
+      appSlug: deployment?.registeredAppSlug ?? "",
+      environmentName: deployment?.environmentName ?? null,
+      imageTag: deployment?.imageTag ?? null,
+    },
+    skip: !deployment,
+    fetchPolicy: "cache-first",
+  });
+
+  const events = useQuery<EventsResp>(LIST_EVENTS, {
+    variables: { limit: 50 },
+    skip: !deployment,
+    fetchPolicy: "cache-and-network",
   });
 
   // Live push: any lifecycle event triggers both refetches when the
@@ -385,6 +428,73 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 </li>
               ))}
             </ol>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Rendered manifests</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {manifest.loading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : manifest.data?.astroliftRenderedManifest?.error ? (
+            <div className="text-destructive text-sm">
+              <p className="font-medium">Render failed</p>
+              <p className="mt-1">{manifest.data.astroliftRenderedManifest.error}</p>
+              {manifest.data.astroliftRenderedManifest.errorPath && (
+                <p className="text-muted-foreground mt-1 font-mono text-xs">
+                  {manifest.data.astroliftRenderedManifest.errorPath}
+                  {manifest.data.astroliftRenderedManifest.errorLine != null &&
+                    ` :${manifest.data.astroliftRenderedManifest.errorLine}`}
+                </p>
+              )}
+            </div>
+          ) : manifest.data?.astroliftRenderedManifest ? (
+            <pre className="bg-muted max-h-[480px] overflow-auto rounded p-3 font-mono text-xs leading-relaxed">
+              {JSON.stringify(manifest.data.astroliftRenderedManifest.resources, null, 2)}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground text-sm">No manifests rendered yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent events</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {events.loading && !events.data ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            (() => {
+              const filtered = (events.data?.astroliftEvents ?? []).filter(
+                (e) => e.registeredAppId && d.registeredAppSlug && e.registeredAppId.length > 0,
+              );
+              if (filtered.length === 0) {
+                return (
+                  <p className="text-muted-foreground text-sm">
+                    No platform events for this app yet.
+                  </p>
+                );
+              }
+              return (
+                <ul className="divide-y">
+                  {filtered.slice(0, 12).map((e) => (
+                    <li key={e.id} className="py-2 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs">{e.eventType}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {formatTime(e.occurredAt)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()
           )}
         </CardContent>
       </Card>
