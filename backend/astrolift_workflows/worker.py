@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from astrolift_workflows.activities import (
     apply_manifests,
+    create_promotion_deployment,
+    create_rollback_deployment,
     health_check,
     mark_app_provisioning,
     mark_app_ready,
@@ -27,6 +29,7 @@ from astrolift_workflows.activities import (
 from astrolift_workflows.workflows import (
     DeployAppWorkflow,
     OnboardAppWorkflow,
+    PromoteDeploymentWorkflow,
     RollbackDeploymentWorkflow,
     TearDownPreviewWorkflow,
 )
@@ -34,12 +37,15 @@ from astrolift_workflows.workflows import (
 WORKFLOWS = (
     DeployAppWorkflow,
     OnboardAppWorkflow,
+    PromoteDeploymentWorkflow,
     RollbackDeploymentWorkflow,
     TearDownPreviewWorkflow,
 )
 
 ACTIVITIES = (
     apply_manifests,
+    create_promotion_deployment,
+    create_rollback_deployment,
     health_check,
     mark_app_provisioning,
     mark_app_ready,

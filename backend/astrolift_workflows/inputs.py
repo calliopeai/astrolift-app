@@ -45,6 +45,27 @@ class RollbackInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class RedeployInput:
+    """Re-run apply for the latest deployment of (app, env) with the
+    same image_tag. The mutation already created the new Deployment
+    row; the workflow operates on its id."""
+
+    deployment_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class PromoteInput:
+    """Move an image_tag from one environment to another with the
+    same app — sets ``promoted_from`` on the new deployment so the
+    audit log can trace the lineage."""
+
+    source_deployment_id: int
+    target_app_environment_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class ProvisionManagedServiceInput:
     managed_service_id: int
     actor: Actor
