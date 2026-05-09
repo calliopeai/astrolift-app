@@ -62,26 +62,29 @@ const SUGGESTED_EVENTS = [
   "PREVIEW_TORN_DOWN",
 ];
 
-export function WebhooksClient() {
+export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
   const [open, setOpen] = React.useState(false);
   const [reveal, setReveal] =
     React.useState<AstroliftWebhookSecretReveal | null>(null);
   const [url, setUrl] = React.useState("");
   const [eventsRaw, setEventsRaw] = React.useState(SUGGESTED_EVENTS.join("\n"));
 
-  const subs = useQuery<Resp>(LIST_WEBHOOKS);
+  const variables = { appSlug: appSlug ?? null };
+  const subs = useQuery<Resp>(LIST_WEBHOOKS, { variables });
+
+  const refetchVars = [{ query: LIST_WEBHOOKS, variables }];
 
   const [createWebhook, { loading: creating }] = useMutation<{
     createWebhookSubscription: MutationResult<AstroliftWebhookSecretReveal>;
   }>(CREATE_WEBHOOK, {
-    refetchQueries: [{ query: LIST_WEBHOOKS }],
+    refetchQueries: refetchVars,
     awaitRefetchQueries: true,
   });
 
   const [deleteWebhook, { loading: deleting }] = useMutation<{
     deleteWebhookSubscription: MutationResult<{ id: string; deleted: boolean }>;
   }>(DELETE_WEBHOOK, {
-    refetchQueries: [{ query: LIST_WEBHOOKS }],
+    refetchQueries: refetchVars,
     awaitRefetchQueries: true,
   });
 
@@ -92,7 +95,9 @@ export function WebhooksClient() {
       .map((e) => e.trim())
       .filter(Boolean);
     const { data } = await createWebhook({
-      variables: { input: { url: url.trim(), events } },
+      variables: {
+        input: { url: url.trim(), events, appSlug: appSlug ?? null },
+      },
     });
     if (data?.createWebhookSubscription.ok && data.createWebhookSubscription.data) {
       setReveal(data.createWebhookSubscription.data);
@@ -126,7 +131,11 @@ export function WebhooksClient() {
   return (
     <PageShell
       title="Webhooks"
-      description="Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
+      description={
+        appSlug
+          ? `Outbound HTTP delivery for ${appSlug}'s event stream. Each subscription's secret is used to HMAC-sign every payload.`
+          : "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
+      }
       actions={
         <Can permission="webhook.create">
           <Button onClick={() => setOpen(true)}>
