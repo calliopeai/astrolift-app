@@ -44,6 +44,12 @@ class DeploymentType:
     ended_at: dt.datetime | None
     duration_seconds: int | None
     created_at: dt.datetime
+    # CI / VCS provenance (#166)
+    ci_actor_kind: str
+    commit_sha: str
+    branch: str
+    ci_run_url: str
+    ci_provider: str
 
 
 @strawberry.type(name="AstroliftDeploymentLogEntry")
@@ -103,6 +109,11 @@ def deployment_to_type(d) -> DeploymentType:
         ended_at=d.ended_at,
         duration_seconds=d.duration_seconds,
         created_at=d.created_at,
+        ci_actor_kind=d.ci_actor_kind or "",
+        commit_sha=d.commit_sha or "",
+        branch=d.branch or "",
+        ci_run_url=d.ci_run_url or "",
+        ci_provider=d.ci_provider or "",
     )
 
 

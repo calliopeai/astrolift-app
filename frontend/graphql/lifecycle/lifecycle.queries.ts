@@ -68,6 +68,11 @@ export const GET_DEPLOYMENT = gql`
       endedAt
       durationSeconds
       createdAt
+      ciActorKind
+      commitSha
+      branch
+      ciRunUrl
+      ciProvider
     }
   }
 `;

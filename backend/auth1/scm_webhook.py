@@ -159,6 +159,13 @@ def _fire_deploy(app: RegisteredApp, branch: str, head_sha: str) -> Deployment |
         image_tag=head_sha[:128] if head_sha else "",
         approvals_required=env.required_approvals,
         approvals_received=0,
+        # CI / VCS provenance (#166): the webhook is the canonical
+        # source of these fields when the deploy didn't come from
+        # a human in the UI.
+        ci_actor_kind="bot",
+        commit_sha=head_sha,
+        branch=branch,
+        ci_provider=app.source_kind or "",
     )
 
     if deployment.status == Deployment.Status.PENDING.value:

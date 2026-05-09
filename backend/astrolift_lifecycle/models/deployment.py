@@ -93,6 +93,17 @@ class Deployment(BaseCoreModel):
     image_digest = models.CharField(max_length=256, blank=True, default="")
     config_snapshot = models.JSONField(default=dict, blank=True)
     cluster_revision = models.CharField(max_length=128, blank=True, default="")
+
+    # CI / VCS provenance — captured at deployment creation, never
+    # updated thereafter (treat as append-only). Per spec 14 §18.
+    # ``ci_actor_kind`` is a free-form label (human / bot / deploy-token /
+    # github-action) so we don't need a migration for every new actor
+    # variant.
+    ci_actor_kind = models.CharField(max_length=64, blank=True, default="")
+    commit_sha = models.CharField(max_length=64, blank=True, default="")
+    branch = models.CharField(max_length=255, blank=True, default="")
+    ci_run_url = models.URLField(blank=True, default="")
+    ci_provider = models.CharField(max_length=64, blank=True, default="")
     promoted_from = models.ForeignKey(
         "self",
         related_name="promotions",

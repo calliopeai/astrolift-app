@@ -140,6 +140,11 @@ type AstroliftDeployment {
   endedAt: DateTime
   durationSeconds: Int
   createdAt: DateTime!
+  ciActorKind: String!
+  commitSha: String!
+  branch: String!
+  ciRunUrl: String!
+  ciProvider: String!
 }
 
 type AstroliftDeploymentLifecycleEvent {
@@ -1458,6 +1463,11 @@ input StartDeploymentInput {
   imageDigest: String = null
   workloadSlug: String = null
   triggerKind: String! = "manual"
+  ciActorKind: String = null
+  commitSha: String = null
+  branch: String = null
+  ciRunUrl: String = null
+  ciProvider: String = null
 }
 
 type StartWorkflowResult {
