@@ -2,6 +2,18 @@ input AcceptInvitationInput {
   token: String!
 }
 
+type Appsecretwritepayload {
+  appSlug: String!
+  key: String!
+  rawManifestStaged: String!
+}
+
+type AppsecretwritepayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Appsecretwritepayload
+}
+
 type AstroliftApiToken {
   id: GUID!
   name: String!
@@ -52,6 +64,32 @@ type AstroliftAppHealthSummary {
   latestImageTag: String!
   lastDeployedAt: DateTime
   hasRecentFailure: Boolean!
+}
+
+type AstroliftAppSecret {
+  id: String!
+  key: String!
+  environmentName: String!
+  source: String!
+  bundleSlug: String!
+  managedServiceKind: String!
+  isMasked: Boolean!
+  lastEditedAt: DateTime
+}
+
+type AstroliftAppSecretBundleAttachment {
+  id: GUID!
+  bundleSlug: String!
+  bundleName: String!
+  environmentName: String!
+  prefix: String!
+  registeredAppSlug: String!
+}
+
+type AstroliftAppSecretBundleAttachmentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppSecretBundleAttachment
 }
 
 type AstroliftAuditEvent {
@@ -264,6 +302,19 @@ type AstroliftManagedDomainMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedDomain
+}
+
+type AstroliftManagedService {
+  id: GUID!
+  name: String!
+  kind: String!
+  variant: String!
+  status: String!
+  config: JSON!
+  registeredAppSlug: String!
+  environmentName: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
 type AstroliftMember {
@@ -541,6 +592,16 @@ type AstroliftScmWebhookSecretRevealMutationResult {
   data: AstroliftScmWebhookSecretReveal
 }
 
+type AstroliftSecretBundle {
+  id: GUID!
+  slug: String!
+  name: String!
+  backendRef: String!
+  organizationSlug: String!
+  teamSlug: String
+  createdAt: DateTime!
+}
+
 type AstroliftSourceConnection {
   id: GUID!
   kind: String!
@@ -691,6 +752,24 @@ type AstroliftWorkload {
   registeredAppSlug: String!
 }
 
+input AttachSecretBundleInput {
+  appSlug: String!
+  environmentName: String!
+  bundleSlug: String!
+  prefix: String = null
+}
+
+type Attachmentremovedpayload {
+  attachmentId: GUID!
+  deleted: Boolean!
+}
+
+type AttachmentremovedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Attachmentremovedpayload
+}
+
 type AuditLogEntry {
   operation: String!
   variables: JSON!
@@ -706,6 +785,23 @@ type AvailableTransition {
   toState: String!
   label: String!
   conditionsMet: Boolean!
+}
+
+input BulkImportAppSecretsInput {
+  appSlug: String!
+  dotenvText: String!
+}
+
+type Bulkimportpayload {
+  appSlug: String!
+  keysSet: [String!]!
+  rawManifestStaged: String!
+}
+
+type BulkimportpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Bulkimportpayload
 }
 
 input ConfigureProviderPluginInput {
@@ -822,6 +918,11 @@ scalar Date
 """Date with time (isoformat)"""
 scalar DateTime
 
+input DeleteAppSecretInput {
+  appSlug: String!
+  key: String!
+}
+
 input DeleteRoleInput {
   id: GUID!
 }
@@ -836,6 +937,10 @@ input DeleteWebhookSubscriptionInput {
 
 input DeploymentByIdInput {
   id: GUID!
+}
+
+input DetachSecretBundleInput {
+  attachmentId: GUID!
 }
 
 input DisconnectSourceInput {
@@ -1172,6 +1277,11 @@ type Mutation {
   generateSshDeployKey(input: GenerateSshDeployKeyInput!): AstroliftSshDeployKeyCreatedMutationResult!
   rotateWebhookSecret(input: RotateWebhookSecretInput!): AstroliftScmWebhookSecretRevealMutationResult!
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
+  setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
+  deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
+  bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
+  attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
+  detachSecretBundle(input: DetachSecretBundleInput!): AttachmentremovedpayloadMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -1408,6 +1518,10 @@ type Query {
   astroliftSourceConnections: [AstroliftSourceConnection!]!
   astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
+  astroliftAppSecrets(appSlug: String!, environmentName: String = null): [AstroliftAppSecret!]!
+  astroliftSecretBundles: [AstroliftSecretBundle!]!
+  astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
+  astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
@@ -1468,6 +1582,12 @@ input RotateWebhookSecretInput {
 
 input SetActiveIdentityProviderInput {
   id: GUID!
+}
+
+input SetAppSecretInput {
+  appSlug: String!
+  key: String!
+  value: String!
 }
 
 input SetAppSubdomainInput {

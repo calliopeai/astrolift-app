@@ -440,9 +440,11 @@ export type AstroliftRegisteredApp = {
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   k8sNamespace: Scalars['String']['output'];
+  lastSyncedHash: Scalars['String']['output'];
   logRetentionDays: Scalars['Int']['output'];
   manifestHash: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
+  manifestSyncState: Scalars['String']['output'];
   name: Scalars['String']['output'];
   organizationSlug: Scalars['String']['output'];
   previewEnabled: Scalars['Boolean']['output'];
@@ -451,6 +453,8 @@ export type AstroliftRegisteredApp = {
   projectSlug: Scalars['String']['output'];
   provisioningError: Scalars['String']['output'];
   provisioningStatus: Scalars['String']['output'];
+  rawManifest: Scalars['String']['output'];
+  rawManifestStaged: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   sourceKind: Scalars['String']['output'];
@@ -962,6 +966,32 @@ export type LoginResult = {
   user?: Maybe<UserType>;
 };
 
+export type Manifestpushpayload = {
+  branchName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  note: Scalars['String']['output'];
+  prUrl: Scalars['String']['output'];
+};
+
+export type ManifestpushpayloadMutationResult = {
+  data?: Maybe<Manifestpushpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type Manifeststagepayload = {
+  id: Scalars['GUID']['output'];
+  rawManifest: Scalars['String']['output'];
+  rawManifestStaged: Scalars['String']['output'];
+  syncState: Scalars['String']['output'];
+};
+
+export type ManifeststagepayloadMutationResult = {
+  data?: Maybe<Manifeststagepayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type MarkNotificationReadInput = {
   id: Scalars['GUID']['input'];
 };
@@ -1058,6 +1088,7 @@ export type Mutation = {
   profileRequestDeleteUser: Scalars['Boolean']['output'];
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
+  pushManifestToRepo: ManifestpushpayloadMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
@@ -1088,6 +1119,7 @@ export type Mutation = {
   startWorkflow: StartWorkflowResult;
   /** Switch the active user (impersonation). */
   switchUser: SwitchUserResult;
+  syncManifestFromRepo: ManifeststagepayloadMutationResult;
   tearDownPreview: AstroliftDeploymentMutationResult;
   /** Transition a workflow instance to a new state. */
   transitionWorkflow: MutationResult;
@@ -1095,6 +1127,7 @@ export type Mutation = {
   updateApp: AstroliftRegisteredAppMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
   updateManagedDomain: AstroliftManagedDomainMutationResult;
+  updateManifest: ManifeststagepayloadMutationResult;
   updateMyProfile: AstroliftMyProfileMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
@@ -1402,6 +1435,11 @@ export type MutationProfileRequestPwdChangeArgs = {
 };
 
 
+export type MutationPushManifestToRepoArgs = {
+  input: PushManifestToRepoInput;
+};
+
+
 export type MutationRedeployAppArgs = {
   input: DeploymentByIdInput;
 };
@@ -1531,6 +1569,11 @@ export type MutationSwitchUserArgs = {
 };
 
 
+export type MutationSyncManifestFromRepoArgs = {
+  input: SyncManifestFromRepoInput;
+};
+
+
 export type MutationTearDownPreviewArgs = {
   input: TearDownPreviewInputGql;
 };
@@ -1560,6 +1603,11 @@ export type MutationUpdateIdentityProviderArgs = {
 
 export type MutationUpdateManagedDomainArgs = {
   input: UpdateManagedDomainInput;
+};
+
+
+export type MutationUpdateManifestArgs = {
+  input: UpdateManifestInput;
 };
 
 
@@ -1777,6 +1825,13 @@ export type ProviderpluginconfigpayloadMutationResult = {
   data?: Maybe<Providerpluginconfigpayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type PushManifestToRepoInput = {
+  branchName: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['GUID']['input'];
+  prBody: InputMaybe<Scalars['String']['input']>;
+  prTitle: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Query = {
@@ -2165,6 +2220,10 @@ export type SwitchUserResult = {
   user?: Maybe<UserType>;
 };
 
+export type SyncManifestFromRepoInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type TearDownPreviewInputGql = {
   id: Scalars['GUID']['input'];
 };
@@ -2209,6 +2268,11 @@ export type UpdateManagedDomainInput = {
   dnsConfig: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
   isWildcardManaged: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+export type UpdateManifestInput = {
+  id: Scalars['GUID']['input'];
+  rawManifest: Scalars['String']['input'];
 };
 
 export type UpdateMyProfileInput = {
