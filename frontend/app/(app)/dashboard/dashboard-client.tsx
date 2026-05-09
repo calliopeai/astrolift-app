@@ -5,7 +5,10 @@ import {
   ActivityIcon,
   AlertTriangleIcon,
   BoxIcon,
+  CheckCircle2Icon,
+  CircleXIcon,
   FileBoxIcon,
+  HeartPulseIcon,
   RocketIcon,
   UsersIcon,
 } from "lucide-react";
@@ -23,6 +26,14 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  GET_DEPLOYMENT_METRICS,
+  LIST_APP_HEALTH_SUMMARY,
+} from "@/graphql/lifecycle/lifecycle.queries";
+import type {
+  AstroliftAppHealthSummary,
+  AstroliftDeploymentMetrics,
+} from "@/graphql/lifecycle/lifecycle.types";
+import {
   LIST_PROJECTS,
   LIST_TEAMS,
 } from "@/graphql/identity/identity.queries";
@@ -37,10 +48,43 @@ interface TeamsResp {
 interface ProjectsResp {
   astroliftProjects: AstroliftProject[];
 }
+interface HealthResp {
+  astroliftAppHealthSummary: AstroliftAppHealthSummary[];
+}
+interface MetricsResp {
+  astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
+}
 
 export function DashboardClient() {
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
   const projects = useQuery<ProjectsResp>(LIST_PROJECTS);
+  const health = useQuery<HealthResp>(LIST_APP_HEALTH_SUMMARY);
+  const metrics = useQuery<MetricsResp>(GET_DEPLOYMENT_METRICS, {
+    variables: { windowDays: 30 },
+  });
+
+  const apps = health.data?.astroliftAppHealthSummary ?? [];
+  // Composite health badge: an app counts as healthy when its latest
+  // deploy status is 'running' AND there's been no terminal failure
+  // in the recent window. ``recentFailureCount`` deliberately scopes
+  // to apps that are currently still 'running' so we surface "ran
+  // but had a hiccup" — distinct from "currently broken".
+  const runningCount = apps.filter(
+    (a) => a.latestDeploymentStatus === "running" && !a.hasRecentFailure,
+  ).length;
+  const failingCount = apps.filter(
+    (a) =>
+      a.latestDeploymentStatus === "failed" ||
+      a.latestDeploymentStatus === "rolled_back",
+  ).length;
+  const recentFailureCount = apps.filter(
+    (a) => a.hasRecentFailure && a.latestDeploymentStatus === "running",
+  ).length;
+  const noDeployCount = apps.filter(
+    (a) => a.latestDeploymentStatus == null,
+  ).length;
+  const inFlightCount =
+    metrics.data?.astroliftDeploymentMetrics.inFlight ?? 0;
 
   const tiles = [
     {
@@ -60,15 +104,15 @@ export function DashboardClient() {
     {
       label: "Registered apps",
       icon: RocketIcon,
-      value: 0, // wired once the RegisteredApp surface lands
-      loading: false,
+      value: apps.length,
+      loading: health.loading,
       href: "/apps",
     },
     {
       label: "Active deployments",
       icon: BoxIcon,
-      value: 0, // wired once the Deployment surface lands
-      loading: false,
+      value: inFlightCount,
+      loading: metrics.loading,
       href: "/deployments",
     },
   ];
@@ -118,6 +162,76 @@ export function DashboardClient() {
           </Link>
         ))}
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <HeartPulseIcon className="size-4" /> Fleet health
+            </CardTitle>
+            <CardDescription>
+              Composite of latest deployment status across registered apps.
+            </CardDescription>
+          </div>
+          {health.loading ? (
+            <Skeleton className="h-6 w-20" />
+          ) : failingCount === 0 && recentFailureCount === 0 ? (
+            <Badge className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <CheckCircle2Icon className="size-3" /> healthy
+            </Badge>
+          ) : failingCount > 0 ? (
+            <Badge
+              variant="destructive"
+              className="gap-1 bg-red-500/15 text-red-700 dark:text-red-300"
+            >
+              <CircleXIcon className="size-3" />
+              {failingCount} failing
+            </Badge>
+          ) : (
+            <Badge className="gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-300">
+              <AlertTriangleIcon className="size-3" />
+              {recentFailureCount} hiccup
+              {recentFailureCount === 1 ? "" : "s"}
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent>
+          {health.loading ? (
+            <Skeleton className="h-12 w-full" />
+          ) : apps.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No registered apps yet. Connect a repo on /apps/new to start.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+              <FleetTile
+                label="Running"
+                value={runningCount}
+                tone="ok"
+                href="/deployments"
+              />
+              <FleetTile
+                label="Recent failure"
+                value={recentFailureCount}
+                tone="warn"
+                href="/deployments"
+              />
+              <FleetTile
+                label="Failing"
+                value={failingCount}
+                tone="error"
+                href="/deployments"
+              />
+              <FleetTile
+                label="No deploys"
+                value={noDeployCount}
+                tone="muted"
+                href="/apps"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -194,5 +308,39 @@ export function DashboardClient() {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+const FLEET_TONE: Record<
+  "ok" | "warn" | "error" | "muted",
+  string
+> = {
+  ok: "border-emerald-500/30 bg-emerald-500/5",
+  warn: "border-amber-500/30 bg-amber-500/5",
+  error: "border-red-500/30 bg-red-500/5",
+  muted: "border-muted bg-muted/20",
+};
+
+function FleetTile({
+  label,
+  value,
+  tone,
+  href,
+}: {
+  label: string;
+  value: number;
+  tone: "ok" | "warn" | "error" | "muted";
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group rounded-md border ${FLEET_TONE[tone]} p-3 transition-colors hover:bg-accent/30`}
+    >
+      <div className="text-muted-foreground text-xs uppercase tracking-wide">
+        {label}
+      </div>
+      <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+    </Link>
   );
 }
