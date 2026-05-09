@@ -126,9 +126,22 @@ class OperationsQuery:
     @strawberry.field
     @require_permission(Permission.WEBHOOK_CREATE)
     @tenant_scoped()
-    def astrolift_webhook_subscriptions(self, info: Info) -> list[WebhookSubscriptionType]:
-        qs = WebhookSubscription.objects.order_by("-created_at")[:200]
-        return [webhook_to_type(w) for w in qs]
+    def astrolift_webhook_subscriptions(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+    ) -> list[WebhookSubscriptionType]:
+        """List webhook subscriptions.
+
+        Without ``app_slug``: org-wide subscriptions (those not bound
+        to any app). Pass ``app_slug`` to list per-app subscriptions
+        scoped to that app's UI page (#281)."""
+        qs = WebhookSubscription.objects.order_by("-created_at")
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        else:
+            qs = qs.filter(registered_app__isnull=True)
+        return [webhook_to_type(w) for w in qs[:200]]
 
     @strawberry.field
     @tenant_scoped()

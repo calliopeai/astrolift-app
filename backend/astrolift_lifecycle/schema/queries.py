@@ -11,22 +11,28 @@ from strawberry.types import Info
 from astrolift_lifecycle.models import (
     AppEnvironment,
     CommandRun,
+    CustomDomain,
+    DeployToken,
     Deployment,
     DeploymentLog,
     PreviewEnvironment,
     ScheduledJobRun,
 )
 from astrolift_lifecycle.schema.types import (
+    AppDomainType,
     AppEnvironmentType,
     AppHealthSummaryType,
     CommandRunType,
+    DeployTokenType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
     DeploymentType,
     PreviewEnvironmentType,
     ScheduledJobRunType,
+    app_domain_to_type,
     app_env_to_type,
     command_run_to_type,
+    deploy_token_to_type,
     deployment_log_to_type,
     deployment_to_type,
     preview_to_type,
@@ -246,3 +252,37 @@ class LifecycleQuery:
                 )
             )
         return out
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_domains(
+        self, info: Info, app_slug: str,
+    ) -> list[AppDomainType]:
+        qs = (
+            CustomDomain.objects
+            .select_related("registered_app")
+            .filter(
+                registered_app__slug=app_slug,
+                deleted_at__isnull=True,
+            )
+            .order_by("-created_at")[:100]
+        )
+        return [app_domain_to_type(d) for d in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_deploy_tokens(
+        self, info: Info, app_slug: str,
+    ) -> list[DeployTokenType]:
+        qs = (
+            DeployToken.objects
+            .select_related("registered_app")
+            .filter(
+                registered_app__slug=app_slug,
+                deleted_at__isnull=True,
+            )
+            .order_by("-created_at")[:100]
+        )
+        return [deploy_token_to_type(t) for t in qs]
