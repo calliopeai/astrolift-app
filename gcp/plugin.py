@@ -1,24 +1,116 @@
 """GCP provider plugin manifest.
 
-This plugin will implement drivers for GKE, GCE ingress, Cloud DNS,
-Google-managed certificates, Secret Manager, GKE Workload Identity,
-Artifact Registry, GCS, and Cloud Logging/Monitoring.
+Drivers shipped:
+- ArtifactRegistryDriver (#40) — ImageRegistryDriver
+- GCPSecretsBackend (#39) — SecretsBackend (Secret Manager)
+- GCPWorkloadIdentityDriver (#39) — WorkloadIdentityDriver
+- CloudDNSDriver (#38) — DnsDriver
+- GCPManagedCertDriver (#38) — TlsDriver
+- GKEClusterDriver (#36) — ClusterDriver
+- GCPIngressDriver (#37) — IngressDriver, multi-variant
+  (gce_ingress / gateway_api)
+
+Managed services (#41 MVP — symmetry with AWS S3 + SQS):
+- GCSDriver — object_store/gcs
+- PubSubDriver — queue/pubsub
+
+Pending (separate tickets, follow-on managed services):
+- CloudSQL (postgres / mysql)
+- Memorystore (redis / memcached)
+- Filestore (filesystem)
+- Firestore / Bigtable (nosql)
 """
 
 from _sdk.base import ProviderPlugin
 
-
-class GCPProviderPlugin:
-    """GCP provider plugin -- stub."""
-
-    def __init__(self) -> None:
-        raise NotImplementedError("GCP provider plugin is not yet implemented")
+from gcp.cluster_gke import GKEClusterDriver
+from gcp.dns_clouddns import CloudDNSDriver
+from gcp.identity_wi import GCPWorkloadIdentityDriver
+from gcp.ingress import GCPIngressDriver
+from gcp.managed.object_store_gcs import GCSDriver
+from gcp.managed.queue_pubsub import PubSubDriver
+from gcp.registry_artifact import ArtifactRegistryDriver
+from gcp.secrets import GCPSecretsBackend
+from gcp.tls_managed import GCPManagedCertDriver
 
 
 PLUGIN = ProviderPlugin(
     id="gcp",
     display_name="Google Cloud Platform",
-    drivers={},
-    managed_service_drivers={},
-    config_schema={},
+    drivers={
+        "registry": ArtifactRegistryDriver,
+        "secrets": GCPSecretsBackend,
+        "identity": GCPWorkloadIdentityDriver,
+        "dns": CloudDNSDriver,
+        "tls": GCPManagedCertDriver,
+        "cluster": GKEClusterDriver,
+        "ingress": GCPIngressDriver,
+    },
+    managed_service_drivers={
+        ("object_store", "gcs"): GCSDriver,
+        ("queue", "pubsub"): PubSubDriver,
+    },
+    config_schema={
+        "type": "object",
+        "required": ["project_id", "region"],
+        "properties": {
+            "project_id": {
+                "type": "string",
+                "description": "GCP project ID for this binding.",
+            },
+            "region": {
+                "type": "string",
+                "description": "Default GCP region (e.g. us-central1).",
+            },
+            "zone": {
+                "type": "string",
+                "description": (
+                    "Default GCP zone (e.g. us-central1-a). "
+                    "Required for zonal GKE clusters."
+                ),
+            },
+            "cluster_oidc_issuer": {
+                "type": "string",
+                "description": (
+                    "GKE cluster's workload identity pool URL."
+                ),
+            },
+            "artifact_registry_repo": {
+                "type": "string",
+                "description": (
+                    "Pre-created Artifact Registry repository ID. "
+                    "Driver will auto-create if missing."
+                ),
+            },
+            "ingress_variant": {
+                "type": "string",
+                "enum": ["gce_ingress", "gateway_api"],
+                "default": "gce_ingress",
+            },
+            "managed_cert_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": (
+                    "Prefix for GCP-managed SslCertificate resources."
+                ),
+            },
+            "kms_key": {
+                "type": "string",
+                "description": (
+                    "Optional CMEK KMS key resource for Secret Manager "
+                    "+ Artifact Registry encryption."
+                ),
+            },
+            "bucket_name_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": "Prefix for platform-managed GCS buckets.",
+            },
+            "pubsub_topic_prefix": {
+                "type": "string",
+                "default": "astrolift",
+                "description": "Prefix for platform-managed Pub/Sub topics.",
+            },
+        },
+    },
 )
