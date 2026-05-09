@@ -458,6 +458,16 @@ type AstroliftRemoteRepoList {
   recoverable: Boolean!
 }
 
+type AstroliftRenderedManifest {
+  appSlug: String!
+  environmentName: String!
+  imageTag: String!
+  namespace: String!
+  resources: JSON!
+  error: String
+  errorPath: String
+}
+
 type AstroliftRole {
   id: GUID!
   slug: String!
@@ -1308,6 +1318,7 @@ type Query {
   astroliftApp(slug: String!): AstroliftRegisteredApp
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
+  astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
   astroliftDeployment(id: String!): AstroliftDeployment

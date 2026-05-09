@@ -70,3 +70,25 @@ export const LIST_WORKLOADS = gql`
     }
   }
 `;
+
+export const GET_RENDERED_MANIFEST = gql`
+  query GetRenderedManifest(
+    $appSlug: String!
+    $environmentName: String
+    $imageTag: String
+  ) {
+    astroliftRenderedManifest(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      imageTag: $imageTag
+    ) {
+      appSlug
+      environmentName
+      imageTag
+      namespace
+      resources
+      error
+      errorPath
+    }
+  }
+`;
