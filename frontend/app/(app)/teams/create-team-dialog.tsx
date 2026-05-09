@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -16,16 +16,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { CREATE_TEAM } from "@/graphql/identity/identity.mutations";
-import {
-  LIST_ORGANIZATIONS,
-  LIST_TEAMS,
-} from "@/graphql/identity/identity.queries";
-import type {
-  AstroliftOrganization,
-  AstroliftTeam,
-  MutationResult,
-} from "@/graphql/identity/identity.types";
+import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
+import type { AstroliftTeam, MutationResult } from "@/graphql/identity/identity.types";
 
 interface Props {
   open: boolean;
@@ -41,12 +35,7 @@ const slugify = (s: string) =>
     .slice(0, 100);
 
 export function CreateTeamDialog({ open, onOpenChange }: Props) {
-  const orgs = useQuery<{ astroliftOrganizations: AstroliftOrganization[] }>(
-    LIST_ORGANIZATIONS,
-  );
-  // Single-tenant install: there's exactly one organization. Auto-bind
-  // so users never have to think about a multi-org dropdown.
-  const org = orgs.data?.astroliftOrganizations[0];
+  const { org } = useActiveOrg();
 
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
