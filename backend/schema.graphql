@@ -1,3 +1,7 @@
+input AcceptInvitationInput {
+  token: String!
+}
+
 type AstroliftApiToken {
   id: GUID!
   name: String!
@@ -208,6 +212,37 @@ type AstroliftIdentityProviderMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftIdentityProvider
+}
+
+type AstroliftInvitation {
+  id: GUID!
+  email: String!
+  scopeKind: String!
+  scopeId: String!
+  roleSlug: String
+  status: String!
+  expiresAt: DateTime!
+  acceptedAt: DateTime
+  invitedByUsername: String
+  createdAt: DateTime!
+}
+
+type AstroliftInvitationCreated {
+  invitation: AstroliftInvitation!
+  plaintextToken: String!
+  acceptUrlPath: String!
+}
+
+type AstroliftInvitationCreatedMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftInvitationCreated
+}
+
+type AstroliftInvitationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftInvitation
 }
 
 type AstroliftManagedDomain {
@@ -685,6 +720,12 @@ input CreateIdentityProviderInput {
   setActive: Boolean! = false
 }
 
+input CreateInvitationInput {
+  email: String!
+  roleSlug: String = null
+  expiresInDays: Int = null
+}
+
 input CreateManagedDomainInput {
   zone: String!
   dnsDriver: String!
@@ -1016,6 +1057,9 @@ type Mutation {
   softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   grantRole(input: GrantRoleInput!): AstroliftRoleBindingMutationResult!
   revokeRoleBinding(input: RevokeRoleBindingInput!): SoftdeletepayloadMutationResult!
+  createInvitation(input: CreateInvitationInput!): AstroliftInvitationCreatedMutationResult!
+  revokeInvitation(input: RevokeInvitationInput!): AstroliftInvitationMutationResult!
+  acceptInvitation(input: AcceptInvitationInput!): AstroliftInvitationMutationResult!
   createApiToken(input: CreateApiTokenInput!): AstroliftApiTokenPlaintextMutationResult!
   revokeApiToken(input: RevokeApiTokenInput!): SoftdeletepayloadMutationResult!
   createPolicy(input: CreatePolicyInput!): AstroliftPolicyMutationResult!
@@ -1245,6 +1289,7 @@ type Query {
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
   astroliftMembers: [AstroliftMember!]!
+  astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
   astroliftRoleBindings: [AstroliftRoleBinding!]!
   astroliftApiTokens: [AstroliftApiToken!]!
@@ -1324,6 +1369,10 @@ input RegisterTenantClusterInput {
 }
 
 input RevokeApiTokenInput {
+  id: GUID!
+}
+
+input RevokeInvitationInput {
   id: GUID!
 }
 

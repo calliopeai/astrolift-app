@@ -311,6 +311,47 @@ class PolicyType:
     deleted_at: dt.datetime | None
 
 
+@strawberry.type(name="AstroliftInvitation")
+class InvitationType:
+    id: GUID
+    email: str
+    scope_kind: str
+    scope_id: str
+    role_slug: str | None
+    status: str
+    expires_at: dt.datetime
+    accepted_at: dt.datetime | None
+    invited_by_username: str | None
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftInvitationCreated")
+class InvitationCreatedType:
+    """Returned once at create time. The plaintext token must be shared
+    with the recipient through a side channel (email, link); the
+    backend stores only the hash, so this is the *only* moment the
+    plaintext exists."""
+
+    invitation: InvitationType
+    plaintext_token: str
+    accept_url_path: str
+
+
+def invitation_to_type(inv) -> InvitationType:
+    return InvitationType(
+        id=GUID(str(inv.guid)),
+        email=inv.email,
+        scope_kind=inv.scope_kind,
+        scope_id=str(inv.scope_id),
+        role_slug=inv.role.slug if inv.role_id else None,
+        status=inv.status,
+        expires_at=inv.expires_at,
+        accepted_at=inv.accepted_at,
+        invited_by_username=inv.invited_by.username if inv.invited_by_id else None,
+        created_at=inv.created_at,
+    )
+
+
 def policy_to_type(policy) -> PolicyType:
     return PolicyType(
         id=GUID(str(policy.guid)),

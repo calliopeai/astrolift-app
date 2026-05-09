@@ -1,7 +1,13 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { ShieldIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
+import {
+  MailIcon,
+  ShieldIcon,
+  Trash2Icon,
+  UserPlusIcon,
+  UsersIcon,
+} from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -20,13 +26,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { REVOKE_ROLE_BINDING } from "@/graphql/identity/identity.mutations";
 import {
+  REVOKE_INVITATION,
+  REVOKE_ROLE_BINDING,
+} from "@/graphql/identity/identity.mutations";
+import {
+  LIST_INVITATIONS,
   LIST_MEMBERS,
   LIST_ROLE_BINDINGS,
   LIST_ROLES,
 } from "@/graphql/identity/identity.queries";
 import type {
+  AstroliftInvitation,
   AstroliftMember,
   AstroliftRole,
   AstroliftRoleBinding,
@@ -34,6 +45,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
+import { InviteDialog } from "./invite-dialog";
 
 interface MembersResp {
   astroliftMembers: AstroliftMember[];
@@ -43,6 +55,9 @@ interface RoleBindingsResp {
 }
 interface RolesResp {
   astroliftRoles: AstroliftRole[];
+}
+interface InvitationsResp {
+  astroliftInvitations: AstroliftInvitation[];
 }
 
 const scopeBadge: Record<string, string> = {
@@ -54,9 +69,11 @@ const scopeBadge: Record<string, string> = {
 
 export function MembersClient() {
   const [open, setOpen] = React.useState(false);
+  const [inviteOpen, setInviteOpen] = React.useState(false);
   const members = useQuery<MembersResp>(LIST_MEMBERS);
   const bindings = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
+  const invitations = useQuery<InvitationsResp>(LIST_INVITATIONS);
 
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
@@ -64,6 +81,26 @@ export function MembersClient() {
     refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
     awaitRefetchQueries: true,
   });
+  const [revokeInvite, { loading: revokingInvite }] = useMutation<{
+    revokeInvitation: MutationResult<AstroliftInvitation>;
+  }>(REVOKE_INVITATION, {
+    refetchQueries: [{ query: LIST_INVITATIONS }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleRevokeInvite(inv: AstroliftInvitation) {
+    if (!confirm(`Revoke invitation for ${inv.email}?`)) return;
+    const { data } = await revokeInvite({
+      variables: { input: { id: inv.id } },
+    });
+    if (data?.revokeInvitation.ok) {
+      toast.success("Invitation revoked");
+    } else {
+      toast.error(
+        data?.revokeInvitation.errors?.[0]?.message ?? "Revoke failed",
+      );
+    }
+  }
 
   async function handleRevoke(rb: AstroliftRoleBinding) {
     if (!confirm(`Revoke ${rb.role.slug} from ${rb.user?.username ?? rb.groupExternalId}?`)) {
@@ -94,12 +131,24 @@ export function MembersClient() {
       title="Members"
       description="Users with access to this organization, plus the role bindings that grant their permissions."
       actions={
-        <Can permission="org.manage_members">
-          <Button onClick={() => setOpen(true)} disabled={roles.loading}>
-            <UserPlusIcon className="size-4" />
-            Grant role
-          </Button>
-        </Can>
+        <div className="flex items-center gap-2">
+          <Can permission="org.manage_members">
+            <Button
+              variant="outline"
+              onClick={() => setInviteOpen(true)}
+              disabled={roles.loading}
+            >
+              <MailIcon className="size-4" />
+              Invite
+            </Button>
+          </Can>
+          <Can permission="org.manage_members">
+            <Button onClick={() => setOpen(true)} disabled={roles.loading}>
+              <UserPlusIcon className="size-4" />
+              Grant role
+            </Button>
+          </Can>
+        </div>
       }
     >
       <Card>
@@ -257,9 +306,95 @@ export function MembersClient() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Invitations</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {invitations.loading ? (
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : (invitations.data?.astroliftInvitations ?? []).length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<MailIcon className="size-5" />}
+                title="No invitations"
+                description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
+              />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Invited by</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(invitations.data?.astroliftInvitations ?? []).map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.email}</TableCell>
+                    <TableCell>
+                      {inv.roleSlug ? (
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {inv.roleSlug}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          inv.status === "pending" ? "default" : "secondary"
+                        }
+                        className="capitalize"
+                      >
+                        {inv.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(inv.expiresAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {inv.invitedByUsername ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {inv.status === "pending" && (
+                        <Can permission="org.manage_members">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRevokeInvite(inv)}
+                            disabled={revokingInvite}
+                          >
+                            <Trash2Icon className="size-4" />
+                            <span className="sr-only">Revoke</span>
+                          </Button>
+                        </Can>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
       <GrantRoleDialog
         open={open}
         onOpenChange={setOpen}
+        roles={roles.data?.astroliftRoles ?? []}
+      />
+      <InviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
         roles={roles.data?.astroliftRoles ?? []}
       />
     </PageShell>

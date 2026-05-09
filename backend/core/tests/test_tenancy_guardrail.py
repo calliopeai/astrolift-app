@@ -66,6 +66,12 @@ EXEMPT: dict[str, str] = {
         "operates on the org row directly; permission check restricts "
         "to org admins of that specific org"
     ),
+    "IdentityMutation.accept_invitation": (
+        "the invitation token is the auth proof; by definition the "
+        "accepting user has no tenant context yet at the moment they "
+        "click the link. Email match against the caller's account "
+        "prevents leaked-token redemption against another account."
+    ),
     # Notifications are user-scoped: the resolver filters by the
     # caller's user_id directly, not by tenant.
     "OperationsQuery.astrolift_my_notifications": "self-service: caller's own notifications",

@@ -15,6 +15,7 @@ import type {
   AstroliftApiToken as GeneratedApiToken,
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
+  AstroliftInvitation as GeneratedInvitation,
   AstroliftMember as GeneratedMember,
   AstroliftMyProfile as GeneratedMyProfile,
   AstroliftOrganization as GeneratedOrganization,
@@ -90,6 +91,16 @@ export type AstroliftIdentityProvider = Omit<
 };
 
 export type AstroliftApiToken = GeneratedApiToken;
+
+export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
+
+export type AstroliftInvitation = Omit<
+  GeneratedInvitation,
+  "scopeKind" | "status"
+> & {
+  scopeKind: ScopeKind;
+  status: InvitationStatus;
+};
 
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
 

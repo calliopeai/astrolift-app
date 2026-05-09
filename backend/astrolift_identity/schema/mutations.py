@@ -32,6 +32,7 @@ from astrolift_graphql import (
 from astrolift_identity.models import (
     ApiToken,
     IdentityProvider,
+    Invitation,
     Member,
     Organization,
     Policy,
@@ -43,6 +44,8 @@ from astrolift_identity.models import (
 from astrolift_identity.schema.types import (
     ApiTokenPlaintextType,
     IdentityProviderType,
+    InvitationCreatedType,
+    InvitationType,
     MyProfileType,
     OrganizationType,
     PolicyType,
@@ -51,6 +54,7 @@ from astrolift_identity.schema.types import (
     TeamType,
     api_token_to_type,
     identity_provider_to_type,
+    invitation_to_type,
     organization_to_type,
     policy_to_type,
     project_to_type,
@@ -130,6 +134,23 @@ class GrantRoleInput:
 @strawberry.input
 class RevokeRoleBindingInput:
     id: GUID
+
+
+@strawberry.input
+class CreateInvitationInput:
+    email: str
+    role_slug: str | None = None
+    expires_in_days: int | None = None
+
+
+@strawberry.input
+class RevokeInvitationInput:
+    id: GUID
+
+
+@strawberry.input
+class AcceptInvitationInput:
+    token: str
 
 
 @strawberry.input
@@ -469,6 +490,186 @@ class IdentityMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
         binding.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    # ---- Invitations -----------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="invitation.create")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def create_invitation(
+        self, info: Info, input: CreateInvitationInput
+    ) -> MutationResultType[InvitationCreatedType]:
+        """Issue an invitation token for an email address.
+
+        The plaintext token is returned exactly once via the
+        InvitationCreatedType payload — the DB stores only its
+        SHA-256 hash. Operators are responsible for getting the
+        plaintext to the recipient out-of-band (UI exposes a
+        copy-link affordance with the accept URL).
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        email = input.email.strip().lower()
+        if not email or "@" not in email:
+            return gql_failure(ErrorCode.VALIDATION.value, "valid email required", field="email")
+
+        role = None
+        if input.role_slug:
+            role = Role.objects.filter(slug=input.role_slug).first()
+            if role is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleSlug")
+
+        # Reject if there's already an active pending invite for the
+        # same email at this scope — re-sending should go through a
+        # separate "rotate token" flow rather than silently doubling
+        # up rows.
+        if Invitation.objects.filter(
+            email=email,
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            status=Invitation.Status.PENDING,
+            deleted_at__isnull=True,
+        ).exists():
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                f"a pending invitation already exists for {email}",
+                field="email",
+            )
+
+        plaintext, digest, _last4 = _make_token_secret()
+        expires_at = timezone.now() + timedelta(
+            days=int(input.expires_in_days) if input.expires_in_days else 7
+        )
+        inv = Invitation.objects.create(
+            email=email,
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            role=role,
+            token_hash=digest,
+            expires_at=expires_at,
+            invited_by=_actor(),
+            status=Invitation.Status.PENDING,
+        )
+        return gql_success(
+            InvitationCreatedType(
+                invitation=invitation_to_type(inv),
+                plaintext_token=plaintext,
+                accept_url_path=f"/auth/invitation/{plaintext}",
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="invitation.revoke")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def revoke_invitation(
+        self, info: Info, input: RevokeInvitationInput
+    ) -> MutationResultType[InvitationType]:
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        inv = Invitation.objects.filter(
+            guid=str(input.id),
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if inv is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "invitation not found")
+        if inv.status not in (Invitation.Status.PENDING,):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"invitation is already {inv.status}",
+            )
+        inv.status = Invitation.Status.REVOKED
+        inv.save(update_fields=["status", "updated_at", "version"])
+        return gql_success(invitation_to_type(inv))
+
+    # By definition the accepting user has no tenant context yet at
+    # the moment they click the link. The token *is* the auth check.
+    # Listed in the tenancy guardrail's EXEMPT set with this rationale.
+    @strawberry.field
+    @mutation_audit(action="invitation.accept")
+    def accept_invitation(
+        self, info: Info, input: AcceptInvitationInput
+    ) -> MutationResultType[InvitationType]:
+        import hashlib
+
+        from django.utils import timezone
+
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) if request else None
+        if user is None or not getattr(user, "is_authenticated", False):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "sign in before accepting an invitation",
+            )
+
+        digest = hashlib.sha256(input.token.encode()).hexdigest()
+        inv = Invitation.objects.filter(
+            token_hash=digest, deleted_at__isnull=True
+        ).first()
+        if inv is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "invitation not found")
+        if inv.status != Invitation.Status.PENDING:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"invitation is {inv.status}; nothing to accept",
+            )
+        if inv.is_expired:
+            inv.status = Invitation.Status.EXPIRED
+            inv.save(update_fields=["status", "updated_at", "version"])
+            return gql_failure(ErrorCode.PRECONDITION.value, "invitation has expired")
+
+        # Match the invite to a user. We require the invited email to
+        # match the caller's email so an invite leaked to another user
+        # can't be redeemed against a different account.
+        if (user.email or "").lower() != inv.email.lower():
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "invitation email does not match your account",
+            )
+
+        # Idempotency: a concurrent accept would insert a duplicate
+        # Member row; the unique constraint on (user, scope_kind,
+        # scope_id) catches that case at the DB level. We swallow the
+        # IntegrityError to a clean precondition error.
+        from django.db import IntegrityError, transaction
+
+        try:
+            with transaction.atomic():
+                Member.objects.create(
+                    user=user,
+                    scope_kind=inv.scope_kind,
+                    scope_id=inv.scope_id,
+                    is_active=True,
+                    lifecycle=Member.Lifecycle.ACTIVE,
+                    joined_at=timezone.now(),
+                )
+                if inv.role_id and inv.scope_kind == Invitation.ScopeKind.ORG:
+                    RoleBinding.objects.create(
+                        user=user,
+                        role_id=inv.role_id,
+                        scope_kind=RoleBinding.ScopeKind.ORG,
+                        scope_id=inv.scope_id,
+                    )
+                inv.status = Invitation.Status.ACCEPTED
+                inv.accepted_at = timezone.now()
+                inv.save(update_fields=["status", "accepted_at", "updated_at", "version"])
+        except IntegrityError:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "you are already a member of this scope",
+            )
+
+        return gql_success(invitation_to_type(inv))
 
     # ---- API tokens --------------------------------------------------
 
