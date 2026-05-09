@@ -102,6 +102,14 @@ class SourceConnection(BaseCoreModel):
     account_login = models.CharField(max_length=200, blank=True, default="")
     installation_id = models.CharField(max_length=64, blank=True, default="")
 
+    # When the upstream removes/uninstalls this connection (GitHub
+    # App installation.deleted, OAuth revocation, PAT revoked) we
+    # flip ``is_orphaned`` so the deploy + token-mint paths refuse
+    # to use this row. Reconnect flow clears it. Per spec 06 §4.23.
+    is_orphaned = models.BooleanField(default=False)
+    orphaned_at = models.DateTimeField(null=True, blank=True)
+    orphaned_reason = models.CharField(max_length=255, blank=True, default="")
+
     # Self-hosted Gitea / on-prem GitLab need a custom base URL;
     # github.com / gitlab.com are inferred from kind when blank.
     api_base_url = models.URLField(blank=True, default="")
