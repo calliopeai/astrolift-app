@@ -60,15 +60,16 @@ function formatTime(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString();
 }
 
-export function JobsClient() {
+export function JobsClient({ appSlug }: { appSlug?: string } = {}) {
   const [tab, setTab] = React.useState<"scheduled" | "commands">("scheduled");
+  const variables = appSlug ? { appSlug, limit: 100 } : { limit: 100 };
   const { data: jobsData, loading: jobsLoading } = useQuery<JobResp>(
     LIST_SCHEDULED_JOB_RUNS,
-    { variables: { limit: 100 }, pollInterval: 15000 },
+    { variables, pollInterval: 15000 },
   );
   const { data: cmdData, loading: cmdLoading } = useQuery<CmdResp>(
     LIST_COMMAND_RUNS,
-    { variables: { limit: 100 }, pollInterval: 15000 },
+    { variables, pollInterval: 15000 },
   );
   const jobs = jobsData?.astroliftScheduledJobRuns ?? [];
   const cmds = cmdData?.astroliftCommandRuns ?? [];
@@ -76,7 +77,11 @@ export function JobsClient() {
   return (
     <PageShell
       title="Jobs"
-      description="Scheduled job runs and ad-hoc command executions across all your apps."
+      description={
+        appSlug
+          ? `Scheduled job runs and ad-hoc command executions for ${appSlug}.`
+          : "Scheduled job runs and ad-hoc command executions across all your apps."
+      }
     >
       <div className="flex items-center gap-2">
         <Button

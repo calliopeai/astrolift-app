@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LIST_SCHEDULED_JOB_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 import {
   GET_WORKLOAD,
   LIST_CONTAINERS,
@@ -30,6 +32,10 @@ interface WorkloadResp {
 
 interface ContainersResp {
   astroliftContainers: AstroliftContainer[];
+}
+
+interface JobRunsResp {
+  astroliftScheduledJobRuns: AstroliftScheduledJobRun[];
 }
 
 const HEALTHCHECK_LABEL: Record<string, string> = {
@@ -54,9 +60,22 @@ export function WorkloadDetailClient({
     LIST_CONTAINERS,
     { variables: { workloadSlug } },
   );
-
   const w = wlData?.astroliftWorkload ?? null;
+
+  const isCronjob = w?.kind === "cronjob";
+  const { data: rData, loading: rLoading } = useQuery<JobRunsResp>(
+    LIST_SCHEDULED_JOB_RUNS,
+    {
+      variables: { appSlug, limit: 10 },
+      skip: !isCronjob,
+      pollInterval: isCronjob ? 15000 : 0,
+    },
+  );
+
   const containers = cData?.astroliftContainers ?? [];
+  const runs = (rData?.astroliftScheduledJobRuns ?? []).filter(
+    (r) => r.workloadSlug === workloadSlug,
+  );
 
   if (wlLoading && !w) {
     return (
@@ -151,6 +170,71 @@ export function WorkloadDetailClient({
           />
         </CardContent>
       </Card>
+
+      {isCronjob && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Recent runs
+              <Badge variant="outline" className="ml-2">
+                {runs.length}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {rLoading && runs.length === 0 ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : runs.length === 0 ? (
+              <div className="text-muted-foreground p-6 text-sm">
+                No scheduled runs recorded yet.
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {runs.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="capitalize">
+                          {r.status}
+                        </Badge>
+                        <span className="font-mono text-xs">
+                          {r.k8sJobName || r.id.slice(0, 12)}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground mt-0.5 text-xs">
+                        env <span className="font-mono">{r.environmentName}</span>
+                        {r.startedAt && (
+                          <>
+                            {" · "}started{" "}
+                            {new Date(r.startedAt).toLocaleString()}
+                          </>
+                        )}
+                        {r.durationSeconds != null && (
+                          <>
+                            {" · "}
+                            {r.durationSeconds < 60
+                              ? `${r.durationSeconds}s`
+                              : `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s`}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <code className="text-muted-foreground font-mono text-xs">
+                      exit {r.exitCode ?? "—"}
+                    </code>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
