@@ -17,7 +17,6 @@ from astrolift_identity.schema.mutations import (
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
-
 pytestmark = pytest.mark.django_db
 User = get_user_model()
 

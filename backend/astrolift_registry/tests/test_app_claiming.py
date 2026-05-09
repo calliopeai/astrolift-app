@@ -15,7 +15,6 @@ from astrolift_registry.app_claiming import (
     discoverable_apps,
 )
 
-
 REPO_URL = "https://github.com/acme/api"
 
 

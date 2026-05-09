@@ -25,7 +25,6 @@ import re
 from collections.abc import Sequence
 from enum import Enum
 
-
 # Branch naming: ``astrolift/<app_slug>/<env_slug>/<workflow_run_id>``.
 # Keeps the namespace clean per app + env; the workflow run id is
 # unique even when the same Deployment retries, so we don't open

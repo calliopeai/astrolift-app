@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from astrolift_lifecycle.drift import (
     DriftKind,
-    DriftReport,
     WorkloadExpected,
     WorkloadObserved,
     build_report,

@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
 from astrolift_workflows.managed_service_lifecycle import (
     DeprovisionMode,
     SnapshotPolicy,
     SnapshotRecord,
-    SpecDelta,
     diff_spec,
     idempotency_key,
     plan_deprovision,
     rotation_requires_redeploy,
     snapshots_to_prune,
 )
-
 
 # ---- idempotency ---------------------------------------------------
 

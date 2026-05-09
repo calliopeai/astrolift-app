@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from astrolift_clusters.ingress_modes import (
-    IngressMode,
     RoutingError,
     per_app_annotations,
     resolve_routing,
@@ -13,7 +12,6 @@ from astrolift_clusters.ingress_modes import (
     validate_expose_paths,
 )
 from astrolift_clusters.status_routing import IngressDriver
-
 
 # ---- shared mode annotations ---------------------------------------
 

@@ -16,7 +16,6 @@ import logging
 
 from django.utils import timezone
 
-
 log = logging.getLogger(__name__)
 
 

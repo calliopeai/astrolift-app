@@ -18,7 +18,6 @@ from astrolift_scm.webhook_ingress import (
     verify_signature,
 )
 
-
 SECRET = b"super-secret-key"
 BODY = b'{"event":"push"}'
 

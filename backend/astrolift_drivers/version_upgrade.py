@@ -23,7 +23,6 @@ import re
 from collections.abc import Sequence
 from enum import Enum
 
-
 # ---- semver-ish parsing ----------------------------------------------
 #
 # We don't pull in a full semver lib — the platform pins plugins to

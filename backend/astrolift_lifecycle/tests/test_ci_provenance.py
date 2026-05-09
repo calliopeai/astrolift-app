@@ -17,7 +17,6 @@ from astrolift_lifecycle.schema.mutations import (
 )
 from core.permissions import Permission
 
-
 pytestmark = pytest.mark.django_db
 
 

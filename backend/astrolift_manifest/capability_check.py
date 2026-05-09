@@ -25,7 +25,6 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Sequence
 
-
 # ---- bind pre-check --------------------------------------------------
 
 

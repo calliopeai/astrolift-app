@@ -16,7 +16,6 @@ from astrolift_manifest.parser import parse_raw
 from astrolift_manifest.persist import persist_manifest
 from astrolift_registry.models import Container, RegisteredApp, Workload
 
-
 pytestmark = pytest.mark.django_db
 
 

@@ -8,6 +8,7 @@ package's tests.
 """
 
 from astrolift_lifecycle.tests.conftest import (  # noqa: F401
+    _no_opensearch_profile_index,
     actor,
     app,
     cluster,
@@ -22,5 +23,4 @@ from astrolift_lifecycle.tests.conftest import (  # noqa: F401
     provider_plugin,
     team,
     temporal_recorder,
-    _no_opensearch_profile_index,
 )

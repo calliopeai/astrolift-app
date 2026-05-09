@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 cryptography = pytest.importorskip("cryptography")
@@ -21,7 +19,6 @@ from core.secrets.envelope import (
     rewrap,
     unregister_kek_provider,
 )
-
 
 # ---- in-memory KEK stub ---------------------------------------------
 

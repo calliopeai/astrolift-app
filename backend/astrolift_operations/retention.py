@@ -31,7 +31,7 @@ import hashlib
 import io
 import json
 from collections.abc import Callable, Iterable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 # Spec 17 §11 / spec 03 §11 — default 90-day retention; per-org +
@@ -131,8 +131,8 @@ def _iso(dt: datetime) -> str:
     if dt.tzinfo is None:
         # Storage uses USE_TZ=True so this shouldn't happen, but be
         # defensive — silent UTC assumption beats a stack trace mid-export.
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _hash_line(payload_bytes: bytes) -> str:

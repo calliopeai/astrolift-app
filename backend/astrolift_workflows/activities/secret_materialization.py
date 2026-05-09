@@ -29,7 +29,6 @@ import dataclasses
 from collections.abc import Mapping
 from enum import Enum
 
-
 # Spec 12 §6.2 naming.
 APP_ENV_SECRET_NAME = "astrolift-app-env"
 

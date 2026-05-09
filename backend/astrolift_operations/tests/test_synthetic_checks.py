@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -18,8 +18,7 @@ from astrolift_operations.synthetic_checks import (
     tls_thresholds_to_emit,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _at(off_seconds: int = 0) -> datetime:

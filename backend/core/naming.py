@@ -22,7 +22,6 @@ import re
 from collections.abc import Sequence
 from typing import Final
 
-
 # ---- character class --------------------------------------------------
 #
 # All names: lowercase letters + digits + dashes. No underscores

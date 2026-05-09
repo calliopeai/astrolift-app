@@ -194,7 +194,7 @@ def by_category(
     snapshots: Sequence[CostSnapshot], *, org_id: int,
 ) -> Mapping[CostCategory, float]:
     """Per-category rollup for the cost-breakdown panel."""
-    out: dict[CostCategory, float] = {c: 0.0 for c in CostCategory}
+    out: dict[CostCategory, float] = dict.fromkeys(CostCategory, 0.0)
     for s in snapshots:
         if s.org_id != org_id:
             continue

@@ -27,7 +27,6 @@ import re
 from datetime import date, timedelta
 from enum import Enum
 
-
 # Spec 27 §3 — minimum windows.
 MIN_DEPRECATION_DAYS = 180          # 6 months
 MIN_PREV_MAJOR_SUPPORT_DAYS = 365   # 12 months

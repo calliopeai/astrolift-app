@@ -12,7 +12,6 @@ from astrolift_lifecycle.rollback import (
     resolve_target,
 )
 
-
 GOOD_DIGEST = "sha256:" + "a" * 64
 OTHER_DIGEST = "sha256:" + "b" * 64
 SNAPSHOT = "sha256:" + "c" * 64

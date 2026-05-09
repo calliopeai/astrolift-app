@@ -21,7 +21,6 @@ compute the same resources for cleanup without re-running deploy.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping
 from enum import Enum
 
 

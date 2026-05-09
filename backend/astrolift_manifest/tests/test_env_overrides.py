@@ -7,14 +7,12 @@ import pytest
 from astrolift_manifest.env_overrides import (
     EnvOverrideError,
     Toleration,
-    TolerationEffect,
     TolerationOperator,
     deep_merge,
     parse_toleration,
     render_tolerations_for_pod,
     resolve_environment_overrides,
 )
-
 
 # ---- deep_merge ----------------------------------------------------
 

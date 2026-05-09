@@ -19,11 +19,9 @@ from enum import Enum
 
 from astrolift_drivers.storage_tiers import (
     Durability,
-    PerformanceTier,
     StorageError,
     VolumeSpec,
 )
-
 
 # Spec 22 §15 alert thresholds. Lock-tested.
 WARNING_USED_RATIO = 0.85

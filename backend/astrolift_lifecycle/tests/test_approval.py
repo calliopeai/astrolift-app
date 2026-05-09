@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -20,8 +20,7 @@ from astrolift_lifecycle.approval import (
     verify_magic_link,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _now(*, off_seconds: int = 0) -> datetime:

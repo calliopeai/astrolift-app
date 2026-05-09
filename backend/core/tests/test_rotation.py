@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -16,8 +16,7 @@ from core.secrets.rotation import (
     reminders_to_fire,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _at(year: int, month: int, day: int, hour: int = 0) -> datetime:

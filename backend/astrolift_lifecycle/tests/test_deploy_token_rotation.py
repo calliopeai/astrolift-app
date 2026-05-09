@@ -22,7 +22,6 @@ from astrolift_lifecycle.deploy_tokens import (
 )
 from astrolift_lifecycle.models import DeployToken
 
-
 pytestmark = pytest.mark.django_db
 
 

@@ -6,7 +6,6 @@ import pytest
 
 from astrolift_drivers.version_upgrade import (
     DEFAULT_PHASES,
-    CompatibilityReport,
     RolloutBatch,
     RolloutCluster,
     UpgradeKind,
@@ -18,7 +17,6 @@ from astrolift_drivers.version_upgrade import (
     remaining_clusters,
     upgrade_kind,
 )
-
 
 # ---- semver parsing -------------------------------------------------
 

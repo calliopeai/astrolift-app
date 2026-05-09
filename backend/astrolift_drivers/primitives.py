@@ -23,7 +23,6 @@ import dataclasses
 from collections.abc import Mapping
 from enum import Enum
 
-
 # ---- storage class --------------------------------------------------
 
 

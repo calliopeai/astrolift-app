@@ -27,10 +27,7 @@ import dataclasses
 import hashlib
 import hmac
 import random
-from collections.abc import Mapping
-from datetime import datetime
 from enum import Enum
-
 
 # Spec 17 §6.3 retry schedule, in order. 8 attempts max.
 RETRY_SCHEDULE_SECONDS: tuple[int, ...] = (

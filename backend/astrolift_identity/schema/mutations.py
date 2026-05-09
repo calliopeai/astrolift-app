@@ -63,8 +63,8 @@ from astrolift_identity.schema.types import (
     role_to_type,
     team_to_type,
 )
-from core.mutations import ErrorCode, mutation_audit
 from core.decorators import tenant_scoped
+from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
 from astrolift_workflows.periodic_maintenance import (
     MIN_REHEAL_INTERVAL_HOURS,
-    PrunePlan,
     RehealOutcome,
     classify_test_delivery,
     plan_cost_snapshot,
@@ -17,8 +16,7 @@ from astrolift_workflows.periodic_maintenance import (
     safe_to_delete,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _now(*, off_hours: int = 0) -> datetime:

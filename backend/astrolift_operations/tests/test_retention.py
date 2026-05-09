@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -19,8 +19,7 @@ from astrolift_operations.retention import (
     verify_chain,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 # ---- minimal in-memory row stand-ins ---------------------------------

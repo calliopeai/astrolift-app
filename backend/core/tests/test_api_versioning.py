@@ -23,7 +23,6 @@ from core.api_versioning import (
     validate_changelog_section,
 )
 
-
 # ---- version parsing -----------------------------------------------
 
 

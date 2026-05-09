@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from astrolift_manifest.env_injection import (
     SOURCE_APP_LITERAL,
     SOURCE_APP_SECRET_BUNDLE,
@@ -16,7 +14,6 @@ from astrolift_manifest.env_injection import (
     envelope_keys_for,
     merge_env,
 )
-
 
 # ---- precedence -------------------------------------------------------
 

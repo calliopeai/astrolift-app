@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from astrolift_drivers.primitives import (
-    IngressDecision,
     PerformanceTier,
     StorageResolutionError,
     WorkloadIdentityKind,
@@ -14,7 +13,6 @@ from astrolift_drivers.primitives import (
     resolve_storage_class,
     resolve_workload_identity,
 )
-
 
 # ---- tier parsing ---------------------------------------------------
 

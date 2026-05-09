@@ -10,7 +10,6 @@ from astrolift_drivers.storage_preflight import (
     WARNING_USED_RATIO,
     ClusterStorageCapability,
     ClusterStorageProfile,
-    PreflightFailure,
     VolumeAlertSeverity,
     assert_preflight_passes,
     preflight,
@@ -19,7 +18,6 @@ from astrolift_drivers.storage_preflight import (
 )
 from astrolift_drivers.storage_tiers import (
     Durability,
-    PerformanceTier,
     StorageError,
     VolumeSpec,
 )

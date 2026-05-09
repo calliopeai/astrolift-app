@@ -28,7 +28,6 @@ import re
 from collections.abc import Mapping, Sequence
 from enum import Enum
 
-
 # Spec 27 §8 + §9 — SCIM-specific rate limit + auth.
 SCIM_RATE_LIMIT_PER_MIN = 240
 

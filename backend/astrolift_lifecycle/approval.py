@@ -28,9 +28,8 @@ import dataclasses
 import hashlib
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from enum import Enum
-
 
 # Spec 06 §4.6 default. Operators override per environment via
 # AppEnvironment.approval_timeout_seconds.

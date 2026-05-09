@@ -12,7 +12,6 @@ from astrolift_operations.delivery import (
 )
 from astrolift_operations.models import WebhookSubscription
 
-
 pytestmark = pytest.mark.django_db
 
 

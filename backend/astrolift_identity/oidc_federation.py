@@ -21,8 +21,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections.abc import Mapping, Sequence
-
+from collections.abc import Mapping
 
 # Spec 14 §17 issuers we recognize. Each has a known JWKS URL +
 # claim shape. Per-org config picks a subset; only those are

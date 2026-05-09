@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from astrolift_clusters.egress import EgressPolicy, SourceIPMode
+from astrolift_clusters.egress import EgressPolicy
 from astrolift_workflows.activities.network_policy import (
     DEFAULT_INGRESS_NS_LABEL,
     EDGE_TLS_DEFAULTS,
@@ -12,7 +12,6 @@ from astrolift_workflows.activities.network_policy import (
     edge_annotations,
     render_network_policy,
 )
-
 
 # ---- ingress rules -------------------------------------------------
 

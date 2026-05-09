@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -18,8 +18,7 @@ from astrolift_operations.observability_retention import (
     warn_threshold_for,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 # ---- effective resolution -------------------------------------------

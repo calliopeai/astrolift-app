@@ -34,7 +34,6 @@ import dataclasses
 from collections.abc import Iterable
 from datetime import datetime
 
-
 # Spec 12 §2.3 keywords. amr values mirror RFC 8176; the platform's
 # IdP integration normalises to this fixed vocabulary.
 AMR_PASSWORD = "pwd"

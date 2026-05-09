@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from astrolift_drivers.storage_catalog import (
-    ExpansionPlan,
     StorageClassEntry,
     VolumeExpansionError,
     cluster_default,

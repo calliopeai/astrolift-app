@@ -25,7 +25,6 @@ import ipaddress
 from collections.abc import Sequence
 from enum import Enum
 
-
 # RFC 1918 + link-local + carrier-grade NAT. Tenant pods don't need
 # to reach these by default; egress proxies and DBs run on private
 # CIDRs the operator declares per-cluster on top of these.

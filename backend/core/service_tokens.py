@@ -33,8 +33,7 @@ import hashlib
 import hmac
 import json
 import secrets
-from datetime import datetime, timedelta, timezone
-
+from datetime import datetime
 
 # Spec 12 §3.4: short-lived. 1-hour default works for sync workloads
 # and keeps the blast radius of a leaked token small.

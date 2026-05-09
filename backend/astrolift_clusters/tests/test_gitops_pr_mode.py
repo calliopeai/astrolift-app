@@ -6,14 +6,12 @@ import pytest
 
 from astrolift_clusters.gitops_pr_mode import (
     ApprovalAction,
-    ApprovalDecision,
     ManifestDiffEntry,
     PRMergeDecision,
     branch_name_for,
     render_pr_body,
     route_approval,
 )
-
 
 # ---- branch naming -------------------------------------------------
 

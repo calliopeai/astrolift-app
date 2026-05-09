@@ -14,7 +14,6 @@ from astrolift_drivers.connection_secret import (
     variant_supports_auth_mode,
 )
 
-
 # ---- storage path --------------------------------------------------
 
 

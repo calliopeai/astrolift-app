@@ -26,8 +26,6 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterable, Mapping
-from typing import Any
-
 
 # Source labels used in the provenance map. Values are stable so
 # UI / audit log can carry them around safely; keep them sorted by

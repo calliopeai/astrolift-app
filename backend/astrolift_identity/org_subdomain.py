@@ -27,7 +27,6 @@ import dataclasses
 from collections.abc import Sequence
 from typing import Final
 
-
 # Reserved labels — operators / system / api should never resolve
 # to an org subdomain even if a typo lets one through.
 RESERVED_SUBDOMAIN_LABELS: Final[frozenset[str]] = frozenset({

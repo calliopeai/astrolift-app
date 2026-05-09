@@ -7,9 +7,6 @@ import pytest
 from astrolift_clusters.delivery import (
     DeliveryConfigError,
     DeliveryMode,
-    DeliveryPlan,
-    DirectApplyAction,
-    GitOpsCommitAction,
     GitOpsConfig,
     plan_delivery,
 )

@@ -5,8 +5,6 @@ from __future__ import annotations
 import pytest
 
 from astrolift_drivers.storage_tiers import (
-    Durability,
-    PerformanceTier,
     StorageError,
 )
 from astrolift_manifest.security_volumes import (
@@ -20,7 +18,6 @@ from astrolift_manifest.security_volumes import (
     render_security_context,
     render_volume_mount,
 )
-
 
 # ---- security context defaults -------------------------------------
 

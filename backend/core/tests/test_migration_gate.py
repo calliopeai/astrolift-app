@@ -6,9 +6,9 @@ import pytest
 
 from core.migration_gate import (
     DESTRUCTIVE_OPS,
+    RISKY_OPS,
     DestructiveMigrationBlocked,
     MigrationRisk,
-    RISKY_OPS,
     assess_operations,
     gate,
     render_preview,

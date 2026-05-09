@@ -22,8 +22,7 @@ the API. Cycle detection caps the walk and surfaces the corruption.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping, Sequence
-
+from collections.abc import Mapping
 
 # ---- promote build ---------------------------------------------------
 
