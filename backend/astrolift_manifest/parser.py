@@ -65,8 +65,30 @@ def parse_raw(toml_text: str) -> RawManifest:
 
     name = _require_str(data, "name", "name")
     workloads = tuple(
-        _parse_workload(item, f"workloads[{i}]") for i, item in enumerate(data.get("workloads", []))
+        _parse_workload(item, f"workloads[{i}]")
+        for i, item in enumerate(data.get("workloads", []))
     )
+
+    # ``[[jobs]]`` is a shorthand for a single-container cronjob.
+    # Desugar into the same WorkloadManifest shape so downstream
+    # rendering / validation only ever sees one workload format.
+    desugared_jobs = tuple(
+        _desugar_job(item, f"jobs[{i}]")
+        for i, item in enumerate(data.get("jobs", []))
+    )
+
+    # Reject collisions between [[workloads]] and [[jobs]] sharing a
+    # name — the resulting Workload rows would conflict on the unique
+    # constraint, and silently dropping one is a footgun.
+    workload_names = {w.name for w in workloads}
+    for j in desugared_jobs:
+        if j.name in workload_names:
+            raise ManifestError(
+                f"job name {j.name!r} collides with an existing workload",
+                path=f"jobs",
+            )
+    workloads = workloads + desugared_jobs
+
     managed = tuple(
         _parse_managed_service(item, f"managed_services[{i}]")
         for i, item in enumerate(data.get("managed_services", []))
@@ -142,6 +164,59 @@ def _parse_container(d: dict[str, Any], path: str) -> ContainerManifest:
         healthcheck_kind=hk,
         healthcheck_value=str(healthcheck.get("value", "")),
         healthcheck_port=healthcheck.get("port"),
+    )
+
+
+def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
+    """Lift a ``[[jobs]]`` shorthand into a full WorkloadManifest.
+
+    The job becomes a single-container cronjob workload. The parser
+    rejects jobs without a schedule (same rule as bare cronjob
+    workloads) to avoid silent never-runs.
+    """
+    name = _require_str(d, "name", f"{path}.name")
+    schedule = d.get("schedule")
+    if not schedule:
+        raise ManifestError(
+            "[[jobs]] entry requires a 'schedule'", path=f"{path}.schedule"
+        )
+
+    env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
+
+    container = ContainerManifest(
+        name=name,
+        is_primary=True,
+        image_ref=d.get("image_ref"),
+        dockerfile_path=str(d.get("dockerfile_path", d.get("dockerfile", "Dockerfile"))),
+        build_context=str(d.get("build_context", ".")),
+        port=0,  # jobs don't expose ports
+        command=tuple(map(str, d.get("command", []) or ())),
+        args=tuple(map(str, d.get("args", []) or ())),
+        env=env_pairs,
+        # jobs don't carry liveness/readiness probes — k8s tracks
+        # success/failure via the Job controller's exit code.
+        healthcheck_kind="none",
+        healthcheck_value="",
+        healthcheck_port=None,
+    )
+
+    return WorkloadManifest(
+        name=name,
+        kind="cronjob",
+        is_public=False,
+        schedule=schedule,
+        replicas=1,
+        cpu_request=d.get("cpu_request"),
+        cpu_limit=d.get("cpu_limit"),
+        memory_request=d.get("memory_request"),
+        memory_limit=d.get("memory_limit"),
+        # HPA + storage don't apply to one-shot jobs.
+        hpa_min=None,
+        hpa_max=None,
+        hpa_target_cpu_pct=80,
+        storage_class=None,
+        storage_size=None,
+        containers=(container,),
     )
 
 
