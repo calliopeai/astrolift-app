@@ -48,6 +48,7 @@ const ROUTES: PaletteRoute[] = [
   { label: "Notifications", href: "/settings/notifications", group: "Settings" },
   { label: "Security", href: "/settings/security", group: "Settings" },
   { label: "Policies", href: "/settings/policies", group: "Settings" },
+  { label: "Permissions diagnostics", href: "/settings/permissions", group: "Settings", keywords: ["why", "denied", "rbac", "role"] },
   { label: "Identity provider", href: "/settings/identity-provider", group: "Settings", keywords: ["sso", "oidc", "saml", "idp"] },
   { label: "Organization", href: "/settings/organization", group: "Settings", permission: "org.update" },
 ];
