@@ -27,6 +27,38 @@ export type AcceptInvitationInput = {
   token: Scalars['String']['input'];
 };
 
+export type AcknowledgeAlertEventInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type AddAppDomainInput = {
+  appSlug: Scalars['String']['input'];
+  hostname: Scalars['String']['input'];
+  validationMethod: InputMaybe<Scalars['String']['input']>;
+};
+
+export type Alertruledeletedpayload = {
+  deleted: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+};
+
+export type AlertruledeletedpayloadMutationResult = {
+  data?: Maybe<Alertruledeletedpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type Appdomainremovedpayload = {
+  deleted: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+};
+
+export type AppdomainremovedpayloadMutationResult = {
+  data?: Maybe<Appdomainremovedpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type Appsecretwritepayload = {
   appSlug: Scalars['String']['output'];
   key: Scalars['String']['output'];
@@ -35,6 +67,43 @@ export type Appsecretwritepayload = {
 
 export type AppsecretwritepayloadMutationResult = {
   data?: Maybe<Appsecretwritepayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAlertEvent = {
+  acknowledgedAt?: Maybe<Scalars['DateTime']['output']>;
+  detail: Scalars['JSON']['output'];
+  firedAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  resolvedAt?: Maybe<Scalars['DateTime']['output']>;
+  ruleId: Scalars['GUID']['output'];
+  severity: Scalars['String']['output'];
+  summary: Scalars['String']['output'];
+};
+
+export type AstroliftAlertEventMutationResult = {
+  data?: Maybe<AstroliftAlertEvent>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAlertRule = {
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  notifyChannels: Scalars['JSON']['output'];
+  organizationSlug: Scalars['String']['output'];
+  predicate: Scalars['JSON']['output'];
+  severity: Scalars['String']['output'];
+  target: Scalars['String']['output'];
+  targetId: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAlertRuleMutationResult = {
+  data?: Maybe<AstroliftAlertRule>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -73,6 +142,12 @@ export type AstroliftAppDomain = {
   registeredAppSlug: Scalars['String']['output'];
   validationMethod: Scalars['String']['output'];
   validationToken: Scalars['String']['output'];
+};
+
+export type AstroliftAppDomainMutationResult = {
+  data?: Maybe<AstroliftAppDomain>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAppEnvironment = {
@@ -365,6 +440,12 @@ export type AstroliftManagedService = {
   status: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
+};
+
+export type AstroliftManagedServiceMutationResult = {
+  data?: Maybe<AstroliftManagedService>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftMember = {
@@ -876,11 +957,28 @@ export type ConnectSourceInput = {
   secretPlaintext: Scalars['String']['input'];
 };
 
+export type CreateAlertRuleInput = {
+  isActive: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  notifyChannels: InputMaybe<Scalars['JSON']['input']>;
+  predicate: InputMaybe<Scalars['JSON']['input']>;
+  severity: InputMaybe<Scalars['String']['input']>;
+  target: Scalars['String']['input'];
+  targetId: InputMaybe<Scalars['String']['input']>;
+};
+
 export type CreateApiTokenInput = {
   expiresInDays: InputMaybe<Scalars['Int']['input']>;
   name: Scalars['String']['input'];
   scopes: InputMaybe<Array<Scalars['String']['input']>>;
   teamSlug: InputMaybe<Scalars['String']['input']>;
+};
+
+export type CreateDeployTokenInput = {
+  appSlug: Scalars['String']['input'];
+  expiresAtIso: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  scopes: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type CreateIdentityProviderInput = {
@@ -963,6 +1061,10 @@ export type DataImportUploadResult = {
   publicUrl?: Maybe<Scalars['String']['output']>;
 };
 
+export type DeleteAlertRuleInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type DeleteAppSecretInput = {
   appSlug: Scalars['String']['input'];
   key: Scalars['String']['input'];
@@ -980,7 +1082,33 @@ export type DeleteWebhookSubscriptionInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DeployTokenSecretReveal = {
+  plaintextSecret: Scalars['String']['output'];
+  token: AstroliftDeployToken;
+};
+
+export type DeployTokenSecretRevealMutationResult = {
+  data?: Maybe<DeployTokenSecretReveal>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type DeploymentByIdInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type Deploytokenrevokedpayload = {
+  id: Scalars['GUID']['output'];
+  revoked: Scalars['Boolean']['output'];
+};
+
+export type DeploytokenrevokedpayloadMutationResult = {
+  data?: Maybe<Deploytokenrevokedpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type DeprovisionManagedServiceInput = {
   id: Scalars['GUID']['input'];
 };
 
@@ -1097,6 +1225,17 @@ export type LoginResult = {
   user?: Maybe<UserType>;
 };
 
+export type Managedservicedeletedpayload = {
+  deleted: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+};
+
+export type ManagedservicedeletedpayloadMutationResult = {
+  data?: Maybe<Managedservicedeletedpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type Manifestpushpayload = {
   branchName: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -1140,8 +1279,10 @@ export type MarkallreadpayloadMutationResult = {
 export type Mutation = {
   abortDeployment: AstroliftDeploymentMutationResult;
   acceptInvitation: AstroliftInvitationMutationResult;
+  acknowledgeAlertEvent: AstroliftAlertEventMutationResult;
   /** Activate or deactivate an object by its global ID. */
   activate: Scalars['Boolean']['output'];
+  addAppDomain: AstroliftAppDomainMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
@@ -1149,7 +1290,9 @@ export type Mutation = {
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
   connectSource: AstroliftSourceConnectionMutationResult;
+  createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
+  createDeployToken: DeployTokenSecretRevealMutationResult;
   createIdentityProvider: AstroliftIdentityProviderMutationResult;
   createInvitation: AstroliftInvitationCreatedMutationResult;
   createManagedDomain: AstroliftManagedDomainMutationResult;
@@ -1163,11 +1306,13 @@ export type Mutation = {
   createWorkflowDefinition: MutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
   delete: Scalars['Boolean']['output'];
+  deleteAlertRule: AlertruledeletedpayloadMutationResult;
   deleteAppSecret: AppsecretwritepayloadMutationResult;
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
   /** Delete a workflow definition by slug (staff only). */
   deleteWorkflowDefinition: MutationResult;
+  deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
@@ -1223,15 +1368,20 @@ export type Mutation = {
   profileRequestDeleteUser: Scalars['Boolean']['output'];
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
+  provisionManagedService: AstroliftManagedServiceMutationResult;
   pushManifestToRepo: ManifestpushpayloadMutationResult;
+  recheckDomainValidation: AstroliftAppDomainMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
+  removeAppDomain: AppdomainremovedpayloadMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
+  revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
+  rotateDeployToken: DeployTokenSecretRevealMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -1260,9 +1410,11 @@ export type Mutation = {
   /** Transition a workflow instance to a new state. */
   transitionWorkflow: MutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
+  updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
   updateManagedDomain: AstroliftManagedDomainMutationResult;
+  updateManagedService: AstroliftManagedServiceMutationResult;
   updateManifest: ManifeststagepayloadMutationResult;
   updateMyProfile: AstroliftMyProfileMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
@@ -1293,9 +1445,19 @@ export type MutationAcceptInvitationArgs = {
 };
 
 
+export type MutationAcknowledgeAlertEventArgs = {
+  input: AcknowledgeAlertEventInput;
+};
+
+
 export type MutationActivateArgs = {
   active?: Scalars['Boolean']['input'];
   gid: Scalars['ID']['input'];
+};
+
+
+export type MutationAddAppDomainArgs = {
+  input: AddAppDomainInput;
 };
 
 
@@ -1333,8 +1495,18 @@ export type MutationConnectSourceArgs = {
 };
 
 
+export type MutationCreateAlertRuleArgs = {
+  input: CreateAlertRuleInput;
+};
+
+
 export type MutationCreateApiTokenArgs = {
   input: CreateApiTokenInput;
+};
+
+
+export type MutationCreateDeployTokenArgs = {
+  input: CreateDeployTokenInput;
 };
 
 
@@ -1399,6 +1571,11 @@ export type MutationDeleteArgs = {
 };
 
 
+export type MutationDeleteAlertRuleArgs = {
+  input: DeleteAlertRuleInput;
+};
+
+
 export type MutationDeleteAppSecretArgs = {
   input: DeleteAppSecretInput;
 };
@@ -1416,6 +1593,11 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 export type MutationDeleteWorkflowDefinitionArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationDeprovisionManagedServiceArgs = {
+  input: DeprovisionManagedServiceInput;
 };
 
 
@@ -1591,8 +1773,18 @@ export type MutationProfileRequestPwdChangeArgs = {
 };
 
 
+export type MutationProvisionManagedServiceArgs = {
+  input: ProvisionManagedServiceInput;
+};
+
+
 export type MutationPushManifestToRepoArgs = {
   input: PushManifestToRepoInput;
+};
+
+
+export type MutationRecheckDomainValidationArgs = {
+  input: RecheckDomainValidationInput;
 };
 
 
@@ -1611,6 +1803,11 @@ export type MutationRegisterTenantClusterArgs = {
 };
 
 
+export type MutationRemoveAppDomainArgs = {
+  input: RemoveAppDomainInput;
+};
+
+
 export type MutationResumeEnvironmentArgs = {
   input: EnvironmentByIdInput;
 };
@@ -1618,6 +1815,11 @@ export type MutationResumeEnvironmentArgs = {
 
 export type MutationRevokeApiTokenArgs = {
   input: RevokeApiTokenInput;
+};
+
+
+export type MutationRevokeDeployTokenArgs = {
+  input: RevokeDeployTokenInput;
 };
 
 
@@ -1633,6 +1835,11 @@ export type MutationRevokeRoleBindingArgs = {
 
 export type MutationRollbackDeploymentArgs = {
   input: DeploymentByIdInput;
+};
+
+
+export type MutationRotateDeployTokenArgs = {
+  input: RotateDeployTokenInput;
 };
 
 
@@ -1752,6 +1959,11 @@ export type MutationUnregisterTenantClusterArgs = {
 };
 
 
+export type MutationUpdateAlertRuleArgs = {
+  input: UpdateAlertRuleInput;
+};
+
+
 export type MutationUpdateAppArgs = {
   input: UpdateAppInput;
 };
@@ -1764,6 +1976,11 @@ export type MutationUpdateIdentityProviderArgs = {
 
 export type MutationUpdateManagedDomainArgs = {
   input: UpdateManagedDomainInput;
+};
+
+
+export type MutationUpdateManagedServiceArgs = {
+  input: UpdateManagedServiceInput;
 };
 
 
@@ -1988,6 +2205,15 @@ export type ProviderpluginconfigpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ProvisionManagedServiceInput = {
+  appSlug: Scalars['String']['input'];
+  config: InputMaybe<Scalars['JSON']['input']>;
+  environmentName: Scalars['String']['input'];
+  kind: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  variant: InputMaybe<Scalars['String']['input']>;
+};
+
 export type PushManifestToRepoInput = {
   branchName: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -1997,6 +2223,8 @@ export type PushManifestToRepoInput = {
 
 export type Query = {
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
+  astroliftAlertEvents: Array<AstroliftAlertEvent>;
+  astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApp?: Maybe<AstroliftRegisteredApp>;
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
@@ -2066,6 +2294,20 @@ export type Query = {
   workflowInstance?: Maybe<WorkflowInstanceType>;
   /** List workflow instances for a specific object. */
   workflowInstances: Array<WorkflowInstanceType>;
+};
+
+
+export type QueryAstroliftAlertEventsArgs = {
+  limit?: Scalars['Int']['input'];
+  ruleId?: InputMaybe<Scalars['GUID']['input']>;
+  unresolvedOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftAlertRulesArgs = {
+  activeOnly?: Scalars['Boolean']['input'];
+  target?: InputMaybe<Scalars['String']['input']>;
+  targetId?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -2299,6 +2541,10 @@ export type QueryWorkflowInstancesArgs = {
   objectId: Scalars['Int']['input'];
 };
 
+export type RecheckDomainValidationInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type RegisterAppInput = {
   defaultBranch: InputMaybe<Scalars['String']['input']>;
   deployBranch: InputMaybe<Scalars['String']['input']>;
@@ -2327,7 +2573,15 @@ export type RegisterTenantClusterInput = {
   slug: Scalars['String']['input'];
 };
 
+export type RemoveAppDomainInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type RevokeApiTokenInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type RevokeDeployTokenInput = {
   id: Scalars['GUID']['input'];
 };
 
@@ -2336,6 +2590,10 @@ export type RevokeInvitationInput = {
 };
 
 export type RevokeRoleBindingInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type RotateDeployTokenInput = {
   id: Scalars['GUID']['input'];
 };
 
@@ -2446,6 +2704,15 @@ export type UnregisterTenantClusterInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type UpdateAlertRuleInput = {
+  id: Scalars['GUID']['input'];
+  isActive: InputMaybe<Scalars['Boolean']['input']>;
+  name: InputMaybe<Scalars['String']['input']>;
+  notifyChannels: InputMaybe<Scalars['JSON']['input']>;
+  predicate: InputMaybe<Scalars['JSON']['input']>;
+  severity: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateAppInput = {
   defaultBranch: InputMaybe<Scalars['String']['input']>;
   deployBranch: InputMaybe<Scalars['String']['input']>;
@@ -2474,6 +2741,12 @@ export type UpdateManagedDomainInput = {
   dnsConfig: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['GUID']['input'];
   isWildcardManaged: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+export type UpdateManagedServiceInput = {
+  config: InputMaybe<Scalars['JSON']['input']>;
+  id: Scalars['GUID']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateManifestInput = {
