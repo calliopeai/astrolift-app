@@ -10,10 +10,10 @@ Drivers shipped:
 - IRSADriver (#33) — WorkloadIdentityDriver
 - Route53Driver (#31) — DnsDriver
 - ACMDriver (#31) — TlsDriver
+- EKSClusterDriver (#29) — ClusterDriver
+- ALBIngressDriver (#30) — IngressDriver
 
 Pending (separate tickets):
-- EKSClusterDriver (#29)
-- ALBIngressDriver (#30)
 - AWS managed-service drivers (#35) — RDS, Aurora, ElastiCache,
   DynamoDB, SQS, SNS, S3, EFS
 
@@ -26,8 +26,10 @@ or another plugin contributes the missing role.
 
 from _sdk.base import ProviderPlugin
 
+from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
+from aws.ingress_alb import ALBIngressDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
 from aws.tls_acm import ACMDriver
@@ -44,8 +46,8 @@ PLUGIN = ProviderPlugin(
         "identity": IRSADriver,
         "dns": Route53Driver,
         "tls": ACMDriver,
-        # "cluster": EKSClusterDriver,    # #29
-        # "ingress": ALBIngressDriver,    # #30
+        "cluster": EKSClusterDriver,
+        "ingress": ALBIngressDriver,
     },
     managed_service_drivers={
         # Filled in by #35 (RDS, Aurora, ElastiCache, DynamoDB,
