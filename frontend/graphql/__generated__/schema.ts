@@ -23,6 +23,10 @@ export type Scalars = {
   UUID: { input: any; output: any; }
 };
 
+export type AcceptInvitationInput = {
+  token: Scalars['String']['input'];
+};
+
 export type AstroliftApiToken = {
   createdAt: Scalars['DateTime']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
@@ -231,6 +235,37 @@ export type AstroliftIdentityProvider = {
 
 export type AstroliftIdentityProviderMutationResult = {
   data?: Maybe<AstroliftIdentityProvider>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftInvitation = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  email: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  invitedByUsername?: Maybe<Scalars['String']['output']>;
+  roleSlug?: Maybe<Scalars['String']['output']>;
+  scopeId: Scalars['String']['output'];
+  scopeKind: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftInvitationCreated = {
+  acceptUrlPath: Scalars['String']['output'];
+  invitation: AstroliftInvitation;
+  plaintextToken: Scalars['String']['output'];
+};
+
+export type AstroliftInvitationCreatedMutationResult = {
+  data?: Maybe<AstroliftInvitationCreated>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftInvitationMutationResult = {
+  data?: Maybe<AstroliftInvitation>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -710,6 +745,12 @@ export type CreateIdentityProviderInput = {
   setActive: Scalars['Boolean']['input'];
 };
 
+export type CreateInvitationInput = {
+  email: Scalars['String']['input'];
+  expiresInDays: InputMaybe<Scalars['Int']['input']>;
+  roleSlug: InputMaybe<Scalars['String']['input']>;
+};
+
 export type CreateManagedDomainInput = {
   defaultFor: Scalars['String']['input'];
   dnsConfig: InputMaybe<Scalars['JSON']['input']>;
@@ -901,6 +942,7 @@ export type MarkallreadpayloadMutationResult = {
 
 export type Mutation = {
   abortDeployment: AstroliftDeploymentMutationResult;
+  acceptInvitation: AstroliftInvitationMutationResult;
   /** Activate or deactivate an object by its global ID. */
   activate: Scalars['Boolean']['output'];
   approveDeployment: AstroliftDeploymentMutationResult;
@@ -910,6 +952,7 @@ export type Mutation = {
   connectSource: AstroliftSourceConnectionMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
   createIdentityProvider: AstroliftIdentityProviderMutationResult;
+  createInvitation: AstroliftInvitationCreatedMutationResult;
   createManagedDomain: AstroliftManagedDomainMutationResult;
   createOrganization: AstroliftOrganizationMutationResult;
   createPolicy: AstroliftPolicyMutationResult;
@@ -983,6 +1026,7 @@ export type Mutation = {
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
+  revokeInvitation: AstroliftInvitationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
@@ -1035,6 +1079,11 @@ export type MutationAbortDeploymentArgs = {
 };
 
 
+export type MutationAcceptInvitationArgs = {
+  input: AcceptInvitationInput;
+};
+
+
 export type MutationActivateArgs = {
   active?: Scalars['Boolean']['input'];
   gid: Scalars['ID']['input'];
@@ -1072,6 +1121,11 @@ export type MutationCreateApiTokenArgs = {
 
 export type MutationCreateIdentityProviderArgs = {
   input: CreateIdentityProviderInput;
+};
+
+
+export type MutationCreateInvitationArgs = {
+  input: CreateInvitationInput;
 };
 
 
@@ -1325,6 +1379,11 @@ export type MutationResumeEnvironmentArgs = {
 
 export type MutationRevokeApiTokenArgs = {
   input: RevokeApiTokenInput;
+};
+
+
+export type MutationRevokeInvitationArgs = {
+  input: RevokeInvitationInput;
 };
 
 
@@ -1681,6 +1740,7 @@ export type Query = {
   astroliftEvents: Array<AstroliftEvent>;
   astroliftEventsPage: AstroliftEventPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  astroliftInvitations: Array<AstroliftInvitation>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyNotifications: Array<AstroliftNotification>;
@@ -1798,6 +1858,11 @@ export type QueryAstroliftEventsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   eventType?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftInvitationsArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -1933,6 +1998,10 @@ export type RegisterTenantClusterInput = {
 };
 
 export type RevokeApiTokenInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type RevokeInvitationInput = {
   id: Scalars['GUID']['input'];
 };
 

@@ -1,4 +1,5 @@
 import {
+  LIST_INVITATIONS,
   LIST_MEMBERS,
   LIST_ROLES,
   LIST_ROLE_BINDINGS,
@@ -16,7 +17,9 @@ export default function MembersPage() {
     <PreloadQuery query={LIST_MEMBERS}>
       <PreloadQuery query={LIST_ROLE_BINDINGS}>
         <PreloadQuery query={LIST_ROLES}>
-          <MembersClient />
+          <PreloadQuery query={LIST_INVITATIONS}>
+            <MembersClient />
+          </PreloadQuery>
         </PreloadQuery>
       </PreloadQuery>
     </PreloadQuery>

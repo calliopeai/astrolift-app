@@ -356,3 +356,66 @@ export const REVOKE_ROLE_BINDING = gql`
     }
   }
 `;
+
+const INVITATION_FIELDS = `
+  id
+  email
+  scopeKind
+  scopeId
+  roleSlug
+  status
+  expiresAt
+  acceptedAt
+  invitedByUsername
+  createdAt
+`;
+
+export const CREATE_INVITATION = gql`
+  mutation CreateInvitation($input: CreateInvitationInput!) {
+    createInvitation(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        invitation {
+          ${INVITATION_FIELDS}
+        }
+        plaintextToken
+        acceptUrlPath
+      }
+    }
+  }
+`;
+
+export const REVOKE_INVITATION = gql`
+  mutation RevokeInvitation($input: RevokeInvitationInput!) {
+    revokeInvitation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${INVITATION_FIELDS}
+      }
+    }
+  }
+`;
+
+export const ACCEPT_INVITATION = gql`
+  mutation AcceptInvitation($input: AcceptInvitationInput!) {
+    acceptInvitation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${INVITATION_FIELDS}
+      }
+    }
+  }
+`;

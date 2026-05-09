@@ -18,6 +18,7 @@ from strawberry.types import Info
 from astrolift_identity.models import (
     ApiToken,
     IdentityProvider,
+    Invitation,
     Member,
     Organization,
     Policy,
@@ -29,6 +30,7 @@ from astrolift_identity.models import (
 from astrolift_identity.schema.types import (
     ApiTokenType,
     IdentityProviderType,
+    InvitationType,
     MemberType,
     MyProfileType,
     OrganizationType,
@@ -39,6 +41,7 @@ from astrolift_identity.schema.types import (
     TeamType,
     api_token_to_type,
     identity_provider_to_type,
+    invitation_to_type,
     member_to_type,
     organization_to_type,
     policy_to_type,
@@ -89,6 +92,28 @@ class IdentityQuery:
     def astrolift_members(self, info: Info) -> list[MemberType]:
         qs = Member.objects.select_related("user").order_by("-created_at")[:500]
         return [member_to_type(m) for m in qs]
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_invitations(
+        self, info: Info, status: str | None = None
+    ) -> list[InvitationType]:
+        """Org-scoped invitation list. Filter by status (pending /
+        accepted / expired / revoked); default surfaces every status
+        so the UI can show full history without an extra round-trip."""
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        qs = Invitation.objects.filter(
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).select_related("role", "invited_by").order_by("-created_at")
+        if status:
+            qs = qs.filter(status=status)
+        return [invitation_to_type(i) for i in qs[:500]]
 
     @strawberry.field
     @require_permission(Permission.ORG_READ)

@@ -233,6 +233,23 @@ export const GET_MY_PROFILE = gql`
   }
 `;
 
+export const LIST_INVITATIONS = gql`
+  query ListInvitations($status: String) {
+    astroliftInvitations(status: $status) {
+      id
+      email
+      scopeKind
+      scopeId
+      roleSlug
+      status
+      expiresAt
+      acceptedAt
+      invitedByUsername
+      createdAt
+    }
+  }
+`;
+
 // Suppress the unused import warning — fragment is referenced from
 // other domain files once they're written.
 void IDENTITY_TIMESTAMPS;
