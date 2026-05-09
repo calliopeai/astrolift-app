@@ -58,8 +58,10 @@ class RegisteredApp(NamedBaseCoreModel):
     default_branch = models.CharField(max_length=128, default="main")
 
     manifest_raw = models.TextField(blank=True, default="")
+    manifest_raw_staged = models.TextField(blank=True, default="")
     manifest_normalized = models.JSONField(default=dict, blank=True)
     manifest_hash = models.CharField(max_length=128, blank=True, default="")
+    last_synced_hash = models.CharField(max_length=128, blank=True, default="")
 
     registry_repo_uri = models.CharField(max_length=512, blank=True, default="")
     registry_pull_secret_ref = models.CharField(max_length=512, blank=True, default="")

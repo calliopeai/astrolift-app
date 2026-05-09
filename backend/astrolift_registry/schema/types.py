@@ -29,6 +29,10 @@ class RegisteredAppType:
     default_branch: str
 
     manifest_hash: str
+    raw_manifest: str
+    raw_manifest_staged: str
+    last_synced_hash: str
+    manifest_sync_state: str
 
     registry_repo_uri: str
     k8s_namespace: str
@@ -90,6 +94,16 @@ class ContainerType:
 
 
 def app_to_type(app) -> RegisteredAppType:
+    from astrolift_manifest.sync_state import (
+        SyncSnapshot,
+        classify_state,
+    )
+
+    sync_state = classify_state(SyncSnapshot(
+        db_hash=app.manifest_hash or "",
+        repo_hash=_repo_hash_for(app),
+        last_synced_hash=app.last_synced_hash or "",
+    ))
     return RegisteredAppType(
         id=GUID(str(app.guid)),
         slug=app.slug,
@@ -104,6 +118,10 @@ def app_to_type(app) -> RegisteredAppType:
         manifest_path=app.manifest_path,
         default_branch=app.default_branch,
         manifest_hash=app.manifest_hash,
+        raw_manifest=app.manifest_raw or "",
+        raw_manifest_staged=app.manifest_raw_staged or "",
+        last_synced_hash=app.last_synced_hash or "",
+        manifest_sync_state=sync_state.value,
         registry_repo_uri=app.registry_repo_uri,
         k8s_namespace=app.k8s_namespace,
         subdomain=app.subdomain,
@@ -143,6 +161,16 @@ def workload_to_type(workload) -> WorkloadType:
         storage_size=workload.storage_size or "",
         registered_app_slug=workload.registered_app.slug,
     )
+
+
+def _repo_hash_for(app) -> str:
+    """Best-known repo-side manifest hash. The DB doesn't track the
+    repo-side hash on the app row directly; the SCM sync workflow
+    populates `last_synced_hash` after a successful pull. Until a
+    real fetch lands, use last_synced_hash as the floor — it's the
+    last hash we know was on the repo. The `syncManifestFromRepo`
+    mutation refreshes this."""
+    return app.last_synced_hash or app.manifest_hash or ""
 
 
 @strawberry.type(name="AstroliftRenderedManifest")
