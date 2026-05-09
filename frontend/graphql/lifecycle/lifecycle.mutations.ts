@@ -1,5 +1,96 @@
 import { gql } from "@apollo/client";
 
+const APP_DOMAIN_FIELDS = `
+  id
+  hostname
+  certState
+  validationMethod
+  validationToken
+  lastCheckedAt
+  isActive
+  registeredAppSlug
+  createdAt
+`;
+
+export const ADD_APP_DOMAIN = gql`
+  mutation AddAppDomain($input: AddAppDomainInput!) {
+    addAppDomain(input: $input) {
+      ok
+      errors { code message field }
+      data { ${APP_DOMAIN_FIELDS} }
+    }
+  }
+`;
+
+export const REMOVE_APP_DOMAIN = gql`
+  mutation RemoveAppDomain($input: RemoveAppDomainInput!) {
+    removeAppDomain(input: $input) {
+      ok
+      errors { code message }
+      data { id deleted }
+    }
+  }
+`;
+
+export const RECHECK_DOMAIN_VALIDATION = gql`
+  mutation RecheckDomainValidation($input: RecheckDomainValidationInput!) {
+    recheckDomainValidation(input: $input) {
+      ok
+      errors { code message }
+      data { ${APP_DOMAIN_FIELDS} }
+    }
+  }
+`;
+
+const DEPLOY_TOKEN_FIELDS = `
+  id
+  name
+  last4
+  scopes
+  expiresAt
+  lastUsedAt
+  isRevoked
+  lastRotatedAt
+  registeredAppSlug
+  createdAt
+`;
+
+export const CREATE_DEPLOY_TOKEN = gql`
+  mutation CreateDeployToken($input: CreateDeployTokenInput!) {
+    createDeployToken(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        token { ${DEPLOY_TOKEN_FIELDS} }
+        plaintextSecret
+      }
+    }
+  }
+`;
+
+export const ROTATE_DEPLOY_TOKEN = gql`
+  mutation RotateDeployToken($input: RotateDeployTokenInput!) {
+    rotateDeployToken(input: $input) {
+      ok
+      errors { code message }
+      data {
+        token { ${DEPLOY_TOKEN_FIELDS} }
+        plaintextSecret
+      }
+    }
+  }
+`;
+
+export const REVOKE_DEPLOY_TOKEN = gql`
+  mutation RevokeDeployToken($input: RevokeDeployTokenInput!) {
+    revokeDeployToken(input: $input) {
+      ok
+      errors { code message }
+      data { id revoked }
+    }
+  }
+`;
+
 const DEPLOYMENT_FIELDS = `
   id
   registeredAppSlug

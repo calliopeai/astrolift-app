@@ -164,6 +164,38 @@ export const LIST_APP_HEALTH_SUMMARY = gql`
   }
 `;
 
+export const LIST_APP_DOMAINS = gql`
+  query ListAppDomains($appSlug: String!) {
+    astroliftAppDomains(appSlug: $appSlug) {
+      id
+      hostname
+      certState
+      validationMethod
+      validationToken
+      lastCheckedAt
+      isActive
+      registeredAppSlug
+      createdAt
+    }
+  }
+`;
+
+export const LIST_APP_DEPLOY_TOKENS = gql`
+  query ListAppDeployTokens($appSlug: String!) {
+    astroliftAppDeployTokens(appSlug: $appSlug) {
+      id
+      name
+      last4
+      scopes
+      expiresAt
+      lastUsedAt
+      isRevoked
+      lastRotatedAt
+      createdAt
+    }
+  }
+`;
+
 export const LIST_PREVIEW_ENVIRONMENTS = gql`
   query ListPreviewEnvironments($appSlug: String) {
     astroliftPreviewEnvironments(appSlug: $appSlug) {
