@@ -136,6 +136,128 @@ def test_locate_in_source_returns_none_when_missing():
     assert col is None
 
 
+# ---- [[jobs]] desugaring (#115) ---------------------------------------
+
+
+def test_jobs_block_desugars_into_cronjob_workload():
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+command = ["/bin/run-nightly"]
+"""
+    raw = parse_raw(toml)
+    assert len(raw.workloads) == 1
+    w = raw.workloads[0]
+    assert w.name == "nightly"
+    assert w.kind == "cronjob"
+    assert w.schedule == "0 0 * * *"
+    # Jobs are private (no ingress) and have a single primary container.
+    assert w.is_public is False
+    assert len(w.containers) == 1
+    c = w.containers[0]
+    assert c.is_primary is True
+    assert c.command == ("/bin/run-nightly",)
+    assert c.port == 0  # jobs don't expose ports
+    assert c.healthcheck_kind == "none"  # no liveness/readiness
+
+
+def test_jobs_block_requires_schedule():
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "nightly"
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "schedule" in str(exc.value).lower()
+
+
+def test_jobs_block_with_dockerfile_alias():
+    """Spec lists ``dockerfile`` as the friendly key; the
+    ContainerManifest uses ``dockerfile_path``. Desugaring should
+    accept the friendly form."""
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+dockerfile = "Dockerfile.jobs"
+command = ["/bin/run"]
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].containers[0].dockerfile_path == "Dockerfile.jobs"
+
+
+def test_jobs_and_workloads_can_coexist():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  port = 8080
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+command = ["/bin/run"]
+"""
+    raw = parse_raw(toml)
+    names = sorted(w.name for w in raw.workloads)
+    assert names == ["nightly", "web"]
+
+
+def test_jobs_name_collision_with_workload_rejected():
+    """A [[jobs]] entry sharing a name with a [[workloads]] entry
+    would produce two Workload rows with the same name, which
+    collides on the unique constraint and is silently confusing.
+    Reject up front."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "shared"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  port = 8080
+
+[[jobs]]
+name = "shared"
+schedule = "0 0 * * *"
+command = ["/bin/run"]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "collides" in str(exc.value)
+
+
+def test_jobs_env_pairs_propagate():
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+command = ["/bin/run"]
+env = { LOG_LEVEL = "info", DRY_RUN = "0" }
+"""
+    raw = parse_raw(toml)
+    env = dict(raw.workloads[0].containers[0].env)
+    assert env == {"LOG_LEVEL": "info", "DRY_RUN": "0"}
+
+
 def test_parse_missing_name_is_error():
     toml = """
 [[workloads]]
