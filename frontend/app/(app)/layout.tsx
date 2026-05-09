@@ -8,6 +8,7 @@ import { SkipToContent } from "@/components/SkipToContent";
 import { PreloadQuery, getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
+import { LIST_ORGANIZATIONS } from "@/graphql/identity/identity.queries";
 import type { CurrentUser, MeQueryData, MeQueryVariables } from "@/graphql/user/user.types";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <PreloadQuery query={GET_ME}>
       <PreloadQuery query={GET_MY_PERMISSIONS}>
+        <PreloadQuery query={LIST_ORGANIZATIONS}>
         <LiveRegionProvider>
           <SkipToContent />
           <SidebarProvider>
@@ -47,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <CommandPalette />
           </SidebarProvider>
         </LiveRegionProvider>
+        </PreloadQuery>
       </PreloadQuery>
     </PreloadQuery>
   );

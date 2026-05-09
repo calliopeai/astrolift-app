@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { SaveIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { UPDATE_ORGANIZATION } from "@/graphql/identity/identity.mutations";
 import { LIST_ORGANIZATIONS } from "@/graphql/identity/identity.queries";
 import type {
@@ -24,13 +25,8 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
-interface OrgsResp {
-  astroliftOrganizations: AstroliftOrganization[];
-}
-
 export function OrganizationSettingsClient() {
-  const orgs = useQuery<OrgsResp>(LIST_ORGANIZATIONS);
-  const org = orgs.data?.astroliftOrganizations[0] ?? null;
+  const { org, loading: orgsLoading } = useActiveOrg();
 
   const [name, setName] = React.useState("");
   const [website, setWebsite] = React.useState("");
@@ -83,7 +79,7 @@ export function OrganizationSettingsClient() {
       title="Organization"
       description="Edit the platform's organization-level identity and retention defaults."
     >
-      {orgs.loading ? (
+      {orgsLoading ? (
         <Card>
           <CardContent className="space-y-3 p-6">
             <Skeleton className="h-10 w-full max-w-md" />

@@ -74,7 +74,7 @@ export function ApprovalClient({ id }: { id: string }) {
     return (
       <PageShell
         title="Deployment not found"
-        description="The deployment doesn't exist or isn't visible to your tenant."
+        description="The deployment doesn't exist or you don't have permission to view it."
       >
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">

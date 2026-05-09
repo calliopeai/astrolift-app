@@ -71,7 +71,7 @@ export function WorkloadDetailClient({
     return (
       <PageShell
         title="Workload not found"
-        description="The workload doesn't exist or isn't visible to your tenant."
+        description="The workload doesn't exist or you don't have permission to view it."
       >
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">

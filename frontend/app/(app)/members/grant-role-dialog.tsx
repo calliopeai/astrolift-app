@@ -22,16 +22,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { GRANT_ROLE } from "@/graphql/identity/identity.mutations";
 import {
   LIST_MEMBERS,
-  LIST_ORGANIZATIONS,
   LIST_PROJECTS,
   LIST_ROLE_BINDINGS,
   LIST_TEAMS,
 } from "@/graphql/identity/identity.queries";
 import type {
-  AstroliftOrganization,
   AstroliftProject,
   AstroliftRole,
   AstroliftRoleBinding,
@@ -47,9 +46,7 @@ interface Props {
 }
 
 export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
-  const orgs = useQuery<{ astroliftOrganizations: AstroliftOrganization[] }>(
-    LIST_ORGANIZATIONS,
-  );
+  const { org } = useActiveOrg();
   const teams = useQuery<{ astroliftTeams: AstroliftTeam[] }>(LIST_TEAMS);
   const projects = useQuery<{ astroliftProjects: AstroliftProject[] }>(LIST_PROJECTS);
 
@@ -78,10 +75,7 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
 
   const scopeOptions = React.useMemo(() => {
     if (scopeKind === "ORG") {
-      return (orgs.data?.astroliftOrganizations ?? []).map((o) => ({
-        id: o.id,
-        label: `${o.name} (${o.slug})`,
-      }));
+      return org ? [{ id: org.id, label: `${org.name} (${org.slug})` }] : [];
     }
     if (scopeKind === "TEAM") {
       return (teams.data?.astroliftTeams ?? []).map((t) => ({
@@ -96,7 +90,7 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
       }));
     }
     return [];
-  }, [scopeKind, orgs.data, teams.data, projects.data]);
+  }, [scopeKind, org, teams.data, projects.data]);
 
   // Auto-pick the first scope when options arrive.
   React.useEffect(() => {

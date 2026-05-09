@@ -121,7 +121,7 @@ export function DomainsClient() {
   return (
     <PageShell
       title="Managed domains"
-      description="DNS zones the platform manages on behalf of tenant apps and preview environments."
+      description="DNS zones the platform manages for apps and preview environments."
       actions={
         <Button onClick={() => setCreateOpen(true)}>
           <PlusIcon className="size-4" />

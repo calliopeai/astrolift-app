@@ -70,7 +70,7 @@ export function ProjectsClient() {
   return (
     <PageShell
       title="Projects"
-      description="Logical groupings of apps that share a deploy cadence, a domain, or a stack. The unit of cost reporting."
+      description="Group apps that share a deploy cadence, a domain, or a stack. Cost reporting rolls up at this level."
       actions={
         <Can permission="project.create">
           <Button onClick={() => setOpen(true)} disabled={teams.loading}>

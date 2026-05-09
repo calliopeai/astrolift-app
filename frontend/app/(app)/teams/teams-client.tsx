@@ -67,7 +67,7 @@ export function TeamsClient() {
   return (
     <PageShell
       title="Teams"
-      description="Permission boundaries for groups of humans. Each team owns its own projects, API tokens, and ABAC policies."
+      description="Groups that scope projects, API tokens, and policies. Use teams to delegate ownership of a subset of apps."
       actions={
         <Can permission="team.create">
           <Button onClick={() => setOpen(true)}>
@@ -90,7 +90,7 @@ export function TeamsClient() {
               <EmptyState
                 icon={<UsersIcon className="size-5" />}
                 title="No teams yet"
-                description="Teams group humans into permission boundaries. Create one to start adding projects and apps."
+                description="Create a team to start grouping projects and apps."
               />
             </div>
           ) : (
