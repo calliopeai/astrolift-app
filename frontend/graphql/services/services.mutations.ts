@@ -85,3 +85,63 @@ export const DETACH_SECRET_BUNDLE = gql`
     }
   }
 `;
+
+const MANAGED_SERVICE_FIELDS = `
+  id
+  name
+  kind
+  variant
+  status
+  config
+  registeredAppSlug
+  environmentName
+  createdAt
+  updatedAt
+`;
+
+export const PROVISION_MANAGED_SERVICE = gql`
+  mutation ProvisionManagedService($input: ProvisionManagedServiceInput!) {
+    provisionManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${MANAGED_SERVICE_FIELDS}
+      }
+    }
+  }
+`;
+
+export const UPDATE_MANAGED_SERVICE = gql`
+  mutation UpdateManagedService($input: UpdateManagedServiceInput!) {
+    updateManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${MANAGED_SERVICE_FIELDS}
+      }
+    }
+  }
+`;
+
+export const DEPROVISION_MANAGED_SERVICE = gql`
+  mutation DeprovisionManagedService($input: DeprovisionManagedServiceInput!) {
+    deprovisionManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
