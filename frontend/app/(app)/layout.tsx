@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
+import { LiveRegionProvider } from "@/components/LiveRegion";
+import { SkipToContent } from "@/components/SkipToContent";
 import { PreloadQuery, getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
@@ -32,14 +34,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <PreloadQuery query={GET_ME}>
       <PreloadQuery query={GET_MY_PERMISSIONS}>
-        <SidebarProvider>
-          <AppSidebar ssrUser={ssrUser} />
-          <SidebarInset>
-            <PageHeader />
-            {children}
-          </SidebarInset>
-          <CommandPalette />
-        </SidebarProvider>
+        <LiveRegionProvider>
+          <SkipToContent />
+          <SidebarProvider>
+            <AppSidebar ssrUser={ssrUser} />
+            <SidebarInset>
+              <PageHeader />
+              <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+                {children}
+              </main>
+            </SidebarInset>
+            <CommandPalette />
+          </SidebarProvider>
+        </LiveRegionProvider>
       </PreloadQuery>
     </PreloadQuery>
   );

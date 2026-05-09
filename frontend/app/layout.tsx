@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/Toaster";
+import { getDirection } from "@/lib/i18n/direction";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,9 +24,10 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   const messages = await getMessages();
+  const direction = getDirection(locale);
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} dir={direction} suppressHydrationWarning>
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
