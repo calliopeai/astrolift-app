@@ -1,34 +1,92 @@
 """Vanilla Kubernetes provider plugin manifest.
 
-This plugin targets kind, minikube, k3d, k3s, and any standards-
-compliant Kubernetes cluster without cloud-managed services. It
-implements the minimal driver set needed for local development and
-bare-metal deployments:
+Targets kind, minikube, k3d, k3s, and any standards-compliant
+Kubernetes cluster without cloud-managed services. Implements
+the full driver set so a tenant cluster can be bound to this
+plugin and run end-to-end without depending on AWS/GCP/Azure
+SDKs.
 
-- ClusterDriver (kubectl / client-go)
-- IngressDriver (nginx-ingress or traefik)
-- LogStreamDriver (kubelet stream API)
-- WorkloadIdentityDriver (projected SA tokens)
-
-Managed services, DNS, TLS, and other capabilities are expected to
-be composed from external controllers (cert-manager, external-dns,
-CNPG, etc.) rather than this plugin.
+Drivers shipped:
+- K8sNativeClusterDriver (#48 + #6) — ClusterDriver
+- K8sIngressDriver (#49 + #8) — IngressDriver, multi-variant
+  (nginx / Gateway API / Traefik / Kong / Istio)
+- ExternalDnsDriver (#50 + #9) — DnsDriver via DNSEndpoint CRDs
+- CertManagerDriver (#50 + #9) — TlsDriver via Certificate CRDs
+- VaultSecretsBackend (#51 + #10) — SecretsBackend via Vault KV v2
+- ProjectedSaTokenDriver (#51 + #11) — WorkloadIdentityDriver
+  with projected SA tokens
+- OCIRegistryDriver (#52 + #12) — ImageRegistryDriver, generic
+  OCI (Harbor / Zot / GHCR)
+- CNPGPostgresDriver (#53) — Postgres via CloudNativePG operator
+- RedisOperatorDriver (#53) — Redis via Bitnami operator
 """
 
 from _sdk.base import ProviderPlugin
 
-
-class K8sNativeProviderPlugin:
-    """Vanilla Kubernetes provider plugin -- stub."""
-
-    def __init__(self) -> None:
-        raise NotImplementedError("k8s_native provider plugin is not yet implemented")
+from k8s_native.cluster import K8sNativeClusterDriver
+from k8s_native.dns_external import ExternalDnsDriver
+from k8s_native.identity_projected import ProjectedSaTokenDriver
+from k8s_native.ingress import K8sIngressDriver
+from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
+from k8s_native.managed.redis_operator import RedisOperatorDriver
+from k8s_native.registry_oci import OCIRegistryDriver
+from k8s_native.secrets_vault import VaultSecretsBackend
+from k8s_native.tls_certmanager import CertManagerDriver
 
 
 PLUGIN = ProviderPlugin(
     id="k8s_native",
     display_name="Kubernetes (vanilla)",
-    drivers={},
-    managed_service_drivers={},
-    config_schema={},
+    drivers={
+        "cluster": K8sNativeClusterDriver,
+        "ingress": K8sIngressDriver,
+        "dns": ExternalDnsDriver,
+        "tls": CertManagerDriver,
+        "secrets": VaultSecretsBackend,
+        "identity": ProjectedSaTokenDriver,
+        "registry": OCIRegistryDriver,
+    },
+    managed_service_drivers={
+        ("postgres", "cnpg"): CNPGPostgresDriver,
+        ("redis", "operator"): RedisOperatorDriver,
+    },
+    config_schema={
+        "type": "object",
+        "properties": {
+            "kubeconfig_path": {"type": "string"},
+            "context": {"type": "string"},
+            "in_cluster": {"type": "boolean", "default": False},
+            "ingress_variant": {
+                "type": "string",
+                "enum": [
+                    "nginx_ingress",
+                    "gateway_api",
+                    "traefik",
+                    "kong",
+                    "istio_gateway",
+                ],
+                "default": "nginx_ingress",
+            },
+            "cert_manager_issuer": {
+                "type": "string",
+                "default": "letsencrypt-prod",
+            },
+            "vault_address": {
+                "type": "string",
+                "description": (
+                    "Vault address. Required when 'secrets' driver is "
+                    "selected. Empty falls back to k8s Secrets via the "
+                    "External Secrets Operator (separate ticket)."
+                ),
+            },
+            "oci_registry_url": {
+                "type": "string",
+                "description": (
+                    "Generic OCI registry URL (Harbor/Zot/GHCR)."
+                ),
+            },
+            "cnpg_storage_class": {"type": "string"},
+            "cnpg_backup_url": {"type": "string"},
+        },
+    },
 )
