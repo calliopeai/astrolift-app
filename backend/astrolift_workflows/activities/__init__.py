@@ -8,6 +8,8 @@ provider plugins land in the ``astrolift-providers`` repo.
 
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
+    create_promotion_deployment,
+    create_rollback_deployment,
     health_check,
     mark_app_provisioning,
     mark_app_ready,
@@ -25,6 +27,8 @@ from astrolift_workflows.activities.app_lifecycle import (
 
 __all__ = [
     "apply_manifests",
+    "create_promotion_deployment",
+    "create_rollback_deployment",
     "health_check",
     "mark_app_provisioning",
     "mark_app_ready",
