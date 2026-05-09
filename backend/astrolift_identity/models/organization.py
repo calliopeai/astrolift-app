@@ -51,10 +51,20 @@ class Organization(NamedBaseCoreModel):
     scim_enabled = models.BooleanField(default=False)
     scim_token_hash = models.CharField(max_length=128, blank=True, default="")
 
-    # Retention / quota defaults inherited by leaf entities
+    # Retention / quota defaults inherited by leaf entities. Platform
+    # admins may bump the platform-wide default via settings; the org
+    # column is the per-org override (NULL = inherit). See spec 08 §12
+    # for the observability stream defaults (logs/metrics/traces).
     audit_log_retention_days = models.PositiveIntegerField(default=365)
     preview_max_active_default = models.PositiveIntegerField(default=5)
     log_retention_days_default = models.PositiveIntegerField(default=30)
+    # Observability streams. Metrics carry two horizons because raw
+    # samples are expensive (default 90d) but rollups are cheap
+    # (default 1y) — surfacing them as separate knobs lets billing
+    # show 'raw' and 'rollup' lines distinctly.
+    metrics_retention_days_default = models.PositiveIntegerField(default=90)
+    metrics_rollup_retention_days_default = models.PositiveIntegerField(default=365)
+    trace_retention_days_default = models.PositiveIntegerField(default=14)
 
     # When True, users can edit their own profile fields (display
     # name, email, avatar, locale) on /settings/profile via
