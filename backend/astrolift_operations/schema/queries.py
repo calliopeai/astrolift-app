@@ -10,6 +10,8 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_operations.models import (
+    AlertEvent,
+    AlertRule,
     AuditEvent,
     Event,
     Notification,
@@ -17,18 +19,23 @@ from astrolift_operations.models import (
     WorkflowRun,
 )
 from astrolift_operations.schema.types import (
+    AlertEventType,
+    AlertRuleType,
     AuditEventType,
     EventPageType,
     EventType,
     NotificationType,
     WebhookSubscriptionType,
     WorkflowRunType,
+    alert_event_to_type,
+    alert_rule_to_type,
     audit_to_type,
     event_to_type,
     notification_to_type,
     webhook_to_type,
     workflow_run_to_type,
 )
+from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -158,6 +165,49 @@ class OperationsQuery:
         if unread_only:
             qs = qs.filter(read_at__isnull=True)
         return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_alert_rules(
+        self,
+        info: Info,
+        target: str | None = None,
+        target_id: str | None = None,
+        active_only: bool = True,
+    ) -> list[AlertRuleType]:
+        """List alert rules.
+
+        Without ``target``: every rule visible to the tenant. Pass
+        ``target=app|env|workload|global`` (and optionally
+        ``target_id``) to scope to one target."""
+        qs = AlertRule.objects.select_related("organization")
+        if active_only:
+            qs = qs.filter(is_active=True)
+        if target:
+            qs = qs.filter(target=target)
+        if target_id:
+            qs = qs.filter(target_id=target_id)
+        qs = qs.order_by("-created_at")[:200]
+        return [alert_rule_to_type(r) for r in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_alert_events(
+        self,
+        info: Info,
+        rule_id: GUID | None = None,
+        unresolved_only: bool = False,
+        limit: int = 100,
+    ) -> list[AlertEventType]:
+        qs = AlertEvent.objects.select_related("rule")
+        if rule_id is not None:
+            qs = qs.filter(rule__guid=str(rule_id))
+        if unresolved_only:
+            qs = qs.filter(resolved_at__isnull=True)
+        qs = qs.order_by("-fired_at")[: max(1, min(limit, 500))]
+        return [alert_event_to_type(e) for e in qs]
 
 
 # ---------------------------------------------------------------------------

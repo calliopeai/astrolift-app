@@ -2,10 +2,25 @@ input AcceptInvitationInput {
   token: String!
 }
 
+input AcknowledgeAlertEventInput {
+  id: GUID!
+}
+
 input AddAppDomainInput {
   appSlug: String!
   hostname: String!
   validationMethod: String = null
+}
+
+type Alertruledeletedpayload {
+  id: GUID!
+  deleted: Boolean!
+}
+
+type AlertruledeletedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Alertruledeletedpayload
 }
 
 type Appdomainremovedpayload {
@@ -29,6 +44,43 @@ type AppsecretwritepayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Appsecretwritepayload
+}
+
+type AstroliftAlertEvent {
+  id: GUID!
+  ruleId: GUID!
+  severity: String!
+  firedAt: DateTime!
+  resolvedAt: DateTime
+  acknowledgedAt: DateTime
+  summary: String!
+  detail: JSON!
+}
+
+type AstroliftAlertEventMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAlertEvent
+}
+
+type AstroliftAlertRule {
+  id: GUID!
+  name: String!
+  target: String!
+  targetId: String!
+  severity: String!
+  predicate: JSON!
+  notifyChannels: JSON!
+  isActive: Boolean!
+  organizationSlug: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftAlertRuleMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAlertRule
 }
 
 type AstroliftApiToken {
@@ -880,6 +932,16 @@ input ConnectSourceInput {
   repoVisibilityScopes: [String!] = null
 }
 
+input CreateAlertRuleInput {
+  name: String!
+  target: String!
+  targetId: String = null
+  severity: String = null
+  predicate: JSON = null
+  notifyChannels: JSON = null
+  isActive: Boolean = null
+}
+
 input CreateApiTokenInput {
   name: String!
   scopes: [String!] = null
@@ -979,6 +1041,10 @@ scalar Date
 
 """Date with time (isoformat)"""
 scalar DateTime
+
+input DeleteAlertRuleInput {
+  id: GUID!
+}
 
 input DeleteAppSecretInput {
   appSlug: String!
@@ -1355,6 +1421,10 @@ type Mutation {
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
   markNotificationRead(input: MarkNotificationReadInput!): AstroliftNotificationMutationResult!
   markAllNotificationsRead: MarkallreadpayloadMutationResult!
+  createAlertRule(input: CreateAlertRuleInput!): AstroliftAlertRuleMutationResult!
+  updateAlertRule(input: UpdateAlertRuleInput!): AstroliftAlertRuleMutationResult!
+  deleteAlertRule(input: DeleteAlertRuleInput!): AlertruledeletedpayloadMutationResult!
+  acknowledgeAlertEvent(input: AcknowledgeAlertEventInput!): AstroliftAlertEventMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   unregisterTenantCluster(input: UnregisterTenantClusterInput!): SoftdeletepayloadMutationResult!
@@ -1611,6 +1681,8 @@ type Query {
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
+  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
+  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
@@ -1808,6 +1880,15 @@ scalar UUID
 
 input UnregisterTenantClusterInput {
   id: GUID!
+}
+
+input UpdateAlertRuleInput {
+  id: GUID!
+  name: String = null
+  severity: String = null
+  predicate: JSON = null
+  notifyChannels: JSON = null
+  isActive: Boolean = null
 }
 
 input UpdateAppInput {
