@@ -143,6 +143,25 @@ def workload_to_type(workload) -> WorkloadType:
     )
 
 
+@strawberry.type(name="AstroliftRenderedManifest")
+class RenderedManifestType:
+    """The output of running the platform renderer against the
+    stored TOML for a given (app, environment) pair.
+
+    ``resources`` is a JSON list of Kubernetes resource dicts
+    (apiVersion/kind/metadata/spec). The ``error`` field carries a
+    human-readable message when parsing or normalization failed —
+    callers render either the resources or the error, never both."""
+
+    app_slug: str
+    environment_name: str
+    image_tag: str
+    namespace: str
+    resources: JSON
+    error: str | None
+    error_path: str | None
+
+
 def container_to_type(container) -> ContainerType:
     return ContainerType(
         id=GUID(str(container.guid)),

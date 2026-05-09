@@ -483,6 +483,16 @@ export type AstroliftRemoteRepoList = {
   repos: Array<AstroliftRemoteRepo>;
 };
 
+export type AstroliftRenderedManifest = {
+  appSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  error?: Maybe<Scalars['String']['output']>;
+  errorPath?: Maybe<Scalars['String']['output']>;
+  imageTag: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  resources: Scalars['JSON']['output'];
+};
+
 export type AstroliftRole = {
   description: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -1753,6 +1763,7 @@ export type Query = {
   astroliftProjects: Array<AstroliftProject>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
   astroliftQuotas: Array<AstroliftQuota>;
+  astroliftRenderedManifest?: Maybe<AstroliftRenderedManifest>;
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
   astroliftRoles: Array<AstroliftRole>;
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
@@ -1879,6 +1890,13 @@ export type QueryAstroliftOrganizationArgs = {
 
 export type QueryAstroliftPreviewEnvironmentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftRenderedManifestArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  imageTag?: InputMaybe<Scalars['String']['input']>;
 };
 
 

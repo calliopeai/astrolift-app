@@ -6,6 +6,7 @@ import {
   BoxIcon,
   CheckCircle2Icon,
   ExternalLinkIcon,
+  FileCodeIcon,
   GitBranchIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -121,6 +122,12 @@ export function AppDetailClient({ slug }: { slug: string }) {
       description={a.description || `Registered app · ${a.slug}`}
       actions={
         <>
+          <Button variant="outline" asChild>
+            <a href={`/apps/${a.slug}/manifest`}>
+              <FileCodeIcon className="size-4" />
+              Preview manifest
+            </a>
+          </Button>
           <Button variant="outline" asChild>
             {a.sourceUrl ? (
               <a href={a.sourceUrl} target="_blank" rel="noreferrer">
