@@ -26,6 +26,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -88,8 +96,22 @@ const IN_FLIGHT: DeploymentStatus[] = [
   "redeploying",
 ];
 
+const STATUS_OPTIONS: { value: DeploymentStatus | "all"; label: string }[] = [
+  { value: "all", label: "All statuses" },
+  { value: "pending_approval", label: "Pending approval" },
+  { value: "pending", label: "Pending" },
+  { value: "deploying", label: "Deploying" },
+  { value: "redeploying", label: "Redeploying" },
+  { value: "running", label: "Running" },
+  { value: "failed", label: "Failed" },
+  { value: "rolled_back", label: "Rolled back" },
+  { value: "superseded", label: "Superseded" },
+];
+
 export function DeploymentsClient() {
   const [openCreate, setOpenCreate] = React.useState(false);
+  const [statusFilter, setStatusFilter] = React.useState<DeploymentStatus | "all">("all");
+  const [appFilter, setAppFilter] = React.useState("");
   const { can } = useMyPermissions();
   const { data, loading, refetch: refetchList } = useQuery<Resp>(
     LIST_DEPLOYMENTS,
@@ -100,7 +122,16 @@ export function DeploymentsClient() {
       pollInterval: 30000,
     },
   );
-  const list = data?.astroliftDeployments ?? [];
+  const allDeployments = data?.astroliftDeployments ?? [];
+  const list = React.useMemo(() => {
+    return allDeployments.filter((d) => {
+      if (statusFilter !== "all" && d.status !== statusFilter) return false;
+      if (appFilter && !d.registeredAppSlug.toLowerCase().includes(appFilter.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }, [allDeployments, statusFilter, appFilter]);
 
   // Live push: any status transition for any deployment in the org
   // triggers a list refetch. The backend dedupes per-row, and
@@ -206,6 +237,33 @@ export function DeploymentsClient() {
         </Can>
       }
     >
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Filter by app slug…"
+          value={appFilter}
+          onChange={(e) => setAppFilter(e.target.value)}
+          className="max-w-xs"
+        />
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as DeploymentStatus | "all")}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-muted-foreground text-xs">
+          {list.length} of {allDeployments.length}
+        </span>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {loading && list.length === 0 ? (
