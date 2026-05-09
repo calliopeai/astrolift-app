@@ -320,6 +320,35 @@ export function DeploymentDetailClient({ id }: { id: string }) {
               </span>
             }
           />
+          {(d.commitSha || d.branch || d.ciRunUrl) && (
+            <>
+              {d.commitSha && (
+                <Field label="Commit" mono value={d.commitSha.slice(0, 12)} />
+              )}
+              {d.branch && <Field label="Branch" mono value={d.branch} />}
+              {d.ciActorKind && (
+                <Field label="CI actor" mono value={d.ciActorKind} />
+              )}
+              {d.ciProvider && (
+                <Field label="CI provider" mono value={d.ciProvider} />
+              )}
+              {d.ciRunUrl && (
+                <Field
+                  label="CI run"
+                  value={
+                    <a
+                      href={d.ciRunUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-sm hover:underline"
+                    >
+                      {d.ciRunUrl}
+                    </a>
+                  }
+                />
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 

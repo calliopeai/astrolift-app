@@ -150,7 +150,12 @@ export type AstroliftCostSnapshot = {
 export type AstroliftDeployment = {
   approvalsReceived: Scalars['Int']['output'];
   approvalsRequired: Scalars['Int']['output'];
+  branch: Scalars['String']['output'];
+  ciActorKind: Scalars['String']['output'];
+  ciProvider: Scalars['String']['output'];
+  ciRunUrl: Scalars['String']['output'];
   clusterRevision: Scalars['String']['output'];
+  commitSha: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
   endedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -523,6 +528,12 @@ export type AstroliftRoleBindingMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftRoleMutationResult = {
+  data?: Maybe<AstroliftRole>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftScheduledJobRun = {
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
@@ -798,6 +809,14 @@ export type CreateProjectInput = {
   teamId: Scalars['GUID']['input'];
 };
 
+export type CreateRoleInput = {
+  description: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  permissions: Array<Scalars['String']['input']>;
+  scopeLevel: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+};
+
 export type CreateTeamInput = {
   description: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
@@ -815,6 +834,10 @@ export type DataImportUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
   publicUrl?: Maybe<Scalars['String']['output']>;
+};
+
+export type DeleteRoleInput = {
+  id: Scalars['GUID']['input'];
 };
 
 export type DeleteSshDeployKeyInput = {
@@ -969,6 +992,7 @@ export type Mutation = {
   createOrganization: AstroliftOrganizationMutationResult;
   createPolicy: AstroliftPolicyMutationResult;
   createProject: AstroliftProjectMutationResult;
+  createRole: AstroliftRoleMutationResult;
   createTeam: AstroliftTeamMutationResult;
   createWebhookSubscription: WebhookSecretRevealMutationResult;
   /** Create a new workflow definition (staff only). */
@@ -1055,6 +1079,7 @@ export type Mutation = {
   softDeleteOrganization: SoftdeletepayloadMutationResult;
   softDeletePolicy: SoftdeletepayloadMutationResult;
   softDeleteProject: SoftdeletepayloadMutationResult;
+  softDeleteRole: SoftdeletepayloadMutationResult;
   softDeleteTeam: SoftdeletepayloadMutationResult;
   startDeployment: AstroliftDeploymentMutationResult;
   /** Start a workflow for an object. */
@@ -1072,6 +1097,7 @@ export type Mutation = {
   updateOrganization: AstroliftOrganizationMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
   updateProject: AstroliftProjectMutationResult;
+  updateRole: AstroliftRoleMutationResult;
   updateSourceConnection: AstroliftSourceConnectionMutationResult;
   updateTeam: AstroliftTeamMutationResult;
   updateTenantCluster: AstroliftTenantClusterMutationResult;
@@ -1158,6 +1184,11 @@ export type MutationCreatePolicyArgs = {
 
 export type MutationCreateProjectArgs = {
   input: CreateProjectInput;
+};
+
+
+export type MutationCreateRoleArgs = {
+  input: CreateRoleInput;
 };
 
 
@@ -1466,6 +1497,11 @@ export type MutationSoftDeleteProjectArgs = {
 };
 
 
+export type MutationSoftDeleteRoleArgs = {
+  input: DeleteRoleInput;
+};
+
+
 export type MutationSoftDeleteTeamArgs = {
   input: SoftDeleteByGuidInput;
 };
@@ -1537,6 +1573,11 @@ export type MutationUpdatePolicyArgs = {
 
 export type MutationUpdateProjectArgs = {
   input: UpdateProjectInput;
+};
+
+
+export type MutationUpdateRoleArgs = {
+  input: UpdateRoleInput;
 };
 
 
@@ -2074,6 +2115,11 @@ export type SoftdeletepayloadMutationResult = {
 
 export type StartDeploymentInput = {
   appSlug: Scalars['String']['input'];
+  branch: InputMaybe<Scalars['String']['input']>;
+  ciActorKind: InputMaybe<Scalars['String']['input']>;
+  ciProvider: InputMaybe<Scalars['String']['input']>;
+  ciRunUrl: InputMaybe<Scalars['String']['input']>;
+  commitSha: InputMaybe<Scalars['String']['input']>;
   environmentName: Scalars['String']['input'];
   imageDigest: InputMaybe<Scalars['String']['input']>;
   imageTag: Scalars['String']['input'];
@@ -2182,6 +2228,13 @@ export type UpdateProjectInput = {
   description: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateRoleInput = {
+  description: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['GUID']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  permissions: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type UpdateSourceConnectionInput = {

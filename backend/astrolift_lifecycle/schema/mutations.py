@@ -72,6 +72,14 @@ class StartDeploymentInput:
     image_digest: str | None = None
     workload_slug: str | None = None
     trigger_kind: str = "manual"
+    # CI / VCS provenance (#166). Optional at the GraphQL boundary so
+    # manual deploys from the UI work without specifying these; the
+    # webhook path always populates them.
+    ci_actor_kind: str | None = None
+    commit_sha: str | None = None
+    branch: str | None = None
+    ci_run_url: str | None = None
+    ci_provider: str | None = None
 
 
 @strawberry.input
@@ -226,6 +234,11 @@ class LifecycleMutation:
                 image_digest=input.image_digest or "",
                 approvals_required=env.required_approvals,
                 approvals_received=0,
+                ci_actor_kind=(input.ci_actor_kind or "").strip(),
+                commit_sha=(input.commit_sha or "").strip(),
+                branch=(input.branch or "").strip(),
+                ci_run_url=(input.ci_run_url or "").strip(),
+                ci_provider=(input.ci_provider or "").strip(),
             )
 
             if initial_status is Deployment.Status.PENDING:
