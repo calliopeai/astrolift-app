@@ -221,6 +221,58 @@ MATRIX = AvailabilityMatrix(
             description="Bitnami Redis operator with primary + replicas",
             binding_envs=("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD"),
         ),
+        ManagedServiceEntry(
+            kind="mysql", variant="operator", plugin_id="k8s_native",
+            description=(
+                "Percona XtraDB Cluster (default) / MariaDB / Oracle "
+                "MySQL operator-backed cluster"
+            ),
+            binding_envs=(
+                "MYSQL_HOST", "MYSQL_PORT", "MYSQL_DB",
+                "MYSQL_USER", "MYSQL_PASSWORD",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="document_db", variant="mongodb_operator",
+            plugin_id="k8s_native",
+            description="Percona Server for MongoDB operator",
+            binding_envs=(
+                "DOCDB_URI", "DOCDB_DB", "DOCDB_USER", "DOCDB_PASSWORD",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="event_stream", variant="kafka_strimzi",
+            plugin_id="k8s_native",
+            description="Strimzi-managed Kafka cluster (KRaft)",
+            binding_envs=(
+                "EVENT_STREAM_BROKERS", "EVENT_STREAM_USERNAME",
+                "EVENT_STREAM_PASSWORD", "EVENT_STREAM_TLS",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="event_stream", variant="nats",
+            plugin_id="k8s_native",
+            description="NATS StatefulSet (with optional JetStream)",
+            binding_envs=("EVENT_STREAM_BROKERS", "EVENT_STREAM_TLS"),
+        ),
+        ManagedServiceEntry(
+            kind="queue", variant="rabbitmq_operator",
+            plugin_id="k8s_native",
+            description="RabbitMQ Cluster Operator-backed cluster",
+            binding_envs=(
+                "RABBITMQ_HOST", "RABBITMQ_PORT",
+                "RABBITMQ_USER", "RABBITMQ_PASSWORD",
+            ),
+        ),
+        ManagedServiceEntry(
+            kind="filesystem", variant="nfs_csi",
+            plugin_id="k8s_native",
+            description="NFS CSI driver-backed RWX PVC",
+            binding_envs=(
+                "FILESYSTEM_HANDLE", "FILESYSTEM_MOUNT_PATH",
+                "FILESYSTEM_TLS",
+            ),
+        ),
     ),
 )
 

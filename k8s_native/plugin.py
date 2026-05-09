@@ -27,7 +27,13 @@ from k8s_native.cluster import K8sNativeClusterDriver
 from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver
 from k8s_native.ingress import K8sIngressDriver
+from k8s_native.managed.event_stream_nats import NATSDriver
+from k8s_native.managed.event_stream_strimzi import StrimziKafkaDriver
+from k8s_native.managed.filesystem_nfs import NFSDriver
+from k8s_native.managed.mongodb_operator import MongoDBOperatorDriver
+from k8s_native.managed.mysql_operator import MySQLOperatorDriver
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
+from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorDriver
 from k8s_native.managed.redis_operator import RedisOperatorDriver
 from k8s_native.registry_oci import OCIRegistryDriver
 from k8s_native.secrets_vault import VaultSecretsBackend
@@ -49,6 +55,12 @@ PLUGIN = ProviderPlugin(
     managed_service_drivers={
         ("postgres", "cnpg"): CNPGPostgresDriver,
         ("redis", "operator"): RedisOperatorDriver,
+        ("mysql", "operator"): MySQLOperatorDriver,
+        ("document_db", "mongodb_operator"): MongoDBOperatorDriver,
+        ("event_stream", "kafka_strimzi"): StrimziKafkaDriver,
+        ("event_stream", "nats"): NATSDriver,
+        ("queue", "rabbitmq_operator"): RabbitMQOperatorDriver,
+        ("filesystem", "nfs_csi"): NFSDriver,
     },
     config_schema={
         "type": "object",
