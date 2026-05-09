@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "888db851190f344a34dd2d30e8f4a8b88ae25f2d072885ca6b925c2b4af70f23"
+            "sha256": "ca1c2b3391de6fd3e483a41b89261dcf1cbee2cdc9dc3261f828b47646ad0a7f"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -2344,6 +2344,15 @@
             "index": "pypi",
             "markers": "python_version >= '3.10'",
             "version": "==1.27.0"
+        },
+        "tomli-w": {
+            "hashes": [
+                "sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90",
+                "sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.9'",
+            "version": "==1.2.0"
         },
         "twilio": {
             "hashes": [
