@@ -102,6 +102,44 @@ DEFAULT_RULES: tuple[AlertRuleTemplate, ...] = (
         ),
         for_seconds=0,
     ),
+    # Spec 08 §10.2 broader set (covers #18). Operators may
+    # disable / edit after seeding.
+    AlertRuleTemplate(
+        slug="health_check_failing",
+        title="Health check failing for 5 min",
+        severity=Severity.CRITICAL,
+        expression=(
+            'probe_success{app="$app"} == 0'
+        ),
+        for_seconds=5 * 60,
+    ),
+    AlertRuleTemplate(
+        slug="cron_failure_streak",
+        title="Cron failure streak (3 consecutive)",
+        severity=Severity.WARNING,
+        expression=(
+            'sum_over_time(cronjob_failed_runs{app="$app"}[1h]) >= 3'
+        ),
+        for_seconds=0,
+    ),
+    AlertRuleTemplate(
+        slug="cpu_saturation",
+        title="CPU > 90% for 15 min",
+        severity=Severity.INFO,
+        expression=(
+            'avg_over_time(container_cpu_usage_ratio{namespace=~"$ns"}[15m]) > 0.9'
+        ),
+        for_seconds=15 * 60,
+    ),
+    AlertRuleTemplate(
+        slug="memory_saturation",
+        title="Memory > 90% for 15 min",
+        severity=Severity.INFO,
+        expression=(
+            'avg_over_time(container_memory_usage_ratio{namespace=~"$ns"}[15m]) > 0.9'
+        ),
+        for_seconds=15 * 60,
+    ),
 )
 
 

@@ -30,12 +30,27 @@ def _now(*, off: int = 0) -> datetime:
 
 def test_default_rule_set_matches_spec_08():
     slugs = {r.slug for r in DEFAULT_RULES}
+    # Spec 08 §10.2 + #18 broader set.
     assert slugs == {
         "high_5xx_rate",
         "high_latency_p99",
         "pod_restart_loop",
         "oom_killed",
+        "health_check_failing",
+        "cron_failure_streak",
+        "cpu_saturation",
+        "memory_saturation",
     }
+
+
+def test_severity_distribution_covers_all_levels():
+    """Spec 08 calls out info/warning/critical — verify the seeded
+    set includes each level so the alert routing UI has examples
+    of every severity to render against."""
+    severities = {r.severity for r in DEFAULT_RULES}
+    assert Severity.INFO in severities
+    assert Severity.WARNING in severities
+    assert Severity.CRITICAL in severities
 
 
 def test_render_substitutes_app_and_namespace():
