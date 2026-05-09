@@ -160,6 +160,10 @@ MATRIX = AvailabilityMatrix(
             variant="projected_sa_token",
         ),
         DriverEntry(role="registry", plugin_id="k8s_native", variant="generic_oci"),
+        DriverEntry(role="registry", plugin_id="k8s_native", variant="quay"),
+        DriverEntry(role="registry", plugin_id="k8s_native", variant="dockerhub"),
+        DriverEntry(role="registry", plugin_id="k8s_native", variant="ghcr"),
+        DriverEntry(role="registry", plugin_id="k8s_native", variant="harbor"),
     ),
     managed_services=(
         # AWS — MVP set; extended catalog tracked in #79
