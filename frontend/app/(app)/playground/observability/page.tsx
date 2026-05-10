@@ -96,7 +96,7 @@ const DEMO_COMMITS: GitOpsCommit[] = [
   },
   {
     hash: "5c1d80b3a496e7d5c4b3a2e1d0c9b8a7f6e5d4c3",
-    author: "leo@calliope.ai",
+    author: "ops@example.com",
     message: "config(acme/eng/api): bump cpu_request to 250m",
     occurredAt: "2026-05-08T14:22:18.000Z",
     diffUrl: "https://github.example/acme/astrolift-config/commit/5c1d80b",
