@@ -81,7 +81,7 @@ const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | 
   rolled_back: "muted",
 };
 
-function formatDuration(seconds: number | null): string {
+function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null) return "—";
   if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
