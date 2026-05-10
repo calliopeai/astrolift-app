@@ -190,4 +190,6 @@ real-DB tests, no rebases, no co-author trailers).
 
 MIT. See [LICENSE](LICENSE).
 
-Copyright (c) 2026 Calliope Labs Inc. Calliope AI is a trademark of Calliope Labs Inc.
+Copyright (c) 2026 Calliope Labs Inc. All Rights Reserved. Calliope AI is a trademark of Calliope Labs Inc.
+
+Portions of the framework underlying this repo are derived from **[boilerworks-django-nextjs](https://github.com/ConflictHQ/boilerworks-django-nextjs)** (Copyright (c) Conflict LLC, MIT-licensed). Tip of the hat 🎩
