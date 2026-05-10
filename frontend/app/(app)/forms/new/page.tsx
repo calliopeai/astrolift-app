@@ -79,7 +79,7 @@ export default function NewFormPage() {
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Full-height resizable split */}
-      <PanelGroup direction="horizontal" className="flex-1">
+      <PanelGroup orientation="horizontal" className="flex-1">
         <Panel defaultSize={showPreview ? 65 : 100} minSize={40}>
         {/* LEFT PANE: scrollable form + builder */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex h-full flex-col gap-6 overflow-y-auto p-6">

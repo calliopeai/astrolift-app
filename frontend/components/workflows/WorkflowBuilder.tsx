@@ -489,7 +489,7 @@ export function WorkflowBuilder({
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { strokeWidth: 2 },
       };
-      setEdges((eds) => addEdge(newEdge, eds) as typeof eds);
+      setEdges((eds) => addEdge(newEdge, eds as never) as never);
       setWorkflowTransitions((prev) => [
         ...prev,
         {
