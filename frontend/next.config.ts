@@ -12,6 +12,10 @@ const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000"
 // cares about — admin, GraphQL, REST, OAuth — so dev matches the prod
 // shape (single LB, single origin) exactly.
 const nextConfig: NextConfig = {
+  // Standalone output for slim production container images. Next.js
+  // copies only the runtime files it needs into .next/standalone, so
+  // the runner stage of Dockerfile skips the full node_modules tree.
+  output: "standalone",
   // Django requires trailing slashes (APPEND_SLASH redirects GETs;
   // POSTs with a body hard-error). Skip Next.js's automatic 308
   // /foo/ → /foo redirect so the GraphQL endpoint at
