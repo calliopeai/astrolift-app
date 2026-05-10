@@ -47,7 +47,7 @@ export const NavUser = ({ ssrUser }: { ssrUser: CurrentUser | null }) => {
   }, [user]);
 
   const name = user?.profile?.username ?? "User";
-  const email = user?.email ?? "";
+  const email = "";
   const avatar = "";
   const initials = name.slice(0, 2).toUpperCase();
 

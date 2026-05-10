@@ -118,7 +118,7 @@ export function NotificationsBell() {
                   }
                 >
                   <Wrapper
-                    {...(wrapperProps as never)}
+                    {...(wrapperProps as Record<string, unknown>)}
                     onClick={() => {
                       if (!n.readAt) {
                         markRead({ variables: { input: { id: n.id } } });

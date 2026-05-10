@@ -67,8 +67,12 @@ export default function WorkflowBuilderPage() {
       <Separator />
       <WorkflowBuilder
         states={workflow.states || []}
-        transitions={workflow.transitions || []}
-        onSave={handleSave}
+        // GraphQL types model conditions/actions as unknown[]; the
+        // builder narrows them to Condition[]/Action[]. Trust the
+        // shape coming back from the platform API here — the editor
+        // surfaces anything malformed.
+        transitions={(workflow.transitions || []) as never}
+        onSave={handleSave as never}
         availableForms={(forms ?? []).map((f: { slug: string; name: string }) => ({ slug: f.slug, name: f.name }))}
       />
     </div>

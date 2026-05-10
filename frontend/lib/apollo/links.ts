@@ -1,6 +1,7 @@
 import { ApolloLink, HttpLink, split } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
+import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
@@ -23,19 +24,21 @@ const authLink = setContext(async (_, { headers }) => {
   };
 });
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
-  if (graphQLErrors) {
-    for (const { extensions } of graphQLErrors) {
+// Apollo Client v4 changed onError's signature: a single `error` is
+// passed (use CombinedGraphQLErrors.is(error) to detect GraphQL ones)
+// and any other error type is treated as a network/protocol error.
+const errorLink = onError(({ error }) => {
+  if (CombinedGraphQLErrors.is(error)) {
+    for (const { extensions } of error.errors) {
       if (extensions?.code === "UNAUTHENTICATED") {
         clearToken();
         window.location.href = "/auth/login";
         return;
       }
     }
+    return;
   }
-  if (networkError) {
-    console.error("[Apollo] Network error:", networkError);
-  }
+  console.error("[Apollo] Network error:", error);
 });
 
 function buildWsLink(): GraphQLWsLink | null {
