@@ -135,6 +135,23 @@ export const UPDATE_MY_PROFILE = gql`
   }
 `;
 
+export const LOGOUT_ALL_SESSIONS = gql`
+  mutation LogoutAllSessions($input: LogoutAllSessionsInput!) {
+    logoutAllSessions(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        revokedCount
+        keptCurrent
+      }
+    }
+  }
+`;
+
 export const CREATE_POLICY = gql`
   mutation CreatePolicy($input: CreatePolicyInput!) {
     createPolicy(input: $input) {

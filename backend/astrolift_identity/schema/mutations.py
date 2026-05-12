@@ -253,6 +253,17 @@ class SetActiveIdentityProviderInput:
     id: GUID
 
 
+@strawberry.input
+class LogoutAllSessionsInput:
+    keep_current: bool = True
+
+
+@strawberry.type(name="AstroliftLogoutAllSessionsPayload")
+class _LogoutAllSessionsPayload:
+    revoked_count: int
+    kept_current: bool
+
+
 @strawberry.type
 class _SoftDeletePayload:
     id: GUID
@@ -1167,6 +1178,49 @@ class IdentityMutation:
         viewer.save(update_fields=["first_name", "last_name", "email"])
 
         return gql_success(_my_profile_payload(viewer, org, locked))
+
+    @strawberry.field
+    @mutation_audit(action="session.logout_all")
+    def logout_all_sessions(
+        self, info: Info, input: LogoutAllSessionsInput
+    ) -> MutationResultType[_LogoutAllSessionsPayload]:
+        """Revoke every active django_session row bound to the
+        signed-in viewer. Defaults to keeping the current session
+        active so the caller doesn't immediately bounce to /login.
+
+        Self-only — every authenticated user can sign themselves
+        out of their other devices; no permission gate.
+        """
+        from django.contrib.sessions.models import Session
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        current_key = getattr(getattr(request, "session", None), "session_key", None)
+        viewer_pk = str(viewer.pk)
+        keys_to_delete: list[str] = []
+        for s in Session.objects.iterator():
+            try:
+                data = s.get_decoded()
+            except Exception:
+                continue
+            if str(data.get("_auth_user_id", "")) != viewer_pk:
+                continue
+            if input.keep_current and s.session_key == current_key:
+                continue
+            keys_to_delete.append(s.session_key)
+
+        if keys_to_delete:
+            Session.objects.filter(session_key__in=keys_to_delete).delete()
+
+        return gql_success(
+            _LogoutAllSessionsPayload(
+                revoked_count=len(keys_to_delete),
+                kept_current=bool(input.keep_current and current_key is not None),
+            )
+        )
 
 
 def _validate_idp_config(input) -> MutationResultType | None:

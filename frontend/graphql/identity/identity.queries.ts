@@ -200,6 +200,20 @@ export const GET_ACTIVE_IDENTITY_PROVIDER = gql`
   }
 `;
 
+export const LIST_ACTIVE_SESSIONS = gql`
+  query ListActiveSessions {
+    astroliftActiveSessions {
+      id
+      expiresAt
+      isCurrent
+      createdAt
+      lastSeenAt
+      ipAddress
+      userAgent
+    }
+  }
+`;
+
 export const LIST_API_TOKENS = gql`
   query ListApiTokens {
     astroliftApiTokens {

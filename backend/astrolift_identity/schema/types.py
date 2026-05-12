@@ -352,6 +352,25 @@ def invitation_to_type(inv) -> InvitationType:
     )
 
 
+@strawberry.type(name="AstroliftActiveSession")
+class ActiveSessionType:
+    """A django_session row for the current viewer.
+
+    v1 uses the Django default session store, so ``created_at`` /
+    ``last_seen_at`` / ``ip_address`` / ``user_agent`` are null —
+    the django_session table doesn't track them. They become
+    populated once a ``SessionMetadata`` model + middleware lands.
+    """
+
+    id: str
+    expires_at: dt.datetime
+    is_current: bool
+    created_at: dt.datetime | None
+    last_seen_at: dt.datetime | None
+    ip_address: str | None
+    user_agent: str | None
+
+
 def policy_to_type(policy) -> PolicyType:
     return PolicyType(
         id=GUID(str(policy.guid)),
