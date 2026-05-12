@@ -366,6 +366,34 @@ class Auth1SessionWorkflow:
         request.session.clear()
         url = request.build_absolute_uri(reverse(cls.landing))
         url = cls._fix_proxy_pass(request, url)
+
+        # OIDC providers diverge on logout URL shape:
+        #   Auth0   → /v2/logout?returnTo=…&client_id=…
+        #   Cognito → /logout?logout_uri=…&client_id=…
+        #   generic → end_session_endpoint from the discovery doc
+        # Prefer the discovery doc when available (it's loaded once at
+        # first auth request and cached), fall back to Auth0's shape so
+        # existing Auth0 installs keep working unchanged.
+        try:
+            metadata = cls._client.auth0.load_server_metadata()
+        except Exception:
+            metadata = {}
+        end_session_endpoint = metadata.get("end_session_endpoint")
+
+        if end_session_endpoint and "cognito" in end_session_endpoint:
+            # Cognito-style: /logout, parameter name is `logout_uri`
+            return redirect(
+                end_session_endpoint
+                + "?"
+                + urlencode(
+                    {
+                        "logout_uri": url,
+                        "client_id": settings.AUTH0_CLIENT_ID,
+                    },
+                    quote_via=quote_plus,
+                ),
+            )
+        # Auth0-style fallback (original behavior)
         return redirect(
             f"https://{settings.AUTH0_DOMAIN}/v2/logout?"
             + urlencode(
