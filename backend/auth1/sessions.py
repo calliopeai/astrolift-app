@@ -1,6 +1,7 @@
 """
 Authentication Session Workflow
 """
+
 import dataclasses
 import json
 import logging
@@ -67,6 +68,7 @@ class AuthClient:
     """
     Auth0 Client
     """
+
     name: str
     domain: str
     client_id: str
@@ -81,8 +83,8 @@ class AuthClient:
     _default_client = None
 
     @classmethod
-    def from_settings(cls, name='default') -> 'AuthClient':
-        if name == 'default' and cls._default_client:
+    def from_settings(cls, name="default") -> "AuthClient":
+        if name == "default" and cls._default_client:
             return cls._default_client
 
         _client = cls(
@@ -102,7 +104,7 @@ class AuthClient:
             ),
         )
 
-        if name == 'default':
+        if name == "default":
             cls._default_client = _client
 
         return _client
@@ -122,18 +124,12 @@ class AuthClient:
             "client_id": self.client_id,
             "client_secret": self.client_secret,
             "audience": f"https://{self.domain}/api/v2/",
-            "grant_type": "client_credentials"
+            "grant_type": "client_credentials",
         }
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
 
         # Make the POST request using requests
-        response = requests.post(
-            f"https://{self.domain}/oauth/token",
-            json=payload,
-            headers=headers
-        )
+        response = requests.post(f"https://{self.domain}/oauth/token", json=payload, headers=headers)
 
         # Raise an error for non-2xx status codes
         response.raise_for_status()
@@ -141,7 +137,9 @@ class AuthClient:
 
         # Cache the token and expiration time
         self._token_cache["access_token"] = token["access_token"]
-        self._token_cache["expires_at"] = current_time + token["expires_in"] - 60  # Subtract 1 minute as a buffer
+        self._token_cache["expires_at"] = (
+            current_time + token["expires_in"] - 60
+        )  # Subtract 1 minute as a buffer
 
         return self._token_cache["access_token"]
 
@@ -166,7 +164,7 @@ class AuthClient:
             url = f"https://{self.domain}/api/v2/connections"
             headers = {
                 "Authorization": f"Bearer {self.get_auth0_access_token()}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             response = requests.get(url, headers=headers)
@@ -174,10 +172,10 @@ class AuthClient:
 
             connections = response.json()
             for connection in connections:
-                self._connections[connection['name']] = connection
+                self._connections[connection["name"]] = connection
 
         if connection_name in self._connections:
-            return self._connections[connection_name]['id']
+            return self._connections[connection_name]["id"]
 
         raise ValueError(f"Connection '{connection_name}' not found.")
 
@@ -188,8 +186,9 @@ class AuthClient:
             response.raise_for_status()
         return response
 
-    def create_auth0_user(self, email, phone_number, email_verified=True,
-                          connection=settings.AUTH0_DATABASE_CONNECTION_ID):
+    def create_auth0_user(
+        self, email, phone_number, email_verified=True, connection=settings.AUTH0_DATABASE_CONNECTION_ID
+    ):
         """
         Create a new user in the Auth0 database using Authlib client.
         """
@@ -201,7 +200,8 @@ class AuthClient:
                 "connection": connection,
                 "password": email + str(uuid.uuid4()),
                 "email_verified": email_verified,
-            })
+            },
+        )
 
     def request_reset_password(self, email, connection=settings.AUTH0_DATABASE_CONNECTION_ID):
         """
@@ -213,7 +213,8 @@ class AuthClient:
                 "email": email,
                 "connection": connection,
                 # "connection_id": self._get_connection_id(),
-            })
+            },
+        )
 
 
 class Auth1SessionWorkflow:
@@ -257,27 +258,37 @@ class Auth1SessionWorkflow:
         in a Header.
         """
         try:
-            if request.method != 'POST':
-                logger.warning(f'[Auth0] Requested method {request.method} not support for session endpoint.',
-                               exc_info=True)
-                return HttpResponseNotAllowed(permitted_methods={'POST'})
+            if request.method != "POST":
+                logger.warning(
+                    f"[Auth0] Requested method {request.method} not support for session endpoint.",
+                    exc_info=True,
+                )
+                return HttpResponseNotAllowed(permitted_methods={"POST"})
             auth0_token = json.loads(request.body)
             cls._register_remote_user(request, auth0_token)
-            logger.debug(f'[Auth0] Session {request.session.session_key} registered.')
+            try:
+                from auth1.auto_join import maybe_auto_join_user
+
+                maybe_auto_join_user(getattr(request, "user", None))
+            except Exception:
+                logger.exception("[Auth0] auto_join hook failed — auth flow continues")
+            logger.debug(f"[Auth0] Session {request.session.session_key} registered.")
             return HttpResponse(
                 status=HTTPStatus.ACCEPTED.ACCEPTED,
-                content=json.dumps({
-                    'Authorization': f'Session {request.session.session_key}',
-                }),
+                content=json.dumps(
+                    {
+                        "Authorization": f"Session {request.session.session_key}",
+                    }
+                ),
                 headers={
-                    'Content-Type': 'application/json',
-                }
+                    "Content-Type": "application/json",
+                },
             )
         except EmailNotVerifiedException as e:
             logger.warning(f"[Auth0] {e} redirecting to verify-email", exc_info=True)
             return HttpResponseRedirect(request.build_absolute_uri("/verify-email"))
         except Exception as e:
-            logger.exception(f'[Auth0] Unable to Start Sessions {e}')
+            logger.exception(f"[Auth0] Unable to Start Sessions {e}")
             raise e
 
     @classmethod
@@ -297,7 +308,7 @@ class Auth1SessionWorkflow:
         if proto and host and port:
             url = list(urlsplit(url))
             url[0] = proto
-            url[1] = f'{host}:{port}'
+            url[1] = f"{host}:{port}"
             url = urlunsplit(url)
         return url
 
@@ -310,10 +321,10 @@ class Auth1SessionWorkflow:
         stored in the session so callback() can redirect the browser back to
         the caller (typically the Next.js frontend) after a successful login.
         """
-        logger.debug('[Auth0] Django login requested')
-        next_url = request.GET.get('next', '')
+        logger.debug("[Auth0] Django login requested")
+        next_url = request.GET.get("next", "")
         if next_url:
-            request.session['auth_next'] = next_url
+            request.session["auth_next"] = next_url
         callback_url = request.build_absolute_uri(reverse("callback"))
         callback_url = cls._fix_proxy_pass(request, callback_url)
         return cls._client.auth0.authorize_redirect(request, callback_url)
@@ -328,20 +339,33 @@ class Auth1SessionWorkflow:
         it without needing access to the Django session cookie.
         """
         try:
-            logger.debug('[Auth0] Auth0 Tenant callback received.')
+            logger.debug("[Auth0] Auth0 Tenant callback received.")
             auth0_token = cls._client.auth0.authorize_access_token(request)
             cls._register_remote_user(request, auth0_token)
 
-            next_url = request.session.pop('auth_next', None)
+            # Best-effort: if the user just authed and their email
+            # domain is on the active org's allowlist, auto-create
+            # the Member (and optional RoleBinding) so SSO users
+            # from a trusted corp domain don't need an explicit
+            # invitation. Wrapped to never block auth flow.
+            try:
+                from auth1.auto_join import maybe_auto_join_user
+
+                maybe_auto_join_user(getattr(request, "user", None))
+            except Exception:
+                logger.exception("[Auth0] auto_join hook failed — auth flow continues")
+
+            next_url = request.session.pop("auth_next", None)
             if next_url:
                 token = f"Session {request.session.session_key}"
-                separator = '&' if '?' in next_url else '?'
+                separator = "&" if "?" in next_url else "?"
                 url = f"{next_url}{separator}token={quote_plus(token)}"
             else:
                 # If FRONTEND_URL is set, redirect there with the session token
                 # so the frontend can complete its auth flow
                 from django.conf import settings
-                frontend_url = getattr(settings, 'FRONTEND_URL', None)
+
+                frontend_url = getattr(settings, "FRONTEND_URL", None)
                 if frontend_url:
                     token = f"Session {request.session.session_key}"
                     url = f"{frontend_url}/auth/callback?token={quote_plus(token)}"
@@ -362,7 +386,7 @@ class Auth1SessionWorkflow:
         This method will perform a redirect to the Landing Page for Login
         after cleaning the session.
         """
-        logger.debug('[Auth0] Auth0 Django logout requested')
+        logger.debug("[Auth0] Auth0 Django logout requested")
         request.session.clear()
         url = request.build_absolute_uri(reverse(cls.landing))
         url = cls._fix_proxy_pass(request, url)
@@ -415,8 +439,8 @@ class Auth1SessionWorkflow:
         - callback: tenant callback entrypoint
         - session: start session entrypoint.=
         """
-        _rl_login = ratelimit(key='ip', rate='10/m', block=True)(cls.login)
-        _rl_session = ratelimit(key='ip', rate='5/m', method='POST', block=True)(cls.session)
+        _rl_login = ratelimit(key="ip", rate="10/m", block=True)(cls.login)
+        _rl_session = ratelimit(key="ip", rate="5/m", method="POST", block=True)(cls.session)
         from auth1.active_idp import active_idp
         from auth1.dev_login import dev_login
         from auth1.local_login import local_login
@@ -431,9 +455,7 @@ class Auth1SessionWorkflow:
             path("dev-login", dev_login, name="dev-login"),
             path("local-login", local_login, name="local-login"),
             path("active-idp.json", active_idp, name="active-idp"),
-            path(
-                "scm/github/start", github_start, name="scm_github_start"
-            ),
+            path("scm/github/start", github_start, name="scm_github_start"),
             path(
                 "scm/github/callback",
                 github_callback,
@@ -464,15 +486,15 @@ class Auth1SessionWorkflow:
         """
         filter_chain = Q(email__iexact=user_info.email)
 
-        if settings.DEBUG and '+' in user_info.email:
-            main = user_info.email.split('+')
-            host = user_info.email.split('@')
-            filter_chain = filter_chain & Q(email__iexact=f'{main[0]}@{host[1]}')
+        if settings.DEBUG and "+" in user_info.email:
+            main = user_info.email.split("+")
+            host = user_info.email.split("@")
+            filter_chain = filter_chain & Q(email__iexact=f"{main[0]}@{host[1]}")
 
         user = User.objects.filter(filter_chain).first()
 
         if user:
-            logger.info(f'[Auth0] Found user by email: {repr(user_info.email)} to {repr(user.id)}')
+            logger.info(f"[Auth0] Found user by email: {repr(user_info.email)} to {repr(user.id)}")
             return user
 
         # Optional auto-signup: when the userinfo email lives under an
@@ -485,7 +507,7 @@ class Auth1SessionWorkflow:
             return auto
 
         # TODO: Implement phone number lookup
-        logger.warning(f'[Auth0] Could not find user by email: {repr(user_info.email)}', exc_info=True)
+        logger.warning(f"[Auth0] Could not find user by email: {repr(user_info.email)}", exc_info=True)
         return None
 
     @classmethod
@@ -512,7 +534,8 @@ class Auth1SessionWorkflow:
         if domain not in allow:
             logger.info(
                 "[Auth0] auto-signup skipped — domain %r not in allowlist %r",
-                domain, sorted(allow),
+                domain,
+                sorted(allow),
             )
             return None
 
@@ -539,7 +562,9 @@ class Auth1SessionWorkflow:
             user.save(update_fields=["password"])
             logger.info(
                 "[Auth0] auto-provisioned User id=%s username=%s (domain=%s)",
-                user.id, email, domain,
+                user.id,
+                email,
+                domain,
             )
         return user
 
@@ -548,7 +573,7 @@ class Auth1SessionWorkflow:
         """
         Register a user with the given auth0 token.
         """
-        keys_to_remove = ['gender', 'birthdate']
+        keys_to_remove = ["gender", "birthdate"]
         for key in keys_to_remove:
             if key in auth0_token:
                 del auth0_token[key]
@@ -559,9 +584,7 @@ class Auth1SessionWorkflow:
         # cognito:username, origin_jti, identities, token_use, auth_time,
         # jti. Filter to fields UserInfo actually declares so unknown
         # claims (now or in the future) don't crash callback().
-        _userinfo_fields = {
-            f.name for f in UserInfo._meta.get_fields() if hasattr(f, "attname")
-        }
+        _userinfo_fields = {f.name for f in UserInfo._meta.get_fields() if hasattr(f, "attname")}
         _raw_userinfo = auth0_token.get("userinfo") or {}
         _filtered = {k: v for k, v in _raw_userinfo.items() if k in _userinfo_fields}
 
@@ -574,13 +597,14 @@ class Auth1SessionWorkflow:
         # NOT NULL constraints happy and lets the IdP's own verification
         # gate the auth flow.
         from django.utils import timezone as _tz
+
         if "updated_at" not in _filtered or _filtered.get("updated_at") in (None, ""):
             _filtered["updated_at"] = _tz.now()
         # If the IdP itself asserted the email (federated through Google
         # Workspace via Cognito, or any other IdP-attested flow), trust
         # that. The federated IdP is the source of truth for email
         # verification, not Cognito's own user pool view of it.
-        iss = (_filtered.get("iss") or "")
+        iss = _filtered.get("iss") or ""
         if iss.startswith("https://cognito-idp."):
             _filtered["email_verified"] = True
 
@@ -610,18 +634,17 @@ class Auth1SessionWorkflow:
                 _u.save(update_fields=_changed)
                 logger.info(
                     "[Auth0] synced User fields from IdP for %s: %s",
-                    _u.username, _changed,
+                    _u.username,
+                    _changed,
                 )
 
         if not user_info.email_verified:
-            raise EmailNotVerifiedException(f'Email not verified for user: {user_info.email}')
+            raise EmailNotVerifiedException(f"Email not verified for user: {user_info.email}")
 
         # Same filtering logic for the Authentication model — providers
         # ship extras (refresh_token, scope shapes, provider-specific
         # bookkeeping) the schema doesn't model.
-        _auth_fields = {
-            f.name for f in Authentication._meta.get_fields() if hasattr(f, "attname")
-        }
+        _auth_fields = {f.name for f in Authentication._meta.get_fields() if hasattr(f, "attname")}
         authentication_dict = {k: v for k, v in auth0_token.items() if k in _auth_fields}
         authentication_dict["userinfo"] = user_info
         authentication = Authentication(**authentication_dict)
@@ -630,6 +653,8 @@ class Auth1SessionWorkflow:
         # It consumes a lot of records. We can store this information in Cache
         # Instead of the database.
         if authentication.userinfo.internal_user:
-            logger.info(f'[Auth0] Login with userinfo: {repr(authentication.userinfo.internal_user.username)}')
+            logger.info(
+                f"[Auth0] Login with userinfo: {repr(authentication.userinfo.internal_user.username)}"
+            )
             login(request, authentication.userinfo.internal_user)
         return authentication
