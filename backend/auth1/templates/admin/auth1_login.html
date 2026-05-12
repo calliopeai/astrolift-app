@@ -61,7 +61,12 @@
   {% endif %}
   <div class="submit-row">
     <input type="submit" value="{% translate 'Log in' %}">
-    <input type="submit" onclick="location.href='{% url 'login' %}'" value="{% translate 'SSO' %}">
+    {# Preserve ?next= so the post-callback redirect lands the operator back
+       on the admin page they were trying to reach, not the default frontend
+       landing URL set by FRONTEND_URL. #}
+    <input type="submit"
+           onclick="location.href='{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}'"
+           value="{% translate 'SSO' %}">
   </div>
 </form>
 
