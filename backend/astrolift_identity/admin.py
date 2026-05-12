@@ -18,6 +18,7 @@ from astrolift_identity.models import (
     Invitation,
     Member,
     Organization,
+    OrganizationAllowlistedDomain,
     OrgDomain,
     Policy,
     Project,
@@ -69,6 +70,14 @@ class IdentityProviderAdmin(_TenantAdminMixin, admin.ModelAdmin):
 class OrgDomainAdmin(_TenantAdminMixin, admin.ModelAdmin):
     list_display = ("domain", "organization", "jit_enabled", "deleted_at")
     list_filter = ("jit_enabled",)
+    search_fields = ("domain",)
+    readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(OrganizationAllowlistedDomain)
+class OrganizationAllowlistedDomainAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = ("domain", "organization", "default_role", "requires_review", "deleted_at")
+    list_filter = ("requires_review",)
     search_fields = ("domain",)
     readonly_fields = ("guid", "created_at", "updated_at", "version")
 
