@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import DisallowedHost
+from django.http.request import validate_host
 from netaddr import IPAddress, IPNetwork
 
 
@@ -22,7 +23,12 @@ class AllowCIDRHostsMiddleware:
             return self.get_response(request)
 
         host = request.get_host().split(":")[0]
-        if host in settings.ALLOWED_HOSTS:
+        # Delegate to Django's built-in matcher so '*' and '.example.com'-style
+        # wildcards in ALLOWED_HOSTS work the same way they do everywhere else
+        # in Django. Plain `host in ALLOWED_HOSTS` only catches exact literals
+        # and silently fails on the very wildcards ALLOWED_HOSTS is designed
+        # to support.
+        if validate_host(host, settings.ALLOWED_HOSTS):
             return self.get_response(request)
         try:
             for domain in self.KNOWN_DOMAINS:
