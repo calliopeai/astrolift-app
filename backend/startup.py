@@ -42,7 +42,19 @@ def execute_and_log(command):
     return result.returncode
 
 
-ON_STARTUP = ["showmigrations", "migrate"]
+# collectstatic is also baked into the Dockerfile, but running it again
+# at startup is idempotent and protects against build-time skew (e.g. an
+# operator deploying with a base image that pre-dates the bake step).
+# bootstrap_admin + bootstrap_idp are upsert-style and no-op when their
+# env vars are absent, so they're safe to run on every container start.
+# bootstrap_admin must precede bootstrap_idp (IdP binds to an existing org).
+ON_STARTUP = [
+    "showmigrations",
+    "migrate",
+    "collectstatic --noinput",
+    "bootstrap_admin",
+    "bootstrap_idp",
+]
 
 logger.warning("[STARTUP] Running startup... ==================================")
 

@@ -4,6 +4,7 @@ Authentication Session Workflow
 import dataclasses
 import json
 import logging
+import os
 import time
 import uuid
 from http import HTTPStatus
@@ -434,9 +435,73 @@ class Auth1SessionWorkflow:
             logger.info(f'[Auth0] Found user by email: {repr(user_info.email)} to {repr(user.id)}')
             return user
 
+        # Optional auto-signup: when the userinfo email lives under an
+        # operator-allowlisted domain (env var ASTROLIFT_AUTO_SIGNUP_DOMAINS,
+        # comma-separated, case-insensitive), provision a Django User on
+        # first sign-in instead of returning None. Unset env = legacy
+        # secure-default behavior: no auto-create, returns None.
+        auto = cls._maybe_autoprovision_user(user_info)
+        if auto:
+            return auto
+
         # TODO: Implement phone number lookup
         logger.warning(f'[Auth0] Could not find user by email: {repr(user_info.email)}', exc_info=True)
         return None
+
+    @classmethod
+    def _maybe_autoprovision_user(cls, user_info: UserInfo) -> User | None:
+        """
+        Create a Django User on first sign-in if the IdP-provided email
+        falls under an allowlisted domain. Returns the new User, or None
+        if auto-signup isn't enabled / the domain doesn't match / the
+        email isn't verified.
+
+        Configured by env var ASTROLIFT_AUTO_SIGNUP_DOMAINS — comma-
+        separated, case-insensitive (e.g. "steadymd.com,calliope.ai").
+        Leave it unset to keep the strict-lookup default.
+        """
+        raw = os.environ.get("ASTROLIFT_AUTO_SIGNUP_DOMAINS", "")
+        allow = {d.strip().lower() for d in raw.split(",") if d.strip()}
+        if not allow:
+            return None
+
+        email = (user_info.email or "").strip()
+        if not email or "@" not in email:
+            return None
+        domain = email.rsplit("@", 1)[1].lower()
+        if domain not in allow:
+            logger.info(
+                "[Auth0] auto-signup skipped — domain %r not in allowlist %r",
+                domain, sorted(allow),
+            )
+            return None
+
+        # The provider already attests email_verified=True for IdP-backed
+        # flows (Cognito + Google Workspace HD, Auth0 verified senders).
+        # If the upstream IdP forwards email_verified=False we honor it.
+        if getattr(user_info, "email_verified", True) is False:
+            logger.warning(
+                "[Auth0] auto-signup refused for %r — email_verified=False from IdP",
+                email,
+            )
+            return None
+
+        user, created = User.objects.get_or_create(
+            username=email,
+            defaults={
+                "email": email,
+                "first_name": getattr(user_info, "given_name", "") or "",
+                "last_name": getattr(user_info, "family_name", "") or "",
+            },
+        )
+        if created:
+            user.set_unusable_password()
+            user.save(update_fields=["password"])
+            logger.info(
+                "[Auth0] auto-provisioned User id=%s username=%s (domain=%s)",
+                user.id, email, domain,
+            )
+        return user
 
     @classmethod
     def _register_remote_user(cls, request, auth0_token) -> Authentication:
