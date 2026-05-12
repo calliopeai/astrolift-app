@@ -207,7 +207,10 @@ if USE_S3:
             "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
         },
         "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            # WhiteNoise's CompressedManifest storage hashes asset filenames so
+            # browsers can cache aggressively, and pre-generates gzip/brotli
+            # alongside originals so the runtime serve is just a file read.
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
     STATIC_ROOT = os.path.join(BASE_DIR, "assets")
@@ -398,6 +401,10 @@ MIDDLEWARE = [
     "config.middleware.allow_cidr_hosts.AllowCIDRHostsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise serves collected static files (admin css/js, etc.) directly
+    # from the app server. Must come immediately after SecurityMiddleware per
+    # https://whitenoise.readthedocs.io/.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "auth1.middleware.Auth0SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

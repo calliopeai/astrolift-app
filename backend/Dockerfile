@@ -18,10 +18,25 @@ WORKDIR /astrolift
 COPY Pipfile Pipfile.lock ./
 RUN pipenv requirements --dev > requirements.txt && pip install -r requirements.txt
 
+# whitenoise is declared in Pipfile but Pipfile.lock isn't regenerated as
+# part of this change; install it explicitly so collectstatic + the
+# WhiteNoiseMiddleware import work even before the lock catches up.
+RUN pip install --no-cache-dir whitenoise
+
 COPY . .
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV DJANGO_SETTINGS_MODULE=config.settings
+
+# Pre-collect static files into STATIC_ROOT so WhiteNoise can serve them at
+# runtime. Without this, /static/admin/css/* etc. would 404 in production
+# because Django's contrib.staticfiles isn't a runtime filesystem walker.
+# DJANGO_CONFIGURATION is forced to a config that uses the Manifest storage
+# so the hashing/compression step runs at build time, not first request.
+RUN DJANGO_CONFIGURATION=Prd \
+    DJANGO_SECRET_KEY=build-time-noop \
+    POSTGRES_ENGINE=django.db.backends.dummy \
+    python manage.py collectstatic --noinput
 
 CMD ["python", "startup.py"]
