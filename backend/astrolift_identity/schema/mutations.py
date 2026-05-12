@@ -675,13 +675,19 @@ class IdentityMutation:
 
         The plaintext token is returned exactly once via the
         InvitationCreatedType payload — the DB stores only its
-        SHA-256 hash. Operators are responsible for getting the
-        plaintext to the recipient out-of-band (UI exposes a
-        copy-link affordance with the accept URL).
+        SHA-256 hash. An invitation email is dispatched to ``email``
+        with the accept link; email delivery is best-effort and the
+        copy-link affordance in the UI is the durable channel — a
+        send failure logs but does not fail the mutation.
         """
         from datetime import timedelta
 
         from django.utils import timezone
+
+        from astrolift_identity.emails import (
+            build_invitation_accept_url,
+            send_invitation_email,
+        )
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
@@ -729,6 +735,20 @@ class IdentityMutation:
             invited_by=_actor(),
             status=Invitation.Status.PENDING,
         )
+
+        # Best-effort delivery. The accept_url_path returned in the
+        # payload remains the durable copy-link affordance regardless
+        # of whether the email actually goes out.
+        org = Organization.objects.filter(pk=org_id).only("name").first()
+        org_name = org.name if org is not None else "Astrolift"
+        send_invitation_email(
+            to_email=email,
+            org_name=org_name,
+            inviter=_actor(),
+            accept_url=build_invitation_accept_url(plaintext),
+            expires_at=expires_at,
+        )
+
         return gql_success(
             InvitationCreatedType(
                 invitation=invitation_to_type(inv),
