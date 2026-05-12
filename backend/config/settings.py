@@ -148,6 +148,14 @@ AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET")
 AUTH0_CLIENT_SCOPES = os.environ.get(
     "AUTH0_CLIENT_SCOPES", "openid profile email read:users create:users update:users"
 )
+# OIDC discovery URL override. On Auth0 the discovery doc lives at the same
+# host as the login UI, so AUTH0_DOMAIN is enough — `https://<domain>/.well-known/openid-configuration`
+# is correct. Other OIDC providers (notably AWS Cognito) split the two:
+# the hosted-UI domain serves /oauth2/authorize and /logout, but the
+# discovery doc lives at `cognito-idp.<region>.amazonaws.com/<pool-id>`.
+# When set, AUTH0_SERVER_METADATA_URL overrides the constructed default
+# without disturbing the login/logout flow that still uses AUTH0_DOMAIN.
+AUTH0_SERVER_METADATA_URL = os.environ.get("AUTH0_SERVER_METADATA_URL")
 AUTH0_DATABASE_CONNECTION_ID = os.environ.get(
     "AUTH0_DATABASE_CONNECTION_ID", "Username-Password-Authentication"
 )

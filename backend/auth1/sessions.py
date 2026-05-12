@@ -93,7 +93,13 @@ class AuthClient:
             client_kwargs={
                 "scope": settings.AUTH0_CLIENT_SCOPES,
             },
-            server_metadata_url=f"https://{settings.AUTH0_DOMAIN}/.well-known/openid-configuration",
+            # Prefer the explicit override (Cognito-style providers where the
+            # hosted UI domain doesn't serve the discovery doc); fall back to
+            # the Auth0-style "discovery on the login domain" default.
+            server_metadata_url=(
+                getattr(settings, "AUTH0_SERVER_METADATA_URL", None)
+                or f"https://{settings.AUTH0_DOMAIN}/.well-known/openid-configuration"
+            ),
         )
 
         if name == 'default':
