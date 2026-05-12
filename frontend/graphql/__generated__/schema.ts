@@ -37,6 +37,12 @@ export type AddAppDomainInput = {
   validationMethod: InputMaybe<Scalars['String']['input']>;
 };
 
+export type AddOrganizationAllowlistDomainInput = {
+  defaultRoleSlug: InputMaybe<Scalars['String']['input']>;
+  domain: Scalars['String']['input'];
+  requiresReview: Scalars['Boolean']['input'];
+};
+
 export type Alertruledeletedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -528,6 +534,21 @@ export type AstroliftOrganization = {
   slug: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   website: Scalars['String']['output'];
+};
+
+export type AstroliftOrganizationAllowlistedDomain = {
+  createdAt: Scalars['DateTime']['output'];
+  defaultRoleSlug?: Maybe<Scalars['String']['output']>;
+  domain: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  requiresReview: Scalars['Boolean']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftOrganizationAllowlistedDomainMutationResult = {
+  data?: Maybe<AstroliftOrganizationAllowlistedDomain>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftOrganizationMutationResult = {
@@ -1308,6 +1329,7 @@ export type Mutation = {
   /** Activate or deactivate an object by its global ID. */
   activate: Scalars['Boolean']['output'];
   addAppDomain: AstroliftAppDomainMutationResult;
+  addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
@@ -1401,6 +1423,7 @@ export type Mutation = {
   registerApp: AstroliftRegisteredAppMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
+  removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
@@ -1484,6 +1507,11 @@ export type MutationActivateArgs = {
 
 export type MutationAddAppDomainArgs = {
   input: AddAppDomainInput;
+};
+
+
+export type MutationAddOrganizationAllowlistDomainArgs = {
+  input: AddOrganizationAllowlistDomainInput;
 };
 
 
@@ -1836,6 +1864,11 @@ export type MutationRegisterTenantClusterArgs = {
 
 export type MutationRemoveAppDomainArgs = {
   input: RemoveAppDomainInput;
+};
+
+
+export type MutationRemoveOrganizationAllowlistDomainArgs = {
+  input: RemoveOrganizationAllowlistDomainInput;
 };
 
 
@@ -2288,6 +2321,7 @@ export type Query = {
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
+  astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
   astroliftPolicies: Array<AstroliftPolicy>;
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
@@ -2606,6 +2640,10 @@ export type RegisterTenantClusterInput = {
 };
 
 export type RemoveAppDomainInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type RemoveOrganizationAllowlistDomainInput = {
   id: Scalars['GUID']['input'];
 };
 

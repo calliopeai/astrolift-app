@@ -21,6 +21,7 @@ from astrolift_identity.models import (
     Invitation,
     Member,
     Organization,
+    OrganizationAllowlistedDomain,
     Policy,
     Project,
     Role,
@@ -34,6 +35,7 @@ from astrolift_identity.schema.types import (
     InvitationType,
     MemberType,
     MyProfileType,
+    OrganizationAllowlistedDomainType,
     OrganizationType,
     PolicyType,
     ProjectType,
@@ -44,6 +46,7 @@ from astrolift_identity.schema.types import (
     identity_provider_to_type,
     invitation_to_type,
     member_to_type,
+    organization_allowlisted_domain_to_type,
     organization_to_type,
     policy_to_type,
     project_to_type,
@@ -145,6 +148,29 @@ class IdentityQuery:
     def astrolift_policies(self, info: Info) -> list[PolicyType]:
         qs = Policy.objects.order_by("scope_level", "slug")[:200]
         return [policy_to_type(p) for p in qs]
+
+    # ---- Domain allowlist --------------------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_organization_allowlist_domains(self, info: Info) -> list[OrganizationAllowlistedDomainType]:
+        """Trusted email domains that auto-join SSO users into this org."""
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        qs = (
+            OrganizationAllowlistedDomain.objects.filter(
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("default_role")
+            .order_by("domain")[:500]
+        )
+        return [organization_allowlisted_domain_to_type(r) for r in qs]
 
     # ---- Identity providers ------------------------------------------
 
