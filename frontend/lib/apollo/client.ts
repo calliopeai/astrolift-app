@@ -4,7 +4,28 @@ import { cookies } from "next/headers";
 import { fetchToken } from "@/lib/auth/fetch-token";
 import { makeCache } from "./cache";
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_ROOT}/app/gql/config/`;
+// Server-side: NEXT_PUBLIC_API_ROOT is honored when set (split-origin dev
+// setups, e.g. http://localhost:8000). When unset — the case for the
+// upstream-published image, which is built without that env baked in —
+// fall back to the in-cluster apex via API_INTERNAL_ROOT, or as a last
+// resort PLATFORM_DOMAIN. This keeps SSR PreloadQuery calls from going
+// out as the literal string "undefined/app/gql/config/" and 404-ing,
+// which streams a failed result to the client and surfaces as a
+// "Couldn't load some data" banner on first paint.
+function resolveApiRoot(): string {
+  const explicit = process.env.NEXT_PUBLIC_API_ROOT;
+  if (explicit) return explicit.replace(/\/$/, "");
+  const internal = process.env.API_INTERNAL_ROOT;
+  if (internal) return internal.replace(/\/$/, "");
+  const platform = process.env.PLATFORM_DOMAIN;
+  if (platform) {
+    const host = platform.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${host}`;
+  }
+  return "http://localhost:8000";
+}
+
+const API_URL = `${resolveApiRoot()}/app/gql/config/`;
 
 // Cookies the SSR client forwards to the backend. The dev-login flow
 // uses Django's sessionid; production OIDC uses backend_jwt + a CSRF
