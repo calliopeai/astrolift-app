@@ -237,7 +237,13 @@ class Auth1SessionWorkflow:
         client_kwargs={
             "scope": settings.AUTH0_CLIENT_SCOPES,
         },
-        server_metadata_url=f"https://{settings.AUTH0_DOMAIN}/.well-known/openid-configuration",
+        # Auth0 serves discovery on the same host that handles login; Cognito
+        # splits the two — hosted-UI domain doesn't serve /.well-known. Prefer
+        # the explicit override when set, fall back to the Auth0-style default.
+        server_metadata_url=(
+            getattr(settings, "AUTH0_SERVER_METADATA_URL", None)
+            or f"https://{settings.AUTH0_DOMAIN}/.well-known/openid-configuration"
+        ),
     )
 
     @classmethod
