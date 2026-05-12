@@ -107,13 +107,13 @@ def test_2xx_reenables_and_resets_counter(code):
 
 
 @pytest.mark.parametrize("code", [400, 410, 500, 503])
-def test_non_2xx_increments_counter():
+def test_non_2xx_increments_counter(code):
     """410 and 4xx and 5xx all keep the subscription disabled
     (auto-disable already happened upstream — this is just
     re-test of recovery)."""
     out = classify_test_delivery(
         subscription_id=1,
-        test_status_code=500,
+        test_status_code=code,
         prior_consecutive_failed_reheals=2,
     )
     assert out.outcome == RehealOutcome.STILL_FAILING
