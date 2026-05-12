@@ -45,8 +45,16 @@ EXEMPT: dict[str, str] = {
     "IdentityQuery.astrolift_active_identity_provider": (
         "renders before any tenant is picked — the IdP catalogue is " "the entry point to the login flow"
     ),
+    "IdentityQuery.astrolift_active_sessions": (
+        "self-service: caller's own django_session rows, filtered by viewer "
+        "pk; orthogonal to tenant context"
+    ),
     "IdentityMutation.update_my_profile": (
         "self-service: callers can edit their own profile fields when " "the IdP doesn't lock them"
+    ),
+    "IdentityMutation.logout_all_sessions": (
+        "self-service: revokes the caller's own sessions; tenant context "
+        "is irrelevant — a session is bound to a user, not an org"
     ),
     "IdentityMutation.set_active_organization": (
         "the act of selecting a tenant context cannot itself be " "tenant-scoped"
