@@ -86,14 +86,14 @@ def test_cutoff_rejects_naive_now():
 
 
 def _hold(**kw):
-    base = dict(
-        stream="log",
-        starts_at=datetime(2026, 5, 1, tzinfo=UTC),
-        ends_at=datetime(2026, 5, 3, tzinfo=UTC),
-        resource_kind="",
-        resource_id="",
-        reason="",
-    )
+    base = {
+        "stream": "log",
+        "starts_at": datetime(2026, 5, 1, tzinfo=UTC),
+        "ends_at": datetime(2026, 5, 3, tzinfo=UTC),
+        "resource_kind": "",
+        "resource_id": "",
+        "reason": "",
+    }
     base.update(kw)
     return RetentionHold(**base)
 

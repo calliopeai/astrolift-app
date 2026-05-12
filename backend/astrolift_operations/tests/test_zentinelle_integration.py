@@ -43,22 +43,22 @@ def test_required_keys_present_for_every_event():
 
 
 def _envelope(**overrides) -> ZentinelleEnvelope:
-    base = dict(
-        payload_version=PAYLOAD_VERSION,
-        event_type=ZentinelleEventType.APP_DEPLOY.value,
-        event_id="01HXXX",
-        org_id=42,
-        actor_user_id=1,
-        occurred_at_unix=1_700_000_000,
-        payload={
+    base = {
+        "payload_version": PAYLOAD_VERSION,
+        "event_type": ZentinelleEventType.APP_DEPLOY.value,
+        "event_id": "01HXXX",
+        "org_id": 42,
+        "actor_user_id": 1,
+        "occurred_at_unix": 1_700_000_000,
+        "payload": {
             "app_slug": "api",
             "deployment_id": 100,
             "image_digest": "sha256:abc",
             "environment": "prod",
             "trigger_kind": "ci",
         },
-        idempotency_key="zentinelle-42-01HXXX",
-    )
+        "idempotency_key": "zentinelle-42-01HXXX",
+    }
     base.update(overrides)
     return ZentinelleEnvelope(**base)
 

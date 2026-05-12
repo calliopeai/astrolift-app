@@ -9,6 +9,7 @@ import json
 import strawberry
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_operations.models import (
     AlertEvent,
     AlertRule,
@@ -35,7 +36,6 @@ from astrolift_operations.schema.types import (
     webhook_to_type,
     workflow_run_to_type,
 )
-from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant

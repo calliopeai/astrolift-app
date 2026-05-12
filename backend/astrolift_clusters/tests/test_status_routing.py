@@ -16,14 +16,14 @@ from astrolift_clusters.status_routing import (
 
 
 def _app(**kw) -> AppLookup:
-    base = dict(
-        org_slug="acme",
-        app_slug="api",
-        is_suspended=False,
-        is_deploying=False,
-        last_deploy_failed=False,
-        has_public_workload=True,
-    )
+    base = {
+        "org_slug": "acme",
+        "app_slug": "api",
+        "is_suspended": False,
+        "is_deploying": False,
+        "last_deploy_failed": False,
+        "has_public_workload": True,
+    }
     base.update(kw)
     return AppLookup(**base)
 

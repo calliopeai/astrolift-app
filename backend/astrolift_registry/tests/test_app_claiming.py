@@ -19,25 +19,25 @@ REPO_URL = "https://github.com/acme/api"
 
 
 def _app(**kw) -> AppDiscoveryRow:
-    base = dict(
-        app_id=1,
-        app_slug="api",
-        org_id=10,
-        repo_url=REPO_URL,
-        bound_team_id=None,
-        bound_user_id=None,
-    )
+    base = {
+        "app_id": 1,
+        "app_slug": "api",
+        "org_id": 10,
+        "repo_url": REPO_URL,
+        "bound_team_id": None,
+        "bound_user_id": None,
+    }
     base.update(kw)
     return AppDiscoveryRow(**base)
 
 
 def _user(**kw) -> UserContext:
-    base = dict(
-        user_id=42,
-        accessible_repo_urls=frozenset({REPO_URL}),
-        org_memberships=frozenset({10}),
-        team_memberships=frozenset(),
-    )
+    base = {
+        "user_id": 42,
+        "accessible_repo_urls": frozenset({REPO_URL}),
+        "org_memberships": frozenset({10}),
+        "team_memberships": frozenset(),
+    }
     base.update(kw)
     return UserContext(**base)
 

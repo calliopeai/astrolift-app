@@ -69,12 +69,12 @@ def test_mint_distinct_tokens_per_call():
 
 
 def _record(token_hash: str, **kw) -> MagicLinkRecord:
-    base = dict(
-        token_hash=token_hash,
-        approver_user_id=42,
-        expires_at=_now(off_seconds=DEFAULT_APPROVAL_TIMEOUT_SECONDS),
-        consumed_at=None,
-    )
+    base = {
+        "token_hash": token_hash,
+        "approver_user_id": 42,
+        "expires_at": _now(off_seconds=DEFAULT_APPROVAL_TIMEOUT_SECONDS),
+        "consumed_at": None,
+    }
     base.update(kw)
     return MagicLinkRecord(**base)
 

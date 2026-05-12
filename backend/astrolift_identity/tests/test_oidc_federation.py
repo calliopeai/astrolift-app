@@ -16,25 +16,25 @@ from astrolift_identity.oidc_federation import (
 
 
 def _config(**kw) -> FederationConfig:
-    base = dict(
-        org_id=1,
-        issuer="https://token.actions.githubusercontent.com",
-        allowed_subject_patterns=("repo:acme/api:ref:refs/heads/main",),
-        audience="https://platform.acme.com",
-        target_app_pattern="",
-    )
+    base = {
+        "org_id": 1,
+        "issuer": "https://token.actions.githubusercontent.com",
+        "allowed_subject_patterns": ("repo:acme/api:ref:refs/heads/main",),
+        "audience": "https://platform.acme.com",
+        "target_app_pattern": "",
+    }
     base.update(kw)
     return FederationConfig(**base)
 
 
 def _claims(**kw) -> OidcClaims:
-    base = dict(
-        iss="https://token.actions.githubusercontent.com",
-        aud="https://platform.acme.com",
-        sub="repo:acme/api:ref:refs/heads/main",
-        exp_unix=1_700_000_000,
-        extra_claims={},
-    )
+    base = {
+        "iss": "https://token.actions.githubusercontent.com",
+        "aud": "https://platform.acme.com",
+        "sub": "repo:acme/api:ref:refs/heads/main",
+        "exp_unix": 1_700_000_000,
+        "extra_claims": {},
+    }
     base.update(kw)
     return OidcClaims(**base)
 

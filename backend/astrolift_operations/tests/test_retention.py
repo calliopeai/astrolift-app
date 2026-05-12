@@ -60,37 +60,37 @@ class _FakeAudit:
 
 
 def _ev(**kw) -> _FakeEvent:
-    base = dict(
-        guid=uuid4(),
-        occurred_at=datetime(2026, 5, 1, 12, tzinfo=UTC),
-        organization_id=1,
-        team_id=None,
-        project_id=None,
-        registered_app_id=42,
-        event_type="app.deployed",
-        resource_kind="App",
-        resource_id="42",
-        actor_user_id=7,
-        request_id="req-abc",
-        trace_id="trace-xyz",
-        payload={"deployment_id": 99},
-    )
+    base = {
+        "guid": uuid4(),
+        "occurred_at": datetime(2026, 5, 1, 12, tzinfo=UTC),
+        "organization_id": 1,
+        "team_id": None,
+        "project_id": None,
+        "registered_app_id": 42,
+        "event_type": "app.deployed",
+        "resource_kind": "App",
+        "resource_id": "42",
+        "actor_user_id": 7,
+        "request_id": "req-abc",
+        "trace_id": "trace-xyz",
+        "payload": {"deployment_id": 99},
+    }
     base.update(kw)
     return _FakeEvent(**base)
 
 
 def _aud(**kw) -> _FakeAudit:
-    base = dict(
-        occurred_at=datetime(2026, 5, 1, 12, tzinfo=UTC),
-        organization_id=1,
-        actor_kind="User",
-        actor_id="7",
-        action="app.create",
-        decision="allow",
-        resource_kind="App",
-        resource_id="42",
-        payload={"reason": "ok"},
-    )
+    base = {
+        "occurred_at": datetime(2026, 5, 1, 12, tzinfo=UTC),
+        "organization_id": 1,
+        "actor_kind": "User",
+        "actor_id": "7",
+        "action": "app.create",
+        "decision": "allow",
+        "resource_kind": "App",
+        "resource_id": "42",
+        "payload": {"reason": "ok"},
+    }
     base.update(kw)
     return _FakeAudit(**base)
 
@@ -153,7 +153,7 @@ def test_serialize_event_iso8601_z_suffix():
 def test_serialize_audit_includes_chain_by_default():
     rows = [_aud(action="a.x"), _aud(action="a.y"), _aud(action="a.z")]
     out = serialize_jsonl(rows, stream="audit", chained=True)
-    lines = [json.loads(l) for l in out.strip().split(b"\n")]
+    lines = [json.loads(raw) for raw in out.strip().split(b"\n")]
     assert lines[0]["integrity"]["hash_prev"] == "genesis"
     # each line's hash_prev == prior line's hash_self
     assert lines[1]["integrity"]["hash_prev"] == lines[0]["integrity"]["hash_self"]
@@ -260,7 +260,10 @@ def test_export_with_no_rows_is_noop():
 
 def test_export_partition_key_includes_stream_and_org():
     captured = []
-    sink = lambda b, key: captured.append(key)
+
+    def sink(b, key):
+        return captured.append(key)
+
     export_to_sink(
         [_aud(action="a")],
         stream="audit",

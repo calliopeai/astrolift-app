@@ -130,21 +130,21 @@ def test_workflow_id_includes_repo_in_name():
 
 
 def _event(**overrides) -> PrEventContext:
-    base = dict(
-        raw_action="opened",
-        repo_full_name="acme/api",
-        pr_number=42,
-        head_sha="aaaa1111",
-        head_branch="feat/x",
-        is_merge=False,
-        is_bot_author=False,
-    )
+    base = {
+        "raw_action": "opened",
+        "repo_full_name": "acme/api",
+        "pr_number": 42,
+        "head_sha": "aaaa1111",
+        "head_branch": "feat/x",
+        "is_merge": False,
+        "is_bot_author": False,
+    }
     base.update(overrides)
     return PrEventContext(**base)
 
 
 def _app(**overrides) -> AppPreviewContext:
-    base = dict(registered_app_id=1, preview_enabled=True)
+    base = {"registered_app_id": 1, "preview_enabled": True}
     base.update(overrides)
     return AppPreviewContext(**base)
 

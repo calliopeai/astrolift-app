@@ -101,22 +101,9 @@ def plan_emit_all(
 
     active_gitops.sort(key=lambda d: (d.cluster_slug, d.app_slug, d.env_slug, d.deployment_id))
 
-    out: list[EmitTask] = []
-    seen: set[tuple[str, str, str]] = set()
-    for d in active_gitops:
-        key = (d.cluster_slug, d.app_slug, d.env_slug)
-        if key in seen:
-            # Multiple active deployments for one (cluster, app, env)
-            # is unusual but possible during partial rollouts. The
-            # most-recent (last by deployment_id) wins; we already
-            # sorted so the LAST occurrence is the highest id.
-            continue
-        # Look back: we want the MOST RECENT for this key, not the
-        # first. Process in reverse to capture last-write-wins.
-        # (Actually simpler: iterate once and overwrite.)
-        seen.add(key)
-
-    # Re-do, this time picking last-by-deployment_id per group.
+    # Pick the most recent deployment per (cluster, app, env) — partial
+    # rollouts can leave multiple active rows for one key, and the
+    # highest deployment_id wins (last-write-wins).
     by_key: dict[tuple[str, str, str], ActiveDeployment] = {}
     for d in active_gitops:
         key = (d.cluster_slug, d.app_slug, d.env_slug)

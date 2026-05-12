@@ -16,14 +16,14 @@ from astrolift_identity.org_subdomain import (
 
 
 def _cfg(**kw) -> OrgSubdomainConfig:
-    base = dict(
-        org_id=1,
-        org_slug="acme",
-        base_zone="platform.example.com",
-        subdomain_label="acme",
-        custom_domains=(),
-        idp_id=42,
-    )
+    base = {
+        "org_id": 1,
+        "org_slug": "acme",
+        "base_zone": "platform.example.com",
+        "subdomain_label": "acme",
+        "custom_domains": (),
+        "idp_id": 42,
+    }
     base.update(kw)
     return OrgSubdomainConfig(**base)
 

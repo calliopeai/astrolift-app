@@ -87,12 +87,12 @@ def _render(
     workloads: tuple[WorkloadManifest, ...],
     **kwargs,
 ) -> list[dict]:
-    defaults = dict(
-        namespace="hello-prod",
-        image_tag="abc123",
-        image_repository="ghcr.io/acme/hello",
-        environment_name="prod",
-    )
+    defaults = {
+        "namespace": "hello-prod",
+        "image_tag": "abc123",
+        "image_repository": "ghcr.io/acme/hello",
+        "environment_name": "prod",
+    }
     defaults.update(kwargs)
     return render_manifests(_normalized(*workloads), **defaults)
 

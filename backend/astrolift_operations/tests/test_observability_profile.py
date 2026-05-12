@@ -257,14 +257,14 @@ def test_trace_driver_unknown():
 
 
 def _profile(**overrides) -> ObservabilityProfileSpec:
-    base = dict(
-        log_driver="loki",
-        log_config={"endpoint": "http://loki:3100"},
-        metrics_driver="managed_prometheus",
-        metrics_config={"workspace_url": "https://aps..."},
-        trace_driver="tempo",
-        trace_config={"endpoint": "http://tempo:3200"},
-    )
+    base = {
+        "log_driver": "loki",
+        "log_config": {"endpoint": "http://loki:3100"},
+        "metrics_driver": "managed_prometheus",
+        "metrics_config": {"workspace_url": "https://aps..."},
+        "trace_driver": "tempo",
+        "trace_config": {"endpoint": "http://tempo:3200"},
+    }
     base.update(overrides)
     return ObservabilityProfileSpec(**base)
 

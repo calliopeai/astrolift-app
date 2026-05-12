@@ -32,11 +32,11 @@ def _profile(*caps: ClusterStorageCapability) -> ClusterStorageProfile:
 
 
 def _vol(**kw) -> VolumeSpec:
-    base = dict(
-        name="data",
-        size="20Gi",
-        access_modes=("ReadWriteOnce",),
-    )
+    base = {
+        "name": "data",
+        "size": "20Gi",
+        "access_modes": ("ReadWriteOnce",),
+    }
     base.update(kw)
     return VolumeSpec(**base)
 

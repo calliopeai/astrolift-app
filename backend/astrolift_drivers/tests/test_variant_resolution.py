@@ -193,15 +193,15 @@ def test_org_policy_with_unknown_variant_falls_through_to_cluster_default():
 
 
 def test_resolution_is_deterministic_across_calls():
-    inputs = dict(
-        kind="postgres",
-        manifest_pin=None,
-        org_service_defaults=None,
-        cluster_service_defaults=None,
-        cluster_slug="prod",
-        plugin_slug="aws-rds",
-        plugin_variants=_aws_postgres_catalogue(),
-    )
+    inputs = {
+        "kind": "postgres",
+        "manifest_pin": None,
+        "org_service_defaults": None,
+        "cluster_service_defaults": None,
+        "cluster_slug": "prod",
+        "plugin_slug": "aws-rds",
+        "plugin_variants": _aws_postgres_catalogue(),
+    }
     a = resolve_variant(**inputs)
     b = resolve_variant(**inputs)
     assert (a.fqn, a.source) == (b.fqn, b.source)

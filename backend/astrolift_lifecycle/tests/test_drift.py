@@ -14,30 +14,30 @@ from astrolift_lifecycle.drift import (
 
 
 def _expected(**kw) -> WorkloadExpected:
-    base = dict(
-        name="api",
-        image_tag="api:1.0",
-        replicas=3,
-        env_literals={"FOO": "bar"},
-        resources={"cpu_request": "100m", "memory_limit": "512Mi"},
-        annotations={"team": "platform"},
-        labels={"app": "api"},
-    )
+    base = {
+        "name": "api",
+        "image_tag": "api:1.0",
+        "replicas": 3,
+        "env_literals": {"FOO": "bar"},
+        "resources": {"cpu_request": "100m", "memory_limit": "512Mi"},
+        "annotations": {"team": "platform"},
+        "labels": {"app": "api"},
+    }
     base.update(kw)
     return WorkloadExpected(**base)
 
 
 def _observed(**kw) -> WorkloadObserved:
-    base = dict(
-        name="api",
-        image_tag="api:1.0",
-        replicas=3,
-        env_literals={"FOO": "bar"},
-        resources={"cpu_request": "100m", "memory_limit": "512Mi"},
-        annotations={"team": "platform"},
-        labels={"app": "api"},
-        hpa_active=False,
-    )
+    base = {
+        "name": "api",
+        "image_tag": "api:1.0",
+        "replicas": 3,
+        "env_literals": {"FOO": "bar"},
+        "resources": {"cpu_request": "100m", "memory_limit": "512Mi"},
+        "annotations": {"team": "platform"},
+        "labels": {"app": "api"},
+        "hpa_active": False,
+    }
     base.update(kw)
     return WorkloadObserved(**base)
 

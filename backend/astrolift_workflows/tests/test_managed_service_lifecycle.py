@@ -39,13 +39,13 @@ def test_idempotency_key_stable_for_same_inputs():
 
 
 def test_idempotency_key_changes_with_any_input():
-    base = dict(
-        org_slug="acme",
-        app_slug="api",
-        env_slug="prod",
-        binding_name="main_db",
-        kind="postgres",
-    )
+    base = {
+        "org_slug": "acme",
+        "app_slug": "api",
+        "env_slug": "prod",
+        "binding_name": "main_db",
+        "kind": "postgres",
+    }
     base_key = idempotency_key(**base)
     for field, alt in (
         ("org_slug", "other"),

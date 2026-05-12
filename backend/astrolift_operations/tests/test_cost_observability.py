@@ -21,16 +21,16 @@ from astrolift_operations.cost_observability import (
 
 
 def _snap(**kw) -> CostSnapshot:
-    base = dict(
-        snapshot_date=date(2026, 5, 1),
-        org_id=1,
-        cost_usd=100.0,
-        category=CostCategory.COMPUTE,
-        team_id=None,
-        project_id=None,
-        app_id=None,
-        provider="",
-    )
+    base = {
+        "snapshot_date": date(2026, 5, 1),
+        "org_id": 1,
+        "cost_usd": 100.0,
+        "category": CostCategory.COMPUTE,
+        "team_id": None,
+        "project_id": None,
+        "app_id": None,
+        "provider": "",
+    }
     base.update(kw)
     return CostSnapshot(**base)
 

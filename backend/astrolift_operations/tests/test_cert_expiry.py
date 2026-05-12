@@ -18,7 +18,7 @@ UTC = UTC
 
 
 def _expires_in(days: int, **kw) -> CertSnapshot:
-    base = dict(not_after=datetime(2026, 6, 1, tzinfo=UTC) + timedelta(days=days))
+    base = {"not_after": datetime(2026, 6, 1, tzinfo=UTC) + timedelta(days=days)}
     base.update(kw)
     return CertSnapshot(**base)
 
