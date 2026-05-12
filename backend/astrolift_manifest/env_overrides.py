@@ -44,11 +44,7 @@ def deep_merge(
     """
     out = dict(base)
     for key, value in override.items():
-        if (
-            key in out
-            and isinstance(out[key], Mapping)
-            and isinstance(value, Mapping)
-        ):
+        if key in out and isinstance(out[key], Mapping) and isinstance(value, Mapping):
             out[key] = deep_merge(base=out[key], override=value)
         else:
             out[key] = value
@@ -71,8 +67,7 @@ def resolve_environment_overrides(
     """
     if env_name not in registered_envs:
         raise EnvOverrideError(
-            f"environment {env_name!r} not in registered envs "
-            f"{sorted(registered_envs)}; check for typo"
+            f"environment {env_name!r} not in registered envs " f"{sorted(registered_envs)}; check for typo"
         )
     if not environment_overrides:
         return dict(workload_defaults)
@@ -111,7 +106,7 @@ class Toleration:
 
     key: str
     operator: TolerationOperator
-    effect: str = ""    # "" | NoSchedule | PreferNoSchedule | NoExecute
+    effect: str = ""  # "" | NoSchedule | PreferNoSchedule | NoExecute
     value: str = ""
     toleration_seconds: int | None = None
 
@@ -127,12 +122,12 @@ class Toleration:
             )
 
         if self.operator == TolerationOperator.EXISTS and self.value:
-            raise EnvOverrideError(
-                "toleration with operator=Exists must not set value"
-            )
+            raise EnvOverrideError("toleration with operator=Exists must not set value")
 
         if self.effect and self.effect not in (
-            "NoSchedule", "PreferNoSchedule", "NoExecute",
+            "NoSchedule",
+            "PreferNoSchedule",
+            "NoExecute",
         ):
             raise EnvOverrideError(
                 f"toleration effect {self.effect!r} not one of "
@@ -141,13 +136,9 @@ class Toleration:
 
         if self.toleration_seconds is not None:
             if self.effect != "NoExecute":
-                raise EnvOverrideError(
-                    "toleration_seconds only valid when effect=NoExecute"
-                )
+                raise EnvOverrideError("toleration_seconds only valid when effect=NoExecute")
             if self.toleration_seconds < 0:
-                raise EnvOverrideError(
-                    "toleration_seconds must be non-negative"
-                )
+                raise EnvOverrideError("toleration_seconds must be non-negative")
 
 
 def parse_toleration(raw: Mapping) -> Toleration:
@@ -161,15 +152,11 @@ def parse_toleration(raw: Mapping) -> Toleration:
     try:
         operator = TolerationOperator(op_raw)
     except ValueError as exc:
-        raise EnvOverrideError(
-            f"toleration operator {op_raw!r} must be 'Equal' or 'Exists'"
-        ) from exc
+        raise EnvOverrideError(f"toleration operator {op_raw!r} must be 'Equal' or 'Exists'") from exc
 
     sec = raw.get("toleration_seconds")
     if sec is not None and not isinstance(sec, int):
-        raise EnvOverrideError(
-            "toleration_seconds must be an int (seconds)"
-        )
+        raise EnvOverrideError("toleration_seconds must be an int (seconds)")
 
     return Toleration(
         key=str(raw.get("key", "")),

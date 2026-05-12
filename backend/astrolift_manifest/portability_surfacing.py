@@ -168,43 +168,54 @@ def build_resolution_table(
     rows: list[ResolutionRow] = []
     for b in blocks:
         if b.pin:
-            rows.append(ResolutionRow(
-                kind=b.kind, name=b.name,
-                resolved_variant=b.pin,
-                source=ResolutionSource.MANIFEST_PIN,
-            ))
+            rows.append(
+                ResolutionRow(
+                    kind=b.kind,
+                    name=b.name,
+                    resolved_variant=b.pin,
+                    source=ResolutionSource.MANIFEST_PIN,
+                )
+            )
             continue
 
         org = org_defaults.get(b.kind, "")
         if org:
-            rows.append(ResolutionRow(
-                kind=b.kind, name=b.name,
-                resolved_variant=org,
-                source=ResolutionSource.ORG_DEFAULT,
-            ))
+            rows.append(
+                ResolutionRow(
+                    kind=b.kind,
+                    name=b.name,
+                    resolved_variant=org,
+                    source=ResolutionSource.ORG_DEFAULT,
+                )
+            )
             continue
 
         cluster = cluster_defaults.get(b.kind, "")
         if cluster:
-            rows.append(ResolutionRow(
-                kind=b.kind, name=b.name,
-                resolved_variant=cluster,
-                source=ResolutionSource.CLUSTER_DEFAULT,
-            ))
+            rows.append(
+                ResolutionRow(
+                    kind=b.kind,
+                    name=b.name,
+                    resolved_variant=cluster,
+                    source=ResolutionSource.CLUSTER_DEFAULT,
+                )
+            )
             continue
 
         plugin = plugin_defaults.get(b.kind, "")
         if plugin:
-            rows.append(ResolutionRow(
-                kind=b.kind, name=b.name,
-                resolved_variant=plugin,
-                source=ResolutionSource.PLUGIN_DEFAULT,
-            ))
+            rows.append(
+                ResolutionRow(
+                    kind=b.kind,
+                    name=b.name,
+                    resolved_variant=plugin,
+                    source=ResolutionSource.PLUGIN_DEFAULT,
+                )
+            )
             continue
 
         raise PortabilitySurfaceError(
-            f"block {b.kind}:{b.name!r} can't be resolved — no pin "
-            "and no default at any tier"
+            f"block {b.kind}:{b.name!r} can't be resolved — no pin " "and no default at any tier"
         )
     return tuple(rows)
 
@@ -249,33 +260,38 @@ def make_portable_suggestions(
         if not b.pin:
             continue
         if not has_portable_variant.get(b.kind, False):
-            out.append(MakePortableSuggestion(
-                kind=b.kind, name=b.name, current_pin=b.pin,
-                suggested_change=(
-                    f"no portable variant exists for {b.kind!r}; "
-                    "this kind is unavoidably plugin-specific"
-                ),
-                caveat="cannot swap without re-architecting",
-            ))
+            out.append(
+                MakePortableSuggestion(
+                    kind=b.kind,
+                    name=b.name,
+                    current_pin=b.pin,
+                    suggested_change=(
+                        f"no portable variant exists for {b.kind!r}; "
+                        "this kind is unavoidably plugin-specific"
+                    ),
+                    caveat="cannot swap without re-architecting",
+                )
+            )
             continue
 
         features = plugin_specific_features.get(f"{b.kind}:{b.name}", ())
         caveat = ""
         if features:
-            caveat = (
-                "the portable variant doesn't expose: "
-                + ", ".join(features)
-            )
+            caveat = "the portable variant doesn't expose: " + ", ".join(features)
 
-        out.append(MakePortableSuggestion(
-            kind=b.kind, name=b.name, current_pin=b.pin,
-            suggested_change=(
-                f"remove the variant pin from {b.kind}:{b.name!r} to "
-                "let the platform auto-resolve (would resolve to a "
-                "portable variant when available)"
-            ),
-            caveat=caveat,
-        ))
+        out.append(
+            MakePortableSuggestion(
+                kind=b.kind,
+                name=b.name,
+                current_pin=b.pin,
+                suggested_change=(
+                    f"remove the variant pin from {b.kind}:{b.name!r} to "
+                    "let the platform auto-resolve (would resolve to a "
+                    "portable variant when available)"
+                ),
+                caveat=caveat,
+            )
+        )
     return tuple(out)
 
 

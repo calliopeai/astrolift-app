@@ -81,9 +81,7 @@ class LifecycleQuery:
     def astrolift_deployment(self, info: Info, id: str) -> DeploymentType | None:
         """Single deployment by guid. Tenant-scoped via the manager."""
         d = (
-            Deployment.objects.select_related(
-                "registered_app", "app_environment", "workload"
-            )
+            Deployment.objects.select_related("registered_app", "app_environment", "workload")
             .filter(guid=id)
             .first()
         )
@@ -128,9 +126,9 @@ class LifecycleQuery:
         app_slug: str | None = None,
         limit: int = 100,
     ) -> list[CommandRunType]:
-        qs = CommandRun.objects.select_related(
-            "registered_app", "workload", "invoked_by"
-        ).order_by("-created_at")
+        qs = CommandRun.objects.select_related("registered_app", "workload", "invoked_by").order_by(
+            "-created_at"
+        )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [command_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
@@ -257,11 +255,12 @@ class LifecycleQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_app_domains(
-        self, info: Info, app_slug: str,
+        self,
+        info: Info,
+        app_slug: str,
     ) -> list[AppDomainType]:
         qs = (
-            CustomDomain.objects
-            .select_related("registered_app")
+            CustomDomain.objects.select_related("registered_app")
             .filter(
                 registered_app__slug=app_slug,
                 deleted_at__isnull=True,
@@ -274,11 +273,12 @@ class LifecycleQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_app_deploy_tokens(
-        self, info: Info, app_slug: str,
+        self,
+        info: Info,
+        app_slug: str,
     ) -> list[DeployTokenType]:
         qs = (
-            DeployToken.objects
-            .select_related("registered_app")
+            DeployToken.objects.select_related("registered_app")
             .filter(
                 registered_app__slug=app_slug,
                 deleted_at__isnull=True,

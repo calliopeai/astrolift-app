@@ -43,28 +43,22 @@ EXEMPT: dict[str, str] = {
         "ordering matters because permissions drive nav rendering"
     ),
     "IdentityQuery.astrolift_active_identity_provider": (
-        "renders before any tenant is picked — the IdP catalogue is "
-        "the entry point to the login flow"
+        "renders before any tenant is picked — the IdP catalogue is " "the entry point to the login flow"
     ),
     "IdentityMutation.update_my_profile": (
-        "self-service: callers can edit their own profile fields when "
-        "the IdP doesn't lock them"
+        "self-service: callers can edit their own profile fields when " "the IdP doesn't lock them"
     ),
     "IdentityMutation.set_active_organization": (
-        "the act of selecting a tenant context cannot itself be "
-        "tenant-scoped"
+        "the act of selecting a tenant context cannot itself be " "tenant-scoped"
     ),
     "IdentityMutation.create_organization": (
-        "creates the tenant — by definition there is no tenant "
-        "context yet at the time of this call"
+        "creates the tenant — by definition there is no tenant " "context yet at the time of this call"
     ),
     "IdentityMutation.update_organization": (
-        "operates on the org row directly; permission check restricts "
-        "to org admins of that specific org"
+        "operates on the org row directly; permission check restricts " "to org admins of that specific org"
     ),
     "IdentityMutation.soft_delete_organization": (
-        "operates on the org row directly; permission check restricts "
-        "to org admins of that specific org"
+        "operates on the org row directly; permission check restricts " "to org admins of that specific org"
     ),
     "IdentityMutation.accept_invitation": (
         "the invitation token is the auth proof; by definition the "
@@ -82,9 +76,7 @@ EXEMPT: dict[str, str] = {
 
 def _platform_schema_files() -> list[Path]:
     return sorted(
-        p
-        for p in BACKEND.glob("astrolift_*/schema/*.py")
-        if p.name in {"queries.py", "mutations.py"}
+        p for p in BACKEND.glob("astrolift_*/schema/*.py") if p.name in {"queries.py", "mutations.py"}
     )
 
 
@@ -144,8 +136,7 @@ def _resolver_methods(cls: ast.ClassDef) -> list[ast.FunctionDef]:
     return [
         m
         for m in cls.body
-        if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and _is_strawberry_field(m.decorator_list)
+        if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_strawberry_field(m.decorator_list)
     ]
 
 
@@ -175,9 +166,7 @@ def test_resolvers_have_tenancy_and_permission_guards(path: Path) -> None:
         if "require_permission" not in names:
             missing.append("@require_permission")
         if missing:
-            failures.append(
-                f"{path.relative_to(BACKEND)}::{qualname} is missing {' and '.join(missing)}"
-            )
+            failures.append(f"{path.relative_to(BACKEND)}::{qualname} is missing {' and '.join(missing)}")
 
     if failures:
         msg = (

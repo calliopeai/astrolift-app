@@ -51,9 +51,7 @@ class VersionParseError(ValueError):
 def parse_version(s: str) -> Version:
     m = _VERSION_RE.match(s.strip())
     if m is None:
-        raise VersionParseError(
-            f"version {s!r} not in strict X.Y.Z form (no pre-release / build metadata)"
-        )
+        raise VersionParseError(f"version {s!r} not in strict X.Y.Z form (no pre-release / build metadata)")
     return Version(int(m.group(1)), int(m.group(2)), int(m.group(3)))
 
 
@@ -141,8 +139,7 @@ def check_compatibility(
             CompatibilityIssue(
                 code="major_upgrade_requires_approval",
                 message=(
-                    f"major version bump {from_v} -> {to_v}; "
-                    "workflow must require operator approval"
+                    f"major version bump {from_v} -> {to_v}; " "workflow must require operator approval"
                 ),
             )
         )
@@ -152,16 +149,11 @@ def check_compatibility(
         issues.append(
             CompatibilityIssue(
                 code="missing_cluster_capabilities",
-                message=(
-                    f"cluster missing required capabilities: {sorted(missing)}"
-                ),
+                message=(f"cluster missing required capabilities: {sorted(missing)}"),
             )
         )
 
-    if (
-        min_platform_version is not None
-        and current_platform_version < min_platform_version
-    ):
+    if min_platform_version is not None and current_platform_version < min_platform_version:
         issues.append(
             CompatibilityIssue(
                 code="platform_too_old",
@@ -200,7 +192,7 @@ class RolloutBatch:
 # Default rollout shape: canary → 10% → 50% → 100%. Operators can
 # override per-plugin if they need stricter gates.
 DEFAULT_PHASES: tuple[tuple[str, float], ...] = (
-    ("canary", 0.0),       # canary clusters only
+    ("canary", 0.0),  # canary clusters only
     ("ring_1_10pct", 0.10),
     ("ring_2_50pct", 0.50),
     ("ring_3_100pct", 1.0),
@@ -239,9 +231,7 @@ def plan_rollout(
         # already-sorted non-canaries up to ``cumulative_target``.
         # Subtract clusters already shipped to in earlier phases.
         target_set = non_canaries[:cumulative_target]
-        new_ids = tuple(
-            c.cluster_id for c in target_set if c.cluster_id not in seen_ids
-        )
+        new_ids = tuple(c.cluster_id for c in target_set if c.cluster_id not in seen_ids)
         seen_ids.update(new_ids)
         out.append(RolloutBatch(phase=phase_name, cluster_ids=new_ids))
 

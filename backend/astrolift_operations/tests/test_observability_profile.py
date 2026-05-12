@@ -82,7 +82,8 @@ def test_retention_config_within_bounds():
 
 def test_log_driver_loki_minimal_config():
     kind = validate_log_driver_config(
-        driver="loki", config={"endpoint": "http://loki:3100"},
+        driver="loki",
+        config={"endpoint": "http://loki:3100"},
     )
     assert kind == LogDriver.LOKI
 
@@ -100,14 +101,16 @@ def test_log_driver_missing_required_key():
 def test_log_driver_opensearch_requires_index_prefix():
     with pytest.raises(ObservabilityProfileError, match="index_prefix"):
         validate_log_driver_config(
-            driver="opensearch", config={"endpoint": "https://os:9200"},
+            driver="opensearch",
+            config={"endpoint": "https://os:9200"},
         )
 
 
 def test_log_driver_cloudwatch_requires_region_and_log_group():
     with pytest.raises(ObservabilityProfileError, match="log_group"):
         validate_log_driver_config(
-            driver="cloudwatch_logs", config={"region": "us-east-1"},
+            driver="cloudwatch_logs",
+            config={"region": "us-east-1"},
         )
 
 
@@ -122,12 +125,18 @@ def test_log_driver_config_must_be_mapping():
 def test_log_multiplexer_two_children():
     kind = validate_log_driver_config(
         driver="multiplexer",
-        config={"children": [
-            {"driver": "loki", "config": {"endpoint": "http://loki:3100"}},
-            {"driver": "cloudwatch_logs", "config": {
-                "region": "us-east-1", "log_group": "/astrolift/apps",
-            }},
-        ]},
+        config={
+            "children": [
+                {"driver": "loki", "config": {"endpoint": "http://loki:3100"}},
+                {
+                    "driver": "cloudwatch_logs",
+                    "config": {
+                        "region": "us-east-1",
+                        "log_group": "/astrolift/apps",
+                    },
+                },
+            ]
+        },
     )
     assert kind == LogDriver.MULTIPLEXER
 
@@ -136,7 +145,8 @@ def test_multiplexer_empty_children_rejected():
     """Empty stack is meaningless. Refuse loudly."""
     with pytest.raises(ObservabilityProfileError, match="cannot be empty"):
         validate_log_driver_config(
-            driver="multiplexer", config={"children": []},
+            driver="multiplexer",
+            config={"children": []},
         )
 
 
@@ -152,17 +162,23 @@ def test_multiplexer_no_nesting():
     """Defensive: multiplexer-of-multiplexers would let cycles
     in by negligence. Forbid."""
     with pytest.raises(
-        ObservabilityProfileError, match="multiplexers themselves",
+        ObservabilityProfileError,
+        match="multiplexers themselves",
     ):
         validate_log_driver_config(
             driver="multiplexer",
-            config={"children": [
-                {"driver": "multiplexer", "config": {
-                    "children": [
-                        {"driver": "loki", "config": {"endpoint": "x"}},
-                    ],
-                }},
-            ]},
+            config={
+                "children": [
+                    {
+                        "driver": "multiplexer",
+                        "config": {
+                            "children": [
+                                {"driver": "loki", "config": {"endpoint": "x"}},
+                            ],
+                        },
+                    },
+                ]
+            },
         )
 
 
@@ -171,9 +187,11 @@ def test_multiplexer_child_validates_recursively():
     with pytest.raises(ObservabilityProfileError, match="endpoint"):
         validate_log_driver_config(
             driver="multiplexer",
-            config={"children": [
-                {"driver": "loki", "config": {}},
-            ]},
+            config={
+                "children": [
+                    {"driver": "loki", "config": {}},
+                ]
+            },
         )
 
 
@@ -201,7 +219,8 @@ def test_metrics_driver_managed_prometheus():
 def test_metrics_driver_datadog_requires_api_key():
     with pytest.raises(ObservabilityProfileError, match="api_key_secret_ref"):
         validate_metrics_driver_config(
-            driver="datadog", config={"site": "datadoghq.com"},
+            driver="datadog",
+            config={"site": "datadoghq.com"},
         )
 
 
@@ -215,7 +234,8 @@ def test_metrics_driver_unknown():
 
 def test_trace_driver_tempo():
     kind = validate_trace_driver_config(
-        driver="tempo", config={"endpoint": "http://tempo:3200"},
+        driver="tempo",
+        config={"endpoint": "http://tempo:3200"},
     )
     assert kind == TraceDriver.TEMPO
 
@@ -269,11 +289,13 @@ def test_collect_profile_issues_clean_profile():
 
 def test_collect_profile_issues_multiple():
     """Operator gets all errors at once, not whack-a-mole."""
-    issues = collect_profile_issues(profile=_profile(
-        log_driver="splunk",
-        metrics_driver="influxdb",
-        trace_driver="zipkin",
-    ))
+    issues = collect_profile_issues(
+        profile=_profile(
+            log_driver="splunk",
+            metrics_driver="influxdb",
+            trace_driver="zipkin",
+        )
+    )
     assert len(issues) == 3
     assert any("log_driver" in i for i in issues)
     assert any("metrics_driver" in i for i in issues)
@@ -282,10 +304,12 @@ def test_collect_profile_issues_multiple():
 
 def test_collect_profile_issues_partial_failure():
     """Some valid, some invalid → only invalid ones appear."""
-    issues = collect_profile_issues(profile=_profile(
-        log_driver="opensearch",
-        log_config={"endpoint": "https://os:9200"},  # missing index_prefix
-        # metrics + trace are fine
-    ))
+    issues = collect_profile_issues(
+        profile=_profile(
+            log_driver="opensearch",
+            log_config={"endpoint": "https://os:9200"},  # missing index_prefix
+            # metrics + trace are fine
+        )
+    )
     assert len(issues) == 1
     assert "index_prefix" in issues[0]

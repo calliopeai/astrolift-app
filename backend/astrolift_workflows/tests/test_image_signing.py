@@ -100,7 +100,9 @@ def test_required_passes_when_signer_matches_allowlist():
     )
     out = evaluate_policy(
         result=VerifyResult(
-            image_uri="reg/api:abc", is_signed=True, matched_signer=signer,
+            image_uri="reg/api:abc",
+            is_signed=True,
+            matched_signer=signer,
         ),
         policy=policy,
     )
@@ -117,7 +119,9 @@ def test_required_blocks_signed_but_no_match():
     )
     out = evaluate_policy(
         result=VerifyResult(
-            image_uri="reg/api:abc", is_signed=True, matched_signer=None,
+            image_uri="reg/api:abc",
+            is_signed=True,
+            matched_signer=None,
             verify_error="no matching signer",
         ),
         policy=policy,
@@ -149,7 +153,9 @@ def test_block_when_matched_signer_not_in_allowlist():
     other = AllowedSigner(kind=SignerKind.KMS, identity="some-other-key")
     out = evaluate_policy(
         result=VerifyResult(
-            image_uri="reg/api:abc", is_signed=True, matched_signer=other,
+            image_uri="reg/api:abc",
+            is_signed=True,
+            matched_signer=other,
         ),
         policy=policy,
     )
@@ -201,7 +207,9 @@ def test_override_converts_block_to_warn():
 
 def test_override_no_op_on_pass_or_warn():
     pass_dec = PolicyDecision(
-        decision=SigningDecision.PASS, matched_signer=None, reason="ok",
+        decision=SigningDecision.PASS,
+        matched_signer=None,
+        reason="ok",
     )
     override = SigningOverride(by_user_id=1, reason="just to confirm always")
     assert apply_override(pass_dec, override) == pass_dec

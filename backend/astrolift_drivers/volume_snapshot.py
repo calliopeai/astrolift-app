@@ -39,10 +39,10 @@ class SnapshotKind(str, Enum):
 # entry maps the abstract managed-service kind to its
 # canonical dump command. Driver implementations execute these.
 LOGICAL_BACKUP_TOOLING: dict[str, str] = {
-    "postgres": "pg_basebackup",   # also pg_dump for one-shot
+    "postgres": "pg_basebackup",  # also pg_dump for one-shot
     "mysql": "mysqldump",
     "redis": "BGSAVE",
-    "mq": "kafka-backup",          # vendor-specific; placeholder
+    "mq": "kafka-backup",  # vendor-specific; placeholder
     "object_store": "cross_bucket_replication",
     "document_db": "mongodump",
 }
@@ -51,9 +51,7 @@ LOGICAL_BACKUP_TOOLING: dict[str, str] = {
 # ---- snapshot retention --------------------------------------------
 
 
-_CRON_RE = re.compile(
-    r"^(\S+\s+){4}\S+$"
-)
+_CRON_RE = re.compile(r"^(\S+\s+){4}\S+$")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -75,9 +73,7 @@ class SnapshotPolicy:
         if self.retention <= 0:
             raise ValueError("retention must be positive")
         if not _CRON_RE.match(self.schedule):
-            raise ValueError(
-                f"schedule {self.schedule!r} not a 5-field cron expression"
-            )
+            raise ValueError(f"schedule {self.schedule!r} not a 5-field cron expression")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -104,7 +100,9 @@ def snapshots_to_prune(
     if not snapshots:
         return ()
     sorted_snaps = sorted(
-        snapshots, key=lambda s: s.created_at_unix, reverse=True,
+        snapshots,
+        key=lambda s: s.created_at_unix,
+        reverse=True,
     )
     if len(sorted_snaps) <= retention:
         return ()

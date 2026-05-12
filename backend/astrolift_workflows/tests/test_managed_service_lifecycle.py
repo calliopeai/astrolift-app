@@ -22,20 +22,29 @@ def test_idempotency_key_stable_for_same_inputs():
     """Re-firing the deploy must hit the SAME Temporal workflow id
     so retries join the existing run."""
     a = idempotency_key(
-        org_slug="acme", app_slug="api", env_slug="prod",
-        binding_name="main_db", kind="postgres",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
+        binding_name="main_db",
+        kind="postgres",
     )
     b = idempotency_key(
-        org_slug="acme", app_slug="api", env_slug="prod",
-        binding_name="main_db", kind="postgres",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
+        binding_name="main_db",
+        kind="postgres",
     )
     assert a == b
 
 
 def test_idempotency_key_changes_with_any_input():
     base = dict(
-        org_slug="acme", app_slug="api", env_slug="prod",
-        binding_name="main_db", kind="postgres",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
+        binding_name="main_db",
+        kind="postgres",
     )
     base_key = idempotency_key(**base)
     for field, alt in (
@@ -54,8 +63,11 @@ def test_idempotency_key_starts_with_msvc_prefix():
     """Convention helps operators find the workflow run by
     binding."""
     out = idempotency_key(
-        org_slug="acme", app_slug="api", env_slug="prod",
-        binding_name="main_db", kind="postgres",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
+        binding_name="main_db",
+        kind="postgres",
     )
     assert out.startswith("msvc-acme-api-prod-main_db-")
 
@@ -147,7 +159,8 @@ def test_snapshot_policy_requires_schedule():
 
 def _snap(snapshot_id: str, created_at_unix: int) -> SnapshotRecord:
     return SnapshotRecord(
-        snapshot_id=snapshot_id, created_at_unix=created_at_unix,
+        snapshot_id=snapshot_id,
+        created_at_unix=created_at_unix,
     )
 
 

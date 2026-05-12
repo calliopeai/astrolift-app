@@ -20,9 +20,12 @@ REPO_URL = "https://github.com/acme/api"
 
 def _app(**kw) -> AppDiscoveryRow:
     base = dict(
-        app_id=1, app_slug="api", org_id=10,
+        app_id=1,
+        app_slug="api",
+        org_id=10,
         repo_url=REPO_URL,
-        bound_team_id=None, bound_user_id=None,
+        bound_team_id=None,
+        bound_user_id=None,
     )
     base.update(kw)
     return AppDiscoveryRow(**base)
@@ -52,7 +55,8 @@ def test_unowned_app_in_user_org_with_repo_access_is_unowned():
 def test_team_bound_app_not_claimable():
     """Bound apps require a transfer flow, not claim."""
     state = claimable_state_of(
-        app=_app(bound_team_id=99), user=_user(),
+        app=_app(bound_team_id=99),
+        user=_user(),
     )
     assert state == ClaimableState.NOT_CLAIMABLE
 
@@ -131,7 +135,8 @@ def test_can_claim_returns_owner_id():
 
 def test_can_claim_rejects_team_bound_with_specific_reason():
     decision = can_claim(
-        app=_app(bound_team_id=5), user=_user(),
+        app=_app(bound_team_id=5),
+        user=_user(),
     )
     assert decision.accepted is False
     assert "transfer flow" in decision.reason
@@ -148,7 +153,8 @@ def test_can_claim_rejects_no_scm_access_with_specific_reason():
 
 def test_can_claim_rejects_self_owned():
     decision = can_claim(
-        app=_app(bound_user_id=42), user=_user(),
+        app=_app(bound_user_id=42),
+        user=_user(),
     )
     assert decision.accepted is False
     assert "already owns" in decision.reason

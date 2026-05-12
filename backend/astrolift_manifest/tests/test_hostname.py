@@ -50,9 +50,7 @@ def test_no_public_workloads_yields_no_hostnames():
     assert (
         compute_hostnames(
             manifest,
-            HostnameInputs(
-                app_slug="hello", org_slug="acme", base_zone="astrolift.dev"
-            ),
+            HostnameInputs(app_slug="hello", org_slug="acme", base_zone="astrolift.dev"),
         )
         == []
     )
@@ -62,9 +60,7 @@ def test_single_public_workload_uses_app_slug():
     manifest = _normalized(_wl("web", is_public=True))
     out = compute_hostnames(
         manifest,
-        HostnameInputs(
-            app_slug="hello", org_slug="acme", base_zone="astrolift.dev"
-        ),
+        HostnameInputs(app_slug="hello", org_slug="acme", base_zone="astrolift.dev"),
     )
     assert len(out) == 1
     assert out[0].hostname == "hello.acme.astrolift.dev"
@@ -93,9 +89,7 @@ def test_multi_public_workloads_get_flat_suffix():
     )
     out = compute_hostnames(
         manifest,
-        HostnameInputs(
-            app_slug="hello", org_slug="acme", base_zone="astrolift.dev"
-        ),
+        HostnameInputs(app_slug="hello", org_slug="acme", base_zone="astrolift.dev"),
     )
     hosts = sorted(o.hostname for o in out)
     assert hosts == [
@@ -112,9 +106,7 @@ def test_multi_workload_with_one_private_skips_the_private():
     )
     out = compute_hostnames(
         manifest,
-        HostnameInputs(
-            app_slug="hello", org_slug="acme", base_zone="astrolift.dev"
-        ),
+        HostnameInputs(app_slug="hello", org_slug="acme", base_zone="astrolift.dev"),
     )
     assert {o.workload_slug for o in out} == {"web", "api"}
 
@@ -141,9 +133,7 @@ def test_uppercase_subdomain_normalized_to_lower():
     manifest = _normalized(_wl("web", is_public=True))
     out = compute_hostnames(
         manifest,
-        HostnameInputs(
-            app_slug="HELLO", org_slug="acme", base_zone="astrolift.dev"
-        ),
+        HostnameInputs(app_slug="HELLO", org_slug="acme", base_zone="astrolift.dev"),
     )
     assert out[0].hostname == "hello.acme.astrolift.dev"
 
@@ -152,14 +142,10 @@ def test_uppercase_subdomain_normalized_to_lower():
 
 
 def test_preview_hostname_pattern():
-    h = compute_preview_hostname(
-        pr_number=42, app_slug="hello", org_slug="acme", base_zone="astrolift.dev"
-    )
+    h = compute_preview_hostname(pr_number=42, app_slug="hello", org_slug="acme", base_zone="astrolift.dev")
     assert h == "pr-42-hello.pr.acme.astrolift.dev"
 
 
 def test_preview_hostname_rejects_non_positive_pr_number():
     with pytest.raises(ValueError):
-        compute_preview_hostname(
-            pr_number=0, app_slug="x", org_slug="y", base_zone="z"
-        )
+        compute_preview_hostname(pr_number=0, app_slug="x", org_slug="y", base_zone="z")

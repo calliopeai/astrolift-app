@@ -22,7 +22,9 @@ GOOD_DIGEST = "sha256:" + "a" * 64
 
 def _ref(deployment_id: int, **kw) -> DeploymentRef:
     base = dict(
-        app_id=1, environment_id=1, image_digest=GOOD_DIGEST,
+        app_id=1,
+        environment_id=1,
+        image_digest=GOOD_DIGEST,
         promoted_from_id=None,
     )
     base.update(kw)
@@ -41,7 +43,8 @@ def _target(env_id: int, **kw) -> PromotionTarget:
 def test_promotion_rejected_across_apps():
     with pytest.raises(PromotionError, match="source app .* != target app"):
         validate_promotion(
-            source=_ref(1, app_id=1), target=_target(2, app_id=99),
+            source=_ref(1, app_id=1),
+            target=_target(2, app_id=99),
         )
 
 
@@ -49,7 +52,8 @@ def test_promotion_rejected_to_same_environment():
     """No-op promotion is almost certainly a misclick — surface it."""
     with pytest.raises(PromotionError, match="source environment"):
         validate_promotion(
-            source=_ref(1, environment_id=5), target=_target(5),
+            source=_ref(1, environment_id=5),
+            target=_target(5),
         )
 
 
@@ -58,7 +62,8 @@ def test_promotion_rejected_when_source_unpinned():
     which requires the source to be pinned. Reject otherwise."""
     with pytest.raises(PromotionError, match="no image digest"):
         validate_promotion(
-            source=_ref(1, image_digest=""), target=_target(2),
+            source=_ref(1, image_digest=""),
+            target=_target(2),
         )
 
 
@@ -156,7 +161,8 @@ def test_walk_caps_at_max_hops():
     refs = {}
     for i in range(MAX_LINEAGE_HOPS + 5):
         refs[i] = _ref(
-            i, promoted_from_id=(i - 1) if i > 0 else None,
+            i,
+            promoted_from_id=(i - 1) if i > 0 else None,
             environment_id=i + 1,
         )
     leaf = refs[MAX_LINEAGE_HOPS + 4]

@@ -113,9 +113,7 @@ def reminders_to_fire(
         # last check was before the boundary. ``last_check_at=None``
         # treats the first evaluation as "everything just crossed".
         crossed_now = now >= boundary
-        was_already_crossed = (
-            last_check_at is not None and last_check_at >= boundary
-        )
+        was_already_crossed = last_check_at is not None and last_check_at >= boundary
         if crossed_now and not was_already_crossed:
             crossings.append(threshold)
     return tuple(crossings)
@@ -146,9 +144,7 @@ def evaluate(
         is_due=now >= due_at,
         next_due_at=due_at,
         days_until_due=days_until,
-        reminders_to_fire=reminders_to_fire(
-            policy, now=now, last_check_at=last_check_at
-        ),
+        reminders_to_fire=reminders_to_fire(policy, now=now, last_check_at=last_check_at),
     )
 
 

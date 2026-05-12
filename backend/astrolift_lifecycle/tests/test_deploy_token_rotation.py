@@ -73,11 +73,7 @@ def test_rotate_issues_new_secret_and_parks_old(app):
     assert rotated.last_rotated_at is not None
     # Default grace period: 1h.
     grace = rotated.previous_token_expires_at - rotated.last_rotated_at
-    assert (
-        DEFAULT_GRACE_PERIOD_SECONDS - 1
-        <= grace.total_seconds()
-        <= DEFAULT_GRACE_PERIOD_SECONDS + 1
-    )
+    assert DEFAULT_GRACE_PERIOD_SECONDS - 1 <= grace.total_seconds() <= DEFAULT_GRACE_PERIOD_SECONDS + 1
 
 
 def test_rotate_immediate_skips_grace_window(app):
@@ -140,9 +136,7 @@ def test_verify_rejects_revoked_token(app):
 
 def test_verify_rejects_expired_token(app):
     row, plaintext = issue_token(app=app, name="ci")
-    DeployToken.objects.filter(pk=row.pk).update(
-        expires_at=timezone.now() - dt.timedelta(seconds=1)
-    )
+    DeployToken.objects.filter(pk=row.pk).update(expires_at=timezone.now() - dt.timedelta(seconds=1))
     assert verify_token(plaintext, app=app) is None
 
 

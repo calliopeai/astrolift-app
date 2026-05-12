@@ -37,7 +37,8 @@ def test_parse_path_with_extra_segments_takes_first_two() -> None:
     say) don't break the parser — it takes app + workload from
     the first two slots after /app/exec/."""
     assert _parse_target_id("/app/exec/acme/web/abc-123") == (
-        "acme", "web",
+        "acme",
+        "web",
     )
 
 
@@ -68,7 +69,10 @@ def test_set_exec_backend_swaps() -> None:
 async def test_stub_backend_emits_not_wired_message_then_exits() -> None:
     backend = _StubExecBackend()
     captured: dict[str, list] = {
-        "stdout": [], "stderr": [], "exit": [], "error": [],
+        "stdout": [],
+        "stderr": [],
+        "exit": [],
+        "error": [],
     }
 
     async def stdout(d: str) -> None:
@@ -84,10 +88,14 @@ async def test_stub_backend_emits_not_wired_message_then_exits() -> None:
         captured["error"].append(m)
 
     session = await backend.open(
-        app_slug="acme", workload_slug="web",
-        container="main", command=["sh"],
-        send_stdout=stdout, send_stderr=stderr,
-        send_exit=exit_code, send_error=err,
+        app_slug="acme",
+        workload_slug="web",
+        container="main",
+        command=["sh"],
+        send_stdout=stdout,
+        send_stderr=stderr,
+        send_exit=exit_code,
+        send_error=err,
     )
 
     assert captured["stderr"]
@@ -112,12 +120,14 @@ class _RecordingBackend(ExecBackend):
         self.closes = 0
 
     async def open(self, **kw: Any) -> ExecSession:
-        self.opens.append({
-            "app_slug": kw["app_slug"],
-            "workload_slug": kw["workload_slug"],
-            "container": kw["container"],
-            "command": kw["command"],
-        })
+        self.opens.append(
+            {
+                "app_slug": kw["app_slug"],
+                "workload_slug": kw["workload_slug"],
+                "container": kw["container"],
+                "command": kw["command"],
+            }
+        )
         backend = self
 
         class _Sess(ExecSession):
@@ -150,11 +160,13 @@ async def test_dispatcher_routes_frames_to_backend(
     async def _ok_user(_session_key):
         class _U:
             is_authenticated = True
+
         return _U(), {}
 
     async def _ok_tenant(_user, _data):
         class _T:
             organization_id = 1
+
         return _T()
 
     async def _ok_app(*, app_slug, tenant_org_id):
@@ -163,21 +175,27 @@ async def test_dispatcher_routes_frames_to_backend(
     import core.schema.ws_views as ws_views_mod
 
     monkeypatch.setattr(
-        ws_views_mod, "_resolve_user_from_sessionid", _ok_user,
+        ws_views_mod,
+        "_resolve_user_from_sessionid",
+        _ok_user,
     )
     monkeypatch.setattr(
-        ws_views_mod, "_resolve_tenant_for_user", _ok_tenant,
+        ws_views_mod,
+        "_resolve_tenant_for_user",
+        _ok_tenant,
     )
     monkeypatch.setattr(mod, "_check_app_in_tenant", _ok_app)
 
     incoming: list[dict] = [
         {
             "type": "websocket.receive",
-            "text": json.dumps({
-                "type": "open",
-                "container": "main",
-                "command": ["sh", "-c", "echo hi"],
-            }),
+            "text": json.dumps(
+                {
+                    "type": "open",
+                    "container": "main",
+                    "command": ["sh", "-c", "echo hi"],
+                }
+            ),
         },
         {
             "type": "websocket.receive",
@@ -185,9 +203,13 @@ async def test_dispatcher_routes_frames_to_backend(
         },
         {
             "type": "websocket.receive",
-            "text": json.dumps({
-                "type": "resize", "rows": 24, "cols": 80,
-            }),
+            "text": json.dumps(
+                {
+                    "type": "resize",
+                    "rows": 24,
+                    "cols": 80,
+                }
+            ),
         },
         {
             "type": "websocket.receive",
@@ -212,12 +234,14 @@ async def test_dispatcher_routes_frames_to_backend(
 
     await mod.exec_ws_application(scope, receive, send)
 
-    assert backend.opens == [{
-        "app_slug": "acme",
-        "workload_slug": "web",
-        "container": "main",
-        "command": ["sh", "-c", "echo hi"],
-    }]
+    assert backend.opens == [
+        {
+            "app_slug": "acme",
+            "workload_slug": "web",
+            "container": "main",
+            "command": ["sh", "-c", "echo hi"],
+        }
+    ]
     assert backend.stdin == ["more"]
     assert backend.resizes == [(24, 80)]
     # Close runs from explicit 'close' frame + finally block.

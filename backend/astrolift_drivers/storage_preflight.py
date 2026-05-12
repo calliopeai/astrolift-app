@@ -86,57 +86,63 @@ def preflight(
         # RWX requirement
         if "ReadWriteMany" in volume.access_modes:
             if ClusterStorageCapability.HAS_RWX not in profile.capabilities:
-                out.append(PreflightFailure(
-                    volume_name=volume.name,
-                    code="no_rwx_storage_class",
-                    message=(
-                        f"volume {volume.name!r} requires ReadWriteMany "
-                        f"but cluster {profile.cluster_slug!r} has no "
-                        "RWX-capable StorageClass"
-                    ),
-                    remediation=(
-                        "install a CSI driver with RWX support: "
-                        "Longhorn (longhorn-rwx), rook-ceph-filesystem, "
-                        "AWS EFS CSI, or GCP Filestore CSI; or pick a "
-                        "different cluster"
-                    ),
-                ))
+                out.append(
+                    PreflightFailure(
+                        volume_name=volume.name,
+                        code="no_rwx_storage_class",
+                        message=(
+                            f"volume {volume.name!r} requires ReadWriteMany "
+                            f"but cluster {profile.cluster_slug!r} has no "
+                            "RWX-capable StorageClass"
+                        ),
+                        remediation=(
+                            "install a CSI driver with RWX support: "
+                            "Longhorn (longhorn-rwx), rook-ceph-filesystem, "
+                            "AWS EFS CSI, or GCP Filestore CSI; or pick a "
+                            "different cluster"
+                        ),
+                    )
+                )
 
         # Regional durability requirement
         if volume.durability == Durability.REGIONAL:
             if ClusterStorageCapability.HAS_REGIONAL not in profile.capabilities:
-                out.append(PreflightFailure(
-                    volume_name=volume.name,
-                    code="no_regional_storage_class",
-                    message=(
-                        f"volume {volume.name!r} requires regional "
-                        "durability but cluster has no regional "
-                        "StorageClass"
-                    ),
-                    remediation=(
-                        "select a managed regional StorageClass on "
-                        "the cluster (e.g. AWS gp3 with multi-AZ EBS "
-                        "snapshot replication, GCP regional pd-ssd, "
-                        "Azure ZRS) or pick a different cluster"
-                    ),
-                ))
+                out.append(
+                    PreflightFailure(
+                        volume_name=volume.name,
+                        code="no_regional_storage_class",
+                        message=(
+                            f"volume {volume.name!r} requires regional "
+                            "durability but cluster has no regional "
+                            "StorageClass"
+                        ),
+                        remediation=(
+                            "select a managed regional StorageClass on "
+                            "the cluster (e.g. AWS gp3 with multi-AZ EBS "
+                            "snapshot replication, GCP regional pd-ssd, "
+                            "Azure ZRS) or pick a different cluster"
+                        ),
+                    )
+                )
 
     # In-cluster managed service block-storage requirement
     if needs_in_cluster_managed_service:
         if ClusterStorageCapability.HAS_BLOCK not in profile.capabilities:
-            out.append(PreflightFailure(
-                volume_name="",
-                code="no_block_storage_class",
-                message=(
-                    "in-cluster managed service variant selected but "
-                    "cluster has no usable block StorageClass"
-                ),
-                remediation=(
-                    "install a CSI block driver (rook-ceph-block, "
-                    "longhorn block) or pick an out-of-cluster "
-                    "managed-service variant"
-                ),
-            ))
+            out.append(
+                PreflightFailure(
+                    volume_name="",
+                    code="no_block_storage_class",
+                    message=(
+                        "in-cluster managed service variant selected but "
+                        "cluster has no usable block StorageClass"
+                    ),
+                    remediation=(
+                        "install a CSI block driver (rook-ceph-block, "
+                        "longhorn block) or pick an out-of-cluster "
+                        "managed-service variant"
+                    ),
+                )
+            )
 
     return tuple(out)
 
@@ -150,7 +156,8 @@ def assert_preflight_passes(
     """Raise StorageError concatenating every failure if any.
     Convenience for the bind workflow."""
     failures = preflight(
-        volumes=volumes, profile=profile,
+        volumes=volumes,
+        profile=profile,
         needs_in_cluster_managed_service=needs_in_cluster_managed_service,
     )
     if failures:
@@ -180,7 +187,9 @@ def used_ratio_severity(*, used_ratio: float) -> VolumeAlertSeverity:
 
 
 def snapshot_age_alarm(
-    *, oldest_snapshot_age_seconds: float, schedule_seconds: int,
+    *,
+    oldest_snapshot_age_seconds: float,
+    schedule_seconds: int,
 ) -> bool:
     """True when the oldest snapshot is staler than 1.5x the
     declared schedule period — strong signal the snapshot

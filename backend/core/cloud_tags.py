@@ -65,12 +65,14 @@ TAG_DEPLOYMENT_ID = f"{PLATFORM_NAMESPACE}/deployment_id"
 # CI test in astrolift-providers asserts this on smoke-deployed
 # fixtures — catches plugin authors who forgot to thread tags
 # through.
-MIN_REQUIRED_KEYS: frozenset[str] = frozenset({
-    TAG_INSTALL,
-    TAG_ORG,
-    TAG_APP,
-    TAG_ENV,
-})
+MIN_REQUIRED_KEYS: frozenset[str] = frozenset(
+    {
+        TAG_INSTALL,
+        TAG_ORG,
+        TAG_APP,
+        TAG_ENV,
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -118,15 +120,13 @@ class CloudTagSet:
         ):
             if not value:
                 raise ValueError(
-                    f"{label} is required for cloud tag set "
-                    "(platform-mandated for cost attribution)"
+                    f"{label} is required for cloud tag set " "(platform-mandated for cost attribution)"
                 )
         # Reserved-namespace check on extra keys
         for key in self.extra:
             if key.startswith(PLATFORM_NAMESPACE):
                 raise ValueError(
-                    f"extra key {key!r} clashes with the platform "
-                    f"namespace {PLATFORM_NAMESPACE!r}"
+                    f"extra key {key!r} clashes with the platform " f"namespace {PLATFORM_NAMESPACE!r}"
                 )
 
     def as_canonical_dict(self) -> dict[str, str]:
@@ -238,10 +238,7 @@ def assert_required_tags(tags: Mapping[str, str]) -> None:
     """Used by the providers-repo CI test and by post-provision
     smoke checks: every resource freshly provisioned must carry
     at minimum the MIN_REQUIRED_KEYS set with non-empty values."""
-    missing = [
-        k for k in MIN_REQUIRED_KEYS
-        if not tags.get(k)
-    ]
+    missing = [k for k in MIN_REQUIRED_KEYS if not tags.get(k)]
     if missing:
         raise TagEnforcementError(
             f"resource missing required platform tags: {sorted(missing)}; "
@@ -265,5 +262,7 @@ def for_agent_run(
     if not agent_id or not agent_run_id:
         raise ValueError("agent_id and agent_run_id are both required")
     return dataclasses.replace(
-        base, agent_id=agent_id, agent_run_id=agent_run_id,
+        base,
+        agent_id=agent_id,
+        agent_run_id=agent_run_id,
     )

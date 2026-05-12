@@ -99,11 +99,13 @@ def app_to_type(app) -> RegisteredAppType:
         classify_state,
     )
 
-    sync_state = classify_state(SyncSnapshot(
-        db_hash=app.manifest_hash or "",
-        repo_hash=_repo_hash_for(app),
-        last_synced_hash=app.last_synced_hash or "",
-    ))
+    sync_state = classify_state(
+        SyncSnapshot(
+            db_hash=app.manifest_hash or "",
+            repo_hash=_repo_hash_for(app),
+            last_synced_hash=app.last_synced_hash or "",
+        )
+    )
     return RegisteredAppType(
         id=GUID(str(app.guid)),
         slug=app.slug,

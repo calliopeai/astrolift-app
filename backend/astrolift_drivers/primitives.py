@@ -46,8 +46,7 @@ def parse_tier(value: str | None) -> PerformanceTier:
         return PerformanceTier(value)
     except ValueError as exc:
         raise StorageResolutionError(
-            f"performance_tier {value!r} not one of "
-            f"{[t.value for t in PerformanceTier]}"
+            f"performance_tier {value!r} not one of " f"{[t.value for t in PerformanceTier]}"
         ) from exc
 
 
@@ -73,9 +72,7 @@ def resolve_storage_class(
         return tier_to_class[tier]
     if default_class:
         return default_class
-    raise StorageResolutionError(
-        f"no storage class for tier {tier.value!r} and no cluster default"
-    )
+    raise StorageResolutionError(f"no storage class for tier {tier.value!r} and no cluster default")
 
 
 # ---- workload identity ----------------------------------------------
@@ -111,9 +108,7 @@ def resolve_workload_identity(*, cluster_provider: str) -> WorkloadIdentityKind:
     Provider strings the platform recognises are listed in
     ``_CLUSTER_TO_WIK``. Unknown provider falls back to projected
     SA tokens — works everywhere, just not as strong."""
-    return _CLUSTER_TO_WIK.get(
-        cluster_provider.lower(), WorkloadIdentityKind.PROJECTED_SA
-    )
+    return _CLUSTER_TO_WIK.get(cluster_provider.lower(), WorkloadIdentityKind.PROJECTED_SA)
 
 
 # ---- ingress --------------------------------------------------------
@@ -121,8 +116,8 @@ def resolve_workload_identity(*, cluster_provider: str) -> WorkloadIdentityKind:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class IngressDecision:
-    kind: str        # 'aws/alb' / 'k8s/nginx' / 'gateway_api' / etc.
-    source: str      # 'manifest' | 'cluster_default'
+    kind: str  # 'aws/alb' / 'k8s/nginx' / 'gateway_api' / etc.
+    source: str  # 'manifest' | 'cluster_default'
 
 
 def resolve_ingress_kind(

@@ -21,29 +21,35 @@ from astrolift_clusters.custom_domain import (
 # ---- hostname validation -------------------------------------------
 
 
-@pytest.mark.parametrize("hostname", [
-    "acme.com",
-    "api.acme.com",
-    "deep.api.acme.com",
-    "abc-def.acme.com",
-    "a.io",
-    "long.subdomain.with.many.labels.acme.com",
-])
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        "acme.com",
+        "api.acme.com",
+        "deep.api.acme.com",
+        "abc-def.acme.com",
+        "a.io",
+        "long.subdomain.with.many.labels.acme.com",
+    ],
+)
 def test_valid_hostnames(hostname):
     assert is_valid_hostname(hostname) is True
 
 
-@pytest.mark.parametrize("hostname", [
-    "",
-    "not-a-domain",
-    ".acme.com",        # leading dot
-    "acme.com.",        # trailing dot
-    "-acme.com",        # leading hyphen on label
-    "acme-.com",        # trailing hyphen on label
-    "acme..com",        # empty label
-    "acme.c",           # TLD too short (1 char)
-    "a" * 254,          # too long
-])
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        "",
+        "not-a-domain",
+        ".acme.com",  # leading dot
+        "acme.com.",  # trailing dot
+        "-acme.com",  # leading hyphen on label
+        "acme-.com",  # trailing hyphen on label
+        "acme..com",  # empty label
+        "acme.c",  # TLD too short (1 char)
+        "a" * 254,  # too long
+    ],
+)
 def test_invalid_hostnames(hostname):
     assert is_valid_hostname(hostname) is False
 
@@ -64,9 +70,14 @@ def test_apex_hosts_detected(apex_host):
     assert is_apex(apex_host) is True
 
 
-@pytest.mark.parametrize("subdomain_host", [
-    "api.acme.com", "www.acme.com", "deep.nested.acme.com",
-])
+@pytest.mark.parametrize(
+    "subdomain_host",
+    [
+        "api.acme.com",
+        "www.acme.com",
+        "deep.nested.acme.com",
+    ],
+)
 def test_subdomain_hosts_detected(subdomain_host):
     assert is_apex(subdomain_host) is False
 
@@ -118,64 +129,94 @@ def test_verify_challenge_matches_in_set():
         "v=spf1 -all",
         challenge.record_value,
     ]
-    assert verify_txt_challenge(
-        expected=challenge, observed_records=observed,
-    ) is True
+    assert (
+        verify_txt_challenge(
+            expected=challenge,
+            observed_records=observed,
+        )
+        is True
+    )
 
 
 def test_verify_challenge_rejects_when_missing():
     challenge = issue_txt_challenge(hostname="api.acme.com")
-    assert verify_txt_challenge(
-        expected=challenge, observed_records=["unrelated"],
-    ) is False
+    assert (
+        verify_txt_challenge(
+            expected=challenge,
+            observed_records=["unrelated"],
+        )
+        is False
+    )
 
 
 def test_verify_challenge_rejects_when_no_records():
     challenge = issue_txt_challenge(hostname="api.acme.com")
-    assert verify_txt_challenge(
-        expected=challenge, observed_records=[],
-    ) is False
+    assert (
+        verify_txt_challenge(
+            expected=challenge,
+            observed_records=[],
+        )
+        is False
+    )
 
 
 # ---- state transitions ---------------------------------------------
 
 
 def test_pending_can_progress_to_validating_or_error():
-    assert can_transition(
-        from_state=DomainState.PENDING_VALIDATION,
-        to_state=DomainState.VALIDATING,
-    ) is True
-    assert can_transition(
-        from_state=DomainState.PENDING_VALIDATION,
-        to_state=DomainState.ERROR,
-    ) is True
+    assert (
+        can_transition(
+            from_state=DomainState.PENDING_VALIDATION,
+            to_state=DomainState.VALIDATING,
+        )
+        is True
+    )
+    assert (
+        can_transition(
+            from_state=DomainState.PENDING_VALIDATION,
+            to_state=DomainState.ERROR,
+        )
+        is True
+    )
 
 
 def test_pending_cannot_skip_to_active():
     """Must validate first."""
-    assert can_transition(
-        from_state=DomainState.PENDING_VALIDATION,
-        to_state=DomainState.ACTIVE,
-    ) is False
+    assert (
+        can_transition(
+            from_state=DomainState.PENDING_VALIDATION,
+            to_state=DomainState.ACTIVE,
+        )
+        is False
+    )
 
 
 def test_active_can_expire_or_error():
-    assert can_transition(
-        from_state=DomainState.ACTIVE,
-        to_state=DomainState.EXPIRED,
-    ) is True
-    assert can_transition(
-        from_state=DomainState.ACTIVE,
-        to_state=DomainState.ERROR,
-    ) is True
+    assert (
+        can_transition(
+            from_state=DomainState.ACTIVE,
+            to_state=DomainState.EXPIRED,
+        )
+        is True
+    )
+    assert (
+        can_transition(
+            from_state=DomainState.ACTIVE,
+            to_state=DomainState.ERROR,
+        )
+        is True
+    )
 
 
 def test_error_can_retry_to_pending():
     """Tenant can fix their DNS and retry."""
-    assert can_transition(
-        from_state=DomainState.ERROR,
-        to_state=DomainState.PENDING_VALIDATION,
-    ) is True
+    assert (
+        can_transition(
+            from_state=DomainState.ERROR,
+            to_state=DomainState.PENDING_VALIDATION,
+        )
+        is True
+    )
 
 
 def test_idempotent_same_state_allowed():
@@ -186,10 +227,13 @@ def test_idempotent_same_state_allowed():
 
 def test_active_cannot_go_back_to_validating():
     """Once active, must go through expired/error first to retry."""
-    assert can_transition(
-        from_state=DomainState.ACTIVE,
-        to_state=DomainState.VALIDATING,
-    ) is False
+    assert (
+        can_transition(
+            from_state=DomainState.ACTIVE,
+            to_state=DomainState.VALIDATING,
+        )
+        is False
+    )
 
 
 def test_assert_transition_raises_on_invalid():

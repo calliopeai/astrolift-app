@@ -48,45 +48,46 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     literals = read_app_env(raw_text)
     for env_name in env_names:
         for key in sorted(literals):
-            out.append(AppSecretType(
-                id=_secret_id(source="literal", key=key, env=env_name),
-                key=key,
-                environment_name=env_name,
-                source="literal",
-                bundle_slug="",
-                managed_service_kind="",
-                is_masked=True,
-                last_edited_at=app.updated_at,
-            ))
+            out.append(
+                AppSecretType(
+                    id=_secret_id(source="literal", key=key, env=env_name),
+                    key=key,
+                    environment_name=env_name,
+                    source="literal",
+                    bundle_slug="",
+                    managed_service_kind="",
+                    is_masked=True,
+                    last_edited_at=app.updated_at,
+                )
+            )
 
     # 2. Bundle attachments (per env)
-    refs = (
-        AppSecretBundleRef.objects.filter(
-            registered_app=app,
-            deleted_at__isnull=True,
-            app_environment__name__in=env_names,
-        )
-        .select_related("secret_bundle", "app_environment")
-    )
+    refs = AppSecretBundleRef.objects.filter(
+        registered_app=app,
+        deleted_at__isnull=True,
+        app_environment__name__in=env_names,
+    ).select_related("secret_bundle", "app_environment")
     for ref in refs:
         # Bundle keys live in the secrets backend; we only know the
         # bundle attachment exists. Surface a single placeholder row
         # per attachment so the UI can show 'bundle: stripe-prod'
         # without us fetching values out-of-cluster.
-        out.append(AppSecretType(
-            id=_secret_id(
+        out.append(
+            AppSecretType(
+                id=_secret_id(
+                    source="bundle",
+                    key=ref.secret_bundle.slug,
+                    env=ref.app_environment.name,
+                ),
+                key=f"{ref.prefix or ''}*" if ref.prefix else "*",
+                environment_name=ref.app_environment.name,
                 source="bundle",
-                key=ref.secret_bundle.slug,
-                env=ref.app_environment.name,
-            ),
-            key=f"{ref.prefix or ''}*" if ref.prefix else "*",
-            environment_name=ref.app_environment.name,
-            source="bundle",
-            bundle_slug=ref.secret_bundle.slug,
-            managed_service_kind="",
-            is_masked=True,
-            last_edited_at=ref.updated_at,
-        ))
+                bundle_slug=ref.secret_bundle.slug,
+                managed_service_kind="",
+                is_masked=True,
+                last_edited_at=ref.updated_at,
+            )
+        )
 
     # 3. Managed-service envelopes (per binding)
     services = ManagedService.objects.filter(
@@ -97,20 +98,22 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     for svc in services:
         env_name = svc.app_environment.name
         for key in envelope_keys_for(svc.kind):
-            out.append(AppSecretType(
-                id=_secret_id(
+            out.append(
+                AppSecretType(
+                    id=_secret_id(
+                        source="managed_service",
+                        key=f"{svc.name}.{key}",
+                        env=env_name,
+                    ),
+                    key=key,
+                    environment_name=env_name,
                     source="managed_service",
-                    key=f"{svc.name}.{key}",
-                    env=env_name,
-                ),
-                key=key,
-                environment_name=env_name,
-                source="managed_service",
-                bundle_slug="",
-                managed_service_kind=svc.kind,
-                is_masked=True,
-                last_edited_at=svc.updated_at,
-            ))
+                    bundle_slug="",
+                    managed_service_kind=svc.kind,
+                    is_masked=True,
+                    last_edited_at=svc.updated_at,
+                )
+            )
 
     return out
 
@@ -150,12 +153,12 @@ class ServicesQuery:
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_secret_bundles(
-        self, info: Info,
+        self,
+        info: Info,
     ) -> list[SecretBundleType]:
         """All secret bundles in the calling tenant."""
         qs = (
-            SecretBundle.objects
-            .select_related("organization", "team")
+            SecretBundle.objects.select_related("organization", "team")
             .filter(deleted_at__isnull=True)
             .order_by("-created_at")[:200]
         )
@@ -170,15 +173,13 @@ class ServicesQuery:
         app_slug: str,
         environment_name: str | None = None,
     ) -> list[AppSecretBundleAttachmentType]:
-        qs = (
-            AppSecretBundleRef.objects
-            .select_related(
-                "registered_app", "secret_bundle", "app_environment",
-            )
-            .filter(
-                registered_app__slug=app_slug,
-                deleted_at__isnull=True,
-            )
+        qs = AppSecretBundleRef.objects.select_related(
+            "registered_app",
+            "secret_bundle",
+            "app_environment",
+        ).filter(
+            registered_app__slug=app_slug,
+            deleted_at__isnull=True,
         )
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)
@@ -193,13 +194,9 @@ class ServicesQuery:
         app_slug: str,
         environment_name: str | None = None,
     ) -> list[ManagedServiceType]:
-        qs = (
-            ManagedService.objects
-            .select_related("registered_app", "app_environment")
-            .filter(
-                registered_app__slug=app_slug,
-                deleted_at__isnull=True,
-            )
+        qs = ManagedService.objects.select_related("registered_app", "app_environment").filter(
+            registered_app__slug=app_slug,
+            deleted_at__isnull=True,
         )
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)

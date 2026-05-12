@@ -35,9 +35,7 @@ def _scaffold():
     """
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     [plugin] = ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
@@ -99,9 +97,7 @@ def test_returns_rendered_resources_for_default_environment(permission_resolver)
     org, team, project, cluster = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     app = _make_app(org, team, project, manifest=VALID_MANIFEST)
-    AppEnvironment.objects.create(
-        registered_app=app, tenant_cluster=cluster, name="prod"
-    )
+    AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name="prod")
 
     with tenant_context(TenantContext(organization_id=org.id)):
         result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug=app.slug)
@@ -122,9 +118,7 @@ def test_image_tag_override_propagates_to_container_image(permission_resolver):
     app = _make_app(org, team, project, manifest=VALID_MANIFEST)
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_rendered_manifest(
-            _info(), app_slug=app.slug, image_tag="abc123"
-        )
+        result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug=app.slug, image_tag="abc123")
 
     dep = next(r for r in result.resources if r["kind"] == "Deployment")
     container_image = dep["spec"]["template"]["spec"]["containers"][0]["image"]
@@ -135,12 +129,8 @@ def test_environment_name_filter_picks_named_env(permission_resolver):
     org, team, project, cluster = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
     app = _make_app(org, team, project, manifest=VALID_MANIFEST)
-    AppEnvironment.objects.create(
-        registered_app=app, tenant_cluster=cluster, name="prod"
-    )
-    AppEnvironment.objects.create(
-        registered_app=app, tenant_cluster=cluster, name="staging"
-    )
+    AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name="prod")
+    AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name="staging")
 
     with tenant_context(TenantContext(organization_id=org.id)):
         result = RegistryQuery().astrolift_rendered_manifest(
@@ -158,9 +148,7 @@ def test_no_environment_yet_falls_back_to_preview(permission_resolver):
     app = _make_app(org, team, project, manifest=VALID_MANIFEST)
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_rendered_manifest(
-            _info(), app_slug=app.slug
-        )
+        result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug=app.slug)
 
     assert result.environment_name == "preview"
     assert result.error is None
@@ -174,9 +162,7 @@ def test_unknown_app_returns_none(permission_resolver):
     permission_resolver.grant(Permission.APP_READ)
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_rendered_manifest(
-            _info(), app_slug="does-not-exist"
-        )
+        result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug="does-not-exist")
 
     assert result is None
 
@@ -189,9 +175,7 @@ def test_invalid_toml_surfaces_as_error_not_exception(permission_resolver):
     app = _make_app(org, team, project, manifest="name = [unterminated")
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_rendered_manifest(
-            _info(), app_slug=app.slug
-        )
+        result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug=app.slug)
 
     assert result is not None
     assert result.error is not None
@@ -212,9 +196,7 @@ kind = "spaceship"
     app = _make_app(org, team, project, manifest=bad)
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_rendered_manifest(
-            _info(), app_slug=app.slug
-        )
+        result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug=app.slug)
 
     assert result.error is not None
     assert "kind" in result.error.lower()
@@ -237,9 +219,7 @@ def test_toml_syntax_error_carries_line_and_column(permission_resolver):
     )
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_rendered_manifest(
-            _info(), app_slug=app.slug
-        )
+        result = RegistryQuery().astrolift_rendered_manifest(_info(), app_slug=app.slug)
 
     assert result.error is not None
     assert "TOML" in result.error

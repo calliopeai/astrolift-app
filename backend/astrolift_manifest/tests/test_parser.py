@@ -102,7 +102,7 @@ def test_parse_invalid_toml_surfaces_path():
 def test_invalid_toml_carries_line_and_column():
     """tomllib errors expose a position; we surface it on
     ManifestError so editors can highlight the offending row."""
-    bad = "name = \"hello\"\n[[workloads]]\nkind = (\nname = \"x\"\n"
+    bad = 'name = "hello"\n[[workloads]]\nkind = (\nname = "x"\n'
     with pytest.raises(ManifestError) as exc:
         parse_raw(bad)
     err = exc.value
@@ -116,13 +116,7 @@ def test_locate_in_source_finds_leaf_key():
     """Best-effort locator for semantic errors (path → line/col)."""
     from astrolift_manifest.parser import locate_in_source
 
-    text = (
-        'name = "hello"\n'
-        "\n"
-        "[[workloads]]\n"
-        'name = "web"\n'
-        'kind = "spaceship"\n'
-    )
+    text = 'name = "hello"\n' "\n" "[[workloads]]\n" 'name = "web"\n' 'kind = "spaceship"\n'
     line, col = locate_in_source(text, "workloads[0].kind")
     assert line == 5
     assert col == 1

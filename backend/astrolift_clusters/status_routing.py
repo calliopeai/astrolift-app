@@ -206,8 +206,7 @@ _RULE_HINTS: dict[IngressDriver, str] = {
         "platform-namespace Ingress."
     ),
     IngressDriver.AZURE_AGW: (
-        "Application Gateway: emit a default backend pool + listener "
-        "with the lowest priority among rules."
+        "Application Gateway: emit a default backend pool + listener " "with the lowest priority among rules."
     ),
     IngressDriver.GATEWAY_API: (
         "Gateway API: HTTPRoute with no hostname matchers attached "

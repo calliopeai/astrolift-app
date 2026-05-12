@@ -61,21 +61,38 @@ class PolicyResourceKind(str, Enum):
 # drivers translate to provider verbs deterministically. New kinds
 # extend; existing kinds don't grow without a code review.
 _ALLOWED_ACTIONS_BY_KIND: dict[PolicyResourceKind, frozenset[str]] = {
-    PolicyResourceKind.OBJECT_STORE: frozenset({
-        "read", "write", "list", "delete",
-    }),
-    PolicyResourceKind.QUEUE: frozenset({
-        "send", "receive", "delete", "purge",
-    }),
-    PolicyResourceKind.SECRET: frozenset({
-        "read", "write",
-    }),
-    PolicyResourceKind.DATABASE: frozenset({
-        "connect",
-    }),
-    PolicyResourceKind.PUBSUB_TOPIC: frozenset({
-        "publish",
-    }),
+    PolicyResourceKind.OBJECT_STORE: frozenset(
+        {
+            "read",
+            "write",
+            "list",
+            "delete",
+        }
+    ),
+    PolicyResourceKind.QUEUE: frozenset(
+        {
+            "send",
+            "receive",
+            "delete",
+            "purge",
+        }
+    ),
+    PolicyResourceKind.SECRET: frozenset(
+        {
+            "read",
+            "write",
+        }
+    ),
+    PolicyResourceKind.DATABASE: frozenset(
+        {
+            "connect",
+        }
+    ),
+    PolicyResourceKind.PUBSUB_TOPIC: frozenset(
+        {
+            "publish",
+        }
+    ),
 }
 
 
@@ -92,13 +109,9 @@ class PolicyStatement:
 
     def __post_init__(self) -> None:
         if not self.resource_id:
-            raise WorkloadIdentityError(
-                f"resource_id is required for {self.kind.value} statement"
-            )
+            raise WorkloadIdentityError(f"resource_id is required for {self.kind.value} statement")
         if not self.actions:
-            raise WorkloadIdentityError(
-                f"{self.kind.value}:{self.resource_id} has no actions"
-            )
+            raise WorkloadIdentityError(f"{self.kind.value}:{self.resource_id} has no actions")
         allowed = _ALLOWED_ACTIONS_BY_KIND[self.kind]
         bad = set(self.actions) - allowed
         if bad:
@@ -151,9 +164,13 @@ def derive_policies(
             )
         kind, default_actions = _DEFAULT_ACTIONS_BY_SERVICE[b.service_kind]
         actions = b.custom_actions or default_actions
-        out.append(PolicyStatement(
-            kind=kind, resource_id=b.resource_id, actions=actions,
-        ))
+        out.append(
+            PolicyStatement(
+                kind=kind,
+                resource_id=b.resource_id,
+                actions=actions,
+            )
+        )
     return tuple(out)
 
 
@@ -199,7 +216,8 @@ def aws_irsa_annotations(*, role_arn: str) -> dict[str, str]:
 
 
 def gcp_workload_identity_annotations(
-    *, gcp_sa_email: str,
+    *,
+    gcp_sa_email: str,
 ) -> dict[str, str]:
     """GCP Workload Identity: SA carries the GCP SA email
     annotation. Trust binding (KSA → GSA) is configured on the
@@ -222,15 +240,11 @@ def azure_workload_identity_annotations(
     Trust binding is configured on the AAD app's federated
     credentials, not here."""
     if not _is_uuid(client_id):
-        raise WorkloadIdentityError(
-            f"Azure client_id {client_id!r} is not a valid UUID"
-        )
+        raise WorkloadIdentityError(f"Azure client_id {client_id!r} is not a valid UUID")
     out = {"azure.workload.identity/client-id": client_id}
     if tenant_id:
         if not _is_uuid(tenant_id):
-            raise WorkloadIdentityError(
-                f"Azure tenant_id {tenant_id!r} is not a valid UUID"
-            )
+            raise WorkloadIdentityError(f"Azure tenant_id {tenant_id!r} is not a valid UUID")
         out["azure.workload.identity/tenant-id"] = tenant_id
     return out
 
@@ -295,8 +309,7 @@ def validate_delegation_chain(
     """
     if not chain:
         raise WorkloadIdentityError(
-            "delegation chain cannot be empty (omit the chain "
-            "rather than passing [])"
+            "delegation chain cannot be empty (omit the chain " "rather than passing [])"
         )
     if len(chain) > 3:
         raise WorkloadIdentityError(
@@ -314,9 +327,7 @@ def validate_delegation_chain(
                 "cross-cloud workload identity isn't supported"
             )
         if not step.role_id:
-            raise WorkloadIdentityError(
-                f"delegation chain hop {i} missing role_id"
-            )
+            raise WorkloadIdentityError(f"delegation chain hop {i} missing role_id")
 
 
 # ---- whole-role validation -----------------------------------------
@@ -336,10 +347,6 @@ class BoundServiceAccount:
         if not self.sa_name:
             raise WorkloadIdentityError("sa_name is required")
         if not _SLUG_RE.match(self.sa_name):
-            raise WorkloadIdentityError(
-                f"sa_name {self.sa_name!r} not RFC 1123 valid"
-            )
+            raise WorkloadIdentityError(f"sa_name {self.sa_name!r} not RFC 1123 valid")
         if not _SLUG_RE.match(self.namespace):
-            raise WorkloadIdentityError(
-                f"namespace {self.namespace!r} not RFC 1123 valid"
-            )
+            raise WorkloadIdentityError(f"namespace {self.namespace!r} not RFC 1123 valid")

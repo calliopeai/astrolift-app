@@ -105,10 +105,7 @@ def parse_mode(value: str | None) -> PortabilityMode:
     except ValueError as exc:
         raise PortabilityViolation(
             code="invalid_portability_mode",
-            message=(
-                f"portability {value!r} is not one of "
-                f"{[m.value for m in PortabilityMode]}"
-            ),
+            message=(f"portability {value!r} is not one of " f"{[m.value for m in PortabilityMode]}"),
         ) from exc
 
 
@@ -139,10 +136,7 @@ def validate(
     if bad_pins:
         raise PortabilityViolation(
             code="invalid_pin_syntax",
-            message=(
-                f"variant pin must be '<plugin>/<variant>'; "
-                f"malformed in: {bad_pins}"
-            ),
+            message=(f"variant pin must be '<plugin>/<variant>'; " f"malformed in: {bad_pins}"),
             kinds=bad_pins,
         )
 
@@ -175,7 +169,8 @@ def validate(
                 kinds=[f"{b.kind}/{b.name}" for b in cloud_only],
             )
         return ValidationReport(
-            declared_mode=declared, effective_mode=PortabilityMode.PORTABLE,
+            declared_mode=declared,
+            effective_mode=PortabilityMode.PORTABLE,
             warnings=tuple(warnings),
         )
 
@@ -191,7 +186,8 @@ def validate(
                 kinds=[f"{b.kind}/{b.name}" for b in unpinned],
             )
         return ValidationReport(
-            declared_mode=declared, effective_mode=PortabilityMode.PINNED,
+            declared_mode=declared,
+            effective_mode=PortabilityMode.PINNED,
             warnings=tuple(warnings),
         )
 
@@ -210,6 +206,7 @@ def validate(
         )
 
     return ValidationReport(
-        declared_mode=PortabilityMode.AUTO, effective_mode=PortabilityMode.AUTO,
+        declared_mode=PortabilityMode.AUTO,
+        effective_mode=PortabilityMode.AUTO,
         warnings=tuple(warnings),
     )

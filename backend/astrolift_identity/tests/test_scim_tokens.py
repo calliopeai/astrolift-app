@@ -54,6 +54,7 @@ def test_issue_token_hash_matches_sha256():
     """Hash-at-rest invariant: stored hash matches SHA-256 of
     plaintext."""
     import hashlib
+
     issued = issue_token()
     expected = hashlib.sha256(issued.plaintext.encode()).hexdigest()
     assert issued.token_hash == expected
@@ -72,15 +73,21 @@ def test_users_path_requires_users_scope():
 
 
 def test_users_subpath_requires_users_scope():
-    assert required_scope_for_path(
-        path="/Users/abc-123",
-    ) == ScimScope.USERS
+    assert (
+        required_scope_for_path(
+            path="/Users/abc-123",
+        )
+        == ScimScope.USERS
+    )
 
 
 def test_groups_path_requires_groups_scope():
-    assert required_scope_for_path(
-        path="/Groups",
-    ) == ScimScope.GROUPS
+    assert (
+        required_scope_for_path(
+            path="/Groups",
+        )
+        == ScimScope.GROUPS
+    )
 
 
 def test_unknown_path_rejected():
@@ -89,29 +96,39 @@ def test_unknown_path_rejected():
 
 
 def test_has_scope_present():
-    assert has_scope(
-        token_scopes=(ScimScope.USERS, ScimScope.GROUPS),
-        required=ScimScope.USERS,
-    ) is True
+    assert (
+        has_scope(
+            token_scopes=(ScimScope.USERS, ScimScope.GROUPS),
+            required=ScimScope.USERS,
+        )
+        is True
+    )
 
 
 def test_has_scope_absent():
-    assert has_scope(
-        token_scopes=(ScimScope.USERS,),
-        required=ScimScope.GROUPS,
-    ) is False
+    assert (
+        has_scope(
+            token_scopes=(ScimScope.USERS,),
+            required=ScimScope.GROUPS,
+        )
+        is False
+    )
 
 
 # ---- verify --------------------------------------------------------
 
 
 def _stored(
-    *, scopes=(ScimScope.USERS, ScimScope.GROUPS),
-    is_revoked=False, expires_at_unix=None,
+    *,
+    scopes=(ScimScope.USERS, ScimScope.GROUPS),
+    is_revoked=False,
+    expires_at_unix=None,
 ) -> StoredScimToken:
     return StoredScimToken(
-        token_id=1, org_id=1,
-        token_hash="hash", scopes=scopes,
+        token_id=1,
+        org_id=1,
+        token_hash="hash",
+        scopes=scopes,
         is_revoked=is_revoked,
         expires_at_unix=expires_at_unix,
     )
@@ -120,10 +137,12 @@ def _stored(
 def test_verify_happy_path():
     issued = issue_token()
     record = StoredScimToken(
-        token_id=1, org_id=10,
+        token_id=1,
+        org_id=10,
         token_hash=issued.token_hash,
         scopes=(ScimScope.USERS,),
-        is_revoked=False, expires_at_unix=None,
+        is_revoked=False,
+        expires_at_unix=None,
     )
     decision = verify_token(
         plaintext=issued.plaintext,
@@ -163,7 +182,8 @@ def test_verify_rejects_wrong_prefix_as_not_found():
 def test_verify_rejects_revoked():
     issued = issue_token()
     record = StoredScimToken(
-        token_id=1, org_id=1,
+        token_id=1,
+        org_id=1,
         token_hash=issued.token_hash,
         scopes=(ScimScope.USERS,),
         is_revoked=True,
@@ -181,7 +201,8 @@ def test_verify_rejects_revoked():
 def test_verify_rejects_expired():
     issued = issue_token()
     record = StoredScimToken(
-        token_id=1, org_id=1,
+        token_id=1,
+        org_id=1,
         token_hash=issued.token_hash,
         scopes=(ScimScope.USERS,),
         is_revoked=False,
@@ -200,10 +221,12 @@ def test_verify_rejects_insufficient_scope():
     """Token has users scope only; request needs groups."""
     issued = issue_token()
     record = StoredScimToken(
-        token_id=1, org_id=1,
+        token_id=1,
+        org_id=1,
         token_hash=issued.token_hash,
         scopes=(ScimScope.USERS,),
-        is_revoked=False, expires_at_unix=None,
+        is_revoked=False,
+        expires_at_unix=None,
     )
     decision = verify_token(
         plaintext=issued.plaintext,
@@ -303,9 +326,13 @@ def test_remaining_in_window_returns_difference():
         requests_in_window=20,
         window_started_unix=1_700_000_000,
     )
-    assert remaining_in_window(
-        window=window, now_unix=1_700_000_005,
-    ) == 40
+    assert (
+        remaining_in_window(
+            window=window,
+            now_unix=1_700_000_005,
+        )
+        == 40
+    )
 
 
 def test_remaining_full_after_window_expired():
@@ -314,17 +341,23 @@ def test_remaining_full_after_window_expired():
         requests_in_window=60,
         window_started_unix=1_700_000_000,
     )
-    assert remaining_in_window(
-        window=window, now_unix=1_700_000_061,
-    ) == DEFAULT_RATE_LIMIT_PER_MINUTE
+    assert (
+        remaining_in_window(
+            window=window,
+            now_unix=1_700_000_061,
+        )
+        == DEFAULT_RATE_LIMIT_PER_MINUTE
+    )
 
 
 def test_rate_limit_zero_rejected():
     """Defensive: 0 limit would refuse every request → not
     a sensible config."""
     window = RateLimitWindow(
-        token_id=1, requests_in_window=0,
-        window_started_unix=0, rate_limit=0,
+        token_id=1,
+        requests_in_window=0,
+        window_started_unix=0,
+        rate_limit=0,
     )
     with pytest.raises(ScimTokenError):
         is_rate_limited(window=window, now_unix=10)

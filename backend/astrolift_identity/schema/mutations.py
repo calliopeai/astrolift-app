@@ -521,9 +521,7 @@ class IdentityMutation:
     @mutation_audit(action="role.create")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def create_role(
-        self, info: Info, input: CreateRoleInput
-    ) -> MutationResultType[RoleType]:
+    def create_role(self, info: Info, input: CreateRoleInput) -> MutationResultType[RoleType]:
         """Define a custom role for the current org.
 
         System roles ship with the platform (``is_system=True``) and
@@ -551,9 +549,7 @@ class IdentityMutation:
         if not slug:
             return gql_failure(ErrorCode.VALIDATION.value, "slug required", field="slug")
 
-        if Role.objects.filter(
-            organization_id=org_id, slug=slug, deleted_at__isnull=True
-        ).exists():
+        if Role.objects.filter(organization_id=org_id, slug=slug, deleted_at__isnull=True).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
                 f"a role with slug {slug!r} already exists in this org",
@@ -584,9 +580,7 @@ class IdentityMutation:
     @mutation_audit(action="role.update")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def update_role(
-        self, info: Info, input: UpdateRoleInput
-    ) -> MutationResultType[RoleType]:
+    def update_role(self, info: Info, input: UpdateRoleInput) -> MutationResultType[RoleType]:
         """Update a custom role. System roles are read-only here.
 
         Lookup is by guid first so we can return PRECONDITION for the
@@ -597,9 +591,7 @@ class IdentityMutation:
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        role = Role.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True
-        ).first()
+        role = Role.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if role is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role not found")
         if role.is_system:
@@ -636,9 +628,7 @@ class IdentityMutation:
     @mutation_audit(action="role.delete")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def soft_delete_role(
-        self, info: Info, input: DeleteRoleInput
-    ) -> MutationResultType[_SoftDeletePayload]:
+    def soft_delete_role(self, info: Info, input: DeleteRoleInput) -> MutationResultType[_SoftDeletePayload]:
         """Soft-delete a custom role. Bindings to it stay in place
         until separately revoked — clearing them in the same call
         would silently kick users out of access; deliberate.
@@ -648,9 +638,7 @@ class IdentityMutation:
         """
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        role = Role.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True
-        ).first()
+        role = Role.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if role is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "role not found")
         if role.is_system:
@@ -785,9 +773,7 @@ class IdentityMutation:
             )
 
         digest = hashlib.sha256(input.token.encode()).hexdigest()
-        inv = Invitation.objects.filter(
-            token_hash=digest, deleted_at__isnull=True
-        ).first()
+        inv = Invitation.objects.filter(token_hash=digest, deleted_at__isnull=True).first()
         if inv is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "invitation not found")
         if inv.status != Invitation.Status.PENDING:

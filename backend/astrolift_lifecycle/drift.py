@@ -87,47 +87,59 @@ def compare_workload(
     drifts: list[DriftDiff] = []
 
     if expected.image_tag != observed.image_tag:
-        drifts.append(DriftDiff(
-            kind=DriftKind.IMAGE_TAG,
-            field_path=f"workload[{expected.name}].image_tag",
-            expected=expected.image_tag,
-            actual=observed.image_tag,
-        ))
+        drifts.append(
+            DriftDiff(
+                kind=DriftKind.IMAGE_TAG,
+                field_path=f"workload[{expected.name}].image_tag",
+                expected=expected.image_tag,
+                actual=observed.image_tag,
+            )
+        )
 
     # Spec rule: skip replicas check when HPA is active. Otherwise
     # the comparator would flag drift every time the HPA scaled.
     if not observed.hpa_active and expected.replicas != observed.replicas:
-        drifts.append(DriftDiff(
-            kind=DriftKind.REPLICAS,
-            field_path=f"workload[{expected.name}].replicas",
-            expected=expected.replicas,
-            actual=observed.replicas,
-        ))
+        drifts.append(
+            DriftDiff(
+                kind=DriftKind.REPLICAS,
+                field_path=f"workload[{expected.name}].replicas",
+                expected=expected.replicas,
+                actual=observed.replicas,
+            )
+        )
 
-    drifts.extend(_diff_dict(
-        kind=DriftKind.ENV_LITERAL,
-        path=f"workload[{expected.name}].env",
-        expected=expected.env_literals,
-        actual=observed.env_literals,
-    ))
-    drifts.extend(_diff_dict(
-        kind=DriftKind.RESOURCES,
-        path=f"workload[{expected.name}].resources",
-        expected=expected.resources,
-        actual=observed.resources,
-    ))
-    drifts.extend(_diff_dict(
-        kind=DriftKind.ANNOTATIONS,
-        path=f"workload[{expected.name}].annotations",
-        expected=expected.annotations,
-        actual=observed.annotations,
-    ))
-    drifts.extend(_diff_dict(
-        kind=DriftKind.LABELS,
-        path=f"workload[{expected.name}].labels",
-        expected=expected.labels,
-        actual=observed.labels,
-    ))
+    drifts.extend(
+        _diff_dict(
+            kind=DriftKind.ENV_LITERAL,
+            path=f"workload[{expected.name}].env",
+            expected=expected.env_literals,
+            actual=observed.env_literals,
+        )
+    )
+    drifts.extend(
+        _diff_dict(
+            kind=DriftKind.RESOURCES,
+            path=f"workload[{expected.name}].resources",
+            expected=expected.resources,
+            actual=observed.resources,
+        )
+    )
+    drifts.extend(
+        _diff_dict(
+            kind=DriftKind.ANNOTATIONS,
+            path=f"workload[{expected.name}].annotations",
+            expected=expected.annotations,
+            actual=observed.annotations,
+        )
+    )
+    drifts.extend(
+        _diff_dict(
+            kind=DriftKind.LABELS,
+            path=f"workload[{expected.name}].labels",
+            expected=expected.labels,
+            actual=observed.labels,
+        )
+    )
 
     return tuple(drifts)
 
@@ -167,20 +179,32 @@ def _diff_dict(
 
     for k in sorted(expected_keys & actual_keys):
         if expected[k] != actual[k]:
-            out.append(DriftDiff(
-                kind=kind, field_path=f"{path}.{k}",
-                expected=expected[k], actual=actual[k],
-            ))
+            out.append(
+                DriftDiff(
+                    kind=kind,
+                    field_path=f"{path}.{k}",
+                    expected=expected[k],
+                    actual=actual[k],
+                )
+            )
     for k in sorted(expected_keys - actual_keys):
-        out.append(DriftDiff(
-            kind=kind, field_path=f"{path}.{k}",
-            expected=expected[k], actual=None,
-        ))
+        out.append(
+            DriftDiff(
+                kind=kind,
+                field_path=f"{path}.{k}",
+                expected=expected[k],
+                actual=None,
+            )
+        )
     for k in sorted(actual_keys - expected_keys):
-        out.append(DriftDiff(
-            kind=kind, field_path=f"{path}.{k}",
-            expected=None, actual=actual[k],
-        ))
+        out.append(
+            DriftDiff(
+                kind=kind,
+                field_path=f"{path}.{k}",
+                expected=None,
+                actual=actual[k],
+            )
+        )
     return out
 
 

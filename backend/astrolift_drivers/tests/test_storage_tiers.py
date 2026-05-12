@@ -21,13 +21,16 @@ from astrolift_drivers.storage_tiers import (
 # ---- size parser ---------------------------------------------------
 
 
-@pytest.mark.parametrize("size,expected_bytes", [
-    ("1", 1),
-    ("100Mi", 100 * 1024 ** 2),
-    ("20Gi", 20 * 1024 ** 3),
-    ("1.5Ti", int(1.5 * 1024 ** 4)),
-    ("100Pi", 100 * 1024 ** 5),
-])
+@pytest.mark.parametrize(
+    "size,expected_bytes",
+    [
+        ("1", 1),
+        ("100Mi", 100 * 1024**2),
+        ("20Gi", 20 * 1024**3),
+        ("1.5Ti", int(1.5 * 1024**4)),
+        ("100Pi", 100 * 1024**5),
+    ],
+)
 def test_parse_size_units(size, expected_bytes):
     assert parse_size(size) == expected_bytes
 
@@ -82,7 +85,8 @@ def test_min_iops_locked_per_tier():
 
 def test_volume_spec_clean():
     spec = VolumeSpec(
-        name="data", size="20Gi",
+        name="data",
+        size="20Gi",
         access_modes=("ReadWriteOnce",),
     )
     assert spec.performance_tier == PerformanceTier.BALANCED
@@ -103,7 +107,8 @@ def test_volume_spec_rejects_empty_access_modes():
 def test_volume_spec_rejects_unknown_access_mode():
     with pytest.raises(StorageError, match="not one of"):
         VolumeSpec(
-            name="data", size="10Gi",
+            name="data",
+            size="10Gi",
             access_modes=("ReadWriteForever",),
         )
 
@@ -120,13 +125,16 @@ def test_volume_spec_validates_size_via_parse():
 def test_supported_pair_passes():
     compat = TierCompatibility(
         cluster_id=1,
-        supported=frozenset({
-            (PerformanceTier.BALANCED, Durability.ZONAL),
-            (PerformanceTier.HIGH_IOPS, Durability.REGIONAL),
-        }),
+        supported=frozenset(
+            {
+                (PerformanceTier.BALANCED, Durability.ZONAL),
+                (PerformanceTier.HIGH_IOPS, Durability.REGIONAL),
+            }
+        ),
     )
     spec = VolumeSpec(
-        name="data", size="20Gi",
+        name="data",
+        size="20Gi",
         access_modes=("ReadWriteOnce",),
         performance_tier=PerformanceTier.BALANCED,
         durability=Durability.ZONAL,
@@ -137,12 +145,15 @@ def test_supported_pair_passes():
 def test_unsupported_pair_raises():
     compat = TierCompatibility(
         cluster_id=1,
-        supported=frozenset({
-            (PerformanceTier.BALANCED, Durability.ZONAL),
-        }),
+        supported=frozenset(
+            {
+                (PerformanceTier.BALANCED, Durability.ZONAL),
+            }
+        ),
     )
     spec = VolumeSpec(
-        name="data", size="20Gi",
+        name="data",
+        size="20Gi",
         access_modes=("ReadWriteOnce",),
         performance_tier=PerformanceTier.EXTREME,
         durability=Durability.REGIONAL,
@@ -156,7 +167,8 @@ def test_empty_compatibility_rejects_all():
     volume spec — surfaces the misconfig."""
     compat = TierCompatibility(cluster_id=1, supported=frozenset())
     spec = VolumeSpec(
-        name="data", size="20Gi",
+        name="data",
+        size="20Gi",
         access_modes=("ReadWriteOnce",),
     )
     with pytest.raises(StorageError):
@@ -174,8 +186,9 @@ def test_native_hint_for_known_clouds():
 
 def test_native_hint_case_insensitive_cloud():
     """Operators may type 'AWS' or 'aws'."""
-    assert native_hint(cloud="AWS", tier=PerformanceTier.BALANCED) == \
-           native_hint(cloud="aws", tier=PerformanceTier.BALANCED)
+    assert native_hint(cloud="AWS", tier=PerformanceTier.BALANCED) == native_hint(
+        cloud="aws", tier=PerformanceTier.BALANCED
+    )
 
 
 def test_native_hint_unknown_cloud_returns_empty():

@@ -18,7 +18,9 @@ from astrolift_clusters.gitops_pr_mode import (
 
 def test_branch_name_format():
     out = branch_name_for(
-        app_slug="api", env_slug="prod", workflow_run_id="run-abc-123",
+        app_slug="api",
+        env_slug="prod",
+        workflow_run_id="run-abc-123",
     )
     assert out == "astrolift/api/prod/run-abc-123"
 
@@ -51,7 +53,9 @@ def test_branch_name_deterministic_for_same_run():
 
 def test_pr_title_includes_app_env_deployment():
     out = render_pr_body(
-        app_slug="api", env_slug="prod", deployment_id=42,
+        app_slug="api",
+        env_slug="prod",
+        deployment_id=42,
         workflow_run_url="https://platform/wf/123",
         diff_entries=[],
     )
@@ -62,7 +66,9 @@ def test_pr_title_includes_app_env_deployment():
 
 def test_pr_body_links_workflow_run():
     out = render_pr_body(
-        app_slug="api", env_slug="prod", deployment_id=42,
+        app_slug="api",
+        env_slug="prod",
+        deployment_id=42,
         workflow_run_url="https://platform/wf/123",
         diff_entries=[],
     )
@@ -71,8 +77,11 @@ def test_pr_body_links_workflow_run():
 
 def test_pr_body_with_no_changes_says_so():
     out = render_pr_body(
-        app_slug="api", env_slug="prod", deployment_id=42,
-        workflow_run_url="https://x", diff_entries=[],
+        app_slug="api",
+        env_slug="prod",
+        deployment_id=42,
+        workflow_run_url="https://x",
+        diff_entries=[],
     )
     assert "No manifest changes" in out.body
 
@@ -84,8 +93,11 @@ def test_pr_body_lists_diff_entries():
         ManifestDiffEntry(kind="ConfigMap", name="legacy", namespace="acme-api", change="delete"),
     ]
     out = render_pr_body(
-        app_slug="api", env_slug="prod", deployment_id=42,
-        workflow_run_url="https://x", diff_entries=diff,
+        app_slug="api",
+        env_slug="prod",
+        deployment_id=42,
+        workflow_run_url="https://x",
+        diff_entries=diff,
     )
     # Each kind/name/namespace/change appears in the body table
     for entry in diff:

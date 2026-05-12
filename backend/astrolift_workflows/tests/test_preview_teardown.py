@@ -59,17 +59,16 @@ def test_namespace_step_gets_largest_deadline():
     """Namespace deletion + finalizers is the slow path; should
     be the biggest budget."""
     namespace_deadline = STEP_DEADLINES_SECONDS[TeardownStep.DELETE_NAMESPACE]
-    other_max = max(
-        v for k, v in STEP_DEADLINES_SECONDS.items()
-        if k != TeardownStep.DELETE_NAMESPACE
-    )
+    other_max = max(v for k, v in STEP_DEADLINES_SECONDS.items() if k != TeardownStep.DELETE_NAMESPACE)
     assert namespace_deadline >= other_max
 
 
 def test_deadline_for_unknown_step():
     """Defensive — caller can't pass a step not in the map."""
+
     class Fake:
         pass
+
     with pytest.raises(TeardownError):
         deadline_for_step(step=Fake())  # type: ignore[arg-type]
 
@@ -82,12 +81,16 @@ def test_cleanup_orders_postgres_last():
     flush etc. don't outlive the DB."""
     actions = (
         CleanupAction(
-            binding_id=1, kind=ManagedServiceKind.POSTGRES,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="preview_db",
+            binding_id=1,
+            kind=ManagedServiceKind.POSTGRES,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="preview_db",
         ),
         CleanupAction(
-            binding_id=2, kind=ManagedServiceKind.QUEUE,
-            mode=CleanupMode.DEDICATED, target="queue-id",
+            binding_id=2,
+            kind=ManagedServiceKind.QUEUE,
+            mode=CleanupMode.DEDICATED,
+            target="queue-id",
         ),
     )
     ordered = plan_managed_service_cleanup(bindings=actions)
@@ -99,20 +102,28 @@ def test_cleanup_orders_queue_first():
     """Workload writes to queue/object-store; drain those first."""
     actions = (
         CleanupAction(
-            binding_id=1, kind=ManagedServiceKind.REDIS,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="prefix:",
+            binding_id=1,
+            kind=ManagedServiceKind.REDIS,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="prefix:",
         ),
         CleanupAction(
-            binding_id=2, kind=ManagedServiceKind.OBJECT_STORE,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="prefix/",
+            binding_id=2,
+            kind=ManagedServiceKind.OBJECT_STORE,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="prefix/",
         ),
         CleanupAction(
-            binding_id=3, kind=ManagedServiceKind.QUEUE,
-            mode=CleanupMode.DEDICATED, target="q-id",
+            binding_id=3,
+            kind=ManagedServiceKind.QUEUE,
+            mode=CleanupMode.DEDICATED,
+            target="q-id",
         ),
         CleanupAction(
-            binding_id=4, kind=ManagedServiceKind.POSTGRES,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="db",
+            binding_id=4,
+            kind=ManagedServiceKind.POSTGRES,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="db",
         ),
     )
     ordered = plan_managed_service_cleanup(bindings=actions)
@@ -129,16 +140,22 @@ def test_cleanup_within_kind_orders_by_binding_id():
     """Stable ordering for repeatability."""
     actions = (
         CleanupAction(
-            binding_id=5, kind=ManagedServiceKind.POSTGRES,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="db5",
+            binding_id=5,
+            kind=ManagedServiceKind.POSTGRES,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="db5",
         ),
         CleanupAction(
-            binding_id=2, kind=ManagedServiceKind.POSTGRES,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="db2",
+            binding_id=2,
+            kind=ManagedServiceKind.POSTGRES,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="db2",
         ),
         CleanupAction(
-            binding_id=8, kind=ManagedServiceKind.POSTGRES,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="db8",
+            binding_id=8,
+            kind=ManagedServiceKind.POSTGRES,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="db8",
         ),
     )
     ordered = plan_managed_service_cleanup(bindings=actions)
@@ -150,8 +167,10 @@ def test_cleanup_action_for_validates_target():
     Refuse loudly — spec doesn't say 'best effort'."""
     with pytest.raises(TeardownError, match="target"):
         cleanup_action_for(
-            binding_id=1, kind=ManagedServiceKind.POSTGRES,
-            mode=CleanupMode.SHARED_WITH_MAIN, target="",
+            binding_id=1,
+            kind=ManagedServiceKind.POSTGRES,
+            mode=CleanupMode.SHARED_WITH_MAIN,
+            target="",
         )
 
 

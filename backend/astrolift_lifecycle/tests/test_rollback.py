@@ -40,8 +40,10 @@ def test_explicit_target_wins():
         _snap(2, state=DeploymentState.RUNNING, is_current=True),
     ]
     out = resolve_target(
-        app_id=1, environment_id=1,
-        candidates=candidates, explicit_target_id=1,
+        app_id=1,
+        environment_id=1,
+        candidates=candidates,
+        explicit_target_id=1,
     )
     assert out.deployment_id == 1
 
@@ -53,8 +55,10 @@ def test_explicit_target_not_in_scope_raises():
     candidates = [_snap(1)]
     with pytest.raises(RollbackError, match="not a rollback candidate"):
         resolve_target(
-            app_id=1, environment_id=1,
-            candidates=candidates, explicit_target_id=99,
+            app_id=1,
+            environment_id=1,
+            candidates=candidates,
+            explicit_target_id=99,
         )
 
 
@@ -62,8 +66,10 @@ def test_explicit_target_without_digest_raises():
     candidates = [_snap(1, image_digest="")]
     with pytest.raises(RollbackError, match="no image digest"):
         resolve_target(
-            app_id=1, environment_id=1,
-            candidates=candidates, explicit_target_id=1,
+            app_id=1,
+            environment_id=1,
+            candidates=candidates,
+            explicit_target_id=1,
         )
 
 

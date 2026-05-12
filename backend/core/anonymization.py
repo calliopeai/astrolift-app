@@ -65,9 +65,7 @@ class AnonymizedFields:
     is_active: bool = False  # accounts deactivated as part of anonymization
 
 
-def deterministic_placeholders(
-    user_id: int, *, fields: Iterable[str] = USER_PII_FIELDS
-) -> AnonymizedFields:
+def deterministic_placeholders(user_id: int, *, fields: Iterable[str] = USER_PII_FIELDS) -> AnonymizedFields:
     """Compute placeholders for ``user_id``.
 
     Format: ``anon-<user_id>@deleted.local`` for email-shaped fields,
@@ -85,9 +83,7 @@ def deterministic_placeholders(
     return AnonymizedFields(placeholders=out)
 
 
-def scrub_event_payload(
-    payload: dict, *, keys: Iterable[str] = EVENT_PAYLOAD_PII_KEYS
-) -> dict:
+def scrub_event_payload(payload: dict, *, keys: Iterable[str] = EVENT_PAYLOAD_PII_KEYS) -> dict:
     """Return a new payload with PII keys replaced by ``"[anonymized]"``.
 
     Walks one level deep; nested dicts are not processed. Event

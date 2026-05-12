@@ -53,9 +53,7 @@ def test_no_requirements_passes_anything():
     """Default policy = baseline auth required. Session with just
     pwd satisfies it."""
     policy = AssertionPolicy()
-    session = SessionAssertion(
-        user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now(off=-3600)
-    )
+    session = SessionAssertion(user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now(off=-3600))
     evaluate(policy, session, now=_now())  # no raise
 
 
@@ -71,9 +69,7 @@ def test_satisfied_amr_passes():
 
 def test_session_within_max_age_passes():
     policy = AssertionPolicy(max_session_age_seconds=900)
-    session = SessionAssertion(
-        user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now(off=-300)
-    )
+    session = SessionAssertion(user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now(off=-300))
     evaluate(policy, session, now=_now())
 
 
@@ -93,9 +89,7 @@ def test_fresh_device_assertion_passes():
 
 def test_missing_amr_raises_step_up():
     policy = AssertionPolicy(required_amr_any=(AMR_TOTP, AMR_WEBAUTHN))
-    session = SessionAssertion(
-        user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now()
-    )
+    session = SessionAssertion(user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now())
     with pytest.raises(StepUpRequired) as exc:
         evaluate(policy, session, now=_now())
     assert exc.value.missing_amr_any == (AMR_TOTP, AMR_WEBAUTHN)
@@ -105,9 +99,7 @@ def test_missing_amr_raises_step_up():
 
 def test_old_session_raises_too_old():
     policy = AssertionPolicy(max_session_age_seconds=60)
-    session = SessionAssertion(
-        user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now(off=-3600)
-    )
+    session = SessionAssertion(user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now(off=-3600))
     with pytest.raises(StepUpRequired) as exc:
         evaluate(policy, session, now=_now())
     assert exc.value.session_too_old is True
@@ -189,14 +181,10 @@ def test_all_failures_reported_in_one_exception():
 
 def test_evaluate_rejects_naive_timestamps():
     policy = AssertionPolicy()
-    session = SessionAssertion(
-        user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now()
-    )
+    session = SessionAssertion(user_id=1, amr=(AMR_PASSWORD,), authenticated_at=_now())
     with pytest.raises(ValueError):
         evaluate(policy, session, now=datetime(2026, 5, 9))
 
-    bad_session = SessionAssertion(
-        user_id=1, amr=(AMR_PASSWORD,), authenticated_at=datetime(2026, 5, 9)
-    )
+    bad_session = SessionAssertion(user_id=1, amr=(AMR_PASSWORD,), authenticated_at=datetime(2026, 5, 9))
     with pytest.raises(ValueError):
         evaluate(policy, bad_session, now=_now())

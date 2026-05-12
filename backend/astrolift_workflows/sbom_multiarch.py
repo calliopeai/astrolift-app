@@ -49,10 +49,8 @@ def sbom_artifact_tag(*, image_digest: str, fmt: SbomFormat) -> str:
     prefix.
     """
     if not image_digest.startswith("sha256:"):
-        raise BuildPolicyError(
-            f"image_digest {image_digest!r} must start with 'sha256:'"
-        )
-    short = image_digest[len("sha256:"):][:12]
+        raise BuildPolicyError(f"image_digest {image_digest!r} must start with 'sha256:'")
+    short = image_digest[len("sha256:") :][:12]
     return f"sbom-{fmt.value}-{short}"
 
 
@@ -112,9 +110,7 @@ class BuildArchPlan:
 
     def __post_init__(self) -> None:
         if not self.architectures:
-            raise BuildPolicyError(
-                "build plan must target at least one architecture"
-            )
+            raise BuildPolicyError("build plan must target at least one architecture")
 
 
 def plan_architectures(
@@ -139,10 +135,7 @@ def plan_architectures(
       (useful for shared images, future-proofing migrations)
     """
     if not cluster_node_architectures:
-        raise BuildPolicyError(
-            "cluster_node_architectures cannot be empty — "
-            "where would the pods run?"
-        )
+        raise BuildPolicyError("cluster_node_architectures cannot be empty — " "where would the pods run?")
 
     cluster_archs: list[Arch] = []
     seen: set[Arch] = set()
@@ -158,24 +151,17 @@ def plan_architectures(
         target = tuple(cluster_archs)
     elif pref in ("amd64", "x86_64"):
         if Arch.AMD64 not in seen:
-            raise BuildPolicyError(
-                "manifest pinned to amd64 but cluster has no "
-                "amd64 nodes"
-            )
+            raise BuildPolicyError("manifest pinned to amd64 but cluster has no " "amd64 nodes")
         target = (Arch.AMD64,)
     elif pref in ("arm64", "aarch64"):
         if Arch.ARM64 not in seen:
-            raise BuildPolicyError(
-                "manifest pinned to arm64 but cluster has no "
-                "arm64 nodes"
-            )
+            raise BuildPolicyError("manifest pinned to arm64 but cluster has no " "arm64 nodes")
         target = (Arch.ARM64,)
     elif pref == "multi":
         target = (Arch.AMD64, Arch.ARM64)
     else:
         raise BuildPolicyError(
-            f"unknown manifest_arch_preference {pref!r}; "
-            "supported: auto, amd64, arm64, multi"
+            f"unknown manifest_arch_preference {pref!r}; " "supported: auto, amd64, arm64, multi"
         )
 
     return BuildArchPlan(

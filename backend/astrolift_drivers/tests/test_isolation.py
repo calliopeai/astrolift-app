@@ -18,7 +18,8 @@ from astrolift_drivers.isolation import (
 
 def _both_default_shared() -> VariantSupport:
     return VariantSupport(
-        plugin_slug="aws-rds", variant="postgres-15",
+        plugin_slug="aws-rds",
+        variant="postgres-15",
         allowed_modes=frozenset({Isolation.SHARED, Isolation.DEDICATED}),
         default=Isolation.SHARED,
     )
@@ -26,7 +27,8 @@ def _both_default_shared() -> VariantSupport:
 
 def _dedicated_only() -> VariantSupport:
     return VariantSupport(
-        plugin_slug="aws-rds", variant="aurora-serverless-v2",
+        plugin_slug="aws-rds",
+        variant="aurora-serverless-v2",
         allowed_modes=frozenset({Isolation.DEDICATED}),
         default=Isolation.DEDICATED,
     )
@@ -34,7 +36,8 @@ def _dedicated_only() -> VariantSupport:
 
 def _shared_only() -> VariantSupport:
     return VariantSupport(
-        plugin_slug="acme-shared-pool", variant="pg-cheap",
+        plugin_slug="acme-shared-pool",
+        variant="pg-cheap",
         allowed_modes=frozenset({Isolation.SHARED}),
         default=Isolation.SHARED,
     )
@@ -46,7 +49,9 @@ def _shared_only() -> VariantSupport:
 def test_variant_rejects_empty_allowed_modes():
     with pytest.raises(ValueError):
         VariantSupport(
-            plugin_slug="x", variant="y", allowed_modes=frozenset(),
+            plugin_slug="x",
+            variant="y",
+            allowed_modes=frozenset(),
             default=Isolation.SHARED,
         )
 
@@ -54,7 +59,8 @@ def test_variant_rejects_empty_allowed_modes():
 def test_variant_rejects_default_not_in_allowed():
     with pytest.raises(ValueError, match="default"):
         VariantSupport(
-            plugin_slug="x", variant="y",
+            plugin_slug="x",
+            variant="y",
             allowed_modes=frozenset({Isolation.SHARED}),
             default=Isolation.DEDICATED,
         )

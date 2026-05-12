@@ -44,37 +44,52 @@ def _claims(**kw) -> OidcClaims:
 
 def test_glob_segment_match():
     """``*`` matches a non-slash segment."""
-    assert matches_subject(
-        allowed_pattern="repo:acme/api:*",
-        presented_sub="repo:acme/api:ref:refs/heads/main",
-    ) is False  # * doesn't span '/'
+    assert (
+        matches_subject(
+            allowed_pattern="repo:acme/api:*",
+            presented_sub="repo:acme/api:ref:refs/heads/main",
+        )
+        is False
+    )  # * doesn't span '/'
 
     # Single-segment glob: matches any leaf
-    assert matches_subject(
-        allowed_pattern="repo:acme/api:ref:refs/heads/*",
-        presented_sub="repo:acme/api:ref:refs/heads/main",
-    ) is True
+    assert (
+        matches_subject(
+            allowed_pattern="repo:acme/api:ref:refs/heads/*",
+            presented_sub="repo:acme/api:ref:refs/heads/main",
+        )
+        is True
+    )
 
 
 def test_glob_exact_pattern():
     """Pattern without ``*`` must match exactly."""
-    assert matches_subject(
-        allowed_pattern="repo:acme/api:ref:refs/heads/main",
-        presented_sub="repo:acme/api:ref:refs/heads/main",
-    ) is True
-    assert matches_subject(
-        allowed_pattern="repo:acme/api:ref:refs/heads/main",
-        presented_sub="repo:acme/api:ref:refs/heads/develop",
-    ) is False
+    assert (
+        matches_subject(
+            allowed_pattern="repo:acme/api:ref:refs/heads/main",
+            presented_sub="repo:acme/api:ref:refs/heads/main",
+        )
+        is True
+    )
+    assert (
+        matches_subject(
+            allowed_pattern="repo:acme/api:ref:refs/heads/main",
+            presented_sub="repo:acme/api:ref:refs/heads/develop",
+        )
+        is False
+    )
 
 
 def test_glob_handles_special_regex_chars():
     """A pattern containing dots/dashes shouldn't be treated as
     regex. ``acme.org`` should match literally, not 'acme[any]org'."""
-    assert matches_subject(
-        allowed_pattern="repo:acme.org/api:*",
-        presented_sub="repo:acmeXorg/api:ref:refs/heads/main",
-    ) is False
+    assert (
+        matches_subject(
+            allowed_pattern="repo:acme.org/api:*",
+            presented_sub="repo:acmeXorg/api:ref:refs/heads/main",
+        )
+        is False
+    )
 
 
 def test_empty_pattern_rejected():
@@ -95,7 +110,8 @@ def test_config_requires_subject_patterns():
     with pytest.raises(FederationError, match="subject_patterns"):
         FederationConfig(
             org_id=1,
-            issuer="https://x", audience="https://y",
+            issuer="https://x",
+            audience="https://y",
             allowed_subject_patterns=(),
         )
 
@@ -103,12 +119,16 @@ def test_config_requires_subject_patterns():
 def test_config_requires_issuer_and_audience():
     with pytest.raises(FederationError):
         FederationConfig(
-            org_id=1, issuer="", audience="x",
+            org_id=1,
+            issuer="",
+            audience="x",
             allowed_subject_patterns=("*",),
         )
     with pytest.raises(FederationError):
         FederationConfig(
-            org_id=1, issuer="x", audience="",
+            org_id=1,
+            issuer="x",
+            audience="",
             allowed_subject_patterns=("*",),
         )
 
@@ -116,7 +136,9 @@ def test_config_requires_issuer_and_audience():
 def test_config_requires_positive_org_id():
     with pytest.raises(FederationError):
         FederationConfig(
-            org_id=0, issuer="x", audience="y",
+            org_id=0,
+            issuer="x",
+            audience="y",
             allowed_subject_patterns=("*",),
         )
 
@@ -126,7 +148,8 @@ def test_config_requires_positive_org_id():
 
 def test_clean_exchange():
     out = evaluate_exchange(
-        config=_config(), claims=_claims(),
+        config=_config(),
+        claims=_claims(),
         target_app_slug="api",
     )
     assert out.org_id == 1
@@ -165,9 +188,7 @@ def test_subject_not_in_allowlist_rejected():
 def test_subject_glob_matches_branch_wildcard():
     """A wildcard branch pattern works."""
     out = evaluate_exchange(
-        config=_config(allowed_subject_patterns=(
-            "repo:acme/api:ref:refs/heads/*",
-        )),
+        config=_config(allowed_subject_patterns=("repo:acme/api:ref:refs/heads/*",)),
         claims=_claims(sub="repo:acme/api:ref:refs/heads/feature-x"),
         target_app_slug="api",
     )
@@ -179,13 +200,17 @@ def test_target_app_pattern_restricts():
     the pattern. CI repo-level scoping."""
     config = _config(target_app_pattern="api")
     out = evaluate_exchange(
-        config=config, claims=_claims(), target_app_slug="api",
+        config=config,
+        claims=_claims(),
+        target_app_slug="api",
     )
     assert out.target_app_pattern == "api"
 
     with pytest.raises(FederationError, match="target app"):
         evaluate_exchange(
-            config=config, claims=_claims(), target_app_slug="other-app",
+            config=config,
+            claims=_claims(),
+            target_app_slug="other-app",
         )
 
 

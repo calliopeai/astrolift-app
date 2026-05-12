@@ -133,10 +133,7 @@ class _AttachmentRemovedPayload:
 # Helpers
 
 
-_ENV_NAME_HINT = (
-    "must start with a letter or underscore and use only "
-    "[A-Z0-9_] (POSIX env-var rules)"
-)
+_ENV_NAME_HINT = "must start with a letter or underscore and use only " "[A-Z0-9_] (POSIX env-var rules)"
 
 
 def _validate_env_key(key: str) -> str | None:
@@ -160,9 +157,13 @@ def _stage_manifest(app, new_text: str) -> str:
         app.manifest_raw_staged = ""
     else:
         app.manifest_raw_staged = new_text
-    app.save(update_fields=[
-        "manifest_raw_staged", "updated_at", "version",
-    ])
+    app.save(
+        update_fields=[
+            "manifest_raw_staged",
+            "updated_at",
+            "version",
+        ]
+    )
     return app.manifest_raw_staged
 
 
@@ -176,12 +177,16 @@ class ServicesMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def set_app_secret(
-        self, info: Info, input: SetAppSecretInput,
+        self,
+        info: Info,
+        input: SetAppSecretInput,
     ) -> MutationResultType[_AppSecretWritePayload]:
         validation_msg = _validate_env_key(input.key)
         if validation_msg:
             return gql_failure(
-                ErrorCode.VALIDATION.value, validation_msg, field="key",
+                ErrorCode.VALIDATION.value,
+                validation_msg,
+                field="key",
             )
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
@@ -196,18 +201,22 @@ class ServicesMutation:
                 f"manifest parse failed after edit: {exc}",
                 field="rawManifest",
             )
-        return gql_success(_AppSecretWritePayload(
-            app_slug=app.slug,
-            key=input.key,
-            raw_manifest_staged=staged,
-        ))
+        return gql_success(
+            _AppSecretWritePayload(
+                app_slug=app.slug,
+                key=input.key,
+                raw_manifest_staged=staged,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.secret.delete")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def delete_app_secret(
-        self, info: Info, input: DeleteAppSecretInput,
+        self,
+        info: Info,
+        input: DeleteAppSecretInput,
     ) -> MutationResultType[_AppSecretWritePayload]:
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
@@ -228,18 +237,22 @@ class ServicesMutation:
                 f"manifest parse failed after delete: {exc}",
                 field="rawManifest",
             )
-        return gql_success(_AppSecretWritePayload(
-            app_slug=app.slug,
-            key=input.key,
-            raw_manifest_staged=staged,
-        ))
+        return gql_success(
+            _AppSecretWritePayload(
+                app_slug=app.slug,
+                key=input.key,
+                raw_manifest_staged=staged,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.secret.bulk_import")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def bulk_import_app_secrets(
-        self, info: Info, input: BulkImportAppSecretsInput,
+        self,
+        info: Info,
+        input: BulkImportAppSecretsInput,
     ) -> MutationResultType[_BulkImportPayload]:
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
@@ -257,7 +270,9 @@ class ServicesMutation:
             msg = _validate_env_key(key)
             if msg:
                 return gql_failure(
-                    ErrorCode.VALIDATION.value, msg, field="dotenvText",
+                    ErrorCode.VALIDATION.value,
+                    msg,
+                    field="dotenvText",
                 )
         source = app.manifest_raw_staged or app.manifest_raw or ""
         new_text = set_app_env_keys(source, kvs)
@@ -269,46 +284,38 @@ class ServicesMutation:
                 f"manifest parse failed after bulk import: {exc}",
                 field="rawManifest",
             )
-        return gql_success(_BulkImportPayload(
-            app_slug=app.slug,
-            keys_set=sorted(kvs.keys()),
-            raw_manifest_staged=staged,
-        ))
+        return gql_success(
+            _BulkImportPayload(
+                app_slug=app.slug,
+                keys_set=sorted(kvs.keys()),
+                raw_manifest_staged=staged,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.attach")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def attach_secret_bundle(
-        self, info: Info, input: AttachSecretBundleInput,
+        self,
+        info: Info,
+        input: AttachSecretBundleInput,
     ) -> MutationResultType[AppSecretBundleAttachmentType]:
-        app = (
-            RegisteredApp.objects
-            .filter(slug=input.app_slug)
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
-        env = (
-            AppEnvironment.objects
-            .filter(
-                registered_app=app,
-                name=input.environment_name,
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        env = AppEnvironment.objects.filter(
+            registered_app=app,
+            name=input.environment_name,
+            deleted_at__isnull=True,
+        ).first()
         if env is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 f"environment {input.environment_name!r} not found",
                 field="environmentName",
             )
-        bundle = (
-            SecretBundle.objects
-            .filter(slug=input.bundle_slug, deleted_at__isnull=True)
-            .first()
-        )
+        bundle = SecretBundle.objects.filter(slug=input.bundle_slug, deleted_at__isnull=True).first()
         if bundle is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -336,9 +343,13 @@ class ServicesMutation:
             new_prefix = input.prefix or ""
             if existing.prefix != new_prefix:
                 existing.prefix = new_prefix
-                existing.save(update_fields=[
-                    "prefix", "updated_at", "version",
-                ])
+                existing.save(
+                    update_fields=[
+                        "prefix",
+                        "updated_at",
+                        "version",
+                    ]
+                )
             return gql_success(attachment_to_type(existing))
         ref = AppSecretBundleRef.objects.create(
             registered_app=app,
@@ -353,21 +364,23 @@ class ServicesMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def detach_secret_bundle(
-        self, info: Info, input: DetachSecretBundleInput,
+        self,
+        info: Info,
+        input: DetachSecretBundleInput,
     ) -> MutationResultType[_AttachmentRemovedPayload]:
-        ref = (
-            AppSecretBundleRef.objects
-            .filter(guid=str(input.attachment_id))
-            .first()
-        )
+        ref = AppSecretBundleRef.objects.filter(guid=str(input.attachment_id)).first()
         if ref is None or ref.deleted_at is not None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "attachment not found",
+                ErrorCode.NOT_FOUND.value,
+                "attachment not found",
             )
         ref.soft_delete()
-        return gql_success(_AttachmentRemovedPayload(
-            attachment_id=input.attachment_id, deleted=True,
-        ))
+        return gql_success(
+            _AttachmentRemovedPayload(
+                attachment_id=input.attachment_id,
+                deleted=True,
+            )
+        )
 
     # ---- Managed services CRUD (#281) ----------------------------
 
@@ -376,7 +389,9 @@ class ServicesMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def provision_managed_service(
-        self, info: Info, input: ProvisionManagedServiceInput,
+        self,
+        info: Info,
+        input: ProvisionManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
         """Provision a managed-service binding.
 
@@ -385,22 +400,14 @@ class ServicesMutation:
         ``astrolift_workflows`` and reads from this row. The
         mutation creates the row in PENDING state; the workflow
         loop transitions it through PROVISIONING → ACTIVE."""
-        app = (
-            RegisteredApp.objects
-            .filter(slug=input.app_slug)
-            .first()
-        )
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
-        env = (
-            AppEnvironment.objects
-            .filter(
-                registered_app=app,
-                name=input.environment_name,
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        env = AppEnvironment.objects.filter(
+            registered_app=app,
+            name=input.environment_name,
+            deleted_at__isnull=True,
+        ).first()
         if env is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -415,14 +422,12 @@ class ServicesMutation:
                 field="kind",
             )
         name = (input.name or input.kind).strip()
-        if (
-            ManagedService.objects.filter(
-                registered_app=app,
-                kind=input.kind,
-                name=name,
-                deleted_at__isnull=True,
-            ).exists()
-        ):
+        if ManagedService.objects.filter(
+            registered_app=app,
+            kind=input.kind,
+            name=name,
+            deleted_at__isnull=True,
+        ).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
                 f"managed service ({input.kind}, {name!r}) already exists for this app",
@@ -444,16 +449,15 @@ class ServicesMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def update_managed_service(
-        self, info: Info, input: UpdateManagedServiceInput,
+        self,
+        info: Info,
+        input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
-        svc = (
-            ManagedService.objects
-            .filter(guid=str(input.id), deleted_at__isnull=True)
-            .first()
-        )
+        svc = ManagedService.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if svc is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "managed service not found",
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found",
             )
         if input.name is not None:
             svc.name = input.name.strip()
@@ -463,9 +467,15 @@ class ServicesMutation:
         # the workflow loop will roll it forward to ACTIVE.
         if svc.status == ManagedService.Status.ACTIVE:
             svc.status = ManagedService.Status.UPDATING
-        svc.save(update_fields=[
-            "name", "config", "status", "updated_at", "version",
-        ])
+        svc.save(
+            update_fields=[
+                "name",
+                "config",
+                "status",
+                "updated_at",
+                "version",
+            ]
+        )
         return gql_success(managed_service_to_type(svc))
 
     @strawberry.field
@@ -473,22 +483,28 @@ class ServicesMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def deprovision_managed_service(
-        self, info: Info, input: DeprovisionManagedServiceInput,
+        self,
+        info: Info,
+        input: DeprovisionManagedServiceInput,
     ) -> MutationResultType[_ManagedServiceDeletedPayload]:
-        svc = (
-            ManagedService.objects
-            .filter(guid=str(input.id), deleted_at__isnull=True)
-            .first()
-        )
+        svc = ManagedService.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if svc is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "managed service not found",
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found",
             )
         svc.status = ManagedService.Status.DEPROVISIONING
-        svc.save(update_fields=[
-            "status", "updated_at", "version",
-        ])
+        svc.save(
+            update_fields=[
+                "status",
+                "updated_at",
+                "version",
+            ]
+        )
         svc.soft_delete()
-        return gql_success(_ManagedServiceDeletedPayload(
-            id=input.id, deleted=True,
-        ))
+        return gql_success(
+            _ManagedServiceDeletedPayload(
+                id=input.id,
+                deleted=True,
+            )
+        )

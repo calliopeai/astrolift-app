@@ -55,7 +55,9 @@ def test_inline_secret_shape():
 def test_inline_uses_string_data_not_data():
     """stringData lets apiserver base64 — manual encoding is a foot-gun."""
     out = render_inline_secret(
-        name="x", namespace="ns", string_data={"K": "v"},
+        name="x",
+        namespace="ns",
+        string_data={"K": "v"},
     )
     assert "stringData" in out
     assert "data" not in out
@@ -99,10 +101,15 @@ def test_external_secret_shape():
 
 def test_external_secret_omits_property_when_empty():
     out = render_external_secret(
-        name="x", namespace="ns", secret_store="store",
-        mappings=[ExternalSecretMapping(
-            target_key="K", remote_ref_key="path/to/secret",
-        )],
+        name="x",
+        namespace="ns",
+        secret_store="store",
+        mappings=[
+            ExternalSecretMapping(
+                target_key="K",
+                remote_ref_key="path/to/secret",
+            )
+        ],
     )
     entry = out["spec"]["data"][0]
     assert "property" not in entry["remoteRef"]
@@ -111,24 +118,34 @@ def test_external_secret_omits_property_when_empty():
 def test_external_secret_rejects_empty_mappings():
     with pytest.raises(ValueError, match="mappings"):
         render_external_secret(
-            name="x", namespace="ns", secret_store="s", mappings=[],
+            name="x",
+            namespace="ns",
+            secret_store="s",
+            mappings=[],
         )
 
 
 def test_external_secret_rejects_missing_secret_store():
     with pytest.raises(ValueError, match="secret_store"):
         render_external_secret(
-            name="x", namespace="ns", secret_store="",
-            mappings=[ExternalSecretMapping(
-                target_key="K", remote_ref_key="path",
-            )],
+            name="x",
+            namespace="ns",
+            secret_store="",
+            mappings=[
+                ExternalSecretMapping(
+                    target_key="K",
+                    remote_ref_key="path",
+                )
+            ],
         )
 
 
 def test_external_mapping_rejects_empty_keys():
     with pytest.raises(ValueError):
         render_external_secret(
-            name="x", namespace="ns", secret_store="s",
+            name="x",
+            namespace="ns",
+            secret_store="s",
             mappings=[ExternalSecretMapping(target_key="", remote_ref_key="path")],
         )
 
@@ -166,7 +183,8 @@ def test_render_pod_env_from_no_services():
 def test_materialize_inline_round_trip():
     out = materialize(
         backend=SecretBackend.INLINE,
-        secret_name="x", namespace="ns",
+        secret_name="x",
+        namespace="ns",
         string_data={"K": "v"},
     )
     assert out["kind"] == "Secret"
@@ -176,10 +194,14 @@ def test_materialize_inline_round_trip():
 def test_materialize_external_round_trip():
     out = materialize(
         backend=SecretBackend.EXTERNAL_SECRETS_OPERATOR,
-        secret_name="x", namespace="ns",
-        external_mappings=[ExternalSecretMapping(
-            target_key="K", remote_ref_key="path",
-        )],
+        secret_name="x",
+        namespace="ns",
+        external_mappings=[
+            ExternalSecretMapping(
+                target_key="K",
+                remote_ref_key="path",
+            )
+        ],
         secret_store="vault-store",
     )
     assert out["kind"] == "ExternalSecret"
@@ -189,7 +211,8 @@ def test_materialize_inline_requires_string_data():
     with pytest.raises(ValueError, match="string_data"):
         materialize(
             backend=SecretBackend.INLINE,
-            secret_name="x", namespace="ns",
+            secret_name="x",
+            namespace="ns",
         )
 
 
@@ -197,13 +220,18 @@ def test_materialize_external_requires_mappings_and_store():
     with pytest.raises(ValueError, match="external_mappings"):
         materialize(
             backend=SecretBackend.EXTERNAL_SECRETS_OPERATOR,
-            secret_name="x", namespace="ns",
+            secret_name="x",
+            namespace="ns",
         )
     with pytest.raises(ValueError, match="secret_store"):
         materialize(
             backend=SecretBackend.EXTERNAL_SECRETS_OPERATOR,
-            secret_name="x", namespace="ns",
-            external_mappings=[ExternalSecretMapping(
-                target_key="K", remote_ref_key="path",
-            )],
+            secret_name="x",
+            namespace="ns",
+            external_mappings=[
+                ExternalSecretMapping(
+                    target_key="K",
+                    remote_ref_key="path",
+                )
+            ],
         )

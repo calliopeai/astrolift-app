@@ -22,9 +22,7 @@ pytestmark = pytest.mark.django_db
 def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,
@@ -164,9 +162,7 @@ kind = "deployment"
     assert [w.slug for w in active] == ["web"]
     # The dropped row is gone from the active queryset but still in
     # ``all_objects`` (audit trail).
-    assert Workload.all_objects.filter(
-        registered_app=app, slug="worker"
-    ).count() == 1
+    assert Workload.all_objects.filter(registered_app=app, slug="worker").count() == 1
 
 
 def test_persist_soft_deletes_removed_container():

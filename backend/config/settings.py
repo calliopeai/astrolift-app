@@ -157,8 +157,7 @@ AUTH0_CLIENT_SCOPES = os.environ.get(
 # without disturbing the login/logout flow that still uses AUTH0_DOMAIN.
 AUTH0_SERVER_METADATA_URL = os.environ.get("AUTH0_SERVER_METADATA_URL")
 logger.warning(
-    f"[Auth0] AUTH0_DOMAIN={AUTH0_DOMAIN!r} "
-    f"AUTH0_SERVER_METADATA_URL={AUTH0_SERVER_METADATA_URL!r}"
+    f"[Auth0] AUTH0_DOMAIN={AUTH0_DOMAIN!r} " f"AUTH0_SERVER_METADATA_URL={AUTH0_SERVER_METADATA_URL!r}"
 )
 AUTH0_DATABASE_CONNECTION_ID = os.environ.get(
     "AUTH0_DATABASE_CONNECTION_ID", "Username-Password-Authentication"

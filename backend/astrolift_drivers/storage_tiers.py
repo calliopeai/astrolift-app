@@ -22,7 +22,7 @@ class PerformanceTier(str, Enum):
     every manifest."""
 
     STANDARD = "standard"
-    BALANCED = "balanced"   # default
+    BALANCED = "balanced"  # default
     HIGH_IOPS = "high_iops"
     EXTREME = "extreme"
 
@@ -30,9 +30,9 @@ class PerformanceTier(str, Enum):
 class Durability(str, Enum):
     """Spec 22 §3 — the three durability levels."""
 
-    LOCAL = "local"          # node-bound; lost on node replacement
-    ZONAL = "zonal"          # AZ-bound; default
-    REGIONAL = "regional"    # multi-AZ replicated
+    LOCAL = "local"  # node-bound; lost on node replacement
+    ZONAL = "zonal"  # AZ-bound; default
+    REGIONAL = "regional"  # multi-AZ replicated
 
 
 # Spec 22 §2 expectations: minimum IOPS guarantee per tier the
@@ -51,9 +51,14 @@ TIER_MIN_IOPS: dict[PerformanceTier, int] = {
 
 
 _SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)(Mi|Gi|Ti|Pi)?$")
-_ACCESS_MODES = frozenset({
-    "ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod",
-})
+_ACCESS_MODES = frozenset(
+    {
+        "ReadWriteOnce",
+        "ReadOnlyMany",
+        "ReadWriteMany",
+        "ReadWriteOncePod",
+    }
+)
 
 
 class StorageError(ValueError):
@@ -70,15 +75,15 @@ def parse_size(size: str) -> int:
         raise StorageError("size is required")
     m = _SIZE_RE.match(size.strip())
     if m is None:
-        raise StorageError(
-            f"size {size!r} not in valid form "
-            "(<number>[Mi|Gi|Ti|Pi]; bare number = bytes)"
-        )
+        raise StorageError(f"size {size!r} not in valid form " "(<number>[Mi|Gi|Ti|Pi]; bare number = bytes)")
     value = float(m.group(1))
     unit = m.group(2) or ""
     multipliers = {
-        "": 1, "Mi": 1024 ** 2, "Gi": 1024 ** 3,
-        "Ti": 1024 ** 4, "Pi": 1024 ** 5,
+        "": 1,
+        "Mi": 1024**2,
+        "Gi": 1024**3,
+        "Ti": 1024**4,
+        "Pi": 1024**5,
     }
     return int(value * multipliers[unit])
 
@@ -109,10 +114,7 @@ class VolumeSpec:
             raise StorageError("at least one access_mode required")
         for mode in self.access_modes:
             if mode not in _ACCESS_MODES:
-                raise StorageError(
-                    f"access_mode {mode!r} not one of "
-                    f"{sorted(_ACCESS_MODES)}"
-                )
+                raise StorageError(f"access_mode {mode!r} not one of " f"{sorted(_ACCESS_MODES)}")
 
 
 def parse_tier(value: str | None) -> PerformanceTier:
@@ -123,8 +125,7 @@ def parse_tier(value: str | None) -> PerformanceTier:
         return PerformanceTier(value)
     except ValueError as exc:
         raise StorageError(
-            f"performance_tier {value!r} not one of "
-            f"{[t.value for t in PerformanceTier]}"
+            f"performance_tier {value!r} not one of " f"{[t.value for t in PerformanceTier]}"
         ) from exc
 
 
@@ -134,10 +135,7 @@ def parse_durability(value: str | None) -> Durability:
     try:
         return Durability(value)
     except ValueError as exc:
-        raise StorageError(
-            f"durability {value!r} not one of "
-            f"{[d.value for d in Durability]}"
-        ) from exc
+        raise StorageError(f"durability {value!r} not one of " f"{[d.value for d in Durability]}") from exc
 
 
 # ---- cross-tier compatibility --------------------------------------
@@ -154,8 +152,10 @@ class TierCompatibility:
     supported: frozenset[tuple[PerformanceTier, Durability]]
 
     def supports(
-        self, *,
-        tier: PerformanceTier, durability: Durability,
+        self,
+        *,
+        tier: PerformanceTier,
+        durability: Durability,
     ) -> bool:
         return (tier, durability) in self.supported
 

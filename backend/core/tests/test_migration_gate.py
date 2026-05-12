@@ -142,11 +142,13 @@ def test_gate_passes_safe():
 
 
 def test_render_preview_lists_only_non_safe_ops():
-    a = assess_operations([
-        AddField(name="ok"),
-        RemoveField(name="legacy_email"),
-        AlterField(name="notes"),
-    ])
+    a = assess_operations(
+        [
+            AddField(name="ok"),
+            RemoveField(name="legacy_email"),
+            AlterField(name="notes"),
+        ]
+    )
     preview = render_preview(a)
     assert "DESTRUCTIVE migration" in preview
     assert "legacy_email" in preview

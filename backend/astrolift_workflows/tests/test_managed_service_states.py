@@ -27,64 +27,89 @@ from astrolift_workflows.managed_service_states import (
 
 
 def test_provisioning_to_active():
-    assert can_transition(
-        current=ManagedServiceState.PROVISIONING,
-        target=ManagedServiceState.ACTIVE,
-    ) is True
+    assert (
+        can_transition(
+            current=ManagedServiceState.PROVISIONING,
+            target=ManagedServiceState.ACTIVE,
+        )
+        is True
+    )
 
 
 def test_provisioning_to_failed():
-    assert can_transition(
-        current=ManagedServiceState.PROVISIONING,
-        target=ManagedServiceState.FAILED,
-    ) is True
+    assert (
+        can_transition(
+            current=ManagedServiceState.PROVISIONING,
+            target=ManagedServiceState.FAILED,
+        )
+        is True
+    )
 
 
 def test_active_to_updating():
-    assert can_transition(
-        current=ManagedServiceState.ACTIVE,
-        target=ManagedServiceState.UPDATING,
-    ) is True
+    assert (
+        can_transition(
+            current=ManagedServiceState.ACTIVE,
+            target=ManagedServiceState.UPDATING,
+        )
+        is True
+    )
 
 
 def test_active_to_deprovisioning():
-    assert can_transition(
-        current=ManagedServiceState.ACTIVE,
-        target=ManagedServiceState.DEPROVISIONING,
-    ) is True
+    assert (
+        can_transition(
+            current=ManagedServiceState.ACTIVE,
+            target=ManagedServiceState.DEPROVISIONING,
+        )
+        is True
+    )
 
 
 def test_failed_can_retry_to_provisioning():
     """Retry path: FAILED → PROVISIONING (the workflow restarts)."""
-    assert can_transition(
-        current=ManagedServiceState.FAILED,
-        target=ManagedServiceState.PROVISIONING,
-    ) is True
+    assert (
+        can_transition(
+            current=ManagedServiceState.FAILED,
+            target=ManagedServiceState.PROVISIONING,
+        )
+        is True
+    )
 
 
 def test_soft_deleted_is_terminal():
     """No transitions out of SOFT_DELETED — provision a new
     instance instead of resurrecting."""
     for target in ManagedServiceState:
-        assert can_transition(
-            current=ManagedServiceState.SOFT_DELETED, target=target,
-        ) is False
+        assert (
+            can_transition(
+                current=ManagedServiceState.SOFT_DELETED,
+                target=target,
+            )
+            is False
+        )
 
 
 def test_active_cannot_skip_to_soft_deleted():
     """Must go through DEPROVISIONING first."""
-    assert can_transition(
-        current=ManagedServiceState.ACTIVE,
-        target=ManagedServiceState.SOFT_DELETED,
-    ) is False
+    assert (
+        can_transition(
+            current=ManagedServiceState.ACTIVE,
+            target=ManagedServiceState.SOFT_DELETED,
+        )
+        is False
+    )
 
 
 def test_provisioning_cannot_skip_to_active_via_updating():
     """Defensive: arbitrary transitions refused."""
-    assert can_transition(
-        current=ManagedServiceState.PROVISIONING,
-        target=ManagedServiceState.UPDATING,
-    ) is False
+    assert (
+        can_transition(
+            current=ManagedServiceState.PROVISIONING,
+            target=ManagedServiceState.UPDATING,
+        )
+        is False
+    )
 
 
 def test_assert_transition_raises_on_invalid():
@@ -123,16 +148,10 @@ def test_update_order_locked():
     assert UPDATE_ORDER[0] == UpdateStep.MARK_UPDATING
     assert UPDATE_ORDER[-1] == UpdateStep.MARK_ACTIVE
     # Compute delta before warning (warning depends on delta)
-    assert (
-        UPDATE_ORDER.index(UpdateStep.COMPUTE_DELTA)
-        < UPDATE_ORDER.index(UpdateStep.WARN_IF_DESTRUCTIVE)
-    )
+    assert UPDATE_ORDER.index(UpdateStep.COMPUTE_DELTA) < UPDATE_ORDER.index(UpdateStep.WARN_IF_DESTRUCTIVE)
     # Warning before driver update (operator approval gates
     # destructive ops)
-    assert (
-        UPDATE_ORDER.index(UpdateStep.WARN_IF_DESTRUCTIVE)
-        < UPDATE_ORDER.index(UpdateStep.DRIVER_UPDATE)
-    )
+    assert UPDATE_ORDER.index(UpdateStep.WARN_IF_DESTRUCTIVE) < UPDATE_ORDER.index(UpdateStep.DRIVER_UPDATE)
 
 
 def test_deprovision_order_locked():
@@ -250,9 +269,7 @@ def test_workloads_to_redeploy_dedupes():
 
 def test_workloads_to_redeploy_empty_when_no_rebound():
     """No bindings rebound → no workloads to redeploy."""
-    bindings = (
-        WorkloadBinding(workload_id=1, binding_id=10),
-    )
+    bindings = (WorkloadBinding(workload_id=1, binding_id=10),)
     out = workloads_to_redeploy(
         rebound_binding_ids=[],
         all_bindings=bindings,
@@ -268,6 +285,7 @@ def test_workloads_to_redeploy_stable_order():
         WorkloadBinding(workload_id=8, binding_id=10),
     )
     out = workloads_to_redeploy(
-        rebound_binding_ids=[10], all_bindings=bindings,
+        rebound_binding_ids=[10],
+        all_bindings=bindings,
     )
     assert out == (2, 5, 8)

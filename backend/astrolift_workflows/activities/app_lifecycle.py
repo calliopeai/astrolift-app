@@ -98,12 +98,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     activity.heartbeat()
 
     def _gather():
-        d = (
-            Deployment.all_objects.select_related(
-                "registered_app", "app_environment"
-            )
-            .get(pk=deployment_id)
-        )
+        d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
         app = d.registered_app
         env = d.app_environment
         # Render off the stored TOML — never re-fetch from the repo at
@@ -172,9 +167,7 @@ def _create_rollback_deployment_sync(deployment_id: int) -> int:
     """
     from astrolift_lifecycle.models import Deployment
 
-    current = Deployment.all_objects.select_related(
-        "registered_app", "app_environment"
-    ).get(pk=deployment_id)
+    current = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
     # Find the prior running deployment in the same env (older
     # than the current row). Pick the most recent terminal-OK one.
     prior = (
@@ -193,8 +186,7 @@ def _create_rollback_deployment_sync(deployment_id: int) -> int:
     )
     if prior is None:
         raise RuntimeError(
-            f"deployment {deployment_id} has no prior running revision "
-            "in this env to roll back to"
+            f"deployment {deployment_id} has no prior running revision " "in this env to roll back to"
         )
     new_deploy = Deployment.objects.create(
         registered_app=current.registered_app,
@@ -243,18 +235,14 @@ def _create_promotion_deployment_sync(
     ``_create_rollback_deployment_sync`` for the rationale."""
     from astrolift_lifecycle.models import AppEnvironment, Deployment
 
-    source = Deployment.all_objects.select_related(
-        "registered_app", "app_environment"
-    ).get(pk=source_deployment_id)
+    source = Deployment.all_objects.select_related("registered_app", "app_environment").get(
+        pk=source_deployment_id
+    )
     target_env = AppEnvironment.objects.get(pk=target_app_environment_id)
     if target_env.registered_app_id != source.registered_app_id:
-        raise RuntimeError(
-            "promotion target must belong to the same app as the source"
-        )
+        raise RuntimeError("promotion target must belong to the same app as the source")
     if target_env.deploys_paused:
-        raise RuntimeError(
-            f"target environment {target_env.name!r} has deploys paused"
-        )
+        raise RuntimeError(f"target environment {target_env.name!r} has deploys paused")
 
     initial_status = (
         Deployment.Status.PENDING_APPROVAL.value

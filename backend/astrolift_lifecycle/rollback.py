@@ -77,10 +77,7 @@ def resolve_target(
         ``is_current``.
       - Raises ``RollbackError`` when no eligible target exists.
     """
-    in_scope = [
-        c for c in candidates
-        if c.app_id == app_id and c.environment_id == environment_id
-    ]
+    in_scope = [c for c in candidates if c.app_id == app_id and c.environment_id == environment_id]
     if explicit_target_id is not None:
         match = next(
             (c for c in in_scope if c.deployment_id == explicit_target_id),
@@ -99,10 +96,7 @@ def resolve_target(
         return match
 
     eligible = [
-        c for c in in_scope
-        if c.state == DeploymentState.RUNNING
-        and not c.is_current
-        and c.image_digest
+        c for c in in_scope if c.state == DeploymentState.RUNNING and not c.is_current and c.image_digest
     ]
     if not eligible:
         raise RollbackError(
@@ -136,18 +130,11 @@ def plan_rollback(
     tests + edge-case GraphQL inputs).
     """
     if current.app_id != target.app_id:
-        raise RollbackError(
-            f"current app {current.app_id} != target app {target.app_id}"
-        )
+        raise RollbackError(f"current app {current.app_id} != target app {target.app_id}")
     if current.environment_id != target.environment_id:
-        raise RollbackError(
-            f"current env {current.environment_id} != target env "
-            f"{target.environment_id}"
-        )
+        raise RollbackError(f"current env {current.environment_id} != target env " f"{target.environment_id}")
     if not target.image_digest:
-        raise RollbackError(
-            "target has no image digest; cannot guarantee byte-for-byte rollback"
-        )
+        raise RollbackError("target has no image digest; cannot guarantee byte-for-byte rollback")
     return RollbackPlan(
         app_id=target.app_id,
         environment_id=target.environment_id,

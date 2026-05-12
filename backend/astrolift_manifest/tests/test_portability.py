@@ -14,9 +14,13 @@ from astrolift_manifest.portability import (
 )
 
 
-def _b(kind: str, name: str = "main", *, variant_pin: str = "", has_portable_variant: bool = True) -> BlockPinSnapshot:
+def _b(
+    kind: str, name: str = "main", *, variant_pin: str = "", has_portable_variant: bool = True
+) -> BlockPinSnapshot:
     return BlockPinSnapshot(
-        kind=kind, name=name, variant_pin=variant_pin,
+        kind=kind,
+        name=name,
+        variant_pin=variant_pin,
         has_portable_variant=has_portable_variant,
     )
 
@@ -48,11 +52,18 @@ def test_parse_pin_well_formed():
     assert parse_pin("vault/kv-v2") == ("vault", "kv-v2")
 
 
-@pytest.mark.parametrize("bad", [
-    "", "no-slash", "too/many/parts", "/missing-plugin",
-    "plugin/", "Plugin/Variant",  # uppercase rejected
-    "1plugin/v",  # leading digit
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "no-slash",
+        "too/many/parts",
+        "/missing-plugin",
+        "plugin/",
+        "Plugin/Variant",  # uppercase rejected
+        "1plugin/v",  # leading digit
+    ],
+)
 def test_parse_pin_rejects_malformed(bad):
     assert parse_pin(bad) is None
 
@@ -168,8 +179,8 @@ def test_violation_lists_all_offending_blocks_at_once():
         validate(
             declared=PortabilityMode.PINNED,
             blocks=[
-                _b("postgres"),       # no pin
-                _b("redis"),          # no pin
+                _b("postgres"),  # no pin
+                _b("redis"),  # no pin
                 _b("queue", variant_pin="aws-sqs/standard"),
             ],
         )

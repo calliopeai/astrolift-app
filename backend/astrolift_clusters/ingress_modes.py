@@ -119,7 +119,9 @@ def shared_annotations_for(
 
 
 def per_app_annotations(
-    *, driver: IngressDriver, app_slug: str,
+    *,
+    driver: IngressDriver,
+    app_slug: str,
 ) -> IngressAnnotations:
     """Per-app mode: each app gets its own LB. Group name is
     unique per app."""
@@ -156,9 +158,7 @@ def validate_expose_paths(paths: Sequence[str]) -> None:
         raise RoutingError("expose_paths must not be empty when set")
     for p in paths:
         if not isinstance(p, str):
-            raise RoutingError(
-                f"expose_paths entry {p!r} must be a string"
-            )
+            raise RoutingError(f"expose_paths entry {p!r} must be a string")
         if not _PATH_PATTERN_RE.match(p):
             raise RoutingError(
                 f"path {p!r} must start with '/' and contain only "

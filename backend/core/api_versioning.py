@@ -28,8 +28,8 @@ from datetime import date, timedelta
 from enum import Enum
 
 # Spec 27 §3 — minimum windows.
-MIN_DEPRECATION_DAYS = 180          # 6 months
-MIN_PREV_MAJOR_SUPPORT_DAYS = 365   # 12 months
+MIN_DEPRECATION_DAYS = 180  # 6 months
+MIN_PREV_MAJOR_SUPPORT_DAYS = 365  # 12 months
 
 
 _SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
@@ -60,9 +60,7 @@ class ApiVersionError(ValueError):
 def parse_version(s: str) -> ApiVersion:
     m = _SEMVER_RE.match(s.strip())
     if m is None:
-        raise ApiVersionError(
-            f"version {s!r} not in strict X.Y.Z form"
-        )
+        raise ApiVersionError(f"version {s!r} not in strict X.Y.Z form")
     return ApiVersion(int(m.group(1)), int(m.group(2)), int(m.group(3)))
 
 
@@ -104,9 +102,7 @@ class DeprecationNotice:
 
     def __post_init__(self) -> None:
         if self.removed_at < self.deprecated_at:
-            raise ApiVersionError(
-                "removed_at must be >= deprecated_at"
-            )
+            raise ApiVersionError("removed_at must be >= deprecated_at")
         window = (self.removed_at - self.deprecated_at).days
         if window < MIN_DEPRECATION_DAYS:
             raise ApiVersionError(
@@ -122,8 +118,8 @@ class DeprecationHeaders:
     """The header pair the middleware adds to responses touching
     a deprecated field."""
 
-    deprecation: str   # 'true' (RFC 8594)
-    sunset: str        # HTTP-date format
+    deprecation: str  # 'true' (RFC 8594)
+    sunset: str  # HTTP-date format
 
 
 def headers_for(notice: DeprecationNotice) -> DeprecationHeaders:
@@ -146,7 +142,8 @@ def is_due_for_removal(notice: DeprecationNotice, *, today: date) -> bool:
 
 
 def prev_major_supported_until(
-    *, current_major_released_on: date,
+    *,
+    current_major_released_on: date,
 ) -> date:
     """Spec 27 §3: previous major supported in parallel for >= 12
     months from when the new major shipped. Computes the absolute
@@ -180,9 +177,7 @@ def validate_changelog_section(
     touches CHANGELOG.md.
     """
     if version <= previous:
-        raise ApiVersionError(
-            f"new version {version} must be greater than previous {previous}"
-        )
+        raise ApiVersionError(f"new version {version} must be greater than previous {previous}")
 
     same_major = version.major == previous.major
     if same_major:

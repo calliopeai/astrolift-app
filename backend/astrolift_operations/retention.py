@@ -59,9 +59,7 @@ class RetentionPolicy:
 
     def __post_init__(self) -> None:
         if self.stream not in {"event", "audit"}:
-            raise ValueError(
-                f"retention stream must be 'event' or 'audit', got {self.stream!r}"
-            )
+            raise ValueError(f"retention stream must be 'event' or 'audit', got {self.stream!r}")
         if self.retention_days <= 0:
             raise ValueError("retention_days must be positive")
 
@@ -251,8 +249,6 @@ def export_to_sink(
         return 0
 
     payload = serialize_jsonl(rows_list, stream=stream, chained=chained)
-    partition_key = (
-        f"{stream}/{org_slug}/{partition_date.strftime('%Y/%m/%d')}.jsonl"
-    )
+    partition_key = f"{stream}/{org_slug}/{partition_date.strftime('%Y/%m/%d')}.jsonl"
     sink(payload, partition_key)
     return len(payload)

@@ -32,7 +32,9 @@ def test_in_sync_works_without_anchor():
 def test_db_ahead_when_repo_equals_anchor():
     """Repo stayed at the anchor; DB moved."""
     snap = SyncSnapshot(
-        db_hash="db-new", repo_hash="anchor", last_synced_hash="anchor",
+        db_hash="db-new",
+        repo_hash="anchor",
+        last_synced_hash="anchor",
     )
     assert classify_state(snap) == SyncState.DB_AHEAD
 
@@ -40,14 +42,18 @@ def test_db_ahead_when_repo_equals_anchor():
 def test_repo_ahead_when_db_equals_anchor():
     """DB stayed at the anchor; repo moved."""
     snap = SyncSnapshot(
-        db_hash="anchor", repo_hash="repo-new", last_synced_hash="anchor",
+        db_hash="anchor",
+        repo_hash="repo-new",
+        last_synced_hash="anchor",
     )
     assert classify_state(snap) == SyncState.REPO_AHEAD
 
 
 def test_diverged_when_both_moved_off_anchor():
     snap = SyncSnapshot(
-        db_hash="db-new", repo_hash="repo-new", last_synced_hash="anchor",
+        db_hash="db-new",
+        repo_hash="repo-new",
+        last_synced_hash="anchor",
     )
     assert classify_state(snap) == SyncState.DIVERGED
 
@@ -56,7 +62,9 @@ def test_diverged_when_no_anchor_and_unequal():
     """First-ever divergence with no historical anchor — conservative
     classification: assume both sides moved."""
     snap = SyncSnapshot(
-        db_hash="db", repo_hash="repo", last_synced_hash="",
+        db_hash="db",
+        repo_hash="repo",
+        last_synced_hash="",
     )
     assert classify_state(snap) == SyncState.DIVERGED
 
@@ -76,7 +84,9 @@ def test_only_in_sync_doesnt_need_attention():
 
 def test_reconcile_to_repo_advances_anchor_to_repo():
     snap = SyncSnapshot(
-        db_hash="anchor", repo_hash="repo-new", last_synced_hash="anchor",
+        db_hash="anchor",
+        repo_hash="repo-new",
+        last_synced_hash="anchor",
     )
     event = reconcile_to_repo(snap=snap)
     assert event.new_anchor_hash == "repo-new"
@@ -85,7 +95,9 @@ def test_reconcile_to_repo_advances_anchor_to_repo():
 
 def test_reconcile_to_db_advances_anchor_to_db():
     snap = SyncSnapshot(
-        db_hash="db-new", repo_hash="anchor", last_synced_hash="anchor",
+        db_hash="db-new",
+        repo_hash="anchor",
+        last_synced_hash="anchor",
     )
     event = reconcile_to_db(snap=snap)
     assert event.new_anchor_hash == "db-new"
@@ -94,7 +106,9 @@ def test_reconcile_to_db_advances_anchor_to_db():
 
 def test_reconcile_records_actor_kind():
     snap = SyncSnapshot(
-        db_hash="a", repo_hash="b", last_synced_hash="a",
+        db_hash="a",
+        repo_hash="b",
+        last_synced_hash="a",
     )
     event = reconcile_to_repo(snap=snap, actor_kind="webhook")
     assert event.actor_kind == "webhook"

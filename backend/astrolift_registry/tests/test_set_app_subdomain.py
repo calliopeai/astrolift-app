@@ -25,9 +25,7 @@ def _info():
 def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,

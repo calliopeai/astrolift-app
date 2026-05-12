@@ -84,7 +84,8 @@ def test_verify_returns_user_id_on_match():
     record = _record(issued.token_hash)
     user_id = verify_magic_link(
         presented_plaintext=issued.plaintext_token,
-        record=record, now=_now(),
+        record=record,
+        now=_now(),
     )
     assert user_id == 42
 
@@ -95,7 +96,8 @@ def test_verify_rejects_wrong_token():
     with pytest.raises(MagicLinkInvalid):
         verify_magic_link(
             presented_plaintext=issued.plaintext_token,
-            record=record, now=_now(),
+            record=record,
+            now=_now(),
         )
 
 
@@ -105,7 +107,8 @@ def test_verify_rejects_token_without_prefix():
     with pytest.raises(MagicLinkInvalid):
         verify_magic_link(
             presented_plaintext="random-bytes-here",
-            record=record, now=_now(),
+            record=record,
+            now=_now(),
         )
 
 
@@ -119,7 +122,8 @@ def test_verify_rejects_consumed_token():
     with pytest.raises(MagicLinkInvalid):
         verify_magic_link(
             presented_plaintext=issued.plaintext_token,
-            record=record, now=_now(),
+            record=record,
+            now=_now(),
         )
 
 
@@ -133,7 +137,8 @@ def test_verify_rejects_expired_token():
     with pytest.raises(MagicLinkInvalid):
         verify_magic_link(
             presented_plaintext=issued.plaintext_token,
-            record=record, now=_now(),
+            record=record,
+            now=_now(),
         )
 
 
@@ -148,7 +153,8 @@ def test_verify_uses_generic_message_for_all_failures():
     try:
         verify_magic_link(
             presented_plaintext=issued.plaintext_token,
-            record=record, now=_now(),
+            record=record,
+            now=_now(),
         )
         raise AssertionError("expected raise")
     except MagicLinkInvalid as e:
@@ -159,7 +165,8 @@ def test_verify_uses_generic_message_for_all_failures():
     try:
         verify_magic_link(
             presented_plaintext=issued.plaintext_token,
-            record=record, now=_now(),
+            record=record,
+            now=_now(),
         )
         raise AssertionError("expected raise")
     except MagicLinkInvalid as e:
@@ -211,7 +218,8 @@ def test_quorum_one_rejection_kills_deploy():
             ApprovalVote(user_id=1, decision=ApprovalDecision.APPROVED),
             ApprovalVote(user_id=2, decision=ApprovalDecision.APPROVED),
             ApprovalVote(
-                user_id=3, decision=ApprovalDecision.REJECTED,
+                user_id=3,
+                decision=ApprovalDecision.REJECTED,
                 reason="security concern",
             ),
         ],
@@ -279,18 +287,26 @@ def test_quorum_rejects_min_higher_than_eligible():
 
 def test_not_timed_out_within_window():
     requested = _now(off_seconds=-60)
-    assert is_timed_out(
-        requested_at=requested, now=_now(),
-        timeout_seconds=DEFAULT_APPROVAL_TIMEOUT_SECONDS,
-    ) is False
+    assert (
+        is_timed_out(
+            requested_at=requested,
+            now=_now(),
+            timeout_seconds=DEFAULT_APPROVAL_TIMEOUT_SECONDS,
+        )
+        is False
+    )
 
 
 def test_timed_out_at_or_past_window():
     requested = _now(off_seconds=-DEFAULT_APPROVAL_TIMEOUT_SECONDS - 1)
-    assert is_timed_out(
-        requested_at=requested, now=_now(),
-        timeout_seconds=DEFAULT_APPROVAL_TIMEOUT_SECONDS,
-    ) is True
+    assert (
+        is_timed_out(
+            requested_at=requested,
+            now=_now(),
+            timeout_seconds=DEFAULT_APPROVAL_TIMEOUT_SECONDS,
+        )
+        is True
+    )
 
 
 def test_timeout_default_is_seven_days():
@@ -300,9 +316,11 @@ def test_timeout_default_is_seven_days():
 def test_timeout_rejects_naive_timestamps():
     with pytest.raises(ValueError):
         is_timed_out(
-            requested_at=datetime(2026, 5, 9), now=_now(),
+            requested_at=datetime(2026, 5, 9),
+            now=_now(),
         )
     with pytest.raises(ValueError):
         is_timed_out(
-            requested_at=_now(), now=datetime(2026, 5, 9),
+            requested_at=_now(),
+            now=datetime(2026, 5, 9),
         )

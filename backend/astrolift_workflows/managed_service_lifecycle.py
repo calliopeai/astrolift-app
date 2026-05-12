@@ -32,8 +32,11 @@ from enum import Enum
 
 def idempotency_key(
     *,
-    org_slug: str, app_slug: str, env_slug: str,
-    binding_name: str, kind: str,
+    org_slug: str,
+    app_slug: str,
+    env_slug: str,
+    binding_name: str,
+    kind: str,
 ) -> str:
     """Stable key per (org, app, env, binding, kind). Workflow
     sets this as the Temporal workflow id so re-firing the same
@@ -185,11 +188,13 @@ def snapshots_to_prune(
     if not snapshots:
         return ()
     sorted_snaps = sorted(
-        snapshots, key=lambda s: s.created_at_unix, reverse=True,
+        snapshots,
+        key=lambda s: s.created_at_unix,
+        reverse=True,
     )
     if len(sorted_snaps) <= policy.retain_count:
         return ()
-    return tuple(sorted_snaps[policy.retain_count:])
+    return tuple(sorted_snaps[policy.retain_count :])
 
 
 # ---- credential rotation -------------------------------------------

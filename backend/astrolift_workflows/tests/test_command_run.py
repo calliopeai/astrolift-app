@@ -52,8 +52,10 @@ def test_timeout_constants():
 
 def test_job_name_format():
     plan = plan_job_spec(
-        app_slug="api", run_id="abc-123",
-        namespace="acme-api", image="api:1.0",
+        app_slug="api",
+        run_id="abc-123",
+        namespace="acme-api",
+        image="api:1.0",
         command=("python", "manage.py", "migrate"),
         env={},
     )
@@ -62,7 +64,10 @@ def test_job_name_format():
 
 def test_plan_carries_command_and_env():
     plan = plan_job_spec(
-        app_slug="api", run_id="x", namespace="ns", image="img",
+        app_slug="api",
+        run_id="x",
+        namespace="ns",
+        image="img",
         command=("ls", "-la"),
         env={"DATABASE_URL": "postgres://...", "DEBUG": "1"},
     )
@@ -72,8 +77,12 @@ def test_plan_carries_command_and_env():
 
 def test_plan_default_timeout():
     plan = plan_job_spec(
-        app_slug="api", run_id="x", namespace="ns", image="img",
-        command=("echo", "hi"), env={},
+        app_slug="api",
+        run_id="x",
+        namespace="ns",
+        image="img",
+        command=("echo", "hi"),
+        env={},
     )
     assert plan.timeout_seconds == DEFAULT_COMMAND_TIMEOUT_SECONDS
 
@@ -83,8 +92,12 @@ def test_plan_no_retries():
     they want it to complete or fail visibly, not silently
     retry."""
     plan = plan_job_spec(
-        app_slug="api", run_id="x", namespace="ns", image="img",
-        command=("echo", "hi"), env={},
+        app_slug="api",
+        run_id="x",
+        namespace="ns",
+        image="img",
+        command=("echo", "hi"),
+        env={},
     )
     assert plan.backoff_limit == 0
 
@@ -92,21 +105,33 @@ def test_plan_no_retries():
 def test_plan_rejects_empty_required_fields():
     with pytest.raises(CommandRunError, match="required"):
         plan_job_spec(
-            app_slug="", run_id="x", namespace="ns", image="img",
-            command=("echo",), env={},
+            app_slug="",
+            run_id="x",
+            namespace="ns",
+            image="img",
+            command=("echo",),
+            env={},
         )
     with pytest.raises(CommandRunError, match="required"):
         plan_job_spec(
-            app_slug="api", run_id="x", namespace="ns", image="",
-            command=("echo",), env={},
+            app_slug="api",
+            run_id="x",
+            namespace="ns",
+            image="",
+            command=("echo",),
+            env={},
         )
 
 
 def test_plan_rejects_empty_command():
     with pytest.raises(CommandRunError, match="command"):
         plan_job_spec(
-            app_slug="api", run_id="x", namespace="ns", image="img",
-            command=(), env={},
+            app_slug="api",
+            run_id="x",
+            namespace="ns",
+            image="img",
+            command=(),
+            env={},
         )
 
 
@@ -115,8 +140,12 @@ def test_plan_rejects_empty_run_id():
     not unique enough."""
     with pytest.raises(CommandRunError, match="run_id"):
         plan_job_spec(
-            app_slug="api", run_id="", namespace="ns", image="img",
-            command=("echo",), env={},
+            app_slug="api",
+            run_id="",
+            namespace="ns",
+            image="img",
+            command=("echo",),
+            env={},
         )
 
 
@@ -126,8 +155,10 @@ def test_plan_rejects_empty_run_id():
 def test_deadline_exceeded_classified_as_timeout():
     """Spec rule: the Job's activeDeadlineSeconds elapsed."""
     out = classify_pod_failure(
-        exit_code=137, pod_phase="Failed",
-        reason="DeadlineExceeded", deadline_exceeded=True,
+        exit_code=137,
+        pod_phase="Failed",
+        reason="DeadlineExceeded",
+        deadline_exceeded=True,
     )
     assert out == CommandRunStatus.FAILED_TIMEOUT
 
@@ -136,27 +167,38 @@ def test_oomkilled_classified_as_oom():
     """OOMKilled is a distinct outcome — operator action is to
     bump memory limits, not retry."""
     out = classify_pod_failure(
-        exit_code=137, pod_phase="Failed",
-        reason="OOMKilled", deadline_exceeded=False,
+        exit_code=137,
+        pod_phase="Failed",
+        reason="OOMKilled",
+        deadline_exceeded=False,
     )
     assert out == CommandRunStatus.FAILED_OOM
 
 
-@pytest.mark.parametrize("reason", [
-    "ImagePullBackOff", "ErrImagePull", "InvalidImageName",
-])
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "ImagePullBackOff",
+        "ErrImagePull",
+        "InvalidImageName",
+    ],
+)
 def test_image_pull_failures_classified(reason):
     out = classify_pod_failure(
-        exit_code=None, pod_phase="Pending",
-        reason=reason, deadline_exceeded=False,
+        exit_code=None,
+        pod_phase="Pending",
+        reason=reason,
+        deadline_exceeded=False,
     )
     assert out == CommandRunStatus.FAILED_IMAGE_PULL
 
 
 def test_zero_exit_classified_as_succeeded():
     out = classify_pod_failure(
-        exit_code=0, pod_phase="Succeeded",
-        reason="", deadline_exceeded=False,
+        exit_code=0,
+        pod_phase="Succeeded",
+        reason="",
+        deadline_exceeded=False,
     )
     assert out == CommandRunStatus.SUCCEEDED
 
@@ -165,16 +207,20 @@ def test_succeeded_phase_alone_is_enough():
     """Pod phase Succeeded with no exit code captured (rare race)
     is still success."""
     out = classify_pod_failure(
-        exit_code=None, pod_phase="Succeeded",
-        reason="", deadline_exceeded=False,
+        exit_code=None,
+        pod_phase="Succeeded",
+        reason="",
+        deadline_exceeded=False,
     )
     assert out == CommandRunStatus.SUCCEEDED
 
 
 def test_other_non_zero_exit_is_generic_failed():
     out = classify_pod_failure(
-        exit_code=1, pod_phase="Failed",
-        reason="Error", deadline_exceeded=False,
+        exit_code=1,
+        pod_phase="Failed",
+        reason="Error",
+        deadline_exceeded=False,
     )
     assert out == CommandRunStatus.FAILED
 
@@ -184,8 +230,10 @@ def test_deadline_takes_precedence_over_oom():
     is the more meaningful signal — operator response is
     'increase timeout', not 'increase memory'."""
     out = classify_pod_failure(
-        exit_code=137, pod_phase="Failed",
-        reason="OOMKilled", deadline_exceeded=True,
+        exit_code=137,
+        pod_phase="Failed",
+        reason="OOMKilled",
+        deadline_exceeded=True,
     )
     assert out == CommandRunStatus.FAILED_TIMEOUT
 

@@ -77,9 +77,7 @@ def hostname_for_app(
         if not component:
             raise DnsLayoutError(f"{name} is required")
         if not _DNS_LABEL_RE.match(component):
-            raise DnsLayoutError(
-                f"{name} {component!r} is not RFC 1035 label valid"
-            )
+            raise DnsLayoutError(f"{name} {component!r} is not RFC 1035 label valid")
 
     if not zone:
         raise DnsLayoutError("base_zone is required")
@@ -157,7 +155,8 @@ class NsDelegationCheck:
 
 
 def evaluate_ns_delegation(
-    *, check: NsDelegationCheck,
+    *,
+    check: NsDelegationCheck,
 ) -> tuple[bool, str]:
     """Returns (passed, reason). Reason is human-readable for the
     operator UI / workflow log."""
@@ -209,13 +208,9 @@ class LayoutMigration:
 
     def __post_init__(self) -> None:
         if self.from_mode == self.to_mode:
-            raise DnsLayoutError(
-                "layout migration source and target must differ"
-            )
+            raise DnsLayoutError("layout migration source and target must differ")
         if self.dual_serve_days <= 0:
-            raise DnsLayoutError(
-                f"dual_serve_days {self.dual_serve_days} must be positive"
-            )
+            raise DnsLayoutError(f"dual_serve_days {self.dual_serve_days} must be positive")
         if self.dual_serve_days > 90:
             raise DnsLayoutError(
                 f"dual_serve_days {self.dual_serve_days} exceeds 90 "
@@ -235,12 +230,16 @@ def hostnames_for_dual_serve(
     controller to set up server blocks / VirtualService entries
     for both."""
     old = hostname_for_app(
-        app_slug=app_slug, org_slug=org_slug,
-        base_zone=base_zone, mode=migration.from_mode,
+        app_slug=app_slug,
+        org_slug=org_slug,
+        base_zone=base_zone,
+        mode=migration.from_mode,
     )
     new = hostname_for_app(
-        app_slug=app_slug, org_slug=org_slug,
-        base_zone=base_zone, mode=migration.to_mode,
+        app_slug=app_slug,
+        org_slug=org_slug,
+        base_zone=base_zone,
+        mode=migration.to_mode,
     )
     return old, new
 

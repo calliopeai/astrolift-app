@@ -37,7 +37,8 @@ def test_policy_statement_rejects_empty_actions():
     with pytest.raises(WorkloadIdentityError, match="actions"):
         PolicyStatement(
             kind=PolicyResourceKind.OBJECT_STORE,
-            resource_id="s3:b", actions=(),
+            resource_id="s3:b",
+            actions=(),
         )
 
 
@@ -45,7 +46,8 @@ def test_policy_statement_rejects_empty_resource_id():
     with pytest.raises(WorkloadIdentityError, match="resource_id"):
         PolicyStatement(
             kind=PolicyResourceKind.OBJECT_STORE,
-            resource_id="", actions=("read",),
+            resource_id="",
+            actions=("read",),
         )
 
 
@@ -55,7 +57,8 @@ def test_policy_statement_rejects_unsupported_action():
     with pytest.raises(WorkloadIdentityError, match="unsupported actions"):
         PolicyStatement(
             kind=PolicyResourceKind.OBJECT_STORE,
-            resource_id="s3:b", actions=("read", "admin"),
+            resource_id="s3:b",
+            actions=("read", "admin"),
         )
 
 
@@ -64,20 +67,23 @@ def test_policy_statement_database_only_connect():
     with pytest.raises(WorkloadIdentityError, match="unsupported"):
         PolicyStatement(
             kind=PolicyResourceKind.DATABASE,
-            resource_id="rds:mydb", actions=("read",),
+            resource_id="rds:mydb",
+            actions=("read",),
         )
 
 
 def test_policy_statement_pubsub_only_publish():
     s = PolicyStatement(
         kind=PolicyResourceKind.PUBSUB_TOPIC,
-        resource_id="sns:topic", actions=("publish",),
+        resource_id="sns:topic",
+        actions=("publish",),
     )
     assert s.actions == ("publish",)
     with pytest.raises(WorkloadIdentityError, match="unsupported"):
         PolicyStatement(
             kind=PolicyResourceKind.PUBSUB_TOPIC,
-            resource_id="sns:topic", actions=("subscribe",),
+            resource_id="sns:topic",
+            actions=("subscribe",),
         )
 
 
@@ -114,17 +120,13 @@ def test_derive_policies_custom_actions_override_default():
 
 def test_derive_policies_unknown_service_kind():
     with pytest.raises(WorkloadIdentityError, match="unknown service kind"):
-        derive_policies(bindings=(
-            ServiceBinding(service_kind="quantum", resource_id="x"),
-        ))
+        derive_policies(bindings=(ServiceBinding(service_kind="quantum", resource_id="x"),))
 
 
 def test_derive_policies_secret_default_read_only():
     """Secrets default to read-only; write is for explicit
     rotation flows only."""
-    bindings = (
-        ServiceBinding(service_kind="secret", resource_id="sm:db-creds"),
-    )
+    bindings = (ServiceBinding(service_kind="secret", resource_id="sm:db-creds"),)
     policies = derive_policies(bindings=bindings)
     assert policies[0].actions == ("read",)
 
@@ -166,8 +168,7 @@ def test_aws_irsa_annotation_shape():
         role_arn="arn:aws:iam::123456789012:role/my-role",
     )
     assert out == {
-        "eks.amazonaws.com/role-arn":
-            "arn:aws:iam::123456789012:role/my-role",
+        "eks.amazonaws.com/role-arn": "arn:aws:iam::123456789012:role/my-role",
     }
 
 
@@ -193,8 +194,7 @@ def test_gcp_wi_annotation_shape():
         gcp_sa_email="my-sa@my-proj.iam.gserviceaccount.com",
     )
     assert out == {
-        "iam.gke.io/gcp-service-account":
-            "my-sa@my-proj.iam.gserviceaccount.com",
+        "iam.gke.io/gcp-service-account": "my-sa@my-proj.iam.gserviceaccount.com",
     }
 
 
@@ -219,10 +219,7 @@ def test_azure_wi_with_tenant():
         client_id="01234567-89ab-cdef-0123-456789abcdef",
         tenant_id="76543210-abcd-ef01-2345-6789abcdef01",
     )
-    assert (
-        out["azure.workload.identity/tenant-id"]
-        == "76543210-abcd-ef01-2345-6789abcdef01"
-    )
+    assert out["azure.workload.identity/tenant-id"] == "76543210-abcd-ef01-2345-6789abcdef01"
 
 
 def test_azure_wi_rejects_bad_client_id():
@@ -243,21 +240,27 @@ def test_azure_wi_rejects_bad_tenant_id():
 
 def test_annotations_changed_value_drift():
     """Spec §5.3: re-apply when role ARN changes."""
-    assert annotations_changed(
-        old={"eks.amazonaws.com/role-arn": "arn:aws:iam::1:role/old"},
-        new={"eks.amazonaws.com/role-arn": "arn:aws:iam::1:role/new"},
-    ) is True
+    assert (
+        annotations_changed(
+            old={"eks.amazonaws.com/role-arn": "arn:aws:iam::1:role/old"},
+            new={"eks.amazonaws.com/role-arn": "arn:aws:iam::1:role/new"},
+        )
+        is True
+    )
 
 
 def test_annotations_changed_key_added():
     """Adding tenant_id to an Azure SA → must re-apply."""
-    assert annotations_changed(
-        old={"azure.workload.identity/client-id": "abc"},
-        new={
-            "azure.workload.identity/client-id": "abc",
-            "azure.workload.identity/tenant-id": "def",
-        },
-    ) is True
+    assert (
+        annotations_changed(
+            old={"azure.workload.identity/client-id": "abc"},
+            new={
+                "azure.workload.identity/client-id": "abc",
+                "azure.workload.identity/tenant-id": "def",
+            },
+        )
+        is True
+    )
 
 
 def test_annotations_unchanged_returns_false():
@@ -270,24 +273,25 @@ def test_annotations_unchanged_returns_false():
 
 
 def test_delegation_chain_single_hop():
-    validate_delegation_chain(chain=(
-        DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
-    ))
+    validate_delegation_chain(chain=(DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),))
 
 
 def test_delegation_chain_two_hop():
-    validate_delegation_chain(chain=(
-        DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
-        DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::2:role/y"),
-    ))
+    validate_delegation_chain(
+        chain=(
+            DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
+            DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::2:role/y"),
+        )
+    )
 
 
 def test_delegation_chain_max_three_hops():
     with pytest.raises(WorkloadIdentityError, match="max 3"):
-        validate_delegation_chain(chain=tuple(
-            DelegationStep(cloud=CloudKind.AWS, role_id=f"arn:aws:iam::{i}:role/x")
-            for i in (1, 2, 3, 4)
-        ))
+        validate_delegation_chain(
+            chain=tuple(
+                DelegationStep(cloud=CloudKind.AWS, role_id=f"arn:aws:iam::{i}:role/x") for i in (1, 2, 3, 4)
+            )
+        )
 
 
 def test_delegation_chain_rejects_empty():
@@ -300,18 +304,22 @@ def test_delegation_chain_rejects_mixed_clouds():
     """Workload identity is per-cloud; cross-cloud is workforce
     federation, not workload."""
     with pytest.raises(WorkloadIdentityError, match="mixes clouds"):
-        validate_delegation_chain(chain=(
-            DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
-            DelegationStep(cloud=CloudKind.GCP, role_id="sa@p.iam.gserviceaccount.com"),
-        ))
+        validate_delegation_chain(
+            chain=(
+                DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
+                DelegationStep(cloud=CloudKind.GCP, role_id="sa@p.iam.gserviceaccount.com"),
+            )
+        )
 
 
 def test_delegation_chain_rejects_empty_role_id():
     with pytest.raises(WorkloadIdentityError, match="missing role_id"):
-        validate_delegation_chain(chain=(
-            DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
-            DelegationStep(cloud=CloudKind.AWS, role_id=""),
-        ))
+        validate_delegation_chain(
+            chain=(
+                DelegationStep(cloud=CloudKind.AWS, role_id="arn:aws:iam::1:role/x"),
+                DelegationStep(cloud=CloudKind.AWS, role_id=""),
+            )
+        )
 
 
 # ---- BoundServiceAccount -------------------------------------------

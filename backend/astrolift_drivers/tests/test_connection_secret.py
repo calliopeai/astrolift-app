@@ -19,7 +19,9 @@ from astrolift_drivers.connection_secret import (
 
 def test_path_format():
     out = secret_storage_path(
-        env_slug="prod", org_slug="acme", app_slug="api",
+        env_slug="prod",
+        org_slug="acme",
+        app_slug="api",
         service_name="main-db",
     )
     assert out == "astrolift/prod/acme/api/managed-services/main-db"
@@ -28,7 +30,9 @@ def test_path_format():
 def test_path_rejects_empty_segment():
     with pytest.raises(SecretPathError, match="env_slug"):
         secret_storage_path(
-            env_slug="", org_slug="acme", app_slug="api",
+            env_slug="",
+            org_slug="acme",
+            app_slug="api",
             service_name="main-db",
         )
 
@@ -37,7 +41,9 @@ def test_path_rejects_slash_in_segment():
     """Smuggled '/' would escape the org's namespace in the backend."""
     with pytest.raises(SecretPathError, match="service_name"):
         secret_storage_path(
-            env_slug="prod", org_slug="acme", app_slug="api",
+            env_slug="prod",
+            org_slug="acme",
+            app_slug="api",
             service_name="../../etc/passwd",
         )
 
@@ -45,7 +51,9 @@ def test_path_rejects_slash_in_segment():
 def test_path_rejects_padded_whitespace():
     with pytest.raises(SecretPathError):
         secret_storage_path(
-            env_slug=" prod ", org_slug="acme", app_slug="api",
+            env_slug=" prod ",
+            org_slug="acme",
+            app_slug="api",
             service_name="db",
         )
 
@@ -88,9 +96,7 @@ def test_iam_mode_clean():
             "POSTGRES_HOST": "db.acme.svc",
             "POSTGRES_DB": "main",
         },
-        iam_grants=(
-            {"action": "rds-db:connect", "resource": "arn:..."},
-        ),
+        iam_grants=({"action": "rds-db:connect", "resource": "arn:..."},),
     )
     validate_material(mat)
 

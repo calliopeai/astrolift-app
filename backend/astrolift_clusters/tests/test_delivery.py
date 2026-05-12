@@ -108,7 +108,9 @@ def test_hybrid_splits_workloads_and_platform_objects():
     gitops_kinds = {o["kind"] for o in plan.gitops.objects}
     assert direct_kinds == {"Deployment"}
     assert gitops_kinds == {
-        "CustomResourceDefinition", "ClusterRole", "Namespace",
+        "CustomResourceDefinition",
+        "ClusterRole",
+        "Namespace",
     }
 
 

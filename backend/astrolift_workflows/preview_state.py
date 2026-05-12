@@ -39,25 +39,31 @@ class PreviewStatus(str, Enum):
 
 
 _ALLOWED_TRANSITIONS: dict[PreviewStatus, frozenset[PreviewStatus]] = {
-    PreviewStatus.BUILDING: frozenset({
-        PreviewStatus.RUNNING,
-        PreviewStatus.FAILED,
-        # If a teardown signal arrives mid-build, we may go
-        # straight to TORN_DOWN once the in-flight work cleans up.
-        PreviewStatus.TORN_DOWN,
-    }),
-    PreviewStatus.RUNNING: frozenset({
-        # Re-deploy puts us back in BUILDING (new SHA on existing
-        # preview).
-        PreviewStatus.BUILDING,
-        PreviewStatus.FAILED,
-        PreviewStatus.TORN_DOWN,
-    }),
-    PreviewStatus.FAILED: frozenset({
-        # Push a fix → rebuild.
-        PreviewStatus.BUILDING,
-        PreviewStatus.TORN_DOWN,
-    }),
+    PreviewStatus.BUILDING: frozenset(
+        {
+            PreviewStatus.RUNNING,
+            PreviewStatus.FAILED,
+            # If a teardown signal arrives mid-build, we may go
+            # straight to TORN_DOWN once the in-flight work cleans up.
+            PreviewStatus.TORN_DOWN,
+        }
+    ),
+    PreviewStatus.RUNNING: frozenset(
+        {
+            # Re-deploy puts us back in BUILDING (new SHA on existing
+            # preview).
+            PreviewStatus.BUILDING,
+            PreviewStatus.FAILED,
+            PreviewStatus.TORN_DOWN,
+        }
+    ),
+    PreviewStatus.FAILED: frozenset(
+        {
+            # Push a fix → rebuild.
+            PreviewStatus.BUILDING,
+            PreviewStatus.TORN_DOWN,
+        }
+    ),
     PreviewStatus.TORN_DOWN: frozenset(),
     # TORN_DOWN is terminal — operator pushes a new commit, the
     # webhook handler creates a new PreviewEnvironment row;
@@ -110,28 +116,18 @@ class PreviewProjection:
 
     def __post_init__(self) -> None:
         if self.pr_number <= 0:
-            raise PreviewStateError(
-                f"pr_number must be positive, got {self.pr_number}"
-            )
+            raise PreviewStateError(f"pr_number must be positive, got {self.pr_number}")
         if not self.guid:
             raise PreviewStateError("guid is required")
         if not self.namespace:
             raise PreviewStateError("namespace is required")
-        if (
-            self.status == PreviewStatus.TORN_DOWN
-            and self.torn_down_at_unix is None
-        ):
+        if self.status == PreviewStatus.TORN_DOWN and self.torn_down_at_unix is None:
             # The model permits this temporarily during the
             # bookkeeping-tail recovery (#87); flag it so the
             # workflow knows to populate the timestamp.
             pass
-        if (
-            self.status != PreviewStatus.TORN_DOWN
-            and self.torn_down_at_unix is not None
-        ):
-            raise PreviewStateError(
-                f"torn_down_at set on a {self.status.value} preview"
-            )
+        if self.status != PreviewStatus.TORN_DOWN and self.torn_down_at_unix is not None:
+            raise PreviewStateError(f"torn_down_at set on a {self.status.value} preview")
 
 
 # ---- uniqueness invariant -------------------------------------------
@@ -155,10 +151,9 @@ def find_active_for_pr(
     DB also enforces via partial unique index, but workflows
     can pre-check here to avoid relying on integrity errors."""
     matches = [
-        p for p in previews
-        if p.registered_app_id == registered_app_id
-        and p.pr_number == pr_number
-        and is_active(preview=p)
+        p
+        for p in previews
+        if p.registered_app_id == registered_app_id and p.pr_number == pr_number and is_active(preview=p)
     ]
     if len(matches) > 1:
         raise PreviewStateError(
@@ -198,7 +193,8 @@ def filter_previews(
 
 
 def parse_status_filter(
-    *, raw: Sequence[str],
+    *,
+    raw: Sequence[str],
 ) -> tuple[PreviewStatus, ...]:
     """GraphQL passes string values; validate against enum."""
     out: list[PreviewStatus] = []
@@ -208,8 +204,7 @@ def parse_status_filter(
             status = PreviewStatus(value)
         except ValueError as exc:
             raise PreviewStateError(
-                f"unknown preview status {value!r}; known: "
-                f"{[s.value for s in PreviewStatus]}"
+                f"unknown preview status {value!r}; known: " f"{[s.value for s in PreviewStatus]}"
             ) from exc
         if status not in seen:
             seen.add(status)

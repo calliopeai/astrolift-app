@@ -40,21 +40,25 @@ class MigrationRisk(str, Enum):
 
 # Operation class names that are unambiguously destructive — drops
 # rows or columns, schemas can't be reconstructed without a backup.
-DESTRUCTIVE_OPS: frozenset[str] = frozenset({
-    "DeleteModel",
-    "RemoveField",
-    "RemoveConstraint",   # only sometimes destructive — see exception
-    "RemoveIndex",
-})
+DESTRUCTIVE_OPS: frozenset[str] = frozenset(
+    {
+        "DeleteModel",
+        "RemoveField",
+        "RemoveConstraint",  # only sometimes destructive — see exception
+        "RemoveIndex",
+    }
+)
 
 # These touch shape but don't drop data per se; flagged RISKY.
-RISKY_OPS: frozenset[str] = frozenset({
-    "AlterField",         # may narrow a type
-    "RenameField",        # data preserved, but ORM-level breaking
-    "RenameModel",
-    "RunPython",          # opaque to static analysis
-    "RunSQL",             # opaque
-})
+RISKY_OPS: frozenset[str] = frozenset(
+    {
+        "AlterField",  # may narrow a type
+        "RenameField",  # data preserved, but ORM-level breaking
+        "RenameModel",
+        "RunPython",  # opaque to static analysis
+        "RunSQL",  # opaque
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -91,9 +95,7 @@ def assess_operations(operations: Iterable[object]) -> MigrationAssessment:
     destructive = tuple(a for a in assessments if a.risk == MigrationRisk.DESTRUCTIVE)
     risky = tuple(a for a in assessments if a.risk == MigrationRisk.RISKY)
     overall = (
-        MigrationRisk.DESTRUCTIVE if destructive
-        else MigrationRisk.RISKY if risky
-        else MigrationRisk.SAFE
+        MigrationRisk.DESTRUCTIVE if destructive else MigrationRisk.RISKY if risky else MigrationRisk.SAFE
     )
     return MigrationAssessment(
         overall=overall,
@@ -110,18 +112,10 @@ def _classify(op: object, kind: str) -> tuple[MigrationRisk, str]:
         # the constraint model field requires the ORM. We err on the
         # side of flagging it; safe migrations can list them in an
         # allow-list per migration file.
-        target = (
-            getattr(op, "name", None)
-            or getattr(op, "model_name", None)
-            or ""
-        )
+        target = getattr(op, "name", None) or getattr(op, "model_name", None) or ""
         return MigrationRisk.DESTRUCTIVE, f"{kind}({target})"
     if kind in RISKY_OPS:
-        target = (
-            getattr(op, "name", None)
-            or getattr(op, "old_name", None)
-            or ""
-        )
+        target = getattr(op, "name", None) or getattr(op, "old_name", None) or ""
         return MigrationRisk.RISKY, f"{kind}({target})"
     return MigrationRisk.SAFE, kind
 
@@ -150,9 +144,7 @@ def gate(
     set. RISKY migrations always pass this gate (warning only —
     operators see the warning in the CI log)."""
     if assessment.overall == MigrationRisk.DESTRUCTIVE and not allow_destructive:
-        raise DestructiveMigrationBlocked(
-            assessment=assessment, migration=migration_label
-        )
+        raise DestructiveMigrationBlocked(assessment=assessment, migration=migration_label)
 
 
 def render_preview(assessment: MigrationAssessment) -> str:

@@ -38,9 +38,7 @@ def test_defaults_match_spec_12():
 
 
 def test_config_with_defaults_applies_overrides():
-    cfg = config_with_defaults(
-        DetectorKind.FAILED_LOGIN_BURST, overrides={"threshold": 3}
-    )
+    cfg = config_with_defaults(DetectorKind.FAILED_LOGIN_BURST, overrides={"threshold": 3})
     assert cfg.threshold == 3
     assert cfg.window_seconds == 300
 
@@ -74,8 +72,10 @@ def _failed_cfg() -> DetectorConfig:
 
 def test_below_threshold_no_alert():
     out = evaluate(
-        config=_failed_cfg(), event_count_in_window=4,
-        last_alert_at=None, now=_now(),
+        config=_failed_cfg(),
+        event_count_in_window=4,
+        last_alert_at=None,
+        now=_now(),
     )
     assert out.fire is False
     assert out.severity == Severity.INFO
@@ -83,8 +83,10 @@ def test_below_threshold_no_alert():
 
 def test_at_threshold_fires_warning():
     out = evaluate(
-        config=_failed_cfg(), event_count_in_window=5,
-        last_alert_at=None, now=_now(),
+        config=_failed_cfg(),
+        event_count_in_window=5,
+        last_alert_at=None,
+        now=_now(),
     )
     assert out.fire is True
     assert out.severity == Severity.WARNING
@@ -94,8 +96,10 @@ def test_at_threshold_fires_warning():
 
 def test_critical_severity_at_5x_threshold():
     out = evaluate(
-        config=_failed_cfg(), event_count_in_window=25,  # 5 * 5
-        last_alert_at=None, now=_now(),
+        config=_failed_cfg(),
+        event_count_in_window=25,  # 5 * 5
+        last_alert_at=None,
+        now=_now(),
     )
     assert out.severity == Severity.CRITICAL
 
@@ -103,8 +107,10 @@ def test_critical_severity_at_5x_threshold():
 def test_auto_remediate_at_remediation_threshold():
     """5 failures = warn; 10 failures = critical + lock account."""
     out = evaluate(
-        config=_failed_cfg(), event_count_in_window=10,
-        last_alert_at=None, now=_now(),
+        config=_failed_cfg(),
+        event_count_in_window=10,
+        last_alert_at=None,
+        now=_now(),
     )
     assert out.auto_remediate is True
 
@@ -112,7 +118,8 @@ def test_auto_remediate_at_remediation_threshold():
 def test_cooldown_suppresses_repeat_alerts():
     cfg = _failed_cfg()  # 30 min cooldown
     out = evaluate(
-        config=cfg, event_count_in_window=5,
+        config=cfg,
+        event_count_in_window=5,
         last_alert_at=_now(off=-60),  # 1 min ago
         now=_now(),
     )
@@ -126,18 +133,20 @@ def test_cooldown_does_not_suppress_auto_remediation():
     SRE alert; remediation is the response."""
     cfg = _failed_cfg()
     out = evaluate(
-        config=cfg, event_count_in_window=15,  # past auto_remediate_at=10
+        config=cfg,
+        event_count_in_window=15,  # past auto_remediate_at=10
         last_alert_at=_now(off=-60),
         now=_now(),
     )
-    assert out.fire is True            # NOT suppressed
+    assert out.fire is True  # NOT suppressed
     assert out.auto_remediate is True
 
 
 def test_cooldown_lifted_after_window():
     cfg = _failed_cfg()  # 30 min cooldown
     out = evaluate(
-        config=cfg, event_count_in_window=5,
+        config=cfg,
+        event_count_in_window=5,
         last_alert_at=_now(off=-3600),  # 1 hour ago, well past 30 min
         now=_now(),
     )
@@ -149,9 +158,7 @@ def test_cooldown_lifted_after_window():
 
 def test_count_within_window_counts_inclusive():
     times = [_now(off=-30), _now(off=-90), _now(off=-200)]
-    n = count_within_window(
-        event_times=times, window_seconds=120, now=_now()
-    )
+    n = count_within_window(event_times=times, window_seconds=120, now=_now())
     # -30s and -90s fit; -200s doesn't
     assert n == 2
 
@@ -160,9 +167,7 @@ def test_count_within_window_zero_window_only_now():
     """zero window = a strict 'right at this moment' counter, used
     by token_from_new_ip which tracks first-occurrence not bursts."""
     times = [_now(), _now(off=-1)]
-    n = count_within_window(
-        event_times=times, window_seconds=0, now=_now()
-    )
+    n = count_within_window(event_times=times, window_seconds=0, now=_now())
     # Only the exactly-now event counts (boundary inclusive)
     assert n == 1
 

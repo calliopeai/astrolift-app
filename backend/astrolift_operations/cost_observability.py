@@ -72,9 +72,7 @@ class CostSnapshot:
 
     def __post_init__(self) -> None:
         if self.cost_usd < 0:
-            raise ValueError(
-                f"cost_usd must be non-negative, got {self.cost_usd}"
-            )
+            raise ValueError(f"cost_usd must be non-negative, got {self.cost_usd}")
         if self.org_id <= 0:
             raise ValueError("org_id must be positive (per-tenant scope)")
 
@@ -114,9 +112,7 @@ class BudgetPolicy:
         if not 0 < self.hard_threshold_pct:
             raise ValueError("hard_threshold_pct must be positive")
         if self.soft_threshold_pct >= self.hard_threshold_pct:
-            raise ValueError(
-                "soft_threshold_pct must be < hard_threshold_pct"
-            )
+            raise ValueError("soft_threshold_pct must be < hard_threshold_pct")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -129,7 +125,9 @@ class BudgetEvaluation:
 
 
 def evaluate_budget(
-    *, spent_usd: float, policy: BudgetPolicy,
+    *,
+    spent_usd: float,
+    policy: BudgetPolicy,
 ) -> BudgetEvaluation:
     """Bucket current spend into OK / SOFT_WARNING / HARD_BREACH."""
     if spent_usd < 0:
@@ -138,16 +136,10 @@ def evaluate_budget(
 
     if pct >= policy.hard_threshold_pct:
         severity = BudgetSeverity.HARD_BREACH
-        reason = (
-            f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} "
-            f"({pct:.1%}) — hard breach"
-        )
+        reason = f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} " f"({pct:.1%}) — hard breach"
     elif pct >= policy.soft_threshold_pct:
         severity = BudgetSeverity.SOFT_WARNING
-        reason = (
-            f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} "
-            f"({pct:.1%}) — soft warning"
-        )
+        reason = f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} " f"({pct:.1%}) — soft warning"
     else:
         severity = BudgetSeverity.OK
         reason = "within budget"
@@ -165,7 +157,9 @@ def evaluate_budget(
 
 
 def total_for_org(
-    snapshots: Sequence[CostSnapshot], *, org_id: int,
+    snapshots: Sequence[CostSnapshot],
+    *,
+    org_id: int,
 ) -> float:
     """Sum cost across snapshots for one org. Tenant-scoped: any
     cross-org snapshot is a programming bug — caller's query
@@ -174,7 +168,10 @@ def total_for_org(
 
 
 def top_apps_by_cost(
-    snapshots: Sequence[CostSnapshot], *, org_id: int, n: int = 10,
+    snapshots: Sequence[CostSnapshot],
+    *,
+    org_id: int,
+    n: int = 10,
 ) -> tuple[tuple[int, float], ...]:
     """Top N apps by total cost, descending. Returns (app_id, total)
     pairs. Snapshots without an app_id are excluded (org-level
@@ -191,7 +188,9 @@ def top_apps_by_cost(
 
 
 def by_category(
-    snapshots: Sequence[CostSnapshot], *, org_id: int,
+    snapshots: Sequence[CostSnapshot],
+    *,
+    org_id: int,
 ) -> Mapping[CostCategory, float]:
     """Per-category rollup for the cost-breakdown panel."""
     out: dict[CostCategory, float] = dict.fromkeys(CostCategory, 0.0)
@@ -225,14 +224,14 @@ def top_bindings_by_cost(
         by_binding[s.managed_service_binding_id] = (
             by_binding.get(s.managed_service_binding_id, 0.0) + s.cost_usd
         )
-    sorted_bindings = sorted(
-        by_binding.items(), key=lambda kv: kv[1], reverse=True
-    )
+    sorted_bindings = sorted(by_binding.items(), key=lambda kv: kv[1], reverse=True)
     return tuple(sorted_bindings[:n])
 
 
 def by_provider(
-    snapshots: Sequence[CostSnapshot], *, org_id: int,
+    snapshots: Sequence[CostSnapshot],
+    *,
+    org_id: int,
 ) -> Mapping[str, float]:
     """Per-provider rollup. Empty provider strings rolled up under
     'unknown' so the UI can show what's missing."""
@@ -246,7 +245,9 @@ def by_provider(
 
 
 def monthly_trend(
-    snapshots: Sequence[CostSnapshot], *, org_id: int,
+    snapshots: Sequence[CostSnapshot],
+    *,
+    org_id: int,
 ) -> tuple[tuple[str, float], ...]:
     """Per-month totals as (yyyy-mm, total_usd) sorted ascending.
     Used by the trend chart on the cost dashboard."""

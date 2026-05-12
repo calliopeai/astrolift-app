@@ -110,9 +110,11 @@ def test_validate_payload_app_deploy_happy():
     validate_payload(
         event_type=ZentinelleEventType.APP_DEPLOY,
         payload={
-            "app_slug": "api", "deployment_id": 1,
+            "app_slug": "api",
+            "deployment_id": 1,
             "image_digest": "sha256:abc",
-            "environment": "prod", "trigger_kind": "ci",
+            "environment": "prod",
+            "trigger_kind": "ci",
         },
     )
 
@@ -129,7 +131,9 @@ def test_validate_payload_role_binding_grant():
     validate_payload(
         event_type=ZentinelleEventType.ROLE_BINDING_GRANT,
         payload={
-            "role_id": 1, "scope": "org", "subject_user_id": 42,
+            "role_id": 1,
+            "scope": "org",
+            "subject_user_id": 42,
         },
     )
 
@@ -150,9 +154,11 @@ def test_validate_payload_extra_keys_ok():
     validate_payload(
         event_type=ZentinelleEventType.APP_DEPLOY,
         payload={
-            "app_slug": "api", "deployment_id": 1,
+            "app_slug": "api",
+            "deployment_id": 1,
             "image_digest": "sha256:abc",
-            "environment": "prod", "trigger_kind": "ci",
+            "environment": "prod",
+            "trigger_kind": "ci",
             "extra_field": "future-context",
         },
     )
@@ -189,10 +195,7 @@ def test_idempotency_key_rejects_empty_event_id():
 
 def test_default_template_subscribes_all_events():
     """Operator can narrow but the default is full evidence."""
-    assert (
-        set(DEFAULT_TEMPLATE.event_types)
-        == set(DEFAULT_SUBSCRIBED_EVENTS)
-    )
+    assert set(DEFAULT_TEMPLATE.event_types) == set(DEFAULT_SUBSCRIBED_EVENTS)
 
 
 def test_default_template_signing_required():
@@ -230,7 +233,8 @@ def test_render_subscription_rejects_http():
 def test_render_subscription_rejects_empty():
     with pytest.raises(ZentinelleIntegrationError):
         render_subscription_target(
-            template=DEFAULT_TEMPLATE, zentinelle_url="",
+            template=DEFAULT_TEMPLATE,
+            zentinelle_url="",
         )
 
 
@@ -287,7 +291,8 @@ def test_validation_callback_basic():
 def test_validation_callback_requires_event_id():
     with pytest.raises(ZentinelleIntegrationError):
         ZentinelleValidationCallback(
-            event_id="", zentinelle_evidence_id="ev_abc",
+            event_id="",
+            zentinelle_evidence_id="ev_abc",
             validated_at_unix=0,
         )
 
@@ -297,6 +302,7 @@ def test_validation_callback_requires_zentinelle_id():
     back to in the operator UI."""
     with pytest.raises(ZentinelleIntegrationError):
         ZentinelleValidationCallback(
-            event_id="X", zentinelle_evidence_id="",
+            event_id="X",
+            zentinelle_evidence_id="",
             validated_at_unix=0,
         )

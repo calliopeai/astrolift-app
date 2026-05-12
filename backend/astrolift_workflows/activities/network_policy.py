@@ -73,46 +73,60 @@ def render_network_policy(
 
     # 1. Cluster DNS — always allow. Pods can't resolve anything
     # without it.
-    egress_rules.append({
-        "to": [{"namespaceSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
-        "ports": list(_DNS_PORTS),
-    })
+    egress_rules.append(
+        {
+            "to": [{"namespaceSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
+            "ports": list(_DNS_PORTS),
+        }
+    )
 
     # 2. Managed service CIDRs.
     for ms in managed_service_cidrs:
-        egress_rules.append({
-            "to": [{"ipBlock": {"cidr": ms.cidr}}],
-            "ports": [{"protocol": "TCP", "port": ms.port}],
-        })
+        egress_rules.append(
+            {
+                "to": [{"ipBlock": {"cidr": ms.cidr}}],
+                "ports": [{"protocol": "TCP", "port": ms.port}],
+            }
+        )
 
     # 3. Per-app allow-listed CIDRs (from #72 egress policy).
     for cidr in egress_decision.allow_cidrs:
-        egress_rules.append({
-            "to": [{"ipBlock": {"cidr": cidr}}],
-        })
+        egress_rules.append(
+            {
+                "to": [{"ipBlock": {"cidr": cidr}}],
+            }
+        )
 
     # 4. Public HTTPS internet (when enabled). Excludes the deny
     # floor of internal CIDRs via NetworkPolicy 'except' clauses
     # so pods can't reach control-plane DB / other tenants.
     if allow_internet_https:
-        egress_rules.append({
-            "to": [{
-                "ipBlock": {
-                    "cidr": "0.0.0.0/0",
-                    "except": list(egress_decision.deny_cidrs),
-                },
-            }],
-            "ports": [{"protocol": "TCP", "port": 443}],
-        })
+        egress_rules.append(
+            {
+                "to": [
+                    {
+                        "ipBlock": {
+                            "cidr": "0.0.0.0/0",
+                            "except": list(egress_decision.deny_cidrs),
+                        },
+                    }
+                ],
+                "ports": [{"protocol": "TCP", "port": 443}],
+            }
+        )
 
     # Ingress rules: only the ingress controller namespace.
-    ingress_rules = [{
-        "from": [{
-            "namespaceSelector": {
-                "matchLabels": {ingress_namespace_label: "true"},
-            },
-        }],
-    }]
+    ingress_rules = [
+        {
+            "from": [
+                {
+                    "namespaceSelector": {
+                        "matchLabels": {ingress_namespace_label: "true"},
+                    },
+                }
+            ],
+        }
+    ]
 
     return {
         "apiVersion": "networking.k8s.io/v1",

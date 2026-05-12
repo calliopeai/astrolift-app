@@ -19,20 +19,31 @@ from astrolift_scm.github_pr_dispatch import (
 # ---- action classification -----------------------------------------
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("opened", PrAction.OPENED),
-    ("reopened", PrAction.REOPENED),
-    ("synchronize", PrAction.SYNCHRONIZE),
-    ("closed", PrAction.CLOSED),
-])
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("opened", PrAction.OPENED),
+        ("reopened", PrAction.REOPENED),
+        ("synchronize", PrAction.SYNCHRONIZE),
+        ("closed", PrAction.CLOSED),
+    ],
+)
 def test_classify_known_actions(raw, expected):
     assert classify_action(raw_action=raw) == expected
 
 
-@pytest.mark.parametrize("raw", [
-    "labeled", "unlabeled", "edited", "review_requested",
-    "ready_for_review", "converted_to_draft", "",
-])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "labeled",
+        "unlabeled",
+        "edited",
+        "review_requested",
+        "ready_for_review",
+        "converted_to_draft",
+        "",
+    ],
+)
 def test_classify_unknown_actions_become_ignored(raw):
     """Spec: anything not in our action list is IGNORED so the
     handler returns 200 (GitHub stops retrying)."""
@@ -100,11 +111,15 @@ def test_workflow_id_includes_repo_in_name():
     """Different repos with same PR number get distinct IDs."""
     a = workflow_id_for_event(
         kind=DispatchKind.BUILD_PREVIEW,
-        repo_full_name="acme/api", pr_number=42, head_sha="x",
+        repo_full_name="acme/api",
+        pr_number=42,
+        head_sha="x",
     )
     b = workflow_id_for_event(
         kind=DispatchKind.BUILD_PREVIEW,
-        repo_full_name="globex/api", pr_number=42, head_sha="x",
+        repo_full_name="globex/api",
+        pr_number=42,
+        head_sha="x",
     )
     assert a != b
     assert "acme-api" in a
@@ -142,14 +157,16 @@ def test_dispatch_opened_builds():
 
 def test_dispatch_synchronize_builds():
     decision = decide_dispatch(
-        event=_event(raw_action="synchronize"), app_context=_app(),
+        event=_event(raw_action="synchronize"),
+        app_context=_app(),
     )
     assert decision.kind == DispatchKind.BUILD_PREVIEW
 
 
 def test_dispatch_reopened_builds():
     decision = decide_dispatch(
-        event=_event(raw_action="reopened"), app_context=_app(),
+        event=_event(raw_action="reopened"),
+        app_context=_app(),
     )
     assert decision.kind == DispatchKind.BUILD_PREVIEW
 
@@ -174,7 +191,8 @@ def test_dispatch_merged_tears_down():
 
 def test_dispatch_ignores_other_actions():
     decision = decide_dispatch(
-        event=_event(raw_action="labeled"), app_context=_app(),
+        event=_event(raw_action="labeled"),
+        app_context=_app(),
     )
     assert decision.kind == DispatchKind.IGNORE
 
@@ -213,7 +231,8 @@ def test_dispatch_refuses_missing_head_sha():
     """GitHub edge case: opened arriving before HEAD populated."""
     with pytest.raises(GitHubDispatchError, match="head_sha"):
         decide_dispatch(
-            event=_event(head_sha=""), app_context=_app(),
+            event=_event(head_sha=""),
+            app_context=_app(),
         )
 
 
@@ -230,23 +249,32 @@ def test_dispatch_closed_does_not_need_head_sha():
 
 
 def test_is_replay_true_when_seen():
-    assert is_replay(
-        delivery_id="abc",
-        seen_lookup=lambda d: d == "abc",
-    ) is True
+    assert (
+        is_replay(
+            delivery_id="abc",
+            seen_lookup=lambda d: d == "abc",
+        )
+        is True
+    )
 
 
 def test_is_replay_false_when_unseen():
-    assert is_replay(
-        delivery_id="abc",
-        seen_lookup=lambda d: False,
-    ) is False
+    assert (
+        is_replay(
+            delivery_id="abc",
+            seen_lookup=lambda d: False,
+        )
+        is False
+    )
 
 
 def test_is_replay_false_when_no_id():
     """Some test fixtures lack delivery_id; treat as not-replay so
     the dispatch proceeds rather than silently no-op."""
-    assert is_replay(
-        delivery_id="",
-        seen_lookup=lambda d: True,
-    ) is False
+    assert (
+        is_replay(
+            delivery_id="",
+            seen_lookup=lambda d: True,
+        )
+        is False
+    )

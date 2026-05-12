@@ -64,8 +64,10 @@ def test_entry_rejects_unknown_binding_mode():
 def test_find_returns_match():
     cat = [_entry(name="gp3-balanced")]
     out = find_for_tier(
-        catalog=cat, cluster_id=1,
-        tier=PerformanceTier.BALANCED, durability=Durability.ZONAL,
+        catalog=cat,
+        cluster_id=1,
+        tier=PerformanceTier.BALANCED,
+        durability=Durability.ZONAL,
     )
     assert out is not None
     assert out.name == "gp3-balanced"
@@ -74,8 +76,10 @@ def test_find_returns_match():
 def test_find_returns_none_when_no_match():
     cat = [_entry(performance_tier=PerformanceTier.BALANCED)]
     out = find_for_tier(
-        catalog=cat, cluster_id=1,
-        tier=PerformanceTier.EXTREME, durability=Durability.ZONAL,
+        catalog=cat,
+        cluster_id=1,
+        tier=PerformanceTier.EXTREME,
+        durability=Durability.ZONAL,
     )
     assert out is None
 
@@ -86,8 +90,10 @@ def test_find_filters_by_cluster_id():
         _entry(cluster_id=2, name="cluster-2-gp3"),
     ]
     out = find_for_tier(
-        catalog=cat, cluster_id=2,
-        tier=PerformanceTier.BALANCED, durability=Durability.ZONAL,
+        catalog=cat,
+        cluster_id=2,
+        tier=PerformanceTier.BALANCED,
+        durability=Durability.ZONAL,
     )
     assert out.name == "cluster-2-gp3"
 
@@ -101,8 +107,10 @@ def test_find_prefers_default_for_tier_when_multiple():
         _entry(name="gp3-high-iops", is_default_for_tier=False),
     ]
     out = find_for_tier(
-        catalog=cat, cluster_id=1,
-        tier=PerformanceTier.BALANCED, durability=Durability.ZONAL,
+        catalog=cat,
+        cluster_id=1,
+        tier=PerformanceTier.BALANCED,
+        durability=Durability.ZONAL,
     )
     assert out.name == "gp3-default"
 
@@ -110,8 +118,10 @@ def test_find_prefers_default_for_tier_when_multiple():
 def test_find_returns_first_when_no_default_flagged():
     cat = [_entry(name="alpha"), _entry(name="beta")]
     out = find_for_tier(
-        catalog=cat, cluster_id=1,
-        tier=PerformanceTier.BALANCED, durability=Durability.ZONAL,
+        catalog=cat,
+        cluster_id=1,
+        tier=PerformanceTier.BALANCED,
+        durability=Durability.ZONAL,
     )
     assert out.name == "alpha"
 
@@ -139,8 +149,10 @@ def test_cluster_default_none_when_unflagged():
 def test_plan_expansion_valid():
     sc = _entry(supports_volume_expansion=True)
     plan = plan_expansion(
-        pvc_name="data-pvc", namespace="acme-api",
-        current_size="10Gi", new_size="20Gi",
+        pvc_name="data-pvc",
+        namespace="acme-api",
+        current_size="10Gi",
+        new_size="20Gi",
         storage_class=sc,
     )
     assert plan.pvc_name == "data-pvc"
@@ -153,8 +165,10 @@ def test_plan_expansion_rejects_when_storage_class_doesnt_support():
     sc = _entry(supports_volume_expansion=False)
     with pytest.raises(VolumeExpansionError, match="does not support"):
         plan_expansion(
-            pvc_name="data-pvc", namespace="acme-api",
-            current_size="10Gi", new_size="20Gi",
+            pvc_name="data-pvc",
+            namespace="acme-api",
+            current_size="10Gi",
+            new_size="20Gi",
             storage_class=sc,
         )
 
@@ -166,8 +180,10 @@ def test_plan_expansion_rejects_shrink():
     sc = _entry(supports_volume_expansion=True)
     with pytest.raises(VolumeExpansionError, match="shrinking"):
         plan_expansion(
-            pvc_name="data-pvc", namespace="acme-api",
-            current_size="20Gi", new_size="10Gi",
+            pvc_name="data-pvc",
+            namespace="acme-api",
+            current_size="20Gi",
+            new_size="10Gi",
             storage_class=sc,
         )
 
@@ -178,8 +194,10 @@ def test_plan_expansion_rejects_same_size():
     sc = _entry(supports_volume_expansion=True)
     with pytest.raises(VolumeExpansionError, match="larger than"):
         plan_expansion(
-            pvc_name="data-pvc", namespace="acme-api",
-            current_size="20Gi", new_size="20Gi",
+            pvc_name="data-pvc",
+            namespace="acme-api",
+            current_size="20Gi",
+            new_size="20Gi",
             storage_class=sc,
         )
 
@@ -188,8 +206,10 @@ def test_plan_expansion_rejects_missing_pvc_name():
     sc = _entry(supports_volume_expansion=True)
     with pytest.raises(VolumeExpansionError, match="pvc_name"):
         plan_expansion(
-            pvc_name="", namespace="acme-api",
-            current_size="10Gi", new_size="20Gi",
+            pvc_name="",
+            namespace="acme-api",
+            current_size="10Gi",
+            new_size="20Gi",
             storage_class=sc,
         )
 
@@ -198,8 +218,11 @@ def test_plan_expansion_statefulset_flag_passes_through():
     """StatefulSet volumes need per-replica rolling expansion."""
     sc = _entry(supports_volume_expansion=True)
     plan = plan_expansion(
-        pvc_name="data-pvc", namespace="ns",
-        current_size="10Gi", new_size="20Gi",
-        storage_class=sc, is_statefulset_volume=True,
+        pvc_name="data-pvc",
+        namespace="ns",
+        current_size="10Gi",
+        new_size="20Gi",
+        storage_class=sc,
+        is_statefulset_volume=True,
     )
     assert plan.is_statefulset_volume is True

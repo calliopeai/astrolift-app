@@ -86,8 +86,7 @@ class OperationsQuery:
 
                 cursor_at, cursor_guid = decoded
                 qs = qs.filter(
-                    Q(occurred_at__lt=cursor_at)
-                    | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
+                    Q(occurred_at__lt=cursor_at) | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
                 )
         # Fetch one extra to detect end-of-stream cheaply.
         rows = list(qs[: page_size + 1])

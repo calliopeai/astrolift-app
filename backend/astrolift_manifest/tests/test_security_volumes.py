@@ -40,14 +40,16 @@ def test_parse_security_context_defaults():
 
 
 def test_parse_security_context_all_fields():
-    sec = parse_security_context({
-        "read_only_root_fs": False,
-        "run_as_non_root": False,
-        "run_as_user": 1000,
-        "allow_privilege_escalation": True,
-        "capabilities_drop": ("ALL",),
-        "capabilities_add": ("NET_BIND_SERVICE",),
-    })
+    sec = parse_security_context(
+        {
+            "read_only_root_fs": False,
+            "run_as_non_root": False,
+            "run_as_user": 1000,
+            "allow_privilege_escalation": True,
+            "capabilities_drop": ("ALL",),
+            "capabilities_add": ("NET_BIND_SERVICE",),
+        }
+    )
     assert sec.read_only_root_fs is False
     assert sec.run_as_user == 1000
     assert sec.capabilities_add == ("NET_BIND_SERVICE",)
@@ -58,18 +60,22 @@ def test_run_as_user_zero_with_non_root_rejected():
     simultaneously. Catches a foot-gun where operator sets both
     'run_as_non_root=True' (security flag) AND 'run_as_user=0'."""
     with pytest.raises(StorageError, match="root"):
-        parse_security_context({
-            "run_as_non_root": True,
-            "run_as_user": 0,
-        })
+        parse_security_context(
+            {
+                "run_as_non_root": True,
+                "run_as_user": 0,
+            }
+        )
 
 
 def test_run_as_user_zero_allowed_when_non_root_explicitly_false():
     """Legacy workloads that need root: must set both flags."""
-    sec = parse_security_context({
-        "run_as_non_root": False,
-        "run_as_user": 0,
-    })
+    sec = parse_security_context(
+        {
+            "run_as_non_root": False,
+            "run_as_user": 0,
+        }
+    )
     assert sec.run_as_user == 0
 
 
@@ -131,16 +137,20 @@ def test_pvc_volume_requires_size():
 def test_pvc_volume_validates_size_format():
     with pytest.raises(StorageError):
         VolumeDecl(
-            name="data", mount_path="/data",
-            kind=VolumeKind.PVC, size="oops",
+            name="data",
+            mount_path="/data",
+            kind=VolumeKind.PVC,
+            size="oops",
         )
 
 
 def test_volume_requires_absolute_mount_path():
     with pytest.raises(StorageError, match="absolute"):
         VolumeDecl(
-            name="data", mount_path="data",  # missing leading /
-            kind=VolumeKind.PVC, size="10Gi",
+            name="data",
+            mount_path="data",  # missing leading /
+            kind=VolumeKind.PVC,
+            size="10Gi",
         )
 
 
@@ -152,7 +162,8 @@ def test_volume_requires_name():
 def test_configmap_volume_requires_source_name():
     with pytest.raises(StorageError, match="source_name"):
         VolumeDecl(
-            name="cfg", mount_path="/etc/config",
+            name="cfg",
+            mount_path="/etc/config",
             kind=VolumeKind.CONFIG_MAP,
         )
 
@@ -160,7 +171,8 @@ def test_configmap_volume_requires_source_name():
 def test_secret_volume_requires_source_name():
     with pytest.raises(StorageError, match="source_name"):
         VolumeDecl(
-            name="secrets", mount_path="/etc/secrets",
+            name="secrets",
+            mount_path="/etc/secrets",
             kind=VolumeKind.SECRET,
         )
 
@@ -168,7 +180,8 @@ def test_secret_volume_requires_source_name():
 def test_empty_dir_volume_no_required_fields():
     """emptyDir is the simplest volume kind."""
     vol = VolumeDecl(
-        name="cache", mount_path="/cache",
+        name="cache",
+        mount_path="/cache",
         kind=VolumeKind.EMPTY_DIR,
     )
     assert vol.kind == VolumeKind.EMPTY_DIR
@@ -177,8 +190,10 @@ def test_empty_dir_volume_no_required_fields():
 def test_empty_dir_with_size_limit():
     """Optional sizeLimit bounds memory-backed scratch volumes."""
     vol = VolumeDecl(
-        name="cache", mount_path="/cache",
-        kind=VolumeKind.EMPTY_DIR, size_limit="1Gi",
+        name="cache",
+        mount_path="/cache",
+        kind=VolumeKind.EMPTY_DIR,
+        size_limit="1Gi",
     )
     assert vol.size_limit == "1Gi"
 
@@ -186,8 +201,10 @@ def test_empty_dir_with_size_limit():
 def test_empty_dir_size_limit_validates():
     with pytest.raises(StorageError):
         VolumeDecl(
-            name="cache", mount_path="/cache",
-            kind=VolumeKind.EMPTY_DIR, size_limit="oops",
+            name="cache",
+            mount_path="/cache",
+            kind=VolumeKind.EMPTY_DIR,
+            size_limit="oops",
         )
 
 
@@ -196,27 +213,37 @@ def test_empty_dir_size_limit_validates():
 
 def test_parse_volume_pvc_default_kind():
     """Default kind is pvc — the most common volume."""
-    vol = parse_volume({
-        "name": "data", "mount_path": "/data",
-        "size": "20Gi",
-    })
+    vol = parse_volume(
+        {
+            "name": "data",
+            "mount_path": "/data",
+            "size": "20Gi",
+        }
+    )
     assert vol.kind == VolumeKind.PVC
     assert vol.size == "20Gi"
 
 
 def test_parse_volume_emptydir():
-    vol = parse_volume({
-        "name": "cache", "mount_path": "/cache",
-        "kind": "empty_dir",
-    })
+    vol = parse_volume(
+        {
+            "name": "cache",
+            "mount_path": "/cache",
+            "kind": "empty_dir",
+        }
+    )
     assert vol.kind == VolumeKind.EMPTY_DIR
 
 
 def test_parse_volume_unknown_kind():
     with pytest.raises(StorageError, match="kind"):
-        parse_volume({
-            "name": "x", "mount_path": "/x", "kind": "weird",
-        })
+        parse_volume(
+            {
+                "name": "x",
+                "mount_path": "/x",
+                "kind": "weird",
+            }
+        )
 
 
 def test_parse_volume_rejects_non_mapping():
@@ -229,8 +256,10 @@ def test_parse_volume_rejects_non_mapping():
 
 def test_render_pvc_shape():
     vol = VolumeDecl(
-        name="data", mount_path="/data",
-        kind=VolumeKind.PVC, size="20Gi",
+        name="data",
+        mount_path="/data",
+        kind=VolumeKind.PVC,
+        size="20Gi",
         storage_class="gp3-balanced",
         access_mode="ReadWriteOnce",
     )
@@ -247,8 +276,10 @@ def test_render_pvc_shape():
 def test_render_pvc_omits_storage_class_when_unset():
     """Empty storageClassName lets the cluster default apply."""
     vol = VolumeDecl(
-        name="data", mount_path="/data",
-        kind=VolumeKind.PVC, size="20Gi",
+        name="data",
+        mount_path="/data",
+        kind=VolumeKind.PVC,
+        size="20Gi",
     )
     out = render_pvc(vol, namespace="ns")
     assert "storageClassName" not in out["spec"]
@@ -257,7 +288,8 @@ def test_render_pvc_omits_storage_class_when_unset():
 def test_render_pvc_rejects_non_pvc_volume():
     """Defensive: emptyDir doesn't have a PVC representation."""
     vol = VolumeDecl(
-        name="cache", mount_path="/cache",
+        name="cache",
+        mount_path="/cache",
         kind=VolumeKind.EMPTY_DIR,
     )
     with pytest.raises(StorageError):
@@ -269,8 +301,10 @@ def test_render_pvc_rejects_non_pvc_volume():
 
 def test_render_pod_volume_pvc():
     vol = VolumeDecl(
-        name="data", mount_path="/data",
-        kind=VolumeKind.PVC, size="20Gi",
+        name="data",
+        mount_path="/data",
+        kind=VolumeKind.PVC,
+        size="20Gi",
     )
     out = render_pod_volume(vol)
     assert out == {"name": "data", "persistentVolumeClaim": {"claimName": "data"}}
@@ -278,7 +312,8 @@ def test_render_pod_volume_pvc():
 
 def test_render_pod_volume_empty_dir():
     vol = VolumeDecl(
-        name="cache", mount_path="/cache",
+        name="cache",
+        mount_path="/cache",
         kind=VolumeKind.EMPTY_DIR,
     )
     out = render_pod_volume(vol)
@@ -288,8 +323,10 @@ def test_render_pod_volume_empty_dir():
 
 def test_render_pod_volume_empty_dir_with_size_limit():
     vol = VolumeDecl(
-        name="cache", mount_path="/cache",
-        kind=VolumeKind.EMPTY_DIR, size_limit="1Gi",
+        name="cache",
+        mount_path="/cache",
+        kind=VolumeKind.EMPTY_DIR,
+        size_limit="1Gi",
     )
     out = render_pod_volume(vol)
     assert out["emptyDir"]["sizeLimit"] == "1Gi"
@@ -297,8 +334,10 @@ def test_render_pod_volume_empty_dir_with_size_limit():
 
 def test_render_pod_volume_config_map():
     vol = VolumeDecl(
-        name="cfg", mount_path="/etc/config",
-        kind=VolumeKind.CONFIG_MAP, source_name="app-config",
+        name="cfg",
+        mount_path="/etc/config",
+        kind=VolumeKind.CONFIG_MAP,
+        source_name="app-config",
     )
     out = render_pod_volume(vol)
     assert out["configMap"] == {"name": "app-config"}
@@ -306,8 +345,10 @@ def test_render_pod_volume_config_map():
 
 def test_render_pod_volume_secret():
     vol = VolumeDecl(
-        name="secrets", mount_path="/etc/secrets",
-        kind=VolumeKind.SECRET, source_name="app-secrets",
+        name="secrets",
+        mount_path="/etc/secrets",
+        kind=VolumeKind.SECRET,
+        source_name="app-secrets",
     )
     out = render_pod_volume(vol)
     assert out["secret"] == {"secretName": "app-secrets"}
@@ -316,5 +357,6 @@ def test_render_pod_volume_secret():
 def test_render_volume_mount_shape():
     vol = VolumeDecl(name="data", mount_path="/data", kind=VolumeKind.EMPTY_DIR)
     assert render_volume_mount(vol) == {
-        "name": "data", "mountPath": "/data",
+        "name": "data",
+        "mountPath": "/data",
     }

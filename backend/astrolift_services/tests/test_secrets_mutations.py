@@ -50,7 +50,10 @@ def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
     project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo",
+        organization=org,
+        team=team,
+        name="Demo",
+        slug="demo",
     )
     cluster = TenantCluster.objects.create(
         organization=org,
@@ -60,8 +63,11 @@ def _scaffold():
         cluster_url="http://localhost:8443",
     )
     app = RegisteredApp.objects.create(
-        organization=org, team=team, project=project,
-        name="Hello", slug="hello-app",
+        organization=org,
+        team=team,
+        project=project,
+        name="Hello",
+        slug="hello-app",
         provisioning_status="ready",
         manifest_raw=_BASE_TOML,
     )
@@ -71,8 +77,11 @@ def _scaffold():
         tenant_cluster=cluster,
     )
     bundle = SecretBundle.objects.create(
-        organization=org, team=team, slug="prod-secrets",
-        name="Prod Secrets", backend_ref="vault:/acme/prod",
+        organization=org,
+        team=team,
+        slug="prod-secrets",
+        name="Prod Secrets",
+        backend_ref="vault:/acme/prod",
     )
     return org, app, env, bundle
 
@@ -92,7 +101,9 @@ def test_set_app_secret_writes_to_staging(permission_resolver):
         result = ServicesMutation().set_app_secret(
             _info(),
             input=SetAppSecretInput(
-                app_slug=app.slug, key="API_KEY", value="abc123",
+                app_slug=app.slug,
+                key="API_KEY",
+                value="abc123",
             ),
         )
 
@@ -113,7 +124,9 @@ def test_set_app_secret_invalid_key_rejected(permission_resolver):
         result = ServicesMutation().set_app_secret(
             _info(),
             input=SetAppSecretInput(
-                app_slug=app.slug, key="bad-key", value="x",
+                app_slug=app.slug,
+                key="bad-key",
+                value="x",
             ),
         )
 
@@ -129,7 +142,9 @@ def test_set_app_secret_unknown_app_returns_not_found(permission_resolver):
         result = ServicesMutation().set_app_secret(
             _info(),
             input=SetAppSecretInput(
-                app_slug="missing", key="K", value="v",
+                app_slug="missing",
+                key="K",
+                value="v",
             ),
         )
     assert not result.ok
@@ -142,7 +157,9 @@ def test_set_app_secret_requires_permission():
         result = ServicesMutation().set_app_secret(
             _info(),
             input=SetAppSecretInput(
-                app_slug=app.slug, key="K", value="v",
+                app_slug=app.slug,
+                key="K",
+                value="v",
             ),
         )
     assert not result.ok
@@ -160,7 +177,8 @@ def test_delete_app_secret_removes_key(permission_resolver):
         result = ServicesMutation().delete_app_secret(
             _info(),
             input=DeleteAppSecretInput(
-                app_slug=app.slug, key="KEEP_ME",
+                app_slug=app.slug,
+                key="KEEP_ME",
             ),
         )
 
@@ -178,7 +196,8 @@ def test_delete_app_secret_missing_key_not_found(permission_resolver):
         result = ServicesMutation().delete_app_secret(
             _info(),
             input=DeleteAppSecretInput(
-                app_slug=app.slug, key="NEVER_EXISTED",
+                app_slug=app.slug,
+                key="NEVER_EXISTED",
             ),
         )
 
@@ -203,13 +222,16 @@ SENTRY_DSN="https://x@y.io/1"
         result = ServicesMutation().bulk_import_app_secrets(
             _info(),
             input=BulkImportAppSecretsInput(
-                app_slug=app.slug, dotenv_text=text,
+                app_slug=app.slug,
+                dotenv_text=text,
             ),
         )
 
     assert result.ok, result.errors
     assert set(result.data.keys_set) == {
-        "DATABASE_URL", "LOG_LEVEL", "SENTRY_DSN",
+        "DATABASE_URL",
+        "LOG_LEVEL",
+        "SENTRY_DSN",
     }
     app.refresh_from_db()
     parsed = read_app_env(app.manifest_raw_staged)
@@ -225,7 +247,8 @@ def test_bulk_import_empty_returns_validation(permission_resolver):
         result = ServicesMutation().bulk_import_app_secrets(
             _info(),
             input=BulkImportAppSecretsInput(
-                app_slug=app.slug, dotenv_text="# only comments\n",
+                app_slug=app.slug,
+                dotenv_text="# only comments\n",
             ),
         )
 
@@ -253,7 +276,8 @@ def test_attach_secret_bundle_creates_ref(permission_resolver):
 
     assert result.ok, result.errors
     refs = AppSecretBundleRef.objects.filter(
-        registered_app=app, deleted_at__isnull=True,
+        registered_app=app,
+        deleted_at__isnull=True,
     )
     assert refs.count() == 1
     assert refs.first().prefix == "STRIPE_"
@@ -287,7 +311,8 @@ def test_attach_secret_bundle_idempotent_updates_prefix(
 
     assert result.ok
     refs = AppSecretBundleRef.objects.filter(
-        registered_app=app, deleted_at__isnull=True,
+        registered_app=app,
+        deleted_at__isnull=True,
     )
     assert refs.count() == 1
     assert refs.first().prefix == "B_"
@@ -314,7 +339,9 @@ def test_detach_secret_bundle_soft_deletes(permission_resolver):
     org, app, env, bundle = _scaffold()
     permission_resolver.grant(Permission.APP_UPDATE)
     ref = AppSecretBundleRef.objects.create(
-        registered_app=app, app_environment=env, secret_bundle=bundle,
+        registered_app=app,
+        app_environment=env,
+        secret_bundle=bundle,
     )
 
     with _ctx(org):

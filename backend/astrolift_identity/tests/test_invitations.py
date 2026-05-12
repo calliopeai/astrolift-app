@@ -50,9 +50,7 @@ def _admin_user(email: str | None = None) -> User:
         import uuid
 
         email = f"admin-{uuid.uuid4().hex[:8]}@astrolift.dev"
-    user, _ = User.objects.get_or_create(
-        email=email, defaults={"username": email.split("@")[0]}
-    )
+    user, _ = User.objects.get_or_create(email=email, defaults={"username": email.split("@")[0]})
     return user
 
 
@@ -207,16 +205,12 @@ def test_accept_invitation_creates_member_and_role_binding(permission_resolver):
     with tenant_context(TenantContext(organization_id=org.id)):
         c = IdentityMutation().create_invitation(
             _info(_admin_user()),
-            input=CreateInvitationInput(
-                email="newbie@astrolift.dev", role_slug=role.slug
-            ),
+            input=CreateInvitationInput(email="newbie@astrolift.dev", role_slug=role.slug),
         )
     plaintext = c.data.plaintext_token
 
     # The accepting user signs in fresh and clicks the link.
-    accepting = User.objects.create_user(
-        username="newbie", email="newbie@astrolift.dev"
-    )
+    accepting = User.objects.create_user(username="newbie", email="newbie@astrolift.dev")
     # Accept resolver runs without a tenant context (matches reality).
     r = IdentityMutation().accept_invitation(
         _info(accepting),
@@ -261,18 +255,14 @@ def test_accept_rejects_mismatched_email(permission_resolver):
 
 
 def test_accept_rejects_unauthenticated():
-    r = IdentityMutation().accept_invitation(
-        _info(None), input=AcceptInvitationInput(token="alft_anything")
-    )
+    r = IdentityMutation().accept_invitation(_info(None), input=AcceptInvitationInput(token="alft_anything"))
     assert not r.ok
     assert r.errors[0].code == "PERMISSION_DENIED"
 
 
 def test_accept_rejects_unknown_token():
     user = User.objects.create_user(username="u", email="u@astrolift.dev")
-    r = IdentityMutation().accept_invitation(
-        _info(user), input=AcceptInvitationInput(token="alft_garbage")
-    )
+    r = IdentityMutation().accept_invitation(_info(user), input=AcceptInvitationInput(token="alft_garbage"))
     assert not r.ok
     assert r.errors[0].code == "NOT_FOUND"
 

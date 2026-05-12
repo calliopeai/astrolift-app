@@ -38,9 +38,12 @@ def test_namespace_injection_linkerd():
 
 def test_namespace_injection_none():
     """No mesh installed = no injection annotation."""
-    assert namespace_injection_annotations(
-        provider=MeshProvider.NONE,
-    ) == {}
+    assert (
+        namespace_injection_annotations(
+            provider=MeshProvider.NONE,
+        )
+        == {}
+    )
 
 
 # ---- canary split validation ---------------------------------------
@@ -126,15 +129,17 @@ def test_parse_mesh_config_default():
 
 
 def test_parse_mesh_config_full():
-    cfg = parse_mesh_config({
-        "enabled": True,
-        "mtls": "strict",
-        "traffic_policy": "consistent_hash",
-        "canary_splits": [
-            {"version_label": "v1", "weight": 80},
-            {"version_label": "v2", "weight": 20},
-        ],
-    })
+    cfg = parse_mesh_config(
+        {
+            "enabled": True,
+            "mtls": "strict",
+            "traffic_policy": "consistent_hash",
+            "canary_splits": [
+                {"version_label": "v1", "weight": 80},
+                {"version_label": "v2", "weight": 20},
+            ],
+        }
+    )
     assert cfg.enabled is True
     assert cfg.mtls == MtlsMode.STRICT
     assert cfg.traffic_policy == TrafficPolicy.CONSISTENT_HASH
@@ -148,9 +153,12 @@ def test_parse_mesh_config_unknown_mtls():
 
 def test_parse_mesh_config_unknown_traffic_policy():
     with pytest.raises(MeshError, match="traffic_policy"):
-        parse_mesh_config({
-            "enabled": True, "traffic_policy": "ip_hash",
-        })
+        parse_mesh_config(
+            {
+                "enabled": True,
+                "traffic_policy": "ip_hash",
+            }
+        )
 
 
 def test_parse_mesh_config_none_returns_disabled():
@@ -195,21 +203,30 @@ def test_effective_disabled_passes_through():
 
 def test_must_warn_when_dropped():
     """Operator should learn their canary config was ignored."""
-    assert must_warn_about_dropped_config(
-        manifest_config=MeshConfig(enabled=True),
-        cluster_provider=MeshProvider.NONE,
-    ) is True
+    assert (
+        must_warn_about_dropped_config(
+            manifest_config=MeshConfig(enabled=True),
+            cluster_provider=MeshProvider.NONE,
+        )
+        is True
+    )
 
 
 def test_no_warn_when_not_dropped():
-    assert must_warn_about_dropped_config(
-        manifest_config=MeshConfig(enabled=True),
-        cluster_provider=MeshProvider.ISTIO,
-    ) is False
-    assert must_warn_about_dropped_config(
-        manifest_config=MeshConfig(),
-        cluster_provider=MeshProvider.NONE,
-    ) is False
+    assert (
+        must_warn_about_dropped_config(
+            manifest_config=MeshConfig(enabled=True),
+            cluster_provider=MeshProvider.ISTIO,
+        )
+        is False
+    )
+    assert (
+        must_warn_about_dropped_config(
+            manifest_config=MeshConfig(),
+            cluster_provider=MeshProvider.NONE,
+        )
+        is False
+    )
 
 
 # ---- canary helpers ------------------------------------------------
@@ -242,9 +259,7 @@ def test_canary_inactive_single_version():
     it's just a normal deploy. UI shouldn't render the badge."""
     cfg = MeshConfig(
         enabled=True,
-        canary_splits=(
-            CanarySplit(version_label="v1", weight=100),
-        ),
+        canary_splits=(CanarySplit(version_label="v1", weight=100),),
     )
     assert is_canary_active(config=cfg) is False
 

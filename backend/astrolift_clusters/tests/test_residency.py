@@ -24,16 +24,12 @@ def test_unconfigured_policy_is_unconstrained():
 
 
 def test_constrained_when_regions_set():
-    policy = ResidencyPolicy(
-        org_slug="acme", allowed_regions=("us-east-1",)
-    )
+    policy = ResidencyPolicy(org_slug="acme", allowed_regions=("us-east-1",))
     assert is_constrained(policy) is True
 
 
 def test_constrained_when_cluster_ids_set():
-    policy = ResidencyPolicy(
-        org_slug="acme", allowed_cluster_ids=(1,)
-    )
+    policy = ResidencyPolicy(org_slug="acme", allowed_cluster_ids=(1,))
     assert is_constrained(policy) is True
 
 
@@ -46,17 +42,13 @@ def test_unconstrained_allows_any_region():
 
 
 def test_allowed_region_passes():
-    policy = ResidencyPolicy(
-        org_slug="acme", allowed_regions=("us-east-1", "us-west-2")
-    )
+    policy = ResidencyPolicy(org_slug="acme", allowed_regions=("us-east-1", "us-west-2"))
     check_target(policy, cluster_id=1, cluster_region="us-east-1")
     check_target(policy, cluster_id=2, cluster_region="us-west-2")
 
 
 def test_disallowed_region_raises():
-    policy = ResidencyPolicy(
-        org_slug="acme", allowed_regions=("us-east-1",)
-    )
+    policy = ResidencyPolicy(org_slug="acme", allowed_regions=("us-east-1",))
     with pytest.raises(ResidencyViolation) as exc:
         check_target(policy, cluster_id=1, cluster_region="eu-west-1")
     assert exc.value.org_slug == "acme"
@@ -145,9 +137,7 @@ def test_constrained_org_cross_region_still_rejects():
     """A constrained org with both regions allowed STILL can't
     bind across them — residency is per-region, not just 'is the
     region allowed for the org'."""
-    policy = ResidencyPolicy(
-        org_slug="acme", allowed_regions=("us-east-1", "eu-west-1")
-    )
+    policy = ResidencyPolicy(org_slug="acme", allowed_regions=("us-east-1", "eu-west-1"))
     with pytest.raises(ResidencyViolation, match="cross-region"):
         check_binding(
             policy,

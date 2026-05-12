@@ -40,7 +40,7 @@ RETRY_SCHEDULE_SECONDS: tuple[int, ...] = (
     6 * 3600,
     24 * 3600,
 )
-MAX_ATTEMPTS = len(RETRY_SCHEDULE_SECONDS) + 1   # initial + retries
+MAX_ATTEMPTS = len(RETRY_SCHEDULE_SECONDS) + 1  # initial + retries
 
 # Spec 17 §7 — per-subscription concurrency limit.
 MAX_INFLIGHT_PER_SUBSCRIPTION = 100
@@ -57,7 +57,10 @@ class DeliveryClassification(str, Enum):
 
 
 def sign_payload(
-    *, secret: bytes, timestamp_unix: int, raw_body: bytes,
+    *,
+    secret: bytes,
+    timestamp_unix: int,
+    raw_body: bytes,
 ) -> str:
     """Return ``"sha256=<hex>"`` per spec 17 §6.1.
 
@@ -90,7 +93,9 @@ def verify_signature(
         if abs(now_unix - timestamp_unix) > freshness_window_seconds:
             return False
     expected = sign_payload(
-        secret=secret, timestamp_unix=timestamp_unix, raw_body=raw_body,
+        secret=secret,
+        timestamp_unix=timestamp_unix,
+        raw_body=raw_body,
     )
     return hmac.compare_digest(expected, presented)
 
@@ -127,7 +132,10 @@ def build_headers(
 
 
 def next_retry_delay_seconds(
-    *, attempt: int, jitter_ratio: float = 0.2, rng: random.Random | None = None,
+    *,
+    attempt: int,
+    jitter_ratio: float = 0.2,
+    rng: random.Random | None = None,
 ) -> int | None:
     """Return the delay before attempt N+1 (where N is the just-failed
     attempt, 1-indexed). Returns ``None`` when no more retries are

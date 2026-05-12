@@ -46,10 +46,7 @@ class UnresolvedVariant(ValueError):
         self.cluster_slug = cluster_slug
         self.plugin_slug = plugin_slug
         suffix = f" (plugin {plugin_slug!r} exposes no variant)" if plugin_slug else ""
-        super().__init__(
-            f"kind {kind!r} cannot be satisfied on cluster "
-            f"{cluster_slug!r}{suffix}"
-        )
+        super().__init__(f"kind {kind!r} cannot be satisfied on cluster " f"{cluster_slug!r}{suffix}")
 
 
 # Sentinel labels recorded alongside the resolved variant for the
@@ -131,15 +128,11 @@ def resolve_variant(
     if manifest_pin:
         parsed = _parse_pin(manifest_pin)
         if parsed is None:
-            raise UnresolvedVariant(
-                kind=kind, cluster_slug=cluster_slug, plugin_slug=plugin_slug
-            )
+            raise UnresolvedVariant(kind=kind, cluster_slug=cluster_slug, plugin_slug=plugin_slug)
         pinned_plugin, pinned_variant = parsed
         match = _find_variant(plugin_variants, pinned_plugin, pinned_variant)
         if match is None or match.kind != kind:
-            raise UnresolvedVariant(
-                kind=kind, cluster_slug=cluster_slug, plugin_slug=plugin_slug
-            )
+            raise UnresolvedVariant(kind=kind, cluster_slug=cluster_slug, plugin_slug=plugin_slug)
         return ResolvedVariant(
             plugin_slug=match.plugin_slug,
             variant=match.variant,
@@ -184,9 +177,7 @@ def resolve_variant(
             )
 
     # 5. No resolution
-    raise UnresolvedVariant(
-        kind=kind, cluster_slug=cluster_slug, plugin_slug=plugin_slug
-    )
+    raise UnresolvedVariant(kind=kind, cluster_slug=cluster_slug, plugin_slug=plugin_slug)
 
 
 # ---- helper for callers wiring the platform models in ----------------

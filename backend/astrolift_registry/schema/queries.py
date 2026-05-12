@@ -52,9 +52,7 @@ class RegistryQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_workload(
-        self, info: Info, app_slug: str, slug: str
-    ) -> WorkloadType | None:
+    def astrolift_workload(self, info: Info, app_slug: str, slug: str) -> WorkloadType | None:
         """Single workload by (app_slug, slug).
 
         Workloads are scoped under the registered app — the same
@@ -107,11 +105,7 @@ class RegistryQuery:
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.render import render_manifests
 
-        app = (
-            RegisteredApp.objects.select_related("organization")
-            .filter(slug=app_slug)
-            .first()
-        )
+        app = RegisteredApp.objects.select_related("organization").filter(slug=app_slug).first()
         if app is None:
             return None
 
@@ -125,10 +119,7 @@ class RegistryQuery:
             .first()
         )
         env_name = env.name if env else (environment_name or "preview")
-        namespace = (
-            app.k8s_namespace
-            or f"{app.organization.slug}-{app.slug}"
-        )
+        namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
         image = image_tag or "preview"
 
         try:

@@ -98,41 +98,56 @@ def test_nat_pinned_does_not_force_proxy():
 
 def test_internal_detection_subset_match():
     """10.1.2.0/24 is inside 10.0.0.0/8 → internal."""
-    assert is_internal_destination(
-        ip_or_cidr="10.1.2.0/24",
-        internal_cidrs=DEFAULT_INTERNAL_CIDRS,
-    ) is True
+    assert (
+        is_internal_destination(
+            ip_or_cidr="10.1.2.0/24",
+            internal_cidrs=DEFAULT_INTERNAL_CIDRS,
+        )
+        is True
+    )
 
 
 def test_internal_detection_bare_ip():
     """Bare IP treated as /32. 192.168.5.5 is internal."""
-    assert is_internal_destination(
-        ip_or_cidr="192.168.5.5",
-        internal_cidrs=DEFAULT_INTERNAL_CIDRS,
-    ) is True
+    assert (
+        is_internal_destination(
+            ip_or_cidr="192.168.5.5",
+            internal_cidrs=DEFAULT_INTERNAL_CIDRS,
+        )
+        is True
+    )
 
 
 def test_external_destination_not_internal():
-    assert is_internal_destination(
-        ip_or_cidr="8.8.8.8",
-        internal_cidrs=DEFAULT_INTERNAL_CIDRS,
-    ) is False
+    assert (
+        is_internal_destination(
+            ip_or_cidr="8.8.8.8",
+            internal_cidrs=DEFAULT_INTERNAL_CIDRS,
+        )
+        is False
+    )
 
 
 def test_superset_overlap_flagged():
     """An admin allow-listing 0.0.0.0/0 would supersede every
     internal range. Surface it."""
-    assert is_internal_destination(
-        ip_or_cidr="0.0.0.0/0",
-        internal_cidrs=DEFAULT_INTERNAL_CIDRS,
-    ) is True
+    assert (
+        is_internal_destination(
+            ip_or_cidr="0.0.0.0/0",
+            internal_cidrs=DEFAULT_INTERNAL_CIDRS,
+        )
+        is True
+    )
 
 
 def test_garbage_input_returns_false_quietly():
-    assert is_internal_destination(
-        ip_or_cidr="not-an-ip",
-        internal_cidrs=DEFAULT_INTERNAL_CIDRS,
-    ) is False
+    assert (
+        is_internal_destination(
+            ip_or_cidr="not-an-ip",
+            internal_cidrs=DEFAULT_INTERNAL_CIDRS,
+        )
+        is False
+    )
 
 
 # ---- lint -----------------------------------------------------------

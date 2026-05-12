@@ -73,10 +73,7 @@ def test_pagination_walks_all_events_with_no_overlap(permission_resolver):
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     with tenant_context(TenantContext(organization_id=org.id)):
         events = [_mkevent(org, n) for n in range(1, 8)]
-        expected_ids = [
-            str(e.guid)
-            for e in sorted(events, key=lambda e: e.occurred_at, reverse=True)
-        ]
+        expected_ids = [str(e.guid) for e in sorted(events, key=lambda e: e.occurred_at, reverse=True)]
 
         q = OperationsQuery()
         page1 = q.astrolift_events_page(_info(), limit=3)

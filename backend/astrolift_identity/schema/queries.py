@@ -96,9 +96,7 @@ class IdentityQuery:
     @strawberry.field
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def astrolift_invitations(
-        self, info: Info, status: str | None = None
-    ) -> list[InvitationType]:
+    def astrolift_invitations(self, info: Info, status: str | None = None) -> list[InvitationType]:
         """Org-scoped invitation list. Filter by status (pending /
         accepted / expired / revoked); default surfaces every status
         so the UI can show full history without an extra round-trip."""
@@ -106,11 +104,15 @@ class IdentityQuery:
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        qs = Invitation.objects.filter(
-            scope_kind=Invitation.ScopeKind.ORG,
-            scope_id=org_id,
-            deleted_at__isnull=True,
-        ).select_related("role", "invited_by").order_by("-created_at")
+        qs = (
+            Invitation.objects.filter(
+                scope_kind=Invitation.ScopeKind.ORG,
+                scope_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("role", "invited_by")
+            .order_by("-created_at")
+        )
         if status:
             qs = qs.filter(status=status)
         return [invitation_to_type(i) for i in qs[:500]]

@@ -85,7 +85,10 @@ def test_raises_when_no_default_and_no_mapping():
 def test_workload_identity_recognised_clouds():
     assert resolve_workload_identity(cluster_provider="aws-eks") == WorkloadIdentityKind.IRSA
     assert resolve_workload_identity(cluster_provider="gcp-gke") == WorkloadIdentityKind.GCP_WORKLOAD_IDENTITY
-    assert resolve_workload_identity(cluster_provider="azure-aks") == WorkloadIdentityKind.AZURE_FEDERATED_CREDENTIAL
+    assert (
+        resolve_workload_identity(cluster_provider="azure-aks")
+        == WorkloadIdentityKind.AZURE_FEDERATED_CREDENTIAL
+    )
 
 
 def test_workload_identity_short_provider_keys():
@@ -94,7 +97,9 @@ def test_workload_identity_short_provider_keys():
     managed-k8s flavor yet) doesn't fall through to projected-SA."""
     assert resolve_workload_identity(cluster_provider="aws") == WorkloadIdentityKind.IRSA
     assert resolve_workload_identity(cluster_provider="gcp") == WorkloadIdentityKind.GCP_WORKLOAD_IDENTITY
-    assert resolve_workload_identity(cluster_provider="azure") == WorkloadIdentityKind.AZURE_FEDERATED_CREDENTIAL
+    assert (
+        resolve_workload_identity(cluster_provider="azure") == WorkloadIdentityKind.AZURE_FEDERATED_CREDENTIAL
+    )
 
 
 def test_workload_identity_vanilla_k8s_uses_projected_sa():
@@ -105,7 +110,9 @@ def test_workload_identity_vanilla_k8s_uses_projected_sa():
 def test_workload_identity_unknown_provider_falls_back_safely():
     """Unknown cluster type still gets PROJECTED_SA — works
     everywhere, just not as strong."""
-    assert resolve_workload_identity(cluster_provider="some-future-cloud") == WorkloadIdentityKind.PROJECTED_SA
+    assert (
+        resolve_workload_identity(cluster_provider="some-future-cloud") == WorkloadIdentityKind.PROJECTED_SA
+    )
 
 
 def test_workload_identity_case_insensitive():

@@ -28,41 +28,56 @@ from astrolift_clusters.gitops_events import (
 
 
 def test_failure_is_warning():
-    assert severity_for(
-        event_type=PlatformEventType.GITOPS_SYNC_FAILED,
-    ) == EventSeverity.WARNING
+    assert (
+        severity_for(
+            event_type=PlatformEventType.GITOPS_SYNC_FAILED,
+        )
+        == EventSeverity.WARNING
+    )
 
 
 def test_health_degraded_is_warning():
-    assert severity_for(
-        event_type=PlatformEventType.GITOPS_HEALTH_DEGRADED,
-    ) == EventSeverity.WARNING
+    assert (
+        severity_for(
+            event_type=PlatformEventType.GITOPS_HEALTH_DEGRADED,
+        )
+        == EventSeverity.WARNING
+    )
 
 
 def test_succeeded_is_info():
-    assert severity_for(
-        event_type=PlatformEventType.GITOPS_SYNC_SUCCEEDED,
-    ) == EventSeverity.INFO
+    assert (
+        severity_for(
+            event_type=PlatformEventType.GITOPS_SYNC_SUCCEEDED,
+        )
+        == EventSeverity.INFO
+    )
 
 
 def test_started_is_info():
     """Sync starts shouldn't page anyone — informational only."""
-    assert severity_for(
-        event_type=PlatformEventType.GITOPS_SYNC_STARTED,
-    ) == EventSeverity.INFO
+    assert (
+        severity_for(
+            event_type=PlatformEventType.GITOPS_SYNC_STARTED,
+        )
+        == EventSeverity.INFO
+    )
 
 
 # ---- ArgoCD event mapping ------------------------------------------
 
 
-@pytest.mark.parametrize("template,expected", [
-    ("on-sync-started", PlatformEventType.GITOPS_SYNC_STARTED),
-    ("on-sync-running", PlatformEventType.GITOPS_SYNC_STARTED),
-    ("on-sync-succeeded", PlatformEventType.GITOPS_SYNC_SUCCEEDED),
-    ("on-sync-failed", PlatformEventType.GITOPS_SYNC_FAILED),
-    ("on-sync-status-unknown", PlatformEventType.GITOPS_SYNC_FAILED),
-    ("on-health-degraded", PlatformEventType.GITOPS_HEALTH_DEGRADED),
-])
+@pytest.mark.parametrize(
+    "template,expected",
+    [
+        ("on-sync-started", PlatformEventType.GITOPS_SYNC_STARTED),
+        ("on-sync-running", PlatformEventType.GITOPS_SYNC_STARTED),
+        ("on-sync-succeeded", PlatformEventType.GITOPS_SYNC_SUCCEEDED),
+        ("on-sync-failed", PlatformEventType.GITOPS_SYNC_FAILED),
+        ("on-sync-status-unknown", PlatformEventType.GITOPS_SYNC_FAILED),
+        ("on-health-degraded", PlatformEventType.GITOPS_HEALTH_DEGRADED),
+    ],
+)
 def test_argocd_event_mapping(template, expected):
     assert map_argocd_event(template_name=template) == expected
 
@@ -76,42 +91,66 @@ def test_argocd_unknown_template_returns_none():
 
 
 def test_flux_progressing_is_started():
-    assert map_flux_event(
-        severity="info", reason="Progressing",
-    ) == PlatformEventType.GITOPS_SYNC_STARTED
+    assert (
+        map_flux_event(
+            severity="info",
+            reason="Progressing",
+        )
+        == PlatformEventType.GITOPS_SYNC_STARTED
+    )
 
 
 def test_flux_reconciliation_succeeded():
-    assert map_flux_event(
-        severity="info", reason="ReconciliationSucceeded",
-    ) == PlatformEventType.GITOPS_SYNC_SUCCEEDED
+    assert (
+        map_flux_event(
+            severity="info",
+            reason="ReconciliationSucceeded",
+        )
+        == PlatformEventType.GITOPS_SYNC_SUCCEEDED
+    )
 
 
 def test_flux_reconciliation_failed():
-    assert map_flux_event(
-        severity="error", reason="ReconciliationFailed",
-    ) == PlatformEventType.GITOPS_SYNC_FAILED
+    assert (
+        map_flux_event(
+            severity="error",
+            reason="ReconciliationFailed",
+        )
+        == PlatformEventType.GITOPS_SYNC_FAILED
+    )
 
 
 def test_flux_health_check_failed():
-    assert map_flux_event(
-        severity="error", reason="HealthCheckFailed",
-    ) == PlatformEventType.GITOPS_HEALTH_DEGRADED
+    assert (
+        map_flux_event(
+            severity="error",
+            reason="HealthCheckFailed",
+        )
+        == PlatformEventType.GITOPS_HEALTH_DEGRADED
+    )
 
 
 def test_flux_severity_case_insensitive():
     """Flux capitalization varies in the wild."""
-    assert map_flux_event(
-        severity="INFO", reason="Progressing",
-    ) == PlatformEventType.GITOPS_SYNC_STARTED
+    assert (
+        map_flux_event(
+            severity="INFO",
+            reason="Progressing",
+        )
+        == PlatformEventType.GITOPS_SYNC_STARTED
+    )
 
 
 def test_flux_unknown_combination_returns_none():
     """Many Flux reasons (SourceRefNotReady etc.) are part of
     natural progression — don't bubble them up."""
-    assert map_flux_event(
-        severity="info", reason="SourceRefNotReady",
-    ) is None
+    assert (
+        map_flux_event(
+            severity="info",
+            reason="SourceRefNotReady",
+        )
+        is None
+    )
 
 
 # ---- deployment resolution -----------------------------------------
@@ -156,16 +195,22 @@ def test_resolve_deployment_id_negative_rejected():
 def test_is_for_us_with_annotation():
     """Pre-filter so handler can ack 200 and skip rather than 400
     on third-party Applications in mixed-ArgoCD setups."""
-    assert is_for_us(
-        annotations={ANNOTATION_DEPLOYMENT_ID: "1"},
-    ) is True
+    assert (
+        is_for_us(
+            annotations={ANNOTATION_DEPLOYMENT_ID: "1"},
+        )
+        is True
+    )
 
 
 def test_is_for_us_without_annotation():
     assert is_for_us(annotations={}) is False
-    assert is_for_us(
-        annotations={"app.kubernetes.io/name": "third-party"},
-    ) is False
+    assert (
+        is_for_us(
+            annotations={"app.kubernetes.io/name": "third-party"},
+        )
+        is False
+    )
 
 
 # ---- resolve full event --------------------------------------------
@@ -210,7 +255,8 @@ def test_resolve_short_message_passes_through():
         connection_id=1,
         event_type=PlatformEventType.GITOPS_SYNC_SUCCEEDED,
         annotations={ANNOTATION_DEPLOYMENT_ID: "1"},
-        revision="r", message="ok",
+        revision="r",
+        message="ok",
     )
     resolved = resolve(event=event)
     assert resolved.message == "ok"
@@ -244,40 +290,53 @@ def test_pull_interval_within_bounds():
 
 
 def _resolved(rev="abc"):
-    return resolve(event=IncomingEvent(
-        provider=GitopsProvider.ARGOCD,
-        connection_id=1,
-        event_type=PlatformEventType.GITOPS_SYNC_SUCCEEDED,
-        annotations={ANNOTATION_DEPLOYMENT_ID: "1"},
-        revision=rev,
-    ))
+    return resolve(
+        event=IncomingEvent(
+            provider=GitopsProvider.ARGOCD,
+            connection_id=1,
+            event_type=PlatformEventType.GITOPS_SYNC_SUCCEEDED,
+            annotations={ANNOTATION_DEPLOYMENT_ID: "1"},
+            revision=rev,
+        )
+    )
 
 
 def test_first_event_not_duplicate():
     fp = fingerprint_for(event=_resolved())
-    assert is_duplicate(
-        fingerprint=fp, last_seen_unix=None, now_unix=1_700_000_000,
-    ) is False
+    assert (
+        is_duplicate(
+            fingerprint=fp,
+            last_seen_unix=None,
+            now_unix=1_700_000_000,
+        )
+        is False
+    )
 
 
 def test_within_window_is_duplicate():
     fp = fingerprint_for(event=_resolved())
-    assert is_duplicate(
-        fingerprint=fp,
-        last_seen_unix=1_700_000_000,
-        now_unix=1_700_000_010,
-    ) is True
+    assert (
+        is_duplicate(
+            fingerprint=fp,
+            last_seen_unix=1_700_000_000,
+            now_unix=1_700_000_010,
+        )
+        is True
+    )
 
 
 def test_after_window_not_duplicate():
     """ArgoCD/Flux can re-emit later as a separate transition;
     the dedup window only suppresses the immediate flap."""
     fp = fingerprint_for(event=_resolved())
-    assert is_duplicate(
-        fingerprint=fp,
-        last_seen_unix=1_700_000_000,
-        now_unix=1_700_000_000 + DEDUP_WINDOW_SECONDS + 1,
-    ) is False
+    assert (
+        is_duplicate(
+            fingerprint=fp,
+            last_seen_unix=1_700_000_000,
+            now_unix=1_700_000_000 + DEDUP_WINDOW_SECONDS + 1,
+        )
+        is False
+    )
 
 
 def test_fingerprint_includes_revision():

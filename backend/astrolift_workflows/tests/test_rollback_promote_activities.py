@@ -48,9 +48,7 @@ def _make_failed(app, env, *, image_tag="v2.0.0"):
 # ---- rollback ----------------------------------------------------------
 
 
-def test_rollback_creates_new_deployment_from_prior_running(
-    app, env
-):
+def test_rollback_creates_new_deployment_from_prior_running(app, env):
     """The rollback activity must create a brand-new ``rollback``
     deployment row that copies image_tag + config_snapshot from the
     most-recent prior running deployment, and mark the bad deploy
@@ -67,9 +65,7 @@ def test_rollback_creates_new_deployment_from_prior_running(
     # bad has to be RUNNING-ish to be transitioned to SUPERSEDED;
     # the activity uses the state machine and FAILED→SUPERSEDED isn't
     # a legal transition. Use a RUNNING bad for the test.
-    Deployment.objects.filter(pk=bad.pk).update(
-        status=Deployment.Status.RUNNING.value
-    )
+    Deployment.objects.filter(pk=bad.pk).update(status=Deployment.Status.RUNNING.value)
 
     new_id = _create_rollback_deployment_sync(bad.pk)
     new_deploy = Deployment.objects.get(pk=new_id)
@@ -91,9 +87,7 @@ def test_rollback_fails_when_no_prior_running(app, env):
     from astrolift_workflows.activities.app_lifecycle import _create_rollback_deployment_sync
 
     only = _make_running(app, env, image_tag="v1.0.0")
-    Deployment.objects.filter(pk=only.pk).update(
-        status=Deployment.Status.FAILED.value
-    )
+    Deployment.objects.filter(pk=only.pk).update(status=Deployment.Status.FAILED.value)
 
     with pytest.raises(RuntimeError, match="no prior running revision"):
         _create_rollback_deployment_sync(only.pk)
@@ -128,9 +122,7 @@ def env_prod_with_approvals(app, cluster):
     )
 
 
-def test_promote_creates_new_deployment_in_target_env(
-    app, env_staging, env
-):
+def test_promote_creates_new_deployment_in_target_env(app, env_staging, env):
     """Promotion: image_tag + config copy across envs, lineage via
     ``promoted_from``."""
     from astrolift_workflows.activities.app_lifecycle import _create_promotion_deployment_sync
@@ -148,15 +140,11 @@ def test_promote_creates_new_deployment_in_target_env(
     assert new_deploy.status == Deployment.Status.PENDING.value
 
 
-def test_promote_into_approval_env_starts_pending_approval(
-    app, env_staging, env_prod_with_approvals
-):
+def test_promote_into_approval_env_starts_pending_approval(app, env_staging, env_prod_with_approvals):
     from astrolift_workflows.activities.app_lifecycle import _create_promotion_deployment_sync
 
     source = _make_running(app, env_staging)
-    new_id = _create_promotion_deployment_sync(
-        source.pk, env_prod_with_approvals.pk
-    )
+    new_id = _create_promotion_deployment_sync(source.pk, env_prod_with_approvals.pk)
     new_deploy = Deployment.objects.get(pk=new_id)
     assert new_deploy.status == Deployment.Status.PENDING_APPROVAL.value
     assert new_deploy.approvals_required == 1
@@ -173,22 +161,34 @@ def test_promote_rejects_cross_app(app, env, org, project, team):
 
     source = _make_running(app, env)
     other_app = RegisteredApp.objects.create(
-        organization=org, team=team, project=project,
-        name="Other", slug="other-app", provisioning_status="ready",
+        organization=org,
+        team=team,
+        project=project,
+        name="Other",
+        slug="other-app",
+        provisioning_status="ready",
     )
-    [plugin] = ProviderPlugin.objects.bulk_create([
-        ProviderPlugin(name="P", slug="p2", capabilities_manifest={}, config_schema={}),
-    ])
+    [plugin] = ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(name="P", slug="p2", capabilities_manifest={}, config_schema={}),
+        ]
+    )
     other_cluster = TenantCluster.objects.create(
-        organization=org, name="c2", slug="c2",
-        provider_plugin=plugin, provider_config={},
+        organization=org,
+        name="c2",
+        slug="c2",
+        provider_plugin=plugin,
+        provider_config={},
         endpoint="https://invalid",
         auth_method=TenantCluster.AuthMethod.KUBECONFIG,
         auth_config={},
     )
     other_env = AppEnvironment.objects.create(
-        registered_app=other_app, tenant_cluster=other_cluster,
-        name="prod", url="https://x.example", required_approvals=0,
+        registered_app=other_app,
+        tenant_cluster=other_cluster,
+        name="prod",
+        url="https://x.example",
+        required_approvals=0,
     )
 
     with pytest.raises(RuntimeError, match="same app"):

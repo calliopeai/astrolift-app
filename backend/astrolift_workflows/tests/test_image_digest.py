@@ -19,24 +19,30 @@ ANOTHER_DIGEST = "sha256:" + "b" * 64
 # ---- digest validation ----------------------------------------------
 
 
-@pytest.mark.parametrize("value", [
-    "sha256:" + "a" * 64,
-    "sha256:" + "0123456789abcdef" * 4,
-])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "sha256:" + "a" * 64,
+        "sha256:" + "0123456789abcdef" * 4,
+    ],
+)
 def test_is_digest_accepts_well_formed(value):
     assert is_digest(value) is True
 
 
-@pytest.mark.parametrize("value", [
-    "",
-    "sha256:short",
-    "sha256:" + "a" * 63,           # one short
-    "sha256:" + "a" * 65,           # one long
-    "sha256:" + "A" * 64,           # uppercase
-    "md5:" + "a" * 32,              # wrong algorithm
-    "a" * 64,                       # missing prefix
-    "sha256:" + "g" * 64,           # bad hex char
-])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "sha256:short",
+        "sha256:" + "a" * 63,  # one short
+        "sha256:" + "a" * 65,  # one long
+        "sha256:" + "A" * 64,  # uppercase
+        "md5:" + "a" * 32,  # wrong algorithm
+        "a" * 64,  # missing prefix
+        "sha256:" + "g" * 64,  # bad hex char
+    ],
+)
 def test_is_digest_rejects_malformed(value):
     assert is_digest(value) is False
 
@@ -63,12 +69,15 @@ def test_parse_pinned_strips_whitespace():
     assert out.repo == "registry/api"
 
 
-@pytest.mark.parametrize("bad", [
-    "no-digest-here",
-    "registry/api:tag",                       # tagged, not pinned
-    f"registry/api@md5:{'a' * 32}",           # wrong algo
-    f"@{GOOD_DIGEST}",                        # no repo
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "no-digest-here",
+        "registry/api:tag",  # tagged, not pinned
+        f"registry/api@md5:{'a' * 32}",  # wrong algo
+        f"@{GOOD_DIGEST}",  # no repo
+    ],
+)
 def test_parse_pinned_rejects_unpinned_or_malformed(bad):
     with pytest.raises(ImageRefError):
         parse_pinned_ref(bad)

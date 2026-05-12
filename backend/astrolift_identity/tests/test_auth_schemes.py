@@ -174,33 +174,53 @@ def test_non_scim_token_at_scim_path_rejected():
 
 def test_introspection_admin_authorized():
     """Admin elevation is sufficient regardless of MFA."""
-    assert is_introspection_authorized(
-        requester_amr=("pwd",), requester_is_admin=True,
-    ) is True
+    assert (
+        is_introspection_authorized(
+            requester_amr=("pwd",),
+            requester_is_admin=True,
+        )
+        is True
+    )
 
 
 def test_introspection_strong_mfa_authorized():
     """Strong MFA without admin is also sufficient."""
-    assert is_introspection_authorized(
-        requester_amr=("otp",), requester_is_admin=False,
-    ) is True
-    assert is_introspection_authorized(
-        requester_amr=("webauthn",), requester_is_admin=False,
-    ) is True
+    assert (
+        is_introspection_authorized(
+            requester_amr=("otp",),
+            requester_is_admin=False,
+        )
+        is True
+    )
+    assert (
+        is_introspection_authorized(
+            requester_amr=("webauthn",),
+            requester_is_admin=False,
+        )
+        is True
+    )
 
 
 def test_introspection_password_only_rejected():
     """Plain password session can't introspect tokens. The
     operation reveals which app/user a token belongs to —
     sensitive enough to require elevated context."""
-    assert is_introspection_authorized(
-        requester_amr=("pwd",), requester_is_admin=False,
-    ) is False
+    assert (
+        is_introspection_authorized(
+            requester_amr=("pwd",),
+            requester_is_admin=False,
+        )
+        is False
+    )
 
 
 def test_introspection_sms_not_strong_enough():
     """Spec considers SMS not strong; only otp/webauthn/hwk
     qualify as 'strong MFA' (matches #148 step-up policy)."""
-    assert is_introspection_authorized(
-        requester_amr=("sms",), requester_is_admin=False,
-    ) is False
+    assert (
+        is_introspection_authorized(
+            requester_amr=("sms",),
+            requester_is_admin=False,
+        )
+        is False
+    )

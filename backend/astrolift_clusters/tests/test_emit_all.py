@@ -31,7 +31,8 @@ def _dep(deployment_id: int, **kw) -> ActiveDeployment:
 def test_repo_path_format():
     out = repo_path_for(
         path_prefix="clusters/prod-us-east",
-        app_slug="api", env_slug="prod",
+        app_slug="api",
+        env_slug="prod",
     )
     assert out == "clusters/prod-us-east/api/prod/manifests.yaml"
 
@@ -41,14 +42,17 @@ def test_repo_path_normalizes_trailing_slash():
     a doubled separator."""
     out = repo_path_for(
         path_prefix="clusters/prod-us-east/",
-        app_slug="api", env_slug="prod",
+        app_slug="api",
+        env_slug="prod",
     )
     assert out == "clusters/prod-us-east/api/prod/manifests.yaml"
 
 
 def test_repo_path_custom_filename():
     out = repo_path_for(
-        path_prefix="clusters/x", app_slug="api", env_slug="prod",
+        path_prefix="clusters/x",
+        app_slug="api",
+        env_slug="prod",
         filename="kustomization.yaml",
     )
     assert out.endswith("/kustomization.yaml")
@@ -70,14 +74,23 @@ def test_filters_out_direct_api():
 
 def test_includes_argocd_flux_hybrid():
     deps = [
-        _dep(1, cluster_delivery_mode=DeliveryMode.GITOPS_ARGOCD,
-             app_slug="api", env_slug="prod"),
-        _dep(2, cluster_delivery_mode=DeliveryMode.GITOPS_FLUX,
-             cluster_slug="eu", cluster_path_prefix="clusters/eu",
-             app_slug="api", env_slug="prod"),
-        _dep(3, cluster_delivery_mode=DeliveryMode.HYBRID,
-             cluster_slug="canary", cluster_path_prefix="clusters/canary",
-             app_slug="api", env_slug="canary"),
+        _dep(1, cluster_delivery_mode=DeliveryMode.GITOPS_ARGOCD, app_slug="api", env_slug="prod"),
+        _dep(
+            2,
+            cluster_delivery_mode=DeliveryMode.GITOPS_FLUX,
+            cluster_slug="eu",
+            cluster_path_prefix="clusters/eu",
+            app_slug="api",
+            env_slug="prod",
+        ),
+        _dep(
+            3,
+            cluster_delivery_mode=DeliveryMode.HYBRID,
+            cluster_slug="canary",
+            cluster_path_prefix="clusters/canary",
+            app_slug="api",
+            env_slug="canary",
+        ),
     ]
     out = plan_emit_all(deps)
     assert len(out) == 3
@@ -127,12 +140,9 @@ def test_gitops_modes_set_pinned():
 
 def test_commits_grouped_by_cluster():
     deps = [
-        _dep(1, cluster_slug="us", cluster_path_prefix="clusters/us",
-             app_slug="api", env_slug="prod"),
-        _dep(2, cluster_slug="us", cluster_path_prefix="clusters/us",
-             app_slug="api", env_slug="staging"),
-        _dep(3, cluster_slug="eu", cluster_path_prefix="clusters/eu",
-             app_slug="api", env_slug="prod"),
+        _dep(1, cluster_slug="us", cluster_path_prefix="clusters/us", app_slug="api", env_slug="prod"),
+        _dep(2, cluster_slug="us", cluster_path_prefix="clusters/us", app_slug="api", env_slug="staging"),
+        _dep(3, cluster_slug="eu", cluster_path_prefix="clusters/eu", app_slug="api", env_slug="prod"),
     ]
     plan = plan_emit_all(deps)
     grouped = commits_per_cluster(plan)

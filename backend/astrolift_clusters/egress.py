@@ -39,9 +39,9 @@ DEFAULT_INTERNAL_CIDRS: tuple[str, ...] = (
 
 
 class SourceIPMode(str, Enum):
-    DEFAULT = "default"        # whatever the cluster's normal egress is
+    DEFAULT = "default"  # whatever the cluster's normal egress is
     NAT_PINNED = "nat_pinned"  # provider NAT gateway with stable IP set
-    PROXY = "proxy"            # route via cilium egress gateway / similar
+    PROXY = "proxy"  # route via cilium egress gateway / similar
 
 
 # ---- guards ---------------------------------------------------------
@@ -63,13 +63,9 @@ def _validate_fqdn(fqdn: str) -> None:
     resolution. We just guard against obvious garbage in the
     admin UI: empty, whitespace, scheme-prefixed."""
     if not fqdn or fqdn.strip() != fqdn:
-        raise EgressPolicyError(
-            f"invalid FQDN {fqdn!r}: empty or has surrounding whitespace"
-        )
+        raise EgressPolicyError(f"invalid FQDN {fqdn!r}: empty or has surrounding whitespace")
     if "://" in fqdn or "/" in fqdn:
-        raise EgressPolicyError(
-            f"FQDN {fqdn!r} should be a hostname, not a URL"
-        )
+        raise EgressPolicyError(f"FQDN {fqdn!r} should be a hostname, not a URL")
 
 
 # ---- policy --------------------------------------------------------
@@ -130,10 +126,7 @@ def render(policy: EgressPolicy) -> EgressDecision:
     allow_cidrs = policy.allowed_cidrs
     allow_fqdns = policy.allowed_fqdns
 
-    requires_proxy = (
-        bool(allow_fqdns)
-        or policy.source_ip_mode == SourceIPMode.PROXY
-    )
+    requires_proxy = bool(allow_fqdns) or policy.source_ip_mode == SourceIPMode.PROXY
 
     return EgressDecision(
         deny_cidrs=deny_cidrs,
@@ -143,9 +136,7 @@ def render(policy: EgressPolicy) -> EgressDecision:
     )
 
 
-def is_internal_destination(
-    *, ip_or_cidr: str, internal_cidrs: Sequence[str]
-) -> bool:
+def is_internal_destination(*, ip_or_cidr: str, internal_cidrs: Sequence[str]) -> bool:
     """Helper for allowlist authoring + the policy linter:
     'is this CIDR I'm about to add covered by the deny floor?'
 

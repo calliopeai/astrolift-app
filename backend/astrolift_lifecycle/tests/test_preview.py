@@ -20,7 +20,9 @@ from astrolift_lifecycle.preview import (
 
 def test_single_workload_hostname():
     out = preview_hostname(
-        pr_number=42, app_slug="api", org_slug="acme",
+        pr_number=42,
+        app_slug="api",
+        org_slug="acme",
         platform_domain="myastrolift.net",
     )
     assert out == "pr-42-api.pr.acme.myastrolift.net"
@@ -28,8 +30,11 @@ def test_single_workload_hostname():
 
 def test_multi_workload_hostname():
     out = preview_hostname(
-        pr_number=42, app_slug="api", workload="web",
-        org_slug="acme", platform_domain="myastrolift.net",
+        pr_number=42,
+        app_slug="api",
+        workload="web",
+        org_slug="acme",
+        platform_domain="myastrolift.net",
     )
     assert out == "pr-42-api-web.pr.acme.myastrolift.net"
 
@@ -49,7 +54,9 @@ def test_hostname_rejects_long_label():
 def test_hostname_rejects_zero_pr_number():
     with pytest.raises(PreviewHostnameError, match="positive"):
         preview_hostname(
-            pr_number=0, app_slug="api", org_slug="acme",
+            pr_number=0,
+            app_slug="api",
+            org_slug="acme",
             platform_domain="x.com",
         )
 
@@ -57,14 +64,17 @@ def test_hostname_rejects_zero_pr_number():
 def test_hostname_rejects_empty_required_fields():
     with pytest.raises(PreviewHostnameError):
         preview_hostname(
-            pr_number=1, app_slug="", org_slug="acme",
+            pr_number=1,
+            app_slug="",
+            org_slug="acme",
             platform_domain="x.com",
         )
 
 
 def test_wildcard_zone_format():
     out = wildcard_zone_for_org(
-        org_slug="acme", platform_domain="myastrolift.net",
+        org_slug="acme",
+        platform_domain="myastrolift.net",
     )
     assert out == "*.pr.acme.myastrolift.net"
 

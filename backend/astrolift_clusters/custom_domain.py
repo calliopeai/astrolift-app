@@ -56,11 +56,7 @@ VALIDATION_TIMEOUT_SECONDS = 10 * 60
 
 # RFC 1035 hostname / FQDN regex (relaxed): labels [a-z0-9-]
 # (no leading/trailing hyphen), separated by dots, total <=253.
-_HOSTNAME_RE = re.compile(
-    r"^(?=.{1,253}$)"
-    r"([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+"
-    r"[a-z]{2,63}$"
-)
+_HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)" r"([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+" r"[a-z]{2,63}$")
 
 
 class DomainError(ValueError):
@@ -126,7 +122,8 @@ def issue_txt_challenge(*, hostname: str) -> TxtChallenge:
     record_name = f"{TXT_CHALLENGE_NAME_PREFIX}.{hostname.lower()}"
     record_value = secrets.token_urlsafe(32)
     return TxtChallenge(
-        record_name=record_name, record_value=record_value,
+        record_name=record_name,
+        record_value=record_value,
     )
 
 
@@ -151,21 +148,36 @@ def verify_txt_challenge(
 # Allowed transitions per spec 13 §2.2. Anything else is a bug
 # in the workflow.
 _ALLOWED_TRANSITIONS: dict[DomainState, frozenset[DomainState]] = {
-    DomainState.PENDING_VALIDATION: frozenset({
-        DomainState.VALIDATING, DomainState.ERROR,
-    }),
-    DomainState.VALIDATING: frozenset({
-        DomainState.ACTIVE, DomainState.ERROR, DomainState.PENDING_VALIDATION,
-    }),
-    DomainState.ACTIVE: frozenset({
-        DomainState.EXPIRED, DomainState.ERROR,
-    }),
-    DomainState.ERROR: frozenset({
-        DomainState.PENDING_VALIDATION,  # tenant can retry
-    }),
-    DomainState.EXPIRED: frozenset({
-        DomainState.PENDING_VALIDATION, DomainState.ACTIVE,
-    }),
+    DomainState.PENDING_VALIDATION: frozenset(
+        {
+            DomainState.VALIDATING,
+            DomainState.ERROR,
+        }
+    ),
+    DomainState.VALIDATING: frozenset(
+        {
+            DomainState.ACTIVE,
+            DomainState.ERROR,
+            DomainState.PENDING_VALIDATION,
+        }
+    ),
+    DomainState.ACTIVE: frozenset(
+        {
+            DomainState.EXPIRED,
+            DomainState.ERROR,
+        }
+    ),
+    DomainState.ERROR: frozenset(
+        {
+            DomainState.PENDING_VALIDATION,  # tenant can retry
+        }
+    ),
+    DomainState.EXPIRED: frozenset(
+        {
+            DomainState.PENDING_VALIDATION,
+            DomainState.ACTIVE,
+        }
+    ),
 }
 
 
@@ -180,10 +192,7 @@ def can_transition(*, from_state: DomainState, to_state: DomainState) -> bool:
 
 def assert_transition(*, from_state: DomainState, to_state: DomainState) -> None:
     if not can_transition(from_state=from_state, to_state=to_state):
-        raise DomainError(
-            f"invalid domain state transition: "
-            f"{from_state.value} -> {to_state.value}"
-        )
+        raise DomainError(f"invalid domain state transition: " f"{from_state.value} -> {to_state.value}")
 
 
 # ---- DNS instruction copy ------------------------------------------
@@ -207,7 +216,4 @@ def dns_instruction(*, hostname: str, ingress_target: str) -> str:
             "If your provider doesn't support ALIAS/ANAME (e.g. "
             "raw bind), use a CDN like Cloudflare in front."
         )
-    return (
-        f"At your DNS provider, add a CNAME record for {hostname} "
-        f"pointing to {ingress_target}."
-    )
+    return f"At your DNS provider, add a CNAME record for {hostname} " f"pointing to {ingress_target}."

@@ -22,9 +22,7 @@ def _info():
 def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo")
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,
@@ -39,14 +37,10 @@ def _scaffold():
 def test_returns_workload_by_app_and_slug(permission_resolver):
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
-    Workload.objects.create(
-        registered_app=app, name="Web", slug="web", kind="deployment"
-    )
+    Workload.objects.create(registered_app=app, name="Web", slug="web", kind="deployment")
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_workload(
-            _info(), app_slug="hello-app", slug="web"
-        )
+        result = RegistryQuery().astrolift_workload(_info(), app_slug="hello-app", slug="web")
 
     assert result is not None
     assert result.slug == "web"
@@ -58,9 +52,7 @@ def test_returns_none_for_unknown_workload(permission_resolver):
     permission_resolver.grant(Permission.APP_READ)
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_workload(
-            _info(), app_slug="hello-app", slug="ghost"
-        )
+        result = RegistryQuery().astrolift_workload(_info(), app_slug="hello-app", slug="ghost")
 
     assert result is None
 
@@ -71,13 +63,9 @@ def test_returns_none_when_app_slug_does_not_match(permission_resolver):
     belongs to a different app even if slugs collide."""
     org, app = _scaffold()
     permission_resolver.grant(Permission.APP_READ)
-    Workload.objects.create(
-        registered_app=app, name="Web", slug="web", kind="deployment"
-    )
+    Workload.objects.create(registered_app=app, name="Web", slug="web", kind="deployment")
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        result = RegistryQuery().astrolift_workload(
-            _info(), app_slug="other-app", slug="web"
-        )
+        result = RegistryQuery().astrolift_workload(_info(), app_slug="other-app", slug="web")
 
     assert result is None

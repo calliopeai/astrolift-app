@@ -115,10 +115,7 @@ def discoverable_apps(
 ) -> tuple[AppDiscoveryRow, ...]:
     """Filter ``apps`` to those the user could claim. UI uses
     this to render the discovery list."""
-    return tuple(
-        a for a in apps
-        if claimable_state_of(app=a, user=user) != ClaimableState.NOT_CLAIMABLE
-    )
+    return tuple(a for a in apps if claimable_state_of(app=a, user=user) != ClaimableState.NOT_CLAIMABLE)
 
 
 # ---- claim transition ----------------------------------------------
@@ -164,7 +161,9 @@ def can_claim(
         else:
             reason = "app not claimable in current state"
         return ClaimDecision(
-            accepted=False, new_owner_user_id=None, reason=reason,
+            accepted=False,
+            new_owner_user_id=None,
+            reason=reason,
         )
     return ClaimDecision(
         accepted=True,

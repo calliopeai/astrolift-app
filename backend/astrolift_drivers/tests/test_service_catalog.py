@@ -31,9 +31,22 @@ def test_all_kinds_match_spec_11_section_6():
     """Lock-test: any new kind must update both the catalog and the
     env_injection envelope. Drift surfaces here."""
     expected = {
-        "postgres", "mysql", "redis", "mq", "queue", "topic",
-        "kv_store", "document_db", "search", "vector_index",
-        "time_series", "object_store", "nfs", "cdn", "email", "sms",
+        "postgres",
+        "mysql",
+        "redis",
+        "mq",
+        "queue",
+        "topic",
+        "kv_store",
+        "document_db",
+        "search",
+        "vector_index",
+        "time_series",
+        "object_store",
+        "nfs",
+        "cdn",
+        "email",
+        "sms",
     }
     assert set(ALL_KINDS) == expected
     # Every kind must have a description
@@ -57,10 +70,14 @@ def test_get_entry_unknown_kind_raises():
 
 
 def test_register_and_list_variant():
-    register_variant(CatalogVariant(
-        plugin_slug="aws-rds", variant="aurora-15", kind="postgres",
-        is_default_for_kind=True,
-    ))
+    register_variant(
+        CatalogVariant(
+            plugin_slug="aws-rds",
+            variant="aurora-15",
+            kind="postgres",
+            is_default_for_kind=True,
+        )
+    )
     entry = get_entry("postgres")
     assert len(entry.variants) == 1
     assert entry.variants[0].fqn == "aws-rds/aurora-15"
@@ -68,17 +85,23 @@ def test_register_and_list_variant():
 
 def test_register_rejects_unknown_kind():
     with pytest.raises(ValueError, match="not in the abstract catalog"):
-        register_variant(CatalogVariant(
-            plugin_slug="weird", variant="v1", kind="never-heard-of",
-        ))
+        register_variant(
+            CatalogVariant(
+                plugin_slug="weird",
+                variant="v1",
+                kind="never-heard-of",
+            )
+        )
 
 
 def test_register_variants_bulk():
-    register_variants([
-        CatalogVariant(plugin_slug="aws-rds", variant="aurora-15", kind="postgres"),
-        CatalogVariant(plugin_slug="aws-rds", variant="postgres-15", kind="postgres"),
-        CatalogVariant(plugin_slug="aws-elasticache", variant="redis-7", kind="redis"),
-    ])
+    register_variants(
+        [
+            CatalogVariant(plugin_slug="aws-rds", variant="aurora-15", kind="postgres"),
+            CatalogVariant(plugin_slug="aws-rds", variant="postgres-15", kind="postgres"),
+            CatalogVariant(plugin_slug="aws-elasticache", variant="redis-7", kind="redis"),
+        ]
+    )
     pg = get_entry("postgres")
     rd = get_entry("redis")
     assert len(pg.variants) == 2
@@ -93,9 +116,13 @@ def test_list_entries_covers_every_kind_in_order():
 
 
 def test_find_variant_lookup():
-    register_variant(CatalogVariant(
-        plugin_slug="gcp-cloudsql", variant="postgres-15", kind="postgres",
-    ))
+    register_variant(
+        CatalogVariant(
+            plugin_slug="gcp-cloudsql",
+            variant="postgres-15",
+            kind="postgres",
+        )
+    )
     out = find_variant(plugin_slug="gcp-cloudsql", variant="postgres-15")
     assert out is not None
     assert out.fqn == "gcp-cloudsql/postgres-15"
@@ -106,14 +133,22 @@ def test_find_variant_returns_none_when_unregistered():
 
 
 def test_default_for_kind_flag_preserved():
-    register_variant(CatalogVariant(
-        plugin_slug="aws-rds", variant="aurora-15", kind="postgres",
-        is_default_for_kind=True,
-    ))
-    register_variant(CatalogVariant(
-        plugin_slug="aws-rds", variant="postgres-15", kind="postgres",
-        is_default_for_kind=False,
-    ))
+    register_variant(
+        CatalogVariant(
+            plugin_slug="aws-rds",
+            variant="aurora-15",
+            kind="postgres",
+            is_default_for_kind=True,
+        )
+    )
+    register_variant(
+        CatalogVariant(
+            plugin_slug="aws-rds",
+            variant="postgres-15",
+            kind="postgres",
+            is_default_for_kind=False,
+        )
+    )
     pg = get_entry("postgres")
     defaults = [v for v in pg.variants if v.is_default_for_kind]
     assert len(defaults) == 1

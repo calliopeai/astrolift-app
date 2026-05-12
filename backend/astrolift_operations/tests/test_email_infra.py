@@ -47,23 +47,29 @@ def _email(**kw) -> Email:
 # ---- email validation ----------------------------------------------
 
 
-@pytest.mark.parametrize("addr", [
-    "ops@acme.com",
-    "first.last+tag@acme.com",
-    "x@y.io",
-])
+@pytest.mark.parametrize(
+    "addr",
+    [
+        "ops@acme.com",
+        "first.last+tag@acme.com",
+        "x@y.io",
+    ],
+)
 def test_valid_emails(addr):
     assert is_valid_email(addr) is True
 
 
-@pytest.mark.parametrize("bad", [
-    "",
-    "not-an-email",
-    "@missing.local",
-    "missing@.com",
-    "two@at@signs.com",
-    "no-tld@acme",
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "not-an-email",
+        "@missing.local",
+        "missing@.com",
+        "two@at@signs.com",
+        "no-tld@acme",
+    ],
+)
 def test_invalid_emails(bad):
     assert is_valid_email(bad) is False
 
@@ -132,8 +138,10 @@ def test_supported_transports_locked():
     """Lock-test the supported list — adding a transport requires
     a deliberate code review."""
     assert SUPPORTED_TRANSPORTS == (
-        TransportKind.AWS_SES, TransportKind.SENDGRID,
-        TransportKind.POSTMARK, TransportKind.SMTP,
+        TransportKind.AWS_SES,
+        TransportKind.SENDGRID,
+        TransportKind.POSTMARK,
+        TransportKind.SMTP,
     )
 
 
@@ -142,7 +150,8 @@ def test_supported_transports_locked():
 
 def _entry(addr: str, reason: SuppressionReason) -> SuppressionEntry:
     return SuppressionEntry(
-        address=addr, reason=reason,
+        address=addr,
+        reason=reason,
         suppressed_at=datetime(2026, 5, 1, tzinfo=UTC),
     )
 
@@ -153,20 +162,28 @@ def test_hard_bounce_suppresses_all_kinds():
     entry = _entry("dead@nowhere.com", SuppressionReason.HARD_BOUNCE)
     lookup = lambda a: entry if a == "dead@nowhere.com" else None
     for kind in EmailKind:
-        assert is_suppressed(
-            address="dead@nowhere.com", kind=kind,
-            suppression_lookup=lookup,
-        ) is True
+        assert (
+            is_suppressed(
+                address="dead@nowhere.com",
+                kind=kind,
+                suppression_lookup=lookup,
+            )
+            is True
+        )
 
 
 def test_complaint_suppresses_all_kinds():
     entry = _entry("noreply@acme.com", SuppressionReason.COMPLAINT)
     lookup = lambda a: entry if a == "noreply@acme.com" else None
     for kind in EmailKind:
-        assert is_suppressed(
-            address="noreply@acme.com", kind=kind,
-            suppression_lookup=lookup,
-        ) is True
+        assert (
+            is_suppressed(
+                address="noreply@acme.com",
+                kind=kind,
+                suppression_lookup=lookup,
+            )
+            is True
+        )
 
 
 def test_unsubscribe_suppresses_non_transactional():
@@ -182,10 +199,14 @@ def test_unsubscribe_suppresses_non_transactional():
         EmailKind.DEPLOY_FAILURE,
         EmailKind.SCHEDULED_JOB_FAILURE,
     ):
-        assert is_suppressed(
-            address="user@acme.com", kind=non_transactional,
-            suppression_lookup=lookup,
-        ) is True
+        assert (
+            is_suppressed(
+                address="user@acme.com",
+                kind=non_transactional,
+                suppression_lookup=lookup,
+            )
+            is True
+        )
 
 
 def test_unsubscribe_does_not_suppress_deploy_approval():
@@ -193,20 +214,26 @@ def test_unsubscribe_does_not_suppress_deploy_approval():
     while keeping their account active."""
     entry = _entry("user@acme.com", SuppressionReason.UNSUBSCRIBE)
     lookup = lambda a: entry if a == "user@acme.com" else None
-    assert is_suppressed(
-        address="user@acme.com",
-        kind=EmailKind.DEPLOY_APPROVAL,
-        suppression_lookup=lookup,
-    ) is False
+    assert (
+        is_suppressed(
+            address="user@acme.com",
+            kind=EmailKind.DEPLOY_APPROVAL,
+            suppression_lookup=lookup,
+        )
+        is False
+    )
 
 
 def test_no_suppression_when_address_not_in_list():
     lookup = lambda a: None
-    assert is_suppressed(
-        address="any@acme.com",
-        kind=EmailKind.DEPLOY_FAILURE,
-        suppression_lookup=lookup,
-    ) is False
+    assert (
+        is_suppressed(
+            address="any@acme.com",
+            kind=EmailKind.DEPLOY_FAILURE,
+            suppression_lookup=lookup,
+        )
+        is False
+    )
 
 
 # ---- send + suppression interaction --------------------------------
@@ -217,7 +244,8 @@ def test_send_short_circuits_on_suppression():
     provider quota + reputation."""
     sent: list[Email] = []
     set_transport(
-        kind=TransportKind.AWS_SES, fn=lambda e: sent.append(e),
+        kind=TransportKind.AWS_SES,
+        fn=lambda e: sent.append(e),
     )
     entry = _entry("dead@nowhere.com", SuppressionReason.HARD_BOUNCE)
     lookup = lambda a: entry if a == "dead@nowhere.com" else None
@@ -232,7 +260,8 @@ def test_send_short_circuits_on_suppression():
 def test_send_passes_through_for_unsuppressed_address():
     sent: list[Email] = []
     set_transport(
-        kind=TransportKind.AWS_SES, fn=lambda e: sent.append(e),
+        kind=TransportKind.AWS_SES,
+        fn=lambda e: sent.append(e),
     )
     send(email=_email(), suppression_lookup=lambda a: None)
     assert len(sent) == 1

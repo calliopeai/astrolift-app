@@ -105,9 +105,7 @@ class FederationCapability(str, Enum):
 # ---- trust record --------------------------------------------------
 
 
-_INSTALL_ID_RE = re.compile(
-    r"^[a-z0-9]([a-z0-9.-]{1,253}[a-z0-9])$"
-)
+_INSTALL_ID_RE = re.compile(r"^[a-z0-9]([a-z0-9.-]{1,253}[a-z0-9])$")
 """Install identifiers are DNS zones (per memory). RFC 1035
 hostname rules apply."""
 
@@ -118,9 +116,7 @@ def normalize_install_id(*, value: str) -> str:
     JWT verification + revocation checks."""
     canonical = value.strip(".").lower()
     if not canonical or not _INSTALL_ID_RE.match(canonical):
-        raise FederationError(
-            f"install identifier {value!r} is not a valid DNS zone"
-        )
+        raise FederationError(f"install identifier {value!r} is not a valid DNS zone")
     return canonical
 
 
@@ -160,19 +156,13 @@ class FederationTrust:
         local = normalize_install_id(value=self.local_install)
         remote = normalize_install_id(value=self.remote_install)
         if local == remote:
-            raise FederationError(
-                f"install {local!r} cannot federate with itself"
-            )
+            raise FederationError(f"install {local!r} cannot federate with itself")
         if not self.capabilities:
-            raise FederationError(
-                "trust must grant at least one capability"
-            )
+            raise FederationError("trust must grant at least one capability")
         if not self.jwks_url:
             raise FederationError("jwks_url is required")
         if self.expires_at_unix <= self.granted_at_unix:
-            raise FederationError(
-                "expires_at_unix must be > granted_at_unix"
-            )
+            raise FederationError("expires_at_unix must be > granted_at_unix")
 
 
 # ---- trust validity ------------------------------------------------
@@ -187,14 +177,9 @@ MAX_TRUST_TTL_SECONDS = 5 * 365 * 86400
 
 def validate_trust_ttl(*, seconds: int) -> int:
     if seconds <= 0:
-        raise FederationError(
-            f"trust TTL must be positive, got {seconds}s"
-        )
+        raise FederationError(f"trust TTL must be positive, got {seconds}s")
     if seconds > MAX_TRUST_TTL_SECONDS:
-        raise FederationError(
-            f"trust TTL {seconds}s exceeds maximum "
-            f"{MAX_TRUST_TTL_SECONDS}s (5 years)"
-        )
+        raise FederationError(f"trust TTL {seconds}s exceeds maximum " f"{MAX_TRUST_TTL_SECONDS}s (5 years)")
     return seconds
 
 
@@ -326,15 +311,14 @@ HANDSHAKE_ORDER = (
 
 
 def next_handshake_step(
-    *, current: HandshakeStep,
+    *,
+    current: HandshakeStep,
 ) -> HandshakeStep | None:
     """Returns the next step or None when at the end."""
     try:
         idx = HANDSHAKE_ORDER.index(current)
     except ValueError as exc:
-        raise FederationError(
-            f"unknown handshake step {current!r}"
-        ) from exc
+        raise FederationError(f"unknown handshake step {current!r}") from exc
     if idx + 1 >= len(HANDSHAKE_ORDER):
         return None
     return HANDSHAKE_ORDER[idx + 1]
@@ -406,13 +390,9 @@ class ChallengeResponse:
 
     def __post_init__(self) -> None:
         if not self.iss or not self.nonce or not self.signed_peer_nonce:
-            raise FederationError(
-                "ChallengeResponse requires iss, nonce, signed_peer_nonce"
-            )
+            raise FederationError("ChallengeResponse requires iss, nonce, signed_peer_nonce")
         if not self.fingerprint:
-            raise FederationError(
-                "ChallengeResponse requires fingerprint for OOB confirm"
-            )
+            raise FederationError("ChallengeResponse requires fingerprint for OOB confirm")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -436,22 +416,13 @@ def verify_handshake_pair(
     verification is delegated to the activity layer (which holds
     the keys); this module checks the structural binding."""
     if local_hello.iss == remote_response.iss:
-        raise FederationError(
-            "remote response iss must differ from local hello iss"
-        )
+        raise FederationError("remote response iss must differ from local hello iss")
     if not remote_response.granted_capabilities:
-        raise FederationError(
-            "remote granted no capabilities — operator declined; "
-            "handshake aborts"
-        )
-    bad = (
-        set(remote_response.granted_capabilities)
-        - set(local_hello.requested_capabilities)
-    )
+        raise FederationError("remote granted no capabilities — operator declined; " "handshake aborts")
+    bad = set(remote_response.granted_capabilities) - set(local_hello.requested_capabilities)
     if bad:
         raise FederationError(
-            f"remote granted capabilities not in request: "
-            f"{sorted(c.value for c in bad)}"
+            f"remote granted capabilities not in request: " f"{sorted(c.value for c in bad)}"
         )
 
 
@@ -518,18 +489,13 @@ def build_federated_claims(
     iss_norm = normalize_install_id(value=iss)
     aud_norm = normalize_install_id(value=aud)
     if iss_norm == aud_norm:
-        raise FederationError(
-            "iss and aud must differ — federated request to self "
-            "is meaningless"
-        )
+        raise FederationError("iss and aud must differ — federated request to self " "is meaningless")
     if not jti:
         raise FederationError("jti is required")
     if not sub:
         raise FederationError("sub is required (audit trail)")
     if ttl_seconds <= 0 or ttl_seconds > JWT_TTL_SECONDS:
-        raise FederationError(
-            f"ttl_seconds must be in (0, {JWT_TTL_SECONDS}]"
-        )
+        raise FederationError(f"ttl_seconds must be in (0, {JWT_TTL_SECONDS}]")
     return FederatedRequestClaims(
         iss=iss_norm,
         aud=aud_norm,
@@ -589,10 +555,7 @@ def verify_federated_request(
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.AUDIENCE_MISMATCH,
-            reason=(
-                f"claim audience {claims.aud!r} != this install "
-                f"{local!r}"
-            ),
+            reason=(f"claim audience {claims.aud!r} != this install " f"{local!r}"),
         )
 
     if now_unix < claims.nbf - CLOCK_SKEW_SECONDS:
@@ -614,27 +577,21 @@ def verify_federated_request(
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.NO_TRUST,
-            reason=(
-                f"no trust granted from {local!r} to {claims.iss!r}"
-            ),
+            reason=(f"no trust granted from {local!r} to {claims.iss!r}"),
         )
 
     if trust.is_revoked:
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.TRUST_REVOKED,
-            reason=(
-                f"trust revoked: {trust.revoke_reason or 'no reason'}"
-            ),
+            reason=(f"trust revoked: {trust.revoke_reason or 'no reason'}"),
         )
 
     if now_unix >= trust.expires_at_unix:
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.TRUST_EXPIRED,
-            reason=(
-                f"trust expired at {trust.expires_at_unix}; renew"
-            ),
+            reason=(f"trust expired at {trust.expires_at_unix}; renew"),
         )
 
     if claims.capability not in trust.capabilities:
@@ -747,25 +704,20 @@ class FederationSyncSetting:
         local = normalize_install_id(value=self.local_install)
         peer = normalize_install_id(value=self.peer_install)
         if local == peer:
-            raise FederationError(
-                "sync setting requires distinct local + peer"
-            )
+            raise FederationError("sync setting requires distinct local + peer")
         if self.mode == FederationSyncMode.AUTO_PULL:
             interval = self.pull_interval_seconds or DEFAULT_PULL_INTERVAL_SECONDS
             if interval < MIN_PULL_INTERVAL_SECONDS:
                 raise FederationError(
-                    f"pull interval {interval}s below minimum "
-                    f"{MIN_PULL_INTERVAL_SECONDS}s"
+                    f"pull interval {interval}s below minimum " f"{MIN_PULL_INTERVAL_SECONDS}s"
                 )
             if interval > MAX_PULL_INTERVAL_SECONDS:
                 raise FederationError(
-                    f"pull interval {interval}s exceeds maximum "
-                    f"{MAX_PULL_INTERVAL_SECONDS}s"
+                    f"pull interval {interval}s exceeds maximum " f"{MAX_PULL_INTERVAL_SECONDS}s"
                 )
         elif self.pull_interval_seconds:
             raise FederationError(
-                f"pull_interval_seconds set but mode is "
-                f"{self.mode.value} — only AUTO_PULL uses it"
+                f"pull_interval_seconds set but mode is " f"{self.mode.value} — only AUTO_PULL uses it"
             )
 
 
@@ -778,7 +730,8 @@ def is_auto_sync_enabled(*, setting: FederationSyncSetting) -> bool:
     """Convenience for the activity layer to skip the auto-sync
     workflow when operator hasn't opted in."""
     return setting.mode in (
-        FederationSyncMode.AUTO_PUSH, FederationSyncMode.AUTO_PULL,
+        FederationSyncMode.AUTO_PUSH,
+        FederationSyncMode.AUTO_PULL,
     )
 
 
@@ -843,10 +796,6 @@ def filter_discovery_response(
     industries) have a single point of insertion.
     """
     # Defensive: refuse self-discovery
-    if normalize_install_id(value=requestor_install) == normalize_install_id(
-        value=granting_install
-    ):
-        raise FederationError(
-            "discovery response from self — should never happen"
-        )
+    if normalize_install_id(value=requestor_install) == normalize_install_id(value=granting_install):
+        raise FederationError("discovery response from self — should never happen")
     return tuple(apps)

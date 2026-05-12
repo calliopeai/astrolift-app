@@ -110,8 +110,8 @@ def test_validate_app_namespace_composes_and_validates():
 
 def test_validate_app_namespace_rejects_overlong_composition():
     """Individual parts may be valid; the composition exceeds 63 chars."""
-    long_org = "o" + "r" * 38   # 39 chars
-    long_app = "a" + "p" * 31   # 32 chars
+    long_org = "o" + "r" * 38  # 39 chars
+    long_app = "a" + "p" * 31  # 32 chars
     # Both pass individually
     ORG_SLUG.validate(long_org)
     APP_NAME.validate(long_app)
@@ -122,16 +122,12 @@ def test_validate_app_namespace_rejects_overlong_composition():
 
 def test_validate_app_subdomain_prod_omits_env_label():
     """Convention: prod gets the bare app label; previews get app-env."""
-    fqdn = validate_app_subdomain(
-        app_name="api", env_name="prod", base_zone="acme.com"
-    )
+    fqdn = validate_app_subdomain(app_name="api", env_name="prod", base_zone="acme.com")
     assert fqdn == "api.acme.com"
 
 
 def test_validate_app_subdomain_preview_includes_env():
-    fqdn = validate_app_subdomain(
-        app_name="api", env_name="pr-42", base_zone="acme.com"
-    )
+    fqdn = validate_app_subdomain(app_name="api", env_name="pr-42", base_zone="acme.com")
     assert fqdn == "api-pr-42.acme.com"
 
 
@@ -142,9 +138,7 @@ def test_validate_app_subdomain_rejects_label_overflow():
     APP_NAME.validate(long_app)
     ENV_NAME.validate(long_env)
     # 32 + 1 + 24 = 57 → fits
-    fqdn = validate_app_subdomain(
-        app_name=long_app, env_name=long_env, base_zone="x.com"
-    )
+    fqdn = validate_app_subdomain(app_name=long_app, env_name=long_env, base_zone="x.com")
     assert fqdn.startswith(long_app + "-" + long_env)
 
 
@@ -153,23 +147,27 @@ def test_validate_app_subdomain_rejects_label_overflow():
 
 def test_validate_all_collects_every_violation():
     """CI contract: contributor sees all their naming bugs at once."""
-    violations = validate_all([
-        (ORG_SLUG, "good-org"),
-        (APP_NAME, "Bad_App"),         # bad
-        (DNS_LABEL, "ok-label"),
-        (S3_BUCKET, "ab"),              # bad (too short)
-        (K8S_NAMESPACE, "good"),
-    ])
+    violations = validate_all(
+        [
+            (ORG_SLUG, "good-org"),
+            (APP_NAME, "Bad_App"),  # bad
+            (DNS_LABEL, "ok-label"),
+            (S3_BUCKET, "ab"),  # bad (too short)
+            (K8S_NAMESPACE, "good"),
+        ]
+    )
     assert len(violations) == 2
     rule_names = {v.rule_name for v in violations}
     assert rule_names == {"app_name", "s3_bucket"}
 
 
 def test_validate_all_empty_when_all_pass():
-    violations = validate_all([
-        (ORG_SLUG, "acme"),
-        (APP_NAME, "api"),
-    ])
+    violations = validate_all(
+        [
+            (ORG_SLUG, "acme"),
+            (APP_NAME, "api"),
+        ]
+    )
     assert violations == []
 
 

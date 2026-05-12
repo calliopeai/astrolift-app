@@ -48,9 +48,7 @@ def normalize_timeout(timeout_seconds: int | None) -> int:
     if timeout_seconds is None:
         return DEFAULT_COMMAND_TIMEOUT_SECONDS
     if timeout_seconds <= 0:
-        raise CommandRunError(
-            f"timeout_seconds must be positive, got {timeout_seconds}"
-        )
+        raise CommandRunError(f"timeout_seconds must be positive, got {timeout_seconds}")
     if timeout_seconds > MAX_COMMAND_TIMEOUT_SECONDS:
         return MAX_COMMAND_TIMEOUT_SECONDS
     return timeout_seconds
@@ -98,9 +96,7 @@ def plan_job_spec(
     ``cmd-<app>-<run_id>`` so an operator can find it via kubectl
     by run id."""
     if not app_slug or not namespace or not image:
-        raise CommandRunError(
-            "app_slug, namespace, image are all required"
-        )
+        raise CommandRunError("app_slug, namespace, image are all required")
     if not command:
         raise CommandRunError("command must not be empty")
     if not run_id:
@@ -184,8 +180,7 @@ def assert_no_concurrent_run(
     if allow_concurrent:
         return
     in_flight = [
-        r for r in in_flight_runs
-        if r.status in (CommandRunStatus.PENDING, CommandRunStatus.RUNNING)
+        r for r in in_flight_runs if r.status in (CommandRunStatus.PENDING, CommandRunStatus.RUNNING)
     ]
     if in_flight:
         raise ConcurrencyError(

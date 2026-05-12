@@ -20,9 +20,7 @@ from core.permissions import Permission
 pytestmark = pytest.mark.django_db
 
 
-def test_start_deployment_persists_ci_metadata(
-    org, app, env, fake_info, permission_resolver
-):
+def test_start_deployment_persists_ci_metadata(org, app, env, fake_info, permission_resolver):
     """The StartDeploymentInput accepts every CI field as optional;
     when set, they land on the Deployment row verbatim."""
     permission_resolver.grant(Permission.APP_DEPLOY)
@@ -54,9 +52,7 @@ def test_start_deployment_persists_ci_metadata(
     assert d.ci_provider == "github_actions"
 
 
-def test_manual_deployment_leaves_ci_metadata_empty(
-    org, app, env, fake_info, permission_resolver
-):
+def test_manual_deployment_leaves_ci_metadata_empty(org, app, env, fake_info, permission_resolver):
     """The fields are optional. A UI deploy that doesn't set them
     persists empty strings — DEFINITELY not nulls or 'N/A' — so
     queries don't have to coalesce."""

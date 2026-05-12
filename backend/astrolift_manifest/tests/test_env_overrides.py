@@ -156,8 +156,10 @@ def test_toleration_exists_with_empty_key_allowed():
 def test_toleration_invalid_effect_rejected():
     with pytest.raises(EnvOverrideError, match="effect"):
         Toleration(
-            key="x", operator=TolerationOperator.EQUAL,
-            value="y", effect="Banish",  # not a real k8s effect
+            key="x",
+            operator=TolerationOperator.EQUAL,
+            value="y",
+            effect="Banish",  # not a real k8s effect
         )
 
 
@@ -165,16 +167,21 @@ def test_toleration_seconds_only_with_no_execute():
     """K8s API: tolerationSeconds only meaningful for NoExecute."""
     with pytest.raises(EnvOverrideError, match="NoExecute"):
         Toleration(
-            key="x", operator=TolerationOperator.EQUAL,
-            value="y", effect="NoSchedule", toleration_seconds=60,
+            key="x",
+            operator=TolerationOperator.EQUAL,
+            value="y",
+            effect="NoSchedule",
+            toleration_seconds=60,
         )
 
 
 def test_toleration_seconds_negative_rejected():
     with pytest.raises(EnvOverrideError, match="non-negative"):
         Toleration(
-            key="x", operator=TolerationOperator.EXISTS,
-            effect="NoExecute", toleration_seconds=-1,
+            key="x",
+            operator=TolerationOperator.EXISTS,
+            effect="NoExecute",
+            toleration_seconds=-1,
         )
 
 
@@ -182,10 +189,14 @@ def test_toleration_seconds_negative_rejected():
 
 
 def test_parse_toleration_full_form():
-    t = parse_toleration({
-        "key": "dedicated", "operator": "Equal",
-        "value": "batch", "effect": "NoSchedule",
-    })
+    t = parse_toleration(
+        {
+            "key": "dedicated",
+            "operator": "Equal",
+            "value": "batch",
+            "effect": "NoSchedule",
+        }
+    )
     assert t.key == "dedicated"
     assert t.operator == TolerationOperator.EQUAL
 
@@ -203,10 +214,14 @@ def test_parse_toleration_rejects_bad_operator():
 
 def test_parse_toleration_seconds_must_be_int():
     with pytest.raises(EnvOverrideError, match="int"):
-        parse_toleration({
-            "key": "x", "operator": "Exists",
-            "effect": "NoExecute", "toleration_seconds": "300",  # string
-        })
+        parse_toleration(
+            {
+                "key": "x",
+                "operator": "Exists",
+                "effect": "NoExecute",
+                "toleration_seconds": "300",  # string
+            }
+        )
 
 
 def test_parse_toleration_rejects_non_mapping():
@@ -242,8 +257,10 @@ def test_render_exists_omits_value():
 
 def test_render_includes_effect_when_set():
     t = Toleration(
-        key="x", operator=TolerationOperator.EQUAL,
-        value="y", effect="NoSchedule",
+        key="x",
+        operator=TolerationOperator.EQUAL,
+        value="y",
+        effect="NoSchedule",
     )
     out = render_tolerations_for_pod((t,))
     assert out[0]["effect"] == "NoSchedule"

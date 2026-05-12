@@ -65,10 +65,7 @@ def required_scope_for_path(*, path: str) -> ScimScope:
         return ScimScope.USERS
     if path.startswith(_SCIM_2_0_GROUP_PATHS):
         return ScimScope.GROUPS
-    raise ScimTokenError(
-        f"path {path!r} doesn't map to a SCIM 2.0 resource — "
-        "expected /Users or /Groups"
-    )
+    raise ScimTokenError(f"path {path!r} doesn't map to a SCIM 2.0 resource — " "expected /Users or /Groups")
 
 
 def has_scope(
@@ -168,7 +165,8 @@ def verify_token(
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.NOT_FOUND,
-            token_id=None, org_id=None,
+            token_id=None,
+            org_id=None,
         )
 
     record = lookup_by_hash(_hash(plaintext))
@@ -176,39 +174,42 @@ def verify_token(
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.NOT_FOUND,
-            token_id=None, org_id=None,
+            token_id=None,
+            org_id=None,
         )
 
     if record.is_revoked:
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.REVOKED,
-            token_id=record.token_id, org_id=record.org_id,
+            token_id=record.token_id,
+            org_id=record.org_id,
         )
 
-    if (
-        record.expires_at_unix is not None
-        and now_unix >= record.expires_at_unix
-    ):
+    if record.expires_at_unix is not None and now_unix >= record.expires_at_unix:
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.EXPIRED,
-            token_id=record.token_id, org_id=record.org_id,
+            token_id=record.token_id,
+            org_id=record.org_id,
         )
 
     if not has_scope(
-        token_scopes=record.scopes, required=required_scope,
+        token_scopes=record.scopes,
+        required=required_scope,
     ):
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.INSUFFICIENT_SCOPE,
-            token_id=record.token_id, org_id=record.org_id,
+            token_id=record.token_id,
+            org_id=record.org_id,
         )
 
     return VerifyDecision(
         accepted=True,
         result=VerifyResult.OK,
-        token_id=record.token_id, org_id=record.org_id,
+        token_id=record.token_id,
+        org_id=record.org_id,
     )
 
 
@@ -220,10 +221,7 @@ def validate_scopes_input(*, scopes: Sequence[str]) -> tuple[ScimScope, ...]:
     Empty list rejected — a no-scope token can't access anything,
     almost certainly a bug."""
     if not scopes:
-        raise ScimTokenError(
-            "scopes is required; at least one of "
-            f"{[s.value for s in ScimScope]}"
-        )
+        raise ScimTokenError("scopes is required; at least one of " f"{[s.value for s in ScimScope]}")
     out: list[ScimScope] = []
     seen: set[ScimScope] = set()
     for raw in scopes:
@@ -231,8 +229,7 @@ def validate_scopes_input(*, scopes: Sequence[str]) -> tuple[ScimScope, ...]:
             scope = ScimScope(raw)
         except ValueError as exc:
             raise ScimTokenError(
-                f"unknown SCIM scope {raw!r}; known: "
-                f"{[s.value for s in ScimScope]}"
+                f"unknown SCIM scope {raw!r}; known: " f"{[s.value for s in ScimScope]}"
             ) from exc
         if scope not in seen:
             seen.add(scope)
@@ -248,9 +245,7 @@ def validate_token_name(*, name: str) -> str:
     if not name:
         raise ScimTokenError("token name is required")
     if len(name) > 64:
-        raise ScimTokenError(
-            f"token name {name!r} exceeds 64 chars"
-        )
+        raise ScimTokenError(f"token name {name!r} exceeds 64 chars")
     return name
 
 
@@ -277,9 +272,7 @@ def is_rate_limited(
     1-minute window. Caller resets/advances the window when the
     minute rolls over."""
     if window.rate_limit <= 0:
-        raise ScimTokenError(
-            f"rate_limit must be positive, got {window.rate_limit}"
-        )
+        raise ScimTokenError(f"rate_limit must be positive, got {window.rate_limit}")
     # Window expired = caller will reset; not rate-limited
     if now_unix - window.window_started_unix >= 60:
         return False
@@ -287,7 +280,9 @@ def is_rate_limited(
 
 
 def remaining_in_window(
-    *, window: RateLimitWindow, now_unix: int,
+    *,
+    window: RateLimitWindow,
+    now_unix: int,
 ) -> int:
     """For Retry-After header rendering."""
     if now_unix - window.window_started_unix >= 60:

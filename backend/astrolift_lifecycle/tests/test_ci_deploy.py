@@ -76,7 +76,8 @@ def test_image_tags_accepts_subset():
 def test_image_tags_rejects_empty_map():
     with pytest.raises(CiDeployError):
         validate_image_tags(
-            workload_tags={}, declared_workloads=("web",),
+            workload_tags={},
+            declared_workloads=("web",),
         )
 
 
@@ -131,9 +132,13 @@ def test_commit_sha_non_hex_rejected():
 
 
 def test_environment_known():
-    assert validate_environment(
-        name="prod", registered_envs=("prod", "staging"),
-    ) == "prod"
+    assert (
+        validate_environment(
+            name="prod",
+            registered_envs=("prod", "staging"),
+        )
+        == "prod"
+    )
 
 
 def test_environment_typo_rejected():
@@ -141,7 +146,8 @@ def test_environment_typo_rejected():
     if not validated."""
     with pytest.raises(CiDeployError, match="not registered"):
         validate_environment(
-            name="preod", registered_envs=("prod", "staging"),
+            name="preod",
+            registered_envs=("prod", "staging"),
         )
 
 
@@ -153,12 +159,15 @@ def test_environment_empty_rejected():
 # ---- trigger kind --------------------------------------------------
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("ci", TriggerKind.CI),
-    ("manual_cli", TriggerKind.MANUAL_CLI),
-    ("webhook_scm", TriggerKind.WEBHOOK_SCM),
-    ("scheduled", TriggerKind.SCHEDULED),
-])
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("ci", TriggerKind.CI),
+        ("manual_cli", TriggerKind.MANUAL_CLI),
+        ("webhook_scm", TriggerKind.WEBHOOK_SCM),
+        ("scheduled", TriggerKind.SCHEDULED),
+    ],
+)
 def test_trigger_kind_known(raw, expected):
     assert validate_trigger_kind(value=raw) == expected
 
@@ -209,8 +218,10 @@ def test_parse_request_default_trigger_kind_is_ci():
     body = _body()
     del body["trigger_kind"]
     req = parse_request(
-        app_slug="acme", raw_body=body,
-        declared_workloads=("web",), registered_envs=("prod",),
+        app_slug="acme",
+        raw_body=body,
+        declared_workloads=("web",),
+        registered_envs=("prod",),
     )
     assert req.trigger_kind == TriggerKind.CI
 
@@ -218,16 +229,20 @@ def test_parse_request_default_trigger_kind_is_ci():
 def test_parse_request_rejects_non_dict():
     with pytest.raises(CiDeployError, match="JSON object"):
         parse_request(
-            app_slug="acme", raw_body="not a dict",  # type: ignore[arg-type]
-            declared_workloads=("web",), registered_envs=("prod",),
+            app_slug="acme",
+            raw_body="not a dict",  # type: ignore[arg-type]
+            declared_workloads=("web",),
+            registered_envs=("prod",),
         )
 
 
 def test_parse_request_rejects_empty_app_slug():
     with pytest.raises(CiDeployError):
         parse_request(
-            app_slug="", raw_body=_body(),
-            declared_workloads=("web",), registered_envs=("prod",),
+            app_slug="",
+            raw_body=_body(),
+            declared_workloads=("web",),
+            registered_envs=("prod",),
         )
 
 
@@ -297,12 +312,16 @@ def test_workflow_id_includes_app_slug():
 def test_workflow_id_image_tag_order_independent():
     """{web, worker} vs {worker, web} → same ID. Tags sorted
     internally."""
-    a = workflow_id_for(request=_req(
-        image_tags={"web": "a" * 12, "worker": "b" * 12},
-    ))
-    b = workflow_id_for(request=_req(
-        image_tags={"worker": "b" * 12, "web": "a" * 12},
-    ))
+    a = workflow_id_for(
+        request=_req(
+            image_tags={"web": "a" * 12, "worker": "b" * 12},
+        )
+    )
+    b = workflow_id_for(
+        request=_req(
+            image_tags={"worker": "b" * 12, "web": "a" * 12},
+        )
+    )
     assert a == b
 
 
@@ -316,7 +335,8 @@ def test_polling_url_format():
 
 def test_polling_url_custom_base():
     url = polling_url_for(
-        workflow_id="x", api_base="/api/v2",
+        workflow_id="x",
+        api_base="/api/v2",
     )
     assert url.startswith("/api/v2/")
 
@@ -332,17 +352,16 @@ def test_build_handle():
 
 def test_ci_rate_limit_higher_than_manual():
     """CI tokens get higher RPM than operator-at-keyboard."""
-    assert (
-        rate_limit_for(kind=TriggerKind.CI)
-        > rate_limit_for(kind=TriggerKind.MANUAL_CLI)
-    )
+    assert rate_limit_for(kind=TriggerKind.CI) > rate_limit_for(kind=TriggerKind.MANUAL_CLI)
 
 
 def test_scheduled_rate_limit_lowest():
     """Scheduled triggers shouldn't burst — they're deterministic."""
     scheduled = rate_limit_for(kind=TriggerKind.SCHEDULED)
     for kind in [
-        TriggerKind.CI, TriggerKind.MANUAL_CLI, TriggerKind.WEBHOOK_SCM,
+        TriggerKind.CI,
+        TriggerKind.MANUAL_CLI,
+        TriggerKind.WEBHOOK_SCM,
     ]:
         assert scheduled <= rate_limit_for(kind=kind)
 

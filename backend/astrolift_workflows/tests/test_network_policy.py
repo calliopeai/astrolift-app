@@ -18,7 +18,8 @@ from astrolift_workflows.activities.network_policy import (
 
 def test_ingress_only_from_ingress_controller():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
     )
     ingress = out["spec"]["ingress"]
@@ -29,7 +30,8 @@ def test_ingress_only_from_ingress_controller():
 
 def test_ingress_namespace_label_overridable():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
         ingress_namespace_label="custom.io/ingress",
     )
@@ -43,11 +45,13 @@ def test_ingress_namespace_label_overridable():
 def test_egress_always_allows_dns():
     """Without DNS, pods can't resolve anything — always allow it."""
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
     )
     dns_rules = [
-        e for e in out["spec"]["egress"]
+        e
+        for e in out["spec"]["egress"]
         if any(
             "namespaceSelector" in t and t["namespaceSelector"]["matchLabels"].get("k8s-app") == "kube-dns"
             for t in e.get("to", [])
@@ -61,7 +65,8 @@ def test_egress_always_allows_dns():
 
 def test_egress_includes_managed_service_cidrs():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
         managed_service_cidrs=[
             ManagedServiceCIDR(name="main-db", cidr="10.20.0.0/24", port=5432),
@@ -76,13 +81,11 @@ def test_egress_includes_managed_service_cidrs():
 def test_egress_includes_allowlist_cidrs():
     policy = EgressPolicy(allowed_cidrs=("203.0.113.0/24",))
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=policy,
     )
-    allowlist = [
-        r for r in out["spec"]["egress"]
-        if r.get("to") == [{"ipBlock": {"cidr": "203.0.113.0/24"}}]
-    ]
+    allowlist = [r for r in out["spec"]["egress"] if r.get("to") == [{"ipBlock": {"cidr": "203.0.113.0/24"}}]]
     assert len(allowlist) == 1
 
 
@@ -91,16 +94,15 @@ def test_internet_https_excludes_internal_cidrs():
     or other tenants. Use NetworkPolicy 'except' to carve out the
     deny floor from 0.0.0.0/0."""
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
         allow_internet_https=True,
     )
     https_rules = [
-        r for r in out["spec"]["egress"]
-        if any(
-            t.get("ipBlock", {}).get("cidr") == "0.0.0.0/0"
-            for t in r.get("to", [])
-        )
+        r
+        for r in out["spec"]["egress"]
+        if any(t.get("ipBlock", {}).get("cidr") == "0.0.0.0/0" for t in r.get("to", []))
     ]
     assert len(https_rules) == 1
     block = https_rules[0]["to"][0]["ipBlock"]
@@ -112,14 +114,14 @@ def test_internet_https_excludes_internal_cidrs():
 
 def test_internet_https_can_be_disabled():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
         allow_internet_https=False,
     )
     rules = out["spec"]["egress"]
     https = [
-        r for r in rules
-        if any(t.get("ipBlock", {}).get("cidr") == "0.0.0.0/0" for t in r.get("to", []))
+        r for r in rules if any(t.get("ipBlock", {}).get("cidr") == "0.0.0.0/0" for t in r.get("to", []))
     ]
     assert https == []
 
@@ -129,7 +131,8 @@ def test_internet_https_can_be_disabled():
 
 def test_metadata_has_app_label_and_managed_by():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
     )
     labels = out["metadata"]["labels"]
@@ -139,7 +142,8 @@ def test_metadata_has_app_label_and_managed_by():
 
 def test_pod_selector_targets_app_label():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
     )
     assert out["spec"]["podSelector"] == {"matchLabels": {"app": "api"}}
@@ -147,7 +151,8 @@ def test_pod_selector_targets_app_label():
 
 def test_policy_types_includes_both_directions():
     out = render_network_policy(
-        namespace="acme-api", app_label="api",
+        namespace="acme-api",
+        app_label="api",
         egress_policy=EgressPolicy(),
     )
     assert out["spec"]["policyTypes"] == ["Ingress", "Egress"]
@@ -156,12 +161,14 @@ def test_policy_types_includes_both_directions():
 def test_rejects_empty_namespace_or_app():
     with pytest.raises(ValueError):
         render_network_policy(
-            namespace="", app_label="api",
+            namespace="",
+            app_label="api",
             egress_policy=EgressPolicy(),
         )
     with pytest.raises(ValueError):
         render_network_policy(
-            namespace="ns", app_label="",
+            namespace="ns",
+            app_label="",
             egress_policy=EgressPolicy(),
         )
 
