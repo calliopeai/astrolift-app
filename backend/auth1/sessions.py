@@ -525,14 +525,31 @@ class Auth1SessionWorkflow:
             if key in auth0_token:
                 del auth0_token[key]
 
-        user_info = UserInfo(**auth0_token["userinfo"])
+        # Different OIDC providers ship different claims in the userinfo
+        # response — Auth0 stays close to the OpenID Connect core set,
+        # while Cognito sprinkles in things like at_hash, cognito:groups,
+        # cognito:username, origin_jti, identities, token_use, auth_time,
+        # jti. Filter to fields UserInfo actually declares so unknown
+        # claims (now or in the future) don't crash callback().
+        _userinfo_fields = {
+            f.name for f in UserInfo._meta.get_fields() if hasattr(f, "attname")
+        }
+        _raw_userinfo = auth0_token.get("userinfo") or {}
+        _filtered = {k: v for k, v in _raw_userinfo.items() if k in _userinfo_fields}
+        user_info = UserInfo(**_filtered)
         user_info.internal_user = cls._lookup_user(user_info)
         user_info.save()
 
         if not user_info.email_verified:
             raise EmailNotVerifiedException(f'Email not verified for user: {user_info.email}')
 
-        authentication_dict = dict(auth0_token)
+        # Same filtering logic for the Authentication model — providers
+        # ship extras (refresh_token, scope shapes, provider-specific
+        # bookkeeping) the schema doesn't model.
+        _auth_fields = {
+            f.name for f in Authentication._meta.get_fields() if hasattr(f, "attname")
+        }
+        authentication_dict = {k: v for k, v in auth0_token.items() if k in _auth_fields}
         authentication_dict["userinfo"] = user_info
         authentication = Authentication(**authentication_dict)
 
