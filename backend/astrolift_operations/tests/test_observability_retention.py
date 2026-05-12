@@ -118,70 +118,91 @@ def test_hold_rejects_inverted_window():
 
 def test_held_row_inside_window():
     holds = [_hold()]
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 2, tzinfo=UTC),
-        resource_kind="",
-        resource_id="",
-        holds=holds,
-    ) is True
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
+            resource_kind="",
+            resource_id="",
+            holds=holds,
+        )
+        is True
+    )
 
 
 def test_held_row_at_window_boundary_inclusive():
     holds = [_hold()]
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 1, tzinfo=UTC),
-        resource_kind="",
-        resource_id="",
-        holds=holds,
-    ) is True
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 3, tzinfo=UTC),
-        resource_kind="",
-        resource_id="",
-        holds=holds,
-    ) is True
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 1, tzinfo=UTC),
+            resource_kind="",
+            resource_id="",
+            holds=holds,
+        )
+        is True
+    )
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 3, tzinfo=UTC),
+            resource_kind="",
+            resource_id="",
+            holds=holds,
+        )
+        is True
+    )
 
 
 def test_unheld_row_outside_window():
     holds = [_hold()]
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 4, tzinfo=UTC),
-        resource_kind="",
-        resource_id="",
-        holds=holds,
-    ) is False
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 4, tzinfo=UTC),
+            resource_kind="",
+            resource_id="",
+            holds=holds,
+        )
+        is False
+    )
 
 
 def test_hold_scoped_to_resource_kind_and_id():
     holds = [_hold(resource_kind="App", resource_id="42")]
     # different kind → no hold
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 2, tzinfo=UTC),
-        resource_kind="Workload",
-        resource_id="42",
-        holds=holds,
-    ) is False
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
+            resource_kind="Workload",
+            resource_id="42",
+            holds=holds,
+        )
+        is False
+    )
     # same kind, different id → no hold
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 2, tzinfo=UTC),
-        resource_kind="App",
-        resource_id="99",
-        holds=holds,
-    ) is False
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
+            resource_kind="App",
+            resource_id="99",
+            holds=holds,
+        )
+        is False
+    )
     # match → held
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 2, tzinfo=UTC),
-        resource_kind="App",
-        resource_id="42",
-        holds=holds,
-    ) is True
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
+            resource_kind="App",
+            resource_id="42",
+            holds=holds,
+        )
+        is True
+    )
 
 
 def test_wildcard_stream_hold_covers_any_stream():
@@ -189,23 +210,29 @@ def test_wildcard_stream_hold_covers_any_stream():
     'incident, hold everything'."""
     holds = [_hold(stream="*")]
     for s in ALL_STREAMS:
-        assert is_held(
-            stream=s,
-            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
-            resource_kind="",
-            resource_id="",
-            holds=holds,
-        ) is True
+        assert (
+            is_held(
+                stream=s,
+                timestamp=datetime(2026, 5, 2, tzinfo=UTC),
+                resource_kind="",
+                resource_id="",
+                holds=holds,
+            )
+            is True
+        )
 
 
 def test_no_holds_means_unheld():
-    assert is_held(
-        stream="log",
-        timestamp=datetime(2026, 5, 2, tzinfo=UTC),
-        resource_kind="",
-        resource_id="",
-        holds=[],
-    ) is False
+    assert (
+        is_held(
+            stream="log",
+            timestamp=datetime(2026, 5, 2, tzinfo=UTC),
+            resource_kind="",
+            resource_id="",
+            holds=[],
+        )
+        is False
+    )
 
 
 # ---- billing helpers ------------------------------------------------

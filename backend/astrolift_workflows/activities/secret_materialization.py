@@ -132,16 +132,16 @@ def render_external_secret(
     data_entries = []
     for m in mappings:
         if not m.target_key or not m.remote_ref_key:
-            raise ValueError(
-                "ExternalSecretMapping requires target_key and remote_ref_key"
-            )
+            raise ValueError("ExternalSecretMapping requires target_key and remote_ref_key")
         ref = {"key": m.remote_ref_key}
         if m.remote_ref_property:
             ref["property"] = m.remote_ref_property
-        data_entries.append({
-            "secretKey": m.target_key,
-            "remoteRef": ref,
-        })
+        data_entries.append(
+            {
+                "secretKey": m.target_key,
+                "remoteRef": ref,
+            }
+        )
 
     return {
         "apiVersion": "external-secrets.io/v1",
@@ -213,21 +213,21 @@ def materialize(
         if string_data is None:
             raise ValueError("INLINE backend requires string_data")
         return render_inline_secret(
-            name=secret_name, namespace=namespace,
-            string_data=string_data, labels=labels,
+            name=secret_name,
+            namespace=namespace,
+            string_data=string_data,
+            labels=labels,
         )
     if backend == SecretBackend.EXTERNAL_SECRETS_OPERATOR:
         if not external_mappings:
-            raise ValueError(
-                "EXTERNAL_SECRETS_OPERATOR backend requires external_mappings"
-            )
+            raise ValueError("EXTERNAL_SECRETS_OPERATOR backend requires external_mappings")
         if not secret_store:
-            raise ValueError(
-                "EXTERNAL_SECRETS_OPERATOR backend requires secret_store"
-            )
+            raise ValueError("EXTERNAL_SECRETS_OPERATOR backend requires secret_store")
         return render_external_secret(
-            name=secret_name, namespace=namespace,
-            secret_store=secret_store, mappings=external_mappings,
+            name=secret_name,
+            namespace=namespace,
+            secret_store=secret_store,
+            mappings=external_mappings,
             labels=labels,
         )
     raise ValueError(f"unsupported backend {backend!r}")

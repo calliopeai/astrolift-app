@@ -50,9 +50,7 @@ def parse_size(value: str | None) -> Size:
     if value is None or value == "":
         return Size.MEDIUM
     if value not in _KNOWN:
-        raise SizeError(
-            f"size {value!r} not one of {sorted(_KNOWN)}"
-        )
+        raise SizeError(f"size {value!r} not one of {sorted(_KNOWN)}")
     return Size(value)
 
 
@@ -73,9 +71,7 @@ class ManagedServiceSpec:
 
     def __post_init__(self) -> None:
         if not self.native_class and self.size != Size.CUSTOM:
-            raise ValueError(
-                f"native_class required for non-custom size; got {self.size}"
-            )
+            raise ValueError(f"native_class required for non-custom size; got {self.size}")
 
 
 # ---- mapping registry ------------------------------------------------
@@ -89,9 +85,7 @@ def register_size_mapping(spec: ManagedServiceSpec) -> None:
     _MAPPINGS[(spec.plugin_slug, spec.kind, spec.size)] = spec
 
 
-def lookup_size_mapping(
-    *, plugin_slug: str, kind: str, size: Size
-) -> ManagedServiceSpec | None:
+def lookup_size_mapping(*, plugin_slug: str, kind: str, size: Size) -> ManagedServiceSpec | None:
     return _MAPPINGS.get((plugin_slug, kind, size))
 
 
@@ -174,9 +168,7 @@ CostEstimator = Callable[[ManagedServiceSpec], CostEstimate]
 _ESTIMATORS: dict[tuple[str, str], CostEstimator] = {}
 
 
-def register_cost_estimator(
-    *, plugin_slug: str, kind: str, fn: CostEstimator
-) -> None:
+def register_cost_estimator(*, plugin_slug: str, kind: str, fn: CostEstimator) -> None:
     _ESTIMATORS[(plugin_slug, kind)] = fn
 
 

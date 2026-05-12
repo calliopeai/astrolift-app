@@ -32,16 +32,18 @@ class DeliveryMode(str, Enum):
 # Object kinds that always go through GitOps in HYBRID mode (CRDs,
 # cluster-scoped RBAC, namespace-level RBAC). Workload-y objects
 # (Deployment, Service, ConfigMap, Ingress, ...) take the fast path.
-_HYBRID_GITOPS_KINDS: frozenset[str] = frozenset({
-    "CustomResourceDefinition",
-    "ClusterRole",
-    "ClusterRoleBinding",
-    "Role",
-    "RoleBinding",
-    "Namespace",
-    "ResourceQuota",
-    "NetworkPolicy",
-})
+_HYBRID_GITOPS_KINDS: frozenset[str] = frozenset(
+    {
+        "CustomResourceDefinition",
+        "ClusterRole",
+        "ClusterRoleBinding",
+        "Role",
+        "RoleBinding",
+        "Namespace",
+        "ResourceQuota",
+        "NetworkPolicy",
+    }
+)
 
 
 class DeliveryConfigError(ValueError):
@@ -80,7 +82,7 @@ class GitOpsCommitAction:
 
     objects: tuple[Mapping[str, object], ...]
     config: GitOpsConfig
-    syncer: str   # 'argocd' | 'flux' (informational; UI shows status)
+    syncer: str  # 'argocd' | 'flux' (informational; UI shows status)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -117,36 +119,36 @@ def plan_delivery(
 
     if mode in (DeliveryMode.GITOPS_ARGOCD, DeliveryMode.GITOPS_FLUX):
         if gitops_config is None:
-            raise DeliveryConfigError(
-                f"mode {mode.value!r} requires gitops_config"
-            )
+            raise DeliveryConfigError(f"mode {mode.value!r} requires gitops_config")
         syncer = "argocd" if mode == DeliveryMode.GITOPS_ARGOCD else "flux"
-        return DeliveryPlan(gitops=GitOpsCommitAction(
-            objects=objs, config=gitops_config, syncer=syncer,
-        ))
+        return DeliveryPlan(
+            gitops=GitOpsCommitAction(
+                objects=objs,
+                config=gitops_config,
+                syncer=syncer,
+            )
+        )
 
     if mode == DeliveryMode.HYBRID:
-        gitops_objs = tuple(
-            o for o in objs if _kind_of(o) in _HYBRID_GITOPS_KINDS
-        )
-        direct_objs = tuple(
-            o for o in objs if _kind_of(o) not in _HYBRID_GITOPS_KINDS
-        )
+        gitops_objs = tuple(o for o in objs if _kind_of(o) in _HYBRID_GITOPS_KINDS)
+        direct_objs = tuple(o for o in objs if _kind_of(o) not in _HYBRID_GITOPS_KINDS)
         plan = DeliveryPlan()
         if direct_objs:
             plan = dataclasses.replace(
-                plan, direct=DirectApplyAction(objects=direct_objs),
+                plan,
+                direct=DirectApplyAction(objects=direct_objs),
             )
         if gitops_objs:
             if gitops_config is None:
-                raise DeliveryConfigError(
-                    "HYBRID mode with platform-level objects requires gitops_config"
-                )
+                raise DeliveryConfigError("HYBRID mode with platform-level objects requires gitops_config")
             # Hybrid uses ArgoCD by default; operators can override
             # via delivery_config['hybrid_syncer'] in the model.
             plan = dataclasses.replace(
-                plan, gitops=GitOpsCommitAction(
-                    objects=gitops_objs, config=gitops_config, syncer="argocd",
+                plan,
+                gitops=GitOpsCommitAction(
+                    objects=gitops_objs,
+                    config=gitops_config,
+                    syncer="argocd",
                 ),
             )
         return plan

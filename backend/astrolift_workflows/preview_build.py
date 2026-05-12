@@ -108,8 +108,7 @@ def namespace_for_preview(
     """
     if not org_slug or not app_slug or pr_number <= 0:
         raise PreviewBuildError(
-            "namespace_for_preview requires non-empty org_slug, "
-            "app_slug, and positive pr_number"
+            "namespace_for_preview requires non-empty org_slug, " "app_slug, and positive pr_number"
         )
     raw = f"{org_slug}-{app_slug}-pr-{pr_number}"
     if len(raw) > 63:
@@ -120,24 +119,19 @@ def namespace_for_preview(
         budget = 63 - len(org_slug) - 1 - len(suffix)
         if budget <= 0:
             raise PreviewBuildError(
-                f"org_slug {org_slug!r} too long; can't fit a preview "
-                "namespace within 63 chars"
+                f"org_slug {org_slug!r} too long; can't fit a preview " "namespace within 63 chars"
             )
         truncated_app = app_slug[:budget].rstrip("-")
         raw = f"{org_slug}-{truncated_app}{suffix}"
     if not _RFC1123_LABEL_RE.match(raw):
-        raise PreviewBuildError(
-            f"namespace {raw!r} not RFC 1123 valid"
-        )
+        raise PreviewBuildError(f"namespace {raw!r} not RFC 1123 valid")
     return raw
 
 
 def env_slug_for_preview(*, pr_number: int) -> str:
     """Spec §5: ``preview-pr-<n>`` for the AppEnvironment slug."""
     if pr_number <= 0:
-        raise PreviewBuildError(
-            f"pr_number must be positive, got {pr_number}"
-        )
+        raise PreviewBuildError(f"pr_number must be positive, got {pr_number}")
     return f"preview-pr-{pr_number}"
 
 
@@ -152,13 +146,9 @@ def hostname_for_preview(
     SAN ``*.pr.<org>.<base_zone>`` from #70.
     """
     if not base_zone or not org_slug:
-        raise PreviewBuildError(
-            "hostname_for_preview requires base_zone and org_slug"
-        )
+        raise PreviewBuildError("hostname_for_preview requires base_zone and org_slug")
     if pr_number <= 0:
-        raise PreviewBuildError(
-            f"pr_number must be positive, got {pr_number}"
-        )
+        raise PreviewBuildError(f"pr_number must be positive, got {pr_number}")
     return f"pr-{pr_number}.{org_slug}.{base_zone}".lower()
 
 
@@ -192,13 +182,9 @@ class CostContainment:
 
     def __post_init__(self) -> None:
         if not 0 < self.resource_scale <= 1.0:
-            raise PreviewBuildError(
-                f"resource_scale {self.resource_scale} not in (0, 1]"
-            )
+            raise PreviewBuildError(f"resource_scale {self.resource_scale} not in (0, 1]")
         if self.replicas < 0:
-            raise PreviewBuildError(
-                f"replicas {self.replicas} must be non-negative"
-            )
+            raise PreviewBuildError(f"replicas {self.replicas} must be non-negative")
 
 
 def apply_cost_containment(
@@ -220,7 +206,8 @@ def apply_cost_containment(
     for key in ("cpu_request", "cpu_limit", "memory_request", "memory_limit"):
         if key in out:
             out[key] = _scale_resource_value(
-                value=out[key], scale=containment.resource_scale,
+                value=out[key],
+                scale=containment.resource_scale,
             )
     return out
 

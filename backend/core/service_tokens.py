@@ -60,10 +60,10 @@ class ServiceTokenClaims:
     """Decoded claims after verification. The dataclass mirrors the
     JWT payload but with parsed Python types."""
 
-    sub: str   # service identity
-    aud: str   # audience this token is intended for
-    iss: str   # issuer (the install hostname)
-    exp: int   # unix timestamp, seconds
+    sub: str  # service identity
+    aud: str  # audience this token is intended for
+    iss: str  # issuer (the install hostname)
+    exp: int  # unix timestamp, seconds
     iat: int
     jti: str
 

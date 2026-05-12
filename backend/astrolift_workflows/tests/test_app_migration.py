@@ -37,10 +37,14 @@ def _bundle(**overrides) -> ExportBundle:
         secret_refs=("DATABASE_URL", "STRIPE_KEY"),
         managed_services=(
             ManagedServiceVariant(
-                kind="postgres", major_version=15, role="primary_db",
+                kind="postgres",
+                major_version=15,
+                role="primary_db",
             ),
             ManagedServiceVariant(
-                kind="redis", major_version=7, role="cache",
+                kind="redis",
+                major_version=7,
+                role="cache",
             ),
         ),
         deployment_history=(
@@ -111,16 +115,22 @@ def test_build_claims_requires_destination():
     """Audience binding prevents bundle reuse against any install."""
     with pytest.raises(MigrationError, match="destination_instance"):
         build_claims(
-            source_instance="a", destination_instance="",
-            bundle=_bundle(), issued_at_unix=0, jti="j",
+            source_instance="a",
+            destination_instance="",
+            bundle=_bundle(),
+            issued_at_unix=0,
+            jti="j",
         )
 
 
 def test_build_claims_rejects_same_destination():
     with pytest.raises(MigrationError, match="differ from source"):
         build_claims(
-            source_instance="install-a", destination_instance="install-a",
-            bundle=_bundle(), issued_at_unix=0, jti="j",
+            source_instance="install-a",
+            destination_instance="install-a",
+            bundle=_bundle(),
+            issued_at_unix=0,
+            jti="j",
         )
 
 
@@ -129,8 +139,11 @@ def test_build_claims_rejects_oversized_ttl():
     security ceiling — even with explicit intent."""
     with pytest.raises(MigrationError, match="ttl_seconds"):
         build_claims(
-            source_instance="a", destination_instance="b",
-            bundle=_bundle(), issued_at_unix=0, jti="j",
+            source_instance="a",
+            destination_instance="b",
+            bundle=_bundle(),
+            issued_at_unix=0,
+            jti="j",
             ttl_seconds=JWT_TTL_SECONDS + 1,
         )
 
@@ -138,8 +151,11 @@ def test_build_claims_rejects_oversized_ttl():
 def test_build_claims_rejects_zero_ttl():
     with pytest.raises(MigrationError, match="ttl_seconds"):
         build_claims(
-            source_instance="a", destination_instance="b",
-            bundle=_bundle(), issued_at_unix=0, jti="j",
+            source_instance="a",
+            destination_instance="b",
+            bundle=_bundle(),
+            issued_at_unix=0,
+            jti="j",
             ttl_seconds=0,
         )
 
@@ -147,8 +163,11 @@ def test_build_claims_rejects_zero_ttl():
 def test_build_claims_requires_jti():
     with pytest.raises(MigrationError, match="jti"):
         build_claims(
-            source_instance="a", destination_instance="b",
-            bundle=_bundle(), issued_at_unix=0, jti="",
+            source_instance="a",
+            destination_instance="b",
+            bundle=_bundle(),
+            issued_at_unix=0,
+            jti="",
         )
 
 
@@ -242,8 +261,11 @@ def test_verify_rejects_replay():
 def test_verify_rejects_self_target():
     """Operator pointed export at source instance — no-op."""
     claims = build_claims(
-        source_instance="install-a", destination_instance="install-b",
-        bundle=_bundle(), issued_at_unix=0, jti="j",
+        source_instance="install-a",
+        destination_instance="install-b",
+        bundle=_bundle(),
+        issued_at_unix=0,
+        jti="j",
     )
     decision = verify_claims(
         claims=claims,
@@ -262,8 +284,12 @@ def test_verify_same_instance_when_aud_matches_iss():
     # Bypass build_claims via direct construction — build_claims
     # explicitly refuses same-instance.
     claims = BundleJwtClaims(
-        iss="install-a", aud="install-a",
-        iat=10, nbf=10, exp=10 + JWT_TTL_SECONDS, jti="j",
+        iss="install-a",
+        aud="install-a",
+        iat=10,
+        nbf=10,
+        exp=10 + JWT_TTL_SECONDS,
+        jti="j",
         bundle=_bundle(),
     )
     decision = verify_claims(
@@ -351,37 +377,42 @@ def test_plan_import_lineage_stamp():
         target=ImportTargetContext(
             destination_org_slug="acme",
             destination_project_slug="default",
-            org_exists=True, project_exists=True,
+            org_exists=True,
+            project_exists=True,
         ),
     )
-    assert plan.imported_from == (
-        "install-a.platform.example/acme/api"
-    )
+    assert plan.imported_from == ("install-a.platform.example/acme/api")
 
 
 def test_plan_import_picks_most_recent_history_entry():
     """Order in deployment_history isn't guaranteed; resolver
     picks latest by deployed_at_unix."""
-    bundle = _bundle(deployment_history=(
-        DeploymentHistoryEntry(
-            image_digest="sha256:" + "1" * 64,
-            manifest_sha256="x" * 64, deployed_at_unix=1_000,
-        ),
-        DeploymentHistoryEntry(
-            image_digest="sha256:" + "2" * 64,
-            manifest_sha256="y" * 64, deployed_at_unix=3_000,
-        ),
-        DeploymentHistoryEntry(
-            image_digest="sha256:" + "3" * 64,
-            manifest_sha256="z" * 64, deployed_at_unix=2_000,
-        ),
-    ))
+    bundle = _bundle(
+        deployment_history=(
+            DeploymentHistoryEntry(
+                image_digest="sha256:" + "1" * 64,
+                manifest_sha256="x" * 64,
+                deployed_at_unix=1_000,
+            ),
+            DeploymentHistoryEntry(
+                image_digest="sha256:" + "2" * 64,
+                manifest_sha256="y" * 64,
+                deployed_at_unix=3_000,
+            ),
+            DeploymentHistoryEntry(
+                image_digest="sha256:" + "3" * 64,
+                manifest_sha256="z" * 64,
+                deployed_at_unix=2_000,
+            ),
+        )
+    )
     plan = plan_import(
         bundle=bundle,
         target=ImportTargetContext(
             destination_org_slug="acme",
             destination_project_slug="default",
-            org_exists=True, project_exists=True,
+            org_exists=True,
+            project_exists=True,
         ),
     )
     assert plan.first_deploy_image_digest == "sha256:" + "2" * 64
@@ -394,7 +425,8 @@ def test_plan_import_requires_target_slugs():
             target=ImportTargetContext(
                 destination_org_slug="",
                 destination_project_slug="default",
-                org_exists=True, project_exists=True,
+                org_exists=True,
+                project_exists=True,
             ),
         )
     with pytest.raises(MigrationError):
@@ -403,7 +435,8 @@ def test_plan_import_requires_target_slugs():
             target=ImportTargetContext(
                 destination_org_slug="acme",
                 destination_project_slug="",
-                org_exists=True, project_exists=True,
+                org_exists=True,
+                project_exists=True,
             ),
         )
 
@@ -414,11 +447,13 @@ def test_plan_import_requires_target_slugs():
 def test_required_service_kinds_dedupes():
     """Same kind+version twice (e.g. two postgres bindings of the
     same major) → one requirement; B picks one variant."""
-    bundle = _bundle(managed_services=(
-        ManagedServiceVariant(kind="postgres", major_version=15, role="db1"),
-        ManagedServiceVariant(kind="postgres", major_version=15, role="db2"),
-        ManagedServiceVariant(kind="redis", major_version=7, role="cache"),
-    ))
+    bundle = _bundle(
+        managed_services=(
+            ManagedServiceVariant(kind="postgres", major_version=15, role="db1"),
+            ManagedServiceVariant(kind="postgres", major_version=15, role="db2"),
+            ManagedServiceVariant(kind="redis", major_version=7, role="cache"),
+        )
+    )
     out = required_service_kinds(bundle=bundle)
     assert out == (("postgres", 15), ("redis", 7))
 
@@ -434,9 +469,13 @@ def test_missing_secret_refs():
 
 def test_missing_secret_refs_all_present():
     bundle = _bundle(secret_refs=("X",))
-    assert missing_secret_refs(
-        bundle=bundle, secrets_present_on_destination=("X", "Y"),
-    ) == ()
+    assert (
+        missing_secret_refs(
+            bundle=bundle,
+            secrets_present_on_destination=("X", "Y"),
+        )
+        == ()
+    )
 
 
 # ---- freshness helper ----------------------------------------------

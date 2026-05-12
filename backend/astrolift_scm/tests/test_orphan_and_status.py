@@ -33,9 +33,7 @@ def _conn(**overrides):
     org = overrides.pop("organization", None)
     if org is None:
         _org_counter += 1
-        org = Organization.objects.create(
-            name="ACME Corp", slug=f"acme-corp-{_org_counter}"
-        )
+        org = Organization.objects.create(name="ACME Corp", slug=f"acme-corp-{_org_counter}")
     defaults = {
         "kind": SourceConnection.Kind.GITHUB_APP_INSTALL,
         "account_login": "acme-corp-org",
@@ -95,21 +93,24 @@ def test_reconnect_no_op_on_healthy_connection():
 
 def test_installation_deleted_orphans_all_matching_connections():
     _org_counter_global = id(_conn)  # local unique slug for this test
-    org = Organization.objects.create(
-        name="Beta", slug=f"beta-{_org_counter_global}"
-    )
+    org = Organization.objects.create(name="Beta", slug=f"beta-{_org_counter_global}")
     # Vary account_login so the (org, kind, account_login) unique
     # constraint doesn't trip — same install, multiple repo owners.
     a = _conn(
-        organization=org, installation_id="42",
-        account_login="acme-corp-prod", display_name="prod-install",
+        organization=org,
+        installation_id="42",
+        account_login="acme-corp-prod",
+        display_name="prod-install",
     )
     b = _conn(
-        organization=org, installation_id="42",
-        account_login="acme-corp-dr", display_name="dr-install",
+        organization=org,
+        installation_id="42",
+        account_login="acme-corp-dr",
+        display_name="dr-install",
     )
     other = _conn(
-        organization=org, installation_id="999",
+        organization=org,
+        installation_id="999",
         account_login="some-other-org",
     )
 
@@ -165,9 +166,7 @@ def test_deployment_status_maps_to_github_state(deploy_status, gh_state):
 
 
 def test_status_payload_carries_context_and_description():
-    body = deployment_status_to_github(
-        "running", env_name="prod", target_url="https://x"
-    )
+    body = deployment_status_to_github("running", env_name="prod", target_url="https://x")
     assert body["context"] == "astrolift/prod"
     assert "succeeded" in body["description"]
     assert body["target_url"] == "https://x"
@@ -191,9 +190,7 @@ def test_post_commit_status_short_circuits_on_orphaned_connection(monkeypatch):
     mark_connection_orphaned(c, reason="x")
 
     called = {"count": 0}
-    monkeypatch.setattr(
-        "requests.post", lambda *a, **kw: called.__setitem__("count", called["count"] + 1)
-    )
+    monkeypatch.setattr("requests.post", lambda *a, **kw: called.__setitem__("count", called["count"] + 1))
     ok = post_commit_status(
         connection=c,
         owner="acme",

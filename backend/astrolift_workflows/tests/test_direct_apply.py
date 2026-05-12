@@ -95,9 +95,7 @@ class _StubDriver:
         self.diff_was_empty = diff_was_empty
 
     def apply(self, cluster, objects, *, dry_run=False, field_manager=""):
-        self.calls.append(
-            ("apply", cluster, list(objects), dry_run, field_manager)
-        )
+        self.calls.append(("apply", cluster, list(objects), dry_run, field_manager))
         if dry_run:
             return {"dry_run_errors": self.dry_run_errors}
         return {"diff_was_empty": self.diff_was_empty}

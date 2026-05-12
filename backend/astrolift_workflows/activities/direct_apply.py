@@ -39,9 +39,7 @@ FIELD_MANAGER = "astrolift"
 
 def canonical_object_bytes(obj: Mapping[str, object]) -> bytes:
     """Sorted-keys, no-whitespace JSON of one manifest."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode(
-        "utf-8"
-    )
+    return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def manifest_set_sha256(objects: Iterable[Mapping[str, object]]) -> str:
@@ -119,13 +117,19 @@ def apply_with_dry_run(
     snapshot = manifest_set_sha256(objs)
 
     dry_run_errors = _try_dry_run(
-        driver, cluster, objs, field_manager=field_manager,
+        driver,
+        cluster,
+        objs,
+        field_manager=field_manager,
     )
     if dry_run_errors:
         raise DryRunFailed(errors=dry_run_errors)
 
     diff_was_empty = _apply(
-        driver, cluster, objs, field_manager=field_manager,
+        driver,
+        cluster,
+        objs,
+        field_manager=field_manager,
     )
 
     return ApplyResult(
@@ -141,7 +145,10 @@ def _try_dry_run(driver, cluster, objs, *, field_manager: str) -> list[str]:
     anything else."""
     try:
         result = driver.apply(
-            cluster, objs, dry_run=True, field_manager=field_manager,
+            cluster,
+            objs,
+            dry_run=True,
+            field_manager=field_manager,
         )
     except TypeError:
         # Older driver shape — call without kwargs.
@@ -154,7 +161,10 @@ def _try_dry_run(driver, cluster, objs, *, field_manager: str) -> list[str]:
 def _apply(driver, cluster, objs, *, field_manager: str) -> bool:
     try:
         result = driver.apply(
-            cluster, objs, dry_run=False, field_manager=field_manager,
+            cluster,
+            objs,
+            dry_run=False,
+            field_manager=field_manager,
         )
     except TypeError:
         result = driver.apply(cluster, objs)

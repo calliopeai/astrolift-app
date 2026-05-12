@@ -56,9 +56,7 @@ def _description(status: str, env_name: str) -> str:
     return f"{status} on {env_name}"
 
 
-def deployment_status_to_github(
-    status: str, *, env_name: str, target_url: str = ""
-) -> dict[str, Any]:
+def deployment_status_to_github(status: str, *, env_name: str, target_url: str = "") -> dict[str, Any]:
     """Pure: returns the GitHub statuses-API request body.
 
     Caller plugs in the SHA + repo coords + auth and POSTs.

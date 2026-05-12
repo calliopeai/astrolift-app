@@ -140,7 +140,8 @@ def plan_cost_snapshot(
     aggregations would just emit zero rows."""
     if not active_org_ids:
         return CostSnapshotPlan(
-            snapshot_date=snapshot_date, organizations_to_capture=(),
+            snapshot_date=snapshot_date,
+            organizations_to_capture=(),
         )
     return CostSnapshotPlan(
         snapshot_date=snapshot_date,

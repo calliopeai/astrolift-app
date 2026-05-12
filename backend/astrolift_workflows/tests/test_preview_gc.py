@@ -113,7 +113,9 @@ def test_ttl_zero_rejected():
     now = 1_700_000_000
     with pytest.raises(PreviewGcError):
         is_ttl_expired(
-            preview=_preview(now_unix=now), now_unix=now, ttl_days=0,
+            preview=_preview(now_unix=now),
+            now_unix=now,
+            ttl_days=0,
         )
 
 
@@ -143,9 +145,7 @@ def test_evaluate_ttl_skips_young():
 
 def test_evaluate_ttl_returns_all_expired():
     now = 1_700_000_000
-    previews = [
-        _preview(i, age_days=20, now_unix=now) for i in (1, 2, 3)
-    ]
+    previews = [_preview(i, age_days=20, now_unix=now) for i in (1, 2, 3)]
     decisions = evaluate_ttl_evictions(previews=previews, now_unix=now)
     assert {d.preview_id for d in decisions} == {1, 2, 3}
 
@@ -198,10 +198,7 @@ def test_max_active_all_pinned_no_eviction():
     """Spec §15 footnote: pinning > cap. If all running previews
     are pinned, GC can't evict anything."""
     now = 1_700_000_000
-    previews = [
-        _preview(i, age_days=10, pinned=True, now_unix=now)
-        for i in (1, 2, 3)
-    ]
+    previews = [_preview(i, age_days=10, pinned=True, now_unix=now) for i in (1, 2, 3)]
     decisions = evaluate_max_active_evictions(previews=previews, max_active=1)
     assert decisions == ()
 
@@ -238,7 +235,9 @@ def test_combined_ttl_first_then_max_active():
         _preview(4, age_days=2, now_unix=now),
     ]
     decisions = evaluate_app_evictions(
-        previews=previews, now_unix=now, max_active=2,
+        previews=previews,
+        now_unix=now,
+        max_active=2,
     )
     # Preview 1 evicted by TTL. Then survivors = [2,3,4] which
     # is over max_active=2, so oldest survivor (#2) gets evicted
@@ -259,7 +258,9 @@ def test_combined_no_double_eviction():
         _preview(3, age_days=30, now_unix=now),
     ]
     decisions = evaluate_app_evictions(
-        previews=previews, now_unix=now, max_active=2,
+        previews=previews,
+        now_unix=now,
+        max_active=2,
     )
     assert all(d.reason == EvictionReason.TTL_EXPIRED for d in decisions)
     assert len(decisions) == 3
@@ -272,7 +273,8 @@ def test_admission_under_limit():
     """New PR; existing < max → straight admit."""
     existing = [_preview(i) for i in (1, 2, 3)]
     decision = admission_for_new_preview(
-        existing_previews=existing, max_active=5,
+        existing_previews=existing,
+        max_active=5,
     )
     assert decision.admit is True
     assert decision.eviction is None
@@ -287,7 +289,8 @@ def test_admission_at_limit_evicts_oldest():
         _preview(3, age_days=2, now_unix=now),
     ]
     decision = admission_for_new_preview(
-        existing_previews=existing, max_active=3,
+        existing_previews=existing,
+        max_active=3,
     )
     assert decision.admit is True
     assert decision.eviction is not None
@@ -298,12 +301,10 @@ def test_admission_at_limit_evicts_oldest():
 def test_admission_all_pinned_admits_no_eviction():
     """Spec §15 footnote: pinning > cap."""
     now = 1_700_000_000
-    existing = [
-        _preview(i, age_days=10, pinned=True, now_unix=now)
-        for i in (1, 2, 3)
-    ]
+    existing = [_preview(i, age_days=10, pinned=True, now_unix=now) for i in (1, 2, 3)]
     decision = admission_for_new_preview(
-        existing_previews=existing, max_active=3,
+        existing_previews=existing,
+        max_active=3,
     )
     assert decision.admit is True
     assert decision.eviction is None
@@ -317,7 +318,8 @@ def test_admission_pinned_oldest_skips_to_next_oldest():
         _preview(3, age_days=2, now_unix=now),
     ]
     decision = admission_for_new_preview(
-        existing_previews=existing, max_active=3,
+        existing_previews=existing,
+        max_active=3,
     )
     assert decision.eviction is not None
     assert decision.eviction.preview_id == 2
@@ -332,7 +334,8 @@ def test_admission_excludes_non_running():
         _preview(3, age_days=1, now_unix=now),
     ]
     decision = admission_for_new_preview(
-        existing_previews=existing, max_active=2,
+        existing_previews=existing,
+        max_active=2,
     )
     assert decision.eviction is None
 
@@ -343,7 +346,8 @@ def test_admission_excludes_non_running():
 def test_pr_comment_ttl_expired():
     body = pr_comment_for_eviction(
         decision=EvictionDecision(
-            preview_id=1, reason=EvictionReason.TTL_EXPIRED,
+            preview_id=1,
+            reason=EvictionReason.TTL_EXPIRED,
         ),
     )
     assert "expired" in body.lower()
@@ -353,7 +357,8 @@ def test_pr_comment_ttl_expired():
 def test_pr_comment_ttl_with_redeploy_link():
     body = pr_comment_for_eviction(
         decision=EvictionDecision(
-            preview_id=1, reason=EvictionReason.TTL_EXPIRED,
+            preview_id=1,
+            reason=EvictionReason.TTL_EXPIRED,
         ),
         redeploy_url="https://app.platform/redeploy/1",
     )
@@ -365,7 +370,8 @@ def test_pr_comment_max_active_names_new_pr():
     pushed this one out."""
     body = pr_comment_for_eviction(
         decision=EvictionDecision(
-            preview_id=1, reason=EvictionReason.MAX_ACTIVE_EXCEEDED,
+            preview_id=1,
+            reason=EvictionReason.MAX_ACTIVE_EXCEEDED,
         ),
         new_pr_number=42,
         redeploy_url="https://app.platform/redeploy/1",
@@ -379,7 +385,8 @@ def test_pr_comment_max_active_no_new_pr():
     admission-driven)."""
     body = pr_comment_for_eviction(
         decision=EvictionDecision(
-            preview_id=1, reason=EvictionReason.MAX_ACTIVE_EXCEEDED,
+            preview_id=1,
+            reason=EvictionReason.MAX_ACTIVE_EXCEEDED,
         ),
     )
     assert "#" not in body or "free a slot" in body

@@ -33,8 +33,8 @@ class StorageClassEntry:
     cluster_id: int
     name: str
     csi_driver: str
-    reclaim_policy: str    # 'Delete' | 'Retain'
-    volume_binding_mode: str   # 'Immediate' | 'WaitForFirstConsumer'
+    reclaim_policy: str  # 'Delete' | 'Retain'
+    volume_binding_mode: str  # 'Immediate' | 'WaitForFirstConsumer'
     allowed_topologies: tuple[str, ...]
     parameters: tuple[tuple[str, str], ...]
     """Driver-specific parameters from the StorageClass spec
@@ -59,12 +59,10 @@ class StorageClassEntry:
         if self.cluster_id <= 0:
             raise StorageError("cluster_id must be positive")
         if self.reclaim_policy not in ("Delete", "Retain"):
-            raise StorageError(
-                f"reclaim_policy {self.reclaim_policy!r} must be "
-                "'Delete' or 'Retain'"
-            )
+            raise StorageError(f"reclaim_policy {self.reclaim_policy!r} must be " "'Delete' or 'Retain'")
         if self.volume_binding_mode not in (
-            "Immediate", "WaitForFirstConsumer",
+            "Immediate",
+            "WaitForFirstConsumer",
         ):
             raise StorageError(
                 f"volume_binding_mode {self.volume_binding_mode!r} "
@@ -84,10 +82,9 @@ def find_for_tier(
     multiple entries match.
     """
     candidates = [
-        e for e in catalog
-        if e.cluster_id == cluster_id
-        and e.performance_tier == tier
-        and e.durability == durability
+        e
+        for e in catalog
+        if e.cluster_id == cluster_id and e.performance_tier == tier and e.durability == durability
     ]
     if not candidates:
         return None
@@ -153,9 +150,7 @@ def plan_expansion(
       3. PVC name + namespace required.
     """
     if not pvc_name or not namespace:
-        raise VolumeExpansionError(
-            "pvc_name and namespace are required"
-        )
+        raise VolumeExpansionError("pvc_name and namespace are required")
 
     if not storage_class.supports_volume_expansion:
         raise VolumeExpansionError(

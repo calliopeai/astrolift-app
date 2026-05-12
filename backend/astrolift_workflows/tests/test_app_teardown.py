@@ -44,7 +44,9 @@ def test_teardown_order_dns_after_ingress():
 
 def test_inputs_basic():
     inputs = TeardownInputs(
-        registered_app_id=1, delete_data=False, operator_actor_id=42,
+        registered_app_id=1,
+        delete_data=False,
+        operator_actor_id=42,
     )
     assert inputs.delete_data is False
 
@@ -52,7 +54,9 @@ def test_inputs_basic():
 def test_inputs_rejects_invalid_app_id():
     with pytest.raises(AppTeardownError):
         TeardownInputs(
-            registered_app_id=0, delete_data=False, operator_actor_id=42,
+            registered_app_id=0,
+            delete_data=False,
+            operator_actor_id=42,
         )
 
 
@@ -118,7 +122,8 @@ def test_steps_starts_from_top_for_unknown_step():
 def test_postgres_with_delete_data_snapshots_first():
     """Catastrophe defense: snapshot before drop."""
     plan = plan_managed_service_teardown(
-        bindings=[(1, "postgres")], delete_data=True,
+        bindings=[(1, "postgres")],
+        delete_data=True,
     )
     assert plan[0].snapshot_first is True
     assert plan[0].destroy_data is True
@@ -127,7 +132,8 @@ def test_postgres_with_delete_data_snapshots_first():
 def test_postgres_without_delete_data_keeps_instance():
     """Operator chose to keep data; unbind only."""
     plan = plan_managed_service_teardown(
-        bindings=[(1, "postgres")], delete_data=False,
+        bindings=[(1, "postgres")],
+        delete_data=False,
     )
     assert plan[0].snapshot_first is False
     assert plan[0].destroy_data is False
@@ -135,7 +141,8 @@ def test_postgres_without_delete_data_keeps_instance():
 
 def test_object_store_with_delete_data_snapshots_first():
     plan = plan_managed_service_teardown(
-        bindings=[(1, "object_store")], delete_data=True,
+        bindings=[(1, "object_store")],
+        delete_data=True,
     )
     assert plan[0].snapshot_first is True
 
@@ -143,7 +150,8 @@ def test_object_store_with_delete_data_snapshots_first():
 def test_redis_never_snapshots():
     """Cache state has no recovery value."""
     plan = plan_managed_service_teardown(
-        bindings=[(1, "redis")], delete_data=True,
+        bindings=[(1, "redis")],
+        delete_data=True,
     )
     assert plan[0].snapshot_first is False
     assert plan[0].destroy_data is True
@@ -152,7 +160,8 @@ def test_redis_never_snapshots():
 def test_queue_never_snapshots():
     """In-flight messages aren't worth snapshotting."""
     plan = plan_managed_service_teardown(
-        bindings=[(1, "queue")], delete_data=True,
+        bindings=[(1, "queue")],
+        delete_data=True,
     )
     assert plan[0].snapshot_first is False
 
@@ -160,7 +169,8 @@ def test_queue_never_snapshots():
 def test_unknown_kind_rejected():
     with pytest.raises(AppTeardownError, match="unknown"):
         plan_managed_service_teardown(
-            bindings=[(1, "exotic")], delete_data=True,
+            bindings=[(1, "exotic")],
+            delete_data=True,
         )
 
 
@@ -175,18 +185,32 @@ def test_plan_preserves_binding_order():
 # ---- soft-delete invariants ---------------------------------------
 
 
-@pytest.mark.parametrize("kind", [
-    "RegisteredApp", "Deployment", "ManagedServiceBinding",
-    "WorkloadIdentityRole", "DeployToken", "AppDomain",
-    "PreviewEnvironment", "AppEnvironment",
-])
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "RegisteredApp",
+        "Deployment",
+        "ManagedServiceBinding",
+        "WorkloadIdentityRole",
+        "DeployToken",
+        "AppDomain",
+        "PreviewEnvironment",
+        "AppEnvironment",
+    ],
+)
 def test_business_records_soft_deleted(kind):
     assert must_soft_delete(record_kind=kind) is True
 
 
-@pytest.mark.parametrize("kind", [
-    "AuditLog", "EventLog", "DeploymentLog", "WorkflowHistory",
-])
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "AuditLog",
+        "EventLog",
+        "DeploymentLog",
+        "WorkflowHistory",
+    ],
+)
 def test_audit_records_retained(kind):
     """Spec acceptance: 'audit log retained.'"""
     assert must_soft_delete(record_kind=kind) is False

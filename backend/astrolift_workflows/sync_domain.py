@@ -161,7 +161,8 @@ def needs_per_domain_cert(
     if not hostname:
         raise SyncDomainError("hostname is required")
     return not is_covered_by_wildcard(
-        hostname=hostname, wildcard_sans=wildcard_sans,
+        hostname=hostname,
+        wildcard_sans=wildcard_sans,
     )
 
 
@@ -190,9 +191,7 @@ def rollback_steps(*, progress: SyncProgress) -> tuple[SyncStep, ...]:
         SyncStep.PATCH_INGRESS,
         SyncStep.REQUEST_CERT,
     }
-    to_reverse = tuple(
-        s for s in progress.completed_steps if s in reversible
-    )
+    to_reverse = tuple(s for s in progress.completed_steps if s in reversible)
     return tuple(reversed(to_reverse))
 
 
@@ -202,7 +201,8 @@ def is_rollback_needed(*, progress: SyncProgress) -> bool:
     if progress.failed_step is None:
         return False
     return any(
-        s in {
+        s
+        in {
             SyncStep.UPDATE_DNS,
             SyncStep.PATCH_INGRESS,
             SyncStep.REQUEST_CERT,

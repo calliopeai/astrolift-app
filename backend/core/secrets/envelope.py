@@ -29,8 +29,8 @@ from collections.abc import Callable
 
 # AES-GCM. Defer cryptography import until first use so test code
 # that doesn't actually call encrypt/decrypt doesn't need the dep.
-DEK_BYTES = 32      # AES-256
-NONCE_BYTES = 12    # GCM standard
+DEK_BYTES = 32  # AES-256
+NONCE_BYTES = 12  # GCM standard
 GCM_TAG_BYTES = 16
 
 
@@ -57,11 +57,7 @@ class EnvelopeCiphertext:
     def wire_size(self) -> int:
         """Bytes on the wire (sum of components). Useful for the
         cost/usage calculation."""
-        return (
-            len(self.wrapped_dek.ciphertext)
-            + len(self.nonce)
-            + len(self.ciphertext)
-        )
+        return len(self.wrapped_dek.ciphertext) + len(self.nonce) + len(self.ciphertext)
 
 
 # ---- KEK provider registry ------------------------------------------
@@ -101,8 +97,7 @@ def _provider_for(kek_id: str) -> KekProvider:
     fn = _PROVIDERS.get(kek_id)
     if fn is None:
         raise KekUnavailable(
-            f"no KEK provider registered for {kek_id!r}; "
-            f"available: {sorted(_PROVIDERS)}"
+            f"no KEK provider registered for {kek_id!r}; " f"available: {sorted(_PROVIDERS)}"
         )
     return fn
 
@@ -157,9 +152,7 @@ def decrypt(envelope: EnvelopeCiphertext, *, aad: bytes = b"") -> bytes:
         wrapped_dek_bytes=envelope.wrapped_dek.ciphertext,
     )
     if len(dek) != DEK_BYTES:
-        raise KekUnavailable(
-            f"unwrap returned {len(dek)} bytes; expected {DEK_BYTES}"
-        )
+        raise KekUnavailable(f"unwrap returned {len(dek)} bytes; expected {DEK_BYTES}")
 
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -187,7 +180,9 @@ def rewrap(envelope: EnvelopeCiphertext, *, new_kek_id: str) -> EnvelopeCipherte
         wrapped_dek_bytes=envelope.wrapped_dek.ciphertext,
     )
     new_wrapped = new_provider(
-        operation="wrap", kek_id=new_kek_id, plaintext_dek=dek,
+        operation="wrap",
+        kek_id=new_kek_id,
+        plaintext_dek=dek,
     )
     return EnvelopeCiphertext(
         wrapped_dek=WrappedDEK(kek_id=new_kek_id, ciphertext=new_wrapped),

@@ -40,7 +40,7 @@ AMR_PASSWORD = "pwd"
 AMR_TOTP = "otp"
 AMR_WEBAUTHN = "webauthn"
 AMR_HARDWARE = "hwk"
-AMR_SMS = "sms"     # accepted for legacy IdPs but not allowed for step-up
+AMR_SMS = "sms"  # accepted for legacy IdPs but not allowed for step-up
 KNOWN_AMR = {AMR_PASSWORD, AMR_TOTP, AMR_WEBAUTHN, AMR_HARDWARE, AMR_SMS}
 
 # Methods that count as 'strong' MFA — anything in AMR_REQUIRED list
@@ -72,13 +72,9 @@ class AssertionPolicy:
                 raise ValueError(f"unknown AMR value {amr!r}")
             if self.required_amr_any and amr not in STRONG_AMR:
                 raise ValueError(
-                    f"AMR {amr!r} is not a strong MFA method "
-                    f"(allowed: {sorted(STRONG_AMR)})"
+                    f"AMR {amr!r} is not a strong MFA method " f"(allowed: {sorted(STRONG_AMR)})"
                 )
-        if (
-            self.max_session_age_seconds is not None
-            and self.max_session_age_seconds <= 0
-        ):
+        if self.max_session_age_seconds is not None and self.max_session_age_seconds <= 0:
             raise ValueError("max_session_age_seconds must be positive")
 
 
@@ -88,8 +84,8 @@ class SessionAssertion:
     request's session row + ID token claims."""
 
     user_id: int
-    amr: tuple[str, ...]                 # AMR values from the IdP
-    authenticated_at: datetime           # when this session was first authed
+    amr: tuple[str, ...]  # AMR values from the IdP
+    authenticated_at: datetime  # when this session was first authed
     device_assertion_at: datetime | None = None  # last WebAuthn touch
 
 
@@ -167,10 +163,7 @@ def evaluate(policy: AssertionPolicy, session: SessionAssertion, *, now: datetim
         raise ValueError("now must be timezone-aware")
     if session.authenticated_at.tzinfo is None:
         raise ValueError("session.authenticated_at must be timezone-aware")
-    if (
-        session.device_assertion_at is not None
-        and session.device_assertion_at.tzinfo is None
-    ):
+    if session.device_assertion_at is not None and session.device_assertion_at.tzinfo is None:
         raise ValueError("session.device_assertion_at must be timezone-aware when provided")
 
     missing_amr: tuple[str, ...] = ()

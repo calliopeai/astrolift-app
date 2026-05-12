@@ -31,9 +31,9 @@ class CertHealth(str, Enum):
     crossings — health is a snapshot, crossings are events."""
 
     HEALTHY = "healthy"
-    WARNING = "warning"      # within 30d
-    URGENT = "urgent"        # within 14d
-    CRITICAL = "critical"    # within 7d (escalation territory)
+    WARNING = "warning"  # within 30d
+    URGENT = "urgent"  # within 14d
+    CRITICAL = "critical"  # within 7d (escalation territory)
     EXPIRED = "expired"
     RENEWAL_FAILED = "renewal_failed"
 
@@ -43,9 +43,9 @@ class CertSnapshot:
     """Inputs to the policy. Caller maps from the platform's
     TlsCertificate row (or the cluster-driver's CertificateHandle)."""
 
-    not_after: datetime               # the cert's expiry
+    not_after: datetime  # the cert's expiry
     last_renewal_failed: bool = False  # most recent renewal attempt outcome
-    renewal_attempts: int = 0          # consecutive failed renewals
+    renewal_attempts: int = 0  # consecutive failed renewals
 
     def __post_init__(self) -> None:
         if self.not_after.tzinfo is None:
@@ -57,9 +57,9 @@ class CertStatus:
     """Output of one evaluation."""
 
     health: CertHealth
-    days_until_expiry: int       # negative when already expired
+    days_until_expiry: int  # negative when already expired
     thresholds_to_fire: tuple[int, ...]  # which reminders just crossed
-    should_escalate: bool        # within escalation window AND no recent success
+    should_escalate: bool  # within escalation window AND no recent success
 
 
 def evaluate(
@@ -85,13 +85,8 @@ def evaluate(
     days_until = int(delta.total_seconds() // 86400)
 
     health = _bucket(snapshot, days_until)
-    crossings = _crossings(
-        not_after=snapshot.not_after, now=now, last_check_at=last_check_at
-    )
-    should_escalate = (
-        days_until <= ESCALATION_THRESHOLD_DAYS
-        and snapshot.last_renewal_failed
-    )
+    crossings = _crossings(not_after=snapshot.not_after, now=now, last_check_at=last_check_at)
+    should_escalate = days_until <= ESCALATION_THRESHOLD_DAYS and snapshot.last_renewal_failed
 
     return CertStatus(
         health=health,
@@ -120,16 +115,12 @@ def _bucket(snap: CertSnapshot, days_until: int) -> CertHealth:
     return CertHealth.HEALTHY
 
 
-def _crossings(
-    *, not_after: datetime, now: datetime, last_check_at: datetime | None
-) -> tuple[int, ...]:
+def _crossings(*, not_after: datetime, now: datetime, last_check_at: datetime | None) -> tuple[int, ...]:
     fired: list[int] = []
     for threshold in sorted(EXPIRY_THRESHOLDS_DAYS, reverse=True):
         boundary = not_after - timedelta(days=threshold)
         crossed_now = now >= boundary
-        was_already_crossed = (
-            last_check_at is not None and last_check_at >= boundary
-        )
+        was_already_crossed = last_check_at is not None and last_check_at >= boundary
         if crossed_now and not was_already_crossed:
             fired.append(threshold)
     return tuple(fired)

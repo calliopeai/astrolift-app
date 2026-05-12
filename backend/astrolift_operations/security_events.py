@@ -60,8 +60,8 @@ DEFAULTS = {
         "auto_remediate_at": 10,  # lock the account at 10 failures
     },
     DetectorKind.TOKEN_FROM_NEW_IP: {
-        "threshold": 1,           # any unseen-IP use trips it once
-        "window_seconds": 0,      # not windowed; first-use detection
+        "threshold": 1,  # any unseen-IP use trips it once
+        "window_seconds": 0,  # not windowed; first-use detection
         "cooldown_seconds": 24 * 3600,
         "auto_remediate_at": None,  # not auto-remediated; informational
     },
@@ -94,9 +94,7 @@ class DetectorConfig:
             raise ValueError("cooldown_seconds must be non-negative")
 
 
-def config_with_defaults(
-    kind: DetectorKind, *, overrides: dict | None = None
-) -> DetectorConfig:
+def config_with_defaults(kind: DetectorKind, *, overrides: dict | None = None) -> DetectorConfig:
     """Merge per-org overrides with defaults."""
     base = dict(DEFAULTS[kind])
     if overrides:
@@ -142,15 +140,10 @@ def evaluate(
             reason="below threshold",
         )
 
-    severity = (
-        Severity.CRITICAL
-        if event_count_in_window >= config.threshold * 5
-        else Severity.WARNING
-    )
+    severity = Severity.CRITICAL if event_count_in_window >= config.threshold * 5 else Severity.WARNING
 
     auto_remediate = (
-        config.auto_remediate_at is not None
-        and event_count_in_window >= config.auto_remediate_at
+        config.auto_remediate_at is not None and event_count_in_window >= config.auto_remediate_at
     )
 
     suppressed = False
@@ -173,15 +166,12 @@ def evaluate(
         count=event_count_in_window,
         auto_remediate=auto_remediate,
         reason=(
-            "cooldown" if suppressed
-            else f"threshold crossed ({event_count_in_window} >= {config.threshold})"
+            "cooldown" if suppressed else f"threshold crossed ({event_count_in_window} >= {config.threshold})"
         ),
     )
 
 
-def count_within_window(
-    *, event_times: Iterable[datetime], window_seconds: int, now: datetime
-) -> int:
+def count_within_window(*, event_times: Iterable[datetime], window_seconds: int, now: datetime) -> int:
     """Helper for callers that have a list of event times — return
     how many fall inside ``[now - window, now]``. Useful when the
     caller is reading from the audit log directly rather than a

@@ -297,15 +297,13 @@ class MtlsConfig:
             # OFF / MESH-only with a CA secret set is a
             # misconfiguration — the secret won't be consumed.
             raise TlsError(
-                f"mTLS mode {self.mode.value} cannot accept "
-                "edge_client_ca_secret (would not be consumed)"
+                f"mTLS mode {self.mode.value} cannot accept " "edge_client_ca_secret (would not be consumed)"
             )
 
         if self.mode in (MtlsMode.MESH, MtlsMode.EDGE_AND_MESH):
             if self.mesh_provider not in ("istio", "linkerd"):
                 raise TlsError(
-                    f"mTLS mode {self.mode.value} requires "
-                    "mesh_provider to be 'istio' or 'linkerd'"
+                    f"mTLS mode {self.mode.value} requires " "mesh_provider to be 'istio' or 'linkerd'"
                 )
 
 
@@ -344,10 +342,7 @@ class ZoneCertPlan:
                 f"(zone {self.zone!r} has {len(self.org_slugs)} orgs)"
             )
         if self.layout == ZoneLayout.ORG_PREFIXED and not self.org_slugs:
-            raise TlsError(
-                f"org-prefixed zone {self.zone!r} requires at least "
-                "one org slug"
-            )
+            raise TlsError(f"org-prefixed zone {self.zone!r} requires at least " "one org slug")
 
 
 def expand_cert_plan(*, plan: ZoneCertPlan) -> tuple[WildcardCertScope, ...]:
@@ -356,7 +351,9 @@ def expand_cert_plan(*, plan: ZoneCertPlan) -> tuple[WildcardCertScope, ...]:
     org."""
     return tuple(
         wildcard_sans_for_org(
-            base_zone=plan.zone, org_slug=slug, layout=plan.layout,
+            base_zone=plan.zone,
+            org_slug=slug,
+            layout=plan.layout,
         )
         for slug in plan.org_slugs
     )

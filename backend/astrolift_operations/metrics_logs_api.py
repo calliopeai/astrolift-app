@@ -42,19 +42,24 @@ class StandardMetric(str, Enum):
 # Spec 08 §6 retention rollups. Pure metadata for the catalog
 # query; actual retention enforcement lives in #160 obs retention.
 ROLLUP_RESOLUTIONS_SECONDS: tuple[int, ...] = (
-    0,             # raw samples
-    60,            # 1-minute rollup
-    300,           # 5-minute rollup
-    3600,          # 1-hour rollup
+    0,  # raw samples
+    60,  # 1-minute rollup
+    300,  # 5-minute rollup
+    3600,  # 1-hour rollup
 )
 
 
 # Required label set (spec 08 §6). Per-tenant isolation: every
 # metric MUST carry these so a rogue app can't query another
 # tenant's data.
-REQUIRED_METRIC_LABELS: frozenset[str] = frozenset({
-    "app", "workload", "environment", "region",
-})
+REQUIRED_METRIC_LABELS: frozenset[str] = frozenset(
+    {
+        "app",
+        "workload",
+        "environment",
+        "region",
+    }
+)
 
 
 _LABEL_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -68,16 +73,14 @@ class FilterError(ValueError):
 def _check_label_name(name: str) -> None:
     if not _LABEL_RE.match(name):
         raise FilterError(
-            f"label name {name!r} is not a valid identifier "
-            "(alpha/alphanumeric/underscore, alpha-start)"
+            f"label name {name!r} is not a valid identifier " "(alpha/alphanumeric/underscore, alpha-start)"
         )
 
 
 def _check_label_value(value: str) -> None:
     if not _LABEL_VALUE_RE.match(value):
         raise FilterError(
-            f"label value {value!r} contains characters that could break "
-            "PromQL injection guards"
+            f"label value {value!r} contains characters that could break " "PromQL injection guards"
         )
 
 
@@ -156,11 +159,8 @@ class LogFilter:
         for opt in (self.workload, self.pod, self.container, self.environment):
             if opt:
                 _check_label_value(opt)
-        if self.search and any(c in self.search for c in '\n\r"\''):
-            raise FilterError(
-                "search string contains forbidden characters "
-                "(newline / quote)"
-            )
+        if self.search and any(c in self.search for c in "\n\r\"'"):
+            raise FilterError("search string contains forbidden characters " "(newline / quote)")
         if self.end_unix and self.start_unix > self.end_unix:
             raise FilterError("start_unix must be <= end_unix")
 
@@ -209,7 +209,8 @@ def consume_tokens(
     if state.tokens < n:
         return False, state
     return True, RateLimitState(
-        tokens=state.tokens - n, last_refill_unix=state.last_refill_unix,
+        tokens=state.tokens - n,
+        last_refill_unix=state.last_refill_unix,
     )
 
 

@@ -20,9 +20,12 @@ from astrolift_workflows.preview_state import (
 
 def _projection(**overrides) -> PreviewProjection:
     base = dict(
-        preview_id=1, guid="gp_abc",
-        registered_app_id=1, pr_number=42,
-        branch="feat/x", commit_sha="aaa1111",
+        preview_id=1,
+        guid="gp_abc",
+        registered_app_id=1,
+        pr_number=42,
+        branch="feat/x",
+        commit_sha="aaa1111",
         status=PreviewStatus.RUNNING,
         hostname="pr-42.acme.platform.example",
         namespace="acme-api-pr-42",
@@ -39,34 +42,47 @@ def _projection(**overrides) -> PreviewProjection:
 
 
 def test_building_to_running():
-    assert can_transition(
-        current=PreviewStatus.BUILDING,
-        target=PreviewStatus.RUNNING,
-    ) is True
+    assert (
+        can_transition(
+            current=PreviewStatus.BUILDING,
+            target=PreviewStatus.RUNNING,
+        )
+        is True
+    )
 
 
 def test_running_to_building_for_redeploy():
     """New SHA on existing preview → re-enters BUILDING."""
-    assert can_transition(
-        current=PreviewStatus.RUNNING,
-        target=PreviewStatus.BUILDING,
-    ) is True
+    assert (
+        can_transition(
+            current=PreviewStatus.RUNNING,
+            target=PreviewStatus.BUILDING,
+        )
+        is True
+    )
 
 
 def test_failed_to_building_for_retry():
-    assert can_transition(
-        current=PreviewStatus.FAILED,
-        target=PreviewStatus.BUILDING,
-    ) is True
+    assert (
+        can_transition(
+            current=PreviewStatus.FAILED,
+            target=PreviewStatus.BUILDING,
+        )
+        is True
+    )
 
 
 def test_torn_down_is_terminal():
     """No transitions out — operator pushes a new commit, a
     new row is created."""
     for target in PreviewStatus:
-        assert can_transition(
-            current=PreviewStatus.TORN_DOWN, target=target,
-        ) is False
+        assert (
+            can_transition(
+                current=PreviewStatus.TORN_DOWN,
+                target=target,
+            )
+            is False
+        )
 
 
 def test_assert_transition_raises_on_invalid():
@@ -79,10 +95,13 @@ def test_assert_transition_raises_on_invalid():
 
 def test_building_can_short_circuit_to_torn_down():
     """Teardown signal mid-build."""
-    assert can_transition(
-        current=PreviewStatus.BUILDING,
-        target=PreviewStatus.TORN_DOWN,
-    ) is True
+    assert (
+        can_transition(
+            current=PreviewStatus.BUILDING,
+            target=PreviewStatus.TORN_DOWN,
+        )
+        is True
+    )
 
 
 # ---- projection invariants ----------------------------------------
@@ -153,10 +172,15 @@ def test_is_active_failed():
 
 
 def test_is_active_torn_down_false():
-    assert is_active(preview=_projection(
-        status=PreviewStatus.TORN_DOWN,
-        torn_down_at_unix=1_700_000_000,
-    )) is False
+    assert (
+        is_active(
+            preview=_projection(
+                status=PreviewStatus.TORN_DOWN,
+                torn_down_at_unix=1_700_000_000,
+            )
+        )
+        is False
+    )
 
 
 def test_find_active_for_pr_returns_match():
@@ -165,7 +189,9 @@ def test_find_active_for_pr_returns_match():
         _projection(preview_id=2, pr_number=99, status=PreviewStatus.RUNNING),
     ]
     found = find_active_for_pr(
-        previews=previews, registered_app_id=1, pr_number=42,
+        previews=previews,
+        registered_app_id=1,
+        pr_number=42,
     )
     assert found is not None
     assert found.preview_id == 1
@@ -175,20 +201,25 @@ def test_find_active_for_pr_skips_torn_down():
     """Old torn-down preview for same PR shouldn't shadow."""
     previews = [
         _projection(
-            preview_id=1, pr_number=42,
+            preview_id=1,
+            pr_number=42,
             status=PreviewStatus.TORN_DOWN,
             torn_down_at_unix=1_700_000_000,
         ),
     ]
     found = find_active_for_pr(
-        previews=previews, registered_app_id=1, pr_number=42,
+        previews=previews,
+        registered_app_id=1,
+        pr_number=42,
     )
     assert found is None
 
 
 def test_find_active_for_pr_none_when_absent():
     found = find_active_for_pr(
-        previews=[], registered_app_id=1, pr_number=42,
+        previews=[],
+        registered_app_id=1,
+        pr_number=42,
     )
     assert found is None
 
@@ -202,7 +233,9 @@ def test_find_active_for_pr_raises_on_uniqueness_violation():
     ]
     with pytest.raises(PreviewStateError, match="uniqueness"):
         find_active_for_pr(
-            previews=previews, registered_app_id=1, pr_number=42,
+            previews=previews,
+            registered_app_id=1,
+            pr_number=42,
         )
 
 
@@ -224,14 +257,17 @@ def test_filter_previews_by_app():
 def test_filter_previews_by_status():
     previews = [
         _projection(
-            preview_id=1, status=PreviewStatus.RUNNING,
+            preview_id=1,
+            status=PreviewStatus.RUNNING,
         ),
         _projection(
-            preview_id=2, status=PreviewStatus.TORN_DOWN,
+            preview_id=2,
+            status=PreviewStatus.TORN_DOWN,
             torn_down_at_unix=1_700_000_000,
         ),
         _projection(
-            preview_id=3, status=PreviewStatus.BUILDING,
+            preview_id=3,
+            status=PreviewStatus.BUILDING,
         ),
     ]
     out = filter_previews(
@@ -250,12 +286,14 @@ def test_filter_previews_empty_status_returns_all():
     previews = [
         _projection(preview_id=1, status=PreviewStatus.RUNNING),
         _projection(
-            preview_id=2, status=PreviewStatus.TORN_DOWN,
+            preview_id=2,
+            status=PreviewStatus.TORN_DOWN,
             torn_down_at_unix=1_700_000_000,
         ),
     ]
     out = filter_previews(
-        previews=previews, f=PreviewListFilter(registered_app_id=1),
+        previews=previews,
+        f=PreviewListFilter(registered_app_id=1),
     )
     assert len(out) == 2
 

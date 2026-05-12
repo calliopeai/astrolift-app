@@ -72,9 +72,7 @@ def map_outcome(
         if attempt_number >= max_attempts:
             return AttemptOutcome.PERMANENT_FAILURE
         return AttemptOutcome.RETRY
-    raise WebhookHistoryError(
-        f"unknown classified outcome {classified!r}"
-    )
+    raise WebhookHistoryError(f"unknown classified outcome {classified!r}")
 
 
 # ---- inline-vs-blob (request + response bodies) -------------------
@@ -86,9 +84,7 @@ def should_blob_body(*, byte_count: int) -> bool:
     subscriber's giant response gets entirely blobbed (we
     don't want a chatty subscriber filling the DB)."""
     if byte_count < 0:
-        raise WebhookHistoryError(
-            f"byte_count must be non-negative, got {byte_count}"
-        )
+        raise WebhookHistoryError(f"byte_count must be non-negative, got {byte_count}")
     return byte_count > INLINE_THRESHOLD_BYTES
 
 
@@ -104,17 +100,12 @@ class BodyStorage:
         if self.total_byte_count < 0:
             raise WebhookHistoryError("total_byte_count negative")
         if len(self.inline_bytes) > INLINE_HARD_CAP_BYTES:
-            raise WebhookHistoryError(
-                "inline_bytes exceeds hard cap"
-            )
+            raise WebhookHistoryError("inline_bytes exceeds hard cap")
         if self.blob_ref and len(self.inline_bytes) > 0:
             # Webhook bodies: when blobbed, fully blobbed (no
             # head-inline). Differs from CommandRun where
             # head-inline supports fast UI paint.
-            raise WebhookHistoryError(
-                "webhook body cannot have both blob_ref and "
-                "inline_bytes; pick one"
-            )
+            raise WebhookHistoryError("webhook body cannot have both blob_ref and " "inline_bytes; pick one")
 
 
 def plan_body_storage(*, body: bytes) -> dict:
@@ -210,45 +201,29 @@ class AttemptProjection:
 
     def __post_init__(self) -> None:
         if self.attempt_number < 1:
-            raise WebhookHistoryError(
-                f"attempt_number must be >= 1, got {self.attempt_number}"
-            )
+            raise WebhookHistoryError(f"attempt_number must be >= 1, got {self.attempt_number}")
         if self.attempt_number > MAX_ATTEMPTS:
-            raise WebhookHistoryError(
-                f"attempt_number {self.attempt_number} exceeds "
-                f"max {MAX_ATTEMPTS}"
-            )
+            raise WebhookHistoryError(f"attempt_number {self.attempt_number} exceeds " f"max {MAX_ATTEMPTS}")
         # Phase / timestamp consistency
         if self.phase == AttemptPhase.SCHEDULED:
             if self.attempted_at_unix is not None:
-                raise WebhookHistoryError(
-                    "SCHEDULED phase but attempted_at set"
-                )
+                raise WebhookHistoryError("SCHEDULED phase but attempted_at set")
             if self.completed_at_unix is not None:
-                raise WebhookHistoryError(
-                    "SCHEDULED phase but completed_at set"
-                )
+                raise WebhookHistoryError("SCHEDULED phase but completed_at set")
         if self.phase == AttemptPhase.COMPLETED:
             if self.attempted_at_unix is None:
-                raise WebhookHistoryError(
-                    "COMPLETED phase but attempted_at missing"
-                )
+                raise WebhookHistoryError("COMPLETED phase but attempted_at missing")
             if self.completed_at_unix is None:
-                raise WebhookHistoryError(
-                    "COMPLETED phase but completed_at missing"
-                )
+                raise WebhookHistoryError("COMPLETED phase but completed_at missing")
             if self.outcome is None:
-                raise WebhookHistoryError(
-                    "COMPLETED phase but outcome missing"
-                )
+                raise WebhookHistoryError("COMPLETED phase but outcome missing")
         # Connection-error invariant
         if self.response_status is None and not self.error_message:
             if self.phase == AttemptPhase.COMPLETED:
                 # No status code AND no error message AND
                 # COMPLETED — should never happen.
                 raise WebhookHistoryError(
-                    "COMPLETED with no response_status AND no "
-                    "error_message; one or the other must be set"
+                    "COMPLETED with no response_status AND no " "error_message; one or the other must be set"
                 )
 
 
@@ -287,8 +262,7 @@ def plan_replay(
         raise WebhookHistoryError("new_delivery_id is required")
     if original_attempt.phase != AttemptPhase.COMPLETED:
         raise WebhookHistoryError(
-            f"can't replay attempt in phase "
-            f"{original_attempt.phase.value}; wait for COMPLETED"
+            f"can't replay attempt in phase " f"{original_attempt.phase.value}; wait for COMPLETED"
         )
     return ReplayPlan(
         new_delivery_id=new_delivery_id,
@@ -319,10 +293,7 @@ class HistoryQuery:
 
     def __post_init__(self) -> None:
         if self.limit < 1 or self.limit > MAX_HISTORY_LIMIT:
-            raise WebhookHistoryError(
-                f"limit must be in [1, {MAX_HISTORY_LIMIT}], "
-                f"got {self.limit}"
-            )
+            raise WebhookHistoryError(f"limit must be in [1, {MAX_HISTORY_LIMIT}], " f"got {self.limit}")
 
 
 MAX_HISTORY_LIMIT = 200

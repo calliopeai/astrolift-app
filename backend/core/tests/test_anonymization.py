@@ -131,14 +131,13 @@ def test_schedule_rejects_naive_request_time():
 
 def test_schedule_rejects_negative_grace():
     with pytest.raises(ValueError):
-        schedule_for_deletion(
-            requested_at=datetime(2026, 5, 1, tzinfo=UTC), grace_days=-1
-        )
+        schedule_for_deletion(requested_at=datetime(2026, 5, 1, tzinfo=UTC), grace_days=-1)
 
 
 def test_is_due_rejects_naive_now():
     sched = schedule_for_deletion(
-        requested_at=datetime(2026, 5, 1, tzinfo=UTC), grace_days=30,
+        requested_at=datetime(2026, 5, 1, tzinfo=UTC),
+        grace_days=30,
     )
     with pytest.raises(ValueError):
         sched.is_due(now=datetime(2026, 6, 5))

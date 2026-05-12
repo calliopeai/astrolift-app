@@ -37,9 +37,7 @@ class _RuntimeSignal:
 
 
 _RUNTIME_SIGNALS: tuple[_RuntimeSignal, ...] = (
-    _RuntimeSignal(
-        "python", 8000, ("Pipfile", "requirements.txt", "pyproject.toml")
-    ),
+    _RuntimeSignal("python", 8000, ("Pipfile", "requirements.txt", "pyproject.toml")),
     _RuntimeSignal("node", 3000, ("package.json",)),
     _RuntimeSignal("go", 8080, ("go.mod",)),
     _RuntimeSignal("rust", 8080, ("Cargo.toml",)),
@@ -82,10 +80,7 @@ def _list_dockerfiles(files: Mapping[str, Any]) -> list[str]:
     or ``Dockerfile.jobs``. Doesn't recurse into subdirectories — the
     multi-package monorepo case is its own follow-up.
     """
-    out = sorted(
-        p for p in files
-        if p == "Dockerfile" or p.startswith("Dockerfile.")
-    )
+    out = sorted(p for p in files if p == "Dockerfile" or p.startswith("Dockerfile."))
     return out
 
 
@@ -221,8 +216,7 @@ def infer_manifest_from_signals(
         )
     else:
         primary_port = (
-            _expose_port(files.get("Dockerfile") if "Dockerfile" in files else None)
-            or default_port
+            _expose_port(files.get("Dockerfile") if "Dockerfile" in files else None) or default_port
         )
         if "Dockerfile" in dockerfiles or "Dockerfile.api" in dockerfiles:
             confidence = "high"
@@ -243,17 +237,11 @@ def infer_manifest_from_signals(
                 )
                 continue
 
-            wl_name = (
-                app_name
-                if path == "Dockerfile"
-                else f"{app_name}-{path.split('.', 1)[1]}"
+            wl_name = app_name if path == "Dockerfile" else f"{app_name}-{path.split('.', 1)[1]}"
+            primary = i == 0  # first Dockerfile gets the public hostname
+            port = (_expose_port(files.get(path)) if isinstance(files.get(path), str) else None) or (
+                primary_port if primary else 0
             )
-            primary = (i == 0)  # first Dockerfile gets the public hostname
-            port = (
-                _expose_port(files.get(path))
-                if isinstance(files.get(path), str)
-                else None
-            ) or (primary_port if primary else 0)
             workloads.append(
                 {
                     "name": wl_name,

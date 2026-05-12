@@ -41,16 +41,20 @@ def _snap(**kw) -> CostSnapshot:
 def test_snapshot_rejects_negative_cost():
     with pytest.raises(ValueError):
         CostSnapshot(
-            snapshot_date=date(2026, 5, 1), org_id=1,
-            cost_usd=-1.0, category=CostCategory.COMPUTE,
+            snapshot_date=date(2026, 5, 1),
+            org_id=1,
+            cost_usd=-1.0,
+            category=CostCategory.COMPUTE,
         )
 
 
 def test_snapshot_requires_positive_org_id():
     with pytest.raises(ValueError, match="per-tenant scope"):
         CostSnapshot(
-            snapshot_date=date(2026, 5, 1), org_id=0,
-            cost_usd=10.0, category=CostCategory.COMPUTE,
+            snapshot_date=date(2026, 5, 1),
+            org_id=0,
+            cost_usd=10.0,
+            category=CostCategory.COMPUTE,
         )
 
 
@@ -182,10 +186,13 @@ def test_top_apps_n_must_be_positive():
 def test_by_category_initializes_all_categories():
     """The breakdown panel always shows every category, with 0
     for ones that have no data."""
-    out = by_category([
-        _snap(cost_usd=100, category=CostCategory.COMPUTE),
-        _snap(cost_usd=50, category=CostCategory.STORAGE),
-    ], org_id=1)
+    out = by_category(
+        [
+            _snap(cost_usd=100, category=CostCategory.COMPUTE),
+            _snap(cost_usd=50, category=CostCategory.STORAGE),
+        ],
+        org_id=1,
+    )
     assert out[CostCategory.COMPUTE] == 100
     assert out[CostCategory.STORAGE] == 50
     # Every category present, even if 0
@@ -196,11 +203,14 @@ def test_by_category_initializes_all_categories():
 def test_by_provider_groups_unknown():
     """Snapshots without a provider string roll up under 'unknown'
     so the UI can show what's not classified."""
-    out = by_provider([
-        _snap(provider="aws-rds", cost_usd=100),
-        _snap(provider="", cost_usd=50),
-        _snap(provider="aws-rds", cost_usd=20),
-    ], org_id=1)
+    out = by_provider(
+        [
+            _snap(provider="aws-rds", cost_usd=100),
+            _snap(provider="", cost_usd=50),
+            _snap(provider="aws-rds", cost_usd=20),
+        ],
+        org_id=1,
+    )
     assert out["aws-rds"] == 120
     assert out["unknown"] == 50
 

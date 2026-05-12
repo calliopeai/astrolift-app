@@ -65,9 +65,7 @@ SUPPORTED_TRANSPORTS: tuple[TransportKind, ...] = (
 
 # RFC 5322 simplified email regex. Stricter rules exist; this
 # catches the obvious typos.
-_EMAIL_RE = re.compile(
-    r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"
-)
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 
 class EmailError(ValueError):
@@ -107,9 +105,7 @@ class Email:
         if not self.subject:
             raise EmailError("subject is required")
         if not self.plain_body:
-            raise EmailError(
-                "plain_body required (RFC 8551 multipart/alternative)"
-            )
+            raise EmailError("plain_body required (RFC 8551 multipart/alternative)")
 
 
 # ---- suppression list ----------------------------------------------
@@ -141,9 +137,11 @@ class SuppressionEntry:
 # Transactional kinds that BYPASS unsubscribe suppression — they
 # carry security or operational signals the user can't opt out of
 # while keeping their account active.
-_TRANSACTIONAL_KINDS: frozenset[EmailKind] = frozenset({
-    EmailKind.DEPLOY_APPROVAL,
-})
+_TRANSACTIONAL_KINDS: frozenset[EmailKind] = frozenset(
+    {
+        EmailKind.DEPLOY_APPROVAL,
+    }
+)
 
 
 def is_suppressed(
@@ -191,13 +189,10 @@ _TRANSPORT_KIND: TransportKind = TransportKind.NONE
 def set_transport(*, kind: TransportKind, fn: Transport) -> None:
     """Caller (settings module) registers one transport at startup."""
     if kind == TransportKind.NONE:
-        raise EmailError(
-            "cannot set NONE as a transport; leave unconfigured instead"
-        )
+        raise EmailError("cannot set NONE as a transport; leave unconfigured instead")
     if kind not in SUPPORTED_TRANSPORTS:
         raise EmailError(
-            f"unsupported transport {kind!r}; "
-            f"supported: {[k.value for k in SUPPORTED_TRANSPORTS]}"
+            f"unsupported transport {kind!r}; " f"supported: {[k.value for k in SUPPORTED_TRANSPORTS]}"
         )
     global _TRANSPORT, _TRANSPORT_KIND
     _TRANSPORT = fn

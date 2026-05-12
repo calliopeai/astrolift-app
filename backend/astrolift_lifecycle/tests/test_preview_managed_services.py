@@ -25,8 +25,7 @@ def test_cheap_kinds_default_to_shared():
 def test_expensive_kinds_default_to_dedicated():
     """Stateful or expensive services get fresh instances per
     preview to avoid contamination."""
-    for kind in ("kv_store", "search", "vector_index", "time_series",
-                 "document_db", "mq", "nfs"):
+    for kind in ("kv_store", "search", "vector_index", "time_series", "document_db", "mq", "nfs"):
         assert default_policy_for(kind) == PreviewPolicy.DEDICATED
 
 
@@ -45,9 +44,13 @@ def test_resolve_uses_default_when_no_override():
 
 
 def test_resolve_uses_manifest_override():
-    assert resolve_policy(
-        kind="postgres", manifest_override="dedicated",
-    ) == PreviewPolicy.DEDICATED
+    assert (
+        resolve_policy(
+            kind="postgres",
+            manifest_override="dedicated",
+        )
+        == PreviewPolicy.DEDICATED
+    )
 
 
 def test_resolve_rejects_unknown_override():

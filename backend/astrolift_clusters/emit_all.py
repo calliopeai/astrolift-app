@@ -38,11 +38,13 @@ class DeliveryMode(str, Enum):
     HYBRID = "hybrid"
 
 
-GITOPS_MODES: frozenset[DeliveryMode] = frozenset({
-    DeliveryMode.GITOPS_ARGOCD,
-    DeliveryMode.GITOPS_FLUX,
-    DeliveryMode.HYBRID,
-})
+GITOPS_MODES: frozenset[DeliveryMode] = frozenset(
+    {
+        DeliveryMode.GITOPS_ARGOCD,
+        DeliveryMode.GITOPS_FLUX,
+        DeliveryMode.HYBRID,
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -64,11 +66,14 @@ class EmitTask:
 
     deployment_id: int
     cluster_slug: str
-    repo_path: str   # 'clusters/prod-us-east/api/prod/manifests.yaml'
+    repo_path: str  # 'clusters/prod-us-east/api/prod/manifests.yaml'
 
 
 def repo_path_for(
-    *, path_prefix: str, app_slug: str, env_slug: str,
+    *,
+    path_prefix: str,
+    app_slug: str,
+    env_slug: str,
     filename: str = "manifests.yaml",
 ) -> str:
     """Compose the repo path. ``path_prefix`` is the cluster's
@@ -94,9 +99,7 @@ def plan_emit_all(
         if d.cluster_delivery_mode in GITOPS_MODES:
             active_gitops.append(d)
 
-    active_gitops.sort(
-        key=lambda d: (d.cluster_slug, d.app_slug, d.env_slug, d.deployment_id)
-    )
+    active_gitops.sort(key=lambda d: (d.cluster_slug, d.app_slug, d.env_slug, d.deployment_id))
 
     out: list[EmitTask] = []
     seen: set[tuple[str, str, str]] = set()
@@ -124,15 +127,17 @@ def plan_emit_all(
     out_unsorted: list[EmitTask] = []
     for key in sorted(by_key.keys()):
         d = by_key[key]
-        out_unsorted.append(EmitTask(
-            deployment_id=d.deployment_id,
-            cluster_slug=d.cluster_slug,
-            repo_path=repo_path_for(
-                path_prefix=d.cluster_path_prefix,
-                app_slug=d.app_slug,
-                env_slug=d.env_slug,
-            ),
-        ))
+        out_unsorted.append(
+            EmitTask(
+                deployment_id=d.deployment_id,
+                cluster_slug=d.cluster_slug,
+                repo_path=repo_path_for(
+                    path_prefix=d.cluster_path_prefix,
+                    app_slug=d.app_slug,
+                    env_slug=d.env_slug,
+                ),
+            )
+        )
     return tuple(out_unsorted)
 
 

@@ -75,13 +75,8 @@ def secret_storage_path(
         (service_name, "service_name"),
     ):
         if not _segment_ok(seg):
-            raise SecretPathError(
-                f"{label} {seg!r} contains invalid characters or is empty"
-            )
-    return (
-        f"astrolift/{env_slug}/{org_slug}/{app_slug}/"
-        f"managed-services/{service_name}"
-    )
+            raise SecretPathError(f"{label} {seg!r} contains invalid characters or is empty")
+    return f"astrolift/{env_slug}/{org_slug}/{app_slug}/" f"managed-services/{service_name}"
 
 
 # ---- auth-mode dispatch ---------------------------------------------
@@ -122,13 +117,9 @@ def validate_material(material: ConnectionMaterial) -> None:
     """
     if material.auth_mode == AuthMode.PASSWORD:
         if material.iam_grants:
-            raise AuthModeError(
-                "password mode binding has iam_grants; misconfigured driver"
-            )
+            raise AuthModeError("password mode binding has iam_grants; misconfigured driver")
         if material.mtls_files:
-            raise AuthModeError(
-                "password mode binding has mtls_files; misconfigured driver"
-            )
+            raise AuthModeError("password mode binding has mtls_files; misconfigured driver")
         return
     if material.auth_mode == AuthMode.IAM:
         # IAM mode must NOT carry password-shaped values
@@ -139,21 +130,19 @@ def validate_material(material: ConnectionMaterial) -> None:
                 "workload identity should make secrets unnecessary"
             )
         if material.mtls_files:
-            raise AuthModeError(
-                "iam mode binding has mtls_files; misconfigured driver"
-            )
+            raise AuthModeError("iam mode binding has mtls_files; misconfigured driver")
         return
     if material.auth_mode == AuthMode.MTLS:
         if not material.mtls_files:
-            raise AuthModeError(
-                "mtls mode binding has no mtls_files (client cert + key required)"
-            )
+            raise AuthModeError("mtls mode binding has no mtls_files (client cert + key required)")
         return
     raise AuthModeError(f"unknown auth_mode {material.auth_mode!r}")
 
 
 def variant_supports_auth_mode(
-    *, allowed_modes: frozenset[AuthMode], requested: AuthMode,
+    *,
+    allowed_modes: frozenset[AuthMode],
+    requested: AuthMode,
 ) -> bool:
     """Check the variant declares support for the requested mode."""
     return requested in allowed_modes

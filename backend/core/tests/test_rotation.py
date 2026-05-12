@@ -90,9 +90,7 @@ def test_first_evaluation_fires_active_reminders():
         reminder_thresholds_days=(14, 7, 1),
     )
     # 5 days before due — within both 14d and 7d windows but not 1d
-    fired = reminders_to_fire(
-        policy, now=_at(2026, 1, 26), last_check_at=None
-    )
+    fired = reminders_to_fire(policy, now=_at(2026, 1, 26), last_check_at=None)
     assert fired == (14, 7)
 
 
@@ -105,28 +103,29 @@ def test_crossing_fires_threshold_exactly_once():
         reminder_thresholds_days=(14, 7, 1),
     )
     # Worker poll #1: well before any threshold (35 days before due)
-    fired1 = reminders_to_fire(
-        policy, now=_at(2025, 12, 27), last_check_at=None
-    )
+    fired1 = reminders_to_fire(policy, now=_at(2025, 12, 27), last_check_at=None)
     assert fired1 == ()  # nothing crossed yet
 
     # Worker poll #2: just stepped into 14d window
     fired2 = reminders_to_fire(
-        policy, now=_at(2026, 1, 17, hour=1),
+        policy,
+        now=_at(2026, 1, 17, hour=1),
         last_check_at=_at(2026, 1, 16, hour=23),
     )
     assert fired2 == (14,)
 
     # Worker poll #3: still in 14d window but no NEW crossing
     fired3 = reminders_to_fire(
-        policy, now=_at(2026, 1, 18),
+        policy,
+        now=_at(2026, 1, 18),
         last_check_at=_at(2026, 1, 17, hour=1),
     )
     assert fired3 == ()
 
     # Worker poll #4: stepped into 7d window
     fired4 = reminders_to_fire(
-        policy, now=_at(2026, 1, 24, hour=1),
+        policy,
+        now=_at(2026, 1, 24, hour=1),
         last_check_at=_at(2026, 1, 23, hour=23),
     )
     assert fired4 == (7,)
@@ -144,7 +143,8 @@ def test_skipped_window_still_fires_once():
     # Last check at day 15 (before 14d window). Now at day 28 (within
     # 1d window). So we crossed 14, 7, AND 1 since last check.
     fired = reminders_to_fire(
-        policy, now=_at(2026, 1, 30, hour=12),
+        policy,
+        now=_at(2026, 1, 30, hour=12),
         last_check_at=_at(2026, 1, 15),
     )
     assert fired == (14, 7, 1)
@@ -158,9 +158,7 @@ def test_reminders_descending_order():
         period_days=30,
         reminder_thresholds_days=(7, 1, 14),  # arbitrary order
     )
-    fired = reminders_to_fire(
-        policy, now=_at(2026, 1, 30), last_check_at=None
-    )
+    fired = reminders_to_fire(policy, now=_at(2026, 1, 30), last_check_at=None)
     assert fired == (14, 7, 1)
 
 
@@ -172,9 +170,7 @@ def test_reminders_after_due_still_fire_remaining_thresholds():
         period_days=30,
         reminder_thresholds_days=(14, 7, 1),
     )
-    fired = reminders_to_fire(
-        policy, now=_at(2026, 2, 1), last_check_at=None
-    )
+    fired = reminders_to_fire(policy, now=_at(2026, 2, 1), last_check_at=None)
     assert fired == (14, 7, 1)
 
 
@@ -198,7 +194,5 @@ def test_evaluate_negative_days_when_overdue():
 
 def test_evaluate_default_thresholds_match_spec():
     policy = RotationPolicy(last_rotated_at=_at(2026, 1, 1))
-    assert (
-        policy.reminder_thresholds_days == DEFAULT_REMINDER_THRESHOLDS_DAYS
-    )
+    assert policy.reminder_thresholds_days == DEFAULT_REMINDER_THRESHOLDS_DAYS
     assert DEFAULT_REMINDER_THRESHOLDS_DAYS == (14, 7, 1)

@@ -17,13 +17,15 @@ def _aws_cluster(**kw) -> ClusterCapabilities:
         cluster_slug="acme-prod",
         cloud_provider="aws",
         supported_kinds=frozenset({"postgres", "redis", "queue", "ingress"}),
-        supported_pins=frozenset({
-            "aws-rds/aurora-15",
-            "aws-rds/postgres-15",
-            "aws-elasticache/redis-7",
-            "aws-sqs/standard",
-            "ingress-nginx/v1",
-        }),
+        supported_pins=frozenset(
+            {
+                "aws-rds/aurora-15",
+                "aws-rds/postgres-15",
+                "aws-elasticache/redis-7",
+                "aws-sqs/standard",
+                "ingress-nginx/v1",
+            }
+        ),
     )
     base.update(kw)
     return ClusterCapabilities(**base)
@@ -35,11 +37,13 @@ def _gcp_cluster() -> ClusterCapabilities:
         cluster_slug="acme-eu",
         cloud_provider="gcp",
         supported_kinds=frozenset({"postgres", "redis", "ingress"}),
-        supported_pins=frozenset({
-            "gcp-cloudsql/postgres-15",
-            "gcp-memorystore/redis-7",
-            "ingress-nginx/v1",
-        }),
+        supported_pins=frozenset(
+            {
+                "gcp-cloudsql/postgres-15",
+                "gcp-memorystore/redis-7",
+                "ingress-nginx/v1",
+            }
+        ),
     )
 
 
@@ -60,9 +64,7 @@ def test_bind_passes_when_all_kinds_supported_no_pins():
 def test_bind_passes_with_supported_pins():
     report = bind_precheck(
         requirements=[
-            ManifestRequirement(
-                kind="postgres", name="main", variant_pin="aws-rds/aurora-15"
-            ),
+            ManifestRequirement(kind="postgres", name="main", variant_pin="aws-rds/aurora-15"),
         ],
         cluster=_aws_cluster(),
     )
@@ -83,9 +85,7 @@ def test_bind_rejects_unsupported_kind():
 def test_bind_rejects_unsupported_pin():
     report = bind_precheck(
         requirements=[
-            ManifestRequirement(
-                kind="postgres", name="main", variant_pin="gcp-cloudsql/postgres-15"
-            ),
+            ManifestRequirement(kind="postgres", name="main", variant_pin="gcp-cloudsql/postgres-15"),
         ],
         cluster=_aws_cluster(),
     )
@@ -100,7 +100,8 @@ def test_bind_collects_every_blocker_at_once():
         requirements=[
             ManifestRequirement(kind="kafka", name="events"),
             ManifestRequirement(
-                kind="postgres", name="main",
+                kind="postgres",
+                name="main",
                 variant_pin="gcp-cloudsql/postgres-15",
             ),
             ManifestRequirement(kind="redis", name="cache"),  # OK

@@ -34,10 +34,12 @@ def _scaffold():
 
 
 def _ctx(org, *, actor_user_id=None):
-    return tenant_context(TenantContext(
-        organization_id=org.id,
-        actor_user_id=actor_user_id,
-    ))
+    return tenant_context(
+        TenantContext(
+            organization_id=org.id,
+            actor_user_id=actor_user_id,
+        )
+    )
 
 
 # ---- create -----------------------------------------------------
@@ -139,7 +141,9 @@ def test_create_alert_rule_duplicate_name_conflict(permission_resolver):
     org = _scaffold()
     permission_resolver.grant(Permission.WEBHOOK_CREATE)
     AlertRule.objects.create(
-        organization=org, name="dup", target="global",
+        organization=org,
+        name="dup",
+        target="global",
     )
 
     with _ctx(org):
@@ -169,8 +173,11 @@ def test_update_alert_rule_patches_fields(permission_resolver):
     org = _scaffold()
     permission_resolver.grant(Permission.WEBHOOK_UPDATE)
     rule = AlertRule.objects.create(
-        organization=org, name="orig", target="app",
-        severity="warn", is_active=True,
+        organization=org,
+        name="orig",
+        target="app",
+        severity="warn",
+        is_active=True,
     )
 
     with _ctx(org):
@@ -213,7 +220,9 @@ def test_delete_alert_rule_soft_deletes(permission_resolver):
     org = _scaffold()
     permission_resolver.grant(Permission.WEBHOOK_DELETE)
     rule = AlertRule.objects.create(
-        organization=org, name="r", target="app",
+        organization=org,
+        name="r",
+        target="app",
     )
 
     with _ctx(org):
@@ -233,10 +242,13 @@ def test_acknowledge_alert_event_sets_timestamp(permission_resolver):
     org = _scaffold()
     permission_resolver.grant(Permission.WEBHOOK_UPDATE)
     rule = AlertRule.objects.create(
-        organization=org, name="r", target="app",
+        organization=org,
+        name="r",
+        target="app",
     )
     event = AlertEvent.objects.create(
-        rule=rule, organization=org,
+        rule=rule,
+        organization=org,
         fired_at=timezone.now(),
         severity="warn",
         summary="something fired",
@@ -258,10 +270,13 @@ def test_acknowledge_is_idempotent(permission_resolver):
     org = _scaffold()
     permission_resolver.grant(Permission.WEBHOOK_UPDATE)
     rule = AlertRule.objects.create(
-        organization=org, name="r", target="app",
+        organization=org,
+        name="r",
+        target="app",
     )
     event = AlertEvent.objects.create(
-        rule=rule, organization=org,
+        rule=rule,
+        organization=org,
         fired_at=timezone.now(),
         severity="warn",
         acknowledged_at=timezone.now(),

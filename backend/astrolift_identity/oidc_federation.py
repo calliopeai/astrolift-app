@@ -100,9 +100,7 @@ class FederationConfig:
         if self.org_id <= 0:
             raise FederationError("org_id must be positive")
         if not self.issuer or not self.audience:
-            raise FederationError(
-                "issuer and audience are required"
-            )
+            raise FederationError("issuer and audience are required")
         if not self.allowed_subject_patterns:
             raise FederationError(
                 "allowed_subject_patterns must not be empty (would "
@@ -172,8 +170,7 @@ def evaluate_exchange(
         raise FederationError("audience mismatch")
 
     if not any(
-        matches_subject(allowed_pattern=p, presented_sub=claims.sub)
-        for p in config.allowed_subject_patterns
+        matches_subject(allowed_pattern=p, presented_sub=claims.sub) for p in config.allowed_subject_patterns
     ):
         raise FederationError("subject not allowed by federation policy")
 
@@ -182,9 +179,7 @@ def evaluate_exchange(
             allowed_pattern=config.target_app_pattern,
             presented_sub=target_app_slug,
         ):
-            raise FederationError(
-                "target app not allowed by federation policy"
-            )
+            raise FederationError("target app not allowed by federation policy")
 
     return FederatedDeploy(
         org_id=config.org_id,

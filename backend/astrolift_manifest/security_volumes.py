@@ -69,18 +69,13 @@ def parse_security_context(raw: Mapping) -> SecurityContext:
         if run_as_user < 0:
             raise StorageError("run_as_user must be non-negative")
         if run_as_non_root and run_as_user == 0:
-            raise StorageError(
-                "run_as_non_root=True conflicts with run_as_user=0 "
-                "(uid 0 is root)"
-            )
+            raise StorageError("run_as_non_root=True conflicts with run_as_user=0 " "(uid 0 is root)")
 
     return SecurityContext(
         read_only_root_fs=bool(raw.get("read_only_root_fs", True)),
         run_as_non_root=run_as_non_root,
         run_as_user=run_as_user,
-        allow_privilege_escalation=bool(
-            raw.get("allow_privilege_escalation", False)
-        ),
+        allow_privilege_escalation=bool(raw.get("allow_privilege_escalation", False)),
         capabilities_drop=tuple(raw.get("capabilities_drop", ("ALL",))),
         capabilities_add=tuple(raw.get("capabilities_add", ())),
     )
@@ -146,16 +141,11 @@ class VolumeDecl:
         if not self.name:
             raise StorageError("volume name is required")
         if not self.mount_path or not self.mount_path.startswith("/"):
-            raise StorageError(
-                f"volume mount_path {self.mount_path!r} must be an "
-                "absolute path"
-            )
+            raise StorageError(f"volume mount_path {self.mount_path!r} must be an " "absolute path")
 
         if self.kind == VolumeKind.PVC:
             if not self.size:
-                raise StorageError(
-                    f"PVC volume {self.name!r} requires size"
-                )
+                raise StorageError(f"PVC volume {self.name!r} requires size")
             # Validate parseable
             parse_size(self.size)
         elif self.kind in (VolumeKind.CONFIG_MAP, VolumeKind.SECRET):
@@ -181,8 +171,7 @@ def parse_volume(raw: Mapping) -> VolumeDecl:
         kind = VolumeKind(kind_raw)
     except ValueError as exc:
         raise StorageError(
-            f"volume kind {kind_raw!r} not one of "
-            f"{[k.value for k in VolumeKind]}"
+            f"volume kind {kind_raw!r} not one of " f"{[k.value for k in VolumeKind]}"
         ) from exc
 
     return VolumeDecl(
@@ -204,9 +193,7 @@ def render_pvc(volume: VolumeDecl, *, namespace: str) -> dict:
     is the volume name; the same name is used in
     PodSpec.volumes for the claim ref."""
     if volume.kind != VolumeKind.PVC:
-        raise StorageError(
-            f"render_pvc called on non-PVC volume kind {volume.kind!r}"
-        )
+        raise StorageError(f"render_pvc called on non-PVC volume kind {volume.kind!r}")
     spec: dict = {
         "accessModes": [volume.access_mode],
         "resources": {"requests": {"storage": volume.size}},

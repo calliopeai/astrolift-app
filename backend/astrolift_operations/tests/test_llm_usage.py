@@ -50,10 +50,14 @@ def test_name_hint_case_insensitive():
 def test_no_match_for_non_llm_keys():
     """We only care about LLM providers — Stripe/GitHub/Slack
     keys should NOT match this detector."""
-    out = detect_llm_keys(env_keys=[
-        "STRIPE_API_KEY", "GITHUB_TOKEN", "SLACK_WEBHOOK",
-        "REGULAR_ENV_VAR",
-    ])
+    out = detect_llm_keys(
+        env_keys=[
+            "STRIPE_API_KEY",
+            "GITHUB_TOKEN",
+            "SLACK_WEBHOOK",
+            "REGULAR_ENV_VAR",
+        ]
+    )
     assert out == ()
 
 
@@ -148,9 +152,12 @@ def test_token_usage_validates_period():
     with pytest.raises(ValueError, match="period_yyyy_mm"):
         TokenUsage(
             period_yyyy_mm="May 2026",
-            org_id=1, app_id=1,
-            provider=LLMProvider.OPENAI, model="gpt-4o",
-            input_tokens=100, output_tokens=50,
+            org_id=1,
+            app_id=1,
+            provider=LLMProvider.OPENAI,
+            model="gpt-4o",
+            input_tokens=100,
+            output_tokens=50,
         )
 
 
@@ -158,9 +165,12 @@ def test_token_usage_validates_positive_ids():
     with pytest.raises(ValueError):
         TokenUsage(
             period_yyyy_mm="2026-05",
-            org_id=0, app_id=1,
-            provider=LLMProvider.OPENAI, model="gpt-4o",
-            input_tokens=100, output_tokens=50,
+            org_id=0,
+            app_id=1,
+            provider=LLMProvider.OPENAI,
+            model="gpt-4o",
+            input_tokens=100,
+            output_tokens=50,
         )
 
 
@@ -168,9 +178,12 @@ def test_token_usage_rejects_negative_tokens():
     with pytest.raises(ValueError):
         TokenUsage(
             period_yyyy_mm="2026-05",
-            org_id=1, app_id=1,
-            provider=LLMProvider.OPENAI, model="gpt-4o",
-            input_tokens=-1, output_tokens=50,
+            org_id=1,
+            app_id=1,
+            provider=LLMProvider.OPENAI,
+            model="gpt-4o",
+            input_tokens=-1,
+            output_tokens=50,
         )
 
 
@@ -199,11 +212,14 @@ def test_lookup_pricing_unknown_falls_back_high():
 
 def test_lookup_pricing_org_override_wins():
     override = ModelPricing(
-        provider=LLMProvider.OPENAI, model="gpt-4o",
-        input_per_million_usd=1.00, output_per_million_usd=4.00,
+        provider=LLMProvider.OPENAI,
+        model="gpt-4o",
+        input_per_million_usd=1.00,
+        output_per_million_usd=4.00,
     )
     p = lookup_pricing(
-        provider=LLMProvider.OPENAI, model="gpt-4o",
+        provider=LLMProvider.OPENAI,
+        model="gpt-4o",
         overrides=[override],
     )
     assert p is override
@@ -211,9 +227,13 @@ def test_lookup_pricing_org_override_wins():
 
 def test_cost_for_usage_simple():
     usage = TokenUsage(
-        period_yyyy_mm="2026-05", org_id=1, app_id=1,
-        provider=LLMProvider.OPENAI, model="gpt-4o",
-        input_tokens=1_000_000, output_tokens=500_000,
+        period_yyyy_mm="2026-05",
+        org_id=1,
+        app_id=1,
+        provider=LLMProvider.OPENAI,
+        model="gpt-4o",
+        input_tokens=1_000_000,
+        output_tokens=500_000,
     )
     cost = cost_for_usage(usage)
     # 1M input @ $2.50 + 0.5M output @ $10/M = $5.00
@@ -222,22 +242,32 @@ def test_cost_for_usage_simple():
 
 def test_cost_for_usage_zero_tokens_zero_cost():
     usage = TokenUsage(
-        period_yyyy_mm="2026-05", org_id=1, app_id=1,
-        provider=LLMProvider.OPENAI, model="gpt-4o",
-        input_tokens=0, output_tokens=0,
+        period_yyyy_mm="2026-05",
+        org_id=1,
+        app_id=1,
+        provider=LLMProvider.OPENAI,
+        model="gpt-4o",
+        input_tokens=0,
+        output_tokens=0,
     )
     assert cost_for_usage(usage) == 0.0
 
 
 def test_cost_for_usage_with_override():
     usage = TokenUsage(
-        period_yyyy_mm="2026-05", org_id=1, app_id=1,
-        provider=LLMProvider.OPENAI, model="gpt-4o",
-        input_tokens=1_000_000, output_tokens=0,
+        period_yyyy_mm="2026-05",
+        org_id=1,
+        app_id=1,
+        provider=LLMProvider.OPENAI,
+        model="gpt-4o",
+        input_tokens=1_000_000,
+        output_tokens=0,
     )
     override = ModelPricing(
-        provider=LLMProvider.OPENAI, model="gpt-4o",
-        input_per_million_usd=1.00, output_per_million_usd=4.00,
+        provider=LLMProvider.OPENAI,
+        model="gpt-4o",
+        input_per_million_usd=1.00,
+        output_per_million_usd=4.00,
     )
     assert cost_for_usage(usage, overrides=[override]) == 1.00
 
@@ -261,7 +291,9 @@ def test_fetch_usage_returns_empty_without_source():
     """No source registered → empty tuple, not None. Aggregation
     code can sum across an empty tuple harmlessly."""
     out = fetch_usage(
-        provider=LLMProvider.OPENAI, org_id=1, period_yyyy_mm="2026-05",
+        provider=LLMProvider.OPENAI,
+        org_id=1,
+        period_yyyy_mm="2026-05",
     )
     assert out == ()
 
@@ -273,16 +305,22 @@ def test_fetch_usage_dispatches_to_registered_source():
         captured["called_with"] = (provider, org_id, period)
         return (
             TokenUsage(
-                period_yyyy_mm=period, org_id=org_id, app_id=42,
-                provider=provider, model="gpt-4o",
-                input_tokens=100_000, output_tokens=50_000,
+                period_yyyy_mm=period,
+                org_id=org_id,
+                app_id=42,
+                provider=provider,
+                model="gpt-4o",
+                input_tokens=100_000,
+                output_tokens=50_000,
             ),
         )
 
     register_usage_source(provider=LLMProvider.OPENAI, source=fake_source)
     try:
         out = fetch_usage(
-            provider=LLMProvider.OPENAI, org_id=7, period_yyyy_mm="2026-05",
+            provider=LLMProvider.OPENAI,
+            org_id=7,
+            period_yyyy_mm="2026-05",
         )
     finally:
         unregister_usage_source(LLMProvider.OPENAI)
@@ -290,4 +328,4 @@ def test_fetch_usage_dispatches_to_registered_source():
     assert captured["called_with"] == (LLMProvider.OPENAI, 7, "2026-05")
     assert len(out) == 1
     assert out[0].input_tokens == 100_000
-    assert cost_for_usage(out[0]) == 0.75   # 100k @ $2.50/M + 50k @ $10/M = 0.25 + 0.5
+    assert cost_for_usage(out[0]) == 0.75  # 100k @ $2.50/M + 50k @ $10/M = 0.25 + 0.5

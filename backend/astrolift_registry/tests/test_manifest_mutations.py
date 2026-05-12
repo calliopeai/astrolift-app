@@ -34,7 +34,10 @@ def _scaffold(*, manifest_raw: str = "", manifest_hash: str = ""):
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")
     project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo",
+        organization=org,
+        team=team,
+        name="Demo",
+        slug="demo",
     )
     app = RegisteredApp.objects.create(
         organization=org,
@@ -74,7 +77,8 @@ def test_update_manifest_stages_to_staged_buffer(permission_resolver):
         result = RegistryMutation().update_manifest(
             _info(),
             input=UpdateManifestInput(
-                id=str(app.guid), raw_manifest=_VALID_TOML,
+                id=str(app.guid),
+                raw_manifest=_VALID_TOML,
             ),
         )
 
@@ -99,7 +103,8 @@ def test_update_manifest_with_match_clears_staging_buffer(
         result = RegistryMutation().update_manifest(
             _info(),
             input=UpdateManifestInput(
-                id=str(app.guid), raw_manifest=_VALID_TOML,
+                id=str(app.guid),
+                raw_manifest=_VALID_TOML,
             ),
         )
 
@@ -152,7 +157,8 @@ def test_update_manifest_requires_permission():
         result = RegistryMutation().update_manifest(
             _info(),
             input=UpdateManifestInput(
-                id=str(app.guid), raw_manifest=_VALID_TOML,
+                id=str(app.guid),
+                raw_manifest=_VALID_TOML,
             ),
         )
     assert not result.ok

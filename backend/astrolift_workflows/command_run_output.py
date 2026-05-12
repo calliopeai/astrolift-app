@@ -44,9 +44,7 @@ push past 64KB to blob storage."""
 def should_use_inline(*, byte_count: int) -> bool:
     """True if output fits inline; False means flush to blob."""
     if byte_count < 0:
-        raise CommandRunOutputError(
-            f"byte_count must be non-negative, got {byte_count}"
-        )
+        raise CommandRunOutputError(f"byte_count must be non-negative, got {byte_count}")
     return byte_count <= INLINE_THRESHOLD_BYTES
 
 
@@ -74,13 +72,17 @@ class CaptureState(str, Enum):
 
 
 _ALLOWED_TRANSITIONS = {
-    CaptureState.PENDING: frozenset({
-        CaptureState.CAPTURING,
-    }),
-    CaptureState.CAPTURING: frozenset({
-        CaptureState.CAPTURED,
-        CaptureState.CAPTURE_FAILED,
-    }),
+    CaptureState.PENDING: frozenset(
+        {
+            CaptureState.CAPTURING,
+        }
+    ),
+    CaptureState.CAPTURING: frozenset(
+        {
+            CaptureState.CAPTURED,
+            CaptureState.CAPTURE_FAILED,
+        }
+    ),
     CaptureState.CAPTURED: frozenset(),
     CaptureState.CAPTURE_FAILED: frozenset(),
 }
@@ -100,7 +102,8 @@ def cleanup_gate_open(*, capture_state: CaptureState) -> bool:
     explicit failure — both keep the workflow moving forward).
     PENDING/CAPTURING means logs may still arrive; refuse cleanup."""
     return capture_state in (
-        CaptureState.CAPTURED, CaptureState.CAPTURE_FAILED,
+        CaptureState.CAPTURED,
+        CaptureState.CAPTURE_FAILED,
     )
 
 
@@ -129,22 +132,15 @@ class CapturedStream:
 
     def __post_init__(self) -> None:
         if self.total_byte_count < 0:
-            raise CommandRunOutputError(
-                "total_byte_count cannot be negative"
-            )
+            raise CommandRunOutputError("total_byte_count cannot be negative")
         if len(self.inline_bytes) > INLINE_HARD_CAP_BYTES:
             raise CommandRunOutputError(
-                f"inline_bytes {len(self.inline_bytes)}B exceeds "
-                f"hard cap {INLINE_HARD_CAP_BYTES}B"
+                f"inline_bytes {len(self.inline_bytes)}B exceeds " f"hard cap {INLINE_HARD_CAP_BYTES}B"
             )
         if self.truncated and not self.blob_ref:
-            raise CommandRunOutputError(
-                "truncated=True requires blob_ref"
-            )
+            raise CommandRunOutputError("truncated=True requires blob_ref")
         if not self.truncated and self.blob_ref:
-            raise CommandRunOutputError(
-                "blob_ref set but truncated=False"
-            )
+            raise CommandRunOutputError("blob_ref set but truncated=False")
 
 
 def plan_capture(*, total_byte_count: int) -> dict:
@@ -156,9 +152,7 @@ def plan_capture(*, total_byte_count: int) -> dict:
       when both are used (for fast UI first paint)
     """
     if total_byte_count < 0:
-        raise CommandRunOutputError(
-            "total_byte_count cannot be negative"
-        )
+        raise CommandRunOutputError("total_byte_count cannot be negative")
     if should_use_inline(byte_count=total_byte_count):
         return {
             "inline_only": True,
@@ -199,16 +193,13 @@ def projection_for(
     """Validation wrapper — refuses inconsistent state."""
     if capture_state == CaptureState.CAPTURED:
         if captured_at_unix is None:
-            raise CommandRunOutputError(
-                "capture_state=CAPTURED requires captured_at_unix"
-            )
+            raise CommandRunOutputError("capture_state=CAPTURED requires captured_at_unix")
     if capture_state == CaptureState.PENDING:
         if captured_at_unix is not None:
-            raise CommandRunOutputError(
-                "capture_state=PENDING but captured_at_unix is set"
-            )
+            raise CommandRunOutputError("capture_state=PENDING but captured_at_unix is set")
     return CommandRunOutputProjection(
-        stdout=stdout, stderr=stderr,
+        stdout=stdout,
+        stderr=stderr,
         captured_at_unix=captured_at_unix,
         capture_state=capture_state,
     )
@@ -230,13 +221,9 @@ def validate_retention_days(*, days: int) -> int:
     observability_profile.py — 1 day floor (anything less is
     pointless), 1 year ceiling."""
     if days < MIN_RETENTION_DAYS:
-        raise CommandRunOutputError(
-            f"retention {days}d below minimum {MIN_RETENTION_DAYS}"
-        )
+        raise CommandRunOutputError(f"retention {days}d below minimum {MIN_RETENTION_DAYS}")
     if days > MAX_RETENTION_DAYS:
-        raise CommandRunOutputError(
-            f"retention {days}d exceeds maximum {MAX_RETENTION_DAYS}"
-        )
+        raise CommandRunOutputError(f"retention {days}d exceeds maximum {MAX_RETENTION_DAYS}")
     return days
 
 
@@ -303,10 +290,7 @@ def capture_failure_message(*, attempt_count: int) -> str:
     if attempt_count <= 0:
         raise CommandRunOutputError("attempt_count must be positive")
     if attempt_count == 1:
-        return (
-            "log capture failed (1 attempt); the pod was cleaned "
-            "up before logs could be persisted"
-        )
+        return "log capture failed (1 attempt); the pod was cleaned " "up before logs could be persisted"
     return (
         f"log capture failed after {attempt_count} attempts; "
         "the pod was cleaned up before logs could be persisted"

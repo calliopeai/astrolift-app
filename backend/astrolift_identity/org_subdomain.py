@@ -29,18 +29,20 @@ from typing import Final
 
 # Reserved labels — operators / system / api should never resolve
 # to an org subdomain even if a typo lets one through.
-RESERVED_SUBDOMAIN_LABELS: Final[frozenset[str]] = frozenset({
-    "www",
-    "api",
-    "admin",
-    "auth",
-    "platform",
-    "static",
-    "assets",
-    "cdn",
-    "status",
-    "mail",
-})
+RESERVED_SUBDOMAIN_LABELS: Final[frozenset[str]] = frozenset(
+    {
+        "www",
+        "api",
+        "admin",
+        "auth",
+        "platform",
+        "static",
+        "assets",
+        "cdn",
+        "status",
+        "mail",
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -65,9 +67,7 @@ class OrgSubdomainConfig:
         if not self.org_slug:
             raise ValueError("org_slug is required")
         if self.subdomain_label and self.subdomain_label.lower() in RESERVED_SUBDOMAIN_LABELS:
-            raise ValueError(
-                f"subdomain label {self.subdomain_label!r} is reserved"
-            )
+            raise ValueError(f"subdomain label {self.subdomain_label!r} is reserved")
 
     @property
     def fqdn(self) -> str:
@@ -98,14 +98,11 @@ class CrossOrgAccessDenied(Exception):
         self.presented_org_slug = presented_org_slug
         self.host_org_slug = host_org_slug
         super().__init__(
-            f"session for org {presented_org_slug!r} presented on "
-            f"org {host_org_slug!r}'s subdomain"
+            f"session for org {presented_org_slug!r} presented on " f"org {host_org_slug!r}'s subdomain"
         )
 
 
-def resolve_host(
-    *, host: str, configs: Sequence[OrgSubdomainConfig]
-) -> HostBinding:
+def resolve_host(*, host: str, configs: Sequence[OrgSubdomainConfig]) -> HostBinding:
     """Map the request's Host header to an org configuration.
 
     Order of match:

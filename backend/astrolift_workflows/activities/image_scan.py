@@ -62,7 +62,7 @@ class ScanResult:
     onto this. The deploy workflow stores this on the Deployment row."""
 
     image_uri: str
-    scanner: str   # human label, e.g. 'trivy', 'grype'
+    scanner: str  # human label, e.g. 'trivy', 'grype'
     counts: dict[Severity, int]
     findings: tuple[CVE, ...]
     scan_succeeded: bool = True
@@ -86,8 +86,8 @@ class ScanPolicy:
     equal to ``block_at`` (warn doesn't block at the block level).
     """
 
-    block_at: Severity = Severity.HIGH      # default: block on HIGH+
-    warn_at: Severity = Severity.MEDIUM     # default: warn on MEDIUM
+    block_at: Severity = Severity.HIGH  # default: block on HIGH+
+    warn_at: Severity = Severity.MEDIUM  # default: warn on MEDIUM
     fail_open_on_scanner_error: bool = True
     """When True, a scanner timeout/error returns WARN (deploy goes
     through). When False, returns BLOCK (fail-closed). Default
@@ -100,8 +100,7 @@ class ScanPolicy:
         order = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]
         if order.index(self.warn_at) < order.index(self.block_at):
             raise ValueError(
-                "warn_at cannot be stricter than block_at "
-                "(warn_at must be the same or weaker severity)"
+                "warn_at cannot be stricter than block_at " "(warn_at must be the same or weaker severity)"
             )
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -150,9 +149,7 @@ def evaluate_policy(result: ScanResult, policy: ScanPolicy) -> PolicyDecision:
             decision=ScanDecision.BLOCK,
             blocking_findings=tuple(blocking),
             warning_findings=tuple(warning),
-            reason=(
-                f"{len(blocking)} finding(s) at {policy.block_at.value} or worse"
-            ),
+            reason=(f"{len(blocking)} finding(s) at {policy.block_at.value} or worse"),
         )
     if warning:
         return PolicyDecision(
@@ -183,17 +180,12 @@ class ScanOverride:
 
     def __post_init__(self) -> None:
         if not self.reason or len(self.reason.strip()) < 10:
-            raise ValueError(
-                "override reason must be at least 10 characters "
-                "(operator must explain why)"
-            )
+            raise ValueError("override reason must be at least 10 characters " "(operator must explain why)")
         if self.by_user_id <= 0:
             raise ValueError("by_user_id must be positive")
 
 
-def apply_override(
-    decision: PolicyDecision, override: ScanOverride | None
-) -> PolicyDecision:
+def apply_override(decision: PolicyDecision, override: ScanOverride | None) -> PolicyDecision:
     """Apply an override. Returns a new decision; the original
     decision's findings are preserved on the new one so the audit
     log shows both the original BLOCK and the override.
@@ -207,10 +199,7 @@ def apply_override(
         decision=ScanDecision.WARN,
         blocking_findings=decision.blocking_findings,
         warning_findings=decision.warning_findings,
-        reason=(
-            f"BLOCK overridden by user {override.by_user_id}: "
-            f"{override.reason}"
-        ),
+        reason=(f"BLOCK overridden by user {override.by_user_id}: " f"{override.reason}"),
     )
 
 
@@ -232,10 +221,7 @@ def register_scanner(name: str, scanner: ScannerCallable) -> None:
 
 def get_scanner(name: str) -> ScannerCallable:
     if name not in _SCANNERS:
-        raise KeyError(
-            f"no scanner registered for {name!r}; "
-            f"available: {sorted(_SCANNERS)}"
-        )
+        raise KeyError(f"no scanner registered for {name!r}; " f"available: {sorted(_SCANNERS)}")
     return _SCANNERS[name]
 
 

@@ -56,13 +56,11 @@ class VariantSupport:
     def __post_init__(self) -> None:
         if not self.allowed_modes:
             raise ValueError(
-                f"variant {self.plugin_slug}/{self.variant} declares no "
-                "allowed isolation modes"
+                f"variant {self.plugin_slug}/{self.variant} declares no " "allowed isolation modes"
             )
         if self.default not in self.allowed_modes:
             raise ValueError(
-                f"variant {self.plugin_slug}/{self.variant} default "
-                f"{self.default} not in allowed_modes"
+                f"variant {self.plugin_slug}/{self.variant} default " f"{self.default} not in allowed_modes"
             )
 
 
@@ -82,9 +80,7 @@ def parse_mode(value: str | None) -> Isolation | None:
     try:
         return Isolation(value)
     except ValueError as exc:
-        raise IsolationError(
-            f"isolation {value!r} not one of {[m.value for m in Isolation]}"
-        ) from exc
+        raise IsolationError(f"isolation {value!r} not one of {[m.value for m in Isolation]}") from exc
 
 
 def resolve(
@@ -113,7 +109,9 @@ def resolve(
                 "pick a different variant or update the policy"
             )
         return IsolationDecision(
-            mode=required, source=SOURCE_ORG_POLICY, variant=variant,
+            mode=required,
+            source=SOURCE_ORG_POLICY,
+            variant=variant,
         )
 
     # 2. Manifest opt-in.
@@ -125,10 +123,14 @@ def resolve(
                 f"supports {sorted(m.value for m in variant.allowed_modes)}"
             )
         return IsolationDecision(
-            mode=manifest_choice, source=SOURCE_MANIFEST, variant=variant,
+            mode=manifest_choice,
+            source=SOURCE_MANIFEST,
+            variant=variant,
         )
 
     # 3. Variant default.
     return IsolationDecision(
-        mode=variant.default, source=SOURCE_VARIANT_DEFAULT, variant=variant,
+        mode=variant.default,
+        source=SOURCE_VARIANT_DEFAULT,
+        variant=variant,
     )

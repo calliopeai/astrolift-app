@@ -233,9 +233,7 @@ class RegistryMutation:
         try:
             new_subdomain = validate_subdomain_label(input.subdomain)
         except ValueError as exc:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, str(exc), field="subdomain"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="subdomain")
 
         # Within-org collision: another active app already owning
         # this subdomain is a footgun (DNS would race for the same
@@ -279,7 +277,9 @@ class RegistryMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def update_manifest(
-        self, info: Info, input: UpdateManifestInput,
+        self,
+        info: Info,
+        input: UpdateManifestInput,
     ) -> MutationResultType[_ManifestStagePayload]:
         """Stage a manifest edit. Writes to ``manifest_raw_staged``.
 
@@ -288,7 +288,8 @@ class RegistryMutation:
         """
         from astrolift_manifest.parser import ManifestError, parse_raw
         from astrolift_manifest.sync_state import (
-            SyncSnapshot, classify_state,
+            SyncSnapshot,
+            classify_state,
         )
 
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
@@ -313,28 +314,38 @@ class RegistryMutation:
             app.manifest_raw_staged = ""
         else:
             app.manifest_raw_staged = text
-        app.save(update_fields=[
-            "manifest_raw_staged", "updated_at", "version",
-        ])
+        app.save(
+            update_fields=[
+                "manifest_raw_staged",
+                "updated_at",
+                "version",
+            ]
+        )
 
-        sync_state = classify_state(SyncSnapshot(
-            db_hash=app.manifest_hash or "",
-            repo_hash=app.last_synced_hash or app.manifest_hash or "",
-            last_synced_hash=app.last_synced_hash or "",
-        ))
-        return gql_success(_ManifestStagePayload(
-            id=input.id,
-            sync_state=sync_state.value,
-            raw_manifest=app.manifest_raw or "",
-            raw_manifest_staged=app.manifest_raw_staged or "",
-        ))
+        sync_state = classify_state(
+            SyncSnapshot(
+                db_hash=app.manifest_hash or "",
+                repo_hash=app.last_synced_hash or app.manifest_hash or "",
+                last_synced_hash=app.last_synced_hash or "",
+            )
+        )
+        return gql_success(
+            _ManifestStagePayload(
+                id=input.id,
+                sync_state=sync_state.value,
+                raw_manifest=app.manifest_raw or "",
+                raw_manifest_staged=app.manifest_raw_staged or "",
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.sync_manifest_from_repo")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def sync_manifest_from_repo(
-        self, info: Info, input: SyncManifestFromRepoInput,
+        self,
+        info: Info,
+        input: SyncManifestFromRepoInput,
     ) -> MutationResultType[_ManifestStagePayload]:
         """Re-fetch the manifest from the source repo + recompute
         the hash anchor.
@@ -349,7 +360,8 @@ class RegistryMutation:
         sync_state classifier reads as IN_SYNC.
         """
         from astrolift_manifest.sync_state import (
-            SyncSnapshot, classify_state,
+            SyncSnapshot,
+            classify_state,
         )
 
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
@@ -362,29 +374,39 @@ class RegistryMutation:
         # UI's sync state is consistent.
         app.manifest_raw_staged = ""
         app.last_synced_hash = app.manifest_hash or ""
-        app.save(update_fields=[
-            "manifest_raw_staged", "last_synced_hash",
-            "updated_at", "version",
-        ])
+        app.save(
+            update_fields=[
+                "manifest_raw_staged",
+                "last_synced_hash",
+                "updated_at",
+                "version",
+            ]
+        )
 
-        sync_state = classify_state(SyncSnapshot(
-            db_hash=app.manifest_hash or "",
-            repo_hash=app.last_synced_hash or "",
-            last_synced_hash=app.last_synced_hash or "",
-        ))
-        return gql_success(_ManifestStagePayload(
-            id=input.id,
-            sync_state=sync_state.value,
-            raw_manifest=app.manifest_raw or "",
-            raw_manifest_staged="",
-        ))
+        sync_state = classify_state(
+            SyncSnapshot(
+                db_hash=app.manifest_hash or "",
+                repo_hash=app.last_synced_hash or "",
+                last_synced_hash=app.last_synced_hash or "",
+            )
+        )
+        return gql_success(
+            _ManifestStagePayload(
+                id=input.id,
+                sync_state=sync_state.value,
+                raw_manifest=app.manifest_raw or "",
+                raw_manifest_staged="",
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.push_manifest_to_repo")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def push_manifest_to_repo(
-        self, info: Info, input: PushManifestToRepoInput,
+        self,
+        info: Info,
+        input: PushManifestToRepoInput,
     ) -> MutationResultType[_ManifestPushPayload]:
         """Open a PR with the staged manifest.
 
@@ -400,21 +422,25 @@ class RegistryMutation:
 
         staged = app.manifest_raw_staged or ""
         if not staged or staged == (app.manifest_raw or ""):
-            return gql_success(_ManifestPushPayload(
-                id=input.id,
-                pr_url="",
-                branch_name="",
-                note="nothing_to_push",
-            ))
+            return gql_success(
+                _ManifestPushPayload(
+                    id=input.id,
+                    pr_url="",
+                    branch_name="",
+                    note="nothing_to_push",
+                )
+            )
 
         branch = input.branch_name or f"astrolift/manifest-{app.slug}"
         # TODO: wire astrolift_scm.providers.<source_kind>.open_pull_request
         # to take (source_repo, branch, base=default_branch, file_changes,
         # title, body) and return the PR URL. The SCM-side abstraction
         # already exists for status posts; PR creation is a sibling.
-        return gql_success(_ManifestPushPayload(
-            id=input.id,
-            pr_url="",
-            branch_name=branch,
-            note="scm_pending",
-        ))
+        return gql_success(
+            _ManifestPushPayload(
+                id=input.id,
+                pr_url="",
+                branch_name=branch,
+                note="scm_pending",
+            )
+        )

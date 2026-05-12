@@ -76,9 +76,7 @@ def test_badge_empty_manifest_is_portable():
 
 
 def test_resolution_picks_manifest_pin_over_others():
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="aws/rds"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="aws/rds"),)
     rows = build_resolution_table(
         blocks=blocks,
         org_defaults={"postgres": "gcp/cloudsql"},
@@ -91,9 +89,7 @@ def test_resolution_picks_manifest_pin_over_others():
 
 
 def test_resolution_falls_back_to_org_default():
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin=""),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin=""),)
     rows = build_resolution_table(
         blocks=blocks,
         org_defaults={"postgres": "gcp/cloudsql"},
@@ -135,7 +131,9 @@ def test_resolution_unresolvable_raises():
     with pytest.raises(PortabilitySurfaceError):
         build_resolution_table(
             blocks=blocks,
-            org_defaults={}, cluster_defaults={}, plugin_defaults={},
+            org_defaults={},
+            cluster_defaults={},
+            plugin_defaults={},
         )
 
 
@@ -143,9 +141,7 @@ def test_resolution_unresolvable_raises():
 
 
 def test_make_portable_swappable():
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="aws/rds"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="aws/rds"),)
     suggestions = make_portable_suggestions(
         blocks=blocks,
         has_portable_variant={"postgres": True},
@@ -157,9 +153,7 @@ def test_make_portable_swappable():
 def test_make_portable_unswappable_kind():
     """Some kinds (e.g. an AWS-specific service) have no portable
     variant in the catalog. Suggestion explains the limitation."""
-    blocks = (
-        BlockResolution(kind="aws-eventbridge", name="events", pin="aws/eventbridge"),
-    )
+    blocks = (BlockResolution(kind="aws-eventbridge", name="events", pin="aws/eventbridge"),)
     suggestions = make_portable_suggestions(
         blocks=blocks,
         has_portable_variant={"aws-eventbridge": False},
@@ -172,9 +166,7 @@ def test_make_portable_with_caveats():
     """When the pinned plugin uses features the portable variant
     doesn't have (e.g. RDS Multi-AZ), surface those features in
     the caveat so operator knows what they'd lose."""
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="aws/rds"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="aws/rds"),)
     suggestions = make_portable_suggestions(
         blocks=blocks,
         has_portable_variant={"postgres": True},
@@ -187,9 +179,7 @@ def test_make_portable_with_caveats():
 
 
 def test_make_portable_skips_already_portable():
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin=""),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin=""),)
     suggestions = make_portable_suggestions(
         blocks=blocks,
         has_portable_variant={"postgres": True},
@@ -207,14 +197,19 @@ def test_deployable_clusters_all_compatible():
     )
     clusters = (
         ClusterCompat(
-            cluster_id=1, cluster_slug="aws-prod",
-            available_variants=frozenset({
-                "portable/postgres-15", "portable/redis-7",
-            }),
+            cluster_id=1,
+            cluster_slug="aws-prod",
+            available_variants=frozenset(
+                {
+                    "portable/postgres-15",
+                    "portable/redis-7",
+                }
+            ),
         ),
     )
     out = deployable_clusters(
-        blocks=blocks, candidates=clusters,
+        blocks=blocks,
+        candidates=clusters,
         org_defaults={},
         plugin_defaults={
             "postgres": "portable/postgres-15",
@@ -227,22 +222,24 @@ def test_deployable_clusters_all_compatible():
 
 def test_deployable_clusters_filters_incompatible():
     """Manifest pinned to aws/rds; gcp cluster doesn't have it."""
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="aws/rds"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="aws/rds"),)
     clusters = (
         ClusterCompat(
-            cluster_id=1, cluster_slug="aws",
+            cluster_id=1,
+            cluster_slug="aws",
             available_variants=frozenset({"aws/rds"}),
         ),
         ClusterCompat(
-            cluster_id=2, cluster_slug="gcp",
+            cluster_id=2,
+            cluster_slug="gcp",
             available_variants=frozenset({"gcp/cloudsql"}),
         ),
     )
     out = deployable_clusters(
-        blocks=blocks, candidates=clusters,
-        org_defaults={}, plugin_defaults={},
+        blocks=blocks,
+        candidates=clusters,
+        org_defaults={},
+        plugin_defaults={},
     )
     assert {c.cluster_slug for c in out} == {"aws"}
 
@@ -250,18 +247,19 @@ def test_deployable_clusters_filters_incompatible():
 def test_deployable_clusters_unresolvable_block_drops_cluster():
     """Block has no pin and no default → cluster can't deploy
     this without per-cluster config; skip."""
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin=""),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin=""),)
     clusters = (
         ClusterCompat(
-            cluster_id=1, cluster_slug="aws",
+            cluster_id=1,
+            cluster_slug="aws",
             available_variants=frozenset({"aws/rds"}),
         ),
     )
     out = deployable_clusters(
-        blocks=blocks, candidates=clusters,
-        org_defaults={}, plugin_defaults={},
+        blocks=blocks,
+        candidates=clusters,
+        org_defaults={},
+        plugin_defaults={},
     )
     assert out == ()
 
@@ -271,15 +269,15 @@ def test_deployable_clusters_unresolvable_block_drops_cluster():
 
 def test_promote_check_promotable():
     """Both clusters have aws/rds; pinned manifest promotes."""
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="aws/rds"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="aws/rds"),)
     src = ClusterCompat(
-        cluster_id=1, cluster_slug="aws-staging",
+        cluster_id=1,
+        cluster_slug="aws-staging",
         available_variants=frozenset({"aws/rds"}),
     )
     tgt = ClusterCompat(
-        cluster_id=2, cluster_slug="aws-prod",
+        cluster_id=2,
+        cluster_slug="aws-prod",
         available_variants=frozenset({"aws/rds"}),
     )
     result = evaluate_promote(blocks=blocks, source_cluster=src, target_cluster=tgt)
@@ -288,15 +286,15 @@ def test_promote_check_promotable():
 
 
 def test_promote_check_target_missing_variant():
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="aws/rds"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="aws/rds"),)
     src = ClusterCompat(
-        cluster_id=1, cluster_slug="aws-staging",
+        cluster_id=1,
+        cluster_slug="aws-staging",
         available_variants=frozenset({"aws/rds"}),
     )
     tgt = ClusterCompat(
-        cluster_id=2, cluster_slug="gcp-prod",
+        cluster_id=2,
+        cluster_slug="gcp-prod",
         available_variants=frozenset({"gcp/cloudsql"}),
     )
     result = evaluate_promote(blocks=blocks, source_cluster=src, target_cluster=tgt)
@@ -308,15 +306,15 @@ def test_promote_check_target_missing_variant():
 def test_promote_check_skips_abstract_blocks():
     """Auto-resolved blocks promote freely — target picks its
     own variant."""
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin=""),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin=""),)
     src = ClusterCompat(
-        cluster_id=1, cluster_slug="x",
+        cluster_id=1,
+        cluster_slug="x",
         available_variants=frozenset({"aws/rds"}),
     )
     tgt = ClusterCompat(
-        cluster_id=2, cluster_slug="y",
+        cluster_id=2,
+        cluster_slug="y",
         available_variants=frozenset({"gcp/cloudsql"}),
     )
     result = evaluate_promote(blocks=blocks, source_cluster=src, target_cluster=tgt)
@@ -325,15 +323,15 @@ def test_promote_check_skips_abstract_blocks():
 
 def test_promote_check_both_missing():
     """Pinned to a plugin neither cluster has."""
-    blocks = (
-        BlockResolution(kind="postgres", name="db", pin="exotic/specific"),
-    )
+    blocks = (BlockResolution(kind="postgres", name="db", pin="exotic/specific"),)
     src = ClusterCompat(
-        cluster_id=1, cluster_slug="x",
+        cluster_id=1,
+        cluster_slug="x",
         available_variants=frozenset({"aws/rds"}),
     )
     tgt = ClusterCompat(
-        cluster_id=2, cluster_slug="y",
+        cluster_id=2,
+        cluster_slug="y",
         available_variants=frozenset({"gcp/cloudsql"}),
     )
     result = evaluate_promote(blocks=blocks, source_cluster=src, target_cluster=tgt)

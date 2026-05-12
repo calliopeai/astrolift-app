@@ -37,15 +37,14 @@ def _slugify(value: str) -> str:
 
 
 def branch_name_for(
-    *, app_slug: str, env_slug: str, workflow_run_id: str,
+    *,
+    app_slug: str,
+    env_slug: str,
+    workflow_run_id: str,
 ) -> str:
     if not workflow_run_id:
         raise ValueError("workflow_run_id is required for branch naming")
-    return (
-        f"astrolift/{_slugify(app_slug)}/"
-        f"{_slugify(env_slug)}/"
-        f"{_slugify(workflow_run_id)}"
-    )
+    return f"astrolift/{_slugify(app_slug)}/" f"{_slugify(env_slug)}/" f"{_slugify(workflow_run_id)}"
 
 
 # ---- PR body composer -----------------------------------------------
@@ -59,7 +58,7 @@ class ManifestDiffEntry:
     kind: str
     name: str
     namespace: str
-    change: str   # 'create' | 'update' | 'delete'
+    change: str  # 'create' | 'update' | 'delete'
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -88,9 +87,7 @@ def render_pr_body(
         change_counts: dict[str, int] = {}
         for d in diff_entries:
             change_counts[d.change] = change_counts.get(d.change, 0) + 1
-        counts_line = ", ".join(
-            f"{n} {c}" for c, n in sorted(change_counts.items())
-        )
+        counts_line = ", ".join(f"{n} {c}" for c, n in sorted(change_counts.items()))
         lines = [
             "### Manifest changes",
             "",
@@ -100,16 +97,10 @@ def render_pr_body(
             "|---|---|---|---|",
         ]
         for d in diff_entries:
-            lines.append(
-                f"| {d.change} | {d.kind} | "
-                f"{d.namespace or '—'} | {d.name} |"
-            )
+            lines.append(f"| {d.change} | {d.kind} | " f"{d.namespace or '—'} | {d.name} |")
         body = summary + "\n".join(lines)
     else:
-        body = (
-            summary
-            + "_No manifest changes — re-applying the existing snapshot._"
-        )
+        body = summary + "_No manifest changes — re-applying the existing snapshot._"
     return PullRequestBody(title=title, body=body)
 
 

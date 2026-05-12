@@ -78,9 +78,9 @@ DEFAULT_RULES: tuple[AlertRuleTemplate, ...] = (
         title="High latency (p99 > 1s for 5 min)",
         severity=Severity.WARNING,
         expression=(
-            'histogram_quantile(0.99,'
+            "histogram_quantile(0.99,"
             ' sum(rate(http_request_duration_seconds_bucket{app="$app"}[5m])) by (le))'
-            ' > 1'
+            " > 1"
         ),
         for_seconds=5 * 60,
     ),
@@ -88,9 +88,7 @@ DEFAULT_RULES: tuple[AlertRuleTemplate, ...] = (
         slug="pod_restart_loop",
         title="Pod restart loop",
         severity=Severity.CRITICAL,
-        expression=(
-            'increase(kube_pod_container_status_restarts_total{namespace=~"$ns"}[15m]) > 5'
-        ),
+        expression=('increase(kube_pod_container_status_restarts_total{namespace=~"$ns"}[15m]) > 5'),
         for_seconds=5 * 60,
     ),
     AlertRuleTemplate(
@@ -108,36 +106,28 @@ DEFAULT_RULES: tuple[AlertRuleTemplate, ...] = (
         slug="health_check_failing",
         title="Health check failing for 5 min",
         severity=Severity.CRITICAL,
-        expression=(
-            'probe_success{app="$app"} == 0'
-        ),
+        expression=('probe_success{app="$app"} == 0'),
         for_seconds=5 * 60,
     ),
     AlertRuleTemplate(
         slug="cron_failure_streak",
         title="Cron failure streak (3 consecutive)",
         severity=Severity.WARNING,
-        expression=(
-            'sum_over_time(cronjob_failed_runs{app="$app"}[1h]) >= 3'
-        ),
+        expression=('sum_over_time(cronjob_failed_runs{app="$app"}[1h]) >= 3'),
         for_seconds=0,
     ),
     AlertRuleTemplate(
         slug="cpu_saturation",
         title="CPU > 90% for 15 min",
         severity=Severity.INFO,
-        expression=(
-            'avg_over_time(container_cpu_usage_ratio{namespace=~"$ns"}[15m]) > 0.9'
-        ),
+        expression=('avg_over_time(container_cpu_usage_ratio{namespace=~"$ns"}[15m]) > 0.9'),
         for_seconds=15 * 60,
     ),
     AlertRuleTemplate(
         slug="memory_saturation",
         title="Memory > 90% for 15 min",
         severity=Severity.INFO,
-        expression=(
-            'avg_over_time(container_memory_usage_ratio{namespace=~"$ns"}[15m]) > 0.9'
-        ),
+        expression=('avg_over_time(container_memory_usage_ratio{namespace=~"$ns"}[15m]) > 0.9'),
         for_seconds=15 * 60,
     ),
 )
@@ -161,11 +151,7 @@ def render_for_app(
         rendered.append(
             dataclasses.replace(
                 tpl,
-                expression=(
-                    tpl.expression
-                    .replace("$app", app_name)
-                    .replace("$ns", namespace)
-                ),
+                expression=(tpl.expression.replace("$app", app_name).replace("$ns", namespace)),
             )
         )
     return rendered
@@ -271,8 +257,4 @@ def evaluate(
 def should_fire(decision: DeliveryDecision) -> bool:
     """Convenience: ``True`` iff the caller should actually call the
     channel drivers for this alert."""
-    return (
-        bool(decision.channel_ids)
-        and not decision.suppressed
-        and not decision.deduped
-    )
+    return bool(decision.channel_ids) and not decision.suppressed and not decision.deduped

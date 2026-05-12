@@ -74,10 +74,7 @@ def record_delivery_outcome(
 
     auto_disabled = False
     reason = ""
-    if (
-        subscription.failure_count >= AUTO_DISABLE_THRESHOLD
-        and subscription.is_active
-    ):
+    if subscription.failure_count >= AUTO_DISABLE_THRESHOLD and subscription.is_active:
         subscription.is_active = False
         subscription.disabled_at = timezone.now()
         reason = (

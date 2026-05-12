@@ -25,14 +25,16 @@ from astrolift_drivers.storage_tiers import (
 
 def _profile(*caps: ClusterStorageCapability) -> ClusterStorageProfile:
     return ClusterStorageProfile(
-        cluster_id=1, cluster_slug="prod",
+        cluster_id=1,
+        cluster_slug="prod",
         capabilities=frozenset(caps),
     )
 
 
 def _vol(**kw) -> VolumeSpec:
     base = dict(
-        name="data", size="20Gi",
+        name="data",
+        size="20Gi",
         access_modes=("ReadWriteOnce",),
     )
     base.update(kw)
@@ -97,9 +99,7 @@ def test_zonal_volume_unaffected_by_regional_absence():
     profile = _profile()
     vol = _vol(durability=Durability.ZONAL)
     failures = preflight(volumes=[vol], profile=profile)
-    regional_failures = [
-        f for f in failures if f.code == "no_regional_storage_class"
-    ]
+    regional_failures = [f for f in failures if f.code == "no_regional_storage_class"]
     assert regional_failures == []
 
 
@@ -109,7 +109,8 @@ def test_zonal_volume_unaffected_by_regional_absence():
 def test_in_cluster_managed_service_needs_block_class():
     profile = _profile()  # no block
     failures = preflight(
-        volumes=[], profile=profile,
+        volumes=[],
+        profile=profile,
         needs_in_cluster_managed_service=True,
     )
     assert len(failures) == 1
@@ -119,7 +120,8 @@ def test_in_cluster_managed_service_needs_block_class():
 def test_in_cluster_managed_service_ok_with_block_class():
     profile = _profile(ClusterStorageCapability.HAS_BLOCK)
     failures = preflight(
-        volumes=[], profile=profile,
+        volumes=[],
+        profile=profile,
         needs_in_cluster_managed_service=True,
     )
     assert failures == ()
@@ -136,7 +138,8 @@ def test_all_failures_collected_at_once():
         _vol(name="regional-vol", durability=Durability.REGIONAL),
     ]
     failures = preflight(
-        volumes=volumes, profile=profile,
+        volumes=volumes,
+        profile=profile,
         needs_in_cluster_managed_service=True,
     )
     codes = {f.code for f in failures}
@@ -199,25 +202,34 @@ def test_thresholds_locked():
 def test_snapshot_age_alarm_when_well_past_schedule():
     """1.5x the schedule = strong signal the snapshot workflow
     stopped firing."""
-    assert snapshot_age_alarm(
-        oldest_snapshot_age_seconds=180_000,  # 50 hours
-        schedule_seconds=86_400,  # daily
-    ) is True
+    assert (
+        snapshot_age_alarm(
+            oldest_snapshot_age_seconds=180_000,  # 50 hours
+            schedule_seconds=86_400,  # daily
+        )
+        is True
+    )
 
 
 def test_snapshot_age_no_alarm_within_schedule():
     """The most recent snapshot is at most ``schedule_seconds``
     old in normal operation; ``< 1.5x`` is fine."""
-    assert snapshot_age_alarm(
-        oldest_snapshot_age_seconds=90_000,  # 25 hours
-        schedule_seconds=86_400,  # daily
-    ) is False
+    assert (
+        snapshot_age_alarm(
+            oldest_snapshot_age_seconds=90_000,  # 25 hours
+            schedule_seconds=86_400,  # daily
+        )
+        is False
+    )
 
 
 def test_snapshot_age_no_alarm_when_no_schedule():
     """No scheduled snapshots = operator hasn't opted in;
     don't alarm."""
-    assert snapshot_age_alarm(
-        oldest_snapshot_age_seconds=999_999,
-        schedule_seconds=0,
-    ) is False
+    assert (
+        snapshot_age_alarm(
+            oldest_snapshot_age_seconds=999_999,
+            schedule_seconds=0,
+        )
+        is False
+    )

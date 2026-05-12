@@ -216,17 +216,21 @@ def test_get_scanner_raises_when_unregistered():
 
 
 def test_count_at_or_above_aggregates_severities():
-    result = _result([
-        CVE(cve_id=f"CVE-{i}", severity=s)
-        for i, s in enumerate([
-            Severity.CRITICAL,
-            Severity.HIGH,
-            Severity.HIGH,
-            Severity.MEDIUM,
-            Severity.LOW,
-        ])
-    ])
-    assert result.count_at_or_above(Severity.HIGH) == 3       # 1 critical + 2 high
+    result = _result(
+        [
+            CVE(cve_id=f"CVE-{i}", severity=s)
+            for i, s in enumerate(
+                [
+                    Severity.CRITICAL,
+                    Severity.HIGH,
+                    Severity.HIGH,
+                    Severity.MEDIUM,
+                    Severity.LOW,
+                ]
+            )
+        ]
+    )
+    assert result.count_at_or_above(Severity.HIGH) == 3  # 1 critical + 2 high
     assert result.count_at_or_above(Severity.MEDIUM) == 4
     assert result.count_at_or_above(Severity.LOW) == 5
     assert result.count_at_or_above(Severity.CRITICAL) == 1

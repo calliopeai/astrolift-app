@@ -42,7 +42,8 @@ class MeshProvider(str, Enum):
 
 
 def namespace_injection_annotations(
-    *, provider: MeshProvider,
+    *,
+    provider: MeshProvider,
 ) -> dict[str, str]:
     """Render the per-namespace annotation/label that triggers
     sidecar injection. Each mesh has its own conventions:
@@ -101,9 +102,7 @@ class CanarySplit:
         if not self.version_label:
             raise MeshError("canary split requires version_label")
         if self.weight < 0 or self.weight > 100:
-            raise MeshError(
-                f"canary split weight {self.weight} not in [0, 100]"
-            )
+            raise MeshError(f"canary split weight {self.weight} not in [0, 100]")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -121,20 +120,15 @@ class MeshConfig:
             # so operators don't think their settings are active.
             if self.mtls != MtlsMode.OFF:
                 raise MeshError(
-                    "mesh.enabled=False but mtls is set; remove the "
-                    "mtls line or set enabled=true"
+                    "mesh.enabled=False but mtls is set; remove the " "mtls line or set enabled=true"
                 )
             if self.canary_splits:
-                raise MeshError(
-                    "mesh.enabled=False but canary_splits is set"
-                )
+                raise MeshError("mesh.enabled=False but canary_splits is set")
 
         if self.canary_splits:
             total = sum(s.weight for s in self.canary_splits)
             if total != 100:
-                raise MeshError(
-                    f"canary split weights sum to {total}, must be 100"
-                )
+                raise MeshError(f"canary split weights sum to {total}, must be 100")
 
 
 def parse_mesh_config(raw: dict) -> MeshConfig:
@@ -156,8 +150,7 @@ def parse_mesh_config(raw: dict) -> MeshConfig:
         mtls = MtlsMode(raw.get("mtls", "off"))
     except ValueError as exc:
         raise MeshError(
-            f"mesh.mtls {raw.get('mtls')!r} not one of "
-            f"{[m.value for m in MtlsMode]}"
+            f"mesh.mtls {raw.get('mtls')!r} not one of " f"{[m.value for m in MtlsMode]}"
         ) from exc
 
     try:
@@ -213,10 +206,7 @@ def must_warn_about_dropped_config(
     cluster has no mesh, the deploy log should warn about it
     (silent drop violates 'apps work without mesh' but operator
     may not realize their canary config is being ignored)."""
-    return (
-        manifest_config.enabled
-        and cluster_provider == MeshProvider.NONE
-    )
+    return manifest_config.enabled and cluster_provider == MeshProvider.NONE
 
 
 # ---- canary helpers ------------------------------------------------

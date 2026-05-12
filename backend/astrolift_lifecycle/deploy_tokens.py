@@ -73,9 +73,7 @@ def issue_token(
 
     minted = _mint()
     days = expires_in_days if expires_in_days is None else min(int(expires_in_days), MAX_TTL_DAYS)
-    expires_at = (
-        timezone.now() + dt.timedelta(days=int(days)) if days else None
-    )
+    expires_at = timezone.now() + dt.timedelta(days=int(days)) if days else None
     row = DeployToken.objects.create(
         registered_app=app,
         name=name.strip(),
@@ -105,19 +103,13 @@ def rotate_token(
     grace = (
         0
         if immediate
-        else (
-            grace_period_seconds
-            if grace_period_seconds is not None
-            else DEFAULT_GRACE_PERIOD_SECONDS
-        )
+        else (grace_period_seconds if grace_period_seconds is not None else DEFAULT_GRACE_PERIOD_SECONDS)
     )
 
     minted = _mint()
     now = timezone.now()
     token.previous_token_hash = "" if immediate else token.token_hash
-    token.previous_token_expires_at = (
-        None if immediate else now + dt.timedelta(seconds=grace)
-    )
+    token.previous_token_expires_at = None if immediate else now + dt.timedelta(seconds=grace)
     token.token_hash = minted.token_hash
     token.token_last_4 = minted.last4
     token.last_rotated_at = now
@@ -157,11 +149,7 @@ def verify_token(plaintext: str, app=None):
     digest = _hash(plaintext)
     now = timezone.now()
     qs = DeployToken.objects.filter(
-        Q(token_hash=digest)
-        | (
-            Q(previous_token_hash=digest)
-            & Q(previous_token_expires_at__gt=now)
-        ),
+        Q(token_hash=digest) | (Q(previous_token_hash=digest) & Q(previous_token_expires_at__gt=now)),
         deleted_at__isnull=True,
         is_revoked=False,
     )

@@ -43,18 +43,14 @@ def test_get_template_unknown_slug():
 
 def test_hipaa_requires_6_year_retention():
     """HIPAA: 6-year retention is the regime's requirement."""
-    audit_req = next(
-        r for r in HIPAA.requirements
-        if r.area == CoverageArea.AUDIT_LOG
-    )
+    audit_req = next(r for r in HIPAA.requirements if r.area == CoverageArea.AUDIT_LOG)
     assert audit_req.threshold["min_retention_days"] == 365 * 6
 
 
 def test_hipaa_requires_residency_policy():
     """HIPAA emphasizes data residency for ePHI."""
     region_req = next(
-        (r for r in HIPAA.requirements
-         if r.area == CoverageArea.REGION_CONSTRAINTS),
+        (r for r in HIPAA.requirements if r.area == CoverageArea.REGION_CONSTRAINTS),
         None,
     )
     assert region_req is not None
@@ -63,10 +59,7 @@ def test_hipaa_requires_residency_policy():
 
 def test_hipaa_requires_abac():
     """ABAC required for ePHI access."""
-    access_req = next(
-        r for r in HIPAA.requirements
-        if r.area == CoverageArea.ACCESS_CONTROLS
-    )
+    access_req = next(r for r in HIPAA.requirements if r.area == CoverageArea.ACCESS_CONTROLS)
     assert access_req.threshold["abac_required"] is True
 
 
@@ -74,10 +67,7 @@ def test_hipaa_requires_abac():
 
 
 def test_soc2_audit_retention_one_year():
-    audit_req = next(
-        r for r in SOC_2.requirements
-        if r.area == CoverageArea.AUDIT_LOG
-    )
+    audit_req = next(r for r in SOC_2.requirements if r.area == CoverageArea.AUDIT_LOG)
     assert audit_req.threshold["min_retention_days"] == 365
 
 
@@ -85,10 +75,7 @@ def test_soc2_audit_retention_one_year():
 
 
 def test_iso27001_audit_retention_three_years():
-    audit_req = next(
-        r for r in ISO_27001.requirements
-        if r.area == CoverageArea.AUDIT_LOG
-    )
+    audit_req = next(r for r in ISO_27001.requirements if r.area == CoverageArea.AUDIT_LOG)
     assert audit_req.threshold["min_retention_days"] == 365 * 3
 
 
@@ -104,7 +91,8 @@ def _full_evidence(*, retention_days=365 * 10, hash_chain_valid=True):
         },
         CoverageArea.SECRET_ROTATION: {"pct_within_window": 99},
         CoverageArea.ACCESS_CONTROLS: {
-            "rbac_active": True, "abac_active": True,
+            "rbac_active": True,
+            "abac_active": True,
         },
         CoverageArea.WORKFLOW_AUDIT_TRAIL: {"coverage_pct": 99},
         CoverageArea.ENCRYPTION: {
@@ -119,14 +107,16 @@ def _full_evidence(*, retention_days=365 * 10, hash_chain_valid=True):
 
 def test_soc2_passes_with_full_evidence():
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=_full_evidence(),
+        template=SOC_2,
+        evidence_by_area=_full_evidence(),
     )
     assert report.overall == CheckStatus.PASS
 
 
 def test_hipaa_passes_with_full_evidence():
     report = evaluate_template(
-        template=HIPAA, evidence_by_area=_full_evidence(),
+        template=HIPAA,
+        evidence_by_area=_full_evidence(),
     )
     assert report.overall == CheckStatus.PASS
 
@@ -135,7 +125,8 @@ def test_hipaa_fails_with_one_year_retention():
     """HIPAA needs 6 years; 1 year fails."""
     evidence = _full_evidence(retention_days=365)
     report = evaluate_template(
-        template=HIPAA, evidence_by_area=evidence,
+        template=HIPAA,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -143,7 +134,8 @@ def test_hipaa_fails_with_one_year_retention():
 def test_audit_fails_without_hash_chain():
     evidence = _full_evidence(hash_chain_valid=False)
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -154,11 +146,10 @@ def test_audit_inconclusive_without_evidence():
     evidence = _full_evidence()
     evidence[CoverageArea.AUDIT_LOG] = {}  # remove evidence
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
-    audit_check = next(
-        c for c in report.checks if c.area == CoverageArea.AUDIT_LOG
-    )
+    audit_check = next(c for c in report.checks if c.area == CoverageArea.AUDIT_LOG)
     assert audit_check.status == CheckStatus.INCONCLUSIVE
 
 
@@ -169,11 +160,10 @@ def test_rotation_below_threshold_fails():
     evidence = _full_evidence()
     evidence[CoverageArea.SECRET_ROTATION] = {"pct_within_window": 80}
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
-    rotation_check = next(
-        c for c in report.checks if c.area == CoverageArea.SECRET_ROTATION
-    )
+    rotation_check = next(c for c in report.checks if c.area == CoverageArea.SECRET_ROTATION)
     assert rotation_check.status == CheckStatus.FAIL
 
 
@@ -182,11 +172,10 @@ def test_rotation_at_threshold_passes():
     evidence = _full_evidence()
     evidence[CoverageArea.SECRET_ROTATION] = {"pct_within_window": 90}
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
-    rotation_check = next(
-        c for c in report.checks if c.area == CoverageArea.SECRET_ROTATION
-    )
+    rotation_check = next(c for c in report.checks if c.area == CoverageArea.SECRET_ROTATION)
     assert rotation_check.status == CheckStatus.PASS
 
 
@@ -199,7 +188,8 @@ def test_region_constraints_required_for_hipaa():
         "residency_policy_present": False,
     }
     report = evaluate_template(
-        template=HIPAA, evidence_by_area=evidence,
+        template=HIPAA,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -212,7 +202,8 @@ def test_region_constraints_passthrough_when_not_required():
         "residency_policy_present": False,
     }
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     # SOC 2 doesn't require region constraints
     assert report.overall == CheckStatus.PASS
@@ -224,10 +215,12 @@ def test_region_constraints_passthrough_when_not_required():
 def test_hipaa_fails_without_abac():
     evidence = _full_evidence()
     evidence[CoverageArea.ACCESS_CONTROLS] = {
-        "rbac_active": True, "abac_active": False,
+        "rbac_active": True,
+        "abac_active": False,
     }
     report = evaluate_template(
-        template=HIPAA, evidence_by_area=evidence,
+        template=HIPAA,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -236,10 +229,12 @@ def test_soc2_passes_without_abac():
     """SOC 2 only requires RBAC."""
     evidence = _full_evidence()
     evidence[CoverageArea.ACCESS_CONTROLS] = {
-        "rbac_active": True, "abac_active": False,
+        "rbac_active": True,
+        "abac_active": False,
     }
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.PASS
 
@@ -254,7 +249,8 @@ def test_encryption_fails_with_tls_10():
         "secrets_backend_kind": "aws_secrets_manager",
     }
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -267,7 +263,8 @@ def test_encryption_fails_with_unrecognized_backend():
         "secrets_backend_kind": "filesystem",
     }
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -280,7 +277,8 @@ def test_overall_fail_when_any_fail():
     evidence = _full_evidence()
     evidence[CoverageArea.SECRET_ROTATION] = {"pct_within_window": 50}
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.FAIL
 
@@ -292,14 +290,16 @@ def test_overall_inconclusive_when_no_fail_but_inconclusive():
     evidence = _full_evidence()
     evidence[CoverageArea.AUDIT_LOG] = {}
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=evidence,
+        template=SOC_2,
+        evidence_by_area=evidence,
     )
     assert report.overall == CheckStatus.INCONCLUSIVE
 
 
 def test_overall_pass_when_all_pass():
     report = evaluate_template(
-        template=SOC_2, evidence_by_area=_full_evidence(),
+        template=SOC_2,
+        evidence_by_area=_full_evidence(),
     )
     assert all(c.status == CheckStatus.PASS for c in report.checks)
     assert report.overall == CheckStatus.PASS

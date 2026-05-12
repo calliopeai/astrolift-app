@@ -24,7 +24,8 @@ from astrolift_clusters.dns_layout import (
 def test_hostname_flat():
     """Flat: <app>.<zone>."""
     h = hostname_for_app(
-        app_slug="api", org_slug="acme",
+        app_slug="api",
+        org_slug="acme",
         base_zone="acme.platform.example",
         mode=DnsLayoutMode.FLAT,
     )
@@ -34,7 +35,8 @@ def test_hostname_flat():
 def test_hostname_org_prefixed():
     """Org-prefixed: <app>.<org>.<zone>."""
     h = hostname_for_app(
-        app_slug="api", org_slug="acme",
+        app_slug="api",
+        org_slug="acme",
         base_zone="apps.platform.example",
         mode=DnsLayoutMode.ORG_PREFIXED,
     )
@@ -43,7 +45,8 @@ def test_hostname_org_prefixed():
 
 def test_hostname_lowercases():
     h = hostname_for_app(
-        app_slug="API", org_slug="ACME",
+        app_slug="API",
+        org_slug="ACME",
         base_zone="APPS.PLATFORM.EXAMPLE",
         mode=DnsLayoutMode.FLAT,
     )
@@ -52,7 +55,8 @@ def test_hostname_lowercases():
 
 def test_hostname_strips_trailing_dot():
     h = hostname_for_app(
-        app_slug="api", org_slug="acme",
+        app_slug="api",
+        org_slug="acme",
         base_zone="acme.platform.example.",
         mode=DnsLayoutMode.FLAT,
     )
@@ -62,24 +66,30 @@ def test_hostname_strips_trailing_dot():
 def test_hostname_rejects_invalid_app_slug():
     with pytest.raises(DnsLayoutError, match="app_slug"):
         hostname_for_app(
-            app_slug="My_API", org_slug="acme",
-            base_zone="z.com", mode=DnsLayoutMode.FLAT,
+            app_slug="My_API",
+            org_slug="acme",
+            base_zone="z.com",
+            mode=DnsLayoutMode.FLAT,
         )
 
 
 def test_hostname_rejects_empty_app_slug():
     with pytest.raises(DnsLayoutError, match="app_slug"):
         hostname_for_app(
-            app_slug="", org_slug="acme",
-            base_zone="z.com", mode=DnsLayoutMode.FLAT,
+            app_slug="",
+            org_slug="acme",
+            base_zone="z.com",
+            mode=DnsLayoutMode.FLAT,
         )
 
 
 def test_hostname_rejects_empty_zone():
     with pytest.raises(DnsLayoutError, match="base_zone"):
         hostname_for_app(
-            app_slug="api", org_slug="acme",
-            base_zone="", mode=DnsLayoutMode.FLAT,
+            app_slug="api",
+            org_slug="acme",
+            base_zone="",
+            mode=DnsLayoutMode.FLAT,
         )
 
 
@@ -118,10 +128,13 @@ def test_ns_delegation_passes_with_extra_nameservers_warns():
     check = NsDelegationCheck(
         zone="acme.platform.example",
         expected_nameservers=frozenset({"ns1.platform.example", "ns2.platform.example"}),
-        observed_nameservers=frozenset({
-            "ns1.platform.example", "ns2.platform.example",
-            "old-ns.previous-provider.com",
-        }),
+        observed_nameservers=frozenset(
+            {
+                "ns1.platform.example",
+                "ns2.platform.example",
+                "old-ns.previous-provider.com",
+            }
+        ),
     )
     passed, reason = evaluate_ns_delegation(check=check)
     assert passed is True
@@ -190,7 +203,8 @@ def test_migration_rejects_zero_days():
         LayoutMigration(
             from_mode=DnsLayoutMode.FLAT,
             to_mode=DnsLayoutMode.ORG_PREFIXED,
-            started_at_unix=0, dual_serve_days=0,
+            started_at_unix=0,
+            dual_serve_days=0,
         )
 
 
@@ -201,7 +215,8 @@ def test_migration_caps_at_90_days():
         LayoutMigration(
             from_mode=DnsLayoutMode.FLAT,
             to_mode=DnsLayoutMode.ORG_PREFIXED,
-            started_at_unix=0, dual_serve_days=120,
+            started_at_unix=0,
+            dual_serve_days=120,
         )
 
 
@@ -212,7 +227,8 @@ def test_dual_serve_returns_both_hostnames():
         started_at_unix=1_700_000_000,
     )
     old, new = hostnames_for_dual_serve(
-        app_slug="api", org_slug="acme",
+        app_slug="api",
+        org_slug="acme",
         base_zone="apps.platform.example",
         migration=m,
     )
@@ -230,9 +246,13 @@ def test_dual_serve_active_within_window():
     # Day 1
     assert is_dual_serve_active(migration=m, now_unix=1_700_000_000 + 86400) is True
     # Day 30 - 1 second
-    assert is_dual_serve_active(
-        migration=m, now_unix=1_700_000_000 + 30 * 86400 - 1,
-    ) is True
+    assert (
+        is_dual_serve_active(
+            migration=m,
+            now_unix=1_700_000_000 + 30 * 86400 - 1,
+        )
+        is True
+    )
 
 
 def test_dual_serve_inactive_after_window():
@@ -243,9 +263,13 @@ def test_dual_serve_inactive_after_window():
         dual_serve_days=30,
     )
     # Day 30 + 1 second
-    assert is_dual_serve_active(
-        migration=m, now_unix=1_700_000_000 + 30 * 86400 + 1,
-    ) is False
+    assert (
+        is_dual_serve_active(
+            migration=m,
+            now_unix=1_700_000_000 + 30 * 86400 + 1,
+        )
+        is False
+    )
 
 
 def test_dual_serve_inactive_before_start():
@@ -254,9 +278,13 @@ def test_dual_serve_inactive_before_start():
         to_mode=DnsLayoutMode.ORG_PREFIXED,
         started_at_unix=1_700_000_000,
     )
-    assert is_dual_serve_active(
-        migration=m, now_unix=1_699_999_999,
-    ) is False
+    assert (
+        is_dual_serve_active(
+            migration=m,
+            now_unix=1_699_999_999,
+        )
+        is False
+    )
 
 
 # ---- route count budget -------------------------------------------

@@ -102,13 +102,9 @@ class ScheduleDefinition:
                 f"{MAX_INTERVAL_SECONDS}s"
             )
         if not self.workflow_name:
-            raise ScheduleRegistryError(
-                f"schedule {self.kind.value} requires workflow_name"
-            )
+            raise ScheduleRegistryError(f"schedule {self.kind.value} requires workflow_name")
         if not self.schedule_id:
-            raise ScheduleRegistryError(
-                f"schedule {self.kind.value} requires schedule_id"
-            )
+            raise ScheduleRegistryError(f"schedule {self.kind.value} requires schedule_id")
 
 
 def schedule_id_for(*, kind: ScheduleKind) -> str:
@@ -189,9 +185,7 @@ def get_schedule(*, kind: ScheduleKind) -> ScheduleDefinition:
     for s in DEFAULT_SCHEDULES:
         if s.kind == kind:
             return s
-    raise ScheduleRegistryError(
-        f"no schedule definition for {kind!r}"
-    )
+    raise ScheduleRegistryError(f"no schedule definition for {kind!r}")
 
 
 # ---- registration plan ---------------------------------------------
@@ -225,25 +219,31 @@ def plan_registrations(
     out: list[RegistrationDecision] = []
     for entry in catalog:
         if entry.schedule_id not in existing_ids:
-            out.append(RegistrationDecision(
-                schedule_id=entry.schedule_id,
-                action="create",
-            ))
+            out.append(
+                RegistrationDecision(
+                    schedule_id=entry.schedule_id,
+                    action="create",
+                )
+            )
             continue
         existing = existing_by_id.get(entry.schedule_id)
         if existing is None or (
             existing.workflow_name != entry.workflow_name
             or existing.interval_seconds != entry.interval_seconds
         ):
-            out.append(RegistrationDecision(
-                schedule_id=entry.schedule_id,
-                action="update",
-            ))
+            out.append(
+                RegistrationDecision(
+                    schedule_id=entry.schedule_id,
+                    action="update",
+                )
+            )
             continue
-        out.append(RegistrationDecision(
-            schedule_id=entry.schedule_id,
-            action="skip",
-        ))
+        out.append(
+            RegistrationDecision(
+                schedule_id=entry.schedule_id,
+                action="skip",
+            )
+        )
     return tuple(out)
 
 
@@ -263,7 +263,4 @@ def orphaned_schedule_ids(
     schedules aren't touched.
     """
     catalog_ids = {s.schedule_id for s in catalog}
-    return tuple(
-        sid for sid in sorted(existing_ids)
-        if sid.startswith("astro-") and sid not in catalog_ids
-    )
+    return tuple(sid for sid in sorted(existing_ids) if sid.startswith("astro-") and sid not in catalog_ids)

@@ -49,33 +49,41 @@ class ManagedServiceState(str, Enum):
 # Allowed transitions. Refusing arbitrary transitions catches
 # bugs where a workflow tries to go from e.g. SOFT_DELETED back
 # to ACTIVE (it should provision a new one instead).
-_ALLOWED_TRANSITIONS: dict[
-    ManagedServiceState, frozenset[ManagedServiceState]
-] = {
-    ManagedServiceState.PROVISIONING: frozenset({
-        ManagedServiceState.ACTIVE,
-        ManagedServiceState.FAILED,
-    }),
-    ManagedServiceState.ACTIVE: frozenset({
-        ManagedServiceState.UPDATING,
-        ManagedServiceState.DEPROVISIONING,
-        ManagedServiceState.FAILED,
-    }),
-    ManagedServiceState.UPDATING: frozenset({
-        ManagedServiceState.ACTIVE,
-        ManagedServiceState.FAILED,
-    }),
-    ManagedServiceState.DEPROVISIONING: frozenset({
-        ManagedServiceState.SOFT_DELETED,
-        ManagedServiceState.FAILED,
-    }),
-    ManagedServiceState.FAILED: frozenset({
-        # FAILED can be retried back into PROVISIONING/UPDATING/
-        # DEPROVISIONING depending on which workflow originated.
-        ManagedServiceState.PROVISIONING,
-        ManagedServiceState.UPDATING,
-        ManagedServiceState.DEPROVISIONING,
-    }),
+_ALLOWED_TRANSITIONS: dict[ManagedServiceState, frozenset[ManagedServiceState]] = {
+    ManagedServiceState.PROVISIONING: frozenset(
+        {
+            ManagedServiceState.ACTIVE,
+            ManagedServiceState.FAILED,
+        }
+    ),
+    ManagedServiceState.ACTIVE: frozenset(
+        {
+            ManagedServiceState.UPDATING,
+            ManagedServiceState.DEPROVISIONING,
+            ManagedServiceState.FAILED,
+        }
+    ),
+    ManagedServiceState.UPDATING: frozenset(
+        {
+            ManagedServiceState.ACTIVE,
+            ManagedServiceState.FAILED,
+        }
+    ),
+    ManagedServiceState.DEPROVISIONING: frozenset(
+        {
+            ManagedServiceState.SOFT_DELETED,
+            ManagedServiceState.FAILED,
+        }
+    ),
+    ManagedServiceState.FAILED: frozenset(
+        {
+            # FAILED can be retried back into PROVISIONING/UPDATING/
+            # DEPROVISIONING depending on which workflow originated.
+            ManagedServiceState.PROVISIONING,
+            ManagedServiceState.UPDATING,
+            ManagedServiceState.DEPROVISIONING,
+        }
+    ),
     # SOFT_DELETED is terminal — provision a new instance to
     # recover, don't transition this row back.
     ManagedServiceState.SOFT_DELETED: frozenset(),
@@ -209,24 +217,21 @@ class BindStep:
 # leave a workload trying to mount a missing secret. Order is:
 BIND_ORDER = (
     BindStep(
-        order=1, name="write_secrets_backend",
+        order=1,
+        name="write_secrets_backend",
         description=(
-            "Write connection metadata (host, port, username, "
-            "password, ssl mode) to the SecretsBackend"
+            "Write connection metadata (host, port, username, " "password, ssl mode) to the SecretsBackend"
         ),
     ),
     BindStep(
-        order=2, name="create_binding_row",
-        description=(
-            "Create ManagedServiceBinding row referencing the "
-            "secrets-backend secret name"
-        ),
+        order=2,
+        name="create_binding_row",
+        description=("Create ManagedServiceBinding row referencing the " "secrets-backend secret name"),
     ),
     BindStep(
-        order=3, name="emit_bound_event",
-        description=(
-            "Emit MANAGED_SERVICE_BOUND for downstream workflows"
-        ),
+        order=3,
+        name="emit_bound_event",
+        description=("Emit MANAGED_SERVICE_BOUND for downstream workflows"),
     ),
 )
 
@@ -256,13 +261,12 @@ def is_destructive_update(*, changed_fields: Sequence[str]) -> bool:
 
 
 def destructive_fields_in(
-    *, changed_fields: Sequence[str],
+    *,
+    changed_fields: Sequence[str],
 ) -> tuple[str, ...]:
     """List the destructive fields that triggered the warning,
     for the operator-approval prompt."""
-    return tuple(
-        sorted(set(changed_fields) & _DESTRUCTIVE_FIELDS)
-    )
+    return tuple(sorted(set(changed_fields) & _DESTRUCTIVE_FIELDS))
 
 
 # ---- dependent-workload notification ------------------------------

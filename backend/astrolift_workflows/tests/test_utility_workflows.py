@@ -90,16 +90,23 @@ def test_webhook_4xx_is_permanent(status):
 
 
 def test_webhook_timeout_is_retryable():
-    assert classify_webhook_response(
-        status_code=None, timed_out=True,
-    ) == WebhookOutcome.RETRYABLE_FAILURE
+    assert (
+        classify_webhook_response(
+            status_code=None,
+            timed_out=True,
+        )
+        == WebhookOutcome.RETRYABLE_FAILURE
+    )
 
 
 def test_webhook_transport_failure_is_retryable():
     """DNS/connection refused = no status_code at all."""
-    assert classify_webhook_response(
-        status_code=None,
-    ) == WebhookOutcome.RETRYABLE_FAILURE
+    assert (
+        classify_webhook_response(
+            status_code=None,
+        )
+        == WebhookOutcome.RETRYABLE_FAILURE
+    )
 
 
 # ---- subscription-failed escalation -------------------------------
@@ -107,28 +114,43 @@ def test_webhook_transport_failure_is_retryable():
 
 def test_subscription_failed_on_permanent_first_try():
     """4xx from subscriber: instantly escalate; no retries."""
-    assert should_mark_subscription_failed(
-        outcome=WebhookOutcome.PERMANENT_FAILURE, attempt=1,
-    ) is True
+    assert (
+        should_mark_subscription_failed(
+            outcome=WebhookOutcome.PERMANENT_FAILURE,
+            attempt=1,
+        )
+        is True
+    )
 
 
 def test_subscription_failed_on_max_retries_exhausted():
-    assert should_mark_subscription_failed(
-        outcome=WebhookOutcome.RETRYABLE_FAILURE,
-        attempt=WEBHOOK_MAX_RETRIES,
-    ) is True
+    assert (
+        should_mark_subscription_failed(
+            outcome=WebhookOutcome.RETRYABLE_FAILURE,
+            attempt=WEBHOOK_MAX_RETRIES,
+        )
+        is True
+    )
 
 
 def test_subscription_not_failed_when_retries_remain():
-    assert should_mark_subscription_failed(
-        outcome=WebhookOutcome.RETRYABLE_FAILURE, attempt=3,
-    ) is False
+    assert (
+        should_mark_subscription_failed(
+            outcome=WebhookOutcome.RETRYABLE_FAILURE,
+            attempt=3,
+        )
+        is False
+    )
 
 
 def test_subscription_not_failed_on_success():
-    assert should_mark_subscription_failed(
-        outcome=WebhookOutcome.SUCCESS, attempt=1,
-    ) is False
+    assert (
+        should_mark_subscription_failed(
+            outcome=WebhookOutcome.SUCCESS,
+            attempt=1,
+        )
+        is False
+    )
 
 
 # ---- channel fan-out ----------------------------------------------
@@ -137,10 +159,13 @@ def test_subscription_not_failed_on_success():
 def test_channels_to_fanout_filters_disabled():
     configured = (
         NotifyChannelConfig(
-            kind=NotifyChannel.EMAIL, target="ops@acme.com",
+            kind=NotifyChannel.EMAIL,
+            target="ops@acme.com",
         ),
         NotifyChannelConfig(
-            kind=NotifyChannel.SLACK, target="#alerts", enabled=False,
+            kind=NotifyChannel.SLACK,
+            target="#alerts",
+            enabled=False,
         ),
     )
     out = channels_to_fanout(configured=configured)
@@ -169,7 +194,9 @@ def test_channels_to_fanout_stable_order():
     )
     out = channels_to_fanout(configured=configured)
     assert [c.kind for c in out] == [
-        NotifyChannel.EMAIL, NotifyChannel.WEBHOOK, NotifyChannel.WEBHOOK,
+        NotifyChannel.EMAIL,
+        NotifyChannel.WEBHOOK,
+        NotifyChannel.WEBHOOK,
     ]
     # Within same kind, by target
     assert out[1].target == "https://a.example"
@@ -204,7 +231,9 @@ def test_token_rotation_requires_alft_prefix():
 def test_token_rotation_requires_non_empty():
     with pytest.raises(UtilityWorkflowError):
         plan_token_rotation(
-            old_token_id=1, new_token_plaintext="", now_unix=0,
+            old_token_id=1,
+            new_token_plaintext="",
+            now_unix=0,
         )
 
 
@@ -247,9 +276,13 @@ def test_invitation_past_expiry_not_actionable():
         accepted_at_unix=None,
         expires_at_unix=1_700_000_000,
     )
-    assert is_invitation_actionable(
-        status=status, now_unix=1_700_000_001,
-    ) is False
+    assert (
+        is_invitation_actionable(
+            status=status,
+            now_unix=1_700_000_001,
+        )
+        is False
+    )
 
 
 def test_invitation_already_accepted_not_actionable():
@@ -258,9 +291,13 @@ def test_invitation_already_accepted_not_actionable():
         accepted_at_unix=1_700_000_000,
         expires_at_unix=1_700_000_000 + 86400,
     )
-    assert is_invitation_actionable(
-        status=status, now_unix=1_700_000_000,
-    ) is False
+    assert (
+        is_invitation_actionable(
+            status=status,
+            now_unix=1_700_000_000,
+        )
+        is False
+    )
 
 
 def test_invitation_terminal_pending_within_window_returns_none():
@@ -269,9 +306,13 @@ def test_invitation_terminal_pending_within_window_returns_none():
         accepted_at_unix=None,
         expires_at_unix=1_700_000_000 + 86400,
     )
-    assert invitation_terminal_state(
-        status=status, now_unix=1_700_000_000,
-    ) is None
+    assert (
+        invitation_terminal_state(
+            status=status,
+            now_unix=1_700_000_000,
+        )
+        is None
+    )
 
 
 def test_invitation_terminal_past_expiry_is_expired():
@@ -280,9 +321,13 @@ def test_invitation_terminal_past_expiry_is_expired():
         accepted_at_unix=None,
         expires_at_unix=1_700_000_000,
     )
-    assert invitation_terminal_state(
-        status=status, now_unix=1_700_000_001,
-    ) == InvitationState.EXPIRED
+    assert (
+        invitation_terminal_state(
+            status=status,
+            now_unix=1_700_000_001,
+        )
+        == InvitationState.EXPIRED
+    )
 
 
 def test_invitation_terminal_accepted_returns_accepted():
@@ -291,9 +336,13 @@ def test_invitation_terminal_accepted_returns_accepted():
         accepted_at_unix=1_700_000_000,
         expires_at_unix=1_700_000_000 + 86400,
     )
-    assert invitation_terminal_state(
-        status=status, now_unix=1_700_000_001,
-    ) == InvitationState.ACCEPTED
+    assert (
+        invitation_terminal_state(
+            status=status,
+            now_unix=1_700_000_001,
+        )
+        == InvitationState.ACCEPTED
+    )
 
 
 def test_invitation_terminal_revoked_returns_revoked():
@@ -302,9 +351,13 @@ def test_invitation_terminal_revoked_returns_revoked():
         accepted_at_unix=None,
         expires_at_unix=1_700_000_000 + 86400,
     )
-    assert invitation_terminal_state(
-        status=status, now_unix=1_700_000_001,
-    ) == InvitationState.REVOKED
+    assert (
+        invitation_terminal_state(
+            status=status,
+            now_unix=1_700_000_001,
+        )
+        == InvitationState.REVOKED
+    )
 
 
 # ---- TTL validation -----------------------------------------------

@@ -28,37 +28,49 @@ from astrolift_workflows.webhook_delivery_history import (
 
 
 def test_success_maps_to_success():
-    assert map_outcome(
-        classified=WebhookOutcome.SUCCESS,
-        attempt_number=1,
-        max_attempts=MAX_ATTEMPTS,
-    ) == AttemptOutcome.SUCCESS
+    assert (
+        map_outcome(
+            classified=WebhookOutcome.SUCCESS,
+            attempt_number=1,
+            max_attempts=MAX_ATTEMPTS,
+        )
+        == AttemptOutcome.SUCCESS
+    )
 
 
 def test_permanent_maps_to_permanent():
-    assert map_outcome(
-        classified=WebhookOutcome.PERMANENT_FAILURE,
-        attempt_number=1,
-        max_attempts=MAX_ATTEMPTS,
-    ) == AttemptOutcome.PERMANENT_FAILURE
+    assert (
+        map_outcome(
+            classified=WebhookOutcome.PERMANENT_FAILURE,
+            attempt_number=1,
+            max_attempts=MAX_ATTEMPTS,
+        )
+        == AttemptOutcome.PERMANENT_FAILURE
+    )
 
 
 def test_retryable_with_retries_left():
     """Mid-chain retryable failure → RETRY (worker fires again)."""
-    assert map_outcome(
-        classified=WebhookOutcome.RETRYABLE_FAILURE,
-        attempt_number=3,
-        max_attempts=9,
-    ) == AttemptOutcome.RETRY
+    assert (
+        map_outcome(
+            classified=WebhookOutcome.RETRYABLE_FAILURE,
+            attempt_number=3,
+            max_attempts=9,
+        )
+        == AttemptOutcome.RETRY
+    )
 
 
 def test_retryable_at_max_promotes_to_permanent():
     """Last attempt's retryable failure becomes PERMANENT."""
-    assert map_outcome(
-        classified=WebhookOutcome.RETRYABLE_FAILURE,
-        attempt_number=9,
-        max_attempts=9,
-    ) == AttemptOutcome.PERMANENT_FAILURE
+    assert (
+        map_outcome(
+            classified=WebhookOutcome.RETRYABLE_FAILURE,
+            attempt_number=9,
+            max_attempts=9,
+        )
+        == AttemptOutcome.PERMANENT_FAILURE
+    )
 
 
 # ---- inline-vs-blob bodies ----------------------------------------
@@ -129,42 +141,61 @@ def test_body_storage_rejects_both():
 
 
 def test_scheduled_to_attempted():
-    assert can_transition_phase(
-        current=AttemptPhase.SCHEDULED,
-        target=AttemptPhase.ATTEMPTED,
-    ) is True
+    assert (
+        can_transition_phase(
+            current=AttemptPhase.SCHEDULED,
+            target=AttemptPhase.ATTEMPTED,
+        )
+        is True
+    )
 
 
 def test_attempted_to_completed():
-    assert can_transition_phase(
-        current=AttemptPhase.ATTEMPTED,
-        target=AttemptPhase.COMPLETED,
-    ) is True
+    assert (
+        can_transition_phase(
+            current=AttemptPhase.ATTEMPTED,
+            target=AttemptPhase.COMPLETED,
+        )
+        is True
+    )
 
 
 def test_completed_is_terminal():
     for target in AttemptPhase:
-        assert can_transition_phase(
-            current=AttemptPhase.COMPLETED, target=target,
-        ) is False
+        assert (
+            can_transition_phase(
+                current=AttemptPhase.COMPLETED,
+                target=target,
+            )
+            is False
+        )
 
 
 def test_scheduled_cannot_skip_to_completed():
     """Defensive — phase order is part of the audit invariant."""
-    assert can_transition_phase(
-        current=AttemptPhase.SCHEDULED,
-        target=AttemptPhase.COMPLETED,
-    ) is False
+    assert (
+        can_transition_phase(
+            current=AttemptPhase.SCHEDULED,
+            target=AttemptPhase.COMPLETED,
+        )
+        is False
+    )
 
 
 def test_must_persist_request_first():
     """Spec §6 invariant: request_* persisted BEFORE the POST."""
-    assert must_persist_request_first(
-        phase=AttemptPhase.SCHEDULED,
-    ) is True
-    assert must_persist_request_first(
-        phase=AttemptPhase.ATTEMPTED,
-    ) is False
+    assert (
+        must_persist_request_first(
+            phase=AttemptPhase.SCHEDULED,
+        )
+        is True
+    )
+    assert (
+        must_persist_request_first(
+            phase=AttemptPhase.ATTEMPTED,
+        )
+        is False
+    )
 
 
 # ---- AttemptProjection invariants ---------------------------------
@@ -173,7 +204,9 @@ def test_must_persist_request_first():
 def _attempt(**overrides) -> AttemptProjection:
     base = dict(
         delivery_id="d1",
-        subscription_id=1, event_id=1, attempt_number=1,
+        subscription_id=1,
+        event_id=1,
+        attempt_number=1,
         phase=AttemptPhase.COMPLETED,
         outcome=AttemptOutcome.SUCCESS,
         scheduled_at_unix=1_700_000_000,
@@ -181,11 +214,15 @@ def _attempt(**overrides) -> AttemptProjection:
         completed_at_unix=1_700_000_002,
         request_url="https://subscriber.example/webhook",
         request_body=BodyStorage(
-            inline_bytes=b"req", blob_ref="", total_byte_count=3,
+            inline_bytes=b"req",
+            blob_ref="",
+            total_byte_count=3,
         ),
         response_status=200,
         response_body=BodyStorage(
-            inline_bytes=b"ok", blob_ref="", total_byte_count=2,
+            inline_bytes=b"ok",
+            blob_ref="",
+            total_byte_count=2,
         ),
         error_message="",
         signature_hex="abc123",
@@ -243,7 +280,9 @@ def test_attempt_connection_error_recorded():
         outcome=AttemptOutcome.RETRY,
         response_status=None,
         response_body=BodyStorage(
-            inline_bytes=b"", blob_ref="", total_byte_count=0,
+            inline_bytes=b"",
+            blob_ref="",
+            total_byte_count=0,
         ),
         error_message="connection refused: subscriber.example:443",
     )
@@ -332,28 +371,40 @@ def test_history_query_zero_limit_rejected():
 def test_should_scrub_request_body_when_anonymizing():
     """Per #169: org-deletion mid-flight scrubs cached
     request bodies too."""
-    assert should_scrub_request_body(
-        org_anonymization_active=True,
-        subscription_responses_opted_in=False,
-    ) is True
+    assert (
+        should_scrub_request_body(
+            org_anonymization_active=True,
+            subscription_responses_opted_in=False,
+        )
+        is True
+    )
 
 
 def test_should_not_scrub_when_org_active():
-    assert should_scrub_request_body(
-        org_anonymization_active=False,
-        subscription_responses_opted_in=False,
-    ) is False
+    assert (
+        should_scrub_request_body(
+            org_anonymization_active=False,
+            subscription_responses_opted_in=False,
+        )
+        is False
+    )
 
 
 def test_response_retention_default_off():
     """Privacy default: don't persist subscriber response bodies
     unless org opts in (subscriber-side state can leak)."""
-    assert should_retain_response_body(
-        org_response_retention_opted_in=False,
-    ) is False
+    assert (
+        should_retain_response_body(
+            org_response_retention_opted_in=False,
+        )
+        is False
+    )
 
 
 def test_response_retention_opt_in():
-    assert should_retain_response_body(
-        org_response_retention_opted_in=True,
-    ) is True
+    assert (
+        should_retain_response_body(
+            org_response_retention_opted_in=True,
+        )
+        is True
+    )

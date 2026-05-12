@@ -158,10 +158,7 @@ def workflow_id_for_event(
         ).hexdigest()[:16]
         return f"build-preview-{repo_full_name.replace('/', '-')}-{pr_number}-{digest}"
     if kind == DispatchKind.TEARDOWN_PREVIEW:
-        return (
-            f"teardown-preview-"
-            f"{repo_full_name.replace('/', '-')}-{pr_number}"
-        )
+        return f"teardown-preview-" f"{repo_full_name.replace('/', '-')}-{pr_number}"
     return ""
 
 
@@ -177,19 +174,14 @@ def decide_dispatch(
         return DispatchDecision(
             kind=DispatchKind.IGNORE,
             workflow_id="",
-            reason=(
-                f"action {event.raw_action!r} not a preview trigger"
-            ),
+            reason=(f"action {event.raw_action!r} not a preview trigger"),
         )
 
     if not app_context.preview_enabled:
         return DispatchDecision(
             kind=DispatchKind.IGNORE,
             workflow_id="",
-            reason=(
-                f"app {app_context.registered_app_id} does not have "
-                "preview environments enabled"
-            ),
+            reason=(f"app {app_context.registered_app_id} does not have " "preview environments enabled"),
         )
 
     if action == PrAction.CLOSED:
@@ -201,10 +193,7 @@ def decide_dispatch(
                 pr_number=event.pr_number,
                 head_sha=event.head_sha,
             ),
-            reason=(
-                f"PR #{event.pr_number} "
-                f"{'merged' if event.is_merge else 'closed'}"
-            ),
+            reason=(f"PR #{event.pr_number} " f"{'merged' if event.is_merge else 'closed'}"),
         )
 
     # opened / reopened / synchronize all build
@@ -212,18 +201,14 @@ def decide_dispatch(
         return DispatchDecision(
             kind=DispatchKind.IGNORE,
             workflow_id="",
-            reason=(
-                f"PR #{event.pr_number} is bot-authored and app "
-                "policy skips bot-authored PRs"
-            ),
+            reason=(f"PR #{event.pr_number} is bot-authored and app " "policy skips bot-authored PRs"),
         )
 
     if not event.head_sha:
         # GitHub edge case: opened webhook arriving before HEAD
         # is populated. Refuse — synchronize will retrigger.
         raise GitHubDispatchError(
-            f"PR #{event.pr_number} has no head_sha; can't dispatch "
-            "build_preview workflow"
+            f"PR #{event.pr_number} has no head_sha; can't dispatch " "build_preview workflow"
         )
 
     return DispatchDecision(
@@ -234,10 +219,7 @@ def decide_dispatch(
             pr_number=event.pr_number,
             head_sha=event.head_sha,
         ),
-        reason=(
-            f"PR #{event.pr_number} {action.value} at "
-            f"{event.head_sha[:8]}"
-        ),
+        reason=(f"PR #{event.pr_number} {action.value} at " f"{event.head_sha[:8]}"),
     )
 
 

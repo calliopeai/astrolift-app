@@ -189,9 +189,7 @@ def test_resources_only_request_no_limit():
 
 
 def test_resources_omitted_entirely():
-    w = _deployment_workload(
-        cpu_request=None, cpu_limit=None, memory_request=None, memory_limit=None
-    )
+    w = _deployment_workload(cpu_request=None, cpu_limit=None, memory_request=None, memory_limit=None)
     out = _render((w,))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert "resources" not in container
@@ -208,9 +206,7 @@ def test_service_targets_primary_container_port():
 
 
 def test_no_service_when_primary_has_no_port():
-    out = _render(
-        (_deployment_workload(containers=(_container(port=0),)),)
-    )
+    out = _render((_deployment_workload(containers=(_container(port=0),)),))
     assert all(r["kind"] != "Service" for r in out)
 
 
@@ -224,13 +220,7 @@ def test_service_selector_matches_workload_label():
 
 
 def test_http_probe_rendered_with_default_path():
-    out = _render(
-        (
-            _deployment_workload(
-                containers=(_container(healthcheck_kind="http"),)
-            ),
-        )
-    )
+    out = _render((_deployment_workload(containers=(_container(healthcheck_kind="http"),)),))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     probe = container["livenessProbe"]
     assert probe["httpGet"]["path"] == "/health"
@@ -244,11 +234,7 @@ def test_http_probe_uses_value_path_when_set():
     out = _render(
         (
             _deployment_workload(
-                containers=(
-                    _container(
-                        healthcheck_kind="http", healthcheck_value="/healthz"
-                    ),
-                )
+                containers=(_container(healthcheck_kind="http", healthcheck_value="/healthz"),)
             ),
         )
     )
@@ -257,13 +243,7 @@ def test_http_probe_uses_value_path_when_set():
 
 
 def test_tcp_probe_uses_container_port_by_default():
-    out = _render(
-        (
-            _deployment_workload(
-                containers=(_container(healthcheck_kind="tcp", port=5432),)
-            ),
-        )
-    )
+    out = _render((_deployment_workload(containers=(_container(healthcheck_kind="tcp", port=5432),)),))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert container["livenessProbe"]["tcpSocket"]["port"] == 5432
 
@@ -296,18 +276,14 @@ def test_no_probe_when_kind_is_none():
 
 
 def test_env_pairs_render_as_name_value():
-    w = _deployment_workload(
-        containers=(_container(env=(("DATABASE_URL", "postgres://x"),)),)
-    )
+    w = _deployment_workload(containers=(_container(env=(("DATABASE_URL", "postgres://x"),)),))
     out = _render((w,))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert container["env"] == [{"name": "DATABASE_URL", "value": "postgres://x"}]
 
 
 def test_command_and_args_render_as_lists():
-    w = _deployment_workload(
-        containers=(_container(command=("/bin/sh",), args=("-c", "echo hi")),)
-    )
+    w = _deployment_workload(containers=(_container(command=("/bin/sh",), args=("-c", "echo hi")),))
     out = _render((w,))
     container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert container["command"] == ["/bin/sh"]
@@ -318,9 +294,7 @@ def test_command_and_args_render_as_lists():
 
 
 def test_hpa_renders_when_min_and_max_set():
-    out = _render(
-        (_deployment_workload(hpa_min=2, hpa_max=10, hpa_target_cpu_pct=70),)
-    )
+    out = _render((_deployment_workload(hpa_min=2, hpa_max=10, hpa_target_cpu_pct=70),))
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
     assert hpa["spec"]["minReplicas"] == 2
     assert hpa["spec"]["maxReplicas"] == 10
@@ -345,9 +319,7 @@ def test_cronjob_renders_with_schedule():
         schedule="0 0 * * *",
         cpu_request="50m",
         memory_request="64Mi",
-        containers=(
-            _container(name="job", port=0, command=("/bin/run-job",)),
-        ),
+        containers=(_container(name="job", port=0, command=("/bin/run-job",)),),
     )
     out = render_manifests(
         _normalized(w),

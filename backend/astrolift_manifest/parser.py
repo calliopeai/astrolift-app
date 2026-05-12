@@ -59,23 +59,17 @@ def parse_raw(toml_text: str) -> RawManifest:
         # the message embeds "(at line N, column M)" so we regex it
         # out. Still surfaces the original message in str(exc).
         line, col = _line_col_from_message(str(exc))
-        raise ManifestError(
-            f"invalid TOML: {exc}", line=line, column=col
-        ) from exc
+        raise ManifestError(f"invalid TOML: {exc}", line=line, column=col) from exc
 
     name = _require_str(data, "name", "name")
     workloads = tuple(
-        _parse_workload(item, f"workloads[{i}]")
-        for i, item in enumerate(data.get("workloads", []))
+        _parse_workload(item, f"workloads[{i}]") for i, item in enumerate(data.get("workloads", []))
     )
 
     # ``[[jobs]]`` is a shorthand for a single-container cronjob.
     # Desugar into the same WorkloadManifest shape so downstream
     # rendering / validation only ever sees one workload format.
-    desugared_jobs = tuple(
-        _desugar_job(item, f"jobs[{i}]")
-        for i, item in enumerate(data.get("jobs", []))
-    )
+    desugared_jobs = tuple(_desugar_job(item, f"jobs[{i}]") for i, item in enumerate(data.get("jobs", [])))
 
     # Reject collisions between [[workloads]] and [[jobs]] sharing a
     # name — the resulting Workload rows would conflict on the unique
@@ -177,9 +171,7 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
     name = _require_str(d, "name", f"{path}.name")
     schedule = d.get("schedule")
     if not schedule:
-        raise ManifestError(
-            "[[jobs]] entry requires a 'schedule'", path=f"{path}.schedule"
-        )
+        raise ManifestError("[[jobs]] entry requires a 'schedule'", path=f"{path}.schedule")
 
     env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
 

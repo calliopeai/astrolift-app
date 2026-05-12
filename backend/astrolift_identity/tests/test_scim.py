@@ -75,7 +75,9 @@ def test_parse_user_active_defaults_true():
 
 def test_parse_user_active_false_respected():
     payload = {
-        "userName": "x", "emails": [{"value": "x@x.com"}], "active": False,
+        "userName": "x",
+        "emails": [{"value": "x@x.com"}],
+        "active": False,
     }
     assert parse_user_payload(payload).active is False
 
@@ -156,7 +158,10 @@ def test_filter_matches_sw_displayname():
 def test_filter_matches_active_bool():
     f = ScimFilter(attribute="active", operator="eq", value="false")
     inactive = ScimUser(
-        user_name="x", email="x@x.com", display_name="X", active=False,
+        user_name="x",
+        email="x@x.com",
+        display_name="X",
+        active=False,
     )
     assert filter_matches(filt=f, user=inactive) is True
 
@@ -207,8 +212,10 @@ def test_pagination_clamps_negative():
 def test_mapping_org_scope_id_optional():
     """ORG scope can have None scope_id (defaults to the org)."""
     m = GroupRoleMapping(
-        organization_id=1, group_external_id="okta-1",
-        role_id=2, scope_kind=ScopeKind.ORG,
+        organization_id=1,
+        group_external_id="okta-1",
+        role_id=2,
+        scope_kind=ScopeKind.ORG,
     )
     assert m.scope_id is None
 
@@ -216,8 +223,11 @@ def test_mapping_org_scope_id_optional():
 def test_mapping_team_scope_requires_id():
     with pytest.raises(ValueError, match="scope_id"):
         GroupRoleMapping(
-            organization_id=1, group_external_id="okta-1",
-            role_id=2, scope_kind=ScopeKind.TEAM, scope_id=None,
+            organization_id=1,
+            group_external_id="okta-1",
+            role_id=2,
+            scope_kind=ScopeKind.TEAM,
+            scope_id=None,
         )
 
 
@@ -225,32 +235,44 @@ def test_mapping_org_scope_id_must_match_org():
     """ORG scope with a different scope_id is a misconfig."""
     with pytest.raises(ValueError, match="ORG scope"):
         GroupRoleMapping(
-            organization_id=1, group_external_id="okta-1",
-            role_id=2, scope_kind=ScopeKind.ORG, scope_id=99,
+            organization_id=1,
+            group_external_id="okta-1",
+            role_id=2,
+            scope_kind=ScopeKind.ORG,
+            scope_id=99,
         )
 
 
 def test_mapping_requires_external_id():
     with pytest.raises(ValueError):
         GroupRoleMapping(
-            organization_id=1, group_external_id="",
-            role_id=2, scope_kind=ScopeKind.ORG,
+            organization_id=1,
+            group_external_id="",
+            role_id=2,
+            scope_kind=ScopeKind.ORG,
         )
 
 
 def test_role_assignments_match_groups():
     mappings = [
         GroupRoleMapping(
-            organization_id=1, group_external_id="okta-platform",
-            role_id=10, scope_kind=ScopeKind.ORG,
+            organization_id=1,
+            group_external_id="okta-platform",
+            role_id=10,
+            scope_kind=ScopeKind.ORG,
         ),
         GroupRoleMapping(
-            organization_id=1, group_external_id="okta-app-team",
-            role_id=11, scope_kind=ScopeKind.PROJECT, scope_id=42,
+            organization_id=1,
+            group_external_id="okta-app-team",
+            role_id=11,
+            scope_kind=ScopeKind.PROJECT,
+            scope_id=42,
         ),
         GroupRoleMapping(
-            organization_id=1, group_external_id="okta-other",
-            role_id=99, scope_kind=ScopeKind.ORG,
+            organization_id=1,
+            group_external_id="okta-other",
+            role_id=99,
+            scope_kind=ScopeKind.ORG,
         ),
     ]
     out = role_assignments_for_user(
@@ -266,16 +288,21 @@ def test_role_assignments_dedupe_same_role_scope():
     produce duplicate binding rows."""
     mappings = [
         GroupRoleMapping(
-            organization_id=1, group_external_id="g1",
-            role_id=10, scope_kind=ScopeKind.ORG,
+            organization_id=1,
+            group_external_id="g1",
+            role_id=10,
+            scope_kind=ScopeKind.ORG,
         ),
         GroupRoleMapping(
-            organization_id=1, group_external_id="g2",
-            role_id=10, scope_kind=ScopeKind.ORG,
+            organization_id=1,
+            group_external_id="g2",
+            role_id=10,
+            scope_kind=ScopeKind.ORG,
         ),
     ]
     out = role_assignments_for_user(
-        user_group_external_ids=["g1", "g2"], mappings=mappings,
+        user_group_external_ids=["g1", "g2"],
+        mappings=mappings,
     )
     assert len(out) == 1
 

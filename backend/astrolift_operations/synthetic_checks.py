@@ -34,9 +34,9 @@ class CheckKind(str, Enum):
 
 class HealthBadge(str, Enum):
     HEALTHY = "healthy"
-    DEGRADED = "degraded"   # some probes failing
-    DOWN = "down"           # majority failing
-    UNKNOWN = "unknown"     # no recent probes
+    DEGRADED = "degraded"  # some probes failing
+    DOWN = "down"  # majority failing
+    UNKNOWN = "unknown"  # no recent probes
 
 
 # Spec 08 §11 defaults.
@@ -146,9 +146,7 @@ def tls_thresholds_to_emit(
     for threshold in sorted(TLS_WARN_THRESHOLDS_DAYS, reverse=True):
         boundary = not_after - timedelta(days=threshold)
         crossed_now = now >= boundary
-        was_already_crossed = (
-            last_check_at is not None and last_check_at >= boundary
-        )
+        was_already_crossed = last_check_at is not None and last_check_at >= boundary
         if crossed_now and not was_already_crossed:
             fired.append(threshold)
     return tuple(fired)

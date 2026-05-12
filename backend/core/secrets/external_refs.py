@@ -62,9 +62,7 @@ class ExternalSecretRef:
 # Subset of schemes the platform recognises. Adding a scheme is
 # explicit so we don't accidentally accept ``http://`` and turn the
 # control plane into a credential exfiltration vector.
-SUPPORTED_SCHEMES: Final[frozenset[str]] = frozenset(
-    {"vault", "aws-sm", "aws-ssm", "gcp-sm", "azure-kv"}
-)
+SUPPORTED_SCHEMES: Final[frozenset[str]] = frozenset({"vault", "aws-sm", "aws-ssm", "gcp-sm", "azure-kv"})
 
 
 def parse_secret_ref(value: str) -> ExternalSecretRef:
@@ -82,13 +80,11 @@ def parse_secret_ref(value: str) -> ExternalSecretRef:
     scheme = parsed.scheme.lower()
     if not scheme:
         raise ExternalSecretRefError(
-            f"secret_ref {value!r} missing scheme; "
-            "expected <scheme>://<path>[#key]"
+            f"secret_ref {value!r} missing scheme; " "expected <scheme>://<path>[#key]"
         )
     if scheme not in SUPPORTED_SCHEMES:
         raise ExternalSecretRefError(
-            f"secret_ref scheme {scheme!r} not supported; "
-            f"choose from {sorted(SUPPORTED_SCHEMES)}"
+            f"secret_ref scheme {scheme!r} not supported; " f"choose from {sorted(SUPPORTED_SCHEMES)}"
         )
 
     # urlparse populates `netloc` for `aws-sm://foo/bar`, where
@@ -96,9 +92,7 @@ def parse_secret_ref(value: str) -> ExternalSecretRef:
     # the full path uniformly.
     path = (parsed.netloc + parsed.path).strip("/")
     if not path:
-        raise ExternalSecretRefError(
-            f"secret_ref {value!r} missing path after scheme"
-        )
+        raise ExternalSecretRefError(f"secret_ref {value!r} missing path after scheme")
 
     return ExternalSecretRef(scheme=scheme, path=path, key=parsed.fragment)
 
@@ -116,9 +110,7 @@ def register_resolver(scheme: str, resolver: Resolver) -> None:
     """Register a resolver for a scheme. Plugin packages call this
     at import time; tests call it inside fixtures."""
     if scheme not in SUPPORTED_SCHEMES:
-        raise ExternalSecretRefError(
-            f"cannot register resolver for unsupported scheme {scheme!r}"
-        )
+        raise ExternalSecretRefError(f"cannot register resolver for unsupported scheme {scheme!r}")
     _RESOLVERS[scheme] = resolver
 
 
@@ -136,8 +128,7 @@ def resolve(ref: ExternalSecretRef) -> bytes:
     resolver = _RESOLVERS.get(ref.scheme)
     if resolver is None:
         raise ExternalSecretResolutionError(
-            f"no resolver registered for scheme {ref.scheme!r}; "
-            "the provider plugin probably isn't loaded"
+            f"no resolver registered for scheme {ref.scheme!r}; " "the provider plugin probably isn't loaded"
         )
     try:
         out = resolver(ref)
@@ -149,7 +140,6 @@ def resolve(ref: ExternalSecretRef) -> bytes:
         ) from exc
     if not isinstance(out, (bytes, bytearray)):
         raise ExternalSecretResolutionError(
-            f"resolver for {ref.scheme!r} returned non-bytes "
-            f"({type(out).__name__})"
+            f"resolver for {ref.scheme!r} returned non-bytes " f"({type(out).__name__})"
         )
     return bytes(out)

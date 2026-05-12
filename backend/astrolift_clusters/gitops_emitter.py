@@ -39,7 +39,10 @@ class GitopsEmitterError(ValueError):
 
 def repo_path_for(
     *,
-    cluster_slug: str, org_slug: str, app_slug: str, env_slug: str,
+    cluster_slug: str,
+    org_slug: str,
+    app_slug: str,
+    env_slug: str,
 ) -> str:
     """Compose the deterministic repo path. All components must
     pass the slug regex (lowercase alphanumeric + dashes) so a
@@ -54,11 +57,13 @@ def repo_path_for(
             raise GitopsEmitterError(f"{label} is required")
         if not _SLUG_RE.match(slug):
             raise GitopsEmitterError(
-                f"{label} {slug!r} is not a valid slug "
-                "(lowercase alphanumeric + dashes; alpha-start)"
+                f"{label} {slug!r} is not a valid slug " "(lowercase alphanumeric + dashes; alpha-start)"
             )
     return _REPO_PATH_FMT.format(
-        cluster=cluster_slug, org=org_slug, app=app_slug, env=env_slug,
+        cluster=cluster_slug,
+        org=org_slug,
+        app=app_slug,
+        env=env_slug,
     )
 
 
@@ -104,9 +109,7 @@ def build_commit_message(
     if not reason:
         raise GitopsEmitterError("reason is required")
     if not workflow_run_id:
-        raise GitopsEmitterError(
-            "workflow_run_id is required (audit trail trailer)"
-        )
+        raise GitopsEmitterError("workflow_run_id is required (audit trail trailer)")
     title = f"{verb.value} {app_slug}/{env_slug}: {reason}"
     body_lines = [f"Astrolift-WorkflowRun: {workflow_run_id}"]
     if deployment_id is not None:
@@ -163,12 +166,17 @@ def plan_commit(
     object. Validation runs once here so the git ops step doesn't
     have to."""
     repo_path = repo_path_for(
-        cluster_slug=cluster_slug, org_slug=org_slug,
-        app_slug=app_slug, env_slug=env_slug,
+        cluster_slug=cluster_slug,
+        org_slug=org_slug,
+        app_slug=app_slug,
+        env_slug=env_slug,
     )
     msg = build_commit_message(
-        verb=verb, app_slug=app_slug, env_slug=env_slug,
-        reason=reason, workflow_run_id=workflow_run_id,
+        verb=verb,
+        app_slug=app_slug,
+        env_slug=env_slug,
+        reason=reason,
+        workflow_run_id=workflow_run_id,
         deployment_id=deployment_id,
     )
     name, email = bot_author(platform_domain=platform_domain)

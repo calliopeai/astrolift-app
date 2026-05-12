@@ -32,7 +32,9 @@ def test_policy_rejects_invalid_cron():
 
 def test_valid_policy():
     p = SnapshotPolicy(
-        schedule="0 3 * * *", retention=7, copy_to_object_store=True,
+        schedule="0 3 * * *",
+        retention=7,
+        copy_to_object_store=True,
     )
     assert p.schedule == "0 3 * * *"
     assert p.retention == 7
@@ -52,8 +54,7 @@ def test_no_pruning_when_under_retention():
 
 
 def test_prune_oldest_beyond_retention():
-    snaps = [_snap("s1", 100), _snap("s2", 200), _snap("s3", 300),
-             _snap("s4", 400), _snap("s5", 500)]
+    snaps = [_snap("s1", 100), _snap("s2", 200), _snap("s3", 300), _snap("s4", 400), _snap("s5", 500)]
     out = snapshots_to_prune(snapshots=snaps, retention=3)
     pruned_ids = [s.snapshot_id for s in out]
     # Newest 3 kept (s5/s4/s3); s1/s2 pruned, oldest first
@@ -129,8 +130,7 @@ def test_logical_backup_tooling_locked():
 
 
 def test_supports_logical_backup_for_known_kinds():
-    for kind in ("postgres", "mysql", "redis", "object_store",
-                 "document_db", "mq"):
+    for kind in ("postgres", "mysql", "redis", "object_store", "document_db", "mq"):
         assert supports_logical_backup(kind=kind) is True
 
 
@@ -138,8 +138,7 @@ def test_supports_logical_backup_false_for_unknown():
     """Kinds without a logical-backup story (kv_store, search,
     vector_index, time_series, nfs, cdn, email, sms) get CSI
     snapshot only."""
-    for kind in ("kv_store", "search", "vector_index",
-                 "time_series", "nfs", "cdn", "email", "sms"):
+    for kind in ("kv_store", "search", "vector_index", "time_series", "nfs", "cdn", "email", "sms"):
         assert supports_logical_backup(kind=kind) is False
 
 

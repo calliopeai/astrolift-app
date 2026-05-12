@@ -96,12 +96,14 @@ class SyncEvent:
     """The hash both sides agreed on at this sync point. The
     workflow writes this to the RegisteredApp row."""
 
-    direction: str   # 'db_to_repo' | 'repo_to_db' | 'manual'
+    direction: str  # 'db_to_repo' | 'repo_to_db' | 'manual'
     actor_kind: str  # 'system' | 'user' | 'webhook'
 
 
 def reconcile_to_repo(
-    *, snap: SyncSnapshot, actor_kind: str = "system",
+    *,
+    snap: SyncSnapshot,
+    actor_kind: str = "system",
 ) -> SyncEvent:
     """Bring DB into alignment with repo (apply repo state to DB).
     Anchor advances to the repo hash."""
@@ -113,7 +115,9 @@ def reconcile_to_repo(
 
 
 def reconcile_to_db(
-    *, snap: SyncSnapshot, actor_kind: str = "user",
+    *,
+    snap: SyncSnapshot,
+    actor_kind: str = "user",
 ) -> SyncEvent:
     """Push DB state to the repo (commit DB into manifest).
     Anchor advances to the db hash."""

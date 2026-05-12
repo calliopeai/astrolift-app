@@ -100,9 +100,7 @@ def effective_for(
         raise ValueError(f"unknown observability stream {stream!r}")
 
     if org_override_days is not None and org_override_days > 0:
-        return EffectiveRetention(
-            stream=stream, days=org_override_days, source="org_override"
-        )
+        return EffectiveRetention(stream=stream, days=org_override_days, source="org_override")
     return EffectiveRetention(
         stream=stream,
         days=PLATFORM_DEFAULTS[stream],

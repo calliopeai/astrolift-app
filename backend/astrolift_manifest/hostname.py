@@ -105,9 +105,7 @@ class WorkloadHostname:
     hostname: str
 
 
-def compute_hostnames(
-    manifest: NormalizedManifest, inputs: HostnameInputs
-) -> list[WorkloadHostname]:
+def compute_hostnames(manifest: NormalizedManifest, inputs: HostnameInputs) -> list[WorkloadHostname]:
     """Return the hostname for each public workload.
 
     No-public-workload manifests return an empty list. Single-public

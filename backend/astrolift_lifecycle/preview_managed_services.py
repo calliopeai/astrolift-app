@@ -62,7 +62,9 @@ def default_policy_for(kind: str) -> PreviewPolicy:
 
 
 def resolve_policy(
-    *, kind: str, manifest_override: str | None,
+    *,
+    kind: str,
+    manifest_override: str | None,
 ) -> PreviewPolicy:
     """Manifest's per-binding ``preview_policy`` field wins; else
     kind-specific default. Caller raises an error on unknown
@@ -184,10 +186,7 @@ def shared_plan_for(*, kind: str, pr_number: int, app_slug: str) -> SharedPlan:
         )
     # Other kinds default to DEDICATED — they shouldn't reach this
     # function. Surface loudly if they do (bug in the dispatcher).
-    raise ValueError(
-        f"shared_with_main not supported for kind {kind!r}; "
-        "use DEDICATED policy"
-    )
+    raise ValueError(f"shared_with_main not supported for kind {kind!r}; " "use DEDICATED policy")
 
 
 def teardown_plan_for(*, kind: str, pr_number: int, app_slug: str) -> SharedPlan:

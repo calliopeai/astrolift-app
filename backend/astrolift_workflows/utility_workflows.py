@@ -53,10 +53,7 @@ def webhook_retry_delay(*, attempt: int) -> int:
     if attempt < 1:
         raise UtilityWorkflowError("attempt must be >= 1")
     if attempt > WEBHOOK_MAX_RETRIES:
-        raise UtilityWorkflowError(
-            f"attempt {attempt} exceeds max retries "
-            f"{WEBHOOK_MAX_RETRIES}"
-        )
+        raise UtilityWorkflowError(f"attempt {attempt} exceeds max retries " f"{WEBHOOK_MAX_RETRIES}")
     delay = _WEBHOOK_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
     return min(delay, WEBHOOK_MAX_DELAY_SECONDS)
 
@@ -102,10 +99,7 @@ def should_mark_subscription_failed(
     after WEBHOOK_MAX_RETRIES."""
     if outcome == WebhookOutcome.PERMANENT_FAILURE:
         return True
-    if (
-        outcome == WebhookOutcome.RETRYABLE_FAILURE
-        and attempt >= WEBHOOK_MAX_RETRIES
-    ):
+    if outcome == WebhookOutcome.RETRYABLE_FAILURE and attempt >= WEBHOOK_MAX_RETRIES:
         return True
     return False
 
@@ -140,10 +134,12 @@ def channels_to_fanout(
 ) -> tuple[NotifyChannelConfig, ...]:
     """Filter to enabled channels with non-empty targets.
     Stable order by (kind, target) for determinism."""
-    return tuple(sorted(
-        (c for c in configured if c.enabled and c.target),
-        key=lambda c: (c.kind.value, c.target),
-    ))
+    return tuple(
+        sorted(
+            (c for c in configured if c.enabled and c.target),
+            key=lambda c: (c.kind.value, c.target),
+        )
+    )
 
 
 # ---- RotateDeployTokenWorkflow -------------------------------------
@@ -182,21 +178,14 @@ def plan_token_rotation(
 ) -> TokenRotationPlan:
     """Validate inputs + build the rotation plan."""
     if not new_token_plaintext:
-        raise UtilityWorkflowError(
-            "new_token_plaintext is required"
-        )
+        raise UtilityWorkflowError("new_token_plaintext is required")
     if not new_token_plaintext.startswith("alft_"):
-        raise UtilityWorkflowError(
-            "new_token_plaintext must start with 'alft_' prefix"
-        )
+        raise UtilityWorkflowError("new_token_plaintext must start with 'alft_' prefix")
     if grace_seconds <= 0:
-        raise UtilityWorkflowError(
-            f"grace_seconds must be > 0, got {grace_seconds}"
-        )
+        raise UtilityWorkflowError(f"grace_seconds must be > 0, got {grace_seconds}")
     if grace_seconds > MAX_DEPLOY_TOKEN_GRACE_SECONDS:
         raise UtilityWorkflowError(
-            f"grace_seconds {grace_seconds} exceeds max "
-            f"{MAX_DEPLOY_TOKEN_GRACE_SECONDS} (1 week)"
+            f"grace_seconds {grace_seconds} exceeds max " f"{MAX_DEPLOY_TOKEN_GRACE_SECONDS} (1 week)"
         )
     return TokenRotationPlan(
         old_token_id=old_token_id,
@@ -234,7 +223,9 @@ class InvitationStatus:
 
 
 def is_invitation_actionable(
-    *, status: InvitationStatus, now_unix: int,
+    *,
+    status: InvitationStatus,
+    now_unix: int,
 ) -> bool:
     """True if the invitation is still in PENDING and not
     past expiry. The workflow signal-await loops while this
@@ -247,7 +238,9 @@ def is_invitation_actionable(
 
 
 def invitation_terminal_state(
-    *, status: InvitationStatus, now_unix: int,
+    *,
+    status: InvitationStatus,
+    now_unix: int,
 ) -> InvitationState | None:
     """Decide what state to transition to. Returns None if the
     invitation is still actionable. Otherwise:
@@ -266,22 +259,17 @@ def invitation_terminal_state(
         if now_unix >= status.expires_at_unix:
             return InvitationState.EXPIRED
         return None
-    raise UtilityWorkflowError(
-        f"unknown invitation state {status.state!r}"
-    )
+    raise UtilityWorkflowError(f"unknown invitation state {status.state!r}")
 
 
 def validate_invitation_ttl(*, ttl_seconds: int) -> None:
     """Refuse 0/negative or absurd values. Operator typo
     defense — 'ttl_days = 70 → ttl_seconds = 70 (a minute!)'."""
     if ttl_seconds <= 0:
-        raise UtilityWorkflowError(
-            f"invitation ttl must be positive, got {ttl_seconds}s"
-        )
+        raise UtilityWorkflowError(f"invitation ttl must be positive, got {ttl_seconds}s")
     if ttl_seconds > MAX_INVITATION_TTL_SECONDS:
         raise UtilityWorkflowError(
-            f"invitation ttl {ttl_seconds}s exceeds max "
-            f"{MAX_INVITATION_TTL_SECONDS}s (30 days)"
+            f"invitation ttl {ttl_seconds}s exceeds max " f"{MAX_INVITATION_TTL_SECONDS}s (30 days)"
         )
     if ttl_seconds < 60:
         # Less than a minute is meaningless — by the time the

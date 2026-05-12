@@ -41,7 +41,10 @@ def test_required_fields_must_be_non_empty():
     attributable. Missing org_slug = bill goes to nobody."""
     for empty_field in ("install_slug", "org_slug", "app_slug", "env_slug"):
         kwargs = dict(
-            install_slug="x", org_slug="x", app_slug="x", env_slug="x",
+            install_slug="x",
+            org_slug="x",
+            app_slug="x",
+            env_slug="x",
         )
         kwargs[empty_field] = ""
         with pytest.raises(ValueError, match=empty_field):
@@ -53,7 +56,10 @@ def test_extra_keys_cant_collide_with_platform_namespace():
     platform tags."""
     with pytest.raises(ValueError, match="namespace"):
         CloudTagSet(
-            install_slug="x", org_slug="x", app_slug="x", env_slug="x",
+            install_slug="x",
+            org_slug="x",
+            app_slug="x",
+            env_slug="x",
             extra={f"{PLATFORM_NAMESPACE}/sneaky": "value"},
         )
 
@@ -72,8 +78,10 @@ def test_canonical_dict_drops_empty_optional_fields():
 
 def test_canonical_dict_includes_set_optionals():
     tags = CloudTagSet(
-        install_slug="acme-prod", org_slug="acme",
-        app_slug="api", env_slug="prod",
+        install_slug="acme-prod",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
         binding_name="main_db",
         agent_id="agent-007",
         agent_run_id="run-42",
@@ -88,7 +96,10 @@ def test_min_required_keys_locked():
     """Lock-test: changing what's mandatory needs to be a
     deliberate change reviewed by a human."""
     assert MIN_REQUIRED_KEYS == {
-        TAG_INSTALL, TAG_ORG, TAG_APP, TAG_ENV,
+        TAG_INSTALL,
+        TAG_ORG,
+        TAG_APP,
+        TAG_ENV,
     }
 
 
@@ -104,8 +115,10 @@ def test_aws_keeps_slash_in_keys():
 
 def test_aws_truncates_long_values():
     tags = CloudTagSet(
-        install_slug="acme-prod", org_slug="acme",
-        app_slug="api", env_slug="prod",
+        install_slug="acme-prod",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
         extra={"app/notes": "x" * 500},
     )
     out = to_aws(tags)
@@ -114,8 +127,10 @@ def test_aws_truncates_long_values():
 
 def test_aws_replaces_disallowed_chars():
     tags = CloudTagSet(
-        install_slug="acme-prod", org_slug="acme",
-        app_slug="api", env_slug="prod",
+        install_slug="acme-prod",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
         extra={"app/notes": "value with $weird*chars"},
     )
     out = to_aws(tags)
@@ -138,8 +153,10 @@ def test_gcp_lowercases_and_replaces_dots_slashes():
 
 def test_gcp_lowercases_values():
     tags = CloudTagSet(
-        install_slug="ACME-PROD", org_slug="Acme",
-        app_slug="API", env_slug="Prod",
+        install_slug="ACME-PROD",
+        org_slug="Acme",
+        app_slug="API",
+        env_slug="Prod",
     )
     out = to_gcp(tags)
     assert out["astrolift_io_install"] == "acme-prod"
@@ -147,14 +164,18 @@ def test_gcp_lowercases_values():
 
 def test_gcp_truncates_to_63_chars():
     tags = CloudTagSet(
-        install_slug="acme-prod", org_slug="acme",
-        app_slug="api", env_slug="prod",
+        install_slug="acme-prod",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
         extra={f"{PLATFORM_NAMESPACE}/notused": ""},
     )
     # Values longer than 63 chars get truncated
     long_tags = CloudTagSet(
-        install_slug="acme", org_slug="acme",
-        app_slug="api", env_slug="prod",
+        install_slug="acme",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
         extra={"team": "x" * 100},
     )
     out = to_gcp(long_tags)
@@ -174,8 +195,10 @@ def test_azure_preserves_keys_unchanged():
 
 def test_azure_truncates_to_256():
     tags = CloudTagSet(
-        install_slug="acme", org_slug="acme",
-        app_slug="api", env_slug="prod",
+        install_slug="acme",
+        org_slug="acme",
+        app_slug="api",
+        env_slug="prod",
         extra={"long": "x" * 500},
     )
     out = to_azure(tags)
@@ -186,12 +209,14 @@ def test_azure_truncates_to_256():
 
 
 def test_assert_required_passes_when_all_present():
-    assert_required_tags({
-        TAG_INSTALL: "acme-prod",
-        TAG_ORG: "acme",
-        TAG_APP: "api",
-        TAG_ENV: "prod",
-    })
+    assert_required_tags(
+        {
+            TAG_INSTALL: "acme-prod",
+            TAG_ORG: "acme",
+            TAG_APP: "api",
+            TAG_ENV: "prod",
+        }
+    )
 
 
 def test_assert_required_fails_when_missing():
@@ -199,21 +224,25 @@ def test_assert_required_fails_when_missing():
     freshly-provisioned resource. Catches plugin authors who
     forgot to thread tags through."""
     with pytest.raises(TagEnforcementError, match="missing required"):
-        assert_required_tags({
-            TAG_INSTALL: "acme-prod",
-            TAG_ORG: "acme",
-            # missing TAG_APP and TAG_ENV
-        })
+        assert_required_tags(
+            {
+                TAG_INSTALL: "acme-prod",
+                TAG_ORG: "acme",
+                # missing TAG_APP and TAG_ENV
+            }
+        )
 
 
 def test_assert_required_treats_empty_as_missing():
     with pytest.raises(TagEnforcementError):
-        assert_required_tags({
-            TAG_INSTALL: "acme-prod",
-            TAG_ORG: "",
-            TAG_APP: "api",
-            TAG_ENV: "prod",
-        })
+        assert_required_tags(
+            {
+                TAG_INSTALL: "acme-prod",
+                TAG_ORG: "",
+                TAG_APP: "api",
+                TAG_ENV: "prod",
+            }
+        )
 
 
 # ---- agent stamping ------------------------------------------------
@@ -224,7 +253,9 @@ def test_for_agent_run_stamps_agent_fields():
     routes back to the agent run."""
     base = _base()
     stamped = for_agent_run(
-        base=base, agent_id="agent-007", agent_run_id="run-42",
+        base=base,
+        agent_id="agent-007",
+        agent_run_id="run-42",
     )
     assert stamped.agent_id == "agent-007"
     assert stamped.agent_run_id == "run-42"
@@ -243,7 +274,9 @@ def test_for_agent_run_requires_both_ids():
 def test_agent_tags_appear_in_aws_output():
     base = _base()
     stamped = for_agent_run(
-        base=base, agent_id="agent-007", agent_run_id="run-42",
+        base=base,
+        agent_id="agent-007",
+        agent_run_id="run-42",
     )
     out = to_aws(stamped)
     assert out[TAG_AGENT_ID] == "agent-007"

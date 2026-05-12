@@ -111,8 +111,10 @@ SOC_2 = ComplianceTemplate(
             threshold={
                 "min_tls_version": "1.2",
                 "secrets_backend_kinds": [
-                    "aws_secrets_manager", "gcp_secret_manager",
-                    "azure_key_vault", "hashicorp_vault",
+                    "aws_secrets_manager",
+                    "gcp_secret_manager",
+                    "azure_key_vault",
+                    "hashicorp_vault",
                 ],
             },
         ),
@@ -136,8 +138,10 @@ HIPAA = ComplianceTemplate(
             threshold={
                 "min_tls_version": "1.2",
                 "secrets_backend_kinds": [
-                    "aws_secrets_manager", "gcp_secret_manager",
-                    "azure_key_vault", "hashicorp_vault",
+                    "aws_secrets_manager",
+                    "gcp_secret_manager",
+                    "azure_key_vault",
+                    "hashicorp_vault",
                 ],
             },
         ),
@@ -184,8 +188,10 @@ ISO_27001 = ComplianceTemplate(
             threshold={
                 "min_tls_version": "1.2",
                 "secrets_backend_kinds": [
-                    "aws_secrets_manager", "gcp_secret_manager",
-                    "azure_key_vault", "hashicorp_vault",
+                    "aws_secrets_manager",
+                    "gcp_secret_manager",
+                    "azure_key_vault",
+                    "hashicorp_vault",
                 ],
             },
         ),
@@ -205,8 +211,7 @@ def get_template(*, slug: str) -> ComplianceTemplate:
     \`compliance.reportTemplates\` query enumerates the keys."""
     if slug not in TEMPLATE_REGISTRY:
         raise ComplianceError(
-            f"unknown compliance template {slug!r}; known: "
-            f"{sorted(TEMPLATE_REGISTRY.keys())}"
+            f"unknown compliance template {slug!r}; known: " f"{sorted(TEMPLATE_REGISTRY.keys())}"
         )
     return TEMPLATE_REGISTRY[slug]
 
@@ -255,14 +260,12 @@ def evaluate_audit_log(
         return CheckResult(
             area=CoverageArea.AUDIT_LOG,
             status=CheckStatus.FAIL,
-            detail=(
-                f"audit retention {evidence['retention_days']}d "
-                f"< required {min_days}d"
-            ),
+            detail=(f"audit retention {evidence['retention_days']}d " f"< required {min_days}d"),
         )
 
     if threshold.get("hash_chain_required") and not evidence.get(
-        "hash_chain_valid", False,
+        "hash_chain_valid",
+        False,
     ):
         return CheckResult(
             area=CoverageArea.AUDIT_LOG,
@@ -273,10 +276,7 @@ def evaluate_audit_log(
     return CheckResult(
         area=CoverageArea.AUDIT_LOG,
         status=CheckStatus.PASS,
-        detail=(
-            f"audit retention {evidence['retention_days']}d, "
-            "hash chain valid"
-        ),
+        detail=(f"audit retention {evidence['retention_days']}d, " "hash chain valid"),
     )
 
 
@@ -398,9 +398,7 @@ def evaluate_encryption(
         return CheckResult(
             area=CoverageArea.ENCRYPTION,
             status=CheckStatus.FAIL,
-            detail=(
-                f"min TLS {actual_tls} < required {required_tls}"
-            ),
+            detail=(f"min TLS {actual_tls} < required {required_tls}"),
         )
 
     allowed_backends = threshold.get("secrets_backend_kinds", [])
@@ -409,19 +407,13 @@ def evaluate_encryption(
         return CheckResult(
             area=CoverageArea.ENCRYPTION,
             status=CheckStatus.FAIL,
-            detail=(
-                f"secrets backend {actual_backend!r} not in allowed "
-                f"set {sorted(allowed_backends)}"
-            ),
+            detail=(f"secrets backend {actual_backend!r} not in allowed " f"set {sorted(allowed_backends)}"),
         )
 
     return CheckResult(
         area=CoverageArea.ENCRYPTION,
         status=CheckStatus.PASS,
-        detail=(
-            f"TLS >= {actual_tls}, secrets backend "
-            f"{actual_backend!r}"
-        ),
+        detail=(f"TLS >= {actual_tls}, secrets backend " f"{actual_backend!r}"),
     )
 
 
@@ -460,11 +452,13 @@ def evaluate_template(
     for req in template.requirements:
         evaluator = _AREA_EVALUATORS.get(req.area)
         if evaluator is None:
-            checks.append(CheckResult(
-                area=req.area,
-                status=CheckStatus.INCONCLUSIVE,
-                detail=f"no evaluator for area {req.area.value!r}",
-            ))
+            checks.append(
+                CheckResult(
+                    area=req.area,
+                    status=CheckStatus.INCONCLUSIVE,
+                    detail=f"no evaluator for area {req.area.value!r}",
+                )
+            )
             continue
         evidence = evidence_by_area.get(req.area, {})
         checks.append(evaluator(threshold=req.threshold, evidence=evidence))

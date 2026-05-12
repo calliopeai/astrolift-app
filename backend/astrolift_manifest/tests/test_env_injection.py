@@ -60,7 +60,8 @@ def test_each_layer_sets_correct_provenance():
         app_secret_bundles=[{"FROM_BUNDLE": "2"}],
         managed_service_bindings=[
             ManagedServiceBinding(
-                kind="redis", name="cache",
+                kind="redis",
+                name="cache",
                 connection_secret={"REDIS_URL": "redis://x"},
             ),
         ],
@@ -104,9 +105,22 @@ def test_envelope_catalog_covers_full_spec_11_set():
     expose its declared envelope. Lock-test so additions stay in
     sync with the spec."""
     expected_kinds = {
-        "postgres", "mysql", "redis", "mq", "queue", "topic",
-        "kv_store", "document_db", "search", "vector_index",
-        "time_series", "object_store", "nfs", "cdn", "email", "sms",
+        "postgres",
+        "mysql",
+        "redis",
+        "mq",
+        "queue",
+        "topic",
+        "kv_store",
+        "document_db",
+        "search",
+        "vector_index",
+        "time_series",
+        "object_store",
+        "nfs",
+        "cdn",
+        "email",
+        "sms",
     }
     for kind in expected_kinds:
         keys = envelope_keys_for(kind)

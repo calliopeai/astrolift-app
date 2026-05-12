@@ -38,7 +38,8 @@ def read_app_env(toml_text: str) -> dict[str, str]:
 
 
 def set_app_env_keys(
-    toml_text: str, kvs: Mapping[str, str],
+    toml_text: str,
+    kvs: Mapping[str, str],
 ) -> str:
     """Merge ``kvs`` into the top-level ``[env]`` table, returning
     the new TOML text. Existing keys are overwritten; keys not in
@@ -49,11 +50,7 @@ def set_app_env_keys(
     text when one exists."""
     import tomli_w
 
-    data: dict = (
-        tomllib.loads(toml_text)
-        if toml_text and toml_text.strip()
-        else {}
-    )
+    data: dict = tomllib.loads(toml_text) if toml_text and toml_text.strip() else {}
     env_table = data.get("env", {})
     if not isinstance(env_table, dict):
         env_table = {}
@@ -71,11 +68,7 @@ def delete_app_env_key(toml_text: str, key: str) -> tuple[str, bool]:
     matters."""
     import tomli_w
 
-    data: dict = (
-        tomllib.loads(toml_text)
-        if toml_text and toml_text.strip()
-        else {}
-    )
+    data: dict = tomllib.loads(toml_text) if toml_text and toml_text.strip() else {}
     env_table = data.get("env", {})
     if not isinstance(env_table, dict):
         return toml_text, False
@@ -100,7 +93,7 @@ def parse_dotenv(text: str) -> dict[str, str]:
         if not line or line.startswith("#"):
             continue
         if line.startswith("export "):
-            line = line[len("export "):].lstrip()
+            line = line[len("export ") :].lstrip()
         if "=" not in line:
             continue
         key, _, value = line.partition("=")
@@ -108,11 +101,7 @@ def parse_dotenv(text: str) -> dict[str, str]:
         if not key or not _is_valid_env_name(key):
             continue
         value = value.strip()
-        if (
-            len(value) >= 2
-            and value[0] in ('"', "'")
-            and value[-1] == value[0]
-        ):
+        if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
             value = value[1:-1]
         out[key] = value
     return out

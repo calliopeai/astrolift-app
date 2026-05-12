@@ -64,9 +64,7 @@ def test_render_substitutes_app_and_namespace():
 
 def test_disabled_returns_empty():
     """Org or app-level opt-out: caller skips seeding entirely."""
-    assert render_for_app(
-        app_name="api", namespace="acme-prod", auto_create_disabled=True
-    ) == []
+    assert render_for_app(app_name="api", namespace="acme-prod", auto_create_disabled=True) == []
 
 
 def test_render_preserves_severity_and_for_window():
@@ -83,14 +81,16 @@ def test_render_preserves_severity_and_for_window():
 def test_suppression_window_rejects_inverted_dates():
     with pytest.raises(ValueError):
         SuppressionWindow(
-            starts_at=_now(off=100), ends_at=_now(off=10),
+            starts_at=_now(off=100),
+            ends_at=_now(off=10),
         )
 
 
 def test_suppression_window_rejects_naive():
     with pytest.raises(ValueError):
         SuppressionWindow(
-            starts_at=datetime(2026, 5, 9), ends_at=_now(off=100),
+            starts_at=datetime(2026, 5, 9),
+            ends_at=_now(off=100),
         )
 
 
@@ -98,8 +98,11 @@ def test_alert_inside_suppression_window_is_suppressed():
     routes = [ChannelRoute(severity=Severity.CRITICAL, channel_ids=(1, 2))]
     sup = [SuppressionWindow(starts_at=_now(off=-60), ends_at=_now(off=60))]
     out = evaluate(
-        severity=Severity.CRITICAL, fired_at=_now(),
-        app_name="api", routes=routes, suppressions=sup,
+        severity=Severity.CRITICAL,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
+        suppressions=sup,
     )
     assert out.suppressed is True
     assert out.suppressed_reason == "maintenance window"
@@ -110,12 +113,19 @@ def test_alert_inside_suppression_window_is_suppressed():
 
 def test_suppression_can_scope_by_app():
     routes = [ChannelRoute(severity=Severity.CRITICAL, channel_ids=(1,))]
-    sup = [SuppressionWindow(
-        starts_at=_now(off=-60), ends_at=_now(off=60), app_name="other-app",
-    )]
+    sup = [
+        SuppressionWindow(
+            starts_at=_now(off=-60),
+            ends_at=_now(off=60),
+            app_name="other-app",
+        )
+    ]
     out = evaluate(
-        severity=Severity.CRITICAL, fired_at=_now(),
-        app_name="api", routes=routes, suppressions=sup,
+        severity=Severity.CRITICAL,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
+        suppressions=sup,
     )
     # Suppression applies to other-app, not 'api'
     assert out.suppressed is False
@@ -123,13 +133,19 @@ def test_suppression_can_scope_by_app():
 
 def test_suppression_can_scope_by_severity():
     routes = [ChannelRoute(severity=Severity.WARNING, channel_ids=(1,))]
-    sup = [SuppressionWindow(
-        starts_at=_now(off=-60), ends_at=_now(off=60),
-        severity=Severity.CRITICAL,
-    )]
+    sup = [
+        SuppressionWindow(
+            starts_at=_now(off=-60),
+            ends_at=_now(off=60),
+            severity=Severity.CRITICAL,
+        )
+    ]
     out = evaluate(
-        severity=Severity.WARNING, fired_at=_now(),
-        app_name="api", routes=routes, suppressions=sup,
+        severity=Severity.WARNING,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
+        suppressions=sup,
     )
     # CRITICAL-only window doesn't catch WARNING alerts
     assert out.suppressed is False
@@ -144,8 +160,10 @@ def test_severity_routes_to_matching_channels():
         ChannelRoute(severity=Severity.WARNING, channel_ids=(20, 21)),
     ]
     out = evaluate(
-        severity=Severity.WARNING, fired_at=_now(),
-        app_name="api", routes=routes,
+        severity=Severity.WARNING,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
     )
     assert out.channel_ids == (20, 21)
     assert should_fire(out) is True
@@ -154,8 +172,10 @@ def test_severity_routes_to_matching_channels():
 def test_no_route_for_severity_returns_empty():
     routes = [ChannelRoute(severity=Severity.CRITICAL, channel_ids=(10,))]
     out = evaluate(
-        severity=Severity.WARNING, fired_at=_now(),
-        app_name="api", routes=routes,
+        severity=Severity.WARNING,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
     )
     assert out.channel_ids == ()
     assert should_fire(out) is False
@@ -167,8 +187,10 @@ def test_no_route_for_severity_returns_empty():
 def test_dedup_within_window_marks_deduped():
     routes = [ChannelRoute(severity=Severity.WARNING, channel_ids=(20,))]
     out = evaluate(
-        severity=Severity.WARNING, fired_at=_now(),
-        app_name="api", routes=routes,
+        severity=Severity.WARNING,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
         last_delivery_at=_now(off=-60),
         dedup_window_seconds=300,
     )
@@ -179,8 +201,10 @@ def test_dedup_within_window_marks_deduped():
 def test_dedup_outside_window_fires():
     routes = [ChannelRoute(severity=Severity.WARNING, channel_ids=(20,))]
     out = evaluate(
-        severity=Severity.WARNING, fired_at=_now(),
-        app_name="api", routes=routes,
+        severity=Severity.WARNING,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
         last_delivery_at=_now(off=-3600),  # 1 hour ago
         dedup_window_seconds=300,
     )
@@ -195,8 +219,11 @@ def test_suppression_takes_precedence_over_dedup():
     routes = [ChannelRoute(severity=Severity.WARNING, channel_ids=(20,))]
     sup = [SuppressionWindow(starts_at=_now(off=-60), ends_at=_now(off=60))]
     out = evaluate(
-        severity=Severity.WARNING, fired_at=_now(),
-        app_name="api", routes=routes, suppressions=sup,
+        severity=Severity.WARNING,
+        fired_at=_now(),
+        app_name="api",
+        routes=routes,
+        suppressions=sup,
         last_delivery_at=_now(off=-30),  # would also dedupe
         dedup_window_seconds=300,
     )

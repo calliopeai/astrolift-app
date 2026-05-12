@@ -22,9 +22,7 @@ User = get_user_model()
 
 
 def _info():
-    user, _ = User.objects.get_or_create(
-        username="admin-rb", defaults={"email": "admin-rb@astrolift.dev"}
-    )
+    user, _ = User.objects.get_or_create(username="admin-rb", defaults={"email": "admin-rb@astrolift.dev"})
     return SimpleNamespace(context=SimpleNamespace(user=user, request=SimpleNamespace(user=user)))
 
 
@@ -159,9 +157,7 @@ def test_update_role_swaps_permissions(permission_resolver):
         )
         u = IdentityMutation().update_role(
             _info(),
-            input=UpdateRoleInput(
-                id=c.data.id, permissions=["app.read", "app.rollback"]
-            ),
+            input=UpdateRoleInput(id=c.data.id, permissions=["app.read", "app.rollback"]),
         )
     assert u.ok
     role = Role.objects.get(slug="dev")
@@ -182,9 +178,7 @@ def test_update_rejects_system_role(permission_resolver):
     with _ctx(org):
         result = IdentityMutation().update_role(
             _info(),
-            input=UpdateRoleInput(
-                id=str(sys_role.guid), permissions=["app.read", "app.deploy"]
-            ),
+            input=UpdateRoleInput(id=str(sys_role.guid), permissions=["app.read", "app.deploy"]),
         )
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
@@ -206,9 +200,7 @@ def test_update_rejects_unknown_permission(permission_resolver):
         )
         u = IdentityMutation().update_role(
             _info(),
-            input=UpdateRoleInput(
-                id=c.data.id, permissions=["app.read", "totally.fake"]
-            ),
+            input=UpdateRoleInput(id=c.data.id, permissions=["app.read", "totally.fake"]),
         )
     assert not u.ok
     assert u.errors[0].code == "VALIDATION"
@@ -256,17 +248,13 @@ def test_delete_role_soft_deletes(permission_resolver):
                 permissions=["app.read"],
             ),
         )
-        d = IdentityMutation().soft_delete_role(
-            _info(), input=DeleteRoleInput(id=c.data.id)
-        )
+        d = IdentityMutation().soft_delete_role(_info(), input=DeleteRoleInput(id=c.data.id))
     assert d.ok
     role = Role.all_objects.get(slug="dev")
     assert role.deleted_at is not None
     # soft-delete frees the slug for re-use after deletion (per the
     # uniqueness constraint condition).
-    assert (
-        Role.objects.filter(slug="dev", deleted_at__isnull=True).count() == 0
-    )
+    assert Role.objects.filter(slug="dev", deleted_at__isnull=True).count() == 0
 
 
 def test_delete_rejects_system_role(permission_resolver):
@@ -281,9 +269,7 @@ def test_delete_rejects_system_role(permission_resolver):
     )
 
     with _ctx(org):
-        result = IdentityMutation().soft_delete_role(
-            _info(), input=DeleteRoleInput(id=str(sys_role.guid))
-        )
+        result = IdentityMutation().soft_delete_role(_info(), input=DeleteRoleInput(id=str(sys_role.guid)))
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
     sys_role.refresh_from_db()

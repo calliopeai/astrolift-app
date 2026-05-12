@@ -30,9 +30,17 @@ def test_parse_strict_xyz():
     assert parse_version("2.4.0") == ApiVersion(2, 4, 0)
 
 
-@pytest.mark.parametrize("bad", [
-    "2.4", "2.4.0.1", "v2.4.0", "2.4.0-rc1", "latest", "",
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "2.4",
+        "2.4.0.1",
+        "v2.4.0",
+        "2.4.0-rc1",
+        "latest",
+        "",
+    ],
+)
 def test_parse_rejects_loose(bad):
     with pytest.raises(ApiVersionError):
         parse_version(bad)
@@ -54,25 +62,41 @@ def test_versions_orderable():
 
 
 def test_minor_or_patch_is_not_breaking():
-    assert is_breaking_change(
-        from_v=ApiVersion(2, 4, 0), to_v=ApiVersion(2, 5, 0),
-    ) is False
-    assert is_breaking_change(
-        from_v=ApiVersion(2, 4, 0), to_v=ApiVersion(2, 4, 1),
-    ) is False
+    assert (
+        is_breaking_change(
+            from_v=ApiVersion(2, 4, 0),
+            to_v=ApiVersion(2, 5, 0),
+        )
+        is False
+    )
+    assert (
+        is_breaking_change(
+            from_v=ApiVersion(2, 4, 0),
+            to_v=ApiVersion(2, 4, 1),
+        )
+        is False
+    )
 
 
 def test_major_bump_is_breaking():
-    assert is_breaking_change(
-        from_v=ApiVersion(2, 9, 9), to_v=ApiVersion(3, 0, 0),
-    ) is True
+    assert (
+        is_breaking_change(
+            from_v=ApiVersion(2, 9, 9),
+            to_v=ApiVersion(3, 0, 0),
+        )
+        is True
+    )
 
 
 def test_same_or_lower_major_is_not_breaking():
     """Same major = compatible by definition (spec 27 §3)."""
-    assert is_breaking_change(
-        from_v=ApiVersion(2, 4, 0), to_v=ApiVersion(2, 4, 0),
-    ) is False
+    assert (
+        is_breaking_change(
+            from_v=ApiVersion(2, 4, 0),
+            to_v=ApiVersion(2, 4, 0),
+        )
+        is False
+    )
 
 
 # ---- deprecation notice --------------------------------------------
@@ -176,8 +200,12 @@ def test_changelog_kinds_locked():
     """Lock-test on the vocabulary so new tags require deliberate
     review."""
     assert required_changelog_kinds() == {
-        ChangeKind.ADDED, ChangeKind.CHANGED, ChangeKind.DEPRECATED,
-        ChangeKind.REMOVED, ChangeKind.FIXED, ChangeKind.SECURITY,
+        ChangeKind.ADDED,
+        ChangeKind.CHANGED,
+        ChangeKind.DEPRECATED,
+        ChangeKind.REMOVED,
+        ChangeKind.FIXED,
+        ChangeKind.SECURITY,
     }
 
 

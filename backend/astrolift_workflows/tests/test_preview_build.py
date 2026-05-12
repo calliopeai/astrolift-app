@@ -59,7 +59,9 @@ def test_steps_for_failure_includes_mark_failed():
 def test_namespace_basic():
     """Spec §5: ``<org>-<app>-pr-<n>``."""
     ns = namespace_for_preview(
-        org_slug="acme", app_slug="api", pr_number=42,
+        org_slug="acme",
+        app_slug="api",
+        pr_number=42,
     )
     assert ns == "acme-api-pr-42"
 
@@ -81,7 +83,8 @@ def test_namespace_rejects_too_long_org():
     with pytest.raises(PreviewBuildError):
         namespace_for_preview(
             org_slug="x" * 60,  # leaves no room for app + suffix
-            app_slug="api", pr_number=99999,
+            app_slug="api",
+            pr_number=99999,
         )
 
 
@@ -108,7 +111,8 @@ def test_env_slug_rejects_zero_or_negative():
 def test_hostname_under_preview_wildcard():
     """Pairs with #70 wildcard SAN ``*.pr.<org>.<base_zone>``."""
     host = hostname_for_preview(
-        pr_number=42, base_zone="apps.platform.example",
+        pr_number=42,
+        base_zone="apps.platform.example",
         org_slug="acme",
     )
     assert host == "pr-42.acme.apps.platform.example"
@@ -117,7 +121,8 @@ def test_hostname_under_preview_wildcard():
 def test_hostname_lowercases():
     """RFC 1035 — DNS labels are case-insensitive; canonicalize."""
     host = hostname_for_preview(
-        pr_number=42, base_zone="APPS.PLATFORM.EXAMPLE",
+        pr_number=42,
+        base_zone="APPS.PLATFORM.EXAMPLE",
         org_slug="ACME",
     )
     assert host.islower()
@@ -211,7 +216,10 @@ def test_is_update_flow_no_existing():
 
 def test_is_update_flow_new_sha():
     existing = ExistingPreview(
-        preview_id=1, namespace="x", env_id=1, last_commit_sha="aaa",
+        preview_id=1,
+        namespace="x",
+        env_id=1,
+        last_commit_sha="aaa",
     )
     assert is_update_flow(existing=existing, new_commit_sha="bbb") is True
 
@@ -219,7 +227,10 @@ def test_is_update_flow_new_sha():
 def test_is_update_flow_same_sha():
     """Same SHA = re-delivery of the same webhook; not an update."""
     existing = ExistingPreview(
-        preview_id=1, namespace="x", env_id=1, last_commit_sha="aaa",
+        preview_id=1,
+        namespace="x",
+        env_id=1,
+        last_commit_sha="aaa",
     )
     assert is_update_flow(existing=existing, new_commit_sha="aaa") is False
 
@@ -229,7 +240,8 @@ def test_is_update_flow_same_sha():
 
 def test_pr_comment_success_includes_url():
     body = pr_comment_for_success(
-        pr_number=42, preview_url="https://pr-42.acme.platform.example",
+        pr_number=42,
+        preview_url="https://pr-42.acme.platform.example",
     )
     assert "Preview environment ready" in body
     assert "#42" in body
@@ -238,7 +250,8 @@ def test_pr_comment_success_includes_url():
 
 def test_pr_comment_failure_includes_logs():
     body = pr_comment_for_failure(
-        pr_number=42, logs_url="https://app.platform/builds/42/logs",
+        pr_number=42,
+        logs_url="https://app.platform/builds/42/logs",
     )
     assert "failed" in body.lower()
     assert "https://app.platform/builds/42/logs" in body

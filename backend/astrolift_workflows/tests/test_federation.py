@@ -42,21 +42,30 @@ from astrolift_workflows.federation import (
 
 
 def test_normalize_install_id_basic():
-    assert normalize_install_id(
-        value="acme.platform.example",
-    ) == "acme.platform.example"
+    assert (
+        normalize_install_id(
+            value="acme.platform.example",
+        )
+        == "acme.platform.example"
+    )
 
 
 def test_normalize_install_id_lowercases():
-    assert normalize_install_id(
-        value="ACME.PLATFORM.EXAMPLE",
-    ) == "acme.platform.example"
+    assert (
+        normalize_install_id(
+            value="ACME.PLATFORM.EXAMPLE",
+        )
+        == "acme.platform.example"
+    )
 
 
 def test_normalize_install_id_strips_trailing_dot():
-    assert normalize_install_id(
-        value="acme.platform.example.",
-    ) == "acme.platform.example"
+    assert (
+        normalize_install_id(
+            value="acme.platform.example.",
+        )
+        == "acme.platform.example"
+    )
 
 
 def test_normalize_install_id_rejects_empty():
@@ -146,33 +155,53 @@ def test_trust_inactive_when_revoked():
 
 def test_trust_inactive_when_expired():
     t = _trust()
-    assert is_trust_active(
-        trust=t, now_unix=t.expires_at_unix + 1,
-    ) is False
+    assert (
+        is_trust_active(
+            trust=t,
+            now_unix=t.expires_at_unix + 1,
+        )
+        is False
+    )
 
 
 # ---- grants_capability ---------------------------------------------
 
 
 def test_grants_capability_present():
-    t = _trust(capabilities=frozenset({
-        FederationCapability.APP_TRANSFER,
-        FederationCapability.APP_DISCOVERY_READONLY,
-    }))
-    assert grants_capability(
-        trust=t, capability=FederationCapability.APP_TRANSFER,
-        now_unix=1_700_000_100,
-    ) is True
+    t = _trust(
+        capabilities=frozenset(
+            {
+                FederationCapability.APP_TRANSFER,
+                FederationCapability.APP_DISCOVERY_READONLY,
+            }
+        )
+    )
+    assert (
+        grants_capability(
+            trust=t,
+            capability=FederationCapability.APP_TRANSFER,
+            now_unix=1_700_000_100,
+        )
+        is True
+    )
 
 
 def test_grants_capability_absent():
-    t = _trust(capabilities=frozenset({
-        FederationCapability.APP_DISCOVERY_READONLY,
-    }))
-    assert grants_capability(
-        trust=t, capability=FederationCapability.APP_TRANSFER,
-        now_unix=1_700_000_100,
-    ) is False
+    t = _trust(
+        capabilities=frozenset(
+            {
+                FederationCapability.APP_DISCOVERY_READONLY,
+            }
+        )
+    )
+    assert (
+        grants_capability(
+            trust=t,
+            capability=FederationCapability.APP_TRANSFER,
+            now_unix=1_700_000_100,
+        )
+        is False
+    )
 
 
 def test_grants_capability_revoked_short_circuits():
@@ -180,10 +209,14 @@ def test_grants_capability_revoked_short_circuits():
         capabilities=frozenset({FederationCapability.APP_TRANSFER}),
         is_revoked=True,
     )
-    assert grants_capability(
-        trust=t, capability=FederationCapability.APP_TRANSFER,
-        now_unix=1_700_000_100,
-    ) is False
+    assert (
+        grants_capability(
+            trust=t,
+            capability=FederationCapability.APP_TRANSFER,
+            now_unix=1_700_000_100,
+        )
+        is False
+    )
 
 
 # ---- handshake state machine ---------------------------------------
@@ -196,32 +229,35 @@ def test_handshake_order_locked():
     assert HANDSHAKE_ORDER[0] == HandshakeStep.INIT
     assert HANDSHAKE_ORDER[-1] == HandshakeStep.PERSISTED_TRUST
     # SENT_HELLO before RECEIVED_CHALLENGE_RESPONSE
-    assert (
-        HANDSHAKE_ORDER.index(HandshakeStep.SENT_HELLO)
-        < HANDSHAKE_ORDER.index(HandshakeStep.RECEIVED_CHALLENGE_RESPONSE)
+    assert HANDSHAKE_ORDER.index(HandshakeStep.SENT_HELLO) < HANDSHAKE_ORDER.index(
+        HandshakeStep.RECEIVED_CHALLENGE_RESPONSE
     )
     # Local fingerprint confirm before final ack
-    assert (
-        HANDSHAKE_ORDER.index(HandshakeStep.OPERATOR_CONFIRMED_REMOTE_FINGERPRINT)
-        < HANDSHAKE_ORDER.index(HandshakeStep.SENT_FINAL_ACK)
+    assert HANDSHAKE_ORDER.index(HandshakeStep.OPERATOR_CONFIRMED_REMOTE_FINGERPRINT) < HANDSHAKE_ORDER.index(
+        HandshakeStep.SENT_FINAL_ACK
     )
     # Remote operator confirm before persist
-    assert (
-        HANDSHAKE_ORDER.index(HandshakeStep.REMOTE_OPERATOR_CONFIRMED)
-        < HANDSHAKE_ORDER.index(HandshakeStep.PERSISTED_TRUST)
+    assert HANDSHAKE_ORDER.index(HandshakeStep.REMOTE_OPERATOR_CONFIRMED) < HANDSHAKE_ORDER.index(
+        HandshakeStep.PERSISTED_TRUST
     )
 
 
 def test_next_handshake_step():
-    assert next_handshake_step(
-        current=HandshakeStep.INIT,
-    ) == HandshakeStep.SENT_HELLO
+    assert (
+        next_handshake_step(
+            current=HandshakeStep.INIT,
+        )
+        == HandshakeStep.SENT_HELLO
+    )
 
 
 def test_next_handshake_step_terminal():
-    assert next_handshake_step(
-        current=HandshakeStep.PERSISTED_TRUST,
-    ) is None
+    assert (
+        next_handshake_step(
+            current=HandshakeStep.PERSISTED_TRUST,
+        )
+        is None
+    )
 
 
 # ---- HelloMessage --------------------------------------------------
@@ -241,7 +277,8 @@ def test_hello_message_short_nonce_rejected():
     """Nonce too short = brute-forcable challenge → refuse."""
     with pytest.raises(FederationError, match="32 chars"):
         HelloMessage(
-            iss="a.example", nonce="short",
+            iss="a.example",
+            nonce="short",
             jwks_url="https://a/jwks",
             requested_capabilities=(FederationCapability.APP_TRANSFER,),
         )
@@ -251,7 +288,8 @@ def test_hello_message_empty_caps_rejected():
     """No-cap handshake is meaningless."""
     with pytest.raises(FederationError):
         HelloMessage(
-            iss="a.example", nonce="x" * 32,
+            iss="a.example",
+            nonce="x" * 32,
             jwks_url="https://a/jwks",
             requested_capabilities=(),
         )
@@ -262,7 +300,8 @@ def test_hello_message_empty_caps_rejected():
 
 def test_challenge_response_basic():
     cr = ChallengeResponse(
-        iss="b.example", nonce="y" * 32,
+        iss="b.example",
+        nonce="y" * 32,
         signed_peer_nonce="abc123",
         jwks_url="https://b/jwks",
         granted_capabilities=(FederationCapability.APP_DISCOVERY_READONLY,),
@@ -274,7 +313,8 @@ def test_challenge_response_basic():
 def test_challenge_response_requires_fingerprint():
     with pytest.raises(FederationError, match="fingerprint"):
         ChallengeResponse(
-            iss="b.example", nonce="y" * 32,
+            iss="b.example",
+            nonce="y" * 32,
             signed_peer_nonce="sig",
             jwks_url="https://b/jwks",
             granted_capabilities=(FederationCapability.APP_TRANSFER,),
@@ -287,7 +327,8 @@ def test_challenge_response_requires_fingerprint():
 
 def test_verify_handshake_pair_happy():
     hello = HelloMessage(
-        iss="a.example", nonce="x" * 32,
+        iss="a.example",
+        nonce="x" * 32,
         jwks_url="https://a/jwks",
         requested_capabilities=(
             FederationCapability.APP_TRANSFER,
@@ -295,7 +336,8 @@ def test_verify_handshake_pair_happy():
         ),
     )
     response = ChallengeResponse(
-        iss="b.example", nonce="y" * 32,
+        iss="b.example",
+        nonce="y" * 32,
         signed_peer_nonce="sig_b",
         jwks_url="https://b/jwks",
         granted_capabilities=(FederationCapability.APP_TRANSFER,),
@@ -308,12 +350,14 @@ def test_verify_handshake_pair_rejects_self_loop():
     """If response.iss == hello.iss, something's broken (DNS
     misconfig or attacker reflecting the message)."""
     hello = HelloMessage(
-        iss="a.example", nonce="x" * 32,
+        iss="a.example",
+        nonce="x" * 32,
         jwks_url="https://a/jwks",
         requested_capabilities=(FederationCapability.APP_TRANSFER,),
     )
     response = ChallengeResponse(
-        iss="a.example", nonce="y" * 32,
+        iss="a.example",
+        nonce="y" * 32,
         signed_peer_nonce="sig",
         jwks_url="https://a/jwks",
         granted_capabilities=(FederationCapability.APP_TRANSFER,),
@@ -327,14 +371,14 @@ def test_verify_handshake_pair_remote_must_grant_subset():
     """Remote can grant a subset but not capabilities A didn't
     request — strange behavior, refuse loudly."""
     hello = HelloMessage(
-        iss="a.example", nonce="x" * 32,
+        iss="a.example",
+        nonce="x" * 32,
         jwks_url="https://a/jwks",
-        requested_capabilities=(
-            FederationCapability.APP_DISCOVERY_READONLY,
-        ),
+        requested_capabilities=(FederationCapability.APP_DISCOVERY_READONLY,),
     )
     response = ChallengeResponse(
-        iss="b.example", nonce="y" * 32,
+        iss="b.example",
+        nonce="y" * 32,
         signed_peer_nonce="sig",
         jwks_url="https://b/jwks",
         granted_capabilities=(FederationCapability.SECRET_SHARING,),
@@ -347,12 +391,14 @@ def test_verify_handshake_pair_remote_must_grant_subset():
 def test_verify_handshake_pair_remote_can_decline():
     """Remote granting empty caps = decline; refuse to persist."""
     hello = HelloMessage(
-        iss="a.example", nonce="x" * 32,
+        iss="a.example",
+        nonce="x" * 32,
         jwks_url="https://a/jwks",
         requested_capabilities=(FederationCapability.APP_TRANSFER,),
     )
     response = ChallengeResponse(
-        iss="b.example", nonce="y" * 32,
+        iss="b.example",
+        nonce="y" * 32,
         signed_peer_nonce="sig",
         jwks_url="https://b/jwks",
         granted_capabilities=(),
@@ -367,10 +413,7 @@ def test_verify_handshake_pair_remote_can_decline():
 
 def test_jwks_url_format():
     url = jwks_url_for(install_id="acme.platform.example")
-    assert url == (
-        "https://acme.platform.example"
-        "/.well-known/astrolift-federation/jwks"
-    )
+    assert url == ("https://acme.platform.example" "/.well-known/astrolift-federation/jwks")
 
 
 # ---- federated claims ----------------------------------------------
@@ -381,7 +424,8 @@ def test_build_claims_basic():
         iss="acme.platform.example",
         aud="globex.platform.example",
         sub="user-123",
-        issued_at_unix=1_700_000_000, jti="rpc-1",
+        issued_at_unix=1_700_000_000,
+        jti="rpc-1",
         capability=FederationCapability.APP_DISCOVERY_READONLY,
     )
     assert claims.exp == 1_700_000_000 + JWT_TTL_SECONDS
@@ -390,8 +434,11 @@ def test_build_claims_basic():
 def test_build_claims_rejects_self_audience():
     with pytest.raises(FederationError, match="must differ"):
         build_federated_claims(
-            iss="a.example", aud="a.example",
-            sub="x", issued_at_unix=0, jti="j",
+            iss="a.example",
+            aud="a.example",
+            sub="x",
+            issued_at_unix=0,
+            jti="j",
             capability=FederationCapability.APP_TRANSFER,
         )
 
@@ -399,8 +446,11 @@ def test_build_claims_rejects_self_audience():
 def test_build_claims_rejects_oversized_ttl():
     with pytest.raises(FederationError):
         build_federated_claims(
-            iss="a.example", aud="b.example", sub="x",
-            issued_at_unix=0, jti="j",
+            iss="a.example",
+            aud="b.example",
+            sub="x",
+            issued_at_unix=0,
+            jti="j",
             capability=FederationCapability.APP_TRANSFER,
             ttl_seconds=JWT_TTL_SECONDS + 1,
         )
@@ -409,8 +459,11 @@ def test_build_claims_rejects_oversized_ttl():
 def test_build_claims_requires_jti():
     with pytest.raises(FederationError, match="jti"):
         build_federated_claims(
-            iss="a.example", aud="b.example", sub="x",
-            issued_at_unix=0, jti="",
+            iss="a.example",
+            aud="b.example",
+            sub="x",
+            issued_at_unix=0,
+            jti="",
             capability=FederationCapability.APP_TRANSFER,
         )
 
@@ -418,8 +471,11 @@ def test_build_claims_requires_jti():
 def test_build_claims_requires_sub():
     with pytest.raises(FederationError, match="sub"):
         build_federated_claims(
-            iss="a.example", aud="b.example", sub="",
-            issued_at_unix=0, jti="j",
+            iss="a.example",
+            aud="b.example",
+            sub="",
+            issued_at_unix=0,
+            jti="j",
             capability=FederationCapability.APP_TRANSFER,
         )
 
@@ -482,7 +538,8 @@ def test_verify_trust_revoked():
     trust = _trust(
         local_install="globex.platform.example",
         remote_install="acme.platform.example",
-        is_revoked=True, revoke_reason="incident",
+        is_revoked=True,
+        revoke_reason="incident",
     )
     decision = verify_federated_request(
         claims=_claims(),
@@ -563,12 +620,15 @@ def test_verify_clock_skew_tolerance():
 # ---- shareable kinds + capability mapping --------------------------
 
 
-@pytest.mark.parametrize("kind,expected_cap", [
-    (ShareableKind.APP_INVENTORY, FederationCapability.APP_DISCOVERY_READONLY),
-    (ShareableKind.APP_MANIFEST, FederationCapability.APP_TRANSFER),
-    (ShareableKind.ENV_CONFIG, FederationCapability.ENV_CONFIG_SHARE),
-    (ShareableKind.SECRET_VALUE, FederationCapability.SECRET_SHARING),
-])
+@pytest.mark.parametrize(
+    "kind,expected_cap",
+    [
+        (ShareableKind.APP_INVENTORY, FederationCapability.APP_DISCOVERY_READONLY),
+        (ShareableKind.APP_MANIFEST, FederationCapability.APP_TRANSFER),
+        (ShareableKind.ENV_CONFIG, FederationCapability.ENV_CONFIG_SHARE),
+        (ShareableKind.SECRET_VALUE, FederationCapability.SECRET_SHARING),
+    ],
+)
 def test_capability_for_kind(kind, expected_cap):
     assert capability_for_kind(kind=kind) == expected_cap
 
@@ -675,7 +735,8 @@ def test_authorize_share_happy_path():
     )
     # No raise = authorized
     authorize_share(
-        trust=trust, kind=ShareableKind.APP_MANIFEST,
+        trust=trust,
+        kind=ShareableKind.APP_MANIFEST,
         now_unix=1_700_000_100,
     )
 
@@ -688,7 +749,8 @@ def test_authorize_share_kind_capability_mismatch():
     )
     with pytest.raises(FederationError, match="SECRET_SHARING|secret_sharing"):
         authorize_share(
-            trust=trust, kind=ShareableKind.SECRET_VALUE,
+            trust=trust,
+            kind=ShareableKind.SECRET_VALUE,
             now_unix=1_700_000_100,
         )
 
@@ -700,7 +762,8 @@ def test_authorize_share_revoked():
     )
     with pytest.raises(FederationError, match="not active"):
         authorize_share(
-            trust=trust, kind=ShareableKind.APP_MANIFEST,
+            trust=trust,
+            kind=ShareableKind.APP_MANIFEST,
             now_unix=1_700_000_100,
         )
 
@@ -711,7 +774,8 @@ def test_authorize_share_expired():
     )
     with pytest.raises(FederationError, match="not active"):
         authorize_share(
-            trust=trust, kind=ShareableKind.APP_MANIFEST,
+            trust=trust,
+            kind=ShareableKind.APP_MANIFEST,
             now_unix=trust.expires_at_unix + 1,
         )
 

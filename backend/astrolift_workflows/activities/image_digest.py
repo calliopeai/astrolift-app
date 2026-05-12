@@ -81,17 +81,11 @@ def parse_pinned_ref(value: str) -> PinnedRef:
     """
     left, digest = _split_at_digest(value.strip())
     if digest is None:
-        raise ImageRefError(
-            f"image ref {value!r} is not in '<repo>@sha256:<digest>' form"
-        )
+        raise ImageRefError(f"image ref {value!r} is not in '<repo>@sha256:<digest>' form")
     if not is_digest(digest):
-        raise ImageRefError(
-            f"image ref {value!r} carries non-sha256 digest {digest!r}"
-        )
+        raise ImageRefError(f"image ref {value!r} carries non-sha256 digest {digest!r}")
     if not left:
-        raise ImageRefError(
-            f"image ref {value!r} has empty repo before '@'"
-        )
+        raise ImageRefError(f"image ref {value!r} has empty repo before '@'")
     return PinnedRef(repo=left, digest=digest)
 
 
@@ -105,9 +99,7 @@ def pin_to_digest(*, ref: str, digest: str) -> PinnedRef:
     match).
     """
     if not is_digest(digest):
-        raise ImageRefError(
-            f"digest {digest!r} not in 'sha256:<64-hex>' form"
-        )
+        raise ImageRefError(f"digest {digest!r} not in 'sha256:<64-hex>' form")
 
     ref = ref.strip()
     if not ref:
@@ -117,10 +109,7 @@ def pin_to_digest(*, ref: str, digest: str) -> PinnedRef:
     left, existing_digest = _split_at_digest(ref)
     if existing_digest is not None:
         if not is_digest(existing_digest):
-            raise ImageRefError(
-                f"image ref {ref!r} carries non-sha256 digest "
-                f"{existing_digest!r}"
-            )
+            raise ImageRefError(f"image ref {ref!r} carries non-sha256 digest " f"{existing_digest!r}")
         if existing_digest != digest:
             raise ImageRefError(
                 f"image ref {ref!r} is already pinned to "

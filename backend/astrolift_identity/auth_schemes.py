@@ -53,9 +53,7 @@ _TOKEN_PREFIXES: dict[str, AuthScheme] = {
 # JWT structural detection: three base64url segments separated by
 # dots. OIDC tokens are JWTs; our local API/deploy/SCIM tokens are
 # opaque-string-with-prefix and never JWT-shaped.
-_JWT_RE = re.compile(
-    r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$"
-)
+_JWT_RE = re.compile(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")
 
 
 # SCIM endpoints have a fixed prefix; SCIM tokens are only valid
@@ -102,16 +100,12 @@ def classify(
       4. None → unauthenticated.
     """
     has_bearer = bool(_get_bearer_token(headers))
-    has_cookie = bool(
-        cookies and cookies.get("astrolift_session")
-    )
+    has_cookie = bool(cookies and cookies.get("astrolift_session"))
     has_mtls = bool(client_cert_fingerprint)
 
     presented = sum([has_bearer, has_cookie, has_mtls])
     if presented > 1:
-        raise AuthSchemeError(
-            "multiple credentials presented; submit exactly one"
-        )
+        raise AuthSchemeError("multiple credentials presented; submit exactly one")
 
     if has_mtls:
         return ClassifiedAuth(
@@ -160,13 +154,9 @@ def _classify_bearer(*, token: str, path: str) -> AuthScheme:
     for prefix, scheme in _TOKEN_PREFIXES.items():
         if token.startswith(prefix):
             if scheme == AuthScheme.SCIM and not path.startswith(_SCIM_PATH_PREFIX):
-                raise AuthSchemeError(
-                    "SCIM token presented at non-SCIM endpoint"
-                )
+                raise AuthSchemeError("SCIM token presented at non-SCIM endpoint")
             if scheme != AuthScheme.SCIM and path.startswith(_SCIM_PATH_PREFIX):
-                raise AuthSchemeError(
-                    "non-SCIM token presented at SCIM endpoint"
-                )
+                raise AuthSchemeError("non-SCIM token presented at SCIM endpoint")
             return scheme
 
     raise AuthSchemeError("token format not recognized")
@@ -186,7 +176,7 @@ class TokenIntrospection:
 
     active: bool
     scheme: str
-    principal: str   # 'user:42' / 'app:7' / 'service:workers'
+    principal: str  # 'user:42' / 'app:7' / 'service:workers'
     scopes: tuple[str, ...]
     """e.g. ('app.deploy', 'app.read'). Empty for OIDC tokens
     where scope comes from the upstream IdP claim."""
@@ -195,12 +185,14 @@ class TokenIntrospection:
     """Optional bindings: 'app_id': '42', 'env': 'prod',
     'ip_allowlist': '203.0.113.0/24'. Operator UI surfaces these."""
 
-    expires_at: str = ""   # ISO-8601 UTC; empty for non-expiring tokens
+    expires_at: str = ""  # ISO-8601 UTC; empty for non-expiring tokens
     issued_at: str = ""
 
 
 def is_introspection_authorized(
-    *, requester_amr: tuple[str, ...], requester_is_admin: bool,
+    *,
+    requester_amr: tuple[str, ...],
+    requester_is_admin: bool,
 ) -> bool:
     """Per spec 27 §4.1: introspection requires admin elevation
     OR strong MFA on the requester's session. We check both

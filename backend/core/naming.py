@@ -58,9 +58,7 @@ class NamingRule:
                 reason=f"too long ({len(value)} > {self.max_length})",
             )
         if not self.pattern.fullmatch(value):
-            raise NamingViolation(
-                rule=self, value=value, reason="does not match pattern"
-            )
+            raise NamingViolation(rule=self, value=value, reason="does not match pattern")
 
 
 class NamingViolation(ValueError):
@@ -156,9 +154,15 @@ IAM_ROLE: Final = _rule(
 
 
 ALL_RULES: tuple[NamingRule, ...] = (
-    ORG_SLUG, APP_NAME, ENV_NAME, PROJECT_SLUG,
-    K8S_NAMESPACE, K8S_RESOURCE,
-    DNS_LABEL, S3_BUCKET, IAM_ROLE,
+    ORG_SLUG,
+    APP_NAME,
+    ENV_NAME,
+    PROJECT_SLUG,
+    K8S_NAMESPACE,
+    K8S_RESOURCE,
+    DNS_LABEL,
+    S3_BUCKET,
+    IAM_ROLE,
 )
 
 

@@ -107,9 +107,7 @@ class TeardownInputs:
 
     def __post_init__(self) -> None:
         if self.registered_app_id <= 0:
-            raise AppTeardownError(
-                "registered_app_id must be positive"
-            )
+            raise AppTeardownError("registered_app_id must be positive")
 
 
 # ---- idempotency ---------------------------------------------------
@@ -157,7 +155,7 @@ def steps_to_run(*, state: AppTeardownState) -> tuple[TeardownStep, ...]:
         # safest is to start from the top.
         return TEARDOWN_ORDER
 
-    return TEARDOWN_ORDER[idx + 1:]
+    return TEARDOWN_ORDER[idx + 1 :]
 
 
 # ---- managed service deprovision plan ------------------------------
@@ -211,14 +209,16 @@ def plan_managed_service_teardown(
             destroy_data = delete_data
         else:
             raise AppTeardownError(
-                f"unknown managed service kind {kind!r} for "
-                f"teardown of binding {binding_id}"
+                f"unknown managed service kind {kind!r} for " f"teardown of binding {binding_id}"
             )
-        out.append(ManagedServiceTeardown(
-            binding_id=binding_id, kind=kind,
-            snapshot_first=snapshot_first,
-            destroy_data=destroy_data,
-        ))
+        out.append(
+            ManagedServiceTeardown(
+                binding_id=binding_id,
+                kind=kind,
+                snapshot_first=snapshot_first,
+                destroy_data=destroy_data,
+            )
+        )
     return tuple(out)
 
 
@@ -255,15 +255,27 @@ class TeardownReport:
 
 # Platform record kinds that get soft-deleted on teardown vs the
 # audit-log kinds that are retained per spec acceptance.
-_SOFT_DELETED_RECORD_KINDS = frozenset({
-    "RegisteredApp", "Deployment", "AppEnvironment",
-    "ManagedServiceBinding", "WorkloadIdentityRole",
-    "DeployToken", "AppDomain", "PreviewEnvironment",
-})
+_SOFT_DELETED_RECORD_KINDS = frozenset(
+    {
+        "RegisteredApp",
+        "Deployment",
+        "AppEnvironment",
+        "ManagedServiceBinding",
+        "WorkloadIdentityRole",
+        "DeployToken",
+        "AppDomain",
+        "PreviewEnvironment",
+    }
+)
 
-_RETAINED_RECORD_KINDS = frozenset({
-    "AuditLog", "EventLog", "DeploymentLog", "WorkflowHistory",
-})
+_RETAINED_RECORD_KINDS = frozenset(
+    {
+        "AuditLog",
+        "EventLog",
+        "DeploymentLog",
+        "WorkflowHistory",
+    }
+)
 
 
 def must_soft_delete(*, record_kind: str) -> bool:
@@ -275,6 +287,5 @@ def must_soft_delete(*, record_kind: str) -> bool:
     if record_kind in _RETAINED_RECORD_KINDS:
         return False
     raise AppTeardownError(
-        f"record kind {record_kind!r} not in either catalog; "
-        "add to soft-delete or retain set explicitly"
+        f"record kind {record_kind!r} not in either catalog; " "add to soft-delete or retain set explicitly"
     )

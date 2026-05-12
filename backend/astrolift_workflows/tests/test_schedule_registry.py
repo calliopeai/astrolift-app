@@ -127,8 +127,10 @@ def test_audit_log_interval_daily():
 
 def test_get_schedule_unknown_kind():
     """Defensive — caller can't look up a kind we don't have."""
+
     class Fake:
         value = "fake"
+
     with pytest.raises(ScheduleRegistryError):
         get_schedule(kind=Fake())  # type: ignore[arg-type]
 
@@ -203,12 +205,10 @@ def test_plan_updates_when_workflow_name_changed():
 
 def test_orphaned_schedules_returns_extras():
     """Old astro- schedule that's no longer in catalog → cleanup."""
-    existing = frozenset(
-        {s.schedule_id for s in DEFAULT_SCHEDULES}
-        | {"astro-old-removed-schedule"}
-    )
+    existing = frozenset({s.schedule_id for s in DEFAULT_SCHEDULES} | {"astro-old-removed-schedule"})
     orphans = orphaned_schedule_ids(
-        catalog=DEFAULT_SCHEDULES, existing_ids=existing,
+        catalog=DEFAULT_SCHEDULES,
+        existing_ids=existing,
     )
     assert orphans == ("astro-old-removed-schedule",)
 
@@ -217,11 +217,11 @@ def test_orphaned_schedules_skips_tenant_owned():
     """Tenant-created schedules don't have astro- prefix; never
     touch them even if not in the platform catalog."""
     existing = frozenset(
-        {s.schedule_id for s in DEFAULT_SCHEDULES}
-        | {"customer-cronjob-1", "customer-cronjob-2"}
+        {s.schedule_id for s in DEFAULT_SCHEDULES} | {"customer-cronjob-1", "customer-cronjob-2"}
     )
     orphans = orphaned_schedule_ids(
-        catalog=DEFAULT_SCHEDULES, existing_ids=existing,
+        catalog=DEFAULT_SCHEDULES,
+        existing_ids=existing,
     )
     assert orphans == ()
 
@@ -229,6 +229,7 @@ def test_orphaned_schedules_skips_tenant_owned():
 def test_orphaned_schedules_no_orphans():
     existing = frozenset({s.schedule_id for s in DEFAULT_SCHEDULES})
     orphans = orphaned_schedule_ids(
-        catalog=DEFAULT_SCHEDULES, existing_ids=existing,
+        catalog=DEFAULT_SCHEDULES,
+        existing_ids=existing,
     )
     assert orphans == ()

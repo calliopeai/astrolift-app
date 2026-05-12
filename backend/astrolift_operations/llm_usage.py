@@ -66,7 +66,9 @@ _PATTERNS: tuple[_KeyPattern, ...] = (
     _KeyPattern(
         provider=LLMProvider.ANTHROPIC,
         name_hints=(
-            "anthropic_api_key", "anthropic_key", "claude_api_key",
+            "anthropic_api_key",
+            "anthropic_key",
+            "claude_api_key",
         ),
         value_prefix=re.compile(r"^sk-ant-[A-Za-z0-9_-]{20,}"),
     ),
@@ -86,7 +88,8 @@ _PATTERNS: tuple[_KeyPattern, ...] = (
     _KeyPattern(
         provider=LLMProvider.AZURE_OPENAI,
         name_hints=(
-            "azure_openai_key", "azure_openai_api_key",
+            "azure_openai_key",
+            "azure_openai_api_key",
             "azure_oai_key",
         ),
         # Azure OpenAI uses 32-char hex keys; same shape as
@@ -103,7 +106,7 @@ class LLMKeyDetection:
 
     provider: LLMProvider
     env_key: str
-    matched_via: str   # 'name_hint' | 'value_prefix'
+    matched_via: str  # 'name_hint' | 'value_prefix'
     fingerprint: str = ""
     """``<first-4>...<last-4>`` for value matches; empty for
     name-only matches."""
@@ -144,11 +147,13 @@ def detect_llm_keys(
                 if hint in env_lower:
                     key = (env_key, pattern.provider)
                     if key not in seen:
-                        out.append(LLMKeyDetection(
-                            provider=pattern.provider,
-                            env_key=env_key,
-                            matched_via="name_hint",
-                        ))
+                        out.append(
+                            LLMKeyDetection(
+                                provider=pattern.provider,
+                                env_key=env_key,
+                                matched_via="name_hint",
+                            )
+                        )
                         seen.add(key)
                     break
 
@@ -177,12 +182,14 @@ def detect_llm_keys(
                             upgraded = True
                             break
                     if not upgraded:
-                        out.append(LLMKeyDetection(
-                            provider=pattern.provider,
-                            env_key=env_key,
-                            matched_via="value_prefix",
-                            fingerprint=fp,
-                        ))
+                        out.append(
+                            LLMKeyDetection(
+                                provider=pattern.provider,
+                                env_key=env_key,
+                                matched_via="value_prefix",
+                                fingerprint=fp,
+                            )
+                        )
                         seen.add(key)
                     break
 
@@ -227,21 +234,13 @@ class TokenUsage:
 
     def __post_init__(self) -> None:
         if self.org_id <= 0 or self.app_id < 0:
-            raise ValueError(
-                "org_id must be positive; app_id must be non-negative "
-                "(0 = org-level agent)"
-            )
+            raise ValueError("org_id must be positive; app_id must be non-negative " "(0 = org-level agent)")
         if self.input_tokens < 0 or self.output_tokens < 0:
             raise ValueError("token counts must be non-negative")
         if not re.match(r"^\d{4}-\d{2}$", self.period_yyyy_mm):
-            raise ValueError(
-                f"period_yyyy_mm must be 'YYYY-MM', got "
-                f"{self.period_yyyy_mm!r}"
-            )
+            raise ValueError(f"period_yyyy_mm must be 'YYYY-MM', got " f"{self.period_yyyy_mm!r}")
         if self.agent_run_id and not self.agent_id:
-            raise ValueError(
-                "agent_run_id requires agent_id (a run belongs to an agent)"
-            )
+            raise ValueError("agent_run_id requires agent_id (a run belongs to an agent)")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -321,7 +320,9 @@ def cost_for_usage(
 ) -> float:
     """Compute USD cost for one TokenUsage rollup."""
     pricing = lookup_pricing(
-        provider=usage.provider, model=usage.model, overrides=overrides,
+        provider=usage.provider,
+        model=usage.model,
+        overrides=overrides,
     )
     input_cost = usage.input_tokens / 1_000_000 * pricing.input_per_million_usd
     output_cost = usage.output_tokens / 1_000_000 * pricing.output_per_million_usd
@@ -347,7 +348,9 @@ _SOURCES: dict[LLMProvider, UsageSourceCallable] = {}
 
 
 def register_usage_source(
-    *, provider: LLMProvider, source: UsageSourceCallable,
+    *,
+    provider: LLMProvider,
+    source: UsageSourceCallable,
 ) -> None:
     _SOURCES[provider] = source
 

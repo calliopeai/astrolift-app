@@ -58,29 +58,38 @@ def test_sbom_artifact_tag_rejects_bad_digest():
 
 
 def test_cyclonedx_media_type():
-    assert sbom_media_type(
-        fmt=SbomFormat.CYCLONE_DX,
-    ) == "application/vnd.cyclonedx+json"
+    assert (
+        sbom_media_type(
+            fmt=SbomFormat.CYCLONE_DX,
+        )
+        == "application/vnd.cyclonedx+json"
+    )
 
 
 def test_spdx_media_type():
-    assert sbom_media_type(
-        fmt=SbomFormat.SPDX,
-    ) == "application/spdx+json"
+    assert (
+        sbom_media_type(
+            fmt=SbomFormat.SPDX,
+        )
+        == "application/spdx+json"
+    )
 
 
 # ---- arch normalization -------------------------------------------
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("amd64", Arch.AMD64),
-    ("AMD64", Arch.AMD64),
-    ("x86_64", Arch.AMD64),
-    ("x86-64", Arch.AMD64),
-    ("arm64", Arch.ARM64),
-    ("aarch64", Arch.ARM64),
-    ("ARM64", Arch.ARM64),
-])
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("amd64", Arch.AMD64),
+        ("AMD64", Arch.AMD64),
+        ("x86_64", Arch.AMD64),
+        ("x86-64", Arch.AMD64),
+        ("arm64", Arch.ARM64),
+        ("aarch64", Arch.ARM64),
+        ("ARM64", Arch.ARM64),
+    ],
+)
 def test_normalize_arch_known(raw, expected):
     assert normalize_arch(raw=raw) == expected
 
@@ -210,8 +219,10 @@ def test_has_required_sbom_present_when_required():
 
 def test_has_required_sbom_missing_when_required():
     state = DeploymentSbomState(
-        deployment_id=1, sbom_present=False,
-        sbom_format=None, sbom_artifact_ref="",
+        deployment_id=1,
+        sbom_present=False,
+        sbom_format=None,
+        sbom_artifact_ref="",
     )
     assert has_required_sbom(state=state, required=True) is False
 
@@ -219,7 +230,9 @@ def test_has_required_sbom_missing_when_required():
 def test_sbom_not_required_passes_through():
     """Org doesn't require SBOM → presence doesn't matter."""
     state = DeploymentSbomState(
-        deployment_id=1, sbom_present=False,
-        sbom_format=None, sbom_artifact_ref="",
+        deployment_id=1,
+        sbom_present=False,
+        sbom_format=None,
+        sbom_artifact_ref="",
     )
     assert has_required_sbom(state=state, required=False) is True

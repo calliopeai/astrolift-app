@@ -116,7 +116,9 @@ def evaluate_ttl_evictions(
         for p in previews
         if is_eligible_for_gc(preview=p)
         and is_ttl_expired(
-            preview=p, now_unix=now_unix, ttl_days=ttl_days,
+            preview=p,
+            now_unix=now_unix,
+            ttl_days=ttl_days,
         )
     )
 
@@ -136,9 +138,7 @@ def evaluate_max_active_evictions(
     precedence over the cap.
     """
     if max_active <= 0:
-        raise PreviewGcError(
-            f"max_active must be > 0, got {max_active}"
-        )
+        raise PreviewGcError(f"max_active must be > 0, got {max_active}")
 
     # Only count running previews; pending/failed don't take
     # active resources at the cluster level (they're either
@@ -179,15 +179,16 @@ def evaluate_app_evictions(
     would over-evict because max_active is per-app.
     """
     ttl_decisions = evaluate_ttl_evictions(
-        previews=previews, now_unix=now_unix, ttl_days=ttl_days,
+        previews=previews,
+        now_unix=now_unix,
+        ttl_days=ttl_days,
     )
     ttl_evicted_ids = {d.preview_id for d in ttl_decisions}
 
-    survivors = tuple(
-        p for p in previews if p.preview_id not in ttl_evicted_ids
-    )
+    survivors = tuple(p for p in previews if p.preview_id not in ttl_evicted_ids)
     max_decisions = evaluate_max_active_evictions(
-        previews=survivors, max_active=max_active,
+        previews=survivors,
+        max_active=max_active,
     )
     return ttl_decisions + max_decisions
 
@@ -224,9 +225,7 @@ def admission_for_new_preview(
        pin choice wins over the cap; spec §15 footnote).
     """
     if max_active <= 0:
-        raise PreviewGcError(
-            f"max_active must be > 0, got {max_active}"
-        )
+        raise PreviewGcError(f"max_active must be > 0, got {max_active}")
 
     active = [p for p in existing_previews if p.state == "running"]
     if len(active) < max_active:
@@ -280,10 +279,7 @@ def pr_comment_for_eviction(
     if decision.reason == EvictionReason.MAX_ACTIVE_EXCEEDED:
         prefix = "**Preview environment evicted**\n\n"
         if new_pr_number:
-            prefix += (
-                f"This preview was torn down to make room for "
-                f"#{new_pr_number}. "
-            )
+            prefix += f"This preview was torn down to make room for " f"#{new_pr_number}. "
         else:
             prefix += "This preview was torn down to free a slot. "
         prefix += "Push or redeploy to bring it back."
@@ -291,6 +287,4 @@ def pr_comment_for_eviction(
             prefix += f"\n\n[Redeploy now]({redeploy_url})"
         return prefix
 
-    raise PreviewGcError(
-        f"unknown eviction reason {decision.reason!r}"
-    )
+    raise PreviewGcError(f"unknown eviction reason {decision.reason!r}")

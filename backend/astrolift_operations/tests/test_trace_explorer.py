@@ -61,8 +61,12 @@ def test_filter_clean_passes():
     """OTLP operation names are free-form (HTTP method + path).
     Permit space + path chars but still reject quotes."""
     f = TraceSearchFilter(
-        app_slug="api", service="web", operation="GET /users/:id",
-        status=SpanStatus.ERROR, min_duration_ms=10, max_duration_ms=1000,
+        app_slug="api",
+        service="web",
+        operation="GET /users/:id",
+        status=SpanStatus.ERROR,
+        min_duration_ms=10,
+        max_duration_ms=1000,
         tags=(("http.status_code", "5xx"),),
         page_size=100,
     )
@@ -81,9 +85,11 @@ def test_filter_rejects_quotes_in_operation():
 
 def _span(span_id: str, parent_id: str, start: int, end: int, op: str = "") -> Span:
     return Span(
-        span_id=span_id, parent_id=parent_id,
+        span_id=span_id,
+        parent_id=parent_id,
         operation=op or span_id,
-        start_unix_ns=start, end_unix_ns=end,
+        start_unix_ns=start,
+        end_unix_ns=end,
         status=SpanStatus.OK,
     )
 
@@ -96,7 +102,7 @@ def test_self_time_subtracts_child_durations():
     ]
     out = self_times(spans)
     assert out["root"] == 60
-    assert out["child"] == 40   # leaf == its own duration
+    assert out["child"] == 40  # leaf == its own duration
 
 
 def test_self_time_floors_at_zero_for_overlapping_children():
@@ -162,7 +168,9 @@ def test_log_filter_uses_trace_id_as_search():
 
 def test_log_filter_includes_span_id_when_provided():
     out = log_filter_for_trace(
-        app_slug="api", trace_id="t-abc", span_id="s-456",
+        app_slug="api",
+        trace_id="t-abc",
+        span_id="s-456",
     )
     assert "t-abc" in out.search
     assert "s-456" in out.search
@@ -186,8 +194,10 @@ def test_compare_traces_diffs_op_sets_and_duration():
         _span("b-cache", "b-root", 0, 30, op="cache.lookup"),
     ]
     cmp = compare_traces(
-        trace_a_id="a", spans_a=spans_a,
-        trace_b_id="b", spans_b=spans_b,
+        trace_a_id="a",
+        spans_a=spans_a,
+        trace_b_id="b",
+        spans_b=spans_b,
     )
     assert cmp.duration_a_ns == 100
     assert cmp.duration_b_ns == 200
@@ -200,8 +210,10 @@ def test_compare_traces_diffs_op_sets_and_duration():
 def test_compare_traces_handles_empty_one_side():
     spans_a = [_span("a", "", 0, 100, op="x")]
     cmp = compare_traces(
-        trace_a_id="a", spans_a=spans_a,
-        trace_b_id="b", spans_b=[],
+        trace_a_id="a",
+        spans_a=spans_a,
+        trace_b_id="b",
+        spans_b=[],
     )
     assert cmp.duration_b_ns == 0
     assert cmp.delta_ns == -100  # B faster (because empty)

@@ -63,41 +63,69 @@ def test_sign_rejects_nonpositive_timestamp():
 
 def test_verify_passes_for_valid_signature():
     sig = sign_payload(secret=SECRET, timestamp_unix=TS, raw_body=BODY)
-    assert verify_signature(
-        secret=SECRET, timestamp_unix=TS, raw_body=BODY,
-        presented=sig, now_unix=TS,
-    ) is True
+    assert (
+        verify_signature(
+            secret=SECRET,
+            timestamp_unix=TS,
+            raw_body=BODY,
+            presented=sig,
+            now_unix=TS,
+        )
+        is True
+    )
 
 
 def test_verify_rejects_wrong_signature():
-    assert verify_signature(
-        secret=SECRET, timestamp_unix=TS, raw_body=BODY,
-        presented="sha256=" + "0" * 64,
-    ) is False
+    assert (
+        verify_signature(
+            secret=SECRET,
+            timestamp_unix=TS,
+            raw_body=BODY,
+            presented="sha256=" + "0" * 64,
+        )
+        is False
+    )
 
 
 def test_verify_rejects_unprefixed():
-    assert verify_signature(
-        secret=SECRET, timestamp_unix=TS, raw_body=BODY,
-        presented="just-some-hex",
-    ) is False
+    assert (
+        verify_signature(
+            secret=SECRET,
+            timestamp_unix=TS,
+            raw_body=BODY,
+            presented="just-some-hex",
+        )
+        is False
+    )
 
 
 def test_verify_rejects_stale_timestamp():
     """Beyond freshness window → reject. Catches captured-and-replayed
     deliveries even with a valid signature."""
     sig = sign_payload(secret=SECRET, timestamp_unix=TS, raw_body=BODY)
-    assert verify_signature(
-        secret=SECRET, timestamp_unix=TS, raw_body=BODY,
-        presented=sig, now_unix=TS + 600, freshness_window_seconds=300,
-    ) is False
+    assert (
+        verify_signature(
+            secret=SECRET,
+            timestamp_unix=TS,
+            raw_body=BODY,
+            presented=sig,
+            now_unix=TS + 600,
+            freshness_window_seconds=300,
+        )
+        is False
+    )
 
 
 def test_verify_rejects_none_presented():
-    assert verify_signature(
-        secret=SECRET, timestamp_unix=TS, raw_body=BODY,
-        presented=None,  # type: ignore[arg-type]
-    ) is False
+    assert (
+        verify_signature(
+            secret=SECRET,
+            timestamp_unix=TS,
+            raw_body=BODY,
+            presented=None,  # type: ignore[arg-type]
+        )
+        is False
+    )
 
 
 # ---- headers -------------------------------------------------------

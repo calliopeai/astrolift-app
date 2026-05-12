@@ -68,18 +68,12 @@ class TraceSearchFilter:
 
     def __post_init__(self) -> None:
         if not self.app_slug:
-            raise TraceFilterError(
-                "app_slug is required (per-tenant isolation)"
-            )
+            raise TraceFilterError("app_slug is required (per-tenant isolation)")
         if not _LABEL_VALUE_RE.match(self.app_slug):
-            raise TraceFilterError(
-                f"app_slug {self.app_slug!r} contains unsafe characters"
-            )
+            raise TraceFilterError(f"app_slug {self.app_slug!r} contains unsafe characters")
         for opt in (self.service, self.operation):
             if opt and not _OP_NAME_RE.match(opt):
-                raise TraceFilterError(
-                    f"value {opt!r} contains unsafe characters"
-                )
+                raise TraceFilterError(f"value {opt!r} contains unsafe characters")
         for k, v in self.tags:
             if not _TAG_NAME_RE.match(k):
                 raise TraceFilterError(f"tag name {k!r} invalid")
@@ -88,15 +82,11 @@ class TraceSearchFilter:
         if self.min_duration_ms < 0 or self.max_duration_ms < 0:
             raise TraceFilterError("durations must be non-negative")
         if self.max_duration_ms and self.min_duration_ms > self.max_duration_ms:
-            raise TraceFilterError(
-                "min_duration_ms must be <= max_duration_ms"
-            )
+            raise TraceFilterError("min_duration_ms must be <= max_duration_ms")
         if self.end_unix and self.start_unix > self.end_unix:
             raise TraceFilterError("start_unix must be <= end_unix")
         if self.page_size <= 0 or self.page_size > 1000:
-            raise TraceFilterError(
-                f"page_size {self.page_size} must be 1..1000"
-            )
+            raise TraceFilterError(f"page_size {self.page_size} must be 1..1000")
 
 
 # ---- span tree analysis --------------------------------------------
@@ -161,12 +151,10 @@ def critical_path(spans: Sequence[Span]) -> tuple[Span, ...]:
     for s in spans:
         children.setdefault(s.parent_id, []).append(s)
 
-    roots = children.get("", []) + [
-        s for s in spans
-        if s.parent_id and s.parent_id not in by_id
-    ]
+    roots = children.get("", []) + [s for s in spans if s.parent_id and s.parent_id not in by_id]
     if not roots:
         return ()
+
     # Pick the root whose subtree ends LATEST (largest end_ns
     # among descendants). That subtree drove the trace duration.
     def subtree_end(span: Span) -> int:
@@ -241,25 +229,23 @@ class TraceComparison:
 
 def compare_traces(
     *,
-    trace_a_id: str, spans_a: Sequence[Span],
-    trace_b_id: str, spans_b: Sequence[Span],
+    trace_a_id: str,
+    spans_a: Sequence[Span],
+    trace_b_id: str,
+    spans_b: Sequence[Span],
 ) -> TraceComparison:
     """Diff two traces by operation set + duration."""
     ops_a = {s.operation for s in spans_a if s.operation}
     ops_b = {s.operation for s in spans_b if s.operation}
 
-    duration_a = (
-        max(s.end_unix_ns for s in spans_a) - min(s.start_unix_ns for s in spans_a)
-        if spans_a else 0
-    )
-    duration_b = (
-        max(s.end_unix_ns for s in spans_b) - min(s.start_unix_ns for s in spans_b)
-        if spans_b else 0
-    )
+    duration_a = max(s.end_unix_ns for s in spans_a) - min(s.start_unix_ns for s in spans_a) if spans_a else 0
+    duration_b = max(s.end_unix_ns for s in spans_b) - min(s.start_unix_ns for s in spans_b) if spans_b else 0
 
     return TraceComparison(
-        trace_a_id=trace_a_id, trace_b_id=trace_b_id,
-        duration_a_ns=duration_a, duration_b_ns=duration_b,
+        trace_a_id=trace_a_id,
+        trace_b_id=trace_b_id,
+        duration_a_ns=duration_a,
+        duration_b_ns=duration_b,
         delta_ns=duration_b - duration_a,
         common_ops=tuple(sorted(ops_a & ops_b)),
         a_only_ops=tuple(sorted(ops_a - ops_b)),

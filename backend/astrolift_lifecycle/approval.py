@@ -188,8 +188,7 @@ def evaluate_quorum(
         raise QuorumError("min_approvers must be positive")
     if min_approvers > len(eligible_approvers):
         raise QuorumError(
-            f"min_approvers ({min_approvers}) exceeds eligible "
-            f"approver count ({len(eligible_approvers)})"
+            f"min_approvers ({min_approvers}) exceeds eligible " f"approver count ({len(eligible_approvers)})"
         )
 
     eligible = set(eligible_approvers)
@@ -219,10 +218,7 @@ def evaluate_quorum(
             decision=ApprovalDecision.REJECTED,
             approvers_for=tuple(approvers_for),
             approvers_against=tuple(approvers_against),
-            reason=(
-                f"rejected by user {first_rejector}: "
-                f"{reasons.get(first_rejector, '')}"
-            ).rstrip(": "),
+            reason=(f"rejected by user {first_rejector}: " f"{reasons.get(first_rejector, '')}").rstrip(": "),
         )
 
     if len(approvers_for) >= min_approvers:
@@ -237,9 +233,7 @@ def evaluate_quorum(
         decision=ApprovalDecision.PENDING,
         approvers_for=tuple(approvers_for),
         approvers_against=(),
-        reason=(
-            f"pending: {len(approvers_for)} of {min_approvers} approvals received"
-        ),
+        reason=(f"pending: {len(approvers_for)} of {min_approvers} approvals received"),
     )
 
 
@@ -247,7 +241,9 @@ def evaluate_quorum(
 
 
 def is_timed_out(
-    *, requested_at: datetime, now: datetime,
+    *,
+    requested_at: datetime,
+    now: datetime,
     timeout_seconds: int = DEFAULT_APPROVAL_TIMEOUT_SECONDS,
 ) -> bool:
     """Has the approval window elapsed? Workflow polls/awaits

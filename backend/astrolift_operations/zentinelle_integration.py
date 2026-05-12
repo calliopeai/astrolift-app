@@ -143,15 +143,12 @@ class ZentinelleEnvelope:
     def __post_init__(self) -> None:
         if self.payload_version != PAYLOAD_VERSION:
             raise ZentinelleIntegrationError(
-                f"payload_version {self.payload_version} != "
-                f"current {PAYLOAD_VERSION}"
+                f"payload_version {self.payload_version} != " f"current {PAYLOAD_VERSION}"
             )
         if not self.event_id:
             raise ZentinelleIntegrationError("event_id required")
         if not self.idempotency_key:
-            raise ZentinelleIntegrationError(
-                "idempotency_key required (anti-replay)"
-            )
+            raise ZentinelleIntegrationError("idempotency_key required (anti-replay)")
         if self.org_id <= 0:
             raise ZentinelleIntegrationError("org_id must be positive")
         # Validate event_type is in vocabulary
@@ -166,49 +163,89 @@ class ZentinelleEnvelope:
 
 # Per-type required payload keys. Wire-format contract.
 REQUIRED_PAYLOAD_KEYS: dict[ZentinelleEventType, frozenset[str]] = {
-    ZentinelleEventType.ROLE_BINDING_GRANT: frozenset({
-        "role_id", "scope", "subject_user_id",
-    }),
-    ZentinelleEventType.ROLE_BINDING_REVOKE: frozenset({
-        "role_id", "scope", "subject_user_id",
-    }),
-    ZentinelleEventType.USER_INVITED: frozenset({
-        "subject_email", "invited_by_user_id",
-    }),
-    ZentinelleEventType.USER_ACCEPTED: frozenset({
-        "subject_user_id",
-    }),
-    ZentinelleEventType.USER_DEACTIVATED: frozenset({
-        "subject_user_id", "reason",
-    }),
-    ZentinelleEventType.APP_DEPLOY: frozenset({
-        "app_slug", "deployment_id", "image_digest",
-        "environment", "trigger_kind",
-    }),
-    ZentinelleEventType.APP_REGISTERED: frozenset({
-        "app_slug", "repo_url",
-    }),
-    ZentinelleEventType.APP_DEREGISTERED: frozenset({
-        "app_slug",
-    }),
-    ZentinelleEventType.SECRET_ROTATED: frozenset({
-        "secret_path", "rotation_kind",
-    }),
-    ZentinelleEventType.SECRET_VIEWED: frozenset({
-        "secret_path",
-    }),
-    ZentinelleEventType.ORG_SETTINGS_UPDATED: frozenset({
-        "fields_changed",
-    }),
-    ZentinelleEventType.OBSERVABILITY_PROFILE_UPDATED: frozenset({
-        "fields_changed",
-    }),
-    ZentinelleEventType.RESIDENCY_POLICY_UPDATED: frozenset({
-        "fields_changed",
-    }),
-    ZentinelleEventType.COMPLIANCE_REPORT_GENERATED: frozenset({
-        "template_slug", "overall_verdict",
-    }),
+    ZentinelleEventType.ROLE_BINDING_GRANT: frozenset(
+        {
+            "role_id",
+            "scope",
+            "subject_user_id",
+        }
+    ),
+    ZentinelleEventType.ROLE_BINDING_REVOKE: frozenset(
+        {
+            "role_id",
+            "scope",
+            "subject_user_id",
+        }
+    ),
+    ZentinelleEventType.USER_INVITED: frozenset(
+        {
+            "subject_email",
+            "invited_by_user_id",
+        }
+    ),
+    ZentinelleEventType.USER_ACCEPTED: frozenset(
+        {
+            "subject_user_id",
+        }
+    ),
+    ZentinelleEventType.USER_DEACTIVATED: frozenset(
+        {
+            "subject_user_id",
+            "reason",
+        }
+    ),
+    ZentinelleEventType.APP_DEPLOY: frozenset(
+        {
+            "app_slug",
+            "deployment_id",
+            "image_digest",
+            "environment",
+            "trigger_kind",
+        }
+    ),
+    ZentinelleEventType.APP_REGISTERED: frozenset(
+        {
+            "app_slug",
+            "repo_url",
+        }
+    ),
+    ZentinelleEventType.APP_DEREGISTERED: frozenset(
+        {
+            "app_slug",
+        }
+    ),
+    ZentinelleEventType.SECRET_ROTATED: frozenset(
+        {
+            "secret_path",
+            "rotation_kind",
+        }
+    ),
+    ZentinelleEventType.SECRET_VIEWED: frozenset(
+        {
+            "secret_path",
+        }
+    ),
+    ZentinelleEventType.ORG_SETTINGS_UPDATED: frozenset(
+        {
+            "fields_changed",
+        }
+    ),
+    ZentinelleEventType.OBSERVABILITY_PROFILE_UPDATED: frozenset(
+        {
+            "fields_changed",
+        }
+    ),
+    ZentinelleEventType.RESIDENCY_POLICY_UPDATED: frozenset(
+        {
+            "fields_changed",
+        }
+    ),
+    ZentinelleEventType.COMPLIANCE_REPORT_GENERATED: frozenset(
+        {
+            "template_slug",
+            "overall_verdict",
+        }
+    ),
 }
 
 
@@ -223,14 +260,11 @@ def validate_payload(
     delivery."""
     required = REQUIRED_PAYLOAD_KEYS.get(event_type)
     if required is None:
-        raise ZentinelleIntegrationError(
-            f"no schema for event_type {event_type!r}"
-        )
+        raise ZentinelleIntegrationError(f"no schema for event_type {event_type!r}")
     missing = required - set(payload.keys())
     if missing:
         raise ZentinelleIntegrationError(
-            f"{event_type.value} payload missing required keys: "
-            f"{sorted(missing)}"
+            f"{event_type.value} payload missing required keys: " f"{sorted(missing)}"
         )
 
 
@@ -279,9 +313,7 @@ class ZentinelleSubscriptionTemplate:
 
 DEFAULT_TEMPLATE = ZentinelleSubscriptionTemplate(
     name="Zentinelle GRC integration",
-    target_url_template=(
-        "https://{zentinelle_url}/integrations/astrolift/v1/audit"
-    ),
+    target_url_template=("https://{zentinelle_url}/integrations/astrolift/v1/audit"),
     event_types=DEFAULT_SUBSCRIBED_EVENTS,
 )
 
@@ -296,20 +328,17 @@ def render_subscription_target(
     in cleartext is unacceptable)."""
     url = zentinelle_url.strip()
     if not url:
-        raise ZentinelleIntegrationError(
-            "zentinelle_url is required"
-        )
+        raise ZentinelleIntegrationError("zentinelle_url is required")
     if not url.startswith("https://"):
         raise ZentinelleIntegrationError(
-            f"zentinelle_url must be HTTPS for compliance evidence; "
-            f"got {url!r}"
+            f"zentinelle_url must be HTTPS for compliance evidence; " f"got {url!r}"
         )
     # Strip trailing slash so the format substitution doesn't
     # produce double-slash paths
     url = url.rstrip("/")
     # Strip the protocol prefix for the template substitution
     # since template includes 'https://' itself
-    bare = url[len("https://"):]
+    bare = url[len("https://") :]
     return template.target_url_template.format(
         zentinelle_url=bare,
     )
@@ -340,7 +369,8 @@ _FRAMEWORK_RELEVANCE: dict[ZentinelleEventType, frozenset[str]] = {
 
 
 def frameworks_for_event(
-    *, event_type: ZentinelleEventType,
+    *,
+    event_type: ZentinelleEventType,
 ) -> tuple[str, ...]:
     """Returns the framework slugs (from #271's TEMPLATE_REGISTRY)
     this event feeds evidence for. UI surfaces as a badge."""
@@ -375,6 +405,4 @@ class ZentinelleValidationCallback:
         if not self.event_id:
             raise ZentinelleIntegrationError("event_id required")
         if not self.zentinelle_evidence_id:
-            raise ZentinelleIntegrationError(
-                "zentinelle_evidence_id required"
-            )
+            raise ZentinelleIntegrationError("zentinelle_evidence_id required")

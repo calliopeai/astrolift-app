@@ -75,9 +75,7 @@ def validate_image_tag(*, value: str) -> str:
         return value
     if _VALID_TAG_RE.match(value):
         return value
-    raise CiDeployError(
-        f"image tag {value!r} not a valid OCI tag or hex digest"
-    )
+    raise CiDeployError(f"image tag {value!r} not a valid OCI tag or hex digest")
 
 
 def validate_image_tags(
@@ -96,9 +94,7 @@ def validate_image_tags(
       what to do with absent keys).
     """
     if not workload_tags:
-        raise CiDeployError(
-            "image_tags is required and cannot be empty"
-        )
+        raise CiDeployError("image_tags is required and cannot be empty")
 
     declared = set(declared_workloads)
     out: dict[str, str] = {}
@@ -107,8 +103,7 @@ def validate_image_tags(
             raise CiDeployError("workload slug in image_tags is empty")
         if slug not in declared:
             raise CiDeployError(
-                f"workload {slug!r} not declared in app manifest "
-                f"(declared workloads: {sorted(declared)})"
+                f"workload {slug!r} not declared in app manifest " f"(declared workloads: {sorted(declared)})"
             )
         out[slug] = validate_image_tag(value=tag)
 
@@ -128,9 +123,7 @@ def validate_branch(*, value: str) -> str:
     if not value:
         raise CiDeployError("branch is required")
     if not _VALID_BRANCH_RE.match(value):
-        raise CiDeployError(
-            f"branch {value!r} contains invalid characters"
-        )
+        raise CiDeployError(f"branch {value!r} contains invalid characters")
     return value
 
 
@@ -138,18 +131,13 @@ def validate_commit_sha(*, value: str) -> str:
     """SHA-1 (40 hex) or SHA-256 (64 hex). Refuse short SHAs —
     CI provides full ones, and short SHAs collide."""
     if not value or not _HEX_RE.match(value):
-        raise CiDeployError(
-            f"commit_sha {value!r} not a valid hex digest"
-        )
+        raise CiDeployError(f"commit_sha {value!r} not a valid hex digest")
     if len(value) < 40:
         raise CiDeployError(
-            f"commit_sha {value!r} too short (min 40 hex chars); "
-            "CI should provide the full SHA"
+            f"commit_sha {value!r} too short (min 40 hex chars); " "CI should provide the full SHA"
         )
     if len(value) > 64:
-        raise CiDeployError(
-            f"commit_sha {value!r} too long (max 64 hex chars)"
-        )
+        raise CiDeployError(f"commit_sha {value!r} too long (max 64 hex chars)")
     return value
 
 
@@ -164,8 +152,7 @@ def validate_environment(
         raise CiDeployError("environment is required")
     if name not in registered_envs:
         raise CiDeployError(
-            f"environment {name!r} not registered for this app "
-            f"(known: {sorted(registered_envs)})"
+            f"environment {name!r} not registered for this app " f"(known: {sorted(registered_envs)})"
         )
     return name
 
@@ -175,8 +162,7 @@ def validate_trigger_kind(*, value: str) -> TriggerKind:
         return TriggerKind(value)
     except ValueError as exc:
         raise CiDeployError(
-            f"trigger_kind {value!r} not in vocabulary "
-            f"{[k.value for k in TriggerKind]}"
+            f"trigger_kind {value!r} not in vocabulary " f"{[k.value for k in TriggerKind]}"
         ) from exc
 
 
@@ -291,7 +277,8 @@ def build_handle(
     return WorkflowHandle(
         workflow_id=workflow_id,
         polling_url=polling_url_for(
-            workflow_id=workflow_id, api_base=api_base,
+            workflow_id=workflow_id,
+            api_base=api_base,
         ),
     )
 

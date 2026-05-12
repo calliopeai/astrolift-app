@@ -80,9 +80,7 @@ _REQUIRED_KEYS_BY_LOG_DRIVER: dict[LogDriver, frozenset[str]] = {
     LogDriver.OPENSEARCH: frozenset({"endpoint", "index_prefix"}),
     LogDriver.CLOUDWATCH_LOGS: frozenset({"region", "log_group"}),
     LogDriver.GCP_CLOUD_LOGGING: frozenset({"project_id"}),
-    LogDriver.AZURE_MONITOR_LOGS: frozenset(
-        {"workspace_id", "shared_key_secret_ref"}
-    ),
+    LogDriver.AZURE_MONITOR_LOGS: frozenset({"workspace_id", "shared_key_secret_ref"}),
     LogDriver.OTLP_HTTP: frozenset({"endpoint"}),
     LogDriver.MULTIPLEXER: frozenset({"children"}),
 }
@@ -115,13 +113,10 @@ class RetentionWindow:
 
     def __post_init__(self) -> None:
         if self.default_days <= 0:
-            raise ObservabilityProfileError(
-                f"default_days must be > 0, got {self.default_days}"
-            )
+            raise ObservabilityProfileError(f"default_days must be > 0, got {self.default_days}")
         if self.max_days < self.default_days:
             raise ObservabilityProfileError(
-                f"max_days {self.max_days} < default_days "
-                f"{self.default_days}"
+                f"max_days {self.max_days} < default_days " f"{self.default_days}"
             )
 
 
@@ -161,13 +156,9 @@ class RetentionConfig:
             ("workflows", self.workflows_days, RETENTION_WORKFLOWS),
         ):
             if value <= 0:
-                raise ObservabilityProfileError(
-                    f"{kind}_days must be > 0, got {value}"
-                )
+                raise ObservabilityProfileError(f"{kind}_days must be > 0, got {value}")
             if value > window.max_days:
-                raise ObservabilityProfileError(
-                    f"{kind}_days {value} exceeds max {window.max_days}"
-                )
+                raise ObservabilityProfileError(f"{kind}_days {value} exceeds max {window.max_days}")
 
 
 # ---- driver config validation --------------------------------------
@@ -181,10 +172,7 @@ def _validate_required_keys(
 ) -> None:
     missing = required - set(config.keys())
     if missing:
-        raise ObservabilityProfileError(
-            f"{driver_label} config missing required keys: "
-            f"{sorted(missing)}"
-        )
+        raise ObservabilityProfileError(f"{driver_label} config missing required keys: " f"{sorted(missing)}")
 
 
 def _validate_multiplexer_children(
@@ -198,9 +186,7 @@ def _validate_multiplexer_children(
     children may NOT themselves be multiplexers (no nesting,
     avoids cycles)."""
     if not isinstance(children, Sequence) or isinstance(children, (str, bytes)):
-        raise ObservabilityProfileError(
-            f"{parent_kind} multiplexer 'children' must be a list"
-        )
+        raise ObservabilityProfileError(f"{parent_kind} multiplexer 'children' must be a list")
     if not children:
         raise ObservabilityProfileError(
             f"{parent_kind} multiplexer 'children' cannot be empty "
@@ -214,8 +200,7 @@ def _validate_multiplexer_children(
             )
         if "driver" not in child or "config" not in child:
             raise ObservabilityProfileError(
-                f"{parent_kind} multiplexer children[{i}] missing "
-                "'driver' or 'config'"
+                f"{parent_kind} multiplexer children[{i}] missing " "'driver' or 'config'"
             )
         # Children can't be multiplexers — no nesting (cycle defense)
         if child["driver"] == "multiplexer":
@@ -238,14 +223,11 @@ def validate_log_driver_config(
         kind = LogDriver(driver)
     except ValueError as exc:
         raise ObservabilityProfileError(
-            f"unknown log driver {driver!r}; known: "
-            f"{[d.value for d in LogDriver]}"
+            f"unknown log driver {driver!r}; known: " f"{[d.value for d in LogDriver]}"
         ) from exc
 
     if not isinstance(config, Mapping):
-        raise ObservabilityProfileError(
-            f"log driver {driver!r} config must be a mapping"
-        )
+        raise ObservabilityProfileError(f"log driver {driver!r} config must be a mapping")
 
     _validate_required_keys(
         driver_label=f"log driver {kind.value}",
@@ -258,7 +240,8 @@ def validate_log_driver_config(
             children=config["children"],
             parent_kind="log",
             parse_child=lambda d, c: validate_log_driver_config(
-                driver=d, config=c,
+                driver=d,
+                config=c,
             ),
         )
 
@@ -274,14 +257,11 @@ def validate_metrics_driver_config(
         kind = MetricsDriver(driver)
     except ValueError as exc:
         raise ObservabilityProfileError(
-            f"unknown metrics driver {driver!r}; known: "
-            f"{[d.value for d in MetricsDriver]}"
+            f"unknown metrics driver {driver!r}; known: " f"{[d.value for d in MetricsDriver]}"
         ) from exc
 
     if not isinstance(config, Mapping):
-        raise ObservabilityProfileError(
-            f"metrics driver {driver!r} config must be a mapping"
-        )
+        raise ObservabilityProfileError(f"metrics driver {driver!r} config must be a mapping")
 
     _validate_required_keys(
         driver_label=f"metrics driver {kind.value}",
@@ -294,7 +274,8 @@ def validate_metrics_driver_config(
             children=config["children"],
             parent_kind="metrics",
             parse_child=lambda d, c: validate_metrics_driver_config(
-                driver=d, config=c,
+                driver=d,
+                config=c,
             ),
         )
 
@@ -310,14 +291,11 @@ def validate_trace_driver_config(
         kind = TraceDriver(driver)
     except ValueError as exc:
         raise ObservabilityProfileError(
-            f"unknown trace driver {driver!r}; known: "
-            f"{[d.value for d in TraceDriver]}"
+            f"unknown trace driver {driver!r}; known: " f"{[d.value for d in TraceDriver]}"
         ) from exc
 
     if not isinstance(config, Mapping):
-        raise ObservabilityProfileError(
-            f"trace driver {driver!r} config must be a mapping"
-        )
+        raise ObservabilityProfileError(f"trace driver {driver!r} config must be a mapping")
 
     _validate_required_keys(
         driver_label=f"trace driver {kind.value}",
@@ -330,7 +308,8 @@ def validate_trace_driver_config(
             children=config["children"],
             parent_kind="trace",
             parse_child=lambda d, c: validate_trace_driver_config(
-                driver=d, config=c,
+                driver=d,
+                config=c,
             ),
         )
 
@@ -362,13 +341,16 @@ def validate_profile(*, profile: ObservabilityProfileSpec) -> None:
     layer that maps errors to MutationResult.errors.)
     """
     validate_log_driver_config(
-        driver=profile.log_driver, config=profile.log_config,
+        driver=profile.log_driver,
+        config=profile.log_config,
     )
     validate_metrics_driver_config(
-        driver=profile.metrics_driver, config=profile.metrics_config,
+        driver=profile.metrics_driver,
+        config=profile.metrics_config,
     )
     validate_trace_driver_config(
-        driver=profile.trace_driver, config=profile.trace_config,
+        driver=profile.trace_driver,
+        config=profile.trace_config,
     )
     # RetentionConfig validates in its __post_init__; if we got
     # here it's valid.
@@ -384,15 +366,27 @@ def collect_profile_issues(
     issues: list[str] = []
 
     for label, fn in (
-        ("log_driver", lambda: validate_log_driver_config(
-            driver=profile.log_driver, config=profile.log_config,
-        )),
-        ("metrics_driver", lambda: validate_metrics_driver_config(
-            driver=profile.metrics_driver, config=profile.metrics_config,
-        )),
-        ("trace_driver", lambda: validate_trace_driver_config(
-            driver=profile.trace_driver, config=profile.trace_config,
-        )),
+        (
+            "log_driver",
+            lambda: validate_log_driver_config(
+                driver=profile.log_driver,
+                config=profile.log_config,
+            ),
+        ),
+        (
+            "metrics_driver",
+            lambda: validate_metrics_driver_config(
+                driver=profile.metrics_driver,
+                config=profile.metrics_config,
+            ),
+        ),
+        (
+            "trace_driver",
+            lambda: validate_trace_driver_config(
+                driver=profile.trace_driver,
+                config=profile.trace_config,
+            ),
+        ),
     ):
         try:
             fn()

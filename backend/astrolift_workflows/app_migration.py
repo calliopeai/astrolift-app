@@ -129,9 +129,7 @@ class ExportBundle:
                 f"(this code understands v{BUNDLE_VERSION})"
             )
         if not self.source_org_slug or not self.source_app_slug:
-            raise MigrationError(
-                "source_org_slug and source_app_slug both required"
-            )
+            raise MigrationError("source_org_slug and source_app_slug both required")
         if not self.source_instance:
             raise MigrationError("source_instance is required")
         if not self.manifest_normalized:
@@ -188,16 +186,12 @@ def build_claims(
         )
     if destination_instance == source_instance:
         raise MigrationError(
-            "destination must differ from source — migration "
-            "exists to move between installs"
+            "destination must differ from source — migration " "exists to move between installs"
         )
     if ttl_seconds <= 0 or ttl_seconds > JWT_TTL_SECONDS:
         # Refuse longer-lived bundles even if caller asks for one.
         # The 15-min ceiling is a security invariant.
-        raise MigrationError(
-            f"ttl_seconds must be > 0 and <= {JWT_TTL_SECONDS} "
-            f"(got {ttl_seconds})"
-        )
+        raise MigrationError(f"ttl_seconds must be > 0 and <= {JWT_TTL_SECONDS} " f"(got {ttl_seconds})")
     if not jti:
         raise MigrationError("jti is required (single-use marker)")
 
@@ -257,8 +251,7 @@ def verify_claims(
             accepted=False,
             result=VerificationResult.UNSUPPORTED_VERSION,
             reason=(
-                f"bundle version {claims.bundle.bundle_version} "
-                f"unsupported (expected {BUNDLE_VERSION})"
+                f"bundle version {claims.bundle.bundle_version} " f"unsupported (expected {BUNDLE_VERSION})"
             ),
         )
 
@@ -267,8 +260,7 @@ def verify_claims(
             accepted=False,
             result=VerificationResult.AUDIENCE_MISMATCH,
             reason=(
-                f"bundle audience {claims.aud!r} does not match "
-                f"this instance {expected_destination!r}"
+                f"bundle audience {claims.aud!r} does not match " f"this instance {expected_destination!r}"
             ),
         )
 
@@ -295,9 +287,7 @@ def verify_claims(
         return VerificationDecision(
             accepted=False,
             result=VerificationResult.EXPIRED,
-            reason=(
-                f"bundle expired (exp={claims.exp}, now={now_unix})"
-            ),
+            reason=(f"bundle expired (exp={claims.exp}, now={now_unix})"),
         )
 
     if seen_jti_lookup(claims.jti):
@@ -429,28 +419,21 @@ def plan_import(
         # Verifier should have caught this; defense-in-depth
         # for callers building plans from synthesized bundles
         # in tests.
-        raise MigrationError(
-            "bundle has empty deployment_history — cannot pick "
-            "first-deploy image"
-        )
+        raise MigrationError("bundle has empty deployment_history — cannot pick " "first-deploy image")
 
     most_recent = max(
-        bundle.deployment_history, key=lambda d: d.deployed_at_unix,
+        bundle.deployment_history,
+        key=lambda d: d.deployed_at_unix,
     )
 
     return ImportPlan(
         needs_org_create=not target.org_exists,
-        needs_project_create=(
-            target.org_exists and not target.project_exists
-        ),
+        needs_project_create=(target.org_exists and not target.project_exists),
         # ^ if org doesn't exist, both will get created in the
         # workflow but project_create is bundled inside the org
         # create step; flag stays False to avoid double-create
         new_app_slug=bundle.source_app_slug,
-        imported_from=(
-            f"{bundle.source_instance}/"
-            f"{bundle.source_org_slug}/{bundle.source_app_slug}"
-        ),
+        imported_from=(f"{bundle.source_instance}/" f"{bundle.source_org_slug}/{bundle.source_app_slug}"),
         first_deploy_image_digest=most_recent.image_digest,
         first_deploy_manifest_sha256=most_recent.manifest_sha256,
     )
@@ -460,7 +443,8 @@ def plan_import(
 
 
 def required_service_kinds(
-    *, bundle: ExportBundle,
+    *,
+    bundle: ExportBundle,
 ) -> tuple[tuple[str, int], ...]:
     """The (kind, major_version) tuples B must satisfy. Catalog
     lookup on B's side picks the actual driver/variant; this
@@ -484,9 +468,7 @@ def missing_secret_refs(
     must re-create on B (since values aren't carried). This
     helper computes the diff for the import-time UI."""
     present = set(secrets_present_on_destination)
-    return tuple(
-        ref for ref in bundle.secret_refs if ref not in present
-    )
+    return tuple(ref for ref in bundle.secret_refs if ref not in present)
 
 
 # ---- helpers -------------------------------------------------------
@@ -499,11 +481,7 @@ def is_jwt_recently_issued(*, claims: BundleJwtClaims, now_unix: int) -> bool:
     expired, ask for a new one' message instead of a generic
     error.
     """
-    return (
-        claims.iat - CLOCK_SKEW_SECONDS
-        <= now_unix
-        <= claims.exp + CLOCK_SKEW_SECONDS
-    )
+    return claims.iat - CLOCK_SKEW_SECONDS <= now_unix <= claims.exp + CLOCK_SKEW_SECONDS
 
 
 def now_unix() -> int:

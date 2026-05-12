@@ -93,18 +93,14 @@ def test_clean_patch_upgrade_passes():
 
 
 def test_major_upgrade_reports_approval_required():
-    report = check_compatibility(
-        **_ok_kwargs(from_v=Version(1, 9, 9), to_v=Version(2, 0, 0))
-    )
+    report = check_compatibility(**_ok_kwargs(from_v=Version(1, 9, 9), to_v=Version(2, 0, 0)))
     assert report.ok is False
     codes = {i.code for i in report.issues}
     assert "major_upgrade_requires_approval" in codes
 
 
 def test_downgrade_blocked_without_explicit_flag():
-    report = check_compatibility(
-        **_ok_kwargs(from_v=Version(2, 0, 0), to_v=Version(1, 9, 9))
-    )
+    report = check_compatibility(**_ok_kwargs(from_v=Version(2, 0, 0), to_v=Version(1, 9, 9)))
     codes = {i.code for i in report.issues}
     assert "downgrade_blocked" in codes
 
@@ -112,7 +108,8 @@ def test_downgrade_blocked_without_explicit_flag():
 def test_downgrade_allowed_with_flag():
     report = check_compatibility(
         **_ok_kwargs(
-            from_v=Version(2, 0, 1), to_v=Version(2, 0, 0),
+            from_v=Version(2, 0, 1),
+            to_v=Version(2, 0, 0),
             allow_downgrade=True,
         )
     )
@@ -178,9 +175,7 @@ def test_all_blockers_reported_at_once():
 
 
 def _cluster(cluster_id: int, **kw) -> RolloutCluster:
-    return RolloutCluster(
-        cluster_id=cluster_id, slug=f"c-{cluster_id}", **kw
-    )
+    return RolloutCluster(cluster_id=cluster_id, slug=f"c-{cluster_id}", **kw)
 
 
 def test_rollout_canary_phase_picks_canary_clusters():
@@ -216,10 +211,7 @@ def test_rollout_smallest_clusters_first():
 
 def test_rollout_phases_dont_repeat_clusters():
     """Each cluster is shipped to exactly once across all phases."""
-    candidates = [
-        _cluster(i, is_canary=(i == 1), tenant_count=i * 10)
-        for i in range(1, 11)
-    ]
+    candidates = [_cluster(i, is_canary=(i == 1), tenant_count=i * 10) for i in range(1, 11)]
     plan = plan_rollout(candidates=candidates)
     seen: set[int] = set()
     for batch in plan:

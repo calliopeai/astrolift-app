@@ -51,13 +51,9 @@ def preview_hostname(
     label that fits gets TLS automatically.
     """
     if pr_number <= 0:
-        raise PreviewHostnameError(
-            f"pr_number must be positive, got {pr_number}"
-        )
+        raise PreviewHostnameError(f"pr_number must be positive, got {pr_number}")
     if not app_slug or not org_slug or not platform_domain:
-        raise PreviewHostnameError(
-            "app_slug, org_slug, and platform_domain are required"
-        )
+        raise PreviewHostnameError("app_slug, org_slug, and platform_domain are required")
 
     if workload:
         leftmost = f"pr-{pr_number}-{app_slug}-{workload}"
@@ -66,13 +62,10 @@ def preview_hostname(
 
     if len(leftmost) > 63:
         raise PreviewHostnameError(
-            f"preview leftmost label {leftmost!r} exceeds 63 chars; "
-            "shorten the app/workload name"
+            f"preview leftmost label {leftmost!r} exceeds 63 chars; " "shorten the app/workload name"
         )
     if not _LABEL_RE.match(leftmost):
-        raise PreviewHostnameError(
-            f"preview leftmost label {leftmost!r} is not a valid DNS label"
-        )
+        raise PreviewHostnameError(f"preview leftmost label {leftmost!r} is not a valid DNS label")
 
     return f"{leftmost}.pr.{org_slug}.{platform_domain}"
 
@@ -102,9 +95,7 @@ class PreviewConfig:
 
     def __post_init__(self) -> None:
         if self.max_active <= 0 or self.max_active > 100:
-            raise ValueError(
-                f"max_active {self.max_active} must be 1..100"
-            )
+            raise ValueError(f"max_active {self.max_active} must be 1..100")
 
 
 # Spec 18 §6 cost-containment defaults — applied when no

@@ -19,7 +19,8 @@ from astrolift_clusters.status_routing import IngressDriver
 def test_shared_alb_uses_group_annotations():
     out = shared_annotations_for(
         driver=IngressDriver.AWS_ALB,
-        org_slug="acme", app_slug="api",
+        org_slug="acme",
+        app_slug="api",
     )
     assert out.group_name_key.endswith("group.name")
     assert out.group_name_value == "astrolift-acme"
@@ -32,11 +33,13 @@ def test_shared_group_namespaced_by_org():
     safety default."""
     a = shared_annotations_for(
         driver=IngressDriver.AWS_ALB,
-        org_slug="acme", app_slug="api",
+        org_slug="acme",
+        app_slug="api",
     )
     b = shared_annotations_for(
         driver=IngressDriver.AWS_ALB,
-        org_slug="other-org", app_slug="api",
+        org_slug="other-org",
+        app_slug="api",
     )
     assert a.group_name_value != b.group_name_value
 
@@ -45,7 +48,8 @@ def test_shared_nginx_no_order_annotation():
     """nginx-ingress doesn't use group ordering."""
     out = shared_annotations_for(
         driver=IngressDriver.NGINX,
-        org_slug="acme", app_slug="api",
+        org_slug="acme",
+        app_slug="api",
     )
     assert out.group_order_value == ""
 
@@ -64,33 +68,40 @@ def test_unsupported_driver_raises():
     with pytest.raises(ValueError):
         shared_annotations_for(
             driver="bogus",  # type: ignore[arg-type]
-            org_slug="acme", app_slug="api",
+            org_slug="acme",
+            app_slug="api",
         )
 
 
 # ---- path validation -----------------------------------------------
 
 
-@pytest.mark.parametrize("path", [
-    "/",
-    "/api",
-    "/api/v1",
-    "/api/v1/users",
-    "/api/v1/*",
-    "/.well-known/something",
-    "/api-v2_beta/",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/api",
+        "/api/v1",
+        "/api/v1/users",
+        "/api/v1/*",
+        "/.well-known/something",
+        "/api-v2_beta/",
+    ],
+)
 def test_valid_paths(path):
     validate_expose_paths([path])
 
 
-@pytest.mark.parametrize("bad_path", [
-    "api/v1",         # missing leading /
-    "/api with space",
-    "/api?query=1",   # query string not allowed
-    "/api#frag",
-    "/api/(.*)",      # regex chars not allowed
-])
+@pytest.mark.parametrize(
+    "bad_path",
+    [
+        "api/v1",  # missing leading /
+        "/api with space",
+        "/api?query=1",  # query string not allowed
+        "/api#frag",
+        "/api/(.*)",  # regex chars not allowed
+    ],
+)
 def test_invalid_paths_rejected(bad_path):
     with pytest.raises(RoutingError):
         validate_expose_paths([bad_path])

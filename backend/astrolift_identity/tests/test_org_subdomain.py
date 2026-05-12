@@ -34,7 +34,9 @@ def _cfg(**kw) -> OrgSubdomainConfig:
 def test_config_rejects_empty_slug():
     with pytest.raises(ValueError):
         OrgSubdomainConfig(
-            org_id=1, org_slug="", base_zone="x.example.com",
+            org_id=1,
+            org_slug="",
+            base_zone="x.example.com",
             subdomain_label="acme",
         )
 
@@ -117,7 +119,8 @@ def test_empty_host_rejected():
 
 def test_matching_session_passes():
     binding = HostBinding(
-        org_id=1, org_slug="acme",
+        org_id=1,
+        org_slug="acme",
         host="acme.platform.example.com",
         cookie_domain="acme.platform.example.com",
         requires_idp_id=42,
@@ -127,7 +130,8 @@ def test_matching_session_passes():
 
 def test_mismatched_session_raises_with_both_slugs():
     binding = HostBinding(
-        org_id=1, org_slug="acme",
+        org_id=1,
+        org_slug="acme",
         host="acme.platform.example.com",
         cookie_domain="acme.platform.example.com",
         requires_idp_id=42,
@@ -142,7 +146,8 @@ def test_default_host_accepts_any_session():
     """Install default host = no org enforcement; caller renders
     the org selector / sign-in page."""
     binding = HostBinding(
-        org_id=None, org_slug="",
+        org_id=None,
+        org_slug="",
         host="login.platform.example.com",
         cookie_domain="login.platform.example.com",
         requires_idp_id=None,
@@ -155,7 +160,8 @@ def test_anonymous_on_org_subdomain_does_not_raise():
     """Anonymous request on a per-org subdomain is normal (the caller
     redirects to the org's IdP). Not a CrossOrgAccessDenied."""
     binding = HostBinding(
-        org_id=1, org_slug="acme",
+        org_id=1,
+        org_slug="acme",
         host="acme.platform.example.com",
         cookie_domain="acme.platform.example.com",
         requires_idp_id=42,
@@ -171,7 +177,8 @@ def test_cookie_attrs_use_exact_host_no_leading_dot():
     the EXACT host so isolation holds — a cookie set on
     acme.platform.example.com isn't sent to other.platform.example.com."""
     binding = HostBinding(
-        org_id=1, org_slug="acme",
+        org_id=1,
+        org_slug="acme",
         host="acme.platform.example.com",
         cookie_domain="acme.platform.example.com",
         requires_idp_id=42,
@@ -183,7 +190,8 @@ def test_cookie_attrs_use_exact_host_no_leading_dot():
 
 def test_cookie_attrs_baseline_security_flags():
     binding = HostBinding(
-        org_id=1, org_slug="acme",
+        org_id=1,
+        org_slug="acme",
         host="acme.platform.example.com",
         cookie_domain="acme.platform.example.com",
         requires_idp_id=42,
@@ -199,7 +207,8 @@ def test_cookie_attrs_secure_false_for_dev():
     """Local dev over HTTP: caller flips secure=False so the cookie
     actually persists. Production callers always pass True (or omit)."""
     binding = HostBinding(
-        org_id=1, org_slug="acme",
+        org_id=1,
+        org_slug="acme",
         host="localhost",
         cookie_domain="localhost",
         requires_idp_id=None,

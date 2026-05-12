@@ -35,8 +35,10 @@ def test_github_valid_signature_passes():
         "X-GitHub-Delivery": "abc-123",
     }
     verify_signature(
-        source=WebhookSource.GITHUB, secret=SECRET,
-        raw_body=BODY, headers=headers,
+        source=WebhookSource.GITHUB,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
     )
 
 
@@ -46,16 +48,20 @@ def test_github_invalid_signature_rejected():
     }
     with pytest.raises(WebhookRejected, match="mismatch"):
         verify_signature(
-            source=WebhookSource.GITHUB, secret=SECRET,
-            raw_body=BODY, headers=headers,
+            source=WebhookSource.GITHUB,
+            secret=SECRET,
+            raw_body=BODY,
+            headers=headers,
         )
 
 
 def test_missing_signature_rejected():
     with pytest.raises(WebhookRejected, match="missing"):
         verify_signature(
-            source=WebhookSource.GITHUB, secret=SECRET,
-            raw_body=BODY, headers={},
+            source=WebhookSource.GITHUB,
+            secret=SECRET,
+            raw_body=BODY,
+            headers={},
         )
 
 
@@ -64,8 +70,10 @@ def test_empty_secret_rejected():
     headers = {"X-Hub-Signature-256": "sha256=anything"}
     with pytest.raises(WebhookRejected, match="no secret"):
         verify_signature(
-            source=WebhookSource.GITHUB, secret=b"",
-            raw_body=BODY, headers=headers,
+            source=WebhookSource.GITHUB,
+            secret=b"",
+            raw_body=BODY,
+            headers=headers,
         )
 
 
@@ -73,8 +81,10 @@ def test_gitlab_uses_opaque_token():
     """GitLab is the odd one out — token compared verbatim, no HMAC."""
     headers = {"X-Gitlab-Token": "super-secret-key"}
     verify_signature(
-        source=WebhookSource.GITLAB, secret=SECRET,
-        raw_body=BODY, headers=headers,
+        source=WebhookSource.GITLAB,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
     )
 
 
@@ -82,8 +92,10 @@ def test_gitlab_token_mismatch_rejected():
     headers = {"X-Gitlab-Token": "wrong"}
     with pytest.raises(WebhookRejected, match="mismatch"):
         verify_signature(
-            source=WebhookSource.GITLAB, secret=SECRET,
-            raw_body=BODY, headers=headers,
+            source=WebhookSource.GITLAB,
+            secret=SECRET,
+            raw_body=BODY,
+            headers=headers,
         )
 
 
@@ -91,8 +103,10 @@ def test_bitbucket_signature():
     sig = "sha256=" + hmac.new(SECRET, BODY, hashlib.sha256).hexdigest()
     headers = {"X-Hub-Signature": sig, "X-Hook-UUID": "uuid-1"}
     verify_signature(
-        source=WebhookSource.BITBUCKET, secret=SECRET,
-        raw_body=BODY, headers=headers,
+        source=WebhookSource.BITBUCKET,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
     )
 
 
@@ -101,8 +115,10 @@ def test_gitea_bare_hex_signature():
     sig = hmac.new(SECRET, BODY, hashlib.sha256).hexdigest()
     headers = {"X-Gitea-Signature": sig, "X-Gitea-Delivery": "g-1"}
     verify_signature(
-        source=WebhookSource.GITEA, secret=SECRET,
-        raw_body=BODY, headers=headers,
+        source=WebhookSource.GITEA,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
     )
 
 
@@ -111,8 +127,10 @@ def test_header_lookup_case_insensitive():
     receivers normalize, some don't."""
     headers = {"x-hub-signature-256": _gh_sig(BODY, SECRET)}
     verify_signature(
-        source=WebhookSource.GITHUB, secret=SECRET,
-        raw_body=BODY, headers=headers,
+        source=WebhookSource.GITHUB,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
     )
 
 
@@ -122,8 +140,10 @@ def test_signature_check_uses_constant_time_compare():
     headers = {"X-Hub-Signature-256": "sha256=short"}
     with pytest.raises(WebhookRejected):
         verify_signature(
-            source=WebhookSource.GITHUB, secret=SECRET,
-            raw_body=BODY, headers=headers,
+            source=WebhookSource.GITHUB,
+            secret=SECRET,
+            raw_body=BODY,
+            headers=headers,
         )
 
 
@@ -147,7 +167,8 @@ def test_extract_delivery_id_per_source():
 def test_missing_delivery_id_rejected():
     with pytest.raises(WebhookRejected, match="delivery id"):
         extract_delivery_id(
-            source=WebhookSource.GITHUB, headers={},
+            source=WebhookSource.GITHUB,
+            headers={},
         )
 
 
@@ -173,8 +194,11 @@ def test_evaluate_accepts_valid_first_time():
         "X-GitHub-Delivery": "first-delivery",
     }
     out = evaluate(
-        source=WebhookSource.GITHUB, secret=SECRET,
-        raw_body=BODY, headers=headers, seen_ids=set(),
+        source=WebhookSource.GITHUB,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
+        seen_ids=set(),
     )
     assert out.accepted is True
     assert out.delivery_ref.delivery_id == "first-delivery"
@@ -186,8 +210,11 @@ def test_evaluate_rejects_bad_signature():
         "X-GitHub-Delivery": "x",
     }
     out = evaluate(
-        source=WebhookSource.GITHUB, secret=SECRET,
-        raw_body=BODY, headers=headers, seen_ids=set(),
+        source=WebhookSource.GITHUB,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
+        seen_ids=set(),
     )
     assert out.accepted is False
     assert "mismatch" in out.reason
@@ -203,8 +230,10 @@ def test_evaluate_replay_rejected_but_carries_ref():
         "X-GitHub-Delivery": "already-seen",
     }
     out = evaluate(
-        source=WebhookSource.GITHUB, secret=SECRET,
-        raw_body=BODY, headers=headers,
+        source=WebhookSource.GITHUB,
+        secret=SECRET,
+        raw_body=BODY,
+        headers=headers,
         seen_ids={"already-seen"},
     )
     assert out.accepted is False

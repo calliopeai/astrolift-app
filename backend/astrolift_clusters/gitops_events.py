@@ -107,7 +107,9 @@ def map_argocd_event(*, template_name: str) -> PlatformEventType | None:
 
 
 def map_flux_event(
-    *, severity: str, reason: str,
+    *,
+    severity: str,
+    reason: str,
 ) -> PlatformEventType | None:
     """Map Flux Alert (severity, reason) tuple. Returns None for
     out-of-vocabulary combinations (Flux has many reasons we don't
@@ -171,21 +173,16 @@ def resolve_deployment_id(*, annotations: dict[str, str]) -> int:
     raw = annotations.get(ANNOTATION_DEPLOYMENT_ID)
     if not raw:
         raise GitopsEventError(
-            f"Application missing {ANNOTATION_DEPLOYMENT_ID!r} "
-            "annotation — was it emitted by Astrolift?"
+            f"Application missing {ANNOTATION_DEPLOYMENT_ID!r} " "annotation — was it emitted by Astrolift?"
         )
     try:
         deployment_id = int(raw)
     except ValueError as exc:
         raise GitopsEventError(
-            f"{ANNOTATION_DEPLOYMENT_ID} annotation {raw!r} "
-            "is not a valid integer"
+            f"{ANNOTATION_DEPLOYMENT_ID} annotation {raw!r} " "is not a valid integer"
         ) from exc
     if deployment_id <= 0:
-        raise GitopsEventError(
-            f"{ANNOTATION_DEPLOYMENT_ID} annotation must be > 0, "
-            f"got {deployment_id}"
-        )
+        raise GitopsEventError(f"{ANNOTATION_DEPLOYMENT_ID} annotation must be > 0, " f"got {deployment_id}")
     return deployment_id
 
 
@@ -201,7 +198,7 @@ def is_for_us(*, annotations: dict[str, str]) -> bool:
 def _truncate(*, value: str) -> str:
     if len(value) <= _MAX_MESSAGE_LENGTH:
         return value
-    return value[:_MAX_MESSAGE_LENGTH - 3] + "..."
+    return value[: _MAX_MESSAGE_LENGTH - 3] + "..."
 
 
 def resolve(*, event: IncomingEvent) -> ResolvedEvent:

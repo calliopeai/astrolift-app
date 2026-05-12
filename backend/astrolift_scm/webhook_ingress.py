@@ -191,7 +191,10 @@ def evaluate(
     and queue the async workflow only on accept."""
     try:
         verify_signature(
-            source=source, secret=secret, raw_body=raw_body, headers=headers,
+            source=source,
+            secret=secret,
+            raw_body=raw_body,
+            headers=headers,
         )
     except WebhookRejected as e:
         return IngressDecision(accepted=False, reason=str(e), delivery_ref=None)
@@ -205,7 +208,8 @@ def evaluate(
         # Replays return 200 (idempotent) but the workflow doesn't
         # re-fire. Caller stores the decision in its delivery log.
         return IngressDecision(
-            accepted=False, reason="replay (already processed)",
+            accepted=False,
+            reason="replay (already processed)",
             delivery_ref=ref,
         )
 

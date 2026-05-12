@@ -66,8 +66,7 @@ class SigningPolicy:
             # An empty allow-list with required/optional enforcement
             # would reject everything — surface the misconfig early.
             raise ValueError(
-                f"enforcement={self.enforcement.value!r} requires at least "
-                "one allowed signer"
+                f"enforcement={self.enforcement.value!r} requires at least " "one allowed signer"
             )
 
 
@@ -90,9 +89,7 @@ class PolicyDecision:
     reason: str
 
 
-def evaluate_policy(
-    *, result: VerifyResult, policy: SigningPolicy
-) -> PolicyDecision:
+def evaluate_policy(*, result: VerifyResult, policy: SigningPolicy) -> PolicyDecision:
     """Apply ``policy`` to a verifier ``result``."""
     if policy.enforcement == SigningEnforcement.DISABLED:
         return PolicyDecision(
@@ -106,10 +103,7 @@ def evaluate_policy(
             return PolicyDecision(
                 decision=SigningDecision.BLOCK,
                 matched_signer=None,
-                reason=(
-                    f"image {result.image_uri!r} is not signed; "
-                    "org policy requires signed images"
-                ),
+                reason=(f"image {result.image_uri!r} is not signed; " "org policy requires signed images"),
             )
         return PolicyDecision(
             decision=SigningDecision.WARN,
@@ -132,10 +126,7 @@ def evaluate_policy(
         return PolicyDecision(
             decision=SigningDecision.WARN,
             matched_signer=None,
-            reason=(
-                "image is signed but signer not in allow-list "
-                "(org policy: optional)"
-            ),
+            reason=("image is signed but signer not in allow-list " "(org policy: optional)"),
         )
 
     # Confirm the matched signer is actually in the policy's allow-list
@@ -168,17 +159,12 @@ class SigningOverride:
 
     def __post_init__(self) -> None:
         if not self.reason or len(self.reason.strip()) < 10:
-            raise ValueError(
-                "override reason must be at least 10 characters "
-                "(operator must explain why)"
-            )
+            raise ValueError("override reason must be at least 10 characters " "(operator must explain why)")
         if self.by_user_id <= 0:
             raise ValueError("by_user_id must be positive")
 
 
-def apply_override(
-    decision: PolicyDecision, override: SigningOverride | None
-) -> PolicyDecision:
+def apply_override(decision: PolicyDecision, override: SigningOverride | None) -> PolicyDecision:
     """Apply an override to a BLOCK decision. Audit log records both
     the original block and the override action."""
     if override is None or decision.decision != SigningDecision.BLOCK:
@@ -186,10 +172,7 @@ def apply_override(
     return PolicyDecision(
         decision=SigningDecision.WARN,
         matched_signer=decision.matched_signer,
-        reason=(
-            f"BLOCK overridden by user {override.by_user_id}: "
-            f"{override.reason}"
-        ),
+        reason=(f"BLOCK overridden by user {override.by_user_id}: " f"{override.reason}"),
     )
 
 
@@ -210,10 +193,7 @@ def register_verifier(name: str, fn: VerifierCallable) -> None:
 
 def get_verifier(name: str) -> VerifierCallable:
     if name not in _VERIFIERS:
-        raise KeyError(
-            f"no verifier registered for {name!r}; "
-            f"available: {sorted(_VERIFIERS)}"
-        )
+        raise KeyError(f"no verifier registered for {name!r}; " f"available: {sorted(_VERIFIERS)}")
     return _VERIFIERS[name]
 
 

@@ -96,9 +96,7 @@ def test_parse_strips_leading_slash():
 def test_supported_schemes_locked():
     """Adding a scheme should be a deliberate change — this test
     pins the current set so a silent expansion is caught in review."""
-    assert SUPPORTED_SCHEMES == frozenset(
-        {"vault", "aws-sm", "aws-ssm", "gcp-sm", "azure-kv"}
-    )
+    assert SUPPORTED_SCHEMES == frozenset({"vault", "aws-sm", "aws-ssm", "gcp-sm", "azure-kv"})
 
 
 def test_str_round_trip():

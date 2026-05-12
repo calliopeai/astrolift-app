@@ -35,9 +35,7 @@ SCIM_RATE_LIMIT_PER_MIN = 240
 # RFC 7644 SCIM Core Schemas.
 SCHEMA_USER = "urn:ietf:params:scim:schemas:core:2.0:User"
 SCHEMA_GROUP = "urn:ietf:params:scim:schemas:core:2.0:Group"
-SCHEMA_LIST_RESPONSE = (
-    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-)
+SCHEMA_LIST_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error"
 
 
@@ -107,11 +105,7 @@ def parse_user_payload(payload: Mapping) -> ScimUser:
     if isinstance(name_obj, dict):
         given = name_obj.get("givenName", "")
         family = name_obj.get("familyName", "")
-        display = (
-            payload.get("displayName")
-            or f"{given} {family}".strip()
-            or user_name
-        )
+        display = payload.get("displayName") or f"{given} {family}".strip() or user_name
     else:
         display = payload.get("displayName") or user_name
 
@@ -171,10 +165,7 @@ def parse_group_payload(payload: Mapping) -> ScimGroup:
 # 'userName eq', 'email eq', 'displayName co'.
 
 _FILTER_RE = re.compile(
-    r'^\s*'
-    r'(?P<attr>[A-Za-z][A-Za-z0-9_.]*)\s+'
-    r'(?P<op>eq|ne|co|sw|ew)\s+'
-    r'"(?P<value>[^"]*)"\s*$'
+    r"^\s*" r"(?P<attr>[A-Za-z][A-Za-z0-9_.]*)\s+" r"(?P<op>eq|ne|co|sw|ew)\s+" r'"(?P<value>[^"]*)"\s*$'
 )
 
 
@@ -193,8 +184,7 @@ def parse_filter(filter_str: str) -> ScimFilter | None:
     m = _FILTER_RE.match(filter_str)
     if m is None:
         raise ScimError(
-            f"unsupported filter syntax: {filter_str!r} "
-            "(supported: <attr> {eq|ne|co|sw|ew} \"<value>\")"
+            f"unsupported filter syntax: {filter_str!r} " '(supported: <attr> {eq|ne|co|sw|ew} "<value>")'
         )
     return ScimFilter(
         attribute=m.group("attr"),
@@ -217,14 +207,9 @@ def filter_matches(*, filt: ScimFilter, user: ScimUser) -> bool:
         target = user.external_id
     elif attr == "active":
         # Bool comparison
-        return (
-            (filt.operator == "eq")
-            == (str(user.active).lower() == filt.value.lower())
-        )
+        return (filt.operator == "eq") == (str(user.active).lower() == filt.value.lower())
     else:
-        raise ScimError(
-            f"filter attribute {attr!r} not supported"
-        )
+        raise ScimError(f"filter attribute {attr!r} not supported")
     op = filt.operator
     v = filt.value
     if op == "eq":
@@ -296,13 +281,9 @@ class GroupRoleMapping:
         if not self.group_external_id:
             raise ValueError("group_external_id is required")
         if self.scope_kind == ScopeKind.ORG and self.scope_id not in (None, self.organization_id):
-            raise ValueError(
-                "ORG scope must have scope_id None or the org_id"
-            )
+            raise ValueError("ORG scope must have scope_id None or the org_id")
         if self.scope_kind != ScopeKind.ORG and self.scope_id is None:
-            raise ValueError(
-                f"{self.scope_kind.value} scope requires scope_id"
-            )
+            raise ValueError(f"{self.scope_kind.value} scope requires scope_id")
 
 
 def role_assignments_for_user(

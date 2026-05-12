@@ -61,9 +61,7 @@ class PersistResult:
         ) > 0
 
 
-def persist_manifest(
-    app, manifest: NormalizedManifest, *, raw_text: str = ""
-) -> PersistResult:
+def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -> PersistResult:
     """Reconcile ``app``'s Workload + Container rows against ``manifest``.
 
     Pass the original TOML text via ``raw_text`` so it round-trips
@@ -92,9 +90,9 @@ def persist_manifest(
     desired_by_slug: dict[str, WorkloadManifest] = {w.name: w for w in manifest.workloads}
     existing = {
         w.slug: w
-        for w in Workload.objects.filter(
-            registered_app=app, deleted_at__isnull=True
-        ).select_related("registered_app")
+        for w in Workload.objects.filter(registered_app=app, deleted_at__isnull=True).select_related(
+            "registered_app"
+        )
     }
 
     # Soft-delete workloads that disappeared from the manifest.
@@ -163,12 +161,7 @@ def _persist_containers(workload, containers: tuple[ContainerManifest, ...]) -> 
     from astrolift_registry.models import Container
 
     desired_by_name = {c.name: c for c in containers}
-    existing = {
-        c.name: c
-        for c in Container.objects.filter(
-            workload=workload, deleted_at__isnull=True
-        )
-    }
+    existing = {c.name: c for c in Container.objects.filter(workload=workload, deleted_at__isnull=True)}
 
     diff = _ContainerDiff()
     for name, row in existing.items():

@@ -36,12 +36,10 @@ class _StubKMS:
         self.calls.append(operation)
         if operation == "wrap":
             dek = kw["plaintext_dek"]
-            return bytes(d ^ self.kek_value[i % len(self.kek_value)]
-                         for i, d in enumerate(dek))
+            return bytes(d ^ self.kek_value[i % len(self.kek_value)] for i, d in enumerate(dek))
         if operation == "unwrap":
             wrapped = kw["wrapped_dek_bytes"]
-            return bytes(d ^ self.kek_value[i % len(self.kek_value)]
-                         for i, d in enumerate(wrapped))
+            return bytes(d ^ self.kek_value[i % len(self.kek_value)] for i, d in enumerate(wrapped))
         raise ValueError(operation)
 
 
@@ -157,9 +155,5 @@ def test_rewrap_changes_wrapped_dek_only(kms_a, kms_b):
 
 def test_wire_size_sums_components(kms_a):
     envelope = encrypt(plaintext=b"hello", kek_id="kek-a")
-    expected = (
-        len(envelope.wrapped_dek.ciphertext)
-        + len(envelope.nonce)
-        + len(envelope.ciphertext)
-    )
+    expected = len(envelope.wrapped_dek.ciphertext) + len(envelope.nonce) + len(envelope.ciphertext)
     assert envelope.wire_size == expected

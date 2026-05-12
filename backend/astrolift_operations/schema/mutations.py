@@ -152,11 +152,7 @@ class OperationsMutation:
         if input.app_slug:
             from astrolift_registry.models import RegisteredApp
 
-            registered_app = (
-                RegisteredApp.objects
-                .filter(organization=org, slug=input.app_slug)
-                .first()
-            )
+            registered_app = RegisteredApp.objects.filter(organization=org, slug=input.app_slug).first()
             if registered_app is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,
@@ -250,18 +246,22 @@ class OperationsMutation:
     @require_permission(Permission.WEBHOOK_CREATE)
     @tenant_scoped()
     def create_alert_rule(
-        self, info: Info, input: CreateAlertRuleInput,
+        self,
+        info: Info,
+        input: CreateAlertRuleInput,
     ) -> MutationResultType[AlertRuleType]:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
             return gql_failure(
-                ErrorCode.PRECONDITION.value, "no active organization",
+                ErrorCode.PRECONDITION.value,
+                "no active organization",
             )
         org = Organization.objects.filter(pk=org_id).first()
         if org is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "organization not found",
+                ErrorCode.NOT_FOUND.value,
+                "organization not found",
             )
         valid_targets = {t for t, _ in AlertRule.Target.choices}
         if input.target not in valid_targets:
@@ -284,13 +284,11 @@ class OperationsMutation:
                 "global rules must not carry a target_id",
                 field="targetId",
             )
-        if (
-            AlertRule.objects.filter(
-                organization=org,
-                name=input.name.strip(),
-                deleted_at__isnull=True,
-            ).exists()
-        ):
+        if AlertRule.objects.filter(
+            organization=org,
+            name=input.name.strip(),
+            deleted_at__isnull=True,
+        ).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
                 f"alert rule {input.name!r} already exists",
@@ -304,9 +302,7 @@ class OperationsMutation:
             severity=severity,
             predicate=dict(input.predicate or {}),
             notify_channels=list(input.notify_channels or []),
-            is_active=(
-                True if input.is_active is None else bool(input.is_active)
-            ),
+            is_active=(True if input.is_active is None else bool(input.is_active)),
         )
         return gql_success(alert_rule_to_type(rule))
 
@@ -315,16 +311,15 @@ class OperationsMutation:
     @require_permission(Permission.WEBHOOK_UPDATE)
     @tenant_scoped()
     def update_alert_rule(
-        self, info: Info, input: UpdateAlertRuleInput,
+        self,
+        info: Info,
+        input: UpdateAlertRuleInput,
     ) -> MutationResultType[AlertRuleType]:
-        rule = (
-            AlertRule.objects
-            .filter(guid=str(input.id), deleted_at__isnull=True)
-            .first()
-        )
+        rule = AlertRule.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if rule is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "alert rule not found",
+                ErrorCode.NOT_FOUND.value,
+                "alert rule not found",
             )
         if input.name is not None:
             rule.name = input.name.strip()
@@ -351,37 +346,38 @@ class OperationsMutation:
     @require_permission(Permission.WEBHOOK_DELETE)
     @tenant_scoped()
     def delete_alert_rule(
-        self, info: Info, input: DeleteAlertRuleInput,
+        self,
+        info: Info,
+        input: DeleteAlertRuleInput,
     ) -> MutationResultType[_AlertRuleDeletedPayload]:
-        rule = (
-            AlertRule.objects
-            .filter(guid=str(input.id), deleted_at__isnull=True)
-            .first()
-        )
+        rule = AlertRule.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if rule is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "alert rule not found",
+                ErrorCode.NOT_FOUND.value,
+                "alert rule not found",
             )
         rule.soft_delete()
-        return gql_success(_AlertRuleDeletedPayload(
-            id=input.id, deleted=True,
-        ))
+        return gql_success(
+            _AlertRuleDeletedPayload(
+                id=input.id,
+                deleted=True,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="alert_event.acknowledge")
     @require_permission(Permission.WEBHOOK_UPDATE)
     @tenant_scoped()
     def acknowledge_alert_event(
-        self, info: Info, input: AcknowledgeAlertEventInput,
+        self,
+        info: Info,
+        input: AcknowledgeAlertEventInput,
     ) -> MutationResultType[AlertEventType]:
-        event = (
-            AlertEvent.objects
-            .filter(guid=str(input.id), deleted_at__isnull=True)
-            .first()
-        )
+        event = AlertEvent.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if event is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value, "alert event not found",
+                ErrorCode.NOT_FOUND.value,
+                "alert event not found",
             )
         if event.acknowledged_at is None:
             tenant = get_current_tenant()
@@ -389,15 +385,15 @@ class OperationsMutation:
 
             actor = None
             if tenant is not None and tenant.actor_user_id is not None:
-                actor = (
-                    get_user_model().objects
-                    .filter(pk=tenant.actor_user_id)
-                    .first()
-                )
+                actor = get_user_model().objects.filter(pk=tenant.actor_user_id).first()
             event.acknowledged_at = timezone.now()
             event.acknowledged_by = actor
-            event.save(update_fields=[
-                "acknowledged_at", "acknowledged_by",
-                "updated_at", "version",
-            ])
+            event.save(
+                update_fields=[
+                    "acknowledged_at",
+                    "acknowledged_by",
+                    "updated_at",
+                    "version",
+                ]
+            )
         return gql_success(alert_event_to_type(event))

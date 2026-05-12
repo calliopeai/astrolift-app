@@ -208,8 +208,11 @@ def test_export_to_sink_writes_audit_chain_to_partition_key():
 
     rows = [_aud(action="a"), _aud(action="b")]
     n = export_to_sink(
-        rows, stream="audit", org_slug="acme",
-        partition_date=datetime(2026, 5, 1, tzinfo=UTC), sink=sink,
+        rows,
+        stream="audit",
+        org_slug="acme",
+        partition_date=datetime(2026, 5, 1, tzinfo=UTC),
+        sink=sink,
     )
     assert n > 0
     assert captured["key"] == "audit/acme/2026/05/01.jsonl"
@@ -224,8 +227,11 @@ def test_export_event_stream_defaults_unchained():
 
     rows = [_ev(), _ev(event_type="x")]
     export_to_sink(
-        rows, stream="event", org_slug="acme",
-        partition_date=datetime(2026, 5, 1, tzinfo=UTC), sink=sink,
+        rows,
+        stream="event",
+        org_slug="acme",
+        partition_date=datetime(2026, 5, 1, tzinfo=UTC),
+        sink=sink,
     )
     rec0 = json.loads(captured["bytes"].splitlines()[0])
     assert "integrity" not in rec0
@@ -242,8 +248,11 @@ def test_export_with_no_rows_is_noop():
         calls.append((b, key))
 
     n = export_to_sink(
-        [], stream="event", org_slug="acme",
-        partition_date=datetime(2026, 5, 1, tzinfo=UTC), sink=sink,
+        [],
+        stream="event",
+        org_slug="acme",
+        partition_date=datetime(2026, 5, 1, tzinfo=UTC),
+        sink=sink,
     )
     assert n == 0
     assert calls == []
@@ -253,7 +262,10 @@ def test_export_partition_key_includes_stream_and_org():
     captured = []
     sink = lambda b, key: captured.append(key)
     export_to_sink(
-        [_aud(action="a")], stream="audit", org_slug="org-1",
-        partition_date=datetime(2025, 12, 31, tzinfo=UTC), sink=sink,
+        [_aud(action="a")],
+        stream="audit",
+        org_slug="org-1",
+        partition_date=datetime(2025, 12, 31, tzinfo=UTC),
+        sink=sink,
     )
     assert captured == ["audit/org-1/2025/12/31.jsonl"]

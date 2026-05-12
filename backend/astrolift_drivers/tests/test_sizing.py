@@ -58,7 +58,9 @@ def test_size_vocabulary_locked():
 
 def test_register_and_lookup_round_trip():
     spec = ManagedServiceSpec(
-        plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
+        plugin_slug="aws-rds",
+        kind="postgres",
+        size=Size.MEDIUM,
         native_class="db.r6g.large",
         parameters={"storage_gb": 100, "replicas": 1},
     )
@@ -77,7 +79,9 @@ def test_lookup_unregistered_returns_none():
 
 def test_resolve_uses_registered_mapping():
     spec = ManagedServiceSpec(
-        plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
+        plugin_slug="aws-rds",
+        kind="postgres",
+        size=Size.MEDIUM,
         native_class="db.r6g.large",
         parameters={"storage_gb": 100},
     )
@@ -89,16 +93,26 @@ def test_resolve_uses_registered_mapping():
 def test_resolve_org_override_wins_over_registry():
     """Operators may downgrade from medium to a cheaper class for
     a particular org without changing the plugin."""
-    register_size_mapping(ManagedServiceSpec(
-        plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
-        native_class="db.r6g.large", parameters={},
-    ))
+    register_size_mapping(
+        ManagedServiceSpec(
+            plugin_slug="aws-rds",
+            kind="postgres",
+            size=Size.MEDIUM,
+            native_class="db.r6g.large",
+            parameters={},
+        )
+    )
     overridden = ManagedServiceSpec(
-        plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
-        native_class="db.t3.medium", parameters={},
+        plugin_slug="aws-rds",
+        kind="postgres",
+        size=Size.MEDIUM,
+        native_class="db.t3.medium",
+        parameters={},
     )
     out = resolve_size(
-        plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
+        plugin_slug="aws-rds",
+        kind="postgres",
+        size=Size.MEDIUM,
         org_overrides={("aws-rds", "postgres", Size.MEDIUM): overridden},
     )
     assert out.native_class == "db.t3.medium"
@@ -117,7 +131,9 @@ def test_resolve_custom_requires_parameters():
 
 def test_resolve_custom_emits_spec_with_empty_native_class():
     out = resolve_size(
-        plugin_slug="aws-rds", kind="postgres", size=Size.CUSTOM,
+        plugin_slug="aws-rds",
+        kind="postgres",
+        size=Size.CUSTOM,
         custom_parameters={"instance_class": "db.r6g.16xlarge", "storage_gb": 4000},
     )
     assert out.size == Size.CUSTOM
@@ -130,8 +146,11 @@ def test_managed_service_spec_rejects_empty_native_for_non_custom():
     means a plugin author forgot to fill it in."""
     with pytest.raises(ValueError):
         ManagedServiceSpec(
-            plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
-            native_class="", parameters={},
+            plugin_slug="aws-rds",
+            kind="postgres",
+            size=Size.MEDIUM,
+            native_class="",
+            parameters={},
         )
 
 
@@ -140,13 +159,17 @@ def test_managed_service_spec_rejects_empty_native_for_non_custom():
 
 def test_register_and_call_cost_estimator():
     spec = ManagedServiceSpec(
-        plugin_slug="aws-rds", kind="postgres", size=Size.MEDIUM,
-        native_class="db.r6g.large", parameters={"storage_gb": 100},
+        plugin_slug="aws-rds",
+        kind="postgres",
+        size=Size.MEDIUM,
+        native_class="db.r6g.large",
+        parameters={"storage_gb": 100},
     )
 
     def estimator(s: ManagedServiceSpec) -> CostEstimate:
         return CostEstimate(
-            monthly_usd_low=180.0, monthly_usd_high=210.0,
+            monthly_usd_low=180.0,
+            monthly_usd_high=210.0,
             notes="us-east-1, on-demand",
         )
 
@@ -161,8 +184,11 @@ def test_register_and_call_cost_estimator():
 def test_estimate_returns_none_when_unimplemented():
     """UI falls back to static catalog when no estimator registered."""
     spec = ManagedServiceSpec(
-        plugin_slug="no-estimator", kind="postgres", size=Size.MEDIUM,
-        native_class="x.large", parameters={},
+        plugin_slug="no-estimator",
+        kind="postgres",
+        size=Size.MEDIUM,
+        native_class="x.large",
+        parameters={},
     )
     assert estimate_cost(spec) is None
 

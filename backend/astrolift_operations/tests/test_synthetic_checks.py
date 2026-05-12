@@ -108,15 +108,9 @@ def test_majority_failures_down():
 
 def test_stale_outcomes_excluded_from_badge():
     """Outcomes older than stale_after_seconds don't count."""
-    stale = ProbeOutcome(
-        kind=CheckKind.HTTP, ok=True, ts=_at(off_seconds=-3600)
-    )
-    fresh = ProbeOutcome(
-        kind=CheckKind.HTTP, ok=False, ts=_at(off_seconds=-30)
-    )
-    out = health_badge(
-        outcomes=[stale, fresh], now=_at(), stale_after_seconds=300
-    )
+    stale = ProbeOutcome(kind=CheckKind.HTTP, ok=True, ts=_at(off_seconds=-3600))
+    fresh = ProbeOutcome(kind=CheckKind.HTTP, ok=False, ts=_at(off_seconds=-30))
+    out = health_badge(outcomes=[stale, fresh], now=_at(), stale_after_seconds=300)
     # Only `fresh` counted → 1/1 failure → DOWN
     assert out == HealthBadge.DOWN
 
@@ -135,9 +129,7 @@ def _expires_in(days: int) -> datetime:
 
 def test_tls_first_evaluation_fires_active_thresholds():
     # 5 days to expiry, no prior check → 30 and 7 both crossed
-    fired = tls_thresholds_to_emit(
-        not_after=_expires_in(5), now=_at(), last_check_at=None
-    )
+    fired = tls_thresholds_to_emit(not_after=_expires_in(5), now=_at(), last_check_at=None)
     assert fired == (30, 7)
 
 

@@ -127,7 +127,10 @@ def cleanup_action_for(
             "is empty — refusing to risk dropping the wrong thing"
         )
     return CleanupAction(
-        binding_id=binding_id, kind=kind, mode=mode, target=target,
+        binding_id=binding_id,
+        kind=kind,
+        mode=mode,
+        target=target,
     )
 
 
@@ -154,9 +157,7 @@ def plan_managed_service_cleanup(
         ManagedServiceKind.REDIS: 2,
         ManagedServiceKind.POSTGRES: 3,
     }
-    return tuple(
-        sorted(bindings, key=lambda b: (rank[b.kind], b.binding_id))
-    )
+    return tuple(sorted(bindings, key=lambda b: (rank[b.kind], b.binding_id)))
 
 
 # ---- idempotency ---------------------------------------------------
@@ -180,10 +181,7 @@ def already_torn_down(*, state: PreviewTeardownState) -> bool:
     AND a torn_down_at timestamp both required (paranoid check;
     'torn_down' status without timestamp is an inconsistency the
     workflow should still fix by emitting the missing event)."""
-    return (
-        state.status == "torn_down"
-        and state.torn_down_at_unix is not None
-    )
+    return state.status == "torn_down" and state.torn_down_at_unix is not None
 
 
 def teardown_steps_to_run(

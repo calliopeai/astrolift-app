@@ -94,24 +94,27 @@ def bind_precheck(
     issues: list[CheckIssue] = []
     for req in requirements:
         if req.kind not in cluster.supported_kinds:
-            issues.append(CheckIssue(
-                kind=req.kind, name=req.name,
-                code="unsupported_kind",
-                detail=(
-                    f"cluster {cluster.cluster_slug!r} has no plugin for "
-                    f"kind {req.kind!r}"
-                ),
-            ))
+            issues.append(
+                CheckIssue(
+                    kind=req.kind,
+                    name=req.name,
+                    code="unsupported_kind",
+                    detail=(f"cluster {cluster.cluster_slug!r} has no plugin for " f"kind {req.kind!r}"),
+                )
+            )
             continue
         if req.variant_pin and req.variant_pin not in cluster.supported_pins:
-            issues.append(CheckIssue(
-                kind=req.kind, name=req.name,
-                code="unsupported_pin",
-                detail=(
-                    f"cluster {cluster.cluster_slug!r} ({cluster.cloud_provider}) "
-                    f"does not expose variant {req.variant_pin!r}"
-                ),
-            ))
+            issues.append(
+                CheckIssue(
+                    kind=req.kind,
+                    name=req.name,
+                    code="unsupported_pin",
+                    detail=(
+                        f"cluster {cluster.cluster_slug!r} ({cluster.cloud_provider}) "
+                        f"does not expose variant {req.variant_pin!r}"
+                    ),
+                )
+            )
     return CheckReport(issues=tuple(issues))
 
 
@@ -156,30 +159,36 @@ def promotion_check(
 
     for r in source_resolutions:
         if r.pin not in target_cluster.supported_pins:
-            issues.append(CheckIssue(
-                kind=r.kind, name=r.name,
-                code="missing_variant_on_target",
-                detail=(
-                    f"kind {r.kind!r} was resolved to {r.pin!r} on the "
-                    f"source env but target cluster "
-                    f"{target_cluster.cluster_slug!r} "
-                    f"({target_cluster.cloud_provider}) does not expose "
-                    "that variant"
-                ),
-            ))
+            issues.append(
+                CheckIssue(
+                    kind=r.kind,
+                    name=r.name,
+                    code="missing_variant_on_target",
+                    detail=(
+                        f"kind {r.kind!r} was resolved to {r.pin!r} on the "
+                        f"source env but target cluster "
+                        f"{target_cluster.cluster_slug!r} "
+                        f"({target_cluster.cloud_provider}) does not expose "
+                        "that variant"
+                    ),
+                )
+            )
             continue
 
         if cross_cloud and _is_cloud_specific(r.pin, source_cloud_provider):
-            issues.append(CheckIssue(
-                kind=r.kind, name=r.name,
-                code="cross_cloud_pinned_variant",
-                detail=(
-                    f"variant {r.pin!r} is {source_cloud_provider}-specific; "
-                    f"cannot promote to a {target_cluster.cloud_provider} "
-                    "cluster (declare portability='portable' or use "
-                    "abstract kinds in the source manifest)"
-                ),
-            ))
+            issues.append(
+                CheckIssue(
+                    kind=r.kind,
+                    name=r.name,
+                    code="cross_cloud_pinned_variant",
+                    detail=(
+                        f"variant {r.pin!r} is {source_cloud_provider}-specific; "
+                        f"cannot promote to a {target_cluster.cloud_provider} "
+                        "cluster (declare portability='portable' or use "
+                        "abstract kinds in the source manifest)"
+                    ),
+                )
+            )
     return CheckReport(issues=tuple(issues))
 
 
