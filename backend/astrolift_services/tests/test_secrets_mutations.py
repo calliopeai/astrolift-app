@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from astrolift_clusters.models import TenantCluster
+from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import read_app_env
@@ -32,16 +32,14 @@ def _info():
 
 _BASE_TOML = """\
 astrolift_version = 1
-[app]
 name = "hello"
-slug = "hello-app"
 
 [env]
 KEEP_ME = "yes"
 
 [[workloads]]
 name = "web"
-kind = "service"
+kind = "deployment"
 """
 
 
@@ -54,11 +52,19 @@ def _scaffold():
         name="Demo",
         slug="demo",
     )
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="k8s-native",
+        defaults={
+            "name": "K8s Native",
+            "capabilities_manifest": {},
+            "config_schema": {},
+        },
+    )
     cluster = TenantCluster.objects.create(
         organization=org,
         slug="local",
         name="Local",
-        provider_plugin_id="k8s_native",
+        provider_plugin=plugin,
         endpoint="http://localhost:8443",
     )
     app = RegisteredApp.objects.create(
