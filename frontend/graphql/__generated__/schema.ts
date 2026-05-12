@@ -71,6 +71,16 @@ export type AppsecretwritepayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftActiveSession = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['String']['output'];
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  isCurrent: Scalars['Boolean']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
+  userAgent?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftAlertEvent = {
   acknowledgedAt?: Maybe<Scalars['DateTime']['output']>;
   detail: Scalars['JSON']['output'];
@@ -121,16 +131,6 @@ export type AstroliftApiToken = {
   user: AstroliftUser;
 };
 
-export type AstroliftActiveSession = {
-  createdAt?: Maybe<Scalars['DateTime']['output']>;
-  expiresAt: Scalars['DateTime']['output'];
-  id: Scalars['String']['output'];
-  ipAddress?: Maybe<Scalars['String']['output']>;
-  isCurrent: Scalars['Boolean']['output'];
-  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
-  userAgent?: Maybe<Scalars['String']['output']>;
-};
-
 export type AstroliftApiTokenPlaintext = {
   apiToken: AstroliftApiToken;
   plaintext: Scalars['String']['output'];
@@ -138,17 +138,6 @@ export type AstroliftApiTokenPlaintext = {
 
 export type AstroliftApiTokenPlaintextMutationResult = {
   data?: Maybe<AstroliftApiTokenPlaintext>;
-  errors: Array<MutationError>;
-  ok: Scalars['Boolean']['output'];
-};
-
-export type AstroliftLogoutAllSessionsPayload = {
-  keptCurrent: Scalars['Boolean']['output'];
-  revokedCount: Scalars['Int']['output'];
-};
-
-export type AstroliftLogoutAllSessionsPayloadMutationResult = {
-  data?: Maybe<AstroliftLogoutAllSessionsPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -430,6 +419,17 @@ export type AstroliftInvitationCreatedMutationResult = {
 
 export type AstroliftInvitationMutationResult = {
   data?: Maybe<AstroliftInvitation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftLogoutAllSessionsPayload = {
+  keptCurrent: Scalars['Boolean']['output'];
+  revokedCount: Scalars['Int']['output'];
+};
+
+export type AstroliftLogoutAllSessionsPayloadMutationResult = {
+  data?: Maybe<AstroliftLogoutAllSessionsPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -1246,6 +1246,10 @@ export type LoginResult = {
   user?: Maybe<UserType>;
 };
 
+export type LogoutAllSessionsInput = {
+  keepCurrent: Scalars['Boolean']['input'];
+};
+
 export type Managedservicedeletedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -1281,10 +1285,6 @@ export type ManifeststagepayloadMutationResult = {
   data?: Maybe<Manifeststagepayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
-};
-
-export type LogoutAllSessionsInput = {
-  keepCurrent?: Scalars['Boolean']['input'];
 };
 
 export type MarkNotificationReadInput = {
