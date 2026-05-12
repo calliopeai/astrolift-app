@@ -1,62 +1,69 @@
 /*
- * Astrolift Admin Theme — supports dark, light, and system-auto modes
- * Brand palette:
- *   #2B2D2C  charcoal   (dark body background)
- *   #DC394C  red        (primary brand accent)
- *   #8B3138  crimson    (secondary / hover states)
- *   #FAFAFA  near-white (foreground on dark)
+ * Astrolift Admin Theme — supports dark, light, and system-auto modes.
+ *
+ * Brand palette (aligned with astrolift-site):
+ *   #010409  navy/charcoal (background, dark)
+ *   #5B3A8E  deep purple   (primary brand accent)
+ *   #3E2563  darker purple (secondary / hover)
+ *   #08d4b8  brand teal    (links, accent highlights)
+ *   #37efed  bright teal   (link hover in dark, accent-2)
+ *   #FAFAFA  near-white    (foreground on dark)
+ *
+ * Errors stay red (semantic), but every "brand red" use of #DC394C
+ * has been replaced with the purple/teal pair so destructive intent
+ * isn't conflated with normal navigation.
  */
 
 /* ── Shared brand accents + dark defaults ───────────────────────────────── */
 
 :root {
     /* Brand accents — unchanged across all themes */
-    --primary:                #DC394C;
-    --secondary:              #8B3138;
-    --accent:                 #DC394C;
+    --primary:                #5B3A8E;
+    --secondary:              #3E2563;
+    --accent:                 #08d4b8;
     --primary-fg:             #FAFAFA;
 
     --button-fg:              #FAFAFA;
-    --button-bg:              #DC394C;
-    --button-hover-bg:        #c42d3f;
-    --default-button-bg:      #8B3138;
-    --default-button-hover-bg:#6a1921;
+    --button-bg:              #5B3A8E;
+    --button-hover-bg:        #4A2E73;
+    --default-button-bg:      #3E2563;
+    --default-button-hover-bg:#2D1A47;
     --close-button-bg:        #4a4c4b;
     --close-button-hover-bg:  #5a5c5b;
     --delete-button-bg:       #8B3138;
     --delete-button-hover-bg: #6a1921;
 
     --object-tools-fg:        #FAFAFA;
-    --object-tools-bg:        #8B3138;
-    --object-tools-hover-bg:  #6a1921;
+    --object-tools-bg:        #3E2563;
+    --object-tools-hover-bg:  #2D1A47;
 
-    --breadcrumbs-bg:         #DC394C;
+    --breadcrumbs-bg:         #5B3A8E;
     --breadcrumbs-fg:         #FAFAFA;
     --breadcrumbs-link-fg:    #FAFAFA;
-    --link-selected-fg:       #DC394C;
+    --link-selected-fg:       #08d4b8;
 
     /* Header stays dark in both themes for brand consistency */
     --header-color:           #FAFAFA;
     --header-branding-color:  #FAFAFA;
-    --header-bg:              #1f2120;
+    --header-bg:              #010409;
     --header-link-color:      #FAFAFA;
 
     /* Dark theme defaults (applied when no explicit data-theme is set) */
     --body-fg:                #FAFAFA;
-    --body-bg:                #2B2D2C;
-    --body-quiet-color:       #a8aaa9;
+    --body-bg:                #0D1117;
+    --body-quiet-color:       #a3aed0;
     --body-loud-color:        #ffffff;
 
-    --link-fg:                #e8677a;
-    --link-hover-color:       #f0929f;
+    --link-fg:                #37efed;
+    --link-hover-color:       #5ff7f5;
 
-    --hairline-color:         #3d3f3e;
-    --border-color:           #3d3f3e;
+    --hairline-color:         #1A2035;
+    --border-color:           #1A2035;
 
     --error-fg:               #ff7a7a;
-    --message-success-bg:     #173317;
-    --message-success-color:  #7ddf7d;
-    --message-success-border: #2d5a2d;
+    --message-success-bg:     #0f1f17;
+    --message-success-color:  #6ee5c9;
+    --message-success-border: #1a3d2f;
     --message-warning-bg:     #332e17;
     --message-warning-color:  #e6c87a;
     --message-warning-border: #5a4d2d;
@@ -64,59 +71,59 @@
     --message-error-color:    #ff7a7a;
     --message-error-border:   #5a2d2d;
 
-    --darkened-bg:            #222423;
-    --selected-bg:            #3d1e24;
-    --selected-row:           #3d1e24;
-    --input-bg:               #1f2120;
+    --darkened-bg:            #090C10;
+    --selected-bg:            #2A1F4A;
+    --selected-row:           #2A1F4A;
+    --input-bg:               #0D1117;
 }
 
 /* ── Explicit dark theme (beats Django's html[data-theme="dark"] specificity) */
 
 :root[data-theme="dark"] {
-    --primary:                #DC394C;
-    --secondary:              #8B3138;
-    --accent:                 #DC394C;
+    --primary:                #5B3A8E;
+    --secondary:              #3E2563;
+    --accent:                 #08d4b8;
     --primary-fg:             #FAFAFA;
 
     --button-fg:              #FAFAFA;
-    --button-bg:              #DC394C;
-    --button-hover-bg:        #c42d3f;
-    --default-button-bg:      #8B3138;
-    --default-button-hover-bg:#6a1921;
+    --button-bg:              #5B3A8E;
+    --button-hover-bg:        #4A2E73;
+    --default-button-bg:      #3E2563;
+    --default-button-hover-bg:#2D1A47;
     --close-button-bg:        #4a4c4b;
     --close-button-hover-bg:  #5a5c5b;
     --delete-button-bg:       #8B3138;
     --delete-button-hover-bg: #6a1921;
 
     --object-tools-fg:        #FAFAFA;
-    --object-tools-bg:        #8B3138;
-    --object-tools-hover-bg:  #6a1921;
+    --object-tools-bg:        #3E2563;
+    --object-tools-hover-bg:  #2D1A47;
 
-    --breadcrumbs-bg:         #DC394C;
+    --breadcrumbs-bg:         #5B3A8E;
     --breadcrumbs-fg:         #FAFAFA;
     --breadcrumbs-link-fg:    #FAFAFA;
-    --link-selected-fg:       #DC394C;
+    --link-selected-fg:       #08d4b8;
 
-    --header-bg:              #1f2120;
+    --header-bg:              #010409;
     --header-color:           #FAFAFA;
     --header-branding-color:  #FAFAFA;
     --header-link-color:      #FAFAFA;
 
     --body-fg:                #FAFAFA;
-    --body-bg:                #0d0d0d;
-    --body-quiet-color:       #a8aaa9;
+    --body-bg:                #0D1117;
+    --body-quiet-color:       #a3aed0;
     --body-loud-color:        #ffffff;
 
-    --link-fg:                #e8677a;
-    --link-hover-color:       #f0929f;
+    --link-fg:                #37efed;
+    --link-hover-color:       #5ff7f5;
 
-    --hairline-color:         #2a2c2b;
-    --border-color:           #2a2c2b;
+    --hairline-color:         #1A2035;
+    --border-color:           #1A2035;
 
     --error-fg:               #ff7a7a;
-    --message-success-bg:     #0f1f0f;
-    --message-success-color:  #7ddf7d;
-    --message-success-border: #1e3d1e;
+    --message-success-bg:     #0f1f17;
+    --message-success-color:  #6ee5c9;
+    --message-success-border: #1a3d2f;
     --message-warning-bg:     #1f1c0f;
     --message-warning-color:  #e6c87a;
     --message-warning-border: #3d3519;
@@ -124,9 +131,9 @@
     --message-error-color:    #ff7a7a;
     --message-error-border:   #3d1a1a;
 
-    --darkened-bg:            #141514;
-    --selected-bg:            #2d1219;
-    --selected-row:           #2d1219;
+    --darkened-bg:            #090C10;
+    --selected-bg:            #2A1F4A;
+    --selected-row:           #2A1F4A;
     --input-bg:               #111211;
 }
 
@@ -140,43 +147,43 @@
     --header-link-color:      #FAFAFA;
 
     /* Brand accents — must repeat here to beat base.css html[data-theme="light"] specificity */
-    --primary:                #DC394C;
-    --secondary:              #8B3138;
-    --accent:                 #DC394C;
+    --primary:                #5B3A8E;
+    --secondary:              #3E2563;
+    --accent:                 #08d4b8;
     --primary-fg:             #FAFAFA;
 
     --button-fg:              #FAFAFA;
-    --button-bg:              #DC394C;
-    --button-hover-bg:        #c42d3f;
-    --default-button-bg:      #8B3138;
-    --default-button-hover-bg:#6a1921;
+    --button-bg:              #5B3A8E;
+    --button-hover-bg:        #4A2E73;
+    --default-button-bg:      #3E2563;
+    --default-button-hover-bg:#2D1A47;
     --delete-button-bg:       #8B3138;
     --delete-button-hover-bg: #6a1921;
 
     --object-tools-fg:        #FAFAFA;
-    --object-tools-bg:        #8B3138;
-    --object-tools-hover-bg:  #6a1921;
+    --object-tools-bg:        #3E2563;
+    --object-tools-hover-bg:  #2D1A47;
 
-    --breadcrumbs-bg:         #DC394C;
+    --breadcrumbs-bg:         #5B3A8E;
     --breadcrumbs-fg:         #FAFAFA;
     --breadcrumbs-link-fg:    #FAFAFA;
-    --link-selected-fg:       #DC394C;
+    --link-selected-fg:       #06b8a0;
 
     --body-fg:                #1a1a1a;
     --body-bg:                #f8f8f8;
     --body-quiet-color:       #666666;
     --body-loud-color:        #000000;
 
-    --link-fg:                #DC394C;
-    --link-hover-color:       #8B3138;
+    --link-fg:                #06b8a0;
+    --link-hover-color:       #5B3A8E;
 
     --hairline-color:         #e0e0e0;
     --border-color:           #e0e0e0;
 
     --error-fg:               #c0392b;
-    --message-success-bg:     #d4edda;
-    --message-success-color:  #155724;
-    --message-success-border: #c3e6cb;
+    --message-success-bg:     #d4f1e4;
+    --message-success-color:  #0f6147;
+    --message-success-border: #a0dcbf;
     --message-warning-bg:     #fff3cd;
     --message-warning-color:  #856404;
     --message-warning-border: #ffeeba;
@@ -185,8 +192,8 @@
     --message-error-border:   #f5c6cb;
 
     --darkened-bg:            #eeeeee;
-    --selected-bg:            #fde8ea;
-    --selected-row:           #fde8ea;
+    --selected-bg:            #ece5fa;
+    --selected-row:           #ece5fa;
     --input-bg:               #ffffff;
 }
 
@@ -201,43 +208,43 @@
         --header-link-color:      #FAFAFA;
 
         /* Brand accents */
-        --primary:                #DC394C;
-        --secondary:              #8B3138;
-        --accent:                 #DC394C;
+        --primary:                #5B3A8E;
+        --secondary:              #3E2563;
+        --accent:                 #08d4b8;
         --primary-fg:             #FAFAFA;
 
         --button-fg:              #FAFAFA;
-        --button-bg:              #DC394C;
-        --button-hover-bg:        #c42d3f;
-        --default-button-bg:      #8B3138;
-        --default-button-hover-bg:#6a1921;
+        --button-bg:              #5B3A8E;
+        --button-hover-bg:        #4A2E73;
+        --default-button-bg:      #3E2563;
+        --default-button-hover-bg:#2D1A47;
         --delete-button-bg:       #8B3138;
         --delete-button-hover-bg: #6a1921;
 
         --object-tools-fg:        #FAFAFA;
-        --object-tools-bg:        #8B3138;
-        --object-tools-hover-bg:  #6a1921;
+        --object-tools-bg:        #3E2563;
+        --object-tools-hover-bg:  #2D1A47;
 
-        --breadcrumbs-bg:         #DC394C;
+        --breadcrumbs-bg:         #5B3A8E;
         --breadcrumbs-fg:         #FAFAFA;
         --breadcrumbs-link-fg:    #FAFAFA;
-        --link-selected-fg:       #DC394C;
+        --link-selected-fg:       #06b8a0;
 
         --body-fg:                #1a1a1a;
         --body-bg:                #f8f8f8;
         --body-quiet-color:       #666666;
         --body-loud-color:        #000000;
 
-        --link-fg:                #DC394C;
-        --link-hover-color:       #8B3138;
+        --link-fg:                #06b8a0;
+        --link-hover-color:       #5B3A8E;
 
         --hairline-color:         #e0e0e0;
         --border-color:           #e0e0e0;
 
         --error-fg:               #c0392b;
-        --message-success-bg:     #d4edda;
-        --message-success-color:  #155724;
-        --message-success-border: #c3e6cb;
+        --message-success-bg:     #d4f1e4;
+        --message-success-color:  #0f6147;
+        --message-success-border: #a0dcbf;
         --message-warning-bg:     #fff3cd;
         --message-warning-color:  #856404;
         --message-warning-border: #ffeeba;
@@ -246,8 +253,8 @@
         --message-error-border:   #f5c6cb;
 
         --darkened-bg:            #eeeeee;
-        --selected-bg:            #fde8ea;
-        --selected-row:           #fde8ea;
+        --selected-bg:            #ece5fa;
+        --selected-row:           #ece5fa;
         --input-bg:               #ffffff;
     }
 }
@@ -299,11 +306,11 @@
 }
 
 #header #user-tools {
-    color: #a8aaa9;
+    color: #a3aed0;
 }
 
 #header #user-tools a {
-    color: #a8aaa9;
+    color: #a3aed0;
 }
 
 #header #user-tools a:hover {
@@ -315,7 +322,7 @@
     display: inline-flex;
     gap: 2px;
     margin-right: 8px;
-    border-right: 1px solid #3d3f3e;
+    border-right: 1px solid #1A2035;
     padding-right: 10px;
 }
 
@@ -323,8 +330,8 @@
     display: inline-block;
     padding: 2px 7px;
     border-radius: 3px;
-    background: #2e3130;
-    color: #a8aaa9 !important;
+    background: #1A2035;
+    color: #a3aed0 !important;
     font-size: 0.75em;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -389,7 +396,7 @@ body {
 
 #nav-sidebar .current-app .section:link,
 #nav-sidebar .current-app .section:visited {
-    color: var(--primary);
+    color: var(--accent);
 }
 
 /* ── Tables ─────────────────────────────────────────────────────────────── */
@@ -430,7 +437,7 @@ input, textarea, select,
 input:focus, textarea:focus, select:focus {
     border-color: var(--primary);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(220, 57, 76, 0.25);
+    box-shadow: 0 0 0 2px rgba(91, 58, 142, 0.25);
 }
 
 .form-row {
@@ -656,7 +663,7 @@ a:hover {
 
 .errornote {
     background: var(--message-error-bg);
-    border: 1px solid var(--secondary);
+    border: 1px solid #8B3138;
     color: var(--error-fg);
 }
 
@@ -719,7 +726,7 @@ ul.errorlist {
 }
 
 .inline-related .add-row a {
-    color: var(--primary);
+    color: var(--accent);
 }
 
 .inline-related .add-row a:hover {
