@@ -397,8 +397,11 @@ INTERNAL_IPS = [
 ]
 
 DEBUG_TOOLBAR_CONFIG = {
-    # Show toolbar whenever DEBUG=True, regardless of request IP (needed for Docker)
-    "SHOW_TOOLBAR_CALLBACK": lambda request: DEBUG,
+    # Gate the toolbar on a dedicated env var instead of just DEBUG so prod
+    # installs (which keep DEBUG=True for error-page debugging) can still
+    # hide DJT — it leaks internal SQL / settings / cache details to anyone
+    # who can reach the page and adds noticeable per-request overhead.
+    "SHOW_TOOLBAR_CALLBACK": lambda request: env_bool("ASTROLIFT_ENABLE_DJT", False),
     # Allow test runs without removing debug_toolbar from INSTALLED_APPS
     "IS_RUNNING_TESTS": False,
 }
