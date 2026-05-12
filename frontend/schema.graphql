@@ -12,6 +12,12 @@ input AddAppDomainInput {
   validationMethod: String = null
 }
 
+input AddOrganizationAllowlistDomainInput {
+  domain: String!
+  defaultRoleSlug: String = null
+  requiresReview: Boolean! = false
+}
+
 type Alertruledeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -503,6 +509,21 @@ type AstroliftOrganization {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+}
+
+type AstroliftOrganizationAllowlistedDomain {
+  id: GUID!
+  domain: String!
+  defaultRoleSlug: String
+  requiresReview: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftOrganizationAllowlistedDomainMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftOrganizationAllowlistedDomain
 }
 
 type AstroliftOrganizationMutationResult {
@@ -1424,6 +1445,8 @@ type Mutation {
   createInvitation(input: CreateInvitationInput!): AstroliftInvitationCreatedMutationResult!
   revokeInvitation(input: RevokeInvitationInput!): AstroliftInvitationMutationResult!
   acceptInvitation(input: AcceptInvitationInput!): AstroliftInvitationMutationResult!
+  addOrganizationAllowlistDomain(input: AddOrganizationAllowlistDomainInput!): AstroliftOrganizationAllowlistedDomainMutationResult!
+  removeOrganizationAllowlistDomain(input: RemoveOrganizationAllowlistDomainInput!): SoftdeletepayloadMutationResult!
   createApiToken(input: CreateApiTokenInput!): AstroliftApiTokenPlaintextMutationResult!
   revokeApiToken(input: RevokeApiTokenInput!): SoftdeletepayloadMutationResult!
   createPolicy(input: CreatePolicyInput!): AstroliftPolicyMutationResult!
@@ -1697,6 +1720,7 @@ type Query {
   astroliftRoleBindings: [AstroliftRoleBinding!]!
   astroliftApiTokens: [AstroliftApiToken!]!
   astroliftPolicies: [AstroliftPolicy!]!
+  astroliftOrganizationAllowlistDomains: [AstroliftOrganizationAllowlistedDomain!]!
   astroliftIdentityProviders: [AstroliftIdentityProvider!]!
   astroliftMyProfile: AstroliftMyProfile
   astroliftMyPermissions: [String!]!
@@ -1787,6 +1811,10 @@ input RegisterTenantClusterInput {
 }
 
 input RemoveAppDomainInput {
+  id: GUID!
+}
+
+input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
 }
 

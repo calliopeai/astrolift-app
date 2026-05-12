@@ -352,6 +352,29 @@ def invitation_to_type(inv) -> InvitationType:
     )
 
 
+@strawberry.type(name="AstroliftOrganizationAllowlistedDomain")
+class OrganizationAllowlistedDomainType:
+    """One trusted email domain on an organization's auto-join allowlist."""
+
+    id: GUID
+    domain: str
+    default_role_slug: str | None
+    requires_review: bool
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+def organization_allowlisted_domain_to_type(rule) -> OrganizationAllowlistedDomainType:
+    return OrganizationAllowlistedDomainType(
+        id=GUID(str(rule.guid)),
+        domain=rule.domain,
+        default_role_slug=rule.default_role.slug if rule.default_role_id else None,
+        requires_review=rule.requires_review,
+        created_at=rule.created_at,
+        updated_at=rule.updated_at,
+    )
+
+
 @strawberry.type(name="AstroliftActiveSession")
 class ActiveSessionType:
     """A django_session row for the current viewer.
