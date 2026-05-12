@@ -66,11 +66,37 @@ jobs:
       POSTGRES_USER: dbadmin
       POSTGRES_PASSWORD: Password123
       DJANGO_CACHE_URL: redis://127.0.0.1:6379/1
+      TEMPORAL_ADDRESS: 127.0.0.1:7233
+      TEMPORAL_NAMESPACE: default
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Temporal CLI
+        # Tests against real Temporal (test env) per backend/CLAUDE.md.
+        # dev-server uses SQLite + in-process — boots in seconds, no
+        # external state, perfect for CI.
+        run: |
+          curl -sSf https://temporal.download/cli.sh | sh
+          echo "$HOME/.temporalio/bin" >> "$GITHUB_PATH"
+      - name: Start Temporal dev server
+        run: |
+          "$HOME/.temporalio/bin/temporal" server start-dev \
+            --headless --port 7233 --namespace default \
+            --log-level warn > /tmp/temporal.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if "$HOME/.temporalio/bin/temporal" \
+              --address 127.0.0.1:7233 operator namespace describe default \
+              >/dev/null 2>&1; then
+              echo "Temporal ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Temporal did not become ready in 30s"
+          cat /tmp/temporal.log
+          exit 1
       - name: Install pipenv
         # Pinned to the version that generated Pipfile.lock — pipenv
         # ships breaking changes to its Pipfile-hash algorithm across
