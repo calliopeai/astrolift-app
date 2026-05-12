@@ -58,13 +58,11 @@ def _ctx(org):
 
 _VALID_TOML = """
 astrolift_version = 1
-[app]
 name = "hello"
-slug = "hello-app"
 
 [[workloads]]
 name = "web"
-kind = "service"
+kind = "deployment"
 """
 
 
