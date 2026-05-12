@@ -422,6 +422,47 @@ export const REVOKE_INVITATION = gql`
   }
 `;
 
+export const ADD_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
+  mutation AddOrganizationAllowlistDomain(
+    $input: AddOrganizationAllowlistDomainInput!
+  ) {
+    addOrganizationAllowlistDomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        domain
+        defaultRoleSlug
+        requiresReview
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+export const REMOVE_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
+  mutation RemoveOrganizationAllowlistDomain(
+    $input: RemoveOrganizationAllowlistDomainInput!
+  ) {
+    removeOrganizationAllowlistDomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
 export const ACCEPT_INVITATION = gql`
   mutation AcceptInvitation($input: AcceptInvitationInput!) {
     acceptInvitation(input: $input) {

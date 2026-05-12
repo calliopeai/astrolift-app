@@ -25,6 +25,8 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
+import { TrustedDomainsCard } from "./trusted-domains-card";
+
 export function OrganizationSettingsClient() {
   const { org, loading: orgsLoading } = useActiveOrg();
 
@@ -225,6 +227,8 @@ export function OrganizationSettingsClient() {
           </div>
         </form>
       )}
+
+      <TrustedDomainsCard />
 
       <Card>
         <CardHeader>

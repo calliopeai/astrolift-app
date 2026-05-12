@@ -21,6 +21,7 @@ import type {
   AstroliftMember as GeneratedMember,
   AstroliftMyProfile as GeneratedMyProfile,
   AstroliftOrganization as GeneratedOrganization,
+  AstroliftOrganizationAllowlistedDomain as GeneratedOrganizationAllowlistedDomain,
   AstroliftPolicy as GeneratedPolicy,
   AstroliftProject as GeneratedProject,
   AstroliftRole as GeneratedRole,
@@ -105,6 +106,9 @@ export type AstroliftInvitation = Omit<
 };
 
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
+
+export type AstroliftOrganizationAllowlistedDomain =
+  GeneratedOrganizationAllowlistedDomain;
 
 export type AstroliftActiveSession = GeneratedActiveSession;
 

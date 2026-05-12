@@ -249,6 +249,19 @@ export const GET_MY_PROFILE = gql`
   }
 `;
 
+export const LIST_ORGANIZATION_ALLOWLIST_DOMAINS = gql`
+  query ListOrganizationAllowlistDomains {
+    astroliftOrganizationAllowlistDomains {
+      id
+      domain
+      defaultRoleSlug
+      requiresReview
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 export const LIST_INVITATIONS = gql`
   query ListInvitations($status: String) {
     astroliftInvitations(status: $status) {
