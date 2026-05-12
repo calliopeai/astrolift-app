@@ -72,7 +72,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install pipenv
-        run: pip install "pipenv"
+        # Pinned to the version that generated Pipfile.lock — pipenv
+        # ships breaking changes to its Pipfile-hash algorithm across
+        # majors, so an unpinned `pip install pipenv` here drifts the
+        # expected vs. recorded hash and breaks `--deploy`.
+        run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
         run: pipenv install --dev --deploy
       - name: Run migrations
@@ -92,7 +96,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install pipenv
-        run: pip install "pipenv"
+        # Pinned to the version that generated Pipfile.lock — pipenv
+        # ships breaking changes to its Pipfile-hash algorithm across
+        # majors, so an unpinned `pip install pipenv` here drifts the
+        # expected vs. recorded hash and breaks `--deploy`.
+        run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
         run: pipenv install --dev --deploy
       - name: Run mypy on the platform core

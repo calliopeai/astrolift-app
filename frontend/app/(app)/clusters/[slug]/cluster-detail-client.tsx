@@ -138,7 +138,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
             Connection
           </CardTitle>
           <CardDescription>
-            How the platform reaches the cluster's API server.
+            How the platform reaches the cluster&apos;s API server.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">

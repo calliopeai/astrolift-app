@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { CheckCircle2Icon, ClockIcon, XCircleIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -80,9 +81,9 @@ export function ApprovalClient({ id }: { id: string }) {
           <CardContent className="p-6 text-sm text-muted-foreground">
             The approval link may have expired, or the deployment was deleted.
             Return to the{" "}
-            <a href="/deployments" className="underline">
+            <Link href="/deployments" className="underline">
               deployments list
-            </a>
+            </Link>
             .
           </CardContent>
         </Card>

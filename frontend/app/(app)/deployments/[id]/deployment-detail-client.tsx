@@ -8,6 +8,7 @@ import {
   StopCircleIcon,
   UndoIcon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -216,9 +217,9 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             Try returning to the{" "}
-            <a href="/deployments" className="underline">
+            <Link href="/deployments" className="underline">
               deployments list
-            </a>
+            </Link>
             .
           </CardContent>
         </Card>
