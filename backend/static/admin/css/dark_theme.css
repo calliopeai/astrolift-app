@@ -600,20 +600,24 @@ body.login #container {
 
 /* ── Messages ───────────────────────────────────────────────────────────── */
 
+/* Use background-color: not the `background:` shorthand — the shorthand
+ * resets background-image and background-repeat to defaults, which lets
+ * Django admin's default checkmark icon paint with background-repeat:
+ * repeat and tile across the whole message bar. */
 .messagelist li.success {
-    background: var(--message-success-bg);
+    background-color: var(--message-success-bg);
     color: var(--message-success-color);
     border: 1px solid var(--message-success-border);
 }
 
 .messagelist li.warning {
-    background: var(--message-warning-bg);
+    background-color: var(--message-warning-bg);
     color: var(--message-warning-color);
     border: 1px solid var(--message-warning-border);
 }
 
 .messagelist li.error {
-    background: var(--message-error-bg);
+    background-color: var(--message-error-bg);
     color: var(--message-error-color);
     border: 1px solid var(--message-error-border);
 }

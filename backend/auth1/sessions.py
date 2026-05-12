@@ -588,6 +588,31 @@ class Auth1SessionWorkflow:
         user_info.internal_user = cls._lookup_user(user_info)
         user_info.save()
 
+        # Keep the linked Django User's display fields in sync with what
+        # the IdP just told us. bootstrap_admin seeds a User row by email
+        # alone (no name fields), so without this the frontend ends up
+        # rendering "User" / "US" avatar initials on every page load.
+        # Only fill empty slots — don't overwrite an explicit edit in the
+        # admin.
+        if user_info.internal_user is not None:
+            _u = user_info.internal_user
+            _changed = []
+            if not _u.first_name and getattr(user_info, "given_name", ""):
+                _u.first_name = user_info.given_name
+                _changed.append("first_name")
+            if not _u.last_name and getattr(user_info, "family_name", ""):
+                _u.last_name = user_info.family_name
+                _changed.append("last_name")
+            if not _u.email and getattr(user_info, "email", ""):
+                _u.email = user_info.email
+                _changed.append("email")
+            if _changed:
+                _u.save(update_fields=_changed)
+                logger.info(
+                    "[Auth0] synced User fields from IdP for %s: %s",
+                    _u.username, _changed,
+                )
+
         if not user_info.email_verified:
             raise EmailNotVerifiedException(f'Email not verified for user: {user_info.email}')
 
