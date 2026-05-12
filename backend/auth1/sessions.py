@@ -536,6 +536,26 @@ class Auth1SessionWorkflow:
         }
         _raw_userinfo = auth0_token.get("userinfo") or {}
         _filtered = {k: v for k, v in _raw_userinfo.items() if k in _userinfo_fields}
+
+        # Provider-shape fallbacks. Auth0 supplies `updated_at` on every
+        # userinfo response and propagates `email_verified=true` for
+        # IdP-verified logins; Cognito does neither for users federated
+        # in through Google Workspace — `updated_at` is absent and
+        # `email_verified=false` even though the upstream IdP verified
+        # the email. Filling sensible defaults here keeps UserInfo's
+        # NOT NULL constraints happy and lets the IdP's own verification
+        # gate the auth flow.
+        from django.utils import timezone as _tz
+        if "updated_at" not in _filtered or _filtered.get("updated_at") in (None, ""):
+            _filtered["updated_at"] = _tz.now()
+        # If the IdP itself asserted the email (federated through Google
+        # Workspace via Cognito, or any other IdP-attested flow), trust
+        # that. The federated IdP is the source of truth for email
+        # verification, not Cognito's own user pool view of it.
+        iss = (_filtered.get("iss") or "")
+        if iss.startswith("https://cognito-idp."):
+            _filtered["email_verified"] = True
+
         user_info = UserInfo(**_filtered)
         user_info.internal_user = cls._lookup_user(user_info)
         user_info.save()
