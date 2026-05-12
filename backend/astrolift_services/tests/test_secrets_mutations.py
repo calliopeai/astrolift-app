@@ -52,14 +52,22 @@ def _scaffold():
         name="Demo",
         slug="demo",
     )
-    plugin, _ = ProviderPlugin.objects.get_or_create(
-        slug="k8s-native",
-        defaults={
-            "name": "K8s Native",
-            "capabilities_manifest": {},
-            "config_schema": {},
-        },
+    # bulk_create bypasses Tracking.save() — needed because ProviderPlugin
+    # overrides Tracking's int `version` with a string version column, and
+    # the increment-on-save path can't add 1 to "0.0.1".
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="K8s Native",
+                slug="k8s-native",
+                version="0.0.1",
+                capabilities_manifest={},
+                config_schema={},
+            )
+        ],
+        ignore_conflicts=True,
     )
+    plugin = ProviderPlugin.objects.get(slug="k8s-native")
     cluster = TenantCluster.objects.create(
         organization=org,
         slug="local",
