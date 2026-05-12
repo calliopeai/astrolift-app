@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
+import { ServerError } from "@apollo/client/errors";
 import {
   ActivityIcon,
   AlertTriangleIcon,
@@ -63,6 +64,18 @@ export function DashboardClient() {
     variables: { windowDays: 30 },
   });
 
+  // A 404 on a list query means the resource collection is empty
+  // for this install — surface it as the empty state, not a banner.
+  // Anything else (5xx, GraphQL errors, network drop) still escalates.
+  const isEmptyListError = (err: Error | undefined): boolean =>
+    err != null && ServerError.is(err) && err.statusCode === 404;
+  const teamsCount = isEmptyListError(teams.error)
+    ? 0
+    : teams.data?.astroliftTeams.length;
+  const projectsCount = isEmptyListError(projects.error)
+    ? 0
+    : projects.data?.astroliftProjects.length;
+
   const apps = health.data?.astroliftAppHealthSummary ?? [];
   // Composite health badge: an app counts as healthy when its latest
   // deploy status is 'running' AND there's been no terminal failure
@@ -90,14 +103,14 @@ export function DashboardClient() {
     {
       label: "Teams",
       icon: UsersIcon,
-      value: teams.data?.astroliftTeams.length,
+      value: teamsCount,
       loading: teams.loading,
       href: "/teams",
     },
     {
       label: "Projects",
       icon: FileBoxIcon,
-      value: projects.data?.astroliftProjects.length,
+      value: projectsCount,
       loading: projects.loading,
       href: "/projects",
     },
@@ -118,7 +131,11 @@ export function DashboardClient() {
   ];
 
   const recentProjects = projects.data?.astroliftProjects.slice(0, 5) ?? [];
-  const errorBanner = teams.error ?? projects.error ?? null;
+  const teamsBannerError = isEmptyListError(teams.error) ? null : teams.error;
+  const projectsBannerError = isEmptyListError(projects.error)
+    ? null
+    : projects.error;
+  const errorBanner = teamsBannerError ?? projectsBannerError ?? null;
 
   return (
     <PageShell
