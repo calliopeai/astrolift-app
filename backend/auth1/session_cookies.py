@@ -1,4 +1,4 @@
-"""
+r"""
 Session cookie policy (#272, spec 12 §2.2 + §2.4).
 
 Pure-Python policy. The auth views and IdP logout handler consult

@@ -42,7 +42,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 # Spec 12 §2.2 defaults — overridable in settings for shorter
 # windows on high-security installs.

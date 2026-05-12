@@ -37,17 +37,14 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponseRedirect, JsonResponse
+from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
-from astrolift_identity.models import Organization
 from astrolift_scm.models import SourceConnection
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
-
 
 GITHUB_AUTHORIZE = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_EXCHANGE = "https://github.com/login/oauth/access_token"

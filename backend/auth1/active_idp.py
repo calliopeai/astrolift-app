@@ -22,7 +22,6 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 
-
 # Map IdP kind → the auth1 path the UI should redirect to. The
 # canonical /login URL stays the entry point and dispatches on the
 # active IdP at request time; this is just a hint for the UI's CTA.

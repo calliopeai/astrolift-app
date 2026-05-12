@@ -7,7 +7,6 @@ import pytest
 from auth1.session_cookies import (
     CookieError,
     CookieKind,
-    SignoutPlan,
     SignoutTrigger,
     access_cookie_name,
     build_clear_cookie,
@@ -16,7 +15,6 @@ from auth1.session_cookies import (
     plan_signout,
     refresh_cookie_name,
 )
-
 
 # ---- cookie names --------------------------------------------------
 
