@@ -46,6 +46,16 @@ type AppsecretwritepayloadMutationResult {
   data: Appsecretwritepayload
 }
 
+type AstroliftActiveSession {
+  id: String!
+  expiresAt: DateTime!
+  isCurrent: Boolean!
+  createdAt: DateTime
+  lastSeenAt: DateTime
+  ipAddress: String
+  userAgent: String
+}
+
 type AstroliftAlertEvent {
   id: GUID!
   ruleId: GUID!
@@ -94,16 +104,6 @@ type AstroliftApiToken {
   lastUsedAt: DateTime
   isRevoked: Boolean!
   createdAt: DateTime!
-}
-
-type AstroliftActiveSession {
-  id: String!
-  expiresAt: DateTime!
-  isCurrent: Boolean!
-  createdAt: DateTime
-  lastSeenAt: DateTime
-  ipAddress: String
-  userAgent: String
 }
 
 type AstroliftApiTokenPlaintext {
@@ -392,6 +392,12 @@ type AstroliftInvitationCreatedMutationResult {
   data: AstroliftInvitationCreated
 }
 
+type AstroliftInvitationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftInvitation
+}
+
 type AstroliftLogoutAllSessionsPayload {
   revokedCount: Int!
   keptCurrent: Boolean!
@@ -401,12 +407,6 @@ type AstroliftLogoutAllSessionsPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftLogoutAllSessionsPayload
-}
-
-type AstroliftInvitationMutationResult {
-  ok: Boolean!
-  errors: [MutationError!]!
-  data: AstroliftInvitation
 }
 
 type AstroliftManagedDomain {
@@ -1236,6 +1236,10 @@ type LoginResult {
   user: UserType
 }
 
+input LogoutAllSessionsInput {
+  keepCurrent: Boolean! = true
+}
+
 type Managedservicedeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -1271,10 +1275,6 @@ type ManifeststagepayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Manifeststagepayload
-}
-
-input LogoutAllSessionsInput {
-  keepCurrent: Boolean! = true
 }
 
 input MarkNotificationReadInput {
