@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  AlertTriangleIcon,
   CheckCircle2Icon,
   KeyRoundIcon,
   PlusIcon,
@@ -15,7 +16,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -58,7 +65,7 @@ export function IdentityProviderClient() {
   const [open, setOpen] = React.useState(false);
   const { can } = useMyPermissions();
   const canManageIdp = can("org.update");
-  const { data, loading } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);
+  const { data, loading, error } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);
 
   const [setActive, { loading: switching }] = useMutation<{
     setActiveIdentityProvider: MutationResult<AstroliftIdentityProvider>;
@@ -126,6 +133,20 @@ export function IdentityProviderClient() {
         </Can>
       }
     >
+      {error && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
+            <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
+            <div className="flex-1">
+              <CardTitle className="text-destructive text-sm">
+                Couldn&apos;t load identity providers
+              </CardTitle>
+              <CardDescription>{error.message}</CardDescription>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -133,7 +154,7 @@ export function IdentityProviderClient() {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : list.length === 0 ? (
+          ) : list.length === 0 && !error ? (
             <div className="p-6">
               <EmptyState
                 icon={<KeyRoundIcon className="size-5" />}
@@ -142,7 +163,7 @@ export function IdentityProviderClient() {
                 actionHref={undefined}
               />
             </div>
-          ) : (
+          ) : list.length === 0 ? null : (
             <Table>
               <TableHeader>
                 <TableRow>
