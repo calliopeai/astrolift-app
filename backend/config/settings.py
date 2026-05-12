@@ -157,7 +157,7 @@ AUTH0_CLIENT_SCOPES = os.environ.get(
 # without disturbing the login/logout flow that still uses AUTH0_DOMAIN.
 AUTH0_SERVER_METADATA_URL = os.environ.get("AUTH0_SERVER_METADATA_URL")
 logger.warning(
-    f"[Auth0] AUTH0_DOMAIN={AUTH0_DOMAIN!r} " f"AUTH0_SERVER_METADATA_URL={AUTH0_SERVER_METADATA_URL!r}"
+    f"[Auth0] AUTH0_DOMAIN={AUTH0_DOMAIN!r} AUTH0_SERVER_METADATA_URL={AUTH0_SERVER_METADATA_URL!r}"
 )
 AUTH0_DATABASE_CONNECTION_ID = os.environ.get(
     "AUTH0_DATABASE_CONNECTION_ID", "Username-Password-Authentication"
@@ -171,6 +171,11 @@ EMAIL_BACKEND = env_str("DJANGO_EMAIL_BACKEND", "django_ses.SESBackend")
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
+
+# Public URL the frontend is reachable at — used to build absolute
+# links inside outbound mail (invitation accept URLs, etc.). Falls
+# back to localhost:3000 so local dev doesn't have to set it.
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:3000").rstrip("/")
 
 
 # Firebase configuration
@@ -203,7 +208,7 @@ if USE_S3:
         if AWS_S3_ENDPOINT_URL:
             AWS_S3_CUSTOM_DOMAIN = None  # Let boto3 use endpoint URL directly
         else:
-            AWS_S3_CUSTOM_DOMAIN = f'static.{SERVER_NAME.replace("local", "dev")}'
+            AWS_S3_CUSTOM_DOMAIN = f"static.{SERVER_NAME.replace('local', 'dev')}"
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
     }
@@ -632,10 +637,10 @@ else:
     }
 
 logger.warning(f"Settings Version - End: {VERSION}")
-logger.warning(f'DATABASE: {DATABASES[DEFAULT_DB_ALIAS]["ENGINE"]}')
-logger.warning(f'DB NAME: {DATABASES[DEFAULT_DB_ALIAS]["NAME"]}')
+logger.warning(f"DATABASE: {DATABASES[DEFAULT_DB_ALIAS]['ENGINE']}")
+logger.warning(f"DB NAME: {DATABASES[DEFAULT_DB_ALIAS]['NAME']}")
 if "USER" in DATABASES[DEFAULT_DB_ALIAS]:
-    logger.warning(f'DB USER: {DATABASES[DEFAULT_DB_ALIAS]["USER"]}')
+    logger.warning(f"DB USER: {DATABASES[DEFAULT_DB_ALIAS]['USER']}")
 logger.warning(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 

@@ -1,0 +1,14 @@
+Hi,
+
+{{ inviter_name }} has invited you to join {{ org_name }} on Astrolift.
+
+Accept the invitation here:
+
+  {{ accept_url }}
+
+This link expires on {{ expires_at|date:"Y-m-d H:i T" }}.
+
+If you weren't expecting this, you can ignore the message — the
+invitation will expire automatically.
+
+— Astrolift
