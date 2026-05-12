@@ -59,7 +59,7 @@ def _scaffold():
         slug="local",
         name="Local",
         provider_plugin_id="k8s_native",
-        cluster_url="http://localhost:8443",
+        endpoint="http://localhost:8443",
     )
     app = RegisteredApp.objects.create(
         organization=org,
