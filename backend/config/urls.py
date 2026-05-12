@@ -69,7 +69,14 @@ urlpatterns = [
     path('health/', include('health_check.urls')),
 ]
 
-if settings.DEBUG:
+import os
+
+# DJT URLs are gated by the same env var as the toolbar callback in
+# settings.DEBUG_TOOLBAR_CONFIG. Keeping DEBUG=True in prod is useful for
+# Django's own error pages, but the /__debug__/ route should stay off
+# unless an operator explicitly turns it on.
+if (os.environ.get("ASTROLIFT_ENABLE_DJT", "").lower()
+        in {"1", "true", "yes", "y", "on"}):
     import debug_toolbar
     urlpatterns += [
         path('__debug__/', include(debug_toolbar.urls)),
