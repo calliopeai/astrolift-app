@@ -1,8 +1,9 @@
 """
 Auth1 Admin Model.
 """
-from auth1.models import Authentication, UserInfo
 from django.contrib import admin
+
+from auth1.models import Authentication, UserInfo
 
 
 class AuthenticationInline(admin.TabularInline):

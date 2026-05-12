@@ -1,8 +1,9 @@
 from unittest.mock import MagicMock
 
+from django.contrib.auth.models import User
+
 from auth1.sessions import Auth1SessionWorkflow
 from core.tests.utils.base_test import BaseTest
-from django.contrib.auth.models import User
 
 
 class SessionsTest(BaseTest):

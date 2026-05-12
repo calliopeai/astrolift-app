@@ -2,7 +2,6 @@
 auth1.middleware for supporting login with Session token.
 """
 from importlib import import_module
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.sessions.middleware import SessionMiddleware
@@ -36,7 +35,7 @@ class Auth0SessionMiddleware(SessionMiddleware):
         ]
 
     @classmethod
-    def _get_authorization_data(cls, request: WSGIRequest, schema) -> Optional[str]:
+    def _get_authorization_data(cls, request: WSGIRequest, schema) -> str | None:
         if cls.AUTHORIZATION not in request.headers:
             return None
         parts = request.headers[cls.AUTHORIZATION].split(' ')
@@ -47,7 +46,7 @@ class Auth0SessionMiddleware(SessionMiddleware):
             return token
         return None
 
-    def _pull_from_authorization_bearer(self, request: WSGIRequest) -> Optional[bool]:
+    def _pull_from_authorization_bearer(self, request: WSGIRequest) -> bool | None:
         api_key = self._get_authorization_data(request, self.BEARER)
         if api_key:
             if api_key == settings.CLIENT_SESSION_API_KEY:
@@ -57,7 +56,7 @@ class Auth0SessionMiddleware(SessionMiddleware):
             else:
                 raise Auth0SessionMiddlewareException('Unauthorized', status=401)
 
-    def _pull_from_authorization_session(self, request: WSGIRequest) -> Optional[bool]:
+    def _pull_from_authorization_session(self, request: WSGIRequest) -> bool | None:
         session_key = self._get_authorization_data(request, self.SESSION)
         if session_key:
             request.session = self.SessionStore(session_key)

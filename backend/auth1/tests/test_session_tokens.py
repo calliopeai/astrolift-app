@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -10,7 +10,6 @@ from auth1.session_tokens import (
     DEFAULT_ACCESS_TTL_SECONDS,
     DEFAULT_REFRESH_TTL_SECONDS,
     RefreshTokenInvalid,
-    SessionRecord,
     is_active,
     issue,
     revoke,
@@ -19,8 +18,7 @@ from auth1.session_tokens import (
     rotate,
 )
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _now(*, off_seconds: int = 0) -> datetime:

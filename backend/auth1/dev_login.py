@@ -17,7 +17,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.backends import ModelBackend
 from django.http import HttpResponseRedirect, JsonResponse
-from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 

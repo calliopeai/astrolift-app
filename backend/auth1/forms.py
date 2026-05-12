@@ -9,4 +9,3 @@ class AuthAdminForm(AuthenticationForm):
 
     See: templates/admin/auth1_login.html
     """
-    pass

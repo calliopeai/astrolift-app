@@ -22,7 +22,6 @@ import os
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponseRedirect, JsonResponse
-from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
