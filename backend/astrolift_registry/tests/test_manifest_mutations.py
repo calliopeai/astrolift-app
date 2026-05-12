@@ -22,7 +22,6 @@ from astrolift_registry.schema.mutations import (
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
-
 pytestmark = pytest.mark.django_db
 
 

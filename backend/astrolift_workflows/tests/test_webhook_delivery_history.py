@@ -202,31 +202,31 @@ def test_must_persist_request_first():
 
 
 def _attempt(**overrides) -> AttemptProjection:
-    base = dict(
-        delivery_id="d1",
-        subscription_id=1,
-        event_id=1,
-        attempt_number=1,
-        phase=AttemptPhase.COMPLETED,
-        outcome=AttemptOutcome.SUCCESS,
-        scheduled_at_unix=1_700_000_000,
-        attempted_at_unix=1_700_000_001,
-        completed_at_unix=1_700_000_002,
-        request_url="https://subscriber.example/webhook",
-        request_body=BodyStorage(
+    base = {
+        "delivery_id": "d1",
+        "subscription_id": 1,
+        "event_id": 1,
+        "attempt_number": 1,
+        "phase": AttemptPhase.COMPLETED,
+        "outcome": AttemptOutcome.SUCCESS,
+        "scheduled_at_unix": 1_700_000_000,
+        "attempted_at_unix": 1_700_000_001,
+        "completed_at_unix": 1_700_000_002,
+        "request_url": "https://subscriber.example/webhook",
+        "request_body": BodyStorage(
             inline_bytes=b"req",
             blob_ref="",
             total_byte_count=3,
         ),
-        response_status=200,
-        response_body=BodyStorage(
+        "response_status": 200,
+        "response_body": BodyStorage(
             inline_bytes=b"ok",
             blob_ref="",
             total_byte_count=2,
         ),
-        error_message="",
-        signature_hex="abc123",
-    )
+        "error_message": "",
+        "signature_hex": "abc123",
+    }
     base.update(overrides)
     return AttemptProjection(**base)
 

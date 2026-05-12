@@ -27,15 +27,15 @@ from astrolift_workflows.app_migration import (
 
 
 def _bundle(**overrides) -> ExportBundle:
-    base = dict(
-        bundle_version=BUNDLE_VERSION,
-        source_instance="install-a.platform.example",
-        source_org_slug="acme",
-        source_app_slug="api",
-        manifest_normalized="[app]\nname='api'",
-        env_config={"NODE_ENV": "production"},
-        secret_refs=("DATABASE_URL", "STRIPE_KEY"),
-        managed_services=(
+    base = {
+        "bundle_version": BUNDLE_VERSION,
+        "source_instance": "install-a.platform.example",
+        "source_org_slug": "acme",
+        "source_app_slug": "api",
+        "manifest_normalized": "[app]\nname='api'",
+        "env_config": {"NODE_ENV": "production"},
+        "secret_refs": ("DATABASE_URL", "STRIPE_KEY"),
+        "managed_services": (
             ManagedServiceVariant(
                 kind="postgres",
                 major_version=15,
@@ -47,15 +47,15 @@ def _bundle(**overrides) -> ExportBundle:
                 role="cache",
             ),
         ),
-        deployment_history=(
+        "deployment_history": (
             DeploymentHistoryEntry(
                 image_digest="sha256:" + "a" * 64,
                 manifest_sha256="b" * 64,
                 deployed_at_unix=1_700_000_000,
             ),
         ),
-        exported_at_unix=1_700_000_100,
-    )
+        "exported_at_unix": 1_700_000_100,
+    }
     base.update(overrides)
     return ExportBundle(**base)
 
@@ -175,13 +175,13 @@ def test_build_claims_requires_jti():
 
 
 def _claims(**overrides) -> BundleJwtClaims:
-    base = dict(
-        source_instance="install-a.platform.example",
-        destination_instance="install-b.platform.example",
-        bundle=_bundle(),
-        issued_at_unix=1_700_000_000,
-        jti="bundle-1",
-    )
+    base = {
+        "source_instance": "install-a.platform.example",
+        "destination_instance": "install-b.platform.example",
+        "bundle": _bundle(),
+        "issued_at_unix": 1_700_000_000,
+        "jti": "bundle-1",
+    }
     base.update(overrides)
     return build_claims(**base)
 

@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-
 from astrolift_manifest.env_edit import (
     delete_app_env_key,
     parse_dotenv,
     read_app_env,
     set_app_env_keys,
 )
-
 
 _BASE = """\
 astrolift_version = 1

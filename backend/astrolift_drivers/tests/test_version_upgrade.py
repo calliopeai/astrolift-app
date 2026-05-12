@@ -74,14 +74,14 @@ def test_kind_downgrade():
 
 
 def _ok_kwargs(**overrides):
-    base = dict(
-        from_v=Version(1, 2, 3),
-        to_v=Version(1, 2, 4),
-        cluster_capabilities={"k8s.workloads", "ingress.nginx"},
-        required_capabilities={"k8s.workloads"},
-        min_platform_version=Version(1, 0, 0),
-        current_platform_version=Version(1, 5, 0),
-    )
+    base = {
+        "from_v": Version(1, 2, 3),
+        "to_v": Version(1, 2, 4),
+        "cluster_capabilities": {"k8s.workloads", "ingress.nginx"},
+        "required_capabilities": {"k8s.workloads"},
+        "min_platform_version": Version(1, 0, 0),
+        "current_platform_version": Version(1, 5, 0),
+    }
     base.update(overrides)
     return base
 

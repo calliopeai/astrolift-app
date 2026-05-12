@@ -53,7 +53,6 @@ from django.db import transaction
 
 from astrolift_identity.models import IdentityProvider, Organization
 
-
 _VALID_KINDS = {choice[0] for choice in IdentityProvider.Kind.choices}
 
 

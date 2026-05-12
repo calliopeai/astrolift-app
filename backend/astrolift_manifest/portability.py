@@ -145,7 +145,6 @@ def validate(
     cloud_only = [b for b in abstract_blocks if not b.has_portable_variant]
 
     warnings: list[str] = []
-    effective = declared
 
     if declared == PortabilityMode.PORTABLE:
         if pinned_blocks:

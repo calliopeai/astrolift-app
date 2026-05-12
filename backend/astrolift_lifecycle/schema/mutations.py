@@ -22,6 +22,8 @@ and post-condition state.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import strawberry
 from django.db import transaction
 from django.utils import timezone
@@ -33,8 +35,8 @@ from astrolift_graphql import success as gql_success
 from astrolift_lifecycle.models import (
     AppEnvironment,
     CustomDomain,
-    DeployToken,
     Deployment,
+    DeployToken,
     PreviewEnvironment,
 )
 from astrolift_lifecycle.schema.types import (
@@ -804,7 +806,7 @@ class LifecycleMutation:
     ) -> MutationResultType[DeployTokenSecretReveal]:
         import hashlib
         import secrets as secrets_lib
-        from datetime import datetime, timedelta, timezone as dt_tz
+        from datetime import datetime, timedelta
 
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
@@ -824,7 +826,7 @@ class LifecycleMutation:
                     field="expiresAtIso",
                 )
         else:
-            expires_at = datetime.now(tz=dt_tz.utc) + timedelta(days=365)
+            expires_at = datetime.now(tz=UTC) + timedelta(days=365)
         token = DeployToken.objects.create(
             registered_app=app,
             name=input.name,
@@ -851,7 +853,7 @@ class LifecycleMutation:
     ) -> MutationResultType[DeployTokenSecretReveal]:
         import hashlib
         import secrets as secrets_lib
-        from datetime import datetime, timedelta, timezone as dt_tz
+        from datetime import datetime, timedelta
 
         token = DeployToken.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if token is None:
@@ -870,10 +872,10 @@ class LifecycleMutation:
         # runners holding the old token keep working until they're
         # updated (matches the model's documented rotation flow).
         token.previous_token_hash = token.token_hash
-        token.previous_token_expires_at = datetime.now(tz=dt_tz.utc) + timedelta(hours=24)
+        token.previous_token_expires_at = datetime.now(tz=UTC) + timedelta(hours=24)
         token.token_hash = digest
         token.token_last_4 = plaintext[-4:]
-        token.last_rotated_at = datetime.now(tz=dt_tz.utc)
+        token.last_rotated_at = datetime.now(tz=UTC)
         token.save(
             update_fields=[
                 "previous_token_hash",

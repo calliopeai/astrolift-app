@@ -19,21 +19,21 @@ from astrolift_workflows.preview_state import (
 
 
 def _projection(**overrides) -> PreviewProjection:
-    base = dict(
-        preview_id=1,
-        guid="gp_abc",
-        registered_app_id=1,
-        pr_number=42,
-        branch="feat/x",
-        commit_sha="aaa1111",
-        status=PreviewStatus.RUNNING,
-        hostname="pr-42.acme.platform.example",
-        namespace="acme-api-pr-42",
-        app_environment_id=10,
-        last_deployed_at_unix=1_700_000_000,
-        torn_down_at_unix=None,
-        workflow_run_id="build-preview-acme-42-x",
-    )
+    base = {
+        "preview_id": 1,
+        "guid": "gp_abc",
+        "registered_app_id": 1,
+        "pr_number": 42,
+        "branch": "feat/x",
+        "commit_sha": "aaa1111",
+        "status": PreviewStatus.RUNNING,
+        "hostname": "pr-42.acme.platform.example",
+        "namespace": "acme-api-pr-42",
+        "app_environment_id": 10,
+        "last_deployed_at_unix": 1_700_000_000,
+        "torn_down_at_unix": None,
+        "workflow_run_id": "build-preview-acme-42-x",
+    }
     base.update(overrides)
     return PreviewProjection(**base)
 

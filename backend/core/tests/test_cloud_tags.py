@@ -40,12 +40,12 @@ def test_required_fields_must_be_non_empty():
     """Every resource the platform provisions MUST be cost-
     attributable. Missing org_slug = bill goes to nobody."""
     for empty_field in ("install_slug", "org_slug", "app_slug", "env_slug"):
-        kwargs = dict(
-            install_slug="x",
-            org_slug="x",
-            app_slug="x",
-            env_slug="x",
-        )
+        kwargs = {
+            "install_slug": "x",
+            "org_slug": "x",
+            "app_slug": "x",
+            "env_slug": "x",
+        }
         kwargs[empty_field] = ""
         with pytest.raises(ValueError, match=empty_field):
             CloudTagSet(**kwargs)
@@ -163,13 +163,6 @@ def test_gcp_lowercases_values():
 
 
 def test_gcp_truncates_to_63_chars():
-    tags = CloudTagSet(
-        install_slug="acme-prod",
-        org_slug="acme",
-        app_slug="api",
-        env_slug="prod",
-        extra={f"{PLATFORM_NAMESPACE}/notused": ""},
-    )
     # Values longer than 63 chars get truncated
     long_tags = CloudTagSet(
         install_slug="acme",

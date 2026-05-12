@@ -18,15 +18,15 @@ SNAPSHOT = "sha256:" + "c" * 64
 
 
 def _snap(deployment_id: int, **kw) -> DeploymentSnapshot:
-    base = dict(
-        app_id=1,
-        environment_id=1,
-        state=DeploymentState.RUNNING,
-        image_digest=GOOD_DIGEST,
-        config_snapshot=SNAPSHOT,
-        is_current=False,
-        created_at_unix=1_700_000_000 + deployment_id,
-    )
+    base = {
+        "app_id": 1,
+        "environment_id": 1,
+        "state": DeploymentState.RUNNING,
+        "image_digest": GOOD_DIGEST,
+        "config_snapshot": SNAPSHOT,
+        "is_current": False,
+        "created_at_unix": 1_700_000_000 + deployment_id,
+    }
     base.update(kw)
     return DeploymentSnapshot(deployment_id=deployment_id, **base)
 

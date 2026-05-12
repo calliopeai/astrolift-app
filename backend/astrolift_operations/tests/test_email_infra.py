@@ -32,14 +32,14 @@ def _clean():
 
 
 def _email(**kw) -> Email:
-    base = dict(
-        to_address="ops@acme.com",
-        subject="Approval needed",
-        html_body="<p>x</p>",
-        plain_body="x",
-        from_address="bot@acme.platform",
-        kind=EmailKind.DEPLOY_APPROVAL,
-    )
+    base = {
+        "to_address": "ops@acme.com",
+        "subject": "Approval needed",
+        "html_body": "<p>x</p>",
+        "plain_body": "x",
+        "from_address": "bot@acme.platform",
+        "kind": EmailKind.DEPLOY_APPROVAL,
+    }
     base.update(kw)
     return Email(**base)
 
@@ -160,7 +160,10 @@ def test_hard_bounce_suppresses_all_kinds():
     """Provider rate-limits us if we keep hammering bounced
     addresses."""
     entry = _entry("dead@nowhere.com", SuppressionReason.HARD_BOUNCE)
-    lookup = lambda a: entry if a == "dead@nowhere.com" else None
+
+    def lookup(a):
+        return entry if a == "dead@nowhere.com" else None
+
     for kind in EmailKind:
         assert (
             is_suppressed(
@@ -174,7 +177,10 @@ def test_hard_bounce_suppresses_all_kinds():
 
 def test_complaint_suppresses_all_kinds():
     entry = _entry("noreply@acme.com", SuppressionReason.COMPLAINT)
-    lookup = lambda a: entry if a == "noreply@acme.com" else None
+
+    def lookup(a):
+        return entry if a == "noreply@acme.com" else None
+
     for kind in EmailKind:
         assert (
             is_suppressed(
@@ -189,7 +195,9 @@ def test_complaint_suppresses_all_kinds():
 def test_unsubscribe_suppresses_non_transactional():
     """Marketing-shaped sends respect unsubscribe."""
     entry = _entry("user@acme.com", SuppressionReason.UNSUBSCRIBE)
-    lookup = lambda a: entry if a == "user@acme.com" else None
+
+    def lookup(a):
+        return entry if a == "user@acme.com" else None
 
     # Failure alerts are non-transactional? Spec says
     # DEPLOY_APPROVAL is transactional (security signal). Other
@@ -213,7 +221,10 @@ def test_unsubscribe_does_not_suppress_deploy_approval():
     """Deploy approval is a security signal — user can't opt out
     while keeping their account active."""
     entry = _entry("user@acme.com", SuppressionReason.UNSUBSCRIBE)
-    lookup = lambda a: entry if a == "user@acme.com" else None
+
+    def lookup(a):
+        return entry if a == "user@acme.com" else None
+
     assert (
         is_suppressed(
             address="user@acme.com",
@@ -225,7 +236,9 @@ def test_unsubscribe_does_not_suppress_deploy_approval():
 
 
 def test_no_suppression_when_address_not_in_list():
-    lookup = lambda a: None
+    def lookup(a):
+        return None
+
     assert (
         is_suppressed(
             address="any@acme.com",
@@ -248,7 +261,9 @@ def test_send_short_circuits_on_suppression():
         fn=lambda e: sent.append(e),
     )
     entry = _entry("dead@nowhere.com", SuppressionReason.HARD_BOUNCE)
-    lookup = lambda a: entry if a == "dead@nowhere.com" else None
+
+    def lookup(a):
+        return entry if a == "dead@nowhere.com" else None
 
     send(
         email=_email(to_address="dead@nowhere.com"),

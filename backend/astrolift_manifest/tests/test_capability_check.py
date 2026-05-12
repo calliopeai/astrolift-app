@@ -12,12 +12,12 @@ from astrolift_manifest.capability_check import (
 
 
 def _aws_cluster(**kw) -> ClusterCapabilities:
-    base = dict(
-        cluster_id=1,
-        cluster_slug="acme-prod",
-        cloud_provider="aws",
-        supported_kinds=frozenset({"postgres", "redis", "queue", "ingress"}),
-        supported_pins=frozenset(
+    base = {
+        "cluster_id": 1,
+        "cluster_slug": "acme-prod",
+        "cloud_provider": "aws",
+        "supported_kinds": frozenset({"postgres", "redis", "queue", "ingress"}),
+        "supported_pins": frozenset(
             {
                 "aws-rds/aurora-15",
                 "aws-rds/postgres-15",
@@ -26,7 +26,7 @@ def _aws_cluster(**kw) -> ClusterCapabilities:
                 "ingress-nginx/v1",
             }
         ),
-    )
+    }
     base.update(kw)
     return ClusterCapabilities(**base)
 

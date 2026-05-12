@@ -19,18 +19,18 @@ from astrolift_drivers.storage_tiers import (
 
 
 def _entry(**kw) -> StorageClassEntry:
-    base = dict(
-        cluster_id=1,
-        name="gp3-balanced",
-        csi_driver="ebs.csi.aws.com",
-        reclaim_policy="Delete",
-        volume_binding_mode="WaitForFirstConsumer",
-        allowed_topologies=(),
-        parameters=(),
-        performance_tier=PerformanceTier.BALANCED,
-        durability=Durability.ZONAL,
-        access_modes=("ReadWriteOnce",),
-    )
+    base = {
+        "cluster_id": 1,
+        "name": "gp3-balanced",
+        "csi_driver": "ebs.csi.aws.com",
+        "reclaim_policy": "Delete",
+        "volume_binding_mode": "WaitForFirstConsumer",
+        "allowed_topologies": (),
+        "parameters": (),
+        "performance_tier": PerformanceTier.BALANCED,
+        "durability": Durability.ZONAL,
+        "access_modes": ("ReadWriteOnce",),
+    }
     base.update(kw)
     return StorageClassEntry(**base)
 

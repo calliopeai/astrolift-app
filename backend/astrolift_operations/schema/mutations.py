@@ -382,6 +382,7 @@ class OperationsMutation:
         if event.acknowledged_at is None:
             tenant = get_current_tenant()
             from django.contrib.auth import get_user_model
+            from django.utils import timezone
 
             actor = None
             if tenant is not None and tenant.actor_user_id is not None:

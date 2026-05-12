@@ -250,14 +250,14 @@ def test_parse_request_rejects_empty_app_slug():
 
 
 def _req(**overrides) -> CiDeployRequest:
-    base = dict(
-        app_slug="acme",
-        image_tags={"web": "abc1234567890"},
-        commit_sha="a" * 40,
-        branch="main",
-        environment="prod",
-        trigger_kind=TriggerKind.CI,
-    )
+    base = {
+        "app_slug": "acme",
+        "image_tags": {"web": "abc1234567890"},
+        "commit_sha": "a" * 40,
+        "branch": "main",
+        "environment": "prod",
+        "trigger_kind": TriggerKind.CI,
+    }
     base.update(overrides)
     return CiDeployRequest(**base)
 

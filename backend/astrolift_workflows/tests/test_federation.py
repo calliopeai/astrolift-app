@@ -82,14 +82,14 @@ def test_normalize_install_id_rejects_invalid_chars():
 
 
 def _trust(**overrides) -> FederationTrust:
-    base = dict(
-        local_install="acme.platform.example",
-        remote_install="globex.platform.example",
-        capabilities=frozenset({FederationCapability.APP_DISCOVERY_READONLY}),
-        jwks_url="https://globex.platform.example/.well-known/astrolift-federation/jwks",
-        granted_at_unix=1_700_000_000,
-        expires_at_unix=1_700_000_000 + DEFAULT_TRUST_TTL_SECONDS,
-    )
+    base = {
+        "local_install": "acme.platform.example",
+        "remote_install": "globex.platform.example",
+        "capabilities": frozenset({FederationCapability.APP_DISCOVERY_READONLY}),
+        "jwks_url": "https://globex.platform.example/.well-known/astrolift-federation/jwks",
+        "granted_at_unix": 1_700_000_000,
+        "expires_at_unix": 1_700_000_000 + DEFAULT_TRUST_TTL_SECONDS,
+    }
     base.update(overrides)
     return FederationTrust(**base)
 
@@ -484,14 +484,14 @@ def test_build_claims_requires_sub():
 
 
 def _claims(**overrides) -> FederatedRequestClaims:
-    base = dict(
-        iss="acme.platform.example",
-        aud="globex.platform.example",
-        sub="user-123",
-        issued_at_unix=1_700_000_000,
-        jti="rpc-1",
-        capability=FederationCapability.APP_DISCOVERY_READONLY,
-    )
+    base = {
+        "iss": "acme.platform.example",
+        "aud": "globex.platform.example",
+        "sub": "user-123",
+        "issued_at_unix": 1_700_000_000,
+        "jti": "rpc-1",
+        "capability": FederationCapability.APP_DISCOVERY_READONLY,
+    }
     base.update(overrides)
     return build_federated_claims(**base)
 
@@ -637,12 +637,12 @@ def test_capability_for_kind(kind, expected_cap):
 
 
 def _sync(**overrides) -> FederationSyncSetting:
-    base = dict(
-        local_install="acme.platform.example",
-        peer_install="globex.platform.example",
-        kind=ShareableKind.APP_MANIFEST,
-        mode=FederationSyncMode.AUTO_PUSH,
-    )
+    base = {
+        "local_install": "acme.platform.example",
+        "peer_install": "globex.platform.example",
+        "kind": ShareableKind.APP_MANIFEST,
+        "mode": FederationSyncMode.AUTO_PUSH,
+    }
     base.update(overrides)
     return FederationSyncSetting(**base)
 

@@ -31,7 +31,6 @@ from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 
-
 # ---------------------------------------------------------------------
 # Inputs
 

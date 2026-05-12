@@ -21,18 +21,18 @@ GOOD_DIGEST = "sha256:" + "a" * 64
 
 
 def _ref(deployment_id: int, **kw) -> DeploymentRef:
-    base = dict(
-        app_id=1,
-        environment_id=1,
-        image_digest=GOOD_DIGEST,
-        promoted_from_id=None,
-    )
+    base = {
+        "app_id": 1,
+        "environment_id": 1,
+        "image_digest": GOOD_DIGEST,
+        "promoted_from_id": None,
+    }
     base.update(kw)
     return DeploymentRef(deployment_id=deployment_id, **base)
 
 
 def _target(env_id: int, **kw) -> PromotionTarget:
-    base = dict(app_id=1, requires_approval=False)
+    base = {"app_id": 1, "requires_approval": False}
     base.update(kw)
     return PromotionTarget(environment_id=env_id, **base)
 

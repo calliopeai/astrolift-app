@@ -142,7 +142,7 @@ def test_merge_partial_override():
 
 
 def _snap(preview_id: int, last_activity_unix: int, **kw) -> PreviewSnapshot:
-    base = dict(pr_number=preview_id, is_pinned=False)
+    base = {"pr_number": preview_id, "is_pinned": False}
     base.update(kw)
     return PreviewSnapshot(
         preview_id=preview_id,

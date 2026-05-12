@@ -13,14 +13,14 @@ from astrolift_clusters.emit_all import (
 
 
 def _dep(deployment_id: int, **kw) -> ActiveDeployment:
-    base = dict(
-        cluster_id=1,
-        cluster_slug="prod-us-east",
-        cluster_path_prefix="clusters/prod-us-east",
-        cluster_delivery_mode=DeliveryMode.GITOPS_ARGOCD,
-        app_slug="api",
-        env_slug="prod",
-    )
+    base = {
+        "cluster_id": 1,
+        "cluster_slug": "prod-us-east",
+        "cluster_path_prefix": "clusters/prod-us-east",
+        "cluster_delivery_mode": DeliveryMode.GITOPS_ARGOCD,
+        "app_slug": "api",
+        "env_slug": "prod",
+    }
     base.update(kw)
     return ActiveDeployment(deployment_id=deployment_id, **base)
 

@@ -8,7 +8,7 @@ cryptography = pytest.importorskip("cryptography")
 
 from cryptography.exceptions import InvalidTag  # noqa: E402
 
-from core.secrets.envelope import (
+from core.secrets.envelope import (  # noqa: E402
     DEK_BYTES,
     NONCE_BYTES,
     EnvelopeCiphertext,
