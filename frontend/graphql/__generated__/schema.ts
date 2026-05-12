@@ -121,6 +121,16 @@ export type AstroliftApiToken = {
   user: AstroliftUser;
 };
 
+export type AstroliftActiveSession = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['String']['output'];
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  isCurrent: Scalars['Boolean']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
+  userAgent?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftApiTokenPlaintext = {
   apiToken: AstroliftApiToken;
   plaintext: Scalars['String']['output'];
@@ -128,6 +138,17 @@ export type AstroliftApiTokenPlaintext = {
 
 export type AstroliftApiTokenPlaintextMutationResult = {
   data?: Maybe<AstroliftApiTokenPlaintext>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftLogoutAllSessionsPayload = {
+  keptCurrent: Scalars['Boolean']['output'];
+  revokedCount: Scalars['Int']['output'];
+};
+
+export type AstroliftLogoutAllSessionsPayloadMutationResult = {
+  data?: Maybe<AstroliftLogoutAllSessionsPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -1262,6 +1283,10 @@ export type ManifeststagepayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type LogoutAllSessionsInput = {
+  keepCurrent?: Scalars['Boolean']['input'];
+};
+
 export type MarkNotificationReadInput = {
   id: Scalars['GUID']['input'];
 };
@@ -1337,6 +1362,7 @@ export type Mutation = {
   login: LoginResult;
   /** Logout the current user. */
   logout: Scalars['Boolean']['output'];
+  logoutAllSessions: AstroliftLogoutAllSessionsPayloadMutationResult;
   markAllNotificationsRead: MarkallreadpayloadMutationResult;
   markNotificationRead: AstroliftNotificationMutationResult;
   /** Create or update a Metabase chart via MetabaseChartSerializer. */
@@ -1670,6 +1696,11 @@ export type MutationLibrarySetIconArgs = {
 export type MutationLoginArgs = {
   password: Scalars['String']['input'];
   username: Scalars['String']['input'];
+};
+
+
+export type MutationLogoutAllSessionsArgs = {
+  input: LogoutAllSessionsInput;
 };
 
 
@@ -2223,6 +2254,7 @@ export type PushManifestToRepoInput = {
 
 export type Query = {
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
+  astroliftActiveSessions: Array<AstroliftActiveSession>;
   astroliftAlertEvents: Array<AstroliftAlertEvent>;
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftApiTokens: Array<AstroliftApiToken>;

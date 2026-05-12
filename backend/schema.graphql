@@ -96,6 +96,16 @@ type AstroliftApiToken {
   createdAt: DateTime!
 }
 
+type AstroliftActiveSession {
+  id: String!
+  expiresAt: DateTime!
+  isCurrent: Boolean!
+  createdAt: DateTime
+  lastSeenAt: DateTime
+  ipAddress: String
+  userAgent: String
+}
+
 type AstroliftApiTokenPlaintext {
   apiToken: AstroliftApiToken!
   plaintext: String!
@@ -380,6 +390,17 @@ type AstroliftInvitationCreatedMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftInvitationCreated
+}
+
+type AstroliftLogoutAllSessionsPayload {
+  revokedCount: Int!
+  keptCurrent: Boolean!
+}
+
+type AstroliftLogoutAllSessionsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftLogoutAllSessionsPayload
 }
 
 type AstroliftInvitationMutationResult {
@@ -1252,6 +1273,10 @@ type ManifeststagepayloadMutationResult {
   data: Manifeststagepayload
 }
 
+input LogoutAllSessionsInput {
+  keepCurrent: Boolean! = true
+}
+
 input MarkNotificationReadInput {
   id: GUID!
 }
@@ -1409,6 +1434,7 @@ type Mutation {
   setActiveIdentityProvider(input: SetActiveIdentityProviderInput!): AstroliftIdentityProviderMutationResult!
   softDeleteIdentityProvider(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
+  logoutAllSessions(input: LogoutAllSessionsInput!): AstroliftLogoutAllSessionsPayloadMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
@@ -1675,6 +1701,7 @@ type Query {
   astroliftMyProfile: AstroliftMyProfile
   astroliftMyPermissions: [String!]!
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
+  astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftEvents(limit: Int! = 100, eventType: String = null): [AstroliftEvent!]!
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null): [AstroliftAuditEvent!]!

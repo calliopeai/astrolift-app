@@ -12,10 +12,12 @@
  */
 
 import type {
+  AstroliftActiveSession as GeneratedActiveSession,
   AstroliftApiToken as GeneratedApiToken,
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
   AstroliftInvitation as GeneratedInvitation,
+  AstroliftLogoutAllSessionsPayload as GeneratedLogoutAllSessionsPayload,
   AstroliftMember as GeneratedMember,
   AstroliftMyProfile as GeneratedMyProfile,
   AstroliftOrganization as GeneratedOrganization,
@@ -103,6 +105,10 @@ export type AstroliftInvitation = Omit<
 };
 
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
+
+export type AstroliftActiveSession = GeneratedActiveSession;
+
+export type AstroliftLogoutAllSessionsPayload = GeneratedLogoutAllSessionsPayload;
 
 export type MutationError = GeneratedMutationError;
 
