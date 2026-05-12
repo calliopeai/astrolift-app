@@ -19,6 +19,7 @@ export const LIST_ORGANIZATIONS = gql`
       auditLogRetentionDays
       previewMaxActiveDefault
       logRetentionDaysDefault
+      allowUserProfileEdit
       createdAt
       updatedAt
       deletedAt
@@ -78,6 +79,7 @@ export const GET_ORGANIZATION = gql`
       auditLogRetentionDays
       previewMaxActiveDefault
       logRetentionDaysDefault
+      allowUserProfileEdit
       createdAt
       updatedAt
       deletedAt
