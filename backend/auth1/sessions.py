@@ -444,6 +444,11 @@ class Auth1SessionWorkflow:
         from auth1.active_idp import active_idp
         from auth1.dev_login import dev_login
         from auth1.local_login import local_login
+        from auth1.scm_app_manifest import (
+            github_app_manifest_callback,
+            github_app_manifest_setup,
+            github_app_manifest_start,
+        )
         from auth1.scm_oauth import (
             github_callback,
             github_start,
@@ -465,6 +470,21 @@ class Auth1SessionWorkflow:
                 "scm/github/callback",
                 github_callback,
                 name="scm_github_callback",
+            ),
+            path(
+                "scm/github/app-manifest/start",
+                github_app_manifest_start,
+                name="scm_github_app_manifest_start",
+            ),
+            path(
+                "scm/github/app-manifest/callback",
+                github_app_manifest_callback,
+                name="scm_github_app_manifest_callback",
+            ),
+            path(
+                "scm/github/app-manifest/setup",
+                github_app_manifest_setup,
+                name="scm_github_app_manifest_setup",
             ),
             path("scm/gitlab/start", gitlab_start, name="scm_gitlab_start"),
             path(
