@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { FileBoxIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -118,10 +119,15 @@ export function ProjectsClient() {
                 {list.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
-                      <div className="font-medium">{p.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        {p.team.slug}/{p.slug}
-                      </div>
+                      <Link
+                        href={`/projects/${p.slug}`}
+                        className="hover:underline"
+                      >
+                        <div className="font-medium">{p.name}</div>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {p.team.slug}/{p.slug}
+                        </div>
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{p.team.slug}</Badge>
