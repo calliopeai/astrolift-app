@@ -1,0 +1,190 @@
+"use client";
+
+import { useMutation, useQuery } from "@apollo/client/react";
+import { CheckIcon, GitCommitIcon, Loader2Icon, ShieldCheckIcon, XIcon } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useFormatters } from "@/lib/i18n/formatters";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { ABORT_DEPLOYMENT, APPROVE_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
+import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
+import type { MutationResult } from "@/graphql/identity/identity.types";
+
+interface DeploymentsResp {
+  astroliftDeployments: AstroliftDeployment[];
+}
+
+interface MutResp {
+  approveDeployment?: MutationResult<AstroliftDeployment>;
+  abortDeployment?: MutationResult<AstroliftDeployment>;
+}
+
+interface Props {
+  appSlug: string;
+}
+
+/**
+ * Approval queue for deploys whose strategy requires sign-off before they
+ * can roll out. Hidden entirely when nothing's waiting — operators see an
+ * approval prompt or nothing at all, no "0 pending" busy-work card.
+ */
+export function PendingDeployments({ appSlug }: Props) {
+  const { can } = useMyPermissions();
+  const canApprove = can("app.approve_deploy");
+
+  const { data, loading, refetch } = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
+    variables: { appSlug, limit: 25 },
+    fetchPolicy: "cache-and-network",
+    pollInterval: 30_000,
+  });
+
+  const pending = (data?.astroliftDeployments ?? []).filter((d) => d.status === "pending_approval");
+
+  if (loading && !data) {
+    // Soft skeleton — most apps have none pending, so an aggressive
+    // shimmer would be misleading. Tiny placeholder only.
+    return <Skeleton className="h-12 w-full rounded-md" />;
+  }
+
+  if (pending.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-purple-500/30 bg-purple-500/5 p-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheckIcon className="size-4 text-purple-600 dark:text-purple-400" />
+        <h2 className="text-sm font-semibold">Pending approval</h2>
+        <span className="text-muted-foreground text-xs">({pending.length})</span>
+        {canApprove ? (
+          <Badge variant="secondary" className="ml-auto text-[10px]">
+            You can approve
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground ml-auto text-[10px] italic">Read-only</span>
+        )}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {canApprove
+          ? "Review each candidate before unlocking the rollout."
+          : "Waiting on a reviewer with the `app.approve_deploy` permission."}
+      </p>
+      <div className="flex flex-col gap-2">
+        {pending.map((d) => (
+          <PendingRow
+            key={d.id}
+            deployment={d}
+            canApprove={canApprove}
+            onSettled={() => void refetch()}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PendingRow({
+  deployment,
+  canApprove,
+  onSettled,
+}: {
+  deployment: AstroliftDeployment;
+  canApprove: boolean;
+  onSettled: () => void;
+}) {
+  const fmt = useFormatters();
+  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+
+  const [approve] = useMutation<MutResp>(APPROVE_DEPLOYMENT);
+  const [abort] = useMutation<MutResp>(ABORT_DEPLOYMENT);
+
+  const shortTag = (deployment.imageTag ?? deployment.id).slice(0, 10);
+
+  async function handleApprove() {
+    if (!confirm(`Approve ${shortTag} and start the rollout?`)) return;
+    setBusy("approve");
+    try {
+      const { data } = await approve({
+        variables: { input: { id: deployment.id } },
+      });
+      if (data?.approveDeployment?.ok) {
+        toast.success(`Approved ${shortTag}.`);
+      } else {
+        toast.error(data?.approveDeployment?.errors?.[0]?.message ?? "Approve failed.");
+      }
+    } finally {
+      setBusy(null);
+      onSettled();
+    }
+  }
+
+  async function handleReject() {
+    if (!confirm(`Reject ${shortTag}? The deployment will be aborted.`)) return;
+    setBusy("reject");
+    try {
+      const { data } = await abort({
+        variables: { input: { id: deployment.id } },
+      });
+      if (data?.abortDeployment?.ok) {
+        toast.success("Deployment rejected.");
+      } else {
+        toast.error(data?.abortDeployment?.errors?.[0]?.message ?? "Reject failed.");
+      }
+    } finally {
+      setBusy(null);
+      onSettled();
+    }
+  }
+
+  return (
+    <div className="bg-background flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <GitCommitIcon className="text-muted-foreground size-4 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm">{shortTag}</span>
+            {deployment.environmentName && (
+              <span className="text-muted-foreground text-xs">→ {deployment.environmentName}</span>
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              {deployment.approvalsReceived}/{deployment.approvalsRequired || 1} approvals
+            </Badge>
+          </div>
+          <div className="text-muted-foreground text-xs">
+            Received {fmt.formatRelativeTime(deployment.createdAt)}
+            {deployment.triggerKind && ` · ${deployment.triggerKind}`}
+          </div>
+        </div>
+      </div>
+      {canApprove && (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleReject}
+            disabled={busy !== null}
+            className="text-muted-foreground hover:text-destructive gap-1"
+          >
+            {busy === "reject" ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <XIcon className="size-3.5" />
+            )}
+            Reject
+          </Button>
+          <Button size="sm" onClick={handleApprove} disabled={busy !== null} className="gap-1">
+            {busy === "approve" ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <CheckIcon className="size-3.5" />
+            )}
+            Approve &amp; deploy
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
