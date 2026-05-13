@@ -5,7 +5,17 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type TabKey = "overview" | "deployments" | "domains" | "secrets" | "members" | "settings";
+type TabKey =
+  | "overview"
+  | "deployments"
+  | "workloads"
+  | "observability"
+  | "console"
+  | "previews"
+  | "domains"
+  | "secrets"
+  | "members"
+  | "settings";
 
 interface TabSpec {
   key: TabKey;
@@ -25,12 +35,37 @@ const TABS: TabSpec[] = [
   {
     key: "deployments",
     label: "Deployments",
-    href: (s) => `/apps/${s}/environments`,
+    href: (s) => `/apps/${s}/deployments`,
     match: (p, s) =>
+      p === `/apps/${s}/deployments` ||
+      p.startsWith(`/apps/${s}/deployments/`) ||
       p.startsWith(`/apps/${s}/environments`) ||
-      p.startsWith(`/apps/${s}/workloads`) ||
       p.startsWith(`/apps/${s}/jobs`) ||
       p.startsWith(`/apps/${s}/commands`),
+  },
+  {
+    key: "workloads",
+    label: "Workloads",
+    href: (s) => `/apps/${s}/workloads`,
+    match: (p, s) => p.startsWith(`/apps/${s}/workloads`),
+  },
+  {
+    key: "observability",
+    label: "Observability",
+    href: (s) => `/apps/${s}/observability`,
+    match: (p, s) => p.startsWith(`/apps/${s}/observability`),
+  },
+  {
+    key: "console",
+    label: "Console",
+    href: (s) => `/apps/${s}/console`,
+    match: (p, s) => p.startsWith(`/apps/${s}/console`),
+  },
+  {
+    key: "previews",
+    label: "Previews",
+    href: (s) => `/apps/${s}/previews`,
+    match: (p, s) => p.startsWith(`/apps/${s}/previews`),
   },
   {
     key: "domains",

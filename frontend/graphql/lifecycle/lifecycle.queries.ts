@@ -44,6 +44,11 @@ export const LIST_DEPLOYMENTS = gql`
       endedAt
       durationSeconds
       createdAt
+      commitSha
+      branch
+      ciActorKind
+      ciProvider
+      ciRunUrl
     }
   }
 `;
