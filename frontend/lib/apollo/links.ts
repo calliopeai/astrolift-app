@@ -27,12 +27,21 @@ const authLink = setContext(async (_, { headers }) => {
 // Apollo Client v4 changed onError's signature: a single `error` is
 // passed (use CombinedGraphQLErrors.is(error) to detect GraphQL ones)
 // and any other error type is treated as a network/protocol error.
+//
+// On UNAUTHENTICATED we dispatch ``astrolift:session-expired`` rather
+// than forcing a redirect — ``SessionExpiredModal`` (mounted in the
+// app-shell layout) picks the event up and shows an in-page modal so
+// the operator can copy any unsaved draft before re-authing. The
+// modal then routes them to /auth/login itself. The token is cleared
+// here so any subsequent request also fails fast and re-dispatches.
 const errorLink = onError(({ error }) => {
   if (CombinedGraphQLErrors.is(error)) {
     for (const { extensions } of error.errors) {
       if (extensions?.code === "UNAUTHENTICATED") {
         clearToken();
-        window.location.href = "/auth/login";
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("astrolift:session-expired"));
+        }
         return;
       }
     }
