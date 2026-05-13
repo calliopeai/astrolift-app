@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { AstroliftNav } from "@/components/AstroliftNav";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { NavTree } from "@/components/NavTree";
 import { NavUser } from "@/components/NavUser";
 import { OrgSwitcher } from "@/components/OrgSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -28,6 +29,12 @@ export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
         <OrgSwitcher />
       </SidebarHeader>
       <SidebarContent>
+        {/* Tenant hierarchy first so operators land on their work
+            without scrolling past platform-wide tabs. The flat
+            AstroliftNav stays below for cross-cutting sections
+            (Operations, Infrastructure, Administration, Account). */}
+        <NavTree />
+        <SidebarSeparator />
         <AstroliftNav />
       </SidebarContent>
       <SidebarFooter>
