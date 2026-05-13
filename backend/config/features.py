@@ -21,7 +21,7 @@ Usage:
 
 import logging
 import os
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def _env_bool(key, default=True):
     return os.environ.get(key, str(default)).lower() in ("true", "1", "yes")
 
 
-class Feature(str, Enum):
+class Feature(StrEnum):
     """Platform features that can be toggled on/off."""
 
     WORKFLOWS = "workflows"

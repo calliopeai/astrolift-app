@@ -32,10 +32,10 @@ import dataclasses
 import hashlib
 import hmac
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class WebhookSource(str, Enum):
+class WebhookSource(StrEnum):
     GITHUB = "github"
     GITLAB = "gitlab"
     BITBUCKET = "bitbucket"

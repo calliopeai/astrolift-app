@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from enum import Enum
+from enum import StrEnum
 
 
 class DnsLayoutError(ValueError):
@@ -34,7 +34,7 @@ class DnsLayoutError(ValueError):
 # ---- layout mode ---------------------------------------------------
 
 
-class DnsLayoutMode(str, Enum):
+class DnsLayoutMode(StrEnum):
     """Spec 13 §2.0.3."""
 
     FLAT = "flat"
@@ -92,7 +92,7 @@ def hostname_for_app(
 # ---- post-install zone registration --------------------------------
 
 
-class ZoneRegistrationStep(str, Enum):
+class ZoneRegistrationStep(StrEnum):
     """Spec 13 §2.0.4: ordered validation + registration flow.
 
     Each step is gated on the previous succeeding. Failures halt

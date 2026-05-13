@@ -25,7 +25,7 @@ import dataclasses
 import hashlib
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 # ---- idempotency ---------------------------------------------------
 
@@ -94,7 +94,7 @@ def diff_spec(
 # ---- deprovision ---------------------------------------------------
 
 
-class DeprovisionMode(str, Enum):
+class DeprovisionMode(StrEnum):
     SOFT = "soft"
     """Mark the binding deleted; KEEP the underlying resource +
     snapshots. Recovery flow re-binds within retention window."""

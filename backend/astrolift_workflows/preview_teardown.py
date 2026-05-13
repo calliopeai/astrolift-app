@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class TeardownError(ValueError):
@@ -32,7 +32,7 @@ PREVIEW_TEARDOWN_DEADLINE_SECONDS = 15 * 60
 # ---- step ordering -------------------------------------------------
 
 
-class TeardownStep(str, Enum):
+class TeardownStep(StrEnum):
     """Ordered cleanup operations.
 
     Reverse of provisioning: app-namespace last in, first out.
@@ -80,7 +80,7 @@ reordering is a code review."""
 # ---- per-managed-service cleanup -----------------------------------
 
 
-class CleanupMode(str, Enum):
+class CleanupMode(StrEnum):
     """Spec §7: per-binding cleanup style."""
 
     SHARED_WITH_MAIN = "shared_with_main"
@@ -92,7 +92,7 @@ class CleanupMode(str, Enum):
     """Preview has its own dedicated instance. Full deprovision."""
 
 
-class ManagedServiceKind(str, Enum):
+class ManagedServiceKind(StrEnum):
     POSTGRES = "postgres"
     REDIS = "redis"
     OBJECT_STORE = "object_store"

@@ -27,7 +27,7 @@ import dataclasses
 import hashlib
 import hmac
 import random
-from enum import Enum
+from enum import StrEnum
 
 # Spec 17 §6.3 retry schedule, in order. 8 attempts max.
 RETRY_SCHEDULE_SECONDS: tuple[int, ...] = (
@@ -46,7 +46,7 @@ MAX_ATTEMPTS = len(RETRY_SCHEDULE_SECONDS) + 1  # initial + retries
 MAX_INFLIGHT_PER_SUBSCRIPTION = 100
 
 
-class DeliveryClassification(str, Enum):
+class DeliveryClassification(StrEnum):
     SUCCESS = "success"
     RETRY = "retry"
     PERMANENT_FAILURE = "permanent_failure"

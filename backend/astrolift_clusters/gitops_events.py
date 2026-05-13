@@ -21,7 +21,7 @@ Pairs with the existing webhook-ingress HMAC verifier (#93).
 from __future__ import annotations
 
 import dataclasses
-from enum import Enum
+from enum import StrEnum
 
 
 class GitopsEventError(ValueError):
@@ -31,7 +31,7 @@ class GitopsEventError(ValueError):
 # ---- providers -----------------------------------------------------
 
 
-class GitopsProvider(str, Enum):
+class GitopsProvider(StrEnum):
     """Spec 07 §12: two reconcilers we accept events from."""
 
     ARGOCD = "argocd"
@@ -41,7 +41,7 @@ class GitopsProvider(str, Enum):
 # ---- platform event types (locked) --------------------------------
 
 
-class PlatformEventType(str, Enum):
+class PlatformEventType(StrEnum):
     """Spec 07 §12: one platform event per sync transition.
     Locked vocabulary — alert delivery (#159) keys off these."""
 
@@ -51,7 +51,7 @@ class PlatformEventType(str, Enum):
     GITOPS_HEALTH_DEGRADED = "deployment.gitops_health_degraded"
 
 
-class EventSeverity(str, Enum):
+class EventSeverity(StrEnum):
     INFO = "info"
     WARNING = "warning"
 
@@ -173,16 +173,16 @@ def resolve_deployment_id(*, annotations: dict[str, str]) -> int:
     raw = annotations.get(ANNOTATION_DEPLOYMENT_ID)
     if not raw:
         raise GitopsEventError(
-            f"Application missing {ANNOTATION_DEPLOYMENT_ID!r} " "annotation — was it emitted by Astrolift?"
+            f"Application missing {ANNOTATION_DEPLOYMENT_ID!r} annotation — was it emitted by Astrolift?"
         )
     try:
         deployment_id = int(raw)
     except ValueError as exc:
         raise GitopsEventError(
-            f"{ANNOTATION_DEPLOYMENT_ID} annotation {raw!r} " "is not a valid integer"
+            f"{ANNOTATION_DEPLOYMENT_ID} annotation {raw!r} is not a valid integer"
         ) from exc
     if deployment_id <= 0:
-        raise GitopsEventError(f"{ANNOTATION_DEPLOYMENT_ID} annotation must be > 0, " f"got {deployment_id}")
+        raise GitopsEventError(f"{ANNOTATION_DEPLOYMENT_ID} annotation must be > 0, got {deployment_id}")
     return deployment_id
 
 

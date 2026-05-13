@@ -21,7 +21,7 @@ fills in the persistence half).
 from __future__ import annotations
 
 import dataclasses
-from enum import Enum
+from enum import StrEnum
 
 
 class CommandRunOutputError(ValueError):
@@ -51,7 +51,7 @@ def should_use_inline(*, byte_count: int) -> bool:
 # ---- capture state machine -----------------------------------------
 
 
-class CaptureState(str, Enum):
+class CaptureState(StrEnum):
     """Capture phases. Workflow advances through these."""
 
     PENDING = "pending"
@@ -135,7 +135,7 @@ class CapturedStream:
             raise CommandRunOutputError("total_byte_count cannot be negative")
         if len(self.inline_bytes) > INLINE_HARD_CAP_BYTES:
             raise CommandRunOutputError(
-                f"inline_bytes {len(self.inline_bytes)}B exceeds " f"hard cap {INLINE_HARD_CAP_BYTES}B"
+                f"inline_bytes {len(self.inline_bytes)}B exceeds hard cap {INLINE_HARD_CAP_BYTES}B"
             )
         if self.truncated and not self.blob_ref:
             raise CommandRunOutputError("truncated=True requires blob_ref")
@@ -290,7 +290,7 @@ def capture_failure_message(*, attempt_count: int) -> str:
     if attempt_count <= 0:
         raise CommandRunOutputError("attempt_count must be positive")
     if attempt_count == 1:
-        return "log capture failed (1 attempt); the pod was cleaned " "up before logs could be persisted"
+        return "log capture failed (1 attempt); the pod was cleaned up before logs could be persisted"
     return (
         f"log capture failed after {attempt_count} attempts; "
         "the pod was cleaned up before logs could be persisted"

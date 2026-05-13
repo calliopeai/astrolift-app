@@ -25,7 +25,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from datetime import date, timedelta
-from enum import Enum
+from enum import StrEnum
 
 # Spec 27 §3 — minimum windows.
 MIN_DEPRECATION_DAYS = 180  # 6 months
@@ -75,7 +75,7 @@ def is_breaking_change(*, from_v: ApiVersion, to_v: ApiVersion) -> bool:
 # ---- deprecation -----------------------------------------------------
 
 
-class ChangeKind(str, Enum):
+class ChangeKind(StrEnum):
     """Locked vocabulary for CHANGELOG.md entries (spec 27 §20)."""
 
     ADDED = "Added"
@@ -184,8 +184,7 @@ def validate_changelog_section(
         for e in entries:
             if e.kind == ChangeKind.REMOVED:
                 raise ApiVersionError(
-                    f"'Removed' entries forbidden within a major "
-                    f"({version.major}.x.y); requires major bump"
+                    f"'Removed' entries forbidden within a major ({version.major}.x.y); requires major bump"
                 )
 
 

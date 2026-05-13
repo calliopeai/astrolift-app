@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterable, Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class DeliveryMode(str, Enum):
+class DeliveryMode(StrEnum):
     """Mirrors the model's TextChoices so non-Django callers don't
     need to import the model class."""
 

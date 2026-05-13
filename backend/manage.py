@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
-    logger.warning(f'DJANGO_SETTINGS_MODULE: {os.environ["DJANGO_SETTINGS_MODULE"]}')
+    logger.warning(f"DJANGO_SETTINGS_MODULE: {os.environ['DJANGO_SETTINGS_MODULE']}")
 
     try:
         from django.core.management import execute_from_command_line

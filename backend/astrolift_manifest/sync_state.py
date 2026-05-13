@@ -18,10 +18,10 @@ both call into ``classify_state`` to keep the badge accurate.
 from __future__ import annotations
 
 import dataclasses
-from enum import Enum
+from enum import StrEnum
 
 
-class SyncState(str, Enum):
+class SyncState(StrEnum):
     IN_SYNC = "in_sync"
     DB_AHEAD = "db_ahead"
     REPO_AHEAD = "repo_ahead"

@@ -79,12 +79,10 @@ def parse_secret_ref(value: str) -> ExternalSecretRef:
     parsed = urlparse(value)
     scheme = parsed.scheme.lower()
     if not scheme:
-        raise ExternalSecretRefError(
-            f"secret_ref {value!r} missing scheme; " "expected <scheme>://<path>[#key]"
-        )
+        raise ExternalSecretRefError(f"secret_ref {value!r} missing scheme; expected <scheme>://<path>[#key]")
     if scheme not in SUPPORTED_SCHEMES:
         raise ExternalSecretRefError(
-            f"secret_ref scheme {scheme!r} not supported; " f"choose from {sorted(SUPPORTED_SCHEMES)}"
+            f"secret_ref scheme {scheme!r} not supported; choose from {sorted(SUPPORTED_SCHEMES)}"
         )
 
     # urlparse populates `netloc` for `aws-sm://foo/bar`, where
@@ -128,7 +126,7 @@ def resolve(ref: ExternalSecretRef) -> bytes:
     resolver = _RESOLVERS.get(ref.scheme)
     if resolver is None:
         raise ExternalSecretResolutionError(
-            f"no resolver registered for scheme {ref.scheme!r}; " "the provider plugin probably isn't loaded"
+            f"no resolver registered for scheme {ref.scheme!r}; the provider plugin probably isn't loaded"
         )
     try:
         out = resolver(ref)
@@ -140,6 +138,6 @@ def resolve(ref: ExternalSecretRef) -> bytes:
         ) from exc
     if not isinstance(out, (bytes, bytearray)):
         raise ExternalSecretResolutionError(
-            f"resolver for {ref.scheme!r} returned non-bytes " f"({type(out).__name__})"
+            f"resolver for {ref.scheme!r} returned non-bytes ({type(out).__name__})"
         )
     return bytes(out)

@@ -25,10 +25,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterable, Sequence
-from enum import Enum
+from enum import StrEnum
 
 
-class DeliveryMode(str, Enum):
+class DeliveryMode(StrEnum):
     """Mirrors astrolift_clusters.delivery.DeliveryMode for callers
     that don't want to import the strategy module."""
 

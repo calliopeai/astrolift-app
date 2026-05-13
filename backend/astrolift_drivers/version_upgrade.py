@@ -21,7 +21,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 # ---- semver-ish parsing ----------------------------------------------
 #
@@ -58,7 +58,7 @@ def parse_version(s: str) -> Version:
 # ---- compatibility ---------------------------------------------------
 
 
-class UpgradeKind(str, Enum):
+class UpgradeKind(StrEnum):
     """Same X.Y.Z numbering as the version itself."""
 
     PATCH = "patch"
@@ -138,9 +138,7 @@ def check_compatibility(
         issues.append(
             CompatibilityIssue(
                 code="major_upgrade_requires_approval",
-                message=(
-                    f"major version bump {from_v} -> {to_v}; " "workflow must require operator approval"
-                ),
+                message=(f"major version bump {from_v} -> {to_v}; workflow must require operator approval"),
             )
         )
 

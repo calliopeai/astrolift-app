@@ -111,8 +111,7 @@ def check_target(
             target_region=cluster_region,
             allowed_regions=policy.allowed_regions,
             reason=(
-                f"cluster {cluster_id} is not in the allowed cluster set"
-                f" {sorted(policy.allowed_cluster_ids)}"
+                f"cluster {cluster_id} is not in the allowed cluster set {sorted(policy.allowed_cluster_ids)}"
             ),
         )
 

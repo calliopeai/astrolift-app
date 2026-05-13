@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class Isolation(str, Enum):
+class Isolation(StrEnum):
     SHARED = "shared"
     DEDICATED = "dedicated"
 
@@ -55,12 +55,10 @@ class VariantSupport:
 
     def __post_init__(self) -> None:
         if not self.allowed_modes:
-            raise ValueError(
-                f"variant {self.plugin_slug}/{self.variant} declares no " "allowed isolation modes"
-            )
+            raise ValueError(f"variant {self.plugin_slug}/{self.variant} declares no allowed isolation modes")
         if self.default not in self.allowed_modes:
             raise ValueError(
-                f"variant {self.plugin_slug}/{self.variant} default " f"{self.default} not in allowed_modes"
+                f"variant {self.plugin_slug}/{self.variant} default {self.default} not in allowed_modes"
             )
 
 

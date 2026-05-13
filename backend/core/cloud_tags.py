@@ -120,13 +120,13 @@ class CloudTagSet:
         ):
             if not value:
                 raise ValueError(
-                    f"{label} is required for cloud tag set " "(platform-mandated for cost attribution)"
+                    f"{label} is required for cloud tag set (platform-mandated for cost attribution)"
                 )
         # Reserved-namespace check on extra keys
         for key in self.extra:
             if key.startswith(PLATFORM_NAMESPACE):
                 raise ValueError(
-                    f"extra key {key!r} clashes with the platform " f"namespace {PLATFORM_NAMESPACE!r}"
+                    f"extra key {key!r} clashes with the platform namespace {PLATFORM_NAMESPACE!r}"
                 )
 
     def as_canonical_dict(self) -> dict[str, str]:

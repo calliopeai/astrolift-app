@@ -132,7 +132,7 @@ class _AttachmentRemovedPayload:
 # Helpers
 
 
-_ENV_NAME_HINT = "must start with a letter or underscore and use only " "[A-Z0-9_] (POSIX env-var rules)"
+_ENV_NAME_HINT = "must start with a letter or underscore and use only [A-Z0-9_] (POSIX env-var rules)"
 
 
 def _validate_env_key(key: str) -> str | None:

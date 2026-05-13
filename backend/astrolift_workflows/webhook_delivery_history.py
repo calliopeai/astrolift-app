@@ -20,7 +20,7 @@ history GraphQL query consult this for:
 from __future__ import annotations
 
 import dataclasses
-from enum import Enum
+from enum import StrEnum
 
 from astrolift_workflows.command_run_output import (
     INLINE_HARD_CAP_BYTES,
@@ -36,7 +36,7 @@ class WebhookHistoryError(ValueError):
 # ---- attempt outcome ----------------------------------------------
 
 
-class AttemptOutcome(str, Enum):
+class AttemptOutcome(StrEnum):
     """Spec §6: persisted alongside each attempt."""
 
     SUCCESS = "success"
@@ -105,7 +105,7 @@ class BodyStorage:
             # Webhook bodies: when blobbed, fully blobbed (no
             # head-inline). Differs from CommandRun where
             # head-inline supports fast UI paint.
-            raise WebhookHistoryError("webhook body cannot have both blob_ref and " "inline_bytes; pick one")
+            raise WebhookHistoryError("webhook body cannot have both blob_ref and inline_bytes; pick one")
 
 
 def plan_body_storage(*, body: bytes) -> dict:
@@ -124,7 +124,7 @@ def plan_body_storage(*, body: bytes) -> dict:
 # ---- attempt lifecycle gates --------------------------------------
 
 
-class AttemptPhase(str, Enum):
+class AttemptPhase(StrEnum):
     """Spec §6 capture-before-POST flow."""
 
     SCHEDULED = "scheduled"
@@ -203,7 +203,7 @@ class AttemptProjection:
         if self.attempt_number < 1:
             raise WebhookHistoryError(f"attempt_number must be >= 1, got {self.attempt_number}")
         if self.attempt_number > MAX_ATTEMPTS:
-            raise WebhookHistoryError(f"attempt_number {self.attempt_number} exceeds " f"max {MAX_ATTEMPTS}")
+            raise WebhookHistoryError(f"attempt_number {self.attempt_number} exceeds max {MAX_ATTEMPTS}")
         # Phase / timestamp consistency
         if self.phase == AttemptPhase.SCHEDULED:
             if self.attempted_at_unix is not None:
@@ -223,7 +223,7 @@ class AttemptProjection:
                 # No status code AND no error message AND
                 # COMPLETED — should never happen.
                 raise WebhookHistoryError(
-                    "COMPLETED with no response_status AND no " "error_message; one or the other must be set"
+                    "COMPLETED with no response_status AND no error_message; one or the other must be set"
                 )
 
 
@@ -262,7 +262,7 @@ def plan_replay(
         raise WebhookHistoryError("new_delivery_id is required")
     if original_attempt.phase != AttemptPhase.COMPLETED:
         raise WebhookHistoryError(
-            f"can't replay attempt in phase " f"{original_attempt.phase.value}; wait for COMPLETED"
+            f"can't replay attempt in phase {original_attempt.phase.value}; wait for COMPLETED"
         )
     return ReplayPlan(
         new_delivery_id=new_delivery_id,
@@ -293,7 +293,7 @@ class HistoryQuery:
 
     def __post_init__(self) -> None:
         if self.limit < 1 or self.limit > MAX_HISTORY_LIMIT:
-            raise WebhookHistoryError(f"limit must be in [1, {MAX_HISTORY_LIMIT}], " f"got {self.limit}")
+            raise WebhookHistoryError(f"limit must be in [1, {MAX_HISTORY_LIMIT}], got {self.limit}")
 
 
 MAX_HISTORY_LIMIT = 200

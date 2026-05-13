@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class AppTeardownError(ValueError):
@@ -36,7 +36,7 @@ class AppTeardownError(ValueError):
 # ---- step ordering -------------------------------------------------
 
 
-class TeardownStep(str, Enum):
+class TeardownStep(StrEnum):
     """Spec 06 §4.10."""
 
     MARK_TEARING_DOWN = "mark_tearing_down"
@@ -113,7 +113,7 @@ class TeardownInputs:
 # ---- idempotency ---------------------------------------------------
 
 
-class AppLifecycleState(str, Enum):
+class AppLifecycleState(StrEnum):
     """Subset of RegisteredApp.state the teardown cares about."""
 
     ACTIVE = "active"
@@ -209,7 +209,7 @@ def plan_managed_service_teardown(
             destroy_data = delete_data
         else:
             raise AppTeardownError(
-                f"unknown managed service kind {kind!r} for " f"teardown of binding {binding_id}"
+                f"unknown managed service kind {kind!r} for teardown of binding {binding_id}"
             )
         out.append(
             ManagedServiceTeardown(
@@ -287,5 +287,5 @@ def must_soft_delete(*, record_kind: str) -> bool:
     if record_kind in _RETAINED_RECORD_KINDS:
         return False
     raise AppTeardownError(
-        f"record kind {record_kind!r} not in either catalog; " "add to soft-delete or retain set explicitly"
+        f"record kind {record_kind!r} not in either catalog; add to soft-delete or retain set explicitly"
     )

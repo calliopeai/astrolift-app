@@ -77,8 +77,7 @@ def _token(connection) -> str:
     if connection.kind == "github_oauth_app":
         raise GithubProviderError(
             "OAUTH_NOT_CONNECTED",
-            "this is the OAuth app config row; complete the OAuth dance "
-            "to create a token connection first",
+            "this is the OAuth app config row; complete the OAuth dance to create a token connection first",
             recoverable=True,
         )
     raise GithubProviderError(

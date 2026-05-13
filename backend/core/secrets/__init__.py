@@ -60,9 +60,7 @@ def secrets_backend():
     kind = getattr(settings, "ASTROLIFT_SECRETS_BACKEND", "local_fernet")
     cls = _BACKENDS.get(kind)
     if cls is None:
-        raise RuntimeError(
-            f"unknown ASTROLIFT_SECRETS_BACKEND={kind!r}; " f"valid options: {sorted(_BACKENDS)}"
-        )
+        raise RuntimeError(f"unknown ASTROLIFT_SECRETS_BACKEND={kind!r}; valid options: {sorted(_BACKENDS)}")
     return cls()
 
 
@@ -81,9 +79,7 @@ def decrypt(secret: EncryptedSecret) -> bytes:
     """
     cls = _BACKENDS.get(secret.backend_kind)
     if cls is None:
-        raise RuntimeError(
-            f"row was encrypted with unknown backend " f"{secret.backend_kind!r}; cannot decrypt"
-        )
+        raise RuntimeError(f"row was encrypted with unknown backend {secret.backend_kind!r}; cannot decrypt")
     return cls().decrypt(secret.backend_ref)
 
 

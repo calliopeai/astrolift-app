@@ -26,7 +26,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import StrEnum
 
 # Spec 27 §8 + §9 — SCIM-specific rate limit + auth.
 SCIM_RATE_LIMIT_PER_MIN = 240
@@ -184,7 +184,7 @@ def parse_filter(filter_str: str) -> ScimFilter | None:
     m = _FILTER_RE.match(filter_str)
     if m is None:
         raise ScimError(
-            f"unsupported filter syntax: {filter_str!r} " '(supported: <attr> {eq|ne|co|sw|ew} "<value>")'
+            f'unsupported filter syntax: {filter_str!r} (supported: <attr> {{eq|ne|co|sw|ew}} "<value>")'
         )
     return ScimFilter(
         attribute=m.group("attr"),
@@ -255,7 +255,7 @@ def normalize_pagination(
 # ---- group -> role mapping -----------------------------------------
 
 
-class ScopeKind(str, Enum):
+class ScopeKind(StrEnum):
     ORG = "org"
     TEAM = "team"
     PROJECT = "project"

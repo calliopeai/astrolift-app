@@ -98,7 +98,7 @@ class CrossOrgAccessDenied(Exception):
         self.presented_org_slug = presented_org_slug
         self.host_org_slug = host_org_slug
         super().__init__(
-            f"session for org {presented_org_slug!r} presented on " f"org {host_org_slug!r}'s subdomain"
+            f"session for org {presented_org_slug!r} presented on org {host_org_slug!r}'s subdomain"
         )
 
 

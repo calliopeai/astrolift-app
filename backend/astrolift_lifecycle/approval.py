@@ -29,7 +29,7 @@ import hashlib
 import secrets
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 # Spec 06 §4.6 default. Operators override per environment via
 # AppEnvironment.approval_timeout_seconds.
@@ -41,7 +41,7 @@ DEFAULT_APPROVAL_TIMEOUT_SECONDS = 7 * 24 * 3600
 MAGIC_LINK_PREFIX = "alft_ml_"
 
 
-class ApprovalDecision(str, Enum):
+class ApprovalDecision(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -188,7 +188,7 @@ def evaluate_quorum(
         raise QuorumError("min_approvers must be positive")
     if min_approvers > len(eligible_approvers):
         raise QuorumError(
-            f"min_approvers ({min_approvers}) exceeds eligible " f"approver count ({len(eligible_approvers)})"
+            f"min_approvers ({min_approvers}) exceeds eligible approver count ({len(eligible_approvers)})"
         )
 
     eligible = set(eligible_approvers)
@@ -218,7 +218,7 @@ def evaluate_quorum(
             decision=ApprovalDecision.REJECTED,
             approvers_for=tuple(approvers_for),
             approvers_against=tuple(approvers_against),
-            reason=(f"rejected by user {first_rejector}: " f"{reasons.get(first_rejector, '')}").rstrip(": "),
+            reason=(f"rejected by user {first_rejector}: {reasons.get(first_rejector, '')}").rstrip(": "),
         )
 
     if len(approvers_for) >= min_approvers:

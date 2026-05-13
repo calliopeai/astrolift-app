@@ -21,7 +21,7 @@ class Command(BaseCommand):
             env_key, default = FEATURE_DEFAULTS[feature]
             apps = FEATURE_APPS.get(feature, [])
             status = self.style.SUCCESS("ON ") if enabled else self.style.ERROR("OFF")
-            apps_str = f'  apps: {", ".join(apps)}' if apps else ""
+            apps_str = f"  apps: {', '.join(apps)}" if apps else ""
 
             self.stdout.write(f"  {status}  {feature.value:<25s}  env: {env_key}{apps_str}")
 

@@ -24,16 +24,16 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Sequence
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
 
 
-class AlertState(str, Enum):
+class AlertState(StrEnum):
     FIRING = "firing"
     ACKNOWLEDGED = "acknowledged"
     RESOLVED = "resolved"

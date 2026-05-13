@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class ObservabilityProfileError(ValueError):
@@ -32,7 +32,7 @@ class ObservabilityProfileError(ValueError):
 # ---- driver registries ---------------------------------------------
 
 
-class LogDriver(str, Enum):
+class LogDriver(StrEnum):
     """Spec 08 §3.4: known log backends."""
 
     LOKI = "loki"
@@ -49,7 +49,7 @@ class LogDriver(str, Enum):
     for reads (configured)."""
 
 
-class MetricsDriver(str, Enum):
+class MetricsDriver(StrEnum):
     PROMETHEUS = "prometheus"
     """Self-hosted Prometheus on the cluster."""
 
@@ -64,7 +64,7 @@ class MetricsDriver(str, Enum):
     MULTIPLEXER = "multiplexer"
 
 
-class TraceDriver(str, Enum):
+class TraceDriver(StrEnum):
     TEMPO = "tempo"
     JAEGER = "jaeger"
     OTLP_HTTP = "otlp_http"
@@ -115,9 +115,7 @@ class RetentionWindow:
         if self.default_days <= 0:
             raise ObservabilityProfileError(f"default_days must be > 0, got {self.default_days}")
         if self.max_days < self.default_days:
-            raise ObservabilityProfileError(
-                f"max_days {self.max_days} < default_days " f"{self.default_days}"
-            )
+            raise ObservabilityProfileError(f"max_days {self.max_days} < default_days {self.default_days}")
 
 
 # Spec §12 — these are the tier defaults. max_days is what an org
@@ -172,7 +170,7 @@ def _validate_required_keys(
 ) -> None:
     missing = required - set(config.keys())
     if missing:
-        raise ObservabilityProfileError(f"{driver_label} config missing required keys: " f"{sorted(missing)}")
+        raise ObservabilityProfileError(f"{driver_label} config missing required keys: {sorted(missing)}")
 
 
 def _validate_multiplexer_children(
@@ -195,12 +193,11 @@ def _validate_multiplexer_children(
     for i, child in enumerate(children):
         if not isinstance(child, Mapping):
             raise ObservabilityProfileError(
-                f"{parent_kind} multiplexer children[{i}] must be a "
-                "mapping with 'driver' and 'config' keys"
+                f"{parent_kind} multiplexer children[{i}] must be a mapping with 'driver' and 'config' keys"
             )
         if "driver" not in child or "config" not in child:
             raise ObservabilityProfileError(
-                f"{parent_kind} multiplexer children[{i}] missing " "'driver' or 'config'"
+                f"{parent_kind} multiplexer children[{i}] missing 'driver' or 'config'"
             )
         # Children can't be multiplexers — no nesting (cycle defense)
         if child["driver"] == "multiplexer":
@@ -223,7 +220,7 @@ def validate_log_driver_config(
         kind = LogDriver(driver)
     except ValueError as exc:
         raise ObservabilityProfileError(
-            f"unknown log driver {driver!r}; known: " f"{[d.value for d in LogDriver]}"
+            f"unknown log driver {driver!r}; known: {[d.value for d in LogDriver]}"
         ) from exc
 
     if not isinstance(config, Mapping):
@@ -257,7 +254,7 @@ def validate_metrics_driver_config(
         kind = MetricsDriver(driver)
     except ValueError as exc:
         raise ObservabilityProfileError(
-            f"unknown metrics driver {driver!r}; known: " f"{[d.value for d in MetricsDriver]}"
+            f"unknown metrics driver {driver!r}; known: {[d.value for d in MetricsDriver]}"
         ) from exc
 
     if not isinstance(config, Mapping):
@@ -291,7 +288,7 @@ def validate_trace_driver_config(
         kind = TraceDriver(driver)
     except ValueError as exc:
         raise ObservabilityProfileError(
-            f"unknown trace driver {driver!r}; known: " f"{[d.value for d in TraceDriver]}"
+            f"unknown trace driver {driver!r}; known: {[d.value for d in TraceDriver]}"
         ) from exc
 
     if not isinstance(config, Mapping):

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 from astrolift_drivers.storage_tiers import (
     Durability,
@@ -29,7 +29,7 @@ CRITICAL_USED_RATIO = 0.95
 SNAPSHOT_AGE_OVER_SCHEDULE_RATIO = 1.5
 
 
-class ClusterStorageCapability(str, Enum):
+class ClusterStorageCapability(StrEnum):
     """Per-cluster capability flags the pre-flight checks."""
 
     HAS_RWX = "has_rwx"
@@ -168,7 +168,7 @@ def assert_preflight_passes(
 # ---- alert evaluators ----------------------------------------------
 
 
-class VolumeAlertSeverity(str, Enum):
+class VolumeAlertSeverity(StrEnum):
     OK = "ok"
     WARNING = "warning"
     CRITICAL = "critical"

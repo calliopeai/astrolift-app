@@ -29,10 +29,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 
 
-class MigrationRisk(str, Enum):
+class MigrationRisk(StrEnum):
     SAFE = "safe"
     RISKY = "risky"
     DESTRUCTIVE = "destructive"

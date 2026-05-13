@@ -8,7 +8,7 @@ per-app schema modules).
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 import strawberry
 
@@ -18,13 +18,13 @@ T = TypeVar("T")
 
 
 @strawberry.type(name="MutationResult")
-class MutationResultType(Generic[T]):
+class MutationResultType[T]:
     ok: bool
     errors: list[MutationErrorType] = strawberry.field(default_factory=list)
     data: T | None = None
 
 
-def success(data: T) -> MutationResultType[T]:
+def success[T](data: T) -> MutationResultType[T]:
     return MutationResultType(ok=True, data=data, errors=[])
 
 

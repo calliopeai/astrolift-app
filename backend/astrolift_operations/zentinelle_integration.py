@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
 class ZentinelleIntegrationError(ValueError):
@@ -47,7 +47,7 @@ its retention window expires."""
 # ---- event-type catalog -------------------------------------------
 
 
-class ZentinelleEventType(str, Enum):
+class ZentinelleEventType(StrEnum):
     """Locked vocabulary of audit events Zentinelle ingests as
     evidence. SOC 2 / HIPAA / ISO 27001 (per #271) collectors
     cross-reference these types when generating control-test
@@ -143,7 +143,7 @@ class ZentinelleEnvelope:
     def __post_init__(self) -> None:
         if self.payload_version != PAYLOAD_VERSION:
             raise ZentinelleIntegrationError(
-                f"payload_version {self.payload_version} != " f"current {PAYLOAD_VERSION}"
+                f"payload_version {self.payload_version} != current {PAYLOAD_VERSION}"
             )
         if not self.event_id:
             raise ZentinelleIntegrationError("event_id required")
@@ -264,7 +264,7 @@ def validate_payload(
     missing = required - set(payload.keys())
     if missing:
         raise ZentinelleIntegrationError(
-            f"{event_type.value} payload missing required keys: " f"{sorted(missing)}"
+            f"{event_type.value} payload missing required keys: {sorted(missing)}"
         )
 
 
@@ -330,9 +330,7 @@ def render_subscription_target(
     if not url:
         raise ZentinelleIntegrationError("zentinelle_url is required")
     if not url.startswith("https://"):
-        raise ZentinelleIntegrationError(
-            f"zentinelle_url must be HTTPS for compliance evidence; " f"got {url!r}"
-        )
+        raise ZentinelleIntegrationError(f"zentinelle_url must be HTTPS for compliance evidence; got {url!r}")
     # Strip trailing slash so the format substitution doesn't
     # produce double-slash paths
     url = url.rstrip("/")

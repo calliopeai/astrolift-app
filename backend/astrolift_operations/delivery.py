@@ -78,8 +78,7 @@ def record_delivery_outcome(
         subscription.is_active = False
         subscription.disabled_at = timezone.now()
         reason = (
-            f"auto-disabled after {AUTO_DISABLE_THRESHOLD} consecutive "
-            f"failures (last status: {status_code})"
+            f"auto-disabled after {AUTO_DISABLE_THRESHOLD} consecutive failures (last status: {status_code})"
         )
         subscription.disabled_reason = reason
         fields_to_update += ["is_active", "disabled_at", "disabled_reason"]

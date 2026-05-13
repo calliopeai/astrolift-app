@@ -15,10 +15,10 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
-class SnapshotKind(str, Enum):
+class SnapshotKind(StrEnum):
     """Three snapshot strategies; backup workflow picks based on
     what's being snapshotted."""
 

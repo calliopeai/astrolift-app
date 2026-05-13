@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class BuildPolicyError(ValueError):
@@ -29,7 +29,7 @@ class BuildPolicyError(ValueError):
 # ---- SBOM format ---------------------------------------------------
 
 
-class SbomFormat(str, Enum):
+class SbomFormat(StrEnum):
     """Spec 14 §10: two industry-standard formats."""
 
     CYCLONE_DX = "cyclonedx"
@@ -68,7 +68,7 @@ def sbom_media_type(*, fmt: SbomFormat) -> str:
 # ---- multi-arch ----------------------------------------------------
 
 
-class Arch(str, Enum):
+class Arch(StrEnum):
     """OCI architecture vocabulary the platform supports.
     Limited to amd64 + arm64; ppc64le / s390x are out of scope
     until an org actually needs them (the CI matrix expands
@@ -135,7 +135,7 @@ def plan_architectures(
       (useful for shared images, future-proofing migrations)
     """
     if not cluster_node_architectures:
-        raise BuildPolicyError("cluster_node_architectures cannot be empty — " "where would the pods run?")
+        raise BuildPolicyError("cluster_node_architectures cannot be empty — where would the pods run?")
 
     cluster_archs: list[Arch] = []
     seen: set[Arch] = set()
@@ -151,17 +151,17 @@ def plan_architectures(
         target = tuple(cluster_archs)
     elif pref in ("amd64", "x86_64"):
         if Arch.AMD64 not in seen:
-            raise BuildPolicyError("manifest pinned to amd64 but cluster has no " "amd64 nodes")
+            raise BuildPolicyError("manifest pinned to amd64 but cluster has no amd64 nodes")
         target = (Arch.AMD64,)
     elif pref in ("arm64", "aarch64"):
         if Arch.ARM64 not in seen:
-            raise BuildPolicyError("manifest pinned to arm64 but cluster has no " "arm64 nodes")
+            raise BuildPolicyError("manifest pinned to arm64 but cluster has no arm64 nodes")
         target = (Arch.ARM64,)
     elif pref == "multi":
         target = (Arch.AMD64, Arch.ARM64)
     else:
         raise BuildPolicyError(
-            f"unknown manifest_arch_preference {pref!r}; " "supported: auto, amd64, arm64, multi"
+            f"unknown manifest_arch_preference {pref!r}; supported: auto, amd64, arm64, multi"
         )
 
     return BuildArchPlan(

@@ -145,15 +145,14 @@ def installation_token(connection) -> str:
     if connection.kind != "github_app_install":
         raise GithubAppError(
             "WRONG_KIND",
-            f"installation_token only works on github_app_install rows, " f"got {connection.kind!r}",
+            f"installation_token only works on github_app_install rows, got {connection.kind!r}",
         )
     app_id = connection.oauth_client_id or ""
     installation_id = connection.installation_id or ""
     if not app_id or not installation_id:
         raise GithubAppError(
             "INCOMPLETE_CONFIG",
-            "github_app_install connection needs both app_id "
-            "(stored in oauth_client_id) and installation_id",
+            "github_app_install connection needs both app_id (stored in oauth_client_id) and installation_id",
             recoverable=True,
         )
 

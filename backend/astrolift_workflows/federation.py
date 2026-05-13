@@ -58,7 +58,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class FederationError(ValueError):
@@ -68,7 +68,7 @@ class FederationError(ValueError):
 # ---- federation capabilities ---------------------------------------
 
 
-class FederationCapability(str, Enum):
+class FederationCapability(StrEnum):
     """Locked vocabulary. Trust is granted per-capability so an
     operator can allow narrow flows without auto-granting the
     full surface. Capabilities are intentionally fine-grained:
@@ -179,7 +179,7 @@ def validate_trust_ttl(*, seconds: int) -> int:
     if seconds <= 0:
         raise FederationError(f"trust TTL must be positive, got {seconds}s")
     if seconds > MAX_TRUST_TTL_SECONDS:
-        raise FederationError(f"trust TTL {seconds}s exceeds maximum " f"{MAX_TRUST_TTL_SECONDS}s (5 years)")
+        raise FederationError(f"trust TTL {seconds}s exceeds maximum {MAX_TRUST_TTL_SECONDS}s (5 years)")
     return seconds
 
 
@@ -260,7 +260,7 @@ def grants_capability(
 # side can unilaterally revoke at any time.
 
 
-class HandshakeStep(str, Enum):
+class HandshakeStep(StrEnum):
     """Steps the workflow walks through. Steps are PER-DIRECTION
     (run twice for full mutual establishment)."""
 
@@ -353,15 +353,13 @@ class HelloMessage:
             raise FederationError("HelloMessage requires nonce")
         if len(self.nonce) < 32:
             raise FederationError(
-                f"HelloMessage nonce too short ({len(self.nonce)}); "
-                "minimum 32 chars (256 bits of randomness)"
+                f"HelloMessage nonce too short ({len(self.nonce)}); minimum 32 chars (256 bits of randomness)"
             )
         if not self.jwks_url:
             raise FederationError("HelloMessage requires jwks_url")
         if not self.requested_capabilities:
             raise FederationError(
-                "HelloMessage requires at least one requested "
-                "capability — a no-cap handshake is meaningless"
+                "HelloMessage requires at least one requested capability — a no-cap handshake is meaningless"
             )
 
 
@@ -418,12 +416,10 @@ def verify_handshake_pair(
     if local_hello.iss == remote_response.iss:
         raise FederationError("remote response iss must differ from local hello iss")
     if not remote_response.granted_capabilities:
-        raise FederationError("remote granted no capabilities — operator declined; " "handshake aborts")
+        raise FederationError("remote granted no capabilities — operator declined; handshake aborts")
     bad = set(remote_response.granted_capabilities) - set(local_hello.requested_capabilities)
     if bad:
-        raise FederationError(
-            f"remote granted capabilities not in request: " f"{sorted(c.value for c in bad)}"
-        )
+        raise FederationError(f"remote granted capabilities not in request: {sorted(c.value for c in bad)}")
 
 
 def jwks_url_for(*, install_id: str) -> str:
@@ -489,7 +485,7 @@ def build_federated_claims(
     iss_norm = normalize_install_id(value=iss)
     aud_norm = normalize_install_id(value=aud)
     if iss_norm == aud_norm:
-        raise FederationError("iss and aud must differ — federated request to self " "is meaningless")
+        raise FederationError("iss and aud must differ — federated request to self is meaningless")
     if not jti:
         raise FederationError("jti is required")
     if not sub:
@@ -511,7 +507,7 @@ def build_federated_claims(
 # ---- verification --------------------------------------------------
 
 
-class VerifyResult(str, Enum):
+class VerifyResult(StrEnum):
     OK = "ok"
     EXPIRED = "expired"
     NOT_YET_VALID = "not_yet_valid"
@@ -555,7 +551,7 @@ def verify_federated_request(
         return VerifyDecision(
             accepted=False,
             result=VerifyResult.AUDIENCE_MISMATCH,
-            reason=(f"claim audience {claims.aud!r} != this install " f"{local!r}"),
+            reason=(f"claim audience {claims.aud!r} != this install {local!r}"),
         )
 
     if now_unix < claims.nbf - CLOCK_SKEW_SECONDS:
@@ -621,7 +617,7 @@ def verify_federated_request(
 # ---- shareable kinds + capability mapping --------------------------
 
 
-class ShareableKind(str, Enum):
+class ShareableKind(StrEnum):
     """What can flow over federation. Each kind requires a
     matching capability on the granting side; the receiving side
     enforces."""
@@ -666,7 +662,7 @@ def capability_for_kind(*, kind: ShareableKind) -> FederationCapability:
 # ---- per-peer sync settings ---------------------------------------
 
 
-class FederationSyncMode(str, Enum):
+class FederationSyncMode(StrEnum):
     """Operator-controlled per (peer install, kind) tuple."""
 
     DISABLED = "disabled"
@@ -708,16 +704,14 @@ class FederationSyncSetting:
         if self.mode == FederationSyncMode.AUTO_PULL:
             interval = self.pull_interval_seconds or DEFAULT_PULL_INTERVAL_SECONDS
             if interval < MIN_PULL_INTERVAL_SECONDS:
-                raise FederationError(
-                    f"pull interval {interval}s below minimum " f"{MIN_PULL_INTERVAL_SECONDS}s"
-                )
+                raise FederationError(f"pull interval {interval}s below minimum {MIN_PULL_INTERVAL_SECONDS}s")
             if interval > MAX_PULL_INTERVAL_SECONDS:
                 raise FederationError(
-                    f"pull interval {interval}s exceeds maximum " f"{MAX_PULL_INTERVAL_SECONDS}s"
+                    f"pull interval {interval}s exceeds maximum {MAX_PULL_INTERVAL_SECONDS}s"
                 )
         elif self.pull_interval_seconds:
             raise FederationError(
-                f"pull_interval_seconds set but mode is " f"{self.mode.value} — only AUTO_PULL uses it"
+                f"pull_interval_seconds set but mode is {self.mode.value} — only AUTO_PULL uses it"
             )
 
 
