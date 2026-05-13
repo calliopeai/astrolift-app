@@ -1,0 +1,137 @@
+"""Azure provider plugin manifest.
+
+Drivers shipped:
+- ACRDriver (#46) — ImageRegistryDriver (Azure Container Registry)
+- KeyVaultSecretsBackend (#45) — SecretsBackend (Key Vault)
+- AzureFederatedIdentityDriver (#45) — WorkloadIdentityDriver
+  (AKS Workload Identity + federated credentials)
+- AzureDNSDriver (#44) — DnsDriver (Azure DNS)
+- AzureAppGatewayTlsDriver (#44) — TlsDriver (App Gateway / Key
+  Vault-backed cert + Azure-managed cert)
+- AKSClusterDriver (#42) — ClusterDriver
+- AzureAppGatewayIngressDriver (#43) — IngressDriver, multi-variant
+  (agic / gateway_api)
+
+Managed services (#47 MVP — symmetry with AWS S3 + SQS,
+GCP GCS + Pub/Sub):
+- BlobStorageDriver — object_store/blob
+- ServiceBusDriver — queue/servicebus
+
+Pending (separate tickets, follow-on managed services):
+- Azure Database for PostgreSQL Flexible Server
+- Azure Cache for Redis
+- Cosmos DB (Mongo / Cassandra / SQL APIs)
+- Azure Files (filesystem)
+- Event Hubs (event-stream)
+- Azure OpenAI (model endpoint)
+"""
+
+from _sdk.base import ProviderPlugin
+
+from azure.cluster_aks import AKSClusterDriver
+from azure.dns_azuredns import AzureDNSDriver
+from azure.identity_federated import AzureFederatedIdentityDriver
+from azure.ingress_appgw import AzureAppGatewayIngressDriver
+from azure.managed.object_store_blob import BlobStorageDriver
+from azure.managed.queue_servicebus import ServiceBusDriver
+from azure.registry_acr import ACRDriver
+from azure.secrets_keyvault import KeyVaultSecretsBackend
+from azure.tls_appgw import AzureAppGatewayTlsDriver
+
+
+PLUGIN = ProviderPlugin(
+    id="azure",
+    display_name="Microsoft Azure",
+    drivers={
+        "registry": ACRDriver,
+        "secrets": KeyVaultSecretsBackend,
+        "identity": AzureFederatedIdentityDriver,
+        "dns": AzureDNSDriver,
+        "tls": AzureAppGatewayTlsDriver,
+        "cluster": AKSClusterDriver,
+        "ingress": AzureAppGatewayIngressDriver,
+    },
+    managed_service_drivers={
+        ("object_store", "blob"): BlobStorageDriver,
+        ("queue", "servicebus"): ServiceBusDriver,
+    },
+    config_schema={
+        "type": "object",
+        "required": ["subscription_id", "tenant_id", "resource_group"],
+        "properties": {
+            "subscription_id": {
+                "type": "string",
+                "description": "Azure subscription ID (UUID).",
+            },
+            "tenant_id": {
+                "type": "string",
+                "description": "Azure AD tenant ID (UUID).",
+            },
+            "resource_group": {
+                "type": "string",
+                "description": (
+                    "Default resource group for platform-managed "
+                    "resources."
+                ),
+            },
+            "location": {
+                "type": "string",
+                "default": "eastus",
+                "description": "Default Azure region.",
+            },
+            "cluster_oidc_issuer": {
+                "type": "string",
+                "description": (
+                    "AKS cluster OIDC issuer URL. Required for "
+                    "Workload Identity federated credentials."
+                ),
+            },
+            "registry_name": {
+                "type": "string",
+                "description": (
+                    "ACR registry name (without .azurecr.io suffix)."
+                ),
+            },
+            "vault_url": {
+                "type": "string",
+                "description": (
+                    "Key Vault URL "
+                    "(https://<name>.vault.azure.net)."
+                ),
+            },
+            "storage_account": {
+                "type": "string",
+                "description": (
+                    "Storage account name for object_store "
+                    "managed-service binding."
+                ),
+            },
+            "servicebus_namespace": {
+                "type": "string",
+                "description": (
+                    "Service Bus namespace name for queue "
+                    "managed-service binding."
+                ),
+            },
+            "ingress_variant": {
+                "type": "string",
+                "enum": ["agic", "gateway_api"],
+                "default": "agic",
+            },
+            "appgw_id": {
+                "type": "string",
+                "description": (
+                    "Application Gateway resource ID — required "
+                    "when ingress_variant=agic."
+                ),
+            },
+            "akv_secret_id_for_tls": {
+                "type": "string",
+                "description": (
+                    "Key Vault secret ID for the TLS cert (PFX). "
+                    "AGIC reads this via SSL profile."
+                ),
+            },
+        },
+    },
+)

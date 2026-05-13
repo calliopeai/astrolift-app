@@ -25,6 +25,17 @@ RUN pip install --no-cache-dir whitenoise
 
 COPY . .
 
+# Provider plugins (astrolift-providers, vendored under backend/vendor) ship
+# with the backend image so the cluster fleet can register AWS/k8s_native
+# clusters without an extra side-car. Installed in non-editable mode so the
+# `astrolift.providers` entry points land in site-packages metadata and the
+# loader can find them via importlib.metadata.entry_points(). Extras pulled:
+# - aws  -> boto3 (already pinned in Pipfile) + kubernetes + PyYAML
+# - k8s  -> kubernetes + PyYAML
+# gcp/azure are intentionally omitted to keep the image small; add them as
+# additional `[gcp,azure]` extras when those clouds are wanted.
+RUN pip install --no-cache-dir ./vendor/astrolift-providers[aws,k8s]
+
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV DJANGO_SETTINGS_MODULE=config.settings
