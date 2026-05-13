@@ -143,6 +143,15 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
   const meta = KINDS.find((k) => k.value === kind);
   const isOauthApp = meta?.takesOauthApp ?? false;
   const isGithub = kind.startsWith("github_");
+  const isGitlab = kind.startsWith("gitlab_");
+
+  // OAuth-app config rows need a redirect URI that matches the host
+  // — the placeholder hints the operator at the correct backend path
+  // for the kind they just selected so they're less likely to paste
+  // a stale GitHub URL into a GitLab Application.
+  const redirectUriHostPath = isGitlab
+    ? "/app/auth1/scm/gitlab/callback"
+    : "/app/auth1/scm/github/callback";
 
   function toggleScope(s: ScmVisibilityScope) {
     setScopes((prev) =>
@@ -300,10 +309,14 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
                   id="oauth-redirect"
                   value={oauthRedirectUri}
                   onChange={(e) => setOauthRedirectUri(e.target.value)}
-                  placeholder="https://your-astrolift.example/app/auth1/scm/github/callback"
+                  placeholder={`https://your-astrolift.example${redirectUriHostPath}`}
                   type="url"
                   className="font-mono text-xs"
                 />
+                <p className="text-muted-foreground text-xs">
+                  Must match the redirect URI registered on the OAuth
+                  application at the host side ({isGitlab ? "GitLab" : "GitHub"}).
+                </p>
               </div>
             </>
           )}
@@ -331,13 +344,13 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
             </p>
           </div>
 
-          {isGithub && (
+          {(isGithub || isGitlab) && (
             <div className="space-y-2">
               <Label>Repo visibility scopes</Label>
               <p className="text-muted-foreground text-xs">
                 Constrain what repos this connection is allowed to surface
-                when phase-2 listing queries call the GitHub API. No
-                selections = no scope restriction.
+                when listing queries call the {isGitlab ? "GitLab" : "GitHub"} API.
+                No selections = no scope restriction.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {VISIBILITY_SCOPES.map((s) => (
