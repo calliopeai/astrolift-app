@@ -23,16 +23,16 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 
-class CheckKind(str, Enum):
+class CheckKind(StrEnum):
     HTTP = "http"
     TLS_EXPIRY = "tls_expiry"
     DNS = "dns"
 
 
-class HealthBadge(str, Enum):
+class HealthBadge(StrEnum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"  # some probes failing
     DOWN = "down"  # majority failing

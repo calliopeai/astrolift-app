@@ -27,12 +27,12 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 from astrolift_clusters.status_routing import IngressDriver
 
 
-class IngressMode(str, Enum):
+class IngressMode(StrEnum):
     SHARED_INGRESS = "shared_ingress"
     """One ingress LB fronts all apps in the cluster. Tenant
     Ingresses opt into the shared group via driver-specific

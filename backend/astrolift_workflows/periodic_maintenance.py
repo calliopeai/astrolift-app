@@ -20,12 +20,12 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import date, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 # ---- webhook reheal ------------------------------------------------
 
 
-class RehealOutcome(str, Enum):
+class RehealOutcome(StrEnum):
     """Per-subscription test-delivery outcome."""
 
     REENABLED = "reenabled"

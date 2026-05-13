@@ -23,7 +23,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 # Branch naming: ``astrolift/<app_slug>/<env_slug>/<workflow_run_id>``.
 # Keeps the namespace clean per app + env; the workflow run id is
@@ -44,7 +44,7 @@ def branch_name_for(
 ) -> str:
     if not workflow_run_id:
         raise ValueError("workflow_run_id is required for branch naming")
-    return f"astrolift/{_slugify(app_slug)}/" f"{_slugify(env_slug)}/" f"{_slugify(workflow_run_id)}"
+    return f"astrolift/{_slugify(app_slug)}/{_slugify(env_slug)}/{_slugify(workflow_run_id)}"
 
 
 # ---- PR body composer -----------------------------------------------
@@ -97,7 +97,7 @@ def render_pr_body(
             "|---|---|---|---|",
         ]
         for d in diff_entries:
-            lines.append(f"| {d.change} | {d.kind} | " f"{d.namespace or '—'} | {d.name} |")
+            lines.append(f"| {d.change} | {d.kind} | {d.namespace or '—'} | {d.name} |")
         body = summary + "\n".join(lines)
     else:
         body = summary + "_No manifest changes — re-applying the existing snapshot._"
@@ -107,12 +107,12 @@ def render_pr_body(
 # ---- approval routing ----------------------------------------------
 
 
-class ApprovalAction(str, Enum):
+class ApprovalAction(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
 
 
-class PRMergeDecision(str, Enum):
+class PRMergeDecision(StrEnum):
     MERGE = "merge"
     CLOSE = "close"
     NO_OP = "no_op"

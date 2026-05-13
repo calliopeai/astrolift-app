@@ -96,9 +96,7 @@ class KekUnavailable(Exception):
 def _provider_for(kek_id: str) -> KekProvider:
     fn = _PROVIDERS.get(kek_id)
     if fn is None:
-        raise KekUnavailable(
-            f"no KEK provider registered for {kek_id!r}; " f"available: {sorted(_PROVIDERS)}"
-        )
+        raise KekUnavailable(f"no KEK provider registered for {kek_id!r}; available: {sorted(_PROVIDERS)}")
     return fn
 
 

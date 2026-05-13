@@ -21,10 +21,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import StrEnum
 
 
-class DriftKind(str, Enum):
+class DriftKind(StrEnum):
     IMAGE_TAG = "image_tag"
     REPLICAS = "replicas"
     ENV_LITERAL = "env_literal"

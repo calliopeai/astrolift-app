@@ -35,16 +35,16 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Iterable
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
 
 
-class DetectorKind(str, Enum):
+class DetectorKind(StrEnum):
     FAILED_LOGIN_BURST = "failed_login_burst"
     TOKEN_FROM_NEW_IP = "token_from_new_ip"
     PERMISSION_DENIED_BURST = "permission_denied_burst"

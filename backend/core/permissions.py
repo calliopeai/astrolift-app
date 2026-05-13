@@ -25,7 +25,7 @@ from typing import Any
 from core.tenancy import TenantContext, get_current_tenant
 
 
-class Permission(str, enum.Enum):
+class Permission(enum.StrEnum):
     # --- Organization ----------------------------------------------
     ORG_READ = "org.read"
     ORG_UPDATE = "org.update"
@@ -103,7 +103,7 @@ class Permission(str, enum.Enum):
     ADMIN_ELEVATE = "admin.elevate"
 
 
-class ScopeKind(str, enum.Enum):
+class ScopeKind(enum.StrEnum):
     ORG = "ORG"
     TEAM = "TEAM"
     PROJECT = "PROJECT"

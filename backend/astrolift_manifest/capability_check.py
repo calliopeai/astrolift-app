@@ -99,7 +99,7 @@ def bind_precheck(
                     kind=req.kind,
                     name=req.name,
                     code="unsupported_kind",
-                    detail=(f"cluster {cluster.cluster_slug!r} has no plugin for " f"kind {req.kind!r}"),
+                    detail=(f"cluster {cluster.cluster_slug!r} has no plugin for kind {req.kind!r}"),
                 )
             )
             continue

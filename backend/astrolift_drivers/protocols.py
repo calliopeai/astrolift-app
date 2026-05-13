@@ -47,7 +47,7 @@ class DnsRecord:
     ttl: int = 60
 
 
-class CertificateState(str, enum.Enum):
+class CertificateState(enum.StrEnum):
     PENDING = "pending"
     READY = "ready"
     FAILED = "failed"

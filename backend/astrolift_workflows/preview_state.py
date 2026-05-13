@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class PreviewStateError(ValueError):
@@ -29,7 +29,7 @@ class PreviewStateError(ValueError):
 # ---- status ---------------------------------------------------------
 
 
-class PreviewStatus(str, Enum):
+class PreviewStatus(StrEnum):
     """Spec 18 §3."""
 
     BUILDING = "building"
@@ -204,7 +204,7 @@ def parse_status_filter(
             status = PreviewStatus(value)
         except ValueError as exc:
             raise PreviewStateError(
-                f"unknown preview status {value!r}; known: " f"{[s.value for s in PreviewStatus]}"
+                f"unknown preview status {value!r}; known: {[s.value for s in PreviewStatus]}"
             ) from exc
         if status not in seen:
             seen.add(status)

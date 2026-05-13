@@ -20,14 +20,14 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class MeshError(ValueError):
     pass
 
 
-class MeshProvider(str, Enum):
+class MeshProvider(StrEnum):
     """Spec 13 §8: supported mesh providers."""
 
     NONE = "none"
@@ -68,7 +68,7 @@ def namespace_injection_annotations(
 # ---- per-workload mesh config validation ---------------------------
 
 
-class MtlsMode(str, Enum):
+class MtlsMode(StrEnum):
     """Spec 13 §8: per-workload mesh mTLS."""
 
     OFF = "off"
@@ -80,7 +80,7 @@ class MtlsMode(str, Enum):
     """Require mTLS. Refuses non-mTLS connections."""
 
 
-class TrafficPolicy(str, Enum):
+class TrafficPolicy(StrEnum):
     """Spec 13 §8: traffic distribution within a mesh service."""
 
     ROUND_ROBIN = "round_robin"
@@ -120,7 +120,7 @@ class MeshConfig:
             # so operators don't think their settings are active.
             if self.mtls != MtlsMode.OFF:
                 raise MeshError(
-                    "mesh.enabled=False but mtls is set; remove the " "mtls line or set enabled=true"
+                    "mesh.enabled=False but mtls is set; remove the mtls line or set enabled=true"
                 )
             if self.canary_splits:
                 raise MeshError("mesh.enabled=False but canary_splits is set")
@@ -149,9 +149,7 @@ def parse_mesh_config(raw: dict) -> MeshConfig:
     try:
         mtls = MtlsMode(raw.get("mtls", "off"))
     except ValueError as exc:
-        raise MeshError(
-            f"mesh.mtls {raw.get('mtls')!r} not one of " f"{[m.value for m in MtlsMode]}"
-        ) from exc
+        raise MeshError(f"mesh.mtls {raw.get('mtls')!r} not one of {[m.value for m in MtlsMode]}") from exc
 
     try:
         policy = TrafficPolicy(
@@ -159,8 +157,7 @@ def parse_mesh_config(raw: dict) -> MeshConfig:
         )
     except ValueError as exc:
         raise MeshError(
-            f"mesh.traffic_policy {raw.get('traffic_policy')!r} "
-            f"not one of {[p.value for p in TrafficPolicy]}"
+            f"mesh.traffic_policy {raw.get('traffic_policy')!r} not one of {[p.value for p in TrafficPolicy]}"
         ) from exc
 
     return MeshConfig(

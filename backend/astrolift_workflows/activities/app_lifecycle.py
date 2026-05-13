@@ -186,7 +186,7 @@ def _create_rollback_deployment_sync(deployment_id: int) -> int:
     )
     if prior is None:
         raise RuntimeError(
-            f"deployment {deployment_id} has no prior running revision " "in this env to roll back to"
+            f"deployment {deployment_id} has no prior running revision in this env to roll back to"
         )
     new_deploy = Deployment.objects.create(
         registered_app=current.registered_app,

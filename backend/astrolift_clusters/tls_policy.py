@@ -28,7 +28,7 @@ or the A record is pointing at ingress.
 from __future__ import annotations
 
 import dataclasses
-from enum import Enum
+from enum import StrEnum
 
 
 class TlsError(ValueError):
@@ -38,7 +38,7 @@ class TlsError(ValueError):
 # ---- wildcard SAN construction -------------------------------------
 
 
-class ZoneLayout(str, Enum):
+class ZoneLayout(StrEnum):
     """Spec 13 §2.0.2."""
 
     FLAT = "flat"
@@ -109,7 +109,7 @@ def wildcard_sans_for_org(
 # ---- custom-domain challenge selection -----------------------------
 
 
-class ChallengeKind(str, Enum):
+class ChallengeKind(StrEnum):
     HTTP_01 = "http-01"
     """Server presents a token at
     ``/.well-known/acme-challenge/<token>``. Requires the domain
@@ -192,7 +192,7 @@ def challenge_for_custom_domain(
 # ---- renewal severity ----------------------------------------------
 
 
-class RenewalSeverity(str, Enum):
+class RenewalSeverity(StrEnum):
     """Spec 13 §5.3: notification tiers."""
 
     OK = "ok"
@@ -258,7 +258,7 @@ def at_notification_threshold(
 # ---- mTLS mode validation ------------------------------------------
 
 
-class MtlsMode(str, Enum):
+class MtlsMode(StrEnum):
     """Spec 13 §5.4."""
 
     OFF = "off"
@@ -297,13 +297,13 @@ class MtlsConfig:
             # OFF / MESH-only with a CA secret set is a
             # misconfiguration — the secret won't be consumed.
             raise TlsError(
-                f"mTLS mode {self.mode.value} cannot accept " "edge_client_ca_secret (would not be consumed)"
+                f"mTLS mode {self.mode.value} cannot accept edge_client_ca_secret (would not be consumed)"
             )
 
         if self.mode in (MtlsMode.MESH, MtlsMode.EDGE_AND_MESH):
             if self.mesh_provider not in ("istio", "linkerd"):
                 raise TlsError(
-                    f"mTLS mode {self.mode.value} requires " "mesh_provider to be 'istio' or 'linkerd'"
+                    f"mTLS mode {self.mode.value} requires mesh_provider to be 'istio' or 'linkerd'"
                 )
 
 
@@ -342,7 +342,7 @@ class ZoneCertPlan:
                 f"(zone {self.zone!r} has {len(self.org_slugs)} orgs)"
             )
         if self.layout == ZoneLayout.ORG_PREFIXED and not self.org_slugs:
-            raise TlsError(f"org-prefixed zone {self.zone!r} requires at least " "one org slug")
+            raise TlsError(f"org-prefixed zone {self.zone!r} requires at least one org slug")
 
 
 def expand_cert_plan(*, plan: ZoneCertPlan) -> tuple[WildcardCertScope, ...]:

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 from astrolift_drivers.storage_tiers import (
     Durability,
@@ -69,7 +69,7 @@ def parse_security_context(raw: Mapping) -> SecurityContext:
         if run_as_user < 0:
             raise StorageError("run_as_user must be non-negative")
         if run_as_non_root and run_as_user == 0:
-            raise StorageError("run_as_non_root=True conflicts with run_as_user=0 " "(uid 0 is root)")
+            raise StorageError("run_as_non_root=True conflicts with run_as_user=0 (uid 0 is root)")
 
     return SecurityContext(
         read_only_root_fs=bool(raw.get("read_only_root_fs", True)),
@@ -104,7 +104,7 @@ def render_security_context(sec: SecurityContext) -> dict:
 # ---- volume declarations -------------------------------------------
 
 
-class VolumeKind(str, Enum):
+class VolumeKind(StrEnum):
     """Locked vocabulary so the renderer can switch reliably."""
 
     PVC = "pvc"
@@ -141,7 +141,7 @@ class VolumeDecl:
         if not self.name:
             raise StorageError("volume name is required")
         if not self.mount_path or not self.mount_path.startswith("/"):
-            raise StorageError(f"volume mount_path {self.mount_path!r} must be an " "absolute path")
+            raise StorageError(f"volume mount_path {self.mount_path!r} must be an absolute path")
 
         if self.kind == VolumeKind.PVC:
             if not self.size:
@@ -170,9 +170,7 @@ def parse_volume(raw: Mapping) -> VolumeDecl:
     try:
         kind = VolumeKind(kind_raw)
     except ValueError as exc:
-        raise StorageError(
-            f"volume kind {kind_raw!r} not one of " f"{[k.value for k in VolumeKind]}"
-        ) from exc
+        raise StorageError(f"volume kind {kind_raw!r} not one of {[k.value for k in VolumeKind]}") from exc
 
     return VolumeDecl(
         name=str(raw.get("name", "")),

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class ScheduleRegistryError(ValueError):
@@ -37,7 +37,7 @@ MAX_INTERVAL_SECONDS = 24 * 60 * 60
 # ---- schedule definition -------------------------------------------
 
 
-class ScheduleKind(str, Enum):
+class ScheduleKind(StrEnum):
     """Spec 06 §5: locked vocabulary of recurring workflows."""
 
     PREVIEW_GC = "preview_gc"

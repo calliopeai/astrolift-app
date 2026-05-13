@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
-class ClaimableState(str, Enum):
+class ClaimableState(StrEnum):
     """Why an app appears in the discovery list."""
 
     UNOWNED = "unowned"

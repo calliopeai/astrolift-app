@@ -413,7 +413,7 @@ def test_verify_handshake_pair_remote_can_decline():
 
 def test_jwks_url_format():
     url = jwks_url_for(install_id="acme.platform.example")
-    assert url == ("https://acme.platform.example" "/.well-known/astrolift-federation/jwks")
+    assert url == ("https://acme.platform.example/.well-known/astrolift-federation/jwks")
 
 
 # ---- federated claims ----------------------------------------------

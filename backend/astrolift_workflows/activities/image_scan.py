@@ -29,17 +29,17 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
-class ScanDecision(str, Enum):
+class ScanDecision(StrEnum):
     PASS = "pass"
     WARN = "warn"
     BLOCK = "block"
@@ -100,7 +100,7 @@ class ScanPolicy:
         order = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]
         if order.index(self.warn_at) < order.index(self.block_at):
             raise ValueError(
-                "warn_at cannot be stricter than block_at " "(warn_at must be the same or weaker severity)"
+                "warn_at cannot be stricter than block_at (warn_at must be the same or weaker severity)"
             )
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -180,7 +180,7 @@ class ScanOverride:
 
     def __post_init__(self) -> None:
         if not self.reason or len(self.reason.strip()) < 10:
-            raise ValueError("override reason must be at least 10 characters " "(operator must explain why)")
+            raise ValueError("override reason must be at least 10 characters (operator must explain why)")
         if self.by_user_id <= 0:
             raise ValueError("by_user_id must be positive")
 
@@ -199,7 +199,7 @@ def apply_override(decision: PolicyDecision, override: ScanOverride | None) -> P
         decision=ScanDecision.WARN,
         blocking_findings=decision.blocking_findings,
         warning_findings=decision.warning_findings,
-        reason=(f"BLOCK overridden by user {override.by_user_id}: " f"{override.reason}"),
+        reason=(f"BLOCK overridden by user {override.by_user_id}: {override.reason}"),
     )
 
 
@@ -221,7 +221,7 @@ def register_scanner(name: str, scanner: ScannerCallable) -> None:
 
 def get_scanner(name: str) -> ScannerCallable:
     if name not in _SCANNERS:
-        raise KeyError(f"no scanner registered for {name!r}; " f"available: {sorted(_SCANNERS)}")
+        raise KeyError(f"no scanner registered for {name!r}; available: {sorted(_SCANNERS)}")
     return _SCANNERS[name]
 
 

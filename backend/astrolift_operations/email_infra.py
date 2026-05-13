@@ -31,10 +31,10 @@ import dataclasses
 import re
 from collections.abc import Callable
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class EmailKind(str, Enum):
+class EmailKind(StrEnum):
     """Locked vocabulary so the renderer's template registry can
     rely on it."""
 
@@ -44,7 +44,7 @@ class EmailKind(str, Enum):
     SCHEDULED_JOB_FAILURE = "scheduled_job_failure"
 
 
-class TransportKind(str, Enum):
+class TransportKind(StrEnum):
     AWS_SES = "aws_ses"
     SENDGRID = "sendgrid"
     POSTMARK = "postmark"
@@ -111,7 +111,7 @@ class Email:
 # ---- suppression list ----------------------------------------------
 
 
-class SuppressionReason(str, Enum):
+class SuppressionReason(StrEnum):
     HARD_BOUNCE = "hard_bounce"
     """Permanent failure (user doesn't exist, mailbox full,
     domain unreachable). Never retry."""
@@ -192,7 +192,7 @@ def set_transport(*, kind: TransportKind, fn: Transport) -> None:
         raise EmailError("cannot set NONE as a transport; leave unconfigured instead")
     if kind not in SUPPORTED_TRANSPORTS:
         raise EmailError(
-            f"unsupported transport {kind!r}; " f"supported: {[k.value for k in SUPPORTED_TRANSPORTS]}"
+            f"unsupported transport {kind!r}; supported: {[k.value for k in SUPPORTED_TRANSPORTS]}"
         )
     global _TRANSPORT, _TRANSPORT_KIND
     _TRANSPORT = fn

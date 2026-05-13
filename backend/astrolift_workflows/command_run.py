@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import StrEnum
 
 # Spec 06 §4.20 timeout bounds.
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 5 * 60
 MAX_COMMAND_TIMEOUT_SECONDS = 60 * 60
 
 
-class CommandRunStatus(str, Enum):
+class CommandRunStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     SUCCEEDED = "succeeded"

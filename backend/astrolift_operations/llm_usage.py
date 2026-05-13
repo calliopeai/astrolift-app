@@ -31,10 +31,10 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Callable, Iterable, Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class LLMProvider(str, Enum):
+class LLMProvider(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GEMINI = "gemini"
@@ -234,11 +234,11 @@ class TokenUsage:
 
     def __post_init__(self) -> None:
         if self.org_id <= 0 or self.app_id < 0:
-            raise ValueError("org_id must be positive; app_id must be non-negative " "(0 = org-level agent)")
+            raise ValueError("org_id must be positive; app_id must be non-negative (0 = org-level agent)")
         if self.input_tokens < 0 or self.output_tokens < 0:
             raise ValueError("token counts must be non-negative")
         if not re.match(r"^\d{4}-\d{2}$", self.period_yyyy_mm):
-            raise ValueError(f"period_yyyy_mm must be 'YYYY-MM', got " f"{self.period_yyyy_mm!r}")
+            raise ValueError(f"period_yyyy_mm must be 'YYYY-MM', got {self.period_yyyy_mm!r}")
         if self.agent_run_id and not self.agent_id:
             raise ValueError("agent_run_id requires agent_id (a run belongs to an agent)")
 

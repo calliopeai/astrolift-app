@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class SyncDomainError(ValueError):
@@ -35,7 +35,7 @@ class SyncDomainError(ValueError):
 # ---- step ordering -------------------------------------------------
 
 
-class SyncStep(str, Enum):
+class SyncStep(StrEnum):
     """Spec 06 §4.17."""
 
     UPDATE_DNS = "update_dns"
@@ -71,7 +71,7 @@ SYNC_ORDER = (
 # ---- diff classification -------------------------------------------
 
 
-class HostnameAction(str, Enum):
+class HostnameAction(StrEnum):
     """What to do with a hostname during sync."""
 
     ADD = "add"

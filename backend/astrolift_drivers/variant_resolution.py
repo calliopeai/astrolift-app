@@ -46,7 +46,7 @@ class UnresolvedVariant(ValueError):
         self.cluster_slug = cluster_slug
         self.plugin_slug = plugin_slug
         suffix = f" (plugin {plugin_slug!r} exposes no variant)" if plugin_slug else ""
-        super().__init__(f"kind {kind!r} cannot be satisfied on cluster " f"{cluster_slug!r}{suffix}")
+        super().__init__(f"kind {kind!r} cannot be satisfied on cluster {cluster_slug!r}{suffix}")
 
 
 # Sentinel labels recorded alongside the resolved variant for the

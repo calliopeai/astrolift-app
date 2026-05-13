@@ -20,7 +20,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 # Spec 07 §3.1 path layout. The cluster name is the prefix the
 # GitOps tool watches; nesting under ``apps/`` keeps shared
@@ -57,7 +57,7 @@ def repo_path_for(
             raise GitopsEmitterError(f"{label} is required")
         if not _SLUG_RE.match(slug):
             raise GitopsEmitterError(
-                f"{label} {slug!r} is not a valid slug " "(lowercase alphanumeric + dashes; alpha-start)"
+                f"{label} {slug!r} is not a valid slug (lowercase alphanumeric + dashes; alpha-start)"
             )
     return _REPO_PATH_FMT.format(
         cluster=cluster_slug,
@@ -70,7 +70,7 @@ def repo_path_for(
 # ---- commit message ------------------------------------------------
 
 
-class CommitVerb(str, Enum):
+class CommitVerb(StrEnum):
     """Closed vocabulary so log readers can grep effectively."""
 
     DEPLOY = "deploy"

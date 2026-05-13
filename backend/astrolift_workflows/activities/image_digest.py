@@ -109,11 +109,10 @@ def pin_to_digest(*, ref: str, digest: str) -> PinnedRef:
     left, existing_digest = _split_at_digest(ref)
     if existing_digest is not None:
         if not is_digest(existing_digest):
-            raise ImageRefError(f"image ref {ref!r} carries non-sha256 digest " f"{existing_digest!r}")
+            raise ImageRefError(f"image ref {ref!r} carries non-sha256 digest {existing_digest!r}")
         if existing_digest != digest:
             raise ImageRefError(
-                f"image ref {ref!r} is already pinned to "
-                f"{existing_digest!r}; refusing to repin to {digest!r}"
+                f"image ref {ref!r} is already pinned to {existing_digest!r}; refusing to repin to {digest!r}"
             )
         return PinnedRef(repo=left, digest=digest)
 

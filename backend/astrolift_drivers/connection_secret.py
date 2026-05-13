@@ -33,10 +33,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class AuthMode(str, Enum):
+class AuthMode(StrEnum):
     PASSWORD = "password"
     IAM = "iam"
     MTLS = "mtls"
@@ -76,7 +76,7 @@ def secret_storage_path(
     ):
         if not _segment_ok(seg):
             raise SecretPathError(f"{label} {seg!r} contains invalid characters or is empty")
-    return f"astrolift/{env_slug}/{org_slug}/{app_slug}/" f"managed-services/{service_name}"
+    return f"astrolift/{env_slug}/{org_slug}/{app_slug}/managed-services/{service_name}"
 
 
 # ---- auth-mode dispatch ---------------------------------------------

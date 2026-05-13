@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class UtilityWorkflowError(ValueError):
@@ -53,12 +53,12 @@ def webhook_retry_delay(*, attempt: int) -> int:
     if attempt < 1:
         raise UtilityWorkflowError("attempt must be >= 1")
     if attempt > WEBHOOK_MAX_RETRIES:
-        raise UtilityWorkflowError(f"attempt {attempt} exceeds max retries " f"{WEBHOOK_MAX_RETRIES}")
+        raise UtilityWorkflowError(f"attempt {attempt} exceeds max retries {WEBHOOK_MAX_RETRIES}")
     delay = _WEBHOOK_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
     return min(delay, WEBHOOK_MAX_DELAY_SECONDS)
 
 
-class WebhookOutcome(str, Enum):
+class WebhookOutcome(StrEnum):
     """Spec §4.15: classify the response."""
 
     SUCCESS = "success"
@@ -107,7 +107,7 @@ def should_mark_subscription_failed(
 # ---- NotifyDeploymentWorkflow --------------------------------------
 
 
-class NotifyChannel(str, Enum):
+class NotifyChannel(StrEnum):
     """Spec §4.14: configured notification channels."""
 
     EMAIL = "email"
@@ -185,7 +185,7 @@ def plan_token_rotation(
         raise UtilityWorkflowError(f"grace_seconds must be > 0, got {grace_seconds}")
     if grace_seconds > MAX_DEPLOY_TOKEN_GRACE_SECONDS:
         raise UtilityWorkflowError(
-            f"grace_seconds {grace_seconds} exceeds max " f"{MAX_DEPLOY_TOKEN_GRACE_SECONDS} (1 week)"
+            f"grace_seconds {grace_seconds} exceeds max {MAX_DEPLOY_TOKEN_GRACE_SECONDS} (1 week)"
         )
     return TokenRotationPlan(
         old_token_id=old_token_id,
@@ -204,7 +204,7 @@ DEFAULT_INVITATION_TTL_SECONDS = 7 * 24 * 60 * 60
 MAX_INVITATION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
-class InvitationState(str, Enum):
+class InvitationState(StrEnum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     EXPIRED = "expired"
@@ -269,7 +269,7 @@ def validate_invitation_ttl(*, ttl_seconds: int) -> None:
         raise UtilityWorkflowError(f"invitation ttl must be positive, got {ttl_seconds}s")
     if ttl_seconds > MAX_INVITATION_TTL_SECONDS:
         raise UtilityWorkflowError(
-            f"invitation ttl {ttl_seconds}s exceeds max " f"{MAX_INVITATION_TTL_SECONDS}s (30 days)"
+            f"invitation ttl {ttl_seconds}s exceeds max {MAX_INVITATION_TTL_SECONDS}s (30 days)"
         )
     if ttl_seconds < 60:
         # Less than a minute is meaningless — by the time the

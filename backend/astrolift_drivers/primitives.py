@@ -21,12 +21,12 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 # ---- storage class --------------------------------------------------
 
 
-class PerformanceTier(str, Enum):
+class PerformanceTier(StrEnum):
     STANDARD = "standard"
     BALANCED = "balanced"
     HIGH_IOPS = "high_iops"
@@ -46,7 +46,7 @@ def parse_tier(value: str | None) -> PerformanceTier:
         return PerformanceTier(value)
     except ValueError as exc:
         raise StorageResolutionError(
-            f"performance_tier {value!r} not one of " f"{[t.value for t in PerformanceTier]}"
+            f"performance_tier {value!r} not one of {[t.value for t in PerformanceTier]}"
         ) from exc
 
 
@@ -78,7 +78,7 @@ def resolve_storage_class(
 # ---- workload identity ----------------------------------------------
 
 
-class WorkloadIdentityKind(str, Enum):
+class WorkloadIdentityKind(StrEnum):
     """One of these per cluster. The manifest never references this —
     the resolver picks based on cluster type."""
 

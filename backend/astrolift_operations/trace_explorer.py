@@ -20,7 +20,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 from astrolift_operations.metrics_logs_api import LogFilter, Severity
 
@@ -39,7 +39,7 @@ class TraceFilterError(ValueError):
 # ---- search filter --------------------------------------------------
 
 
-class SpanStatus(str, Enum):
+class SpanStatus(StrEnum):
     OK = "ok"
     ERROR = "error"
     UNSET = "unset"

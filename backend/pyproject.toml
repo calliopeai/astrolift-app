@@ -10,6 +10,10 @@ extend-exclude = [
   "**/migrations/**",
   "static",
   "templates",
+  # Vendored sibling-repo code: kept byte-identical to upstream so
+  # `vendor/<x>/...` doesn't drift on reformat.
+  "vendor",
+  "vendor/**",
   # legacy scaffold (boilerworks-django-nextjs) — untouched here
   "auth1",
   "config/config_merger.py",

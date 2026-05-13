@@ -23,7 +23,7 @@ import dataclasses
 import hashlib
 import re
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
 class CiDeployError(ValueError):
@@ -33,7 +33,7 @@ class CiDeployError(ValueError):
 # ---- trigger kinds -------------------------------------------------
 
 
-class TriggerKind(str, Enum):
+class TriggerKind(StrEnum):
     """Locked vocabulary. Anything else gets refused so the
     audit log doesn't pile up free-text trigger sources."""
 
@@ -103,7 +103,7 @@ def validate_image_tags(
             raise CiDeployError("workload slug in image_tags is empty")
         if slug not in declared:
             raise CiDeployError(
-                f"workload {slug!r} not declared in app manifest " f"(declared workloads: {sorted(declared)})"
+                f"workload {slug!r} not declared in app manifest (declared workloads: {sorted(declared)})"
             )
         out[slug] = validate_image_tag(value=tag)
 
@@ -134,7 +134,7 @@ def validate_commit_sha(*, value: str) -> str:
         raise CiDeployError(f"commit_sha {value!r} not a valid hex digest")
     if len(value) < 40:
         raise CiDeployError(
-            f"commit_sha {value!r} too short (min 40 hex chars); " "CI should provide the full SHA"
+            f"commit_sha {value!r} too short (min 40 hex chars); CI should provide the full SHA"
         )
     if len(value) > 64:
         raise CiDeployError(f"commit_sha {value!r} too long (max 64 hex chars)")
@@ -152,7 +152,7 @@ def validate_environment(
         raise CiDeployError("environment is required")
     if name not in registered_envs:
         raise CiDeployError(
-            f"environment {name!r} not registered for this app " f"(known: {sorted(registered_envs)})"
+            f"environment {name!r} not registered for this app (known: {sorted(registered_envs)})"
         )
     return name
 
@@ -162,7 +162,7 @@ def validate_trigger_kind(*, value: str) -> TriggerKind:
         return TriggerKind(value)
     except ValueError as exc:
         raise CiDeployError(
-            f"trigger_kind {value!r} not in vocabulary " f"{[k.value for k in TriggerKind]}"
+            f"trigger_kind {value!r} not in vocabulary {[k.value for k in TriggerKind]}"
         ) from exc
 
 

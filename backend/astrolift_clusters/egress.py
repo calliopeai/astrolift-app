@@ -23,7 +23,7 @@ from __future__ import annotations
 import dataclasses
 import ipaddress
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 # RFC 1918 + link-local + carrier-grade NAT. Tenant pods don't need
 # to reach these by default; egress proxies and DBs run on private
@@ -38,7 +38,7 @@ DEFAULT_INTERNAL_CIDRS: tuple[str, ...] = (
 )
 
 
-class SourceIPMode(str, Enum):
+class SourceIPMode(StrEnum):
     DEFAULT = "default"  # whatever the cluster's normal egress is
     NAT_PINNED = "nat_pinned"  # provider NAT gateway with stable IP set
     PROXY = "proxy"  # route via cilium egress gateway / similar

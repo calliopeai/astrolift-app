@@ -125,6 +125,4 @@ class Command(BaseCommand):
                 f"{'(created)' if created else '(updated)'}"
             )
         )
-        self.stdout.write(
-            f"  password: {password}\n" f"  org guid: {org_row.guid}\n" f"  user pk:  {user.pk}\n"
-        )
+        self.stdout.write(f"  password: {password}\n  org guid: {org_row.guid}\n  user pk:  {user.pk}\n")

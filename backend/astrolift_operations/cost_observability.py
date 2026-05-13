@@ -22,10 +22,10 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Mapping, Sequence
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 
-class CostCategory(str, Enum):
+class CostCategory(StrEnum):
     """Lock-down vocabulary so UI panels can rely on the strings."""
 
     COMPUTE = "compute"
@@ -80,7 +80,7 @@ class CostSnapshot:
 # ---- budget --------------------------------------------------------
 
 
-class BudgetSeverity(str, Enum):
+class BudgetSeverity(StrEnum):
     OK = "ok"
     SOFT_WARNING = "soft_warning"
     HARD_BREACH = "hard_breach"
@@ -136,10 +136,10 @@ def evaluate_budget(
 
     if pct >= policy.hard_threshold_pct:
         severity = BudgetSeverity.HARD_BREACH
-        reason = f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} " f"({pct:.1%}) — hard breach"
+        reason = f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} ({pct:.1%}) — hard breach"
     elif pct >= policy.soft_threshold_pct:
         severity = BudgetSeverity.SOFT_WARNING
-        reason = f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} " f"({pct:.1%}) — soft warning"
+        reason = f"spent ${spent_usd:.2f} of ${policy.period_budget_usd:.2f} ({pct:.1%}) — soft warning"
     else:
         severity = BudgetSeverity.OK
         reason = "within budget"

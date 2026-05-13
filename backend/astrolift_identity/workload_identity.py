@@ -26,7 +26,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class WorkloadIdentityError(ValueError):
@@ -36,7 +36,7 @@ class WorkloadIdentityError(ValueError):
 # ---- managed-service → policy derivation ---------------------------
 
 
-class PolicyResourceKind(str, Enum):
+class PolicyResourceKind(StrEnum):
     """Spec 12 §5.1: high-level resource categories. Each cloud
     driver maps these to provider-specific ARNs/URIs/scopes."""
 
@@ -198,7 +198,7 @@ def serviceaccount_name_for_app(*, app_slug: str) -> str:
 # ---- IAM annotation rendering --------------------------------------
 
 
-class CloudKind(str, Enum):
+class CloudKind(StrEnum):
     AWS = "aws"
     GCP = "gcp"
     AZURE = "azure"
@@ -309,7 +309,7 @@ def validate_delegation_chain(
     """
     if not chain:
         raise WorkloadIdentityError(
-            "delegation chain cannot be empty (omit the chain " "rather than passing [])"
+            "delegation chain cannot be empty (omit the chain rather than passing [])"
         )
     if len(chain) > 3:
         raise WorkloadIdentityError(

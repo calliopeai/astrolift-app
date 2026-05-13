@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class ManagedServiceStateError(ValueError):
@@ -34,7 +34,7 @@ class ManagedServiceStateError(ValueError):
 # ---- lifecycle state machine ---------------------------------------
 
 
-class ManagedServiceState(str, Enum):
+class ManagedServiceState(StrEnum):
     """Spec 06 §4.7-§4.9: lifecycle states a managed service
     instance moves through."""
 
@@ -118,7 +118,7 @@ def assert_transition(
 # ---- step ordering -------------------------------------------------
 
 
-class ProvisionStep(str, Enum):
+class ProvisionStep(StrEnum):
     """Spec §4.7 ordered steps."""
 
     MARK_PROVISIONING = "mark_provisioning"
@@ -139,7 +139,7 @@ PROVISION_ORDER = (
 )
 
 
-class UpdateStep(str, Enum):
+class UpdateStep(StrEnum):
     """Spec §4.8."""
 
     MARK_UPDATING = "mark_updating"
@@ -172,7 +172,7 @@ UPDATE_ORDER = (
 )
 
 
-class DeprovisionStep(str, Enum):
+class DeprovisionStep(StrEnum):
     """Spec §4.9."""
 
     MARK_DEPROVISIONING = "mark_deprovisioning"
@@ -220,13 +220,13 @@ BIND_ORDER = (
         order=1,
         name="write_secrets_backend",
         description=(
-            "Write connection metadata (host, port, username, " "password, ssl mode) to the SecretsBackend"
+            "Write connection metadata (host, port, username, password, ssl mode) to the SecretsBackend"
         ),
     ),
     BindStep(
         order=2,
         name="create_binding_row",
-        description=("Create ManagedServiceBinding row referencing the " "secrets-backend secret name"),
+        description=("Create ManagedServiceBinding row referencing the secrets-backend secret name"),
     ),
     BindStep(
         order=3,

@@ -28,10 +28,10 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class AuthScheme(str, Enum):
+class AuthScheme(StrEnum):
     SESSION_COOKIE = "session_cookie"
     API_TOKEN = "api_token"
     DEPLOY_TOKEN = "deploy_token"

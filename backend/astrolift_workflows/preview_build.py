@@ -20,7 +20,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
 class PreviewBuildError(ValueError):
@@ -30,7 +30,7 @@ class PreviewBuildError(ValueError):
 # ---- step ordering -------------------------------------------------
 
 
-class BuildStep(str, Enum):
+class BuildStep(StrEnum):
     """Build flow per spec §5. Locked sequence."""
 
     UPSERT_PREVIEW = "upsert_preview"
@@ -108,7 +108,7 @@ def namespace_for_preview(
     """
     if not org_slug or not app_slug or pr_number <= 0:
         raise PreviewBuildError(
-            "namespace_for_preview requires non-empty org_slug, " "app_slug, and positive pr_number"
+            "namespace_for_preview requires non-empty org_slug, app_slug, and positive pr_number"
         )
     raw = f"{org_slug}-{app_slug}-pr-{pr_number}"
     if len(raw) > 63:
@@ -119,7 +119,7 @@ def namespace_for_preview(
         budget = 63 - len(org_slug) - 1 - len(suffix)
         if budget <= 0:
             raise PreviewBuildError(
-                f"org_slug {org_slug!r} too long; can't fit a preview " "namespace within 63 chars"
+                f"org_slug {org_slug!r} too long; can't fit a preview namespace within 63 chars"
             )
         truncated_app = app_slug[:budget].rstrip("-")
         raw = f"{org_slug}-{truncated_app}{suffix}"
@@ -288,11 +288,7 @@ def pr_comment_for_failure(
     logs_url: str,
 ) -> str:
     """Spec §5: 'PR comment includes log link on failure.'"""
-    body = (
-        f"**Preview build failed**\n\n"
-        f"The preview environment for PR #{pr_number} couldn't "
-        f"be deployed."
-    )
+    body = f"**Preview build failed**\n\nThe preview environment for PR #{pr_number} couldn't be deployed."
     if logs_url:
         body += f"\n\n[View build logs]({logs_url})"
     return body

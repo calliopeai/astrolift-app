@@ -24,7 +24,7 @@ from __future__ import annotations
 import collections
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class PortabilitySurfaceError(ValueError):
@@ -34,7 +34,7 @@ class PortabilitySurfaceError(ValueError):
 # ---- portability badge ---------------------------------------------
 
 
-class BadgeKind(str, Enum):
+class BadgeKind(StrEnum):
     """Spec §11: three states for the UI badge."""
 
     PORTABLE = "portable"
@@ -124,7 +124,7 @@ def compute_badge(
 # ---- resolution table ----------------------------------------------
 
 
-class ResolutionSource(str, Enum):
+class ResolutionSource(StrEnum):
     """Where the resolved variant came from. Order matters —
     manifest pin > org default > cluster default > plugin default."""
 
@@ -215,7 +215,7 @@ def build_resolution_table(
             continue
 
         raise PortabilitySurfaceError(
-            f"block {b.kind}:{b.name!r} can't be resolved — no pin " "and no default at any tier"
+            f"block {b.kind}:{b.name!r} can't be resolved — no pin and no default at any tier"
         )
     return tuple(rows)
 
@@ -266,8 +266,7 @@ def make_portable_suggestions(
                     name=b.name,
                     current_pin=b.pin,
                     suggested_change=(
-                        f"no portable variant exists for {b.kind!r}; "
-                        "this kind is unavoidably plugin-specific"
+                        f"no portable variant exists for {b.kind!r}; this kind is unavoidably plugin-specific"
                     ),
                     caveat="cannot swap without re-architecting",
                 )

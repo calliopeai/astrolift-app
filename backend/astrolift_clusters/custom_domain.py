@@ -36,10 +36,10 @@ from __future__ import annotations
 import dataclasses
 import re
 import secrets
-from enum import Enum
+from enum import StrEnum
 
 
-class DomainState(str, Enum):
+class DomainState(StrEnum):
     PENDING_VALIDATION = "pending_validation"
     VALIDATING = "validating"
     ACTIVE = "active"
@@ -192,7 +192,7 @@ def can_transition(*, from_state: DomainState, to_state: DomainState) -> bool:
 
 def assert_transition(*, from_state: DomainState, to_state: DomainState) -> None:
     if not can_transition(from_state=from_state, to_state=to_state):
-        raise DomainError(f"invalid domain state transition: " f"{from_state.value} -> {to_state.value}")
+        raise DomainError(f"invalid domain state transition: {from_state.value} -> {to_state.value}")
 
 
 # ---- DNS instruction copy ------------------------------------------
@@ -216,4 +216,4 @@ def dns_instruction(*, hostname: str, ingress_target: str) -> str:
             "If your provider doesn't support ALIAS/ANAME (e.g. "
             "raw bind), use a CDN like Cloudflare in front."
         )
-    return f"At your DNS provider, add a CNAME record for {hostname} " f"pointing to {ingress_target}."
+    return f"At your DNS provider, add a CNAME record for {hostname} pointing to {ingress_target}."

@@ -35,38 +35,36 @@ EXEMPT: dict[str, str] = {
     "IdentityQuery.me": "self-service: returns the caller's profile",
     "IdentityQuery.astrolift_my_profile": "self-service: editable profile fields",
     "IdentityQuery.my_memberships": (
-        "self-service: enumerates orgs the caller belongs to — needed "
-        "before any tenant context can be picked"
+        "self-service: enumerates orgs the caller belongs to — needed before any tenant context can be picked"
     ),
     "IdentityQuery.astrolift_my_permissions": (
         "self-service: returns the caller's effective permissions — "
         "ordering matters because permissions drive nav rendering"
     ),
     "IdentityQuery.astrolift_active_identity_provider": (
-        "renders before any tenant is picked — the IdP catalogue is " "the entry point to the login flow"
+        "renders before any tenant is picked — the IdP catalogue is the entry point to the login flow"
     ),
     "IdentityQuery.astrolift_active_sessions": (
-        "self-service: caller's own django_session rows, filtered by viewer "
-        "pk; orthogonal to tenant context"
+        "self-service: caller's own django_session rows, filtered by viewer pk; orthogonal to tenant context"
     ),
     "IdentityMutation.update_my_profile": (
-        "self-service: callers can edit their own profile fields when " "the IdP doesn't lock them"
+        "self-service: callers can edit their own profile fields when the IdP doesn't lock them"
     ),
     "IdentityMutation.logout_all_sessions": (
         "self-service: revokes the caller's own sessions; tenant context "
         "is irrelevant — a session is bound to a user, not an org"
     ),
     "IdentityMutation.set_active_organization": (
-        "the act of selecting a tenant context cannot itself be " "tenant-scoped"
+        "the act of selecting a tenant context cannot itself be tenant-scoped"
     ),
     "IdentityMutation.create_organization": (
-        "creates the tenant — by definition there is no tenant " "context yet at the time of this call"
+        "creates the tenant — by definition there is no tenant context yet at the time of this call"
     ),
     "IdentityMutation.update_organization": (
-        "operates on the org row directly; permission check restricts " "to org admins of that specific org"
+        "operates on the org row directly; permission check restricts to org admins of that specific org"
     ),
     "IdentityMutation.soft_delete_organization": (
-        "operates on the org row directly; permission check restricts " "to org admins of that specific org"
+        "operates on the org row directly; permission check restricts to org admins of that specific org"
     ),
     "IdentityMutation.accept_invitation": (
         "the invitation token is the auth proof; by definition the "

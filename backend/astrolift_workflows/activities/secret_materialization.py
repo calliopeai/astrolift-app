@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 # Spec 12 §6.2 naming.
 APP_ENV_SECRET_NAME = "astrolift-app-env"
@@ -41,7 +41,7 @@ def service_secret_name(service_name: str) -> str:
     return f"astrolift-svc-{service_name}"
 
 
-class SecretBackend(str, Enum):
+class SecretBackend(StrEnum):
     """Which mechanism populates the in-pod Secret."""
 
     INLINE = "inline"

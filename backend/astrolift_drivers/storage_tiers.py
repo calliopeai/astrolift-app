@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from enum import Enum
+from enum import StrEnum
 
 
-class PerformanceTier(str, Enum):
+class PerformanceTier(StrEnum):
     """Spec 22 §2 vocabulary. Locked: changing names would break
     every manifest."""
 
@@ -27,7 +27,7 @@ class PerformanceTier(str, Enum):
     EXTREME = "extreme"
 
 
-class Durability(str, Enum):
+class Durability(StrEnum):
     """Spec 22 §3 — the three durability levels."""
 
     LOCAL = "local"  # node-bound; lost on node replacement
@@ -75,7 +75,7 @@ def parse_size(size: str) -> int:
         raise StorageError("size is required")
     m = _SIZE_RE.match(size.strip())
     if m is None:
-        raise StorageError(f"size {size!r} not in valid form " "(<number>[Mi|Gi|Ti|Pi]; bare number = bytes)")
+        raise StorageError(f"size {size!r} not in valid form (<number>[Mi|Gi|Ti|Pi]; bare number = bytes)")
     value = float(m.group(1))
     unit = m.group(2) or ""
     multipliers = {
@@ -114,7 +114,7 @@ class VolumeSpec:
             raise StorageError("at least one access_mode required")
         for mode in self.access_modes:
             if mode not in _ACCESS_MODES:
-                raise StorageError(f"access_mode {mode!r} not one of " f"{sorted(_ACCESS_MODES)}")
+                raise StorageError(f"access_mode {mode!r} not one of {sorted(_ACCESS_MODES)}")
 
 
 def parse_tier(value: str | None) -> PerformanceTier:
@@ -125,7 +125,7 @@ def parse_tier(value: str | None) -> PerformanceTier:
         return PerformanceTier(value)
     except ValueError as exc:
         raise StorageError(
-            f"performance_tier {value!r} not one of " f"{[t.value for t in PerformanceTier]}"
+            f"performance_tier {value!r} not one of {[t.value for t in PerformanceTier]}"
         ) from exc
 
 
@@ -135,7 +135,7 @@ def parse_durability(value: str | None) -> Durability:
     try:
         return Durability(value)
     except ValueError as exc:
-        raise StorageError(f"durability {value!r} not one of " f"{[d.value for d in Durability]}") from exc
+        raise StorageError(f"durability {value!r} not one of {[d.value for d in Durability]}") from exc
 
 
 # ---- cross-tier compatibility --------------------------------------

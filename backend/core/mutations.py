@@ -26,7 +26,7 @@ import functools
 import logging
 import time
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import get_current_tenant
@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class ErrorCode(str, enum.Enum):
+class ErrorCode(enum.StrEnum):
     PERMISSION_DENIED = "PERMISSION_DENIED"
     VALIDATION = "VALIDATION"
     NOT_FOUND = "NOT_FOUND"
@@ -56,7 +56,7 @@ class MutationError:
 
 
 @dataclasses.dataclass(slots=True)
-class MutationResult(Generic[T]):
+class MutationResult[T]:
     ok: bool
     errors: list[MutationError] = dataclasses.field(default_factory=list)
     data: T | None = None

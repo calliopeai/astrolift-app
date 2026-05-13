@@ -20,7 +20,7 @@ import dataclasses
 import hashlib
 import secrets
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class ScimTokenError(ValueError):
@@ -41,7 +41,7 @@ DEFAULT_RATE_LIMIT_PER_MINUTE = 60
 # ---- scopes --------------------------------------------------------
 
 
-class ScimScope(str, Enum):
+class ScimScope(StrEnum):
     """Spec §3.3 vocabulary."""
 
     USERS = "scim.users"
@@ -65,7 +65,7 @@ def required_scope_for_path(*, path: str) -> ScimScope:
         return ScimScope.USERS
     if path.startswith(_SCIM_2_0_GROUP_PATHS):
         return ScimScope.GROUPS
-    raise ScimTokenError(f"path {path!r} doesn't map to a SCIM 2.0 resource — " "expected /Users or /Groups")
+    raise ScimTokenError(f"path {path!r} doesn't map to a SCIM 2.0 resource — expected /Users or /Groups")
 
 
 def has_scope(
@@ -125,7 +125,7 @@ class StoredScimToken:
     expires_at_unix: int | None
 
 
-class VerifyResult(str, Enum):
+class VerifyResult(StrEnum):
     OK = "ok"
     NOT_FOUND = "not_found"
     """Hash didn't match any token row."""
@@ -221,7 +221,7 @@ def validate_scopes_input(*, scopes: Sequence[str]) -> tuple[ScimScope, ...]:
     Empty list rejected — a no-scope token can't access anything,
     almost certainly a bug."""
     if not scopes:
-        raise ScimTokenError("scopes is required; at least one of " f"{[s.value for s in ScimScope]}")
+        raise ScimTokenError(f"scopes is required; at least one of {[s.value for s in ScimScope]}")
     out: list[ScimScope] = []
     seen: set[ScimScope] = set()
     for raw in scopes:
@@ -229,7 +229,7 @@ def validate_scopes_input(*, scopes: Sequence[str]) -> tuple[ScimScope, ...]:
             scope = ScimScope(raw)
         except ValueError as exc:
             raise ScimTokenError(
-                f"unknown SCIM scope {raw!r}; known: " f"{[s.value for s in ScimScope]}"
+                f"unknown SCIM scope {raw!r}; known: {[s.value for s in ScimScope]}"
             ) from exc
         if scope not in seen:
             seen.add(scope)

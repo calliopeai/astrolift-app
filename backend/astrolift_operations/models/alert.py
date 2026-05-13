@@ -51,7 +51,7 @@ class AlertRule(BaseCoreModel):
         max_length=128,
         blank=True,
         default="",
-        help_text=("Slug or guid of the target object. Empty when " "target=global."),
+        help_text=("Slug or guid of the target object. Empty when target=global."),
     )
     predicate = models.JSONField(
         default=dict,

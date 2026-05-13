@@ -24,13 +24,13 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from enum import Enum
+from enum import StrEnum
 
 
 # Spec 08 §6 — the 'four golden signals' plus saturation. Lock the
 # names so PrometheusRule files + alert templates (#159) can refer
 # to them by stable string.
-class StandardMetric(str, Enum):
+class StandardMetric(StrEnum):
     REQUEST_RATE = "request_rate"
     LATENCY_P50 = "latency_p50"
     LATENCY_P95 = "latency_p95"
@@ -73,14 +73,14 @@ class FilterError(ValueError):
 def _check_label_name(name: str) -> None:
     if not _LABEL_RE.match(name):
         raise FilterError(
-            f"label name {name!r} is not a valid identifier " "(alpha/alphanumeric/underscore, alpha-start)"
+            f"label name {name!r} is not a valid identifier (alpha/alphanumeric/underscore, alpha-start)"
         )
 
 
 def _check_label_value(value: str) -> None:
     if not _LABEL_VALUE_RE.match(value):
         raise FilterError(
-            f"label value {value!r} contains characters that could break " "PromQL injection guards"
+            f"label value {value!r} contains characters that could break PromQL injection guards"
         )
 
 
@@ -126,7 +126,7 @@ class MetricsQuery:
 # ---- log filter -----------------------------------------------------
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     DEBUG = "debug"
     INFO = "info"
     WARN = "warn"
@@ -160,7 +160,7 @@ class LogFilter:
             if opt:
                 _check_label_value(opt)
         if self.search and any(c in self.search for c in "\n\r\"'"):
-            raise FilterError("search string contains forbidden characters " "(newline / quote)")
+            raise FilterError("search string contains forbidden characters (newline / quote)")
         if self.end_unix and self.start_unix > self.end_unix:
             raise FilterError("start_unix must be <= end_unix")
 

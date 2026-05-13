@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class PreviewGcError(ValueError):
@@ -38,7 +38,7 @@ GC_INTERVAL_SECONDS = 15 * 60
 """Spec §15: GC runs every 15 minutes."""
 
 
-class EvictionReason(str, Enum):
+class EvictionReason(StrEnum):
     """Why GC chose this preview for teardown."""
 
     TTL_EXPIRED = "ttl_expired"
@@ -279,7 +279,7 @@ def pr_comment_for_eviction(
     if decision.reason == EvictionReason.MAX_ACTIVE_EXCEEDED:
         prefix = "**Preview environment evicted**\n\n"
         if new_pr_number:
-            prefix += f"This preview was torn down to make room for " f"#{new_pr_number}. "
+            prefix += f"This preview was torn down to make room for #{new_pr_number}. "
         else:
             prefix += "This preview was torn down to free a slot. "
         prefix += "Push or redeploy to bring it back."

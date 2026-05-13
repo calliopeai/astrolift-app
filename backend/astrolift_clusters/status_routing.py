@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 
 
-class StatusState(str, Enum):
+class StatusState(StrEnum):
     """One of these states drives the status-page template."""
 
     APP_NOT_FOUND = "app_not_found"
@@ -178,7 +178,7 @@ def resolve(
 # ---- per-driver catch-all rule shape -------------------------------
 
 
-class IngressDriver(str, Enum):
+class IngressDriver(StrEnum):
     NGINX = "nginx"
     AWS_ALB = "aws-alb"
     GCE = "gce"
@@ -206,7 +206,7 @@ _RULE_HINTS: dict[IngressDriver, str] = {
         "platform-namespace Ingress."
     ),
     IngressDriver.AZURE_AGW: (
-        "Application Gateway: emit a default backend pool + listener " "with the lowest priority among rules."
+        "Application Gateway: emit a default backend pool + listener with the lowest priority among rules."
     ),
     IngressDriver.GATEWAY_API: (
         "Gateway API: HTTPRoute with no hostname matchers attached "

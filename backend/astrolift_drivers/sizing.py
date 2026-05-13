@@ -25,10 +25,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable, Mapping
-from enum import Enum
+from enum import StrEnum
 
 
-class Size(str, Enum):
+class Size(StrEnum):
     SMALL = "small"
     MEDIUM = "medium"
     LARGE = "large"

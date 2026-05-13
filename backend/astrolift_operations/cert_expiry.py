@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 # Spec 13 §5.3: 30 / 14 / 7 day reminders, 7-day escalation.
 EXPIRY_THRESHOLDS_DAYS: tuple[int, ...] = (30, 14, 7)
 ESCALATION_THRESHOLD_DAYS: int = 7
 
 
-class CertHealth(str, Enum):
+class CertHealth(StrEnum):
     """Bucket each certificate into one of these states for the
     cert-health dashboard. Not all states map 1:1 to threshold
     crossings — health is a snapshot, crossings are events."""

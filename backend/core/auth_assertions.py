@@ -71,9 +71,7 @@ class AssertionPolicy:
             if amr not in KNOWN_AMR:
                 raise ValueError(f"unknown AMR value {amr!r}")
             if self.required_amr_any and amr not in STRONG_AMR:
-                raise ValueError(
-                    f"AMR {amr!r} is not a strong MFA method " f"(allowed: {sorted(STRONG_AMR)})"
-                )
+                raise ValueError(f"AMR {amr!r} is not a strong MFA method (allowed: {sorted(STRONG_AMR)})")
         if self.max_session_age_seconds is not None and self.max_session_age_seconds <= 0:
             raise ValueError("max_session_age_seconds must be positive")
 

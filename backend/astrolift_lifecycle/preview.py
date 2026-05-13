@@ -62,7 +62,7 @@ def preview_hostname(
 
     if len(leftmost) > 63:
         raise PreviewHostnameError(
-            f"preview leftmost label {leftmost!r} exceeds 63 chars; " "shorten the app/workload name"
+            f"preview leftmost label {leftmost!r} exceeds 63 chars; shorten the app/workload name"
         )
     if not _LABEL_RE.match(leftmost):
         raise PreviewHostnameError(f"preview leftmost label {leftmost!r} is not a valid DNS label")

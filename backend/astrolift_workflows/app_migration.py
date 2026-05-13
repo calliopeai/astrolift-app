@@ -29,7 +29,7 @@ from __future__ import annotations
 import dataclasses
 import time
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import StrEnum
 
 
 class MigrationError(ValueError):
@@ -125,8 +125,7 @@ class ExportBundle:
             # Construction-time guard; verifier checks again
             # at unpack-time when version field comes from JWT.
             raise MigrationError(
-                f"unsupported bundle version {self.bundle_version} "
-                f"(this code understands v{BUNDLE_VERSION})"
+                f"unsupported bundle version {self.bundle_version} (this code understands v{BUNDLE_VERSION})"
             )
         if not self.source_org_slug or not self.source_app_slug:
             raise MigrationError("source_org_slug and source_app_slug both required")
@@ -186,12 +185,12 @@ def build_claims(
         )
     if destination_instance == source_instance:
         raise MigrationError(
-            "destination must differ from source — migration " "exists to move between installs"
+            "destination must differ from source — migration exists to move between installs"
         )
     if ttl_seconds <= 0 or ttl_seconds > JWT_TTL_SECONDS:
         # Refuse longer-lived bundles even if caller asks for one.
         # The 15-min ceiling is a security invariant.
-        raise MigrationError(f"ttl_seconds must be > 0 and <= {JWT_TTL_SECONDS} " f"(got {ttl_seconds})")
+        raise MigrationError(f"ttl_seconds must be > 0 and <= {JWT_TTL_SECONDS} (got {ttl_seconds})")
     if not jti:
         raise MigrationError("jti is required (single-use marker)")
 
@@ -209,7 +208,7 @@ def build_claims(
 # ---- verifier ------------------------------------------------------
 
 
-class VerificationResult(str, Enum):
+class VerificationResult(StrEnum):
     """Why a bundle was accepted or rejected at import time."""
 
     OK = "ok"
@@ -250,18 +249,14 @@ def verify_claims(
         return VerificationDecision(
             accepted=False,
             result=VerificationResult.UNSUPPORTED_VERSION,
-            reason=(
-                f"bundle version {claims.bundle.bundle_version} " f"unsupported (expected {BUNDLE_VERSION})"
-            ),
+            reason=(f"bundle version {claims.bundle.bundle_version} unsupported (expected {BUNDLE_VERSION})"),
         )
 
     if claims.aud != expected_destination:
         return VerificationDecision(
             accepted=False,
             result=VerificationResult.AUDIENCE_MISMATCH,
-            reason=(
-                f"bundle audience {claims.aud!r} does not match " f"this instance {expected_destination!r}"
-            ),
+            reason=(f"bundle audience {claims.aud!r} does not match this instance {expected_destination!r}"),
         )
 
     if claims.iss == expected_destination:
@@ -307,7 +302,7 @@ def verify_claims(
 # ---- source-instance pause / revert --------------------------------
 
 
-class SourceState(str, Enum):
+class SourceState(StrEnum):
     """Tracks what happened on instance A during export."""
 
     LIVE = "live"
@@ -419,7 +414,7 @@ def plan_import(
         # Verifier should have caught this; defense-in-depth
         # for callers building plans from synthesized bundles
         # in tests.
-        raise MigrationError("bundle has empty deployment_history — cannot pick " "first-deploy image")
+        raise MigrationError("bundle has empty deployment_history — cannot pick first-deploy image")
 
     most_recent = max(
         bundle.deployment_history,
@@ -433,7 +428,7 @@ def plan_import(
         # workflow but project_create is bundled inside the org
         # create step; flag stays False to avoid double-create
         new_app_slug=bundle.source_app_slug,
-        imported_from=(f"{bundle.source_instance}/" f"{bundle.source_org_slug}/{bundle.source_app_slug}"),
+        imported_from=(f"{bundle.source_instance}/{bundle.source_org_slug}/{bundle.source_app_slug}"),
         first_deploy_image_digest=most_recent.image_digest,
         first_deploy_manifest_sha256=most_recent.manifest_sha256,
     )

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
 class ComplianceError(ValueError):
@@ -31,7 +31,7 @@ class ComplianceError(ValueError):
 # ---- coverage areas ------------------------------------------------
 
 
-class CoverageArea(str, Enum):
+class CoverageArea(StrEnum):
     """Spec 12 §11: the categories a template can require."""
 
     ACCESS_CONTROLS = "access_controls"
@@ -211,7 +211,7 @@ def get_template(*, slug: str) -> ComplianceTemplate:
     \`compliance.reportTemplates\` query enumerates the keys."""
     if slug not in TEMPLATE_REGISTRY:
         raise ComplianceError(
-            f"unknown compliance template {slug!r}; known: " f"{sorted(TEMPLATE_REGISTRY.keys())}"
+            f"unknown compliance template {slug!r}; known: {sorted(TEMPLATE_REGISTRY.keys())}"
         )
     return TEMPLATE_REGISTRY[slug]
 
@@ -219,7 +219,7 @@ def get_template(*, slug: str) -> ComplianceTemplate:
 # ---- evidence evaluation -------------------------------------------
 
 
-class CheckStatus(str, Enum):
+class CheckStatus(StrEnum):
     """Per-requirement outcome."""
 
     PASS = "pass"
@@ -260,7 +260,7 @@ def evaluate_audit_log(
         return CheckResult(
             area=CoverageArea.AUDIT_LOG,
             status=CheckStatus.FAIL,
-            detail=(f"audit retention {evidence['retention_days']}d " f"< required {min_days}d"),
+            detail=(f"audit retention {evidence['retention_days']}d < required {min_days}d"),
         )
 
     if threshold.get("hash_chain_required") and not evidence.get(
@@ -276,7 +276,7 @@ def evaluate_audit_log(
     return CheckResult(
         area=CoverageArea.AUDIT_LOG,
         status=CheckStatus.PASS,
-        detail=(f"audit retention {evidence['retention_days']}d, " "hash chain valid"),
+        detail=(f"audit retention {evidence['retention_days']}d, hash chain valid"),
     )
 
 
@@ -407,13 +407,13 @@ def evaluate_encryption(
         return CheckResult(
             area=CoverageArea.ENCRYPTION,
             status=CheckStatus.FAIL,
-            detail=(f"secrets backend {actual_backend!r} not in allowed " f"set {sorted(allowed_backends)}"),
+            detail=(f"secrets backend {actual_backend!r} not in allowed set {sorted(allowed_backends)}"),
         )
 
     return CheckResult(
         area=CoverageArea.ENCRYPTION,
         status=CheckStatus.PASS,
-        detail=(f"TLS >= {actual_tls}, secrets backend " f"{actual_backend!r}"),
+        detail=(f"TLS >= {actual_tls}, secrets backend {actual_backend!r}"),
     )
 
 

@@ -21,10 +21,10 @@ compute the same resources for cleanup without re-running deploy.
 from __future__ import annotations
 
 import dataclasses
-from enum import Enum
+from enum import StrEnum
 
 
-class PreviewPolicy(str, Enum):
+class PreviewPolicy(StrEnum):
     SHARED_WITH_MAIN = "shared_with_main"
     DEDICATED = "dedicated"
 
@@ -186,7 +186,7 @@ def shared_plan_for(*, kind: str, pr_number: int, app_slug: str) -> SharedPlan:
         )
     # Other kinds default to DEDICATED — they shouldn't reach this
     # function. Surface loudly if they do (bug in the dispatcher).
-    raise ValueError(f"shared_with_main not supported for kind {kind!r}; " "use DEDICATED policy")
+    raise ValueError(f"shared_with_main not supported for kind {kind!r}; use DEDICATED policy")
 
 
 def teardown_plan_for(*, kind: str, pr_number: int, app_slug: str) -> SharedPlan:

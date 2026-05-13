@@ -59,7 +59,7 @@ class StorageClassEntry:
         if self.cluster_id <= 0:
             raise StorageError("cluster_id must be positive")
         if self.reclaim_policy not in ("Delete", "Retain"):
-            raise StorageError(f"reclaim_policy {self.reclaim_policy!r} must be " "'Delete' or 'Retain'")
+            raise StorageError(f"reclaim_policy {self.reclaim_policy!r} must be 'Delete' or 'Retain'")
         if self.volume_binding_mode not in (
             "Immediate",
             "WaitForFirstConsumer",

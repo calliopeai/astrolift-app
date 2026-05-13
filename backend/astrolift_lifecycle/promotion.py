@@ -72,7 +72,7 @@ def validate_promotion(
         whole 'byte-identical' point).
     """
     if source.app_id != target.app_id:
-        raise PromotionError(f"cannot promote: source app {source.app_id} != target app " f"{target.app_id}")
+        raise PromotionError(f"cannot promote: source app {source.app_id} != target app {target.app_id}")
     if source.environment_id == target.environment_id:
         raise PromotionError(f"cannot promote to the source environment ({source.environment_id})")
     if not source.image_digest:
@@ -178,14 +178,13 @@ def walk_lineage(
             return tuple(chain)
         if parent.deployment_id in seen:
             raise LineageCycle(
-                f"promotion lineage cycle detected at deployment "
-                f"{parent.deployment_id} (already in chain)"
+                f"promotion lineage cycle detected at deployment {parent.deployment_id} (already in chain)"
             )
         chain.append(parent)
         seen.add(parent.deployment_id)
         current = parent
 
-    raise LineageCycle(f"promotion lineage exceeded {MAX_LINEAGE_HOPS} hops; " "chain is corrupt")
+    raise LineageCycle(f"promotion lineage exceeded {MAX_LINEAGE_HOPS} hops; chain is corrupt")
 
 
 def root_of_lineage(

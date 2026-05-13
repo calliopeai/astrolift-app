@@ -31,10 +31,10 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Iterable, Sequence
-from enum import Enum
+from enum import StrEnum
 
 
-class PortabilityMode(str, Enum):
+class PortabilityMode(StrEnum):
     AUTO = "auto"
     PORTABLE = "portable"
     PINNED = "pinned"
@@ -105,7 +105,7 @@ def parse_mode(value: str | None) -> PortabilityMode:
     except ValueError as exc:
         raise PortabilityViolation(
             code="invalid_portability_mode",
-            message=(f"portability {value!r} is not one of " f"{[m.value for m in PortabilityMode]}"),
+            message=(f"portability {value!r} is not one of {[m.value for m in PortabilityMode]}"),
         ) from exc
 
 
@@ -136,7 +136,7 @@ def validate(
     if bad_pins:
         raise PortabilityViolation(
             code="invalid_pin_syntax",
-            message=(f"variant pin must be '<plugin>/<variant>'; " f"malformed in: {bad_pins}"),
+            message=(f"variant pin must be '<plugin>/<variant>'; malformed in: {bad_pins}"),
             kinds=bad_pins,
         )
 
@@ -179,8 +179,7 @@ def validate(
             raise PortabilityViolation(
                 code="pinned_missing_pins",
                 message=(
-                    "manifest declares portability='pinned' but "
-                    f"{len(unpinned)} block(s) have no variant pin"
+                    f"manifest declares portability='pinned' but {len(unpinned)} block(s) have no variant pin"
                 ),
                 kinds=[f"{b.kind}/{b.name}" for b in unpinned],
             )

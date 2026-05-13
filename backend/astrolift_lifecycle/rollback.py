@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 
-class DeploymentState(str, Enum):
+class DeploymentState(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     FAILED = "failed"
@@ -132,7 +132,7 @@ def plan_rollback(
     if current.app_id != target.app_id:
         raise RollbackError(f"current app {current.app_id} != target app {target.app_id}")
     if current.environment_id != target.environment_id:
-        raise RollbackError(f"current env {current.environment_id} != target env " f"{target.environment_id}")
+        raise RollbackError(f"current env {current.environment_id} != target env {target.environment_id}")
     if not target.image_digest:
         raise RollbackError("target has no image digest; cannot guarantee byte-for-byte rollback")
     return RollbackPlan(

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
 
 class EnvOverrideError(ValueError):
@@ -67,7 +67,7 @@ def resolve_environment_overrides(
     """
     if env_name not in registered_envs:
         raise EnvOverrideError(
-            f"environment {env_name!r} not in registered envs " f"{sorted(registered_envs)}; check for typo"
+            f"environment {env_name!r} not in registered envs {sorted(registered_envs)}; check for typo"
         )
     if not environment_overrides:
         return dict(workload_defaults)
@@ -77,7 +77,7 @@ def resolve_environment_overrides(
 # ---- k8s tolerations -----------------------------------------------
 
 
-class TolerationOperator(str, Enum):
+class TolerationOperator(StrEnum):
     """K8s allows two: Equal (matches if value matches),
     Exists (matches any value, value field forbidden)."""
 
@@ -85,7 +85,7 @@ class TolerationOperator(str, Enum):
     EXISTS = "Exists"
 
 
-class TolerationEffect(str, Enum):
+class TolerationEffect(StrEnum):
     """K8s taint effects."""
 
     NO_SCHEDULE = "NoSchedule"
