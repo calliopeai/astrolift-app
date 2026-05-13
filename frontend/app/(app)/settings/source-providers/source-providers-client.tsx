@@ -320,7 +320,14 @@ export function SourceProvidersClient() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {c.kind === "github_oauth_app" && c.isOauthAppConfig && (
+                        {/* GitHub user-to-server OAuth works against both a classic
+                            OAuth App config (kind=github_oauth_app + isOauthAppConfig)
+                            and a manifest-registered GitHub App install
+                            (kind=github_app_install) — both have a client_id sitting
+                            in oauth_client_id and GitHub's /login/oauth/authorize
+                            endpoint accepts either. */}
+                        {((c.kind === "github_oauth_app" && c.isOauthAppConfig) ||
+                          c.kind === "github_app_install") && (
                           <Button asChild size="sm" variant="outline">
                             <a
                               href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
