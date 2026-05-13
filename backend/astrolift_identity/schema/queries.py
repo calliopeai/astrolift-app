@@ -35,6 +35,9 @@ from astrolift_identity.schema.types import (
     InvitationType,
     MemberType,
     MyProfileType,
+    NavTreeProjectType,
+    NavTreeTeamType,
+    NavTreeType,
     OrganizationAllowlistedDomainType,
     OrganizationType,
     PolicyType,
@@ -43,6 +46,7 @@ from astrolift_identity.schema.types import (
     RoleType,
     TeamType,
     api_token_to_type,
+    app_to_summary,
     identity_provider_to_type,
     invitation_to_type,
     member_to_type,
@@ -87,6 +91,106 @@ class IdentityQuery:
     def astrolift_projects(self, info: Info) -> list[ProjectType]:
         qs = Project.objects.select_related("organization", "team")[:200]
         return [project_to_type(p) for p in qs]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_nav_tree(self, info: Info) -> NavTreeType | None:
+        """Hierarchical Org -> Team -> Project -> App view for the sidebar.
+
+        Self-service: no ``@require_permission`` gate -- tenant scope
+        already binds the request to a single organization, which is
+        the visibility boundary. Mirrors ``astrolift_my_permissions``
+        in that respect; every authed user is allowed to see the shape
+        of the tenant they belong to. Resource-level reads continue to
+        flow through the per-domain permission-gated resolvers.
+
+        Composes three batched queries (teams, projects, apps) and
+        groups in Python so the tree degrades to O(N) on the app count
+        regardless of how nested the hierarchy gets. Soft-deleted rows
+        are excluded by the default managers; ``RegisteredApp`` rows
+        with no project (unlikely after recent migrations, but defended
+        for legacy data) surface under the team's ``unassigned_apps``
+        bucket or the org's ``unassigned_apps`` bucket so they stay
+        visible until reassigned.
+        """
+        from astrolift_registry.models import RegisteredApp
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return None
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return None
+
+        teams = list(
+            Team.objects.filter(organization_id=org_id)
+            .select_related("organization")
+            .order_by("name")
+        )
+        projects = list(
+            Project.objects.filter(organization_id=org_id)
+            .select_related("organization", "team")
+            .order_by("name")
+        )
+        apps = list(
+            RegisteredApp.objects.filter(organization_id=org_id)
+            .only(
+                "id",
+                "guid",
+                "slug",
+                "name",
+                "provisioning_status",
+                "team_id",
+                "project_id",
+            )
+            .order_by("name")
+        )
+
+        projects_by_team: dict[int, list] = {}
+        for project in projects:
+            projects_by_team.setdefault(project.team_id, []).append(project)
+
+        apps_by_project: dict[int | None, list] = {}
+        apps_by_team_no_project: dict[int | None, list] = {}
+        unassigned_org_apps: list = []
+        for app in apps:
+            if app.project_id is not None:
+                apps_by_project.setdefault(app.project_id, []).append(app)
+            elif app.team_id is not None:
+                apps_by_team_no_project.setdefault(app.team_id, []).append(app)
+            else:
+                unassigned_org_apps.append(app)
+
+        team_nodes: list[NavTreeTeamType] = []
+        for team in teams:
+            project_nodes: list[NavTreeProjectType] = []
+            for project in projects_by_team.get(team.id, []):
+                project_nodes.append(
+                    NavTreeProjectType(
+                        project=project_to_type(project),
+                        apps=[
+                            app_to_summary(a) for a in apps_by_project.get(project.id, [])
+                        ],
+                    )
+                )
+            team_nodes.append(
+                NavTreeTeamType(
+                    team=team_to_type(team),
+                    projects=project_nodes,
+                    unassigned_apps=[
+                        app_to_summary(a)
+                        for a in apps_by_team_no_project.get(team.id, [])
+                    ],
+                )
+            )
+
+        return NavTreeType(
+            organization=organization_to_type(org),
+            teams=team_nodes,
+            unassigned_apps=[app_to_summary(a) for a in unassigned_org_apps],
+        )
 
     # ---- RBAC queries ------------------------------------------------
 

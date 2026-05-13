@@ -195,6 +195,13 @@ type AstroliftAppSecretBundleAttachmentMutationResult {
   data: AstroliftAppSecretBundleAttachment
 }
 
+type AstroliftAppSummary {
+  id: GUID!
+  slug: String!
+  name: String!
+  status: String!
+}
+
 type AstroliftAuditEvent {
   id: GUID!
   organizationId: String
@@ -477,6 +484,23 @@ type AstroliftMyProfileMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftMyProfile
+}
+
+type AstroliftNavTree {
+  organization: AstroliftOrganization!
+  teams: [AstroliftNavTreeTeam!]!
+  unassignedApps: [AstroliftAppSummary!]!
+}
+
+type AstroliftNavTreeProject {
+  project: AstroliftProject!
+  apps: [AstroliftAppSummary!]!
+}
+
+type AstroliftNavTreeTeam {
+  team: AstroliftTeam!
+  projects: [AstroliftNavTreeProject!]!
+  unassignedApps: [AstroliftAppSummary!]!
 }
 
 type AstroliftNotification {
@@ -1724,6 +1748,7 @@ type Query {
   astroliftOrganizations: [AstroliftOrganization!]!
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
+  astroliftNavTree: AstroliftNavTree
   astroliftMembers: [AstroliftMember!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!

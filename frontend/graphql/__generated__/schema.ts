@@ -220,6 +220,13 @@ export type AstroliftAppSecretBundleAttachmentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAppSummary = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type AstroliftAuditEvent = {
   action: Scalars['String']['output'];
   actorDisplay: Scalars['String']['output'];
@@ -502,6 +509,23 @@ export type AstroliftMyProfileMutationResult = {
   data?: Maybe<AstroliftMyProfile>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftNavTree = {
+  organization: AstroliftOrganization;
+  teams: Array<AstroliftNavTreeTeam>;
+  unassignedApps: Array<AstroliftAppSummary>;
+};
+
+export type AstroliftNavTreeProject = {
+  apps: Array<AstroliftAppSummary>;
+  project: AstroliftProject;
+};
+
+export type AstroliftNavTreeTeam = {
+  projects: Array<AstroliftNavTreeProject>;
+  team: AstroliftTeam;
+  unassignedApps: Array<AstroliftAppSummary>;
 };
 
 export type AstroliftNotification = {
@@ -2330,6 +2354,7 @@ export type Query = {
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
+  astroliftNavTree?: Maybe<AstroliftNavTree>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
