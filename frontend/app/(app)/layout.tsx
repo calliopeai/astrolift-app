@@ -4,6 +4,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { LiveRegionProvider } from "@/components/LiveRegion";
+import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { PreloadQuery, getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </main>
             </SidebarInset>
             <CommandPalette />
+            <SessionExpiredModal />
           </SidebarProvider>
         </LiveRegionProvider>
         </PreloadQuery>
