@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@apollo/client/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -23,22 +26,34 @@ import {
   BellIcon,
   BadgeCheckIcon,
   ChevronsUpDownIcon,
+  LockIcon,
   LogOutIcon,
   ZapIcon,
   AlertTriangleIcon,
   InfoIcon,
   CheckCircle2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useMe } from "@/graphql/user/user.hooks";
+import { GET_MY_PROFILE } from "@/graphql/identity/identity.queries";
+import type { AstroliftMyProfile } from "@/graphql/identity/identity.types";
 import { clearToken } from "@/lib/auth/token-store";
 import { setSentryUser } from "@/lib/sentry";
 import type { CurrentUser } from "@/graphql/user/user.types";
 
-export const NavUser = ({ ssrUser }: { ssrUser: CurrentUser | null }) => {
+interface MyProfileResp {
+  astroliftMyProfile: AstroliftMyProfile | null;
+}
+
+export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) => {
   const t = useTranslations("user");
   const { isMobile } = useSidebar();
-  const { data: meData, user, loading: meLoading } = useMe();
+  const { user } = useMe();
+  const { data: profileData, loading: profileLoading } = useQuery<MyProfileResp>(
+    GET_MY_PROFILE,
+    { fetchPolicy: "cache-first" },
+  );
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -46,10 +61,21 @@ export const NavUser = ({ ssrUser }: { ssrUser: CurrentUser | null }) => {
     setSentryUser(user ?? null);
   }, [user]);
 
-  const name = user?.profile?.username ?? "User";
-  const email = "";
+  const profile = profileData?.astroliftMyProfile ?? null;
+  const fullName =
+    profile && (profile.firstName || profile.lastName)
+      ? `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim()
+      : profile?.username || user?.profile?.username || "User";
+  const email = profile?.email ?? "";
+  const username = profile?.username ?? user?.profile?.username ?? "";
   const avatar = "";
-  const initials = name.slice(0, 2).toUpperCase();
+  const initials = fullName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "U";
 
   const handleLogout = () => {
     setSentryUser(null);
@@ -69,12 +95,12 @@ export const NavUser = ({ ssrUser }: { ssrUser: CurrentUser | null }) => {
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={avatar} alt={name} />
+                  <AvatarImage src={avatar} alt={fullName} />
                   <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{name}</span>
-                  <span className="truncate text-xs">{email}</span>
+                  <span className="truncate font-medium">{fullName}</span>
+                  <span className="text-muted-foreground truncate text-xs">{email}</span>
                 </div>
                 <ChevronsUpDownIcon className="ml-auto size-4" />
               </SidebarMenuButton>
@@ -88,12 +114,12 @@ export const NavUser = ({ ssrUser }: { ssrUser: CurrentUser | null }) => {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={avatar} alt={name} />
+                    <AvatarImage src={avatar} alt={fullName} />
                     <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{name}</span>
-                    <span className="truncate text-xs">{email}</span>
+                    <span className="truncate font-medium">{fullName}</span>
+                    <span className="text-muted-foreground truncate text-xs">{email}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
@@ -139,45 +165,83 @@ export const NavUser = ({ ssrUser }: { ssrUser: CurrentUser | null }) => {
 
           <div className="flex flex-col items-center gap-3 py-6">
             <Avatar className="h-20 w-20 rounded-xl">
-              <AvatarImage src={avatar} alt={name} />
+              <AvatarImage src={avatar} alt={fullName} />
               <AvatarFallback className="rounded-xl text-2xl">{initials}</AvatarFallback>
             </Avatar>
             <div className="text-center">
-              <p className="text-lg font-semibold">{name}</p>
-              <p className="text-muted-foreground text-sm">{email}</p>
+              <p className="text-lg font-semibold">{fullName}</p>
+              {email && <p className="text-muted-foreground text-sm">{email}</p>}
             </div>
           </div>
 
           <Separator />
 
-          <div className="flex flex-col gap-6 px-1 py-6">
-            <section className="flex flex-col gap-3">
-              <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                SSR · getClient
+          <div className="flex flex-col gap-4 px-4 py-6">
+            <ProfileRow
+              label="Username"
+              value={username || "—"}
+              locked={profile?.lockedFields?.includes("username")}
+            />
+            <ProfileRow
+              label="First name"
+              value={profile?.firstName || "—"}
+              locked={profile?.lockedFields?.includes("first_name")}
+            />
+            <ProfileRow
+              label="Last name"
+              value={profile?.lastName || "—"}
+              locked={profile?.lockedFields?.includes("last_name")}
+            />
+            <ProfileRow
+              label="Email"
+              value={email || "—"}
+              locked={profile?.lockedFields?.includes("email")}
+            />
+            {profile && profile.orgAllowsEdit === false && (
+              <p className="bg-muted text-muted-foreground rounded-md p-3 text-xs">
+                Profile editing is disabled for your organization. Names and email sync from your
+                identity provider on each sign-in.
               </p>
-              <Row label="me.id" value={ssrUser?.id ?? "—"} />
-              <Row label="me.profile.id" value={ssrUser?.profile?.id ?? "—"} />
-              <Row label="me.profile.username" value={ssrUser?.profile?.username ?? "—"} />
-            </section>
-
-            <Separator />
-
-            <section className="flex flex-col gap-3">
-              <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                Client · useMe{" "}
-                {meLoading && <span className="font-normal normal-case">loading…</span>}
-              </p>
-              <Row label="me.id" value={meData?.me?.id ?? "—"} />
-              <Row label="me.profile.id" value={meData?.me?.profile?.id ?? "—"} />
-              <Row label="me.profile.username" value={meData?.me?.profile?.username ?? "—"} />
-            </section>
-
+            )}
+            {profile && profile.orgAllowsEdit && (
+              <Button asChild variant="outline" size="sm" className="self-start">
+                <Link href="/settings/profile" onClick={() => setAccountOpen(false)}>
+                  Edit profile
+                </Link>
+              </Button>
+            )}
+            {profileLoading && !profile && (
+              <p className="text-muted-foreground text-sm">Loading…</p>
+            )}
           </div>
         </SheetContent>
       </Sheet>
     </>
   );
 };
+
+const ProfileRow = ({
+  label,
+  value,
+  locked,
+}: {
+  label: string;
+  value: string;
+  locked?: boolean;
+}) => (
+  <div className="flex items-start justify-between gap-3 text-sm">
+    <span className="text-muted-foreground shrink-0">{label}</span>
+    <span className="flex items-center gap-1.5 text-right">
+      <span className="truncate">{value}</span>
+      {locked && (
+        <Badge variant="outline" className="gap-1 text-xs">
+          <LockIcon className="size-3" />
+          IdP-managed
+        </Badge>
+      )}
+    </span>
+  </div>
+);
 
 const Row = ({ label, value }: { label: string; value: string }) => (
   <div className="flex items-center justify-between text-sm">
