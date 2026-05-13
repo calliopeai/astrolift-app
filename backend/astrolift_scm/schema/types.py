@@ -78,6 +78,25 @@ class RemoteRepoListType:
     recoverable: bool
 
 
+@strawberry.type(name="AstroliftSourceFile")
+class SourceFileType:
+    """A file fetched from a remote repo through a SourceConnection.
+
+    Returned by ``astroliftSourceFile`` so the onboarding wizard can
+    pre-fill the manifest textarea from the repo's default branch.
+    When ``content`` is None the file wasn't found at that ref —
+    distinct from an auth/network error, which surfaces a non-null
+    ``error_code``."""
+
+    repo_full_name: str
+    path: str
+    ref: str
+    content: str | None
+    error_code: str | None
+    error_message: str | None
+    recoverable: bool
+
+
 @strawberry.type(name="AstroliftSshDeployKeyCreated")
 class SshDeployKeyCreatedType:
     """Returned exactly once on creation. Same shape as
