@@ -91,6 +91,12 @@ const sections: NavSection[] = [
     label: "Operations",
     items: [
       {
+        label: "Ops dashboard",
+        href: "/ops",
+        icon: <GaugeIcon />,
+        permission: "org.read",
+      },
+      {
         label: "Environments",
         href: "/environments",
         icon: <CloudIcon />,
