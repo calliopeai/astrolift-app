@@ -4,7 +4,11 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import {
   BookOpenIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   GitBranchIcon,
+  GithubIcon,
+  GitlabIcon,
   KeyRoundIcon,
   PlusIcon,
   Trash2Icon,
@@ -33,10 +37,7 @@ import {
   DISCONNECT_SOURCE,
   ROTATE_WEBHOOK_SECRET,
 } from "@/graphql/scm/scm.mutations";
-import {
-  LIST_SOURCE_CONNECTIONS,
-  LIST_SSH_DEPLOY_KEYS,
-} from "@/graphql/scm/scm.queries";
+import { LIST_SOURCE_CONNECTIONS, LIST_SSH_DEPLOY_KEYS } from "@/graphql/scm/scm.queries";
 import type {
   AstroliftSourceConnection,
   AstroliftSshDeployKey,
@@ -44,6 +45,8 @@ import type {
   MutationResult,
 } from "@/graphql/scm/scm.types";
 
+import { ConnectGitHubDialog } from "./connect-github-dialog";
+import { ConnectGitLabDialog } from "./connect-gitlab-dialog";
 import { ConnectSourceDialog } from "./connect-source-dialog";
 import { GenerateSshKeyDialog } from "./generate-ssh-key-dialog";
 
@@ -79,7 +82,10 @@ interface KeysResp {
 
 export function SourceProvidersClient() {
   const [openConnect, setOpenConnect] = React.useState(false);
+  const [openConnectGithub, setOpenConnectGithub] = React.useState(false);
+  const [openConnectGitlab, setOpenConnectGitlab] = React.useState(false);
   const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
 
   const conns = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
 
@@ -121,14 +127,13 @@ export function SourceProvidersClient() {
   const [deleteKey, deleteKeyState] = useMutation<{
     deleteSshDeployKey: MutationResult<{ id: string }>;
   }>(DELETE_SSH_DEPLOY_KEY, {
-    refetchQueries: [
-      { query: LIST_SSH_DEPLOY_KEYS, variables: { appSlug: null } },
-    ],
+    refetchQueries: [{ query: LIST_SSH_DEPLOY_KEYS, variables: { appSlug: null } }],
     awaitRefetchQueries: true,
   });
 
-  const [revealedSecret, setRevealedSecret] =
-    React.useState<AstroliftWebhookSecretReveal | null>(null);
+  const [revealedSecret, setRevealedSecret] = React.useState<AstroliftWebhookSecretReveal | null>(
+    null
+  );
 
   const [rotateSecret, rotateSecretState] = useMutation<{
     rotateWebhookSecret: MutationResult<AstroliftWebhookSecretReveal>;
@@ -140,7 +145,7 @@ export function SourceProvidersClient() {
   async function handleRotateSecret(c: AstroliftSourceConnection) {
     if (
       !confirm(
-        `Generate a fresh webhook secret for ${c.name}? Any existing webhook signed with the old secret will start failing immediately — paste the new secret into the SCM host's webhook config.`,
+        `Generate a fresh webhook secret for ${c.name}? Any existing webhook signed with the old secret will start failing immediately — paste the new secret into the SCM host's webhook config.`
       )
     )
       return;
@@ -150,9 +155,7 @@ export function SourceProvidersClient() {
     if (data?.rotateWebhookSecret.ok && data.rotateWebhookSecret.data) {
       setRevealedSecret(data.rotateWebhookSecret.data);
     } else {
-      toast.error(
-        data?.rotateWebhookSecret.errors?.[0]?.message ?? "Rotation failed",
-      );
+      toast.error(data?.rotateWebhookSecret.errors?.[0]?.message ?? "Rotation failed");
     }
   }
 
@@ -162,32 +165,22 @@ export function SourceProvidersClient() {
   async function handleDisconnect(c: AstroliftSourceConnection) {
     if (
       !confirm(
-        `Disconnect ${c.name}? Apps using this connection will lose access until you connect again.`,
+        `Disconnect ${c.name}? Apps using this connection will lose access until you connect again.`
       )
     ) {
       return;
     }
     const { data } = await disconnect({ variables: { input: { id: c.id } } });
     if (data?.disconnectSource.ok) toast.success(`Disconnected ${c.name}`);
-    else
-      toast.error(
-        data?.disconnectSource.errors?.[0]?.message ?? "Disconnect failed",
-      );
+    else toast.error(data?.disconnectSource.errors?.[0]?.message ?? "Disconnect failed");
   }
 
   async function handleDeleteKey(k: AstroliftSshDeployKey) {
-    if (
-      !confirm(
-        `Delete SSH key ${k.name}? Remove it from any repo deploy-key lists first.`,
-      )
-    )
+    if (!confirm(`Delete SSH key ${k.name}? Remove it from any repo deploy-key lists first.`))
       return;
     const { data } = await deleteKey({ variables: { input: { id: k.id } } });
     if (data?.deleteSshDeployKey.ok) toast.success(`Deleted ${k.name}`);
-    else
-      toast.error(
-        data?.deleteSshDeployKey.errors?.[0]?.message ?? "Delete failed",
-      );
+    else toast.error(data?.deleteSshDeployKey.errors?.[0]?.message ?? "Delete failed");
   }
 
   return (
@@ -204,27 +197,27 @@ export function SourceProvidersClient() {
               Hosts
             </CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              GitHub, GitLab, Bitbucket, Gitea — OAuth App config or PAT.
-              Visibility scopes constrain what repos this connection can
-              surface (e.g. private org repos only).
+              One-click GitHub App registration via the manifest flow, or a guided GitLab Group
+              OAuth wizard. Personal Access Tokens and pre-registered OAuth apps remain available
+              under <em>Advanced</em>.
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button asChild size="sm" variant="outline">
-                <a
-                  href={DOC_LINKS.scmGithubOauth.primary}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={DOC_LINKS.scmGithubOauth.primary} target="_blank" rel="noreferrer">
                   <BookOpenIcon className="size-4" />
                   Setup guide
                 </a>
               </Button>
               <Can permission="scm.connect">
-                <Button size="sm" onClick={() => setOpenConnect(true)}>
-                  <PlusIcon className="size-4" />
-                  Connect host
+                <Button size="sm" onClick={() => setOpenConnectGithub(true)}>
+                  <GithubIcon className="size-4" />
+                  Connect to GitHub
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setOpenConnectGitlab(true)}>
+                  <GitlabIcon className="size-4" />
+                  Connect to GitLab
                 </Button>
               </Can>
             </div>
@@ -234,7 +227,7 @@ export function SourceProvidersClient() {
               rel="noreferrer"
               className="text-muted-foreground text-[11px] underline"
             >
-              also on the wiki
+              one-click GitHub flow + GitLab wizard — also on the wiki
             </a>
           </div>
         </CardHeader>
@@ -249,7 +242,7 @@ export function SourceProvidersClient() {
               <EmptyState
                 icon={<GitBranchIcon className="size-5" />}
                 title="No hosts connected yet"
-                description="Connect GitHub or GitLab so Astrolift can clone your repos. Phase 1 supports OAuth-app config + PAT paste; the OAuth dance and repo browser ship in phase 2."
+                description="Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step — no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs."
               />
             </div>
           ) : (
@@ -276,29 +269,22 @@ export function SourceProvidersClient() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {KIND_LABEL[c.kind] ?? c.kind}
-                      </Badge>
+                      <Badge variant="outline">{KIND_LABEL[c.kind] ?? c.kind}</Badge>
                       {c.isOauthAppConfig && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-2 gap-1 text-[10px]"
-                        >
+                        <Badge variant="secondary" className="ml-2 gap-1 text-[10px]">
                           OAuth-app config
                         </Badge>
                       )}
                       {c.isPersonal && (
                         <Badge
                           variant="secondary"
-                          className="ml-2 gap-1 text-[10px] bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                          className="ml-2 gap-1 bg-blue-500/15 text-[10px] text-blue-700 dark:text-blue-300"
                         >
                           personal {c.userUsername ? `· ${c.userUsername}` : ""}
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {c.accountLogin || "—"}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{c.accountLogin || "—"}</TableCell>
                     <TableCell>
                       {c.repoVisibilityScopes.length === 0 ? (
                         <span className="text-muted-foreground text-xs">
@@ -307,11 +293,7 @@ export function SourceProvidersClient() {
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {c.repoVisibilityScopes.map((s) => (
-                            <Badge
-                              key={s}
-                              variant="secondary"
-                              className="text-[10px]"
-                            >
+                            <Badge key={s} variant="secondary" className="text-[10px]">
                               {SCOPE_LABEL[s] ?? s}
                             </Badge>
                           ))}
@@ -321,7 +303,7 @@ export function SourceProvidersClient() {
                     <TableCell>
                       {c.isActive ? (
                         <Badge
-                          className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 gap-1"
+                          className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                           variant="secondary"
                         >
                           <CheckCircle2Icon className="size-3" />
@@ -334,11 +316,7 @@ export function SourceProvidersClient() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {c.kind === "github_oauth_app" && c.isOauthAppConfig && (
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="outline"
-                          >
+                          <Button asChild size="sm" variant="outline">
                             <a
                               href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
                             >
@@ -347,11 +325,7 @@ export function SourceProvidersClient() {
                           </Button>
                         )}
                         {c.kind === "gitlab_oauth_app" && c.isOauthAppConfig && (
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="outline"
-                          >
+                          <Button asChild size="sm" variant="outline">
                             <a
                               href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
                             >
@@ -360,8 +334,7 @@ export function SourceProvidersClient() {
                           </Button>
                         )}
                         {!c.isPersonal &&
-                          (c.kind.startsWith("github_") ||
-                            c.kind.startsWith("gitlab_")) && (
+                          (c.kind.startsWith("github_") || c.kind.startsWith("gitlab_")) && (
                             <Can permission="scm.connect">
                               <Button
                                 size="sm"
@@ -403,10 +376,9 @@ export function SourceProvidersClient() {
               SSH deploy keys
             </CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              ed25519 keypairs for direct git-over-SSH access. The public key
-              is shown for you to paste into the repo&apos;s deploy-key
-              settings; the private key stays encrypted in the platform
-              secrets backend.
+              ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to
+              paste into the repo&apos;s deploy-key settings; the private key stays encrypted in the
+              platform secrets backend.
             </p>
           </div>
           <Can permission="scm.key_create">
@@ -446,16 +418,12 @@ export function SourceProvidersClient() {
                     <TableCell className="font-medium">{k.name}</TableCell>
                     <TableCell>
                       {k.registeredAppSlug ? (
-                        <Badge variant="secondary">
-                          app: {k.registeredAppSlug}
-                        </Badge>
+                        <Badge variant="secondary">app: {k.registeredAppSlug}</Badge>
                       ) : (
                         <Badge variant="outline">org-scoped</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="font-mono text-[11px]">
-                      {k.fingerprintSha256}
-                    </TableCell>
+                    <TableCell className="font-mono text-[11px]">{k.fingerprintSha256}</TableCell>
                     <TableCell>
                       <PublicKeyCell value={k.publicKey} />
                     </TableCell>
@@ -480,16 +448,41 @@ export function SourceProvidersClient() {
         </CardContent>
       </Card>
 
+      {/* Advanced: pre-registered OAuth apps / PATs / GitHub-App-from-paste */}
+      <Can permission="scm.connect">
+        <div className="text-muted-foreground text-xs">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((x) => !x)}
+            className="hover:text-foreground inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
+          >
+            {showAdvanced ? (
+              <ChevronDownIcon className="size-3.5" />
+            ) : (
+              <ChevronRightIcon className="size-3.5" />
+            )}
+            Advanced: paste a Personal Access Token or pre-registered OAuth app
+          </button>
+          {showAdvanced && (
+            <div className="mt-2 flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setOpenConnect(true)}>
+                <PlusIcon className="size-4" />
+                Paste credentials…
+              </Button>
+              <span className="text-muted-foreground text-xs">
+                Use this if you already have a registered OAuth App or want to connect via a PAT.
+              </span>
+            </div>
+          )}
+        </div>
+      </Can>
+
+      <ConnectGitHubDialog open={openConnectGithub} onOpenChange={setOpenConnectGithub} />
+      <ConnectGitLabDialog open={openConnectGitlab} onOpenChange={setOpenConnectGitlab} />
       <ConnectSourceDialog open={openConnect} onOpenChange={setOpenConnect} />
-      <GenerateSshKeyDialog
-        open={openGenerateKey}
-        onOpenChange={setOpenGenerateKey}
-      />
+      <GenerateSshKeyDialog open={openGenerateKey} onOpenChange={setOpenGenerateKey} />
       {revealedSecret && (
-        <WebhookSecretReveal
-          reveal={revealedSecret}
-          onClose={() => setRevealedSecret(null)}
-        />
+        <WebhookSecretReveal reveal={revealedSecret} onClose={() => setRevealedSecret(null)} />
       )}
     </PageShell>
   );
@@ -520,29 +513,25 @@ function WebhookSecretReveal({
         <h2 className="text-lg font-semibold">Webhook secret generated</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Paste these into the SCM host&apos;s webhook config{" "}
-          <span className="font-medium">now</span> — the plaintext secret
-          is shown exactly once, then encrypted at rest.
+          <span className="font-medium">now</span> — the plaintext secret is shown exactly once,
+          then encrypted at rest.
         </p>
         <div className="mt-4 space-y-3">
           <div>
-            <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+            <span className="text-muted-foreground block text-xs tracking-wide uppercase">
               Webhook URL
             </span>
             <div className="mt-1 flex items-center gap-2">
               <code className="bg-muted flex-1 rounded px-2 py-1 font-mono text-[11px] break-all">
                 {fullUrl}
               </code>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => copy(fullUrl, "URL")}
-              >
+              <Button size="sm" variant="outline" onClick={() => copy(fullUrl, "URL")}>
                 copy
               </Button>
             </div>
           </div>
           <div>
-            <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+            <span className="text-muted-foreground block text-xs tracking-wide uppercase">
               Secret
             </span>
             <div className="mt-1 flex items-center gap-2">
@@ -560,10 +549,9 @@ function WebhookSecretReveal({
           </div>
           <p className="text-muted-foreground text-xs">
             GitHub: <code>Settings → Webhooks → Add webhook</code>. Set
-            <code> Content type: application/json</code>, paste the URL +
-            secret, choose <code>Just the push event</code>. GitLab:{" "}
-            <code>Settings → Webhooks</code>, paste both, tick{" "}
-            <code>Push events</code>.
+            <code> Content type: application/json</code>, paste the URL + secret, choose{" "}
+            <code>Just the push event</code>. GitLab: <code>Settings → Webhooks</code>, paste both,
+            tick <code>Push events</code>.
           </p>
         </div>
         <div className="mt-6 flex justify-end">
@@ -573,7 +561,6 @@ function WebhookSecretReveal({
     </div>
   );
 }
-
 
 function PublicKeyCell({ value }: { value: string }) {
   const [copied, setCopied] = React.useState(false);
@@ -589,7 +576,7 @@ function PublicKeyCell({ value }: { value: string }) {
   const truncated = value.length > 60 ? `${value.slice(0, 60)}…` : value;
   return (
     <div className="flex items-center gap-2">
-      <code className="text-[11px] font-mono">{truncated}</code>
+      <code className="font-mono text-[11px]">{truncated}</code>
       <Button size="sm" variant="ghost" onClick={onCopy}>
         {copied ? "copied" : "copy"}
       </Button>
