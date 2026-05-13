@@ -375,6 +375,51 @@ def organization_allowlisted_domain_to_type(rule) -> OrganizationAllowlistedDoma
     )
 
 
+@strawberry.type(name="AstroliftAppSummary")
+class AppSummaryType:
+    """A registered app reduced to what the sidebar needs.
+
+    The full ``AstroliftRegisteredApp`` type carries manifest text,
+    deploy tokens, retention counts -- payload the nav tree never
+    renders. ``AppSummaryType`` is the slim projection so the nav
+    query stays cheap on orgs with hundreds of apps.
+    """
+
+    id: GUID
+    slug: str
+    name: str
+    status: str
+
+
+@strawberry.type(name="AstroliftNavTreeProject")
+class NavTreeProjectType:
+    project: ProjectType
+    apps: list[AppSummaryType]
+
+
+@strawberry.type(name="AstroliftNavTreeTeam")
+class NavTreeTeamType:
+    team: TeamType
+    projects: list[NavTreeProjectType]
+    unassigned_apps: list[AppSummaryType]
+
+
+@strawberry.type(name="AstroliftNavTree")
+class NavTreeType:
+    organization: OrganizationType
+    teams: list[NavTreeTeamType]
+    unassigned_apps: list[AppSummaryType]
+
+
+def app_to_summary(app) -> AppSummaryType:
+    return AppSummaryType(
+        id=GUID(str(app.guid)),
+        slug=app.slug,
+        name=app.name,
+        status=app.provisioning_status,
+    )
+
+
 @strawberry.type(name="AstroliftActiveSession")
 class ActiveSessionType:
     """A django_session row for the current viewer.
