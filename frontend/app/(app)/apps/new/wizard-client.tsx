@@ -1,0 +1,321 @@
+"use client";
+
+import { useMutation } from "@apollo/client/react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+
+import { REGISTER_APP } from "@/graphql/registry/registry.mutations";
+import { LIST_APPS } from "@/graphql/registry/registry.queries";
+import type {
+  AstroliftRegisteredApp,
+  SourceKind,
+  TriggerMode,
+} from "@/graphql/registry/registry.types";
+import type { MutationResult } from "@/graphql/identity/identity.types";
+
+import { WizardShell, type WizardStep } from "./components/WizardShell";
+import { AppDetailsStep } from "./steps/AppDetailsStep";
+import { DeployStrategyStep } from "./steps/DeployStrategyStep";
+import { ManifestPreviewStep } from "./steps/ManifestPreviewStep";
+import { RepoPickerStep } from "./steps/RepoPickerStep";
+import { ReviewSubmitStep, type SideEffectStep } from "./steps/ReviewSubmitStep";
+
+// Step shape — five steps plus a virtual "0" we never render.
+type StepNumber = 1 | 2 | 3 | 4 | 5;
+
+// Wizard-side trigger superset. The backend's `RegisterAppInput`
+// currently only carries `auto_on_push | manual | external_ci`; `cron`
+// is captured here but is informational until the backend exposes
+// scheduled triggers (see follow-up issue noted in ReviewSubmitStep).
+export type WizardTriggerMode = TriggerMode | "cron";
+
+export interface WizardState {
+  step: StepNumber;
+
+  // Step 1
+  connectionId: string;
+  sourceKind: SourceKind;
+  sourceRepo: string;
+  sourceUrl: string;
+  defaultBranch: string;
+  // Read off the picked repo's webhook-support flags for review-step UX.
+  connectionIsAppInstall: boolean;
+
+  // Step 2
+  manifestPath: string;
+  manifestRaw: string;
+  manifestFromRepo: boolean; // false => either missing-on-repo or edited locally
+  manifestValid: boolean;
+  manifestErrors: string[];
+
+  // Step 3
+  name: string;
+  slug: string;
+  slugTouched: boolean;
+  description: string;
+  projectId: string;
+
+  // Step 4
+  triggerMode: WizardTriggerMode;
+  deployBranch: string;
+  cronExpression: string;
+  requiresApproval: boolean;
+  approverUserIds: string[];
+  approverTeamId: string;
+
+  // Step 5
+  pushCiWorkflow: boolean;
+  triggerFirstDeploy: boolean;
+}
+
+export function initialWizardState(): WizardState {
+  return {
+    step: 1,
+    connectionId: "",
+    sourceKind: "github",
+    sourceRepo: "",
+    sourceUrl: "",
+    defaultBranch: "main",
+    connectionIsAppInstall: false,
+    manifestPath: "astrolift.toml",
+    manifestRaw: "",
+    manifestFromRepo: false,
+    manifestValid: false,
+    manifestErrors: [],
+    name: "",
+    slug: "",
+    slugTouched: false,
+    description: "",
+    projectId: "",
+    triggerMode: "auto_on_push",
+    deployBranch: "main",
+    cronExpression: "0 * * * *",
+    requiresApproval: false,
+    approverUserIds: [],
+    approverTeamId: "",
+    pushCiWorkflow: false,
+    triggerFirstDeploy: true,
+  };
+}
+
+const STEPS: WizardStep[] = [
+  {
+    key: "repo",
+    label: "Repo",
+    description: "Pick a source connection and a repository.",
+  },
+  {
+    key: "manifest",
+    label: "Manifest",
+    description: "Review or draft the astrolift.toml manifest.",
+  },
+  {
+    key: "details",
+    label: "Details",
+    description: "Name, slug, description, and where this app lives.",
+  },
+  {
+    key: "strategy",
+    label: "Strategy",
+    description: "How and when deploys should run.",
+  },
+  {
+    key: "review",
+    label: "Review",
+    description: "Final summary and the things we'll do on submit.",
+  },
+];
+
+/**
+ * Top-level state machine for the Register App wizard. Holds the
+ * single `useState<WizardState>` mandated by the brief — every step
+ * gets `state` and `setState` (or a focused setter) and decides for
+ * itself when it's valid. The shell binds Back/Next based on per-step
+ * validity, which each step reports through `setStepValid`.
+ */
+export function WizardClient() {
+  const router = useRouter();
+  const [state, setState] = React.useState<WizardState>(initialWizardState);
+  const [stepValid, setStepValid] = React.useState<Record<StepNumber, boolean>>({
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+    5: true,
+  });
+  const [submitting, setSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [sideEffects, setSideEffects] = React.useState<SideEffectStep[]>([]);
+
+  const [registerApp] = useMutation<{
+    registerApp: MutationResult<AstroliftRegisteredApp>;
+  }>(REGISTER_APP, {
+    refetchQueries: [{ query: LIST_APPS }],
+    awaitRefetchQueries: true,
+  });
+
+  // ---- Step movement ----
+
+  const goTo = React.useCallback((next: StepNumber) => {
+    setState((s) => ({ ...s, step: next }));
+  }, []);
+
+  const goBack = React.useCallback(() => {
+    setState((s) => ({
+      ...s,
+      step: Math.max(1, s.step - 1) as StepNumber,
+    }));
+  }, []);
+
+  const goNext = React.useCallback(() => {
+    setState((s) => ({
+      ...s,
+      step: Math.min(5, s.step + 1) as StepNumber,
+    }));
+  }, []);
+
+  const setValid = React.useCallback((step: StepNumber, valid: boolean) => {
+    setStepValid((prev) => (prev[step] === valid ? prev : { ...prev, [step]: valid }));
+  }, []);
+
+  // ---- Cancel ----
+
+  const handleCancel = React.useCallback(() => {
+    const dirty =
+      state.connectionId !== "" ||
+      state.sourceRepo !== "" ||
+      state.name !== "" ||
+      state.manifestRaw !== "";
+    if (dirty && !window.confirm("Discard wizard progress and return to /apps?")) {
+      return;
+    }
+    router.push("/apps");
+  }, [router, state]);
+
+  // ---- Submit ----
+
+  async function submit() {
+    if (!state.projectId) {
+      toast.error("Pick a project before submitting.");
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError(null);
+
+    // The backend only knows about `auto_on_push | manual | external_ci`.
+    // `cron` and approval flags are captured for future use; for now we
+    // submit `manual` if the operator chose `cron`, so the app is at
+    // least registered and the operator can wire the schedule via the
+    // detail page once that mutation lands.
+    const submittedTriggerMode: TriggerMode =
+      state.triggerMode === "cron" ? "manual" : state.triggerMode;
+
+    const plan: SideEffectStep[] = [
+      { key: "register", label: "Register app", status: "pending" },
+      {
+        key: "ci_workflow",
+        label: ".github/workflows/astrolift-deploy.yml",
+        status: "skipped",
+        note: "Coming soon — pushCiWorkflow mutation pending",
+      },
+      ...(state.triggerFirstDeploy
+        ? [
+            {
+              key: "first_deploy",
+              label: "Trigger first deploy",
+              status: "skipped" as const,
+              note: "Will run once the onboarding workflow lands the app in `ready`",
+            },
+          ]
+        : []),
+    ];
+    setSideEffects(plan);
+
+    const update = (key: string, patch: Partial<SideEffectStep>) =>
+      setSideEffects((prev) => prev.map((s) => (s.key === key ? { ...s, ...patch } : s)));
+
+    try {
+      update("register", { status: "running" });
+      const { data } = await registerApp({
+        variables: {
+          input: {
+            projectId: state.projectId,
+            name: state.name.trim(),
+            slug: state.slug.trim(),
+            description: state.description.trim() || null,
+            sourceKind: state.sourceKind,
+            sourceRepo: state.sourceRepo.trim(),
+            sourceUrl: state.sourceUrl.trim() || null,
+            manifestPath: state.manifestPath.trim() || "astrolift.toml",
+            manifestRaw: state.manifestRaw.trim() || null,
+            defaultBranch: state.defaultBranch.trim() || "main",
+            deployBranch: state.deployBranch.trim() || "main",
+            triggerMode: submittedTriggerMode,
+          },
+        },
+      });
+      const result = data?.registerApp;
+      if (!result?.ok || !result.data) {
+        const msg = result?.errors?.[0]?.message ?? "Register failed";
+        update("register", { status: "failed", error: msg });
+        setSubmitError(msg);
+        setSubmitting(false);
+        return;
+      }
+      update("register", { status: "done" });
+      toast.success(`Registered ${result.data.slug}`);
+      router.push(`/apps/${result.data.slug}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Register failed";
+      update("register", { status: "failed", error: msg });
+      setSubmitError(msg);
+      setSubmitting(false);
+    }
+  }
+
+  // ---- Step body + footer-binding ----
+
+  const isLast = state.step === 5;
+  const canGoNext = stepValid[state.step] ?? false;
+
+  return (
+    <WizardShell
+      step={state.step}
+      steps={STEPS}
+      onStepClick={(idx) => goTo(idx as StepNumber)}
+      onBack={state.step > 1 && !submitting ? goBack : undefined}
+      onNext={isLast ? submit : canGoNext ? goNext : undefined}
+      onCancel={!submitting ? handleCancel : undefined}
+      nextLabel={isLast ? (submitting ? "Submitting…" : "Submit") : "Next"}
+      nextDisabled={!canGoNext}
+      nextLoading={submitting}
+    >
+      {state.step === 1 && (
+        <RepoPickerStep state={state} setState={setState} setValid={(v) => setValid(1, v)} />
+      )}
+      {state.step === 2 && (
+        <ManifestPreviewStep state={state} setState={setState} setValid={(v) => setValid(2, v)} />
+      )}
+      {state.step === 3 && (
+        <AppDetailsStep state={state} setState={setState} setValid={(v) => setValid(3, v)} />
+      )}
+      {state.step === 4 && (
+        <DeployStrategyStep state={state} setState={setState} setValid={(v) => setValid(4, v)} />
+      )}
+      {state.step === 5 && (
+        <ReviewSubmitStep
+          state={state}
+          setState={setState}
+          steps={STEPS}
+          onJumpToStep={(idx) => goTo(idx as StepNumber)}
+          submitting={submitting}
+          submitError={submitError}
+          sideEffects={sideEffects}
+        />
+      )}
+    </WizardShell>
+  );
+}
+
+export default WizardClient;
