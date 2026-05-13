@@ -68,30 +68,28 @@ interface NavSection {
 // decorators on the corresponding GraphQL resolvers. When a viewer
 // can't read a resource, surfacing the link would just lead to a
 // permission-denied empty state, so we hide it entirely.
+//
+// Note: the tenant hierarchy (Org -> Team -> Project -> App) is
+// rendered by `NavTree` above this flat nav. The "Apps" link used to
+// live in this Platform section but is reachable via the tree's
+// leaves now; "Teams" and "Projects" remain as the flat management
+// list pages and have been folded into Administration.
 const sections: NavSection[] = [
   {
     label: "Platform",
     items: [
       { label: "Overview", href: "/dashboard", icon: <HomeIcon /> },
-      { label: "Apps", href: "/apps", icon: <RocketIcon />, permission: "app.read" },
       {
-        label: "Projects",
-        href: "/projects",
-        icon: <FileBoxIcon />,
-        permission: "project.read",
+        label: "Deployments",
+        href: "/deployments",
+        icon: <RocketIcon />,
+        permission: "app.read",
       },
-      { label: "Teams", href: "/teams", icon: <UsersIcon />, permission: "team.read" },
     ],
   },
   {
     label: "Operations",
     items: [
-      {
-        label: "Deployments",
-        href: "/deployments",
-        icon: <BoxIcon />,
-        permission: "app.read",
-      },
       {
         label: "Environments",
         href: "/environments",
@@ -172,6 +170,18 @@ const sections: NavSection[] = [
     // attestations, control testing) lives in Zentinelle, which
     // ingests Astrolift's AuditEvent stream via webhook.
     items: [
+      {
+        label: "Teams",
+        href: "/teams",
+        icon: <UsersIcon />,
+        permission: "team.read",
+      },
+      {
+        label: "Projects",
+        href: "/projects",
+        icon: <FileBoxIcon />,
+        permission: "project.read",
+      },
       {
         label: "Members",
         href: "/members",
