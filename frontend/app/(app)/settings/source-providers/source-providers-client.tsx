@@ -83,19 +83,22 @@ export function SourceProvidersClient() {
 
   const conns = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
 
-  // Surface OAuth-callback outcomes from /app/auth1/scm/github/callback
+  // Surface OAuth-callback outcomes from /app/auth1/scm/<host>/callback
   // — the dance lands the browser back here with ?scm_connected or
-  // ?scm_error so we can toast and clean up the URL.
+  // ?scm_error so we can toast and clean up the URL. The callback
+  // emits a host-agnostic ?scm_connected=<login> so the toast text
+  // stays generic (we don't know which host it was at this point
+  // unless we plumb that through; ?scm_error is also host-agnostic).
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     const ok = url.searchParams.get("scm_connected");
     const err = url.searchParams.get("scm_error");
     if (ok) {
-      toast.success(`Connected GitHub: ${ok}`);
+      toast.success(`Connected ${ok}`);
       void conns.refetch();
     } else if (err) {
-      toast.error(`GitHub OAuth: ${err.replace(/_/g, " ")}`);
+      toast.error(`SCM OAuth: ${err.replace(/_/g, " ")}`);
     }
     if (ok || err) {
       url.searchParams.delete("scm_connected");
@@ -340,6 +343,19 @@ export function SourceProvidersClient() {
                               href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
                             >
                               Connect my GitHub
+                            </a>
+                          </Button>
+                        )}
+                        {c.kind === "gitlab_oauth_app" && c.isOauthAppConfig && (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                          >
+                            <a
+                              href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
+                            >
+                              Connect my GitLab
                             </a>
                           </Button>
                         )}
