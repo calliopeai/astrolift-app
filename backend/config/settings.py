@@ -173,9 +173,14 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
 
 # Public URL the frontend is reachable at — used to build absolute
-# links inside outbound mail (invitation accept URLs, etc.). Falls
-# back to localhost:3000 so local dev doesn't have to set it.
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:3000").rstrip("/")
+# links inside outbound mail (invitation accept URLs, etc.) AND to
+# embed the public webhook URL in the GitHub App manifest. Default
+# is empty so the GitHub-manifest start view can fall back to
+# request.build_absolute_uri() in dev. Production installs MUST set
+# APP_BASE_URL explicitly — otherwise GitHub rejects the manifest with
+# "Hook url is not supported because it isn't reachable over the
+# public Internet (localhost)".
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 
 
 # Firebase configuration

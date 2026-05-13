@@ -103,6 +103,11 @@ export function SourceProvidersClient() {
     if (ok) {
       toast.success(`Connected ${ok}`);
       void conns.refetch();
+    } else if (err === "app_base_url_not_public") {
+      toast.error(
+        "GitHub can't reach this install. Set APP_BASE_URL on the backend to your public URL (e.g. https://astrolift.example.com) and redeploy.",
+        { duration: 10_000 },
+      );
     } else if (err) {
       toast.error(`SCM OAuth: ${err.replace(/_/g, " ")}`);
     }

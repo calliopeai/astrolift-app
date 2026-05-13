@@ -123,6 +123,18 @@ def _app_base_url(request: HttpRequest) -> str:
     return request.build_absolute_uri("/").rstrip("/")
 
 
+_LOCALHOST_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+
+
+def _is_localhost_url(url: str) -> bool:
+    """True when ``url`` resolves to a loopback host github.com can't reach."""
+    try:
+        host = urllib.parse.urlparse(url).hostname or ""
+    except ValueError:
+        return False
+    return host.lower() in _LOCALHOST_HOSTS
+
+
 def _manifest_json(
     request: HttpRequest,
     *,
@@ -213,6 +225,15 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
     org_id = _active_org_id(request)
     if org_id is None:
         return _redirect_with_error(return_to, "no_org")
+
+    # github.com must be able to reach the webhook URL we embed in the
+    # manifest. Refuse the flow early if the base URL is loopback —
+    # otherwise GitHub rejects the manifest with
+    # "Hook url is not supported because it isn't reachable over the
+    # public Internet (localhost)" after the operator has clicked
+    # through everything. Set APP_BASE_URL to the install's public URL.
+    if _is_localhost_url(_app_base_url(request)):
+        return _redirect_with_error(return_to, "app_base_url_not_public")
 
     # Pre-allocate the SourceConnection row so the webhook URL embedded
     # in the manifest references its guid. The row is is_active=False
