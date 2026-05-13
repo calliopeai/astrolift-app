@@ -184,6 +184,58 @@ def test_oauth_app_config_row_returns_recoverable_error(patched_urlopen):
     assert exc.value.recoverable is True
 
 
+def test_fetch_file_returns_content_for_github(monkeypatch):
+    """fetch_file via the GitHub driver returns the raw body."""
+    from astrolift_scm.providers import fetch_file
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        lambda req, timeout=10: _MockResponse([]) if False else _GithubRawResponse(b'name = "demo"\n'),
+    )
+    conn = _FakeConn()
+    body = fetch_file(
+        conn,
+        repo_full_name="acme-org/private-svc",
+        path="astrolift.toml",
+        ref="main",
+    )
+    assert body == 'name = "demo"\n'
+
+
+def test_fetch_file_returns_none_on_404_for_github(monkeypatch):
+    import urllib.error
+
+    from astrolift_scm.providers import fetch_file
+
+    def _boom(req, timeout=10):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, io.BytesIO(b"missing"))
+
+    monkeypatch.setattr("astrolift_scm.providers.github.urllib.request.urlopen", _boom)
+    conn = _FakeConn()
+    assert (
+        fetch_file(
+            conn,
+            repo_full_name="acme-org/private-svc",
+            path="missing.toml",
+            ref="main",
+        )
+        is None
+    )
+
+
+class _GithubRawResponse:
+    """The GitHub raw-content endpoint hands back bytes, not JSON."""
+
+    def __init__(self, body: bytes):
+        self._body = body
+
+    def __enter__(self):
+        return SimpleNamespace(read=lambda: self._body)
+
+    def __exit__(self, *_):
+        return False
+
+
 def test_auth_failure_is_recoverable(monkeypatch):
     """A 401 from GitHub must come back as recoverable so the UI
     surfaces 'reconnect' instead of a 500."""
