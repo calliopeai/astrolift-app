@@ -54,6 +54,11 @@ ON_STARTUP = [
     "collectstatic --noinput",
     "bootstrap_admin",
     "bootstrap_idp",
+    # ProviderPlugin catalog rows must exist before the Clusters page's
+    # registerTenantCluster mutation can pass slug validation. The command
+    # is upsert-style and reads from the in-process plugin registry that
+    # AstroliftClustersConfig.ready() populated; safe to run on every boot.
+    "bootstrap_provider_plugins",
 ]
 
 logger.warning("[STARTUP] Running startup... ==================================")
