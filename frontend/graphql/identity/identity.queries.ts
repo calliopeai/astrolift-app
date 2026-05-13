@@ -68,6 +68,50 @@ export const LIST_PROJECTS = gql`
   }
 `;
 
+export const LIST_NAV_TREE = gql`
+  query ListNavTree {
+    astroliftNavTree {
+      organization {
+        id
+        slug
+        name
+      }
+      teams {
+        team {
+          id
+          slug
+          name
+        }
+        projects {
+          project {
+            id
+            slug
+            name
+          }
+          apps {
+            id
+            slug
+            name
+            status
+          }
+        }
+        unassignedApps {
+          id
+          slug
+          name
+          status
+        }
+      }
+      unassignedApps {
+        id
+        slug
+        name
+        status
+      }
+    }
+  }
+`;
+
 export const GET_ORGANIZATION = gql`
   query GetOrganization($slug: String!) {
     astroliftOrganization(slug: $slug) {

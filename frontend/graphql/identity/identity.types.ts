@@ -15,6 +15,7 @@ import type {
   AstroliftActiveSession as GeneratedActiveSession,
   AstroliftApiToken as GeneratedApiToken,
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
+  AstroliftAppSummary as GeneratedAppSummary,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
   AstroliftInvitation as GeneratedInvitation,
   AstroliftLogoutAllSessionsPayload as GeneratedLogoutAllSessionsPayload,
@@ -63,6 +64,38 @@ export type AstroliftProject = Omit<
   organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
   team: Pick<AstroliftTeam, "id" | "slug" | "name">;
 };
+
+/**
+ * App status enum mirrors RegisteredApp.ProvisioningStatus on the
+ * backend (pending/provisioning/ready/failed). The schema exposes it
+ * as a free `String!` so narrow it here for switch exhaustiveness.
+ */
+export type AstroliftAppStatus =
+  | "pending"
+  | "provisioning"
+  | "ready"
+  | "failed";
+
+export type AstroliftAppSummary = Omit<GeneratedAppSummary, "status"> & {
+  status: AstroliftAppStatus;
+};
+
+export interface AstroliftNavTreeProjectNode {
+  project: Pick<AstroliftProject, "id" | "slug" | "name">;
+  apps: AstroliftAppSummary[];
+}
+
+export interface AstroliftNavTreeTeamNode {
+  team: Pick<AstroliftTeam, "id" | "slug" | "name">;
+  projects: AstroliftNavTreeProjectNode[];
+  unassignedApps: AstroliftAppSummary[];
+}
+
+export interface AstroliftNavTree {
+  organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
+  teams: AstroliftNavTreeTeamNode[];
+  unassignedApps: AstroliftAppSummary[];
+}
 
 export type AstroliftUser = GeneratedUser;
 
