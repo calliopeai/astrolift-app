@@ -125,9 +125,7 @@ class IdentityQuery:
             return None
 
         teams = list(
-            Team.objects.filter(organization_id=org_id)
-            .select_related("organization")
-            .order_by("name")
+            Team.objects.filter(organization_id=org_id).select_related("organization").order_by("name")
         )
         projects = list(
             Project.objects.filter(organization_id=org_id)
@@ -170,19 +168,14 @@ class IdentityQuery:
                 project_nodes.append(
                     NavTreeProjectType(
                         project=project_to_type(project),
-                        apps=[
-                            app_to_summary(a) for a in apps_by_project.get(project.id, [])
-                        ],
+                        apps=[app_to_summary(a) for a in apps_by_project.get(project.id, [])],
                     )
                 )
             team_nodes.append(
                 NavTreeTeamType(
                     team=team_to_type(team),
                     projects=project_nodes,
-                    unassigned_apps=[
-                        app_to_summary(a)
-                        for a in apps_by_team_no_project.get(team.id, [])
-                    ],
+                    unassigned_apps=[app_to_summary(a) for a in apps_by_team_no_project.get(team.id, [])],
                 )
             )
 

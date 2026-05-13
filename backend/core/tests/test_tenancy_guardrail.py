@@ -41,6 +41,13 @@ EXEMPT: dict[str, str] = {
         "self-service: returns the caller's effective permissions — "
         "ordering matters because permissions drive nav rendering"
     ),
+    "IdentityQuery.astrolift_nav_tree": (
+        "self-service: returns the shape of the tenant the caller is "
+        "already scoped to. tenant_scoped is the visibility boundary; "
+        "every authed user is allowed to see the Org→Team→Project→App "
+        "tree of their own org so the sidebar can render. Resource-"
+        "level reads still flow through permission-gated resolvers."
+    ),
     "IdentityQuery.astrolift_active_identity_provider": (
         "renders before any tenant is picked — the IdP catalogue is the entry point to the login flow"
     ),

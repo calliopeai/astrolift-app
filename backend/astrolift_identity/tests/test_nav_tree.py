@@ -21,9 +21,7 @@ def _info():
 def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Engineering", slug="eng")
-    project = Project.objects.create(
-        organization=org, team=team, name="API", slug="api"
-    )
+    project = Project.objects.create(organization=org, team=team, name="API", slug="api")
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,
@@ -85,9 +83,7 @@ def test_nav_tree_excludes_apps_from_other_orgs():
     org_a, _team, _project, _app = _scaffold()
     org_b = Organization.objects.create(name="Beta", slug="beta")
     team_b = Team.objects.create(organization=org_b, name="Eng", slug="eng")
-    project_b = Project.objects.create(
-        organization=org_b, team=team_b, name="API", slug="api"
-    )
+    project_b = Project.objects.create(organization=org_b, team=team_b, name="API", slug="api")
     RegisteredApp.objects.create(
         organization=org_b,
         team=team_b,
