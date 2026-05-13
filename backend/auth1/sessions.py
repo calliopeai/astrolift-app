@@ -444,7 +444,12 @@ class Auth1SessionWorkflow:
         from auth1.active_idp import active_idp
         from auth1.dev_login import dev_login
         from auth1.local_login import local_login
-        from auth1.scm_oauth import github_callback, github_start
+        from auth1.scm_oauth import (
+            github_callback,
+            github_start,
+            gitlab_callback,
+            gitlab_start,
+        )
         from auth1.scm_webhook import github_webhook, gitlab_webhook
 
         return [
@@ -460,6 +465,12 @@ class Auth1SessionWorkflow:
                 "scm/github/callback",
                 github_callback,
                 name="scm_github_callback",
+            ),
+            path("scm/gitlab/start", gitlab_start, name="scm_gitlab_start"),
+            path(
+                "scm/gitlab/callback",
+                gitlab_callback,
+                name="scm_gitlab_callback",
             ),
             path(
                 "scm/github/webhook/<str:connection_id>/",
