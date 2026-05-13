@@ -250,3 +250,96 @@ def test_auth_failure_is_recoverable(monkeypatch):
         list_repos(conn)
     assert exc.value.code == "AUTH_FAILED"
     assert exc.value.recoverable is True
+
+
+# ---------------------------------------------------------------------------
+# github_app_install path: /installation/repositories
+# ---------------------------------------------------------------------------
+
+
+class _AppInstallConn:
+    """SourceConnection-shaped stand-in for a github_app_install row."""
+
+    def __init__(self, *, account_login="acme-org", scopes=None):
+        self.kind = "github_app_install"
+        self.account_login = account_login
+        self.repo_visibility_scopes = scopes or []
+        self.api_base_url = ""
+        self.installation_id = "12345"
+        self.oauth_client_id = "67890"  # app_id
+        self.secret_backend_kind = "local_fernet"
+        self.secret_ciphertext = b""  # never decrypted in these tests
+        # SourceConnection.guid is hit by the in-process installation-
+        # token cache key; supply a stable stub.
+        self.guid = "00000000-0000-0000-0000-000000000001"
+
+
+def test_app_install_lists_via_installation_repositories_endpoint(monkeypatch):
+    """github_app_install must hit /installation/repositories with a
+    Bearer header (not /user/repos with a token header). The endpoint
+    returns ``{ total_count, repositories: [...] }`` instead of a bare
+    list — the driver normalizes that shape."""
+    captured: dict = {}
+
+    def _fake_urlopen(req, timeout=10):
+        captured["url"] = req.full_url
+        captured["auth"] = req.get_header("Authorization")
+        return _MockInstallationResponse(_REPOS)
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        _fake_urlopen,
+    )
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda conn: "v1.installation-token",
+    )
+
+    conn = _AppInstallConn()
+    rows = list(list_repos(conn))
+    assert {r.full_name for r in rows} == {
+        "acme-org/private-svc",
+        "acme-org/public-cli",
+        "alice/personal-blog",
+        "torvalds/linux",
+    }
+    assert "/installation/repositories" in captured["url"]
+    assert captured["auth"] == "Bearer v1.installation-token"
+
+
+def test_app_install_ignores_visibility_scopes(monkeypatch):
+    """The operator already constrained the repo set at install time on
+    GitHub (App installations are explicitly scoped to a chosen repo
+    list), so we don't re-filter by visibility scope. A scope value on
+    the connection is treated as advisory metadata, not a filter."""
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github.urllib.request.urlopen",
+        lambda req, timeout=10: _MockInstallationResponse(_REPOS),
+    )
+    monkeypatch.setattr(
+        "astrolift_scm.providers.github_app.installation_token",
+        lambda conn: "v1.installation-token",
+    )
+
+    conn = _AppInstallConn(scopes=["private_org"])
+    rows = list(list_repos(conn))
+    # Same four entries as the no-filter case — the scope was ignored.
+    assert {r.full_name for r in rows} == {
+        "acme-org/private-svc",
+        "acme-org/public-cli",
+        "alice/personal-blog",
+        "torvalds/linux",
+    }
+
+
+class _MockInstallationResponse:
+    """``/installation/repositories`` wraps the list in a dict."""
+
+    def __init__(self, rows):
+        self._body = json.dumps({"total_count": len(rows), "repositories": rows}).encode("utf-8")
+
+    def __enter__(self):
+        return SimpleNamespace(read=lambda: self._body)
+
+    def __exit__(self, *_):
+        return False

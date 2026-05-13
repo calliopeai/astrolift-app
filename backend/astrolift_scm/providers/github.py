@@ -2,16 +2,22 @@
 GitHub repo listing through a stored connection.
 
 Auth modes covered:
-- ``github_pat``: Authorization: token <pat>
-- ``github_app_install``: not yet (phase 2b — needs JWT minting from
-  the App private key + per-installation token exchange)
+- ``github_pat``: ``Authorization: token <pat>``, lists via ``/user/repos``.
+- ``github_oauth_user``: same shape as PAT — a user-bearer token.
+- ``github_app_install``: ``Authorization: Bearer <installation-token>``,
+  lists via ``/installation/repositories``. Installation tokens are
+  scoped to the App's installation (the operator picks the repos at
+  install time on GitHub) so the result set is *the* canonical list for
+  this connection — no client-side visibility filtering needed.
 
 Visibility scopes from ``SourceConnection.repo_visibility_scopes``
-are applied client-side to the API response. We could push some
-filtering into the API call itself (the ``type`` parameter on
+are applied client-side to the user-token API response. We could push
+some filtering into the API call itself (the ``type`` parameter on
 ``/user/repos``), but the API doesn't have a single mode that
 matches our four-axis scope model exactly, so a clean post-filter
-is more honest than juggling combinations.
+is more honest than juggling combinations. The App-installation path
+ignores visibility scopes because the operator already picked the repo
+set at install time.
 """
 
 from __future__ import annotations
@@ -93,29 +99,47 @@ def list_github_repos(
     search: str | None = None,
     limit: int = 100,
 ) -> list:
-    """Call GitHub's repo listing API and apply the connection's
-    visibility-scope filter to the result."""
+    """Call GitHub's repo listing API and (for user-bearer connections)
+    apply the connection's visibility-scope filter to the result.
+
+    Branches on auth mode:
+      * Installation token → ``/installation/repositories`` (different
+        response shape: ``{ total_count, repositories: [...] }``).
+        Authorization header is ``Bearer``, not ``token``.
+      * PAT / OAuth-user token → ``/user/repos``, ``token`` header,
+        client-side visibility-scope filter applied.
+    """
     from astrolift_scm.providers import RemoteRepo
 
     token = _token(connection)
     base = _api_base(connection)
+    is_app_install = connection.kind == "github_app_install"
 
-    # /user/repos returns repos the token can see (private + public,
-    # owned + collaborator + org). We do per_page=100, single page;
-    # paginating the long tail lands in a follow-up when we need it.
-    qs = urllib.parse.urlencode(
-        {
-            "per_page": str(min(max(limit, 1), 100)),
-            "sort": "pushed",
-            "direction": "desc",
-        }
-    )
-    url = f"{base}/user/repos?{qs}"
+    if is_app_install:
+        # The App installation already has its repo set fixed by the
+        # operator at install-time on GitHub, so we don't pre-filter by
+        # visibility scope. We do honor the operator's per_page hint.
+        qs = urllib.parse.urlencode({"per_page": str(min(max(limit, 1), 100))})
+        url = f"{base}/installation/repositories?{qs}"
+        auth_header = f"Bearer {token}"
+    else:
+        # /user/repos returns repos the token can see (private + public,
+        # owned + collaborator + org). per_page=100, single page;
+        # paginating the long tail lands in a follow-up when we need it.
+        qs = urllib.parse.urlencode(
+            {
+                "per_page": str(min(max(limit, 1), 100)),
+                "sort": "pushed",
+                "direction": "desc",
+            }
+        )
+        url = f"{base}/user/repos?{qs}"
+        auth_header = f"token {token}"
 
     req = urllib.request.Request(
         url,
         headers={
-            "Authorization": f"token {token}",
+            "Authorization": auth_header,
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "astrolift",
@@ -143,22 +167,31 @@ def list_github_repos(
     except urllib.error.URLError as exc:
         raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
-    if not isinstance(payload, list):
-        raise GithubProviderError("UNEXPECTED_SHAPE", "GitHub returned a non-list payload")
+    if is_app_install:
+        if not isinstance(payload, dict) or not isinstance(payload.get("repositories"), list):
+            raise GithubProviderError(
+                "UNEXPECTED_SHAPE",
+                "GitHub returned an unexpected payload for /installation/repositories",
+            )
+        rows = payload["repositories"]
+    else:
+        if not isinstance(payload, list):
+            raise GithubProviderError("UNEXPECTED_SHAPE", "GitHub returned a non-list payload")
+        rows = payload
 
     org_login = (connection.account_login or "").lower()
     scopes = set(connection.repo_visibility_scopes or [])
+    apply_scope_filter = bool(scopes) and not is_app_install
 
     out: list[RemoteRepo] = []
-    for raw in payload:
+    for raw in rows:
         owner = raw.get("owner") or {}
         owner_login = (owner.get("login") or "").lower()
         owner_type = owner.get("type") or "User"
         is_private = bool(raw.get("private"))
         full_name = raw.get("full_name", "")
 
-        # Apply visibility-scope filter when scopes is non-empty.
-        if scopes:
+        if apply_scope_filter:
             in_org = bool(org_login) and owner_login == org_login
             keep = (
                 ("private_org" in scopes and in_org and is_private)
