@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -191,3 +192,51 @@ def list_github_repos(
         )
 
     return out
+
+
+def fetch_github_file(
+    connection,
+    *,
+    repo_full_name: str,
+    path: str,
+    ref: str,
+) -> str | None:
+    """Fetch a file from a GitHub repo at ``ref`` through the
+    connection's token.
+
+    Returns the file body (UTF-8) or None when the file doesn't
+    exist. Raises GithubProviderError on auth / network failures.
+
+    Uses the ``application/vnd.github.raw`` Accept header so the API
+    returns the raw bytes directly — no base64 round-trip."""
+    token = _token(connection)
+    base = _api_base(connection)
+
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    safe_path = "/".join(urllib.parse.quote(p, safe="") for p in path.split("/"))
+    url = f"{base}/repos/{safe_repo}/contents/{safe_path}?ref={urllib.parse.quote(ref)}"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.raw",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
