@@ -803,6 +803,16 @@ export type AstroliftSourceConnectionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftSourceFile = {
+  content?: Maybe<Scalars['String']['output']>;
+  errorCode?: Maybe<Scalars['String']['output']>;
+  errorMessage?: Maybe<Scalars['String']['output']>;
+  path: Scalars['String']['output'];
+  recoverable: Scalars['Boolean']['output'];
+  ref: Scalars['String']['output'];
+  repoFullName: Scalars['String']['output'];
+};
+
 export type AstroliftSshDeployKey = {
   createdAt: Scalars['DateTime']['output'];
   fingerprintSha256: Scalars['String']['output'];
@@ -2334,6 +2344,7 @@ export type Query = {
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
+  astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
   astroliftTeams: Array<AstroliftTeam>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
@@ -2516,6 +2527,14 @@ export type QueryAstroliftScheduledJobRunsArgs = {
 };
 
 
+export type QueryAstroliftSourceFileArgs = {
+  connectionId: Scalars['String']['input'];
+  path: Scalars['String']['input'];
+  ref: Scalars['String']['input'];
+  repoFullName: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftSshDeployKeysArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -2616,6 +2635,7 @@ export type RegisterAppInput = {
   deployBranch: InputMaybe<Scalars['String']['input']>;
   description: InputMaybe<Scalars['String']['input']>;
   manifestPath: InputMaybe<Scalars['String']['input']>;
+  manifestRaw: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   projectId: Scalars['GUID']['input'];
   slug: Scalars['String']['input'];

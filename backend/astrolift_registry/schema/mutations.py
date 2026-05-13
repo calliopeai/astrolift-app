@@ -30,6 +30,13 @@ class RegisterAppInput:
     default_branch: str | None = None
     deploy_branch: str | None = None
     trigger_mode: str | None = None
+    # Optional: the wizard may pre-fetch the manifest (via
+    # astroliftSourceFile) and pass the body here so the new app
+    # boots with manifest_raw already populated. The onboarding
+    # workflow still resyncs from the repo's default branch — this is
+    # just the seed that lets ManifestParse activities run before the
+    # first GitHub/GitLab API call lands.
+    manifest_raw: str | None = None
 
 
 @strawberry.input
@@ -167,6 +174,7 @@ class RegistryMutation:
             source_repo=input.source_repo or "",
             source_url=input.source_url or "",
             manifest_path=input.manifest_path or "astrolift.toml",
+            manifest_raw=input.manifest_raw or "",
             default_branch=input.default_branch or "main",
             deploy_branch=input.deploy_branch or input.default_branch or "main",
             trigger_mode=input.trigger_mode or "auto_on_push",
