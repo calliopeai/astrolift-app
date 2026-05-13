@@ -11,6 +11,7 @@ import type {
   AstroliftRemoteRepoList as GeneratedRemoteRepoList,
   AstroliftScmWebhookSecretReveal as GeneratedScmWebhookSecretReveal,
   AstroliftSourceConnection as GeneratedSourceConnection,
+  AstroliftSourceFile as GeneratedSourceFile,
   AstroliftSshDeployKey as GeneratedSshDeployKey,
   AstroliftSshDeployKeyCreated as GeneratedSshDeployKeyCreated,
 } from "@/graphql/__generated__/schema";
@@ -54,5 +55,7 @@ export type AstroliftWebhookSecretReveal = GeneratedScmWebhookSecretReveal;
 export type AstroliftRemoteRepo = GeneratedRemoteRepo;
 
 export type AstroliftRemoteRepoList = GeneratedRemoteRepoList;
+
+export type AstroliftSourceFile = GeneratedSourceFile;
 
 export type { AstroliftGuid, MutationResult };

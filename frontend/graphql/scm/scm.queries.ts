@@ -49,6 +49,30 @@ export const LIST_SSH_DEPLOY_KEYS = gql`
   }
 `;
 
+export const GET_SOURCE_FILE = gql`
+  query GetSourceFile(
+    $connectionId: String!
+    $repoFullName: String!
+    $path: String!
+    $ref: String!
+  ) {
+    astroliftSourceFile(
+      connectionId: $connectionId
+      repoFullName: $repoFullName
+      path: $path
+      ref: $ref
+    ) {
+      repoFullName
+      path
+      ref
+      content
+      errorCode
+      errorMessage
+      recoverable
+    }
+  }
+`;
+
 export const LIST_AVAILABLE_REPOS = gql`
   query ListAvailableRepos(
     $connectionId: String!

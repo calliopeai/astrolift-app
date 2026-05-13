@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
-import { GitBranchIcon, RocketIcon } from "lucide-react";
+import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
+import { CheckIcon, FileTextIcon, GitBranchIcon, RocketIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -16,6 +16,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,12 +44,14 @@ import type {
 } from "@/graphql/registry/registry.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
+  GET_SOURCE_FILE,
   LIST_AVAILABLE_REPOS,
   LIST_SOURCE_CONNECTIONS,
 } from "@/graphql/scm/scm.queries";
 import type {
   AstroliftRemoteRepoList,
   AstroliftSourceConnection,
+  AstroliftSourceFile,
 } from "@/graphql/scm/scm.types";
 
 interface ProjectsResp {
@@ -54,6 +64,10 @@ interface ConnectionsResp {
 
 interface ReposResp {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
+}
+
+interface SourceFileResp {
+  astroliftSourceFile: AstroliftSourceFile;
 }
 
 const KIND_TO_SOURCE_KIND: Record<string, SourceKind> = {
@@ -100,11 +114,18 @@ export function RegisterAppClient() {
   const [manifestPath, setManifestPath] = React.useState("astrolift.toml");
   const [defaultBranch, setDefaultBranch] = React.useState("main");
   const [deployBranch, setDeployBranch] = React.useState("main");
+  const [manifestRaw, setManifestRaw] = React.useState("");
+  const [manifestTouched, setManifestTouched] = React.useState(false);
+  const [manifestFetchState, setManifestFetchState] = React.useState<
+    "idle" | "fetching" | "loaded" | "missing" | "error"
+  >("idle");
+  const [manifestFetchMessage, setManifestFetchMessage] = React.useState("");
 
   // Connected-host picker. The operator can paste a clone URL the
   // old way OR pick a stored connection and choose a repo from it.
   // Picking a connection auto-fills sourceKind/sourceRepo/sourceUrl/
-  // defaultBranch from the chosen repo.
+  // defaultBranch from the chosen repo and (when the manifest is
+  // present at the default branch) the manifest textarea.
   const [pickerConnectionId, setPickerConnectionId] = React.useState("");
   const [pickerSearch, setPickerSearch] = React.useState("");
 
@@ -118,10 +139,61 @@ export function RegisterAppClient() {
     skip: !repoListable,
   });
 
+  const [fetchManifest] = useLazyQuery<SourceFileResp>(GET_SOURCE_FILE, {
+    fetchPolicy: "network-only",
+  });
+
   const usableConnections = (
     connections.data?.astroliftSourceConnections ?? []
   ).filter((c) => c.isActive && !c.isOauthAppConfig);
   const repoList = repos.data?.astroliftAvailableRepos;
+
+  async function tryAutoFetchManifest(args: {
+    connectionId: string;
+    repoFullName: string;
+    branch: string;
+    path: string;
+  }) {
+    setManifestFetchState("fetching");
+    setManifestFetchMessage("");
+    const { data, error } = await fetchManifest({
+      variables: {
+        connectionId: args.connectionId,
+        repoFullName: args.repoFullName,
+        path: args.path,
+        ref: args.branch,
+      },
+    });
+    if (error) {
+      setManifestFetchState("error");
+      setManifestFetchMessage(error.message);
+      return;
+    }
+    const f = data?.astroliftSourceFile;
+    if (!f) {
+      setManifestFetchState("error");
+      setManifestFetchMessage("no response from server");
+      return;
+    }
+    if (f.errorCode) {
+      setManifestFetchState("error");
+      setManifestFetchMessage(f.errorMessage ?? f.errorCode);
+      return;
+    }
+    if (f.content == null) {
+      setManifestFetchState("missing");
+      setManifestFetchMessage(`${args.path} not found on ${args.branch}`);
+      return;
+    }
+    setManifestFetchState("loaded");
+    setManifestFetchMessage(
+      `Loaded ${args.path} from ${args.repoFullName}@${args.branch}`,
+    );
+    // Don't clobber an operator's manual edit.
+    if (!manifestTouched) {
+      setManifestRaw(f.content);
+    }
+  }
 
   function pickRepo(fullName: string) {
     const repo = repoList?.repos.find((r) => r.fullName === fullName);
@@ -133,14 +205,24 @@ export function RegisterAppClient() {
     setSourceKind(inferredKind);
     setSourceRepo(repo.fullName);
     setSourceUrl(repo.cloneUrlHttps || repo.cloneUrlSsh || "");
-    setDefaultBranch(repo.defaultBranch || "main");
-    setDeployBranch(repo.defaultBranch || "main");
+    const branch = repo.defaultBranch || "main";
+    setDefaultBranch(branch);
+    setDeployBranch(branch);
     if (!name) {
       setName(repo.name);
     }
     if (!slugTouched && !slug) {
       setSlug(slugify(repo.name));
     }
+    // Best-effort manifest auto-fetch from the default branch. The
+    // wizard's manifest path defaults to astrolift.toml; operators
+    // who keep theirs elsewhere can edit the path field and re-pick.
+    void tryAutoFetchManifest({
+      connectionId: pickerConnectionId,
+      repoFullName: repo.fullName,
+      branch,
+      path: manifestPath || "astrolift.toml",
+    });
   }
 
   React.useEffect(() => {
@@ -172,6 +254,7 @@ export function RegisterAppClient() {
           sourceRepo: sourceRepo.trim(),
           sourceUrl: sourceUrl.trim() || null,
           manifestPath: manifestPath.trim() || "astrolift.toml",
+          manifestRaw: manifestRaw.trim() ? manifestRaw : null,
           defaultBranch: defaultBranch.trim() || "main",
           deployBranch: deployBranch.trim() || "main",
         },
@@ -303,13 +386,6 @@ export function RegisterAppClient() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    placeholder="filter repos…"
-                    value={pickerSearch}
-                    onChange={(e) => setPickerSearch(e.target.value)}
-                    disabled={!repoListable}
-                    className="text-xs"
-                  />
                 </div>
                 {repoListable && (
                   <div className="mt-3">
@@ -333,28 +409,57 @@ export function RegisterAppClient() {
                         )}
                       </p>
                     ) : repoList && repoList.repos.length > 0 ? (
-                      <Select
-                        value={sourceRepo || ""}
-                        onValueChange={pickRepo}
+                      <Combobox
+                        items={repoList.repos}
+                        itemToStringLabel={(r) =>
+                          (r as { fullName: string }).fullName
+                        }
+                        value={
+                          sourceRepo
+                            ? (repoList.repos.find(
+                                (r) => r.fullName === sourceRepo,
+                              ) ?? null)
+                            : null
+                        }
+                        onValueChange={(v) => {
+                          if (v && typeof v === "object" && "fullName" in v) {
+                            pickRepo((v as { fullName: string }).fullName);
+                          }
+                        }}
+                        inputValue={pickerSearch}
+                        onInputValueChange={(v) => setPickerSearch(v ?? "")}
                       >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={`Pick from ${repoList.repos.length} repo${repoList.repos.length === 1 ? "" : "s"}`}
-                          />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-72">
-                          {repoList.repos.map((r) => (
-                            <SelectItem key={r.fullName} value={r.fullName}>
-                              {r.fullName}{" "}
-                              <span className="text-muted-foreground text-xs">
-                                ({r.visibility}
-                                {r.isFork && ", fork"}
-                                {r.isArchived && ", archived"})
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <ComboboxInput
+                          placeholder={`Search ${repoList.repos.length} repo${
+                            repoList.repos.length === 1 ? "" : "s"
+                          }…`}
+                        />
+                        <ComboboxContent>
+                          <ComboboxEmpty>No matching repos.</ComboboxEmpty>
+                          <ComboboxList>
+                            {(item) => {
+                              const r = item as {
+                                fullName: string;
+                                visibility: string;
+                                isFork: boolean;
+                                isArchived: boolean;
+                              };
+                              return (
+                                <ComboboxItem key={r.fullName} value={r}>
+                                  <span className="font-mono text-xs">
+                                    {r.fullName}
+                                  </span>
+                                  <span className="text-muted-foreground ml-auto text-[10px]">
+                                    {r.visibility}
+                                    {r.isFork && ", fork"}
+                                    {r.isArchived && ", archived"}
+                                  </span>
+                                </ComboboxItem>
+                              );
+                            }}
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
                     ) : (
                       <p className="text-muted-foreground text-xs">
                         No repos visible to this connection. Adjust the
@@ -465,6 +570,59 @@ export function RegisterAppClient() {
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="manifest-raw">Manifest preview</Label>
+                <div className="flex items-center gap-2">
+                  <ManifestFetchBadge
+                    state={manifestFetchState}
+                    message={manifestFetchMessage}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={
+                      !pickerConnectionId ||
+                      !sourceRepo ||
+                      manifestFetchState === "fetching"
+                    }
+                    onClick={() =>
+                      tryAutoFetchManifest({
+                        connectionId: pickerConnectionId,
+                        repoFullName: sourceRepo,
+                        branch: defaultBranch || "main",
+                        path: manifestPath || "astrolift.toml",
+                      })
+                    }
+                  >
+                    <FileTextIcon className="size-4" />
+                    {manifestFetchState === "fetching" ? "Fetching…" : "Fetch from repo"}
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                id="manifest-raw"
+                value={manifestRaw}
+                onChange={(e) => {
+                  setManifestRaw(e.target.value);
+                  setManifestTouched(true);
+                }}
+                placeholder={
+                  pickerConnectionId
+                    ? "Pick a repo to auto-fetch astrolift.toml from the default branch — or paste your manifest here."
+                    : "Paste astrolift.toml here, or pick a connected source above to auto-fetch it."
+                }
+                rows={10}
+                className="font-mono text-xs"
+              />
+              <p className="text-muted-foreground text-xs">
+                Optional. If empty, the onboarding workflow fetches the
+                manifest from <code>{manifestPath || "astrolift.toml"}</code>{" "}
+                on the default branch after registration.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -512,5 +670,42 @@ export function RegisterAppClient() {
         </div>
       </form>
     </PageShell>
+  );
+}
+
+function ManifestFetchBadge({
+  state,
+  message,
+}: {
+  state: "idle" | "fetching" | "loaded" | "missing" | "error";
+  message: string;
+}) {
+  if (state === "idle") return null;
+  if (state === "fetching") {
+    return (
+      <span className="text-muted-foreground text-[11px]">
+        Fetching manifest…
+      </span>
+    );
+  }
+  if (state === "loaded") {
+    return (
+      <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1 text-[11px]">
+        <CheckIcon className="size-3" />
+        {message}
+      </span>
+    );
+  }
+  if (state === "missing") {
+    return (
+      <span className="text-amber-600 dark:text-amber-400 text-[11px]">
+        Couldn&apos;t find a manifest at that path — paste yours below.
+      </span>
+    );
+  }
+  return (
+    <span className="text-destructive text-[11px]" title={message}>
+      Couldn&apos;t fetch manifest — {message}
+    </span>
   );
 }
