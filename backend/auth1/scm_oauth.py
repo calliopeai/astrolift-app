@@ -193,10 +193,18 @@ def github_start(request: HttpRequest) -> Any:
     if org_id is None:
         return _redirect_with_error(return_to, "no_org")
 
+    # GitHub Apps support a user-to-server OAuth flow on the same
+    # /login/oauth/authorize endpoint as classic OAuth Apps — they
+    # both have a client_id and the auth URL is identical. We accept
+    # both ``github_oauth_app`` (classic OAuth App) and
+    # ``github_app_install`` (manifest-registered GitHub App) here so
+    # operators who chose the one-click App install can also offer a
+    # per-user "Connect my GitHub" button. The callback flow at
+    # ``github_callback`` widens the same filter.
     config = SourceConnection.objects.filter(
         organization_id=org_id,
         guid=config_id,
-        kind="github_oauth_app",
+        kind__in=["github_oauth_app", "github_app_install"],
         is_active=True,
         deleted_at__isnull=True,
     ).first()
@@ -248,7 +256,7 @@ def github_callback(request: HttpRequest) -> Any:
 
     config = SourceConnection.objects.filter(
         guid=pending["config_id"],
-        kind="github_oauth_app",
+        kind__in=["github_oauth_app", "github_app_install"],
         is_active=True,
         deleted_at__isnull=True,
     ).first()
