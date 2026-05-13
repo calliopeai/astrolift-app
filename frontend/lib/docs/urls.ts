@@ -31,12 +31,13 @@ interface DocLink {
 
 export const DOC_LINKS = {
   scmGithubOauth: {
-    // TODO: finalize URL shape when the astrolift.dev MkDocs nav is
-    // configured. Today this is a placeholder; the wiki link works
-    // immediately if the wiki page is created.
+    // Covers both the one-click GitHub-App manifest flow (primary path)
+    // and the legacy paste-credentials options (PAT, pre-registered
+    // OAuth App). Wiki page lives at the repo root per the flat-file
+    // wiki convention.
     primary: `${DOCS_BASE}/scm-github-oauth/`,
     wiki: `${WIKI_BASE}/SCM-GitHub-OAuth-Setup`,
-    label: "GitHub OAuth setup guide",
+    label: "Source-provider setup guide",
   },
 } as const satisfies Record<string, DocLink>;
 
