@@ -9,6 +9,7 @@ import {
   GitPullRequestIcon,
   CloudIcon,
   CoinsIcon,
+  DownloadIcon,
   FileBoxIcon,
   GaugeIcon,
   GitBranchIcon,
@@ -218,6 +219,12 @@ const sections: NavSection[] = [
         icon: <BarChart3Icon />,
         permission: { anyOf: ["app.read", "app.read_metrics"] },
       },
+    ],
+  },
+  {
+    label: "Resources",
+    items: [
+      { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
     ],
   },
   {
