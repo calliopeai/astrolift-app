@@ -12,6 +12,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import {
@@ -78,6 +79,8 @@ interface Resp {
 export function AppDeployTokensClient({ slug }: { slug: string }) {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [reveal, setReveal] = React.useState<DeployTokenSecretReveal | null>(null);
+  const [rotateTarget, setRotateTarget] = React.useState<DeployToken | null>(null);
+  const [revokeTarget, setRevokeTarget] = React.useState<DeployToken | null>(null);
 
   const variables = { appSlug: slug };
   const tokens = useQuery<Resp>(LIST_APP_DEPLOY_TOKENS, {
@@ -101,35 +104,21 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
   const list = tokens.data?.astroliftAppDeployTokens ?? [];
 
   async function handleRotate(t: DeployToken) {
-    if (
-      !confirm(
-        `Rotate ${t.name}? The previous secret stays valid for a 24h grace period.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await rotateToken({ variables: { input: { id: t.id } } });
     if (data?.rotateDeployToken.ok) {
       const next = data.rotateDeployToken.data;
       if (next) setReveal(next);
     } else {
-      toast.error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed");
+      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed");
     }
   }
 
   async function handleRevoke(t: DeployToken) {
-    if (
-      !confirm(
-        `Revoke ${t.name}? Existing CI flows using this token break immediately. Use Rotate for a grace-period swap.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await revokeToken({ variables: { input: { id: t.id } } });
     if (data?.revokeDeployToken.ok) {
       toast.success(`Revoked ${t.name}`);
     } else {
-      toast.error(data?.revokeDeployToken.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeDeployToken.errors?.[0]?.message ?? "Revoke failed");
     }
   }
 
@@ -212,7 +201,7 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRotate(t)}
+                            onClick={() => setRotateTarget(t)}
                             disabled={busy}
                           >
                             <RefreshCwIcon className="size-3.5" />
@@ -221,7 +210,7 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRevoke(t)}
+                            onClick={() => setRevokeTarget(t)}
                             disabled={busy}
                           >
                             <ShieldOffIcon className="size-3.5" />
@@ -262,6 +251,33 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
       />
 
       <RevealDialog reveal={reveal} onOpenChange={() => setReveal(null)} />
+
+      <ConfirmDialog
+        open={rotateTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRotateTarget(null);
+        }}
+        title={rotateTarget ? `Rotate ${rotateTarget.name}?` : "Rotate token?"}
+        description="A fresh plaintext is generated and shown once. The previous secret remains valid for a 24h grace period to let in-flight CI runs finish — use Revoke for an immediate cutover."
+        confirmLabel="Rotate token"
+        onConfirm={async () => {
+          if (rotateTarget) await handleRotate(rotateTarget);
+        }}
+      />
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={revokeTarget ? `Revoke ${revokeTarget.name}?` : "Revoke token?"}
+        description="CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap."
+        confirmLabel="Revoke token"
+        destructive
+        onConfirm={async () => {
+          if (revokeTarget) await handleRevoke(revokeTarget);
+        }}
+      />
     </PageShell>
   );
 }

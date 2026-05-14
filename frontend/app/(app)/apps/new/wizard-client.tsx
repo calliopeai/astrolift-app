@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { REGISTER_APP } from "@/graphql/registry/registry.mutations";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type {
@@ -217,13 +218,16 @@ export function WizardClient() {
 
   // ---- Cancel ----
 
+  const [confirmCancel, setConfirmCancel] = React.useState(false);
+
   const handleCancel = React.useCallback(() => {
     const dirty =
       state.connectionId !== "" ||
       state.sourceRepo !== "" ||
       state.name !== "" ||
       state.manifestRaw !== "";
-    if (dirty && !window.confirm("Discard wizard progress and return to /apps?")) {
+    if (dirty) {
+      setConfirmCancel(true);
       return;
     }
     router.push("/apps");
@@ -392,6 +396,17 @@ export function WizardClient() {
           sideEffects={sideEffects}
         />
       )}
+      <ConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Discard wizard progress?"
+        description="The repo selection, app details, and manifest preview you've built so far are not saved anywhere. Closing the wizard now means starting over."
+        confirmLabel="Discard and exit"
+        destructive
+        onConfirm={() => {
+          router.push("/apps");
+        }}
+      />
     </WizardShell>
   );
 }

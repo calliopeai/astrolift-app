@@ -12,6 +12,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +95,7 @@ export function SecretsClient({ slug }: { slug: string }) {
   const [envName, setEnvName] = React.useState<string>(ALL_ENVS);
   const [setOpen, setSetOpen] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(null);
 
   const variables = {
     appSlug: slug,
@@ -145,7 +147,7 @@ export function SecretsClient({ slug }: { slug: string }) {
   const list = secrets.data?.astroliftAppSecrets ?? [];
   const envList = envs.data?.astroliftEnvironments ?? [];
 
-  async function handleDelete(s: AppSecret) {
+  function requestDelete(s: AppSecret) {
     if (s.source !== "literal") {
       toast.error(
         s.source === "bundle"
@@ -154,20 +156,17 @@ export function SecretsClient({ slug }: { slug: string }) {
       );
       return;
     }
-    if (
-      !confirm(
-        `Delete literal secret ${s.key} from astrolift.toml? Stages the change in the platform; push to repo to land it.`,
-      )
-    ) {
-      return;
-    }
+    setDeleteTarget(s);
+  }
+
+  async function handleDelete(s: AppSecret) {
     const { data } = await deleteSecret({
       variables: { input: { appSlug: slug, key: s.key } },
     });
     if (data?.deleteAppSecret.ok) {
       toast.success(`Deleted ${s.key}`);
     } else {
-      toast.error(data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -277,7 +276,7 @@ export function SecretsClient({ slug }: { slug: string }) {
                             variant="ghost"
                             size="icon"
                             className="size-8"
-                            onClick={() => handleDelete(s)}
+                            onClick={() => requestDelete(s)}
                             disabled={busy}
                           >
                             <Trash2Icon className="size-4" />
@@ -311,6 +310,20 @@ export function SecretsClient({ slug }: { slug: string }) {
           return false;
         }}
         busy={busy}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `Delete ${deleteTarget.key}?` : "Delete secret?"}
+        description="Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed."
+        confirmLabel="Delete secret"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
       />
 
       <BulkImportSheet

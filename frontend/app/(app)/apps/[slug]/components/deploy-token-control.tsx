@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   CREATE_DEPLOY_TOKEN,
   REVOKE_DEPLOY_TOKEN,
@@ -73,6 +74,8 @@ export function DeployTokenControl({ appSlug }: Props) {
   const tokens = data?.astroliftAppDeployTokens ?? [];
   const active = tokens.find((t) => !t.isRevoked) ?? null;
   const [reveal, setReveal] = useState<string | null>(null);
+  const [confirmRotate, setConfirmRotate] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   const refetchAll = async () => {
     await refetch();
@@ -108,9 +111,6 @@ export function DeployTokenControl({ appSlug }: Props) {
 
   async function handleRotate() {
     if (!active) return;
-    if (!confirm("Rotate this deploy token? The previous value stops working immediately.")) {
-      return;
-    }
     const { data } = await rotate({
       variables: { input: { id: active.id } },
     });
@@ -118,22 +118,19 @@ export function DeployTokenControl({ appSlug }: Props) {
       setReveal(data.rotateDeployToken.data.plaintextSecret);
       toast.success("Token rotated — copy the new value now.");
     } else {
-      toast.error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed.");
+      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed.");
     }
   }
 
   async function handleRevoke() {
     if (!active) return;
-    if (!confirm("Revoke this deploy token? CI using it will fail until a new one is minted.")) {
-      return;
-    }
     const { data } = await revoke({
       variables: { input: { id: active.id } },
     });
     if (data?.revokeDeployToken.ok) {
       toast.success("Token revoked.");
     } else {
-      toast.error(data?.revokeDeployToken.errors?.[0]?.message ?? "Revoke failed.");
+      throw new Error(data?.revokeDeployToken.errors?.[0]?.message ?? "Revoke failed.");
     }
   }
 
@@ -176,7 +173,7 @@ export function DeployTokenControl({ appSlug }: Props) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={handleRotate}
+                  onClick={() => setConfirmRotate(true)}
                   disabled={rotating}
                   className="gap-1.5"
                 >
@@ -190,7 +187,7 @@ export function DeployTokenControl({ appSlug }: Props) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={handleRevoke}
+                  onClick={() => setConfirmRevoke(true)}
                   disabled={revoking}
                   className="text-muted-foreground hover:text-destructive gap-1.5"
                 >
@@ -217,6 +214,25 @@ export function DeployTokenControl({ appSlug }: Props) {
       </div>
 
       {reveal && <RevealDialog token={reveal} onClose={() => setReveal(null)} />}
+
+      <ConfirmDialog
+        open={confirmRotate}
+        onOpenChange={setConfirmRotate}
+        title="Rotate deploy token?"
+        description="The previous value stops working immediately. Any CI run still holding the old token will fail until you update the secret on the CI side."
+        confirmLabel="Rotate token"
+        onConfirm={handleRotate}
+      />
+
+      <ConfirmDialog
+        open={confirmRevoke}
+        onOpenChange={setConfirmRevoke}
+        title="Revoke deploy token?"
+        description="CI runs using this token will start failing immediately. Mint a new token afterwards and update your CI secret to recover. No way to un-revoke — soft delete only."
+        confirmLabel="Revoke token"
+        destructive
+        onConfirm={handleRevoke}
+      />
     </section>
   );
 }

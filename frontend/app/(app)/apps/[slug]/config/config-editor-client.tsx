@@ -11,6 +11,7 @@ import {
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -275,6 +276,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   }>(PUSH_MANIFEST_TO_REPO, { refetchQueries: refetch, awaitRefetchQueries: true });
 
   const busy = updateState.loading || syncState.loading || pushState.loading;
+  const [confirmSync, setConfirmSync] = React.useState(false);
 
   async function handleSave() {
     if (!a) return;
@@ -291,13 +293,6 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
   async function handleSync() {
     if (!a) return;
-    if (
-      !confirm(
-        "Sync from repo? Discards any unsaved draft and pulls the source manifest as the new base.",
-      )
-    ) {
-      return;
-    }
     const { data } = await syncManifest({ variables: { input: { id: a.id } } });
     if (data?.syncManifestFromRepo.ok) {
       const next = data.syncManifestFromRepo.data;
@@ -306,7 +301,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       baselineRef.current = text;
       toast.success("Synced from repo");
     } else {
-      toast.error(data?.syncManifestFromRepo.errors?.[0]?.message ?? "Sync failed");
+      throw new Error(data?.syncManifestFromRepo.errors?.[0]?.message ?? "Sync failed");
     }
   }
 
@@ -426,7 +421,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
         <>
           <Button
             variant="outline"
-            onClick={handleSync}
+            onClick={() => setConfirmSync(true)}
             disabled={busy}
           >
             <RefreshCwIcon className="size-4" />
@@ -572,6 +567,16 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
           onClose={() => setConflict(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmSync}
+        onOpenChange={setConfirmSync}
+        title="Sync from repo?"
+        description="Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge."
+        confirmLabel="Sync from repo"
+        destructive
+        onConfirm={handleSync}
+      />
     </PageShell>
   );
 }
