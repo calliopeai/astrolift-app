@@ -14,20 +14,29 @@ shape, same operations, but no boto3. Production use requires the
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from _sdk.cluster import (
     ApplyResult,
+    ClusterAuth,
     ClusterDriver,
     DeleteResult,
     ExecResult,
     Namespace,
     NamespaceState,
+    PodInfo,
+    PodLogLine,
     PortForwardSession,
     RolloutResult,
     WorkloadStatus,
+)
+from k8s_native.observability import (
+    LivePodBackend,
+    LogBackend,
+    PodBackend,
+    default_log_backend,
 )
 
 
@@ -70,10 +79,17 @@ class K8sNativeClusterDriver(ClusterDriver):
         *,
         config: K8sNativeConfig,
         k8s_client_factory: Callable[..., Any] | None = None,
+        pod_backend: PodBackend | None = None,
+        log_backend: LogBackend | None = None,
     ) -> None:
         self._config = config
         self._factory = k8s_client_factory or _build_k8s_client
         self._k8s_cache: dict[str, Any] = {}
+        # Pluggable runtime-observability backends (#299). The defaults
+        # use the live kubernetes client; tests inject fakes so the
+        # observability path is exercisable without a real apiserver.
+        self._pod_backend: PodBackend = pod_backend or LivePodBackend()
+        self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
 
     # ---- apply / delete -------------------------------------------
 
@@ -110,8 +126,10 @@ class K8sNativeClusterDriver(ClusterDriver):
             else:
                 unchanged.append(ref)
         return ApplyResult(
-            created=created, updated=updated,
-            unchanged=unchanged, errors=errors,
+            created=created,
+            updated=updated,
+            unchanged=unchanged,
+            errors=errors,
         )
 
     def delete_manifests(
@@ -136,13 +154,17 @@ class K8sNativeClusterDriver(ClusterDriver):
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
-            deleted=deleted, not_found=not_found, errors=errors,
+            deleted=deleted,
+            not_found=not_found,
+            errors=errors,
         )
 
     # ---- namespaces -----------------------------------------------
 
     def get_namespace(
-        self, cluster: str, name: str,
+        self,
+        cluster: str,
+        name: str,
     ) -> NamespaceState | None:
         client = self._k8s(cluster)
         try:
@@ -174,14 +196,22 @@ class K8sNativeClusterDriver(ClusterDriver):
             },
         }
         client.server_side_apply(
-            namespace=None, manifest=manifest, dry_run=False,
+            namespace=None,
+            manifest=manifest,
+            dry_run=False,
         )
         return Namespace(
-            name=name, labels=dict(labels), annotations=dict(annotations),
+            name=name,
+            labels=dict(labels),
+            annotations=dict(annotations),
         )
 
     def delete_namespace(
-        self, cluster: str, name: str, *, wait: bool = True,
+        self,
+        cluster: str,
+        name: str,
+        *,
+        wait: bool = True,
     ) -> None:
         client = self._k8s(cluster)
         try:
@@ -220,7 +250,9 @@ class K8sNativeClusterDriver(ClusterDriver):
         status = obj.get("status", {})
         spec = obj.get("spec", {})
         return WorkloadStatus(
-            kind=kind, name=name, namespace=namespace,
+            kind=kind,
+            name=name,
+            namespace=namespace,
             ready_replicas=int(status.get("readyReplicas", 0)),
             desired_replicas=int(
                 spec.get("replicas", status.get("replicas", 0)),
@@ -245,12 +277,16 @@ class K8sNativeClusterDriver(ClusterDriver):
         while time.monotonic() < deadline:
             try:
                 status = self.get_workload_status(
-                    cluster=cluster, namespace=namespace,
-                    kind=kind, name=name,
+                    cluster=cluster,
+                    namespace=namespace,
+                    kind=kind,
+                    name=name,
                 )
             except K8sNativeError:
                 return RolloutResult(
-                    success=False, kind=kind, name=name,
+                    success=False,
+                    kind=kind,
+                    name=name,
                     namespace=namespace,
                     message="workload not found",
                     timed_out=False,
@@ -258,32 +294,36 @@ class K8sNativeClusterDriver(ClusterDriver):
             last_status = status
             if on_tick:
                 on_tick(status)
-            if (
-                status.ready_replicas == status.desired_replicas
-                and status.desired_replicas > 0
-            ):
+            if status.ready_replicas == status.desired_replicas and status.desired_replicas > 0:
                 return RolloutResult(
-                    success=True, kind=kind, name=name,
+                    success=True,
+                    kind=kind,
+                    name=name,
                     namespace=namespace,
-                    message=(
-                        f"{status.ready_replicas}/"
-                        f"{status.desired_replicas} ready"
-                    ),
+                    message=(f"{status.ready_replicas}/{status.desired_replicas} ready"),
                     timed_out=False,
                 )
             for cond in status.conditions:
-                if cond.get("type") == "Progressing" and cond.get(
-                    "status",
-                ) == "False":
+                if (
+                    cond.get("type") == "Progressing"
+                    and cond.get(
+                        "status",
+                    )
+                    == "False"
+                ):
                     return RolloutResult(
-                        success=False, kind=kind, name=name,
+                        success=False,
+                        kind=kind,
+                        name=name,
                         namespace=namespace,
                         message=cond.get("message", "Progressing=False"),
                         timed_out=False,
                     )
             time.sleep(min(15, max(1, timeout // 20)))
         return RolloutResult(
-            success=False, kind=kind, name=name,
+            success=False,
+            kind=kind,
+            name=name,
             namespace=namespace,
             message=(
                 last_status.conditions[-1].get("message", "")
@@ -305,7 +345,9 @@ class K8sNativeClusterDriver(ClusterDriver):
     ) -> ExecResult:
         client = self._k8s(cluster)
         return client.exec_in_pod(
-            namespace=namespace, pod=pod, container=container,
+            namespace=namespace,
+            pod=pod,
+            container=container,
             command=command,
         )
 
@@ -318,7 +360,48 @@ class K8sNativeClusterDriver(ClusterDriver):
     ) -> PortForwardSession:
         client = self._k8s(cluster)
         return client.port_forward(
-            namespace=namespace, pod=pod, ports=ports,
+            namespace=namespace,
+            pod=pod,
+            ports=ports,
+        )
+
+    # ---- runtime observability (#299) -----------------------------
+
+    def list_pods(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        app_slug: str,
+    ) -> list[PodInfo]:
+        """Delegate to the (pluggable) pod backend. Subclasses for
+        managed-cloud variants (EKS/GKE/AKS) override only when the
+        auth path differs; the listing shape is cloud-neutral."""
+        return self._pod_backend.list_pods(
+            auth=auth,
+            namespace=namespace,
+            app_slug=app_slug,
+        )
+
+    def stream_logs(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str | None,
+        tail_lines: int,
+        follow: bool,
+    ) -> AsyncIterator[PodLogLine]:
+        """Delegate to the (pluggable) log backend. Returns an
+        async iterator; tear-down is the backend's responsibility."""
+        return self._log_backend.stream(
+            auth=auth,
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            tail_lines=tail_lines,
+            follow=follow,
         )
 
     # ---- internals ------------------------------------------------
@@ -363,8 +446,7 @@ class _RealK8sClient:
 
     def server_side_apply(self, *, namespace, manifest, dry_run):
         raise NotImplementedError(
-            "server_side_apply requires kubernetes.dynamic.DynamicClient "
-            "wiring at deploy time",
+            "server_side_apply requires kubernetes.dynamic.DynamicClient wiring at deploy time",
         )
 
     def get(self, *, kind, namespace, name):

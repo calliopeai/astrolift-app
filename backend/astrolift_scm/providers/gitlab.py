@@ -434,6 +434,96 @@ def _gitlab_branch_head_sha(
     return sha
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class GitlabInstallWebhookResult:
+    hook_id: str
+    webhook_url: str
+
+
+def install_gitlab_webhook(
+    connection,
+    *,
+    repo_full_name: str,
+    target_url: str,
+    secret: str,
+    events: tuple[str, ...] = ("push_events", "merge_requests_events"),
+) -> GitlabInstallWebhookResult:
+    """POST /api/v4/projects/{id}/hooks via the connection's token.
+
+    ``repo_full_name`` is a URL-encoded path-with-namespace; GitLab's
+    hooks API accepts either that or the numeric project id, but the
+    path is what we already carry on the RegisteredApp.
+    """
+    token = _token(connection)
+    base = _api_base(connection)
+    project_path = urllib.parse.quote(repo_full_name, safe="")
+    url = f"{base}/api/v4/projects/{project_path}/hooks"
+
+    body: dict[str, object] = {
+        "url": target_url,
+        "token": secret,
+        "enable_ssl_verification": True,
+    }
+    for evt in events:
+        # GitLab accepts a boolean per event class — push_events,
+        # merge_requests_events, tag_push_events, etc. Anything unknown
+        # gets ignored by the host, so this is forward-compatible.
+        body[evt] = True
+
+    payload_bytes = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload_bytes,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GitlabProviderError(
+                "NOT_FOUND",
+                f"GitLab couldn't find project {repo_full_name}",
+                recoverable=True,
+            ) from exc
+        # GitLab returns 422 with "Hook already exists" or similar when
+        # a webhook with the same URL is registered.
+        if exc.code == 422 and "already exists" in body_text.lower():
+            raise GitlabProviderError(
+                "ALREADY_EXISTS",
+                "a webhook with this URL is already installed on the project",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}: {body_text}") from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+    hook_id = (payload or {}).get("id")
+    if hook_id is None:
+        raise GitlabProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitLab POST hooks response didn't include 'id'",
+        )
+    return GitlabInstallWebhookResult(hook_id=str(hook_id), webhook_url=target_url)
+
+
 def _gitlab_blob_url(*, base: str, repo_full_name: str, branch: str, file_path: str) -> str:
     """Best-effort blob URL for ``file_path`` on ``branch``. GitLab's
     file endpoint doesn't return a web URL; we synthesize one from the

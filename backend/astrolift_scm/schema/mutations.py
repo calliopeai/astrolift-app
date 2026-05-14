@@ -12,13 +12,15 @@ from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.keygen import generate_ed25519_keypair
-from astrolift_scm.models import SourceConnection, SshDeployKey
+from astrolift_scm.models import ScmWebhookInstallation, SourceConnection, SshDeployKey
 from astrolift_scm.schema.types import (
+    ScmWebhookInstallationType,
     SourceConnectionType,
     SshDeployKeyCreatedType,
     SshDeployKeyType,
     source_connection_to_type,
     ssh_key_to_type,
+    webhook_install_to_type,
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -85,6 +87,24 @@ class DeleteSshDeployKeyInput:
 @strawberry.input
 class RotateWebhookSecretInput:
     connection_id: GUID
+
+
+@strawberry.input
+class InstallScmWebhookInput:
+    """Install a webhook on the remote repo through ``connection_id``.
+
+    ``target_url`` defaults to the platform's per-connection webhook
+    ingress path (the same URL surfaced by ``rotateWebhookSecret``);
+    callers may override for self-hosted reverse proxies. ``secret``
+    defaults to the connection's existing webhook secret — if neither
+    a secret is stored nor one is provided, the mutation refuses
+    (HMAC verification would always fail).
+    """
+
+    connection_id: GUID
+    repo_full_name: str
+    target_url: str | None = None
+    secret: str | None = None
 
 
 @strawberry.input
@@ -362,6 +382,213 @@ class ScmMutation:
                 webhook_url_path=path,
             )
         )
+
+    @strawberry.field
+    @mutation_audit(action="scm.webhook.install")
+    @require_permission(Permission.SCM_CONNECT)
+    @tenant_scoped()
+    def install_scm_webhook(
+        self, info: Info, input: InstallScmWebhookInput
+    ) -> MutationResultType[ScmWebhookInstallationType]:
+        """Install a repo webhook on the remote SCM host through
+        ``connection_id``.
+
+        GitHub-App-install connections short-circuit (the App's own
+        webhook fires for every repo the operator picked at install
+        time); we still persist a row so the UI can show
+        "Already installed via App" idempotently.
+
+        For PAT / OAuth-user connections we mint a webhook secret
+        (or reuse the connection's stored one), POST to the host's
+        hooks API, and persist the host-side ``hook_id`` for later
+        rotate / delete.
+        """
+        from django.conf import settings as django_settings
+
+        from astrolift_scm.providers import ProviderError, install_webhook
+        from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+
+        conn = (
+            SourceConnection.objects.filter(
+                guid=str(input.connection_id),
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("organization")
+            .first()
+        )
+        if conn is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "connection not found",
+                field="connectionId",
+            )
+        if not conn.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "connection is inactive; reconnect first",
+                field="connectionId",
+            )
+        if conn.is_orphaned:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "connection is orphaned (upstream revoked or uninstalled)",
+                field="connectionId",
+            )
+        if conn.is_oauth_app_config:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "this is an OAuth-app config row; complete the OAuth dance first",
+                field="connectionId",
+            )
+
+        repo = (input.repo_full_name or "").strip()
+        if not repo:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "repoFullName is required",
+                field="repoFullName",
+            )
+
+        host = (
+            "github"
+            if conn.kind.startswith("github_")
+            else "gitlab"
+            if conn.kind.startswith("gitlab_")
+            else None
+        )
+        if host is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"webhook install for {conn.kind!r} not implemented yet",
+                field="connectionId",
+            )
+
+        # Default target URL = the platform's per-connection ingress
+        # path. Operators behind a reverse proxy override via input.
+        # Note APP_BASE_URL may be empty in local dev; we still emit
+        # the path so the test stack can assert the right structure.
+        app_base = (getattr(django_settings, "APP_BASE_URL", "") or "").rstrip("/")
+        default_path = f"/app/auth1/scm/{host}/webhook/{conn.guid}/"
+        target_url = (input.target_url or "").strip() or f"{app_base}{default_path}"
+
+        # GitHub-App installs deliver via the App's own webhook —
+        # short-circuit + persist a marker row so the UI flips its
+        # "Install webhook" affordance to "Already installed".
+        if conn.kind == "github_app_install":
+            with transaction.atomic():
+                existing = ScmWebhookInstallation.objects.filter(
+                    source_connection=conn,
+                    repo_full_name=repo,
+                    deleted_at__isnull=True,
+                ).first()
+                if existing is not None:
+                    existing.webhook_url = target_url
+                    existing.provider_short_circuited = True
+                    existing.save(
+                        update_fields=[
+                            "webhook_url",
+                            "provider_short_circuited",
+                            "updated_at",
+                            "version",
+                        ]
+                    )
+                    return gql_success(webhook_install_to_type(existing))
+                row = ScmWebhookInstallation.objects.create(
+                    organization_id=org_id,
+                    source_connection=conn,
+                    repo_full_name=repo,
+                    hook_id="",
+                    webhook_url=target_url,
+                    provider_short_circuited=True,
+                )
+            return gql_success(webhook_install_to_type(row))
+
+        # PAT / OAuth-user path: resolve a webhook secret. Order:
+        # 1) caller-supplied (no persistence — caller already shared).
+        # 2) connection's stored ciphertext (we decrypt + re-use).
+        # 3) mint a fresh one and persist on the connection.
+        secret = (input.secret or "").strip()
+        if not secret and conn.webhook_secret_backend_kind and conn.webhook_secret_ciphertext:
+            try:
+                plaintext = decrypt(
+                    EncryptedSecret(
+                        backend_kind=conn.webhook_secret_backend_kind,
+                        backend_ref=bytes(conn.webhook_secret_ciphertext),
+                    )
+                )
+                secret = plaintext.decode("utf-8")
+            except Exception:
+                secret = ""
+        minted_new = False
+        if not secret:
+            import secrets as _secrets
+
+            secret = _secrets.token_urlsafe(32)
+            minted_new = True
+
+        try:
+            result = install_webhook(
+                conn,
+                repo_full_name=repo,
+                target_url=target_url,
+                secret=secret,
+            )
+        except ProviderError as exc:
+            return gql_failure(
+                exc.code,
+                exc.message,
+                field="connectionId" if exc.code == "AUTH_FAILED" else None,
+            )
+
+        with transaction.atomic():
+            if minted_new:
+                encrypted = encrypt_at_rest(secret.encode("utf-8"))
+                conn.webhook_secret_backend_kind = encrypted.backend_kind
+                conn.webhook_secret_ciphertext = encrypted.backend_ref
+                conn.save(
+                    update_fields=[
+                        "webhook_secret_backend_kind",
+                        "webhook_secret_ciphertext",
+                        "updated_at",
+                        "version",
+                    ]
+                )
+            existing = ScmWebhookInstallation.objects.filter(
+                source_connection=conn,
+                repo_full_name=repo,
+                deleted_at__isnull=True,
+            ).first()
+            if existing is not None:
+                existing.hook_id = result.hook_id
+                existing.webhook_url = result.webhook_url
+                existing.provider_short_circuited = False
+                existing.save(
+                    update_fields=[
+                        "hook_id",
+                        "webhook_url",
+                        "provider_short_circuited",
+                        "updated_at",
+                        "version",
+                    ]
+                )
+                row = existing
+            else:
+                row = ScmWebhookInstallation.objects.create(
+                    organization_id=org_id,
+                    source_connection=conn,
+                    repo_full_name=repo,
+                    hook_id=result.hook_id,
+                    webhook_url=result.webhook_url,
+                    provider_short_circuited=False,
+                )
+
+        return gql_success(webhook_install_to_type(row))
 
     @strawberry.field
     @mutation_audit(action="scm.ssh_key.delete")

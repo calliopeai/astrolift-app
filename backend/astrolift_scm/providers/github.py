@@ -283,6 +283,111 @@ class PutFileResult:
     web_url: str
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class InstallWebhookResult:
+    """Output of installing a webhook on the SCM host. ``hook_id``
+    is the host-side identifier we'll need to rotate or delete the
+    hook later through the same connection."""
+
+    hook_id: str
+    webhook_url: str
+
+
+def install_github_webhook(
+    connection,
+    *,
+    repo_full_name: str,
+    target_url: str,
+    secret: str,
+    events: tuple[str, ...] = ("push", "pull_request"),
+) -> InstallWebhookResult:
+    """POST /repos/{owner}/{repo}/hooks via the connection's token.
+
+    GitHub-App-install connections short-circuit (the App's own
+    webhook fires) — callers should detect that case upstream rather
+    than calling this method. PAT / OAuth-user tokens land the hook
+    under the token-owner's name on the repo.
+    """
+    if connection.kind == "github_app_install":
+        raise GithubProviderError(
+            "UNSUPPORTED",
+            "github_app_install already delivers webhooks via the App; no per-repo hook install is needed",
+        )
+    token = _token(connection)
+    base = _api_base(connection)
+
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    url = f"{base}/repos/{safe_repo}/hooks"
+
+    body = {
+        "name": "web",
+        "active": True,
+        "events": list(events),
+        "config": {
+            "url": target_url,
+            "content_type": "json",
+            "secret": secret,
+            "insecure_ssl": "0",
+        },
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        # GitHub returns 422 with "Hook already exists" when the same
+        # URL is registered. Surface that cleanly as a conflict so the
+        # mutation can treat it as idempotent.
+        if exc.code == 422 and "already exists" in body_text.lower():
+            raise GithubProviderError(
+                "ALREADY_EXISTS",
+                "a webhook with this URL is already installed on the repo",
+                recoverable=True,
+            ) from exc
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GithubProviderError(
+                "NOT_FOUND",
+                f"GitHub couldn't find {repo_full_name}. Check repo access.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError(
+            "API_ERROR",
+            f"GitHub returned {exc.code}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+    hook_id = payload.get("id")
+    if hook_id is None:
+        raise GithubProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitHub POST hooks response didn't include 'id'",
+        )
+    return InstallWebhookResult(hook_id=str(hook_id), webhook_url=target_url)
+
+
 def _github_contents_url(base: str, repo_full_name: str, path: str) -> str:
     safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
     safe_path = "/".join(urllib.parse.quote(p, safe="") for p in path.split("/"))
