@@ -194,6 +194,26 @@ export type AstroliftAppHealthSummary = {
   latestImageTag: Scalars['String']['output'];
 };
 
+export type AstroliftAppLogLine = {
+  container: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  stream: Scalars['String']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAppPod = {
+  age?: Maybe<Scalars['DateTime']['output']>;
+  containerStatuses: Array<AstroliftContainerStatus>;
+  name: Scalars['String']['output'];
+  node: Scalars['String']['output'];
+  phase: Scalars['String']['output'];
+  ready: Scalars['Boolean']['output'];
+  restarts: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  workload: Scalars['String']['output'];
+};
+
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -282,6 +302,16 @@ export type AstroliftContainer = {
   name: Scalars['String']['output'];
   port: Scalars['Int']['output'];
   workloadSlug: Scalars['String']['output'];
+};
+
+export type AstroliftContainerStatus = {
+  image: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  ready: Scalars['Boolean']['output'];
+  restarts: Scalars['Int']['output'];
+  state: Scalars['String']['output'];
+  terminatedReason: Scalars['String']['output'];
+  waitingReason: Scalars['String']['output'];
 };
 
 export type AstroliftCostSnapshot = {
@@ -655,6 +685,7 @@ export type AstroliftQuota = {
 
 export type AstroliftRegisteredApp = {
   createdAt: Scalars['DateTime']['output'];
+  cronExpression: Scalars['String']['output'];
   defaultBranch: Scalars['String']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   deployBranch: Scalars['String']['output'];
@@ -775,6 +806,18 @@ export type AstroliftScheduledJobRun = {
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   workloadSlug: Scalars['String']['output'];
+};
+
+export type AstroliftScmPushCiWorkflowResult = {
+  commitSha: Scalars['String']['output'];
+  filePath: Scalars['String']['output'];
+  repoUrl: Scalars['String']['output'];
+};
+
+export type AstroliftScmPushCiWorkflowResultMutationResult = {
+  data?: Maybe<AstroliftScmPushCiWorkflowResult>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftScmWebhookSecretReveal = {
@@ -1451,6 +1494,7 @@ export type Mutation = {
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
   provisionManagedService: AstroliftManagedServiceMutationResult;
+  pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
   pushManifestToRepo: ManifestpushpayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
@@ -1868,6 +1912,11 @@ export type MutationProfileRequestPwdChangeArgs = {
 
 export type MutationProvisionManagedServiceArgs = {
   input: ProvisionManagedServiceInput;
+};
+
+
+export type MutationPushCiWorkflowArgs = {
+  input: PushCiWorkflowInput;
 };
 
 
@@ -2312,6 +2361,14 @@ export type ProvisionManagedServiceInput = {
   variant: InputMaybe<Scalars['String']['input']>;
 };
 
+export type PushCiWorkflowInput = {
+  appId: Scalars['GUID']['input'];
+  branch: InputMaybe<Scalars['String']['input']>;
+  commitMessage: InputMaybe<Scalars['String']['input']>;
+  connectionId: Scalars['GUID']['input'];
+  filePath: InputMaybe<Scalars['String']['input']>;
+};
+
 export type PushManifestToRepoInput = {
   branchName: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -2329,6 +2386,7 @@ export type Query = {
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
+  astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
   astroliftApps: Array<AstroliftRegisteredApp>;
@@ -2425,6 +2483,12 @@ export type QueryAstroliftAppDeployTokensArgs = {
 
 export type QueryAstroliftAppDomainsArgs = {
   appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppPodsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -2656,6 +2720,7 @@ export type RecheckDomainValidationInput = {
 };
 
 export type RegisterAppInput = {
+  cronExpression: InputMaybe<Scalars['String']['input']>;
   defaultBranch: InputMaybe<Scalars['String']['input']>;
   deployBranch: InputMaybe<Scalars['String']['input']>;
   description: InputMaybe<Scalars['String']['input']>;
@@ -2781,6 +2846,7 @@ export type StartWorkflowResult = {
 
 export type Subscription = {
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
+  astroliftOnAppLog: AstroliftAppLogLine;
   formSubmissionReceived: Scalars['String']['output'];
   notificationReceived: Scalars['String']['output'];
 };
@@ -2788,6 +2854,16 @@ export type Subscription = {
 
 export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionAstroliftOnAppLogArgs = {
+  appSlug: Scalars['String']['input'];
+  container?: InputMaybe<Scalars['String']['input']>;
+  follow?: Scalars['Boolean']['input'];
+  podName: Scalars['String']['input'];
+  tailLines?: Scalars['Int']['input'];
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -2829,6 +2905,7 @@ export type UpdateAlertRuleInput = {
 };
 
 export type UpdateAppInput = {
+  cronExpression: InputMaybe<Scalars['String']['input']>;
   defaultBranch: InputMaybe<Scalars['String']['input']>;
   deployBranch: InputMaybe<Scalars['String']['input']>;
   description: InputMaybe<Scalars['String']['input']>;
