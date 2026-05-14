@@ -144,10 +144,7 @@ class Command(BaseCommand):
         if auto_discover is None:
             auto_discover = _env_bool("ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS")
         aws_cluster_name = (
-            opts["aws_cluster_name"]
-            or _env("ASTROLIFT_CLUSTER_AWS_NAME")
-            or _env("EKS_CLUSTER_NAME")
-            or slug
+            opts["aws_cluster_name"] or _env("ASTROLIFT_CLUSTER_AWS_NAME") or _env("EKS_CLUSTER_NAME") or slug
         )
 
         if auth_method not in _VALID_AUTH:
@@ -211,9 +208,7 @@ class Command(BaseCommand):
             "deleted_at": None,
             "deleted_by": None,
         }
-        obj, created = TenantCluster.all_objects.update_or_create(
-            slug=slug, defaults=defaults
-        )
+        obj, created = TenantCluster.all_objects.update_or_create(slug=slug, defaults=defaults)
 
         action = "created" if created else "updated"
         scope = f"org={org.slug}" if org else "shared"
