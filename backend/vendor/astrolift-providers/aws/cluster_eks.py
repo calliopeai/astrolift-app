@@ -43,6 +43,7 @@ from _sdk.cluster import (
     RolloutResult,
     WorkloadStatus,
 )
+from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
 from k8s_native.management import (
     ManagementBackend,
@@ -429,13 +430,15 @@ class EKSClusterDriver(ClusterDriver):
         namespace: str,
         app_slug: str,
     ) -> list[PodInfo]:
-        """Listing path is shared with k8s_native — the EKS-specific
-        bit (IRSA exec_plugin token mint) lives in #309 follow-up.
-        For now, ``auth_method=kubeconfig`` and
-        ``auth_method=service_account_token`` go through directly;
-        ``exec_plugin`` raises ClusterAuthError pointing at #309."""
+        """List pods on the EKS cluster.
+
+        Materializes ``exec_plugin`` auth into a real bearer token
+        (AWS-IAM-Authenticator presigned URL) before delegating to the
+        shared k8s_native pod backend. ``kubeconfig`` /
+        ``service_account_token`` pass through unchanged.
+        """
         return self._pod_backend.list_pods(
-            auth=auth,
+            auth=self._materialize_eks_auth_auth(auth),
             namespace=namespace,
             app_slug=app_slug,
         )
@@ -450,9 +453,9 @@ class EKSClusterDriver(ClusterDriver):
         tail_lines: int,
         follow: bool,
     ) -> AsyncIterator[PodLogLine]:
-        """See ``list_pods`` — same shared k8s_native path."""
+        """See ``list_pods`` — same materialize-then-delegate pattern."""
         return self._log_backend.stream(
-            auth=auth,
+            auth=self._materialize_eks_auth_auth(auth),
             namespace=namespace,
             pod_name=pod_name,
             container=container,
@@ -463,7 +466,10 @@ class EKSClusterDriver(ClusterDriver):
     # ---- bring-into-management (#316) -----------------------------
 
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
-        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+        return probe_cluster_capabilities(
+            backend=self._management_backend,
+            cluster=self._materialize_eks_auth_context(cluster),
+        )
 
     def bring_into_management(
         self,
@@ -473,8 +479,65 @@ class EKSClusterDriver(ClusterDriver):
     ) -> ManagementReport:
         return run_bring_into_management(
             backend=self._management_backend,
-            cluster=cluster,
+            cluster=self._materialize_eks_auth_context(cluster),
             run_preflight=run_preflight,
+        )
+
+    # ---- exec_plugin token materialization -----------------------
+    #
+    # The k8s_native backend's ``build_api_client`` knows how to handle
+    # ``kubeconfig`` + ``service_account_token`` auth but raises on
+    # ``exec_plugin`` — EKS-specific token minting is the cloud
+    # driver's job. We pre-mint the bearer token via the
+    # AWS-IAM-Authenticator protocol and rewrite the auth so the
+    # shared backend sees a plain ``service_account_token`` blob.
+    #
+    # Two helpers because ClusterContext (for bring/probe) and
+    # ClusterAuth (for list_pods/stream_logs) are different frozen
+    # dataclasses — dataclasses.replace is type-specific. The
+    # token-mint logic is shared via ``_eks_token_for``.
+
+    def _eks_token_for(self, cluster_name: str | None, region: str | None) -> str:
+        """Mint an EKS bearer token. Falls back to the driver's
+        configured cluster_name / region when the row didn't carry
+        them (legacy rows registered before auto-discover landed)."""
+        name = cluster_name or self._config.cluster_name
+        rgn = region or self._config.region
+        try:
+            return mint_eks_token(cluster_name=name, region=rgn)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+    def _materialize_eks_auth_context(self, cluster: ClusterContext) -> ClusterContext:
+        if cluster.auth_method != "exec_plugin":
+            return cluster
+        import dataclasses
+
+        cfg = cluster.auth_config or {}
+        token = self._eks_token_for(cfg.get("cluster_name"), cfg.get("region"))
+        return dataclasses.replace(
+            cluster,
+            auth_method="service_account_token",
+            auth_config={
+                "token": token,
+                "ca_cert": cluster.ca_cert or cfg.get("ca_cert", ""),
+            },
+        )
+
+    def _materialize_eks_auth_auth(self, auth: ClusterAuth) -> ClusterAuth:
+        if auth.auth_method != "exec_plugin":
+            return auth
+        import dataclasses
+
+        cfg = auth.auth_config or {}
+        token = self._eks_token_for(cfg.get("cluster_name"), cfg.get("region"))
+        return dataclasses.replace(
+            auth,
+            auth_method="service_account_token",
+            auth_config={
+                "token": token,
+                "ca_cert": auth.ca_cert or cfg.get("ca_cert", ""),
+            },
         )
 
     # ---- internals ------------------------------------------------
@@ -509,20 +572,18 @@ class EKSClusterDriver(ClusterDriver):
         return endpoint, ca_data
 
     def _eks_token(self) -> str:
-        """Generate a short-lived EKS bearer token. Real STS-based
-        token generation goes through the AWS-IAM-authenticator
-        protocol (presigned STS GetCallerIdentity URL). For tests
-        + the placeholder until #29 wires the actual flow, we
-        return a sentinel; the client factory uses it as a stub."""
+        """Generate a short-lived EKS bearer token via the
+        AWS-IAM-Authenticator protocol (presigned STS GetCallerIdentity
+        URL with ``x-k8s-aws-id`` header). Re-minted per operation
+        rather than cached; STS rejects URLs older than 15 minutes,
+        but we set a 60s expiry so a leaked URL is useless quickly."""
         try:
-            response = self._sts.get_caller_identity()
+            return mint_eks_token(
+                cluster_name=self._config.cluster_name,
+                region=self._config.region,
+            )
         except Exception as exc:
             raise map_client_error(exc) from exc
-        # Placeholder token. Real implementation uses awscli
-        # `aws eks get-token` or signs the STS URL manually.
-        return base64.b64encode(
-            f"k8s-aws-v1.{response.get('Account', '')}".encode(),
-        ).decode()
 
 
 # ---- Internal client + exception types -----------------------------
