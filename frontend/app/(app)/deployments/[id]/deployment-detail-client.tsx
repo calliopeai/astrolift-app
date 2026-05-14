@@ -12,6 +12,7 @@ import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Can } from "@/components/Can";
@@ -195,9 +196,12 @@ export function DeploymentDetailClient({ id }: { id: string }) {
     if (result.ok) {
       toast.success(`${label}: ${result.data?.status ?? "ok"}`);
     } else {
-      toast.error(result.errors[0]?.message ?? `${label} failed`);
+      throw new Error(result.errors[0]?.message ?? `${label} failed`);
     }
   }
+
+  const [confirmAbort, setConfirmAbort] = React.useState(false);
+  const [confirmRollback, setConfirmRollback] = React.useState(false);
 
   if (dLoading && !d) {
     return (
@@ -265,18 +269,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 size="sm"
                 variant="destructive"
                 disabled={busy}
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `Abort in-flight deploy of ${d.registeredAppSlug}/${d.environmentName}?`,
-                    )
-                  )
-                    return;
-                  const { data } = await abort({
-                    variables: { input: { id: d.id } },
-                  });
-                  reportResult("abortDeployment", data?.abortDeployment);
-                }}
+                onClick={() => setConfirmAbort(true)}
               >
                 <StopCircleIcon className="size-4" /> Abort
               </Button>
@@ -288,18 +281,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `Rollback ${d.registeredAppSlug}/${d.environmentName}?`,
-                    )
-                  )
-                    return;
-                  const { data } = await rollback({
-                    variables: { input: { id: d.id } },
-                  });
-                  reportResult("rollbackDeployment", data?.rollbackDeployment);
-                }}
+                onClick={() => setConfirmRollback(true)}
               >
                 <UndoIcon className="size-4" /> Rollback
               </Button>
@@ -499,6 +481,31 @@ export function DeploymentDetailClient({ id }: { id: string }) {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmAbort}
+        onOpenChange={setConfirmAbort}
+        title={`Abort deploy of ${d.registeredAppSlug}/${d.environmentName}?`}
+        description="Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed."
+        confirmLabel="Abort deploy"
+        destructive
+        onConfirm={async () => {
+          const { data } = await abort({ variables: { input: { id: d.id } } });
+          reportResult("abortDeployment", data?.abortDeployment);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmRollback}
+        onOpenChange={setConfirmRollback}
+        title={`Rollback ${d.registeredAppSlug}/${d.environmentName}?`}
+        description="Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded."
+        confirmLabel="Rollback"
+        onConfirm={async () => {
+          const { data } = await rollback({ variables: { input: { id: d.id } } });
+          reportResult("rollbackDeployment", data?.rollbackDeployment);
+        }}
+      />
     </PageShell>
   );
 }

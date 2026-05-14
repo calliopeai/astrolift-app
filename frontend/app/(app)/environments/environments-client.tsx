@@ -11,6 +11,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -71,11 +72,12 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
         `${label}: ${result.data?.deploysPaused ? "paused" : "active"}`,
       );
     } else {
-      toast.error(result.errors[0]?.message ?? `${label} failed`);
+      throw new Error(result.errors[0]?.message ?? `${label} failed`);
     }
   }
 
   const canPause = can("app.deploy");
+  const [pauseTarget, setPauseTarget] = React.useState<AstroliftAppEnvironment | null>(null);
 
   return (
     <PageShell
@@ -182,21 +184,7 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
                               size="sm"
                               variant="outline"
                               disabled={busy}
-                              onClick={async () => {
-                                if (
-                                  !confirm(
-                                    `Pause ${e.registeredAppSlug}/${e.name}? CI and push triggers will be rejected until resumed.`,
-                                  )
-                                )
-                                  return;
-                                const { data } = await pause({
-                                  variables: { input: { id: e.id } },
-                                });
-                                reportResult(
-                                  "pauseEnvironment",
-                                  data?.pauseEnvironment,
-                                );
-                              }}
+                              onClick={() => setPauseTarget(e)}
                             >
                               <PauseIcon className="size-3" /> Pause
                             </Button>
@@ -210,6 +198,26 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pauseTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setPauseTarget(null);
+        }}
+        title={
+          pauseTarget
+            ? `Pause ${pauseTarget.registeredAppSlug}/${pauseTarget.name}?`
+            : "Pause environment?"
+        }
+        description="CI pushes and source-driven triggers are rejected with a 423 until you explicitly resume. In-flight deployments continue to completion. Operator-initiated deployments from the UI are still allowed."
+        confirmLabel="Pause environment"
+        destructive
+        onConfirm={async () => {
+          if (!pauseTarget) return;
+          const { data } = await pause({ variables: { input: { id: pauseTarget.id } } });
+          reportResult("pauseEnvironment", data?.pauseEnvironment);
+        }}
+      />
     </PageShell>
   );
 }

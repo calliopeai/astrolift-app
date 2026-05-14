@@ -12,6 +12,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -135,15 +136,14 @@ export function AlertsClient() {
   const eventList = events.data?.astroliftAlertEvents ?? [];
   const unresolvedEvents = eventList.filter((e) => !e.resolvedAt);
 
+  const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
+
   async function handleDelete(r: AlertRule) {
-    if (!confirm(`Delete rule "${r.name}"? Events already fired stay in the log.`)) {
-      return;
-    }
     const { data } = await deleteRule({ variables: { input: { id: r.id } } });
     if (data?.deleteAlertRule.ok) {
       toast.success(`Deleted ${r.name}`);
     } else {
-      toast.error(data?.deleteAlertRule.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.deleteAlertRule.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -269,7 +269,7 @@ export function AlertsClient() {
                           variant="ghost"
                           size="icon"
                           className="size-8"
-                          onClick={() => handleDelete(r)}
+                          onClick={() => setDeleteTarget(r)}
                           disabled={busy}
                         >
                           <Trash2Icon className="size-4" />
@@ -384,6 +384,20 @@ export function AlertsClient() {
           return false;
         }}
         busy={busy}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `Delete rule "${deleteTarget.name}"?` : "Delete rule?"}
+        description="Soft-deletes the rule. Events that already fired stay in the log and remain reachable from the event panel — only future evaluations stop. Re-create the rule with the same target to resume coverage."
+        confirmLabel="Delete rule"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
       />
     </PageShell>
   );
