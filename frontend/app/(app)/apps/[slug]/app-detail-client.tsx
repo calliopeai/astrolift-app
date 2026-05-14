@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -139,6 +141,7 @@ function appTopology(
 
 export function AppDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug: slug },
@@ -177,19 +180,12 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
   async function handleDelete() {
     if (!a) return;
-    if (
-      !confirm(
-        `Delete ${a.slug}? Soft delete only — its slug becomes reclaimable but workloads stay torn down.`
-      )
-    ) {
-      return;
-    }
     const { data } = await softDelete({ variables: { input: { id: a.id } } });
     if (data?.softDeleteApp.ok) {
       toast.success(`Deleted ${a.slug}`);
       router.push("/apps");
     } else {
-      toast.error(data?.softDeleteApp.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.softDeleteApp.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -263,10 +259,12 @@ export function AppDetailClient({ slug }: { slug: string }) {
               </a>
             </Button>
           )}
-          <Button variant="ghost" onClick={handleDelete} disabled={deleting}>
-            <Trash2Icon className="size-4" />
-            Delete
-          </Button>
+          <Can permission="app.delete">
+            <Button variant="ghost" onClick={() => setConfirmOpen(true)} disabled={deleting}>
+              <Trash2Icon className="size-4" />
+              Delete
+            </Button>
+          </Can>
         </>
       }
     >
@@ -327,6 +325,16 @@ export function AppDetailClient({ slug }: { slug: string }) {
       <GithubConnectCallout sourceKind={a.sourceKind} />
 
       <ActivityTimeline appId={a.id} limit={20} />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete ${a.slug}?`}
+        description="Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner."
+        confirmLabel="Delete app"
+        destructive
+        onConfirm={handleDelete}
+      />
     </PageShell>
   );
 }
