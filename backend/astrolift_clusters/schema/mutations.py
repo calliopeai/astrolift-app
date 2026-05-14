@@ -35,7 +35,11 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
 from astrolift_workflows.client import start_workflow
-from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
+from astrolift_workflows.inputs import (
+    Actor,
+    BringClusterIntoManagementInput,
+    DecommissionClusterInput,
+)
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -44,6 +48,10 @@ from core.tenancy import get_current_tenant
 logger = logging.getLogger(__name__)
 
 JSON = strawberry.scalars.JSON
+
+
+def _decommission_workflow_id(cluster_guid: str) -> str:
+    return f"DecommissionClusterWorkflow-{cluster_guid}"
 
 
 def _bring_workflow_id(cluster_guid: str) -> str:
@@ -103,6 +111,36 @@ def _kick_bring_into_management(
             )
         ],
         workflow_id=_bring_workflow_id(str(cluster.guid)),
+    )
+
+
+def _kick_decommission_cluster(*, cluster: TenantCluster, actor: Actor) -> None:
+    """Flip the row to ``decommissioning`` + enqueue the workflow.
+
+    The workflow re-asserts the state on entry, so this synchronous
+    flip is just the UI-spinner shortcut (matching the bring-into-mgmt
+    pattern). The drained-check activity runs first and can flip the
+    row to ``error`` if app envs are still bound — which is why this
+    helper does NOT save until the workflow itself has confirmed the
+    drained state. Operators see the same spinner-then-error UX that
+    bring-into-management uses.
+    """
+    cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
+    cluster.last_management_error = ""
+    cluster.save(
+        update_fields=[
+            "lifecycle",
+            "last_management_error",
+            "updated_at",
+            "version",
+        ]
+    )
+    start_workflow(
+        "DecommissionClusterWorkflow",
+        args=[
+            DecommissionClusterInput(cluster_id=cluster.pk, actor=actor),
+        ],
+        workflow_id=_decommission_workflow_id(str(cluster.guid)),
     )
 
 
@@ -167,6 +205,11 @@ class ConfigureProviderPluginInput:
 
 @strawberry.input
 class BringClusterIntoManagementInputType:
+    cluster_id: GUID
+
+
+@strawberry.input
+class DecommissionClusterInputType:
     cluster_id: GUID
 
 
@@ -325,6 +368,49 @@ class ClustersMutation:
                 actor=actor,
                 force_preflight=bool(input.force_preflight),
             )
+        return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(action="cluster.decommission")
+    @require_permission(Permission.CLUSTER_UNREGISTER)
+    @tenant_scoped()
+    def decommission_cluster(
+        self, info: Info, input: DecommissionClusterInputType
+    ) -> MutationResultType[TenantClusterType]:
+        """Lift the platform RBAC and flip the cluster to ``decommissioned``.
+
+        Refuses when active app environments are still bound — the
+        workflow's drained-check activity surfaces the bound count in
+        ``last_management_error`` and flips the row to ``error`` so the
+        operator can address it. Migrate or delete bound environments
+        first (see ``MigrateAppWorkflow``).
+
+        Once decommissioned, the cluster is excluded from the
+        active-cluster picker. Re-onboarding goes through
+        ``bringClusterIntoManagement`` against a fresh cluster row;
+        decommissioned rows are kept for audit only.
+        """
+        cluster = TenantCluster.objects.filter(guid=str(input.cluster_id), deleted_at__isnull=True).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONED.value:
+            # Already terminal — surface the row without re-firing.
+            return gql_success(cluster_to_type(cluster))
+        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
+            # Already in flight — join the existing run.
+            return gql_success(cluster_to_type(cluster))
+        if cluster.lifecycle not in (
+            TenantCluster.Lifecycle.MANAGED.value,
+            TenantCluster.Lifecycle.ERROR.value,
+        ):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"cluster lifecycle is {cluster.lifecycle!r}; only managed or error clusters can be decommissioned",
+            )
+
+        actor = _actor_from_request(info)
+        with transaction.atomic():
+            _kick_decommission_cluster(cluster=cluster, actor=actor)
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field

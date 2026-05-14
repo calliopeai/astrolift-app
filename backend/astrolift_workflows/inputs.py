@@ -95,6 +95,43 @@ class BringClusterIntoManagementInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class DecommissionClusterInput:
+    """Input for ``DecommissionClusterWorkflow``.
+
+    The workflow refuses to proceed when any active ``AppEnvironment``
+    is bound to the cluster — operators must migrate or delete those
+    envs first. The decommissioned terminal state preserves the row
+    for audit; the cluster is not deploy-eligible from that point.
+    """
+
+    cluster_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class MigrateAppInput:
+    """Input for ``MigrateAppWorkflow``.
+
+    Moves an ``AppEnvironment`` from its current ``tenant_cluster`` to
+    ``target_cluster_id``. The workflow applies to the target first,
+    waits for rollout + health, then atomically switches the env's
+    binding and (when ``drain_source`` is true) deletes the app's
+    resources from the source cluster.
+
+    ``deployment_id`` is the latest RUNNING (or PENDING) deployment row
+    the workflow re-deploys against the target — it carries the image
+    tag, secrets reference set, and rendered config snapshot.
+    """
+
+    registered_app_id: int
+    app_environment_id: int
+    deployment_id: int
+    target_cluster_id: int
+    drain_source: bool
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""
