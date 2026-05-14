@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from astrolift_workflows.activities import (
     apply_manifests,
+    apply_platform_rbac,
     create_promotion_deployment,
     create_rollback_deployment,
     dispatch_cron_deploys,
@@ -17,17 +18,24 @@ from astrolift_workflows.activities import (
     mark_app_provisioning,
     mark_app_ready,
     mark_deploying,
+    mark_error,
+    mark_managed,
+    mark_managing,
     mark_running,
     poll_rollout,
     pre_flight,
+    probe_capabilities,
     provision_managed_services_initial,
     provision_namespace,
     provision_registry_repo,
     render_manifests,
+    run_preflight_job,
     update_secrets,
+    verify_reachability,
     wait_dns,
 )
 from astrolift_workflows.workflows import (
+    BringClusterIntoManagementWorkflow,
     CronDeployTickWorkflow,
     DeployAppWorkflow,
     OnboardAppWorkflow,
@@ -37,6 +45,7 @@ from astrolift_workflows.workflows import (
 )
 
 WORKFLOWS = (
+    BringClusterIntoManagementWorkflow,
     CronDeployTickWorkflow,
     DeployAppWorkflow,
     OnboardAppWorkflow,
@@ -47,6 +56,7 @@ WORKFLOWS = (
 
 ACTIVITIES = (
     apply_manifests,
+    apply_platform_rbac,
     create_promotion_deployment,
     create_rollback_deployment,
     dispatch_cron_deploys,
@@ -54,14 +64,20 @@ ACTIVITIES = (
     mark_app_provisioning,
     mark_app_ready,
     mark_deploying,
+    mark_error,
+    mark_managed,
+    mark_managing,
     mark_running,
     poll_rollout,
     pre_flight,
+    probe_capabilities,
     provision_managed_services_initial,
     provision_namespace,
     provision_registry_repo,
     render_manifests,
+    run_preflight_job,
     update_secrets,
+    verify_reachability,
     wait_dns,
 )
 

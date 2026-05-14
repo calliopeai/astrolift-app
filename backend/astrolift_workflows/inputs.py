@@ -78,6 +78,22 @@ class TearDownPreviewInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class BringClusterIntoManagementInput:
+    """Input for ``BringClusterIntoManagementWorkflow`` (#316).
+
+    ``cluster_id`` is the TenantCluster PK — workflows accept ints
+    everywhere else, so we match that convention. ``force_preflight``
+    is honored on idempotent re-runs: the workflow normally skips the
+    Job when the row is already managed, but a Refresh call from the
+    UI can flip this to True to re-validate end-to-end.
+    """
+
+    cluster_id: int
+    actor: Actor
+    force_preflight: bool = False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""
