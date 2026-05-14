@@ -220,6 +220,18 @@ def test_manifest_callback_persists_credentials_and_redirects_to_install(org_use
     ).decode()
     assert wh_plain == "wh-secret"
 
+    # User-to-server OAuth client_secret persisted in its own column so
+    # the "Connect my GitHub" dance (scm_oauth.github_callback) can
+    # redeem authorization codes against this App row.
+    assert pending.oauth_client_secret_backend_kind
+    cs_plain = decrypt(
+        EncryptedSecret(
+            backend_kind=pending.oauth_client_secret_backend_kind,
+            backend_ref=bytes(pending.oauth_client_secret_ciphertext),
+        )
+    ).decode()
+    assert cs_plain == "ghs_fake"
+
     # Row still inactive until the operator finishes the install step
     assert pending.is_active is False
 
@@ -227,6 +239,34 @@ def test_manifest_callback_persists_credentials_and_redirects_to_install(org_use
     install_state = client.session["scm_github_install_state"]
     assert install_state["connection_guid"] == str(pending.guid)
     assert install_state["state"] == qs["state"][0]
+
+
+def test_manifest_callback_tolerates_missing_client_secret(org_user_member):
+    """If GitHub's response somehow omits ``client_secret`` (older API
+    surface, partial install, etc.) the new column stays blank — the
+    rest of the registration still completes so the App is usable for
+    webhooks + repo listing. The per-user OAuth dance will then surface
+    ``config_missing_oauth_secret`` and prompt re-registration."""
+    org, user = org_user_member
+    client = Client()
+    _login(client, user)
+    client.get("/app/auth1/scm/github/app-manifest/start", {"org": "acme-corp"})
+    state = client.session["scm_github_manifest_state"]["state"]
+
+    payload = _fake_manifest_payload()
+    payload.pop("client_secret")
+    with patch(
+        "auth1.scm_app_manifest._exchange_manifest_code",
+        return_value=(payload, None),
+    ):
+        resp = client.get(
+            "/app/auth1/scm/github/app-manifest/callback",
+            {"state": state, "code": "the-code"},
+        )
+    assert resp.status_code == 302
+    row = SourceConnection.objects.get(organization=org, kind="github_app_install")
+    assert row.oauth_client_secret_backend_kind == ""
+    assert bytes(row.oauth_client_secret_ciphertext) == b""
 
 
 def test_manifest_callback_rejects_state_mismatch(org_user_member):
