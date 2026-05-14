@@ -12,6 +12,7 @@ from astrolift_workflows.activities import (
     apply_manifests,
     create_promotion_deployment,
     create_rollback_deployment,
+    dispatch_cron_deploys,
     health_check,
     mark_app_provisioning,
     mark_app_ready,
@@ -27,6 +28,7 @@ from astrolift_workflows.activities import (
     wait_dns,
 )
 from astrolift_workflows.workflows import (
+    CronDeployTickWorkflow,
     DeployAppWorkflow,
     OnboardAppWorkflow,
     PromoteDeploymentWorkflow,
@@ -35,6 +37,7 @@ from astrolift_workflows.workflows import (
 )
 
 WORKFLOWS = (
+    CronDeployTickWorkflow,
     DeployAppWorkflow,
     OnboardAppWorkflow,
     PromoteDeploymentWorkflow,
@@ -46,6 +49,7 @@ ACTIVITIES = (
     apply_manifests,
     create_promotion_deployment,
     create_rollback_deployment,
+    dispatch_cron_deploys,
     health_check,
     mark_app_provisioning,
     mark_app_ready,
