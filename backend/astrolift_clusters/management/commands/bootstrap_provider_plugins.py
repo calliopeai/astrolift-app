@@ -67,21 +67,42 @@ class Command(BaseCommand):
                     "managed_service_kinds": managed_kinds,
                 }
 
-                obj, created = ProviderPlugin.all_objects.update_or_create(
-                    slug=manifest.plugin_id,
-                    defaults={
-                        "name": manifest.display_name,
-                        "version": manifest.version,
-                        "capabilities_manifest": capabilities,
-                        "is_enabled": True,
-                        # Clear soft-delete on re-seed so an operator who
-                        # accidentally soft-deleted a plugin row gets it
-                        # back on the next deploy.
-                        "deleted_at": None,
-                        "deleted_by": None,
-                    },
-                )
-                action = "created" if created else "updated"
+                # ProviderPlugin.version is a CharField ("0.0.0") that
+                # shadows TrackingMixin.version (the optimistic-lock
+                # IntegerField). BaseCoreModel.save() does
+                # ``self.version = (self.version or 0) + 1`` and crashes
+                # with TypeError when version is a string. Upstream's
+                # test fixture in 2853cd3 uses bulk_create to skirt the
+                # collision; do the same here — bulk_create + .update()
+                # both bypass .save(). Right long-term fix is to rename
+                # the semver field on ProviderPlugin (e.g. plugin_version)
+                # so it stops colliding with the mixin's int version.
+                row_fields = {
+                    "name": manifest.display_name,
+                    "capabilities_manifest": capabilities,
+                    "is_enabled": True,
+                    "deleted_at": None,
+                    "deleted_by": None,
+                }
+                existing = ProviderPlugin.all_objects.filter(slug=manifest.plugin_id).first()
+                if existing is None:
+                    ProviderPlugin.all_objects.bulk_create(
+                        [
+                            ProviderPlugin(
+                                slug=manifest.plugin_id,
+                                version=manifest.version,
+                                **row_fields,
+                            )
+                        ]
+                    )
+                    action = "created"
+                else:
+                    # Don't overwrite the CharField semver on update — the
+                    # operator may have stamped it themselves. Touch only
+                    # the catalog-derived fields.
+                    ProviderPlugin.all_objects.filter(pk=existing.pk).update(**row_fields)
+                    action = "updated"
+
                 self.stdout.write(
                     f"  {action} provider plugin {manifest.plugin_id!r} "
                     f"({len(roles)} drivers, {len(managed_kinds)} managed kinds)"
