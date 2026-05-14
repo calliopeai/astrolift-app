@@ -174,6 +174,7 @@ def _fire_deploy(app: RegisteredApp, branch: str, head_sha: str) -> Deployment |
                 DeployAppInput(
                     registered_app_id=app.pk,
                     app_environment_id=env.pk,
+                    deployment_id=deployment.pk,
                     image_tags={"app": deployment.image_tag},
                     trigger_kind=Deployment.TriggerKind.PUSH.value,
                     actor=actor,
