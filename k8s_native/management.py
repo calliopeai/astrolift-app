@@ -53,19 +53,19 @@ PLATFORM_SA = "astrolift-control-plane"
 PLATFORM_CLUSTER_ROLE = "astrolift-control-plane"
 PLATFORM_CLUSTER_ROLE_BINDING = "astrolift-control-plane"
 
-PREFLIGHT_TIMEOUT_SECONDS = 300
+PREFLIGHT_TIMEOUT_SECONDS = 600
 """Cap on how long the workflow waits for the preflight Job. The
 Job itself declares ``activeDeadlineSeconds=PREFLIGHT_TIMEOUT_SECONDS``
 so the kubelet kills it past the deadline; this is the polling cap on
 top.
 
-Bumped from 60s -> 300s for Fargate-backed EKS clusters: the very
-first pod on a fresh Fargate-only cluster pays a 30-90s cold-start
-penalty while Fargate provisions a node before the kubelet even
-schedules the container, and image pull adds another 10-30s on
-networks without an ECR pull-through cache. 60s left no headroom and
-the cluster's first bring-into-management run timed out before the
-Job container actually started."""
+Set to 10 minutes to comfortably cover Fargate-backed EKS clusters:
+the very first pod on a fresh Fargate-only cluster can pay a 30-90s
+cold-start while Fargate provisions a node before the kubelet
+schedules the container, plus image pull (10-30s) and any first-time
+pod-security / IRSA admission delays. A 10-min cap still fails fast
+enough on genuine misconfig (PodSecurity rejection, no node capacity,
+networking blackhole) — those produce errors well before 10 minutes."""
 
 PREFLIGHT_IMAGE = "nginxinc/nginx-unprivileged:1.27-alpine"
 """Distroless-ish, well-known, runs as non-root by default — fits
