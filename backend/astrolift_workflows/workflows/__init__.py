@@ -9,6 +9,9 @@ the no-op activity implementations until provider plugins ship. The
 sequence is the contract — bodies fill in.
 """
 
+from astrolift_workflows.workflows.bring_cluster_into_management import (
+    BringClusterIntoManagementWorkflow,
+)
 from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflow
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.onboard_app import OnboardAppWorkflow
@@ -17,6 +20,7 @@ from astrolift_workflows.workflows.rollback_deployment import RollbackDeployment
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
 
 __all__ = [
+    "BringClusterIntoManagementWorkflow",
     "CronDeployTickWorkflow",
     "DeployAppWorkflow",
     "OnboardAppWorkflow",
