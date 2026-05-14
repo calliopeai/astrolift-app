@@ -217,3 +217,27 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
     }
   }
 `;
+
+export const LIST_APP_PODS = gql`
+  query ListAppPods($appSlug: String!, $environmentName: String) {
+    astroliftAppPods(appSlug: $appSlug, environmentName: $environmentName) {
+      name
+      workload
+      status
+      phase
+      ready
+      restarts
+      age
+      node
+      containerStatuses {
+        name
+        ready
+        restarts
+        image
+        state
+        waitingReason
+        terminatedReason
+      }
+    }
+  }
+`;
