@@ -10,8 +10,9 @@ Pattern mirrors ``core.schema.subscriptions.Subscription``:
   chains across async-generator boundaries the way it does for
   fields, so we call ``check_permission`` ourselves.
 
-The actual log byte stream lives in :mod:`core.k8s.logs`; this
-module is the wire mapping + tenant + permission glue.
+The actual log byte stream lives in
+:mod:`core.cluster_observability`, which dispatches through the
+``astrolift-providers`` ClusterDriver for the row's plugin (#299).
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ class LifecycleSubscription:
 
         from astrolift_lifecycle.models import AppEnvironment
         from astrolift_registry.models import RegisteredApp
-        from core.k8s.logs import stream_app_logs
+        from core.cluster_observability import stream_app_logs
         from core.permissions import (
             Permission,
             PermissionDenied,
@@ -125,7 +126,7 @@ class LifecycleSubscription:
                 cluster = app.default_tenant_cluster
             if cluster is None or not getattr(cluster, "is_active", True):
                 return None, None, None
-            from core.k8s.client import namespace_for_app
+            from core.cluster_observability import namespace_for_app
 
             namespace = namespace_for_app(app)
             return app, cluster, namespace
