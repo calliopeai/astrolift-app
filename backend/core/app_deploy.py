@@ -26,6 +26,7 @@ from core.cluster_management import (
     _context_for_cluster,
     _driver_for_cluster,
 )
+from core.cluster_observability import _config_for  # type: ignore[attr-defined]
 
 if TYPE_CHECKING:
     from astrolift_clusters.models import TenantCluster
@@ -89,6 +90,33 @@ def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
     return driver, ctx, namespace
 
 
+def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
+    """Resolve a non-cluster driver (``secrets``, ``dns``, ``registry``,
+    ``tls``, ``identity``) for the cluster's provider plugin.
+
+    Mirrors ``_driver_for_cluster`` but takes the capability key the
+    plugin's ``drivers`` dict is indexed by. Raises ``AppDeployError``
+    when the plugin doesn't register a driver for ``capability`` so the
+    activity surface gets a clear error rather than ``DriverNotFound``.
+    """
+    from astrolift_drivers.registry import DriverNotFound, plugins
+
+    plugin_slug = cluster.provider_plugin.slug
+    try:
+        driver_cls = plugins.get(plugin_slug, capability)
+    except DriverNotFound as exc:
+        raise AppDeployError(
+            f"cluster {cluster.slug}: provider plugin {plugin_slug!r} does not register a {capability!r} driver",
+        ) from exc
+    cfg = _config_for(plugin_slug, cluster)
+    try:
+        return driver_cls(config=cfg)
+    except TypeError as exc:
+        raise AppDeployError(
+            f"cluster {cluster.slug}: {capability} driver constructor rejected config: {exc}",
+        ) from exc
+
+
 def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
@@ -146,6 +174,7 @@ def workloads_from_resources(
 __all__ = [
     "AppDeployError",
     "cluster_for_deployment",
+    "driver_for_capability",
     "driver_for_deployment",
     "namespace_for_app",
     "render_resources_for_deployment",
