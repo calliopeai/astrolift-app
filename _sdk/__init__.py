@@ -19,6 +19,15 @@ Usage:
 
 from __future__ import annotations
 
+# Catalog + matrix + capability + cluster registry
+from _sdk.availability import (
+    OPTIONAL_ROLES,
+    REQUIRED_ROLES,
+    AvailabilityMatrix,
+    DriverEntry,
+    ManagedServiceEntry,
+)
+
 # Core plugin manifest types + per-role driver protocols
 from _sdk.base import (
     ClusterDriver,
@@ -39,29 +48,19 @@ from _sdk.base import (
 
 # Cross-cutting protocols
 from _sdk.build import BuildDriver
-from _sdk.cost import (
-    CostEstimate,
-    CostEstimateRequest,
-    CostEstimateUnavailable,
-    CostEstimator,
-    CostLineItem,
-    CostResult,
-)
-from _sdk.event import EventDriver
-from _sdk.trace import TraceDriver
-
-# Catalog + matrix + capability + cluster registry
-from _sdk.availability import (
-    OPTIONAL_ROLES,
-    REQUIRED_ROLES,
-    AvailabilityMatrix,
-    DriverEntry,
-    ManagedServiceEntry,
-)
 from _sdk.capabilities import (
     BindingValidation,
     ServiceDependency,
     validate_cluster_binding,
+)
+
+# Pod observability shapes (#299) — re-exported so backend resolvers
+# only depend on the public SDK surface.
+from _sdk.cluster import (
+    ClusterAuth,
+    ContainerStatusInfo,
+    PodInfo,
+    PodLogLine,
 )
 from _sdk.cluster_capabilities import (
     ClusterCapabilities,
@@ -74,6 +73,14 @@ from _sdk.cluster_registry import (
     probe_connectivity,
 )
 from _sdk.composition import CompositionRegistry
+from _sdk.cost import (
+    CostEstimate,
+    CostEstimateRequest,
+    CostEstimateUnavailable,
+    CostEstimator,
+    CostLineItem,
+    CostResult,
+)
 
 # Policy modules (storage encryption, edge security, postgres
 # extensions, variant migration, identity chains, CSI, instrumentation)
@@ -86,6 +93,7 @@ from _sdk.edge_security import (
     TlsPolicy,
     WafPolicy,
 )
+from _sdk.event import EventDriver
 from _sdk.identity_chain import (
     IdentityChain,
     IdentityHop,
@@ -121,11 +129,11 @@ from _sdk.storage_encryption import (
     EncryptionPolicy,
     check_encryption,
 )
+from _sdk.trace import TraceDriver
 from _sdk.variant_migration import (
     MigrationCatalog,
     MigrationRecipe,
 )
-
 
 __all__ = [
     "DEFAULT_PROFILE",
@@ -137,9 +145,11 @@ __all__ = [
     "AvailabilityMatrix",
     "BindingValidation",
     "BuildDriver",
+    "ClusterAuth",
     "ClusterCapabilities",
     "ClusterDriver",
     "CompositionRegistry",
+    "ContainerStatusInfo",
     "CostEstimate",
     "CostEstimateRequest",
     "CostEstimateUnavailable",
@@ -172,6 +182,8 @@ __all__ = [
     "ObjectStoreDriver",
     "ParityIssue",
     "ParityReport",
+    "PodInfo",
+    "PodLogLine",
     "ProbeResult",
     "ProviderPlugin",
     "SecretsBackend",
