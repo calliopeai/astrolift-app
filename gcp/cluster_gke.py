@@ -15,18 +15,24 @@ from typing import Any
 from _sdk.cluster import (
     ApplyResult,
     ClusterAuth,
+    ClusterContext,
     ClusterDriver,
     DeleteResult,
-    ExecResult,
+    ManagementReport,
     Namespace,
     NamespaceState,
     PodInfo,
     PodLogLine,
-    PortForwardSession,
     RolloutResult,
     WorkloadStatus,
 )
 from gcp._errors import NotFoundError, map_api_error
+from k8s_native.management import (
+    ManagementBackend,
+    default_management_backend,
+    probe_cluster_capabilities,
+    run_bring_into_management,
+)
 from k8s_native.observability import (
     LivePodBackend,
     LogBackend,
@@ -57,6 +63,7 @@ class GKEClusterDriver(ClusterDriver):
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
+        management_backend: ManagementBackend | None = None,
     ) -> None:
         self._config = config
         if config.container_client is not None:
@@ -73,6 +80,13 @@ class GKEClusterDriver(ClusterDriver):
         # Identity exec_plugin token mint lives in #310 follow-up.
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
+        # Bring-into-management (#316). Inherits k8s_native's body
+        # via the management backend; the GKE Workload Identity
+        # token mint is irrelevant for kubeconfig + service-account
+        # auth, both of which go straight through to ``build_api_client``.
+        self._management_backend: ManagementBackend = (
+            management_backend if management_backend is not None else default_management_backend()
+        )
 
     def apply_manifests(
         self,
@@ -92,7 +106,7 @@ class GKEClusterDriver(ClusterDriver):
                     manifest=m,
                     dry_run=dry_run,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
                 continue
             if outcome == "created":
@@ -120,7 +134,7 @@ class GKEClusterDriver(ClusterDriver):
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
@@ -325,6 +339,23 @@ class GKEClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    # ---- bring-into-management (#316) -----------------------------
+
+    def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
+        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+
+    def bring_into_management(
+        self,
+        cluster: ClusterContext,
+        *,
+        run_preflight: bool = True,
+    ) -> ManagementReport:
+        return run_bring_into_management(
+            backend=self._management_backend,
+            cluster=cluster,
+            run_preflight=run_preflight,
+        )
+
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:
             return self._k8s_cache[cluster]
@@ -342,7 +373,7 @@ class GKEClusterDriver(ClusterDriver):
                     f"/clusters/{self._config.cluster_name}"
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         return f"https://{cluster.endpoint}", cluster.master_auth.cluster_ca_certificate
 

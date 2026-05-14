@@ -9,7 +9,6 @@ deployment site.
 
 from __future__ import annotations
 
-import base64
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -17,8 +16,10 @@ from typing import Any
 from _sdk.cluster import (
     ApplyResult,
     ClusterAuth,
+    ClusterContext,
     ClusterDriver,
     DeleteResult,
+    ManagementReport,
     Namespace,
     NamespaceState,
     PodInfo,
@@ -26,8 +27,13 @@ from _sdk.cluster import (
     RolloutResult,
     WorkloadStatus,
 )
-
 from azure._errors import NotFoundError, map_api_error
+from k8s_native.management import (
+    ManagementBackend,
+    default_management_backend,
+    probe_cluster_capabilities,
+    run_bring_into_management,
+)
 from k8s_native.observability import (
     LivePodBackend,
     LogBackend,
@@ -56,6 +62,7 @@ class AKSClusterDriver(ClusterDriver):
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
+        management_backend: ManagementBackend | None = None,
     ) -> None:
         self._config = config
         if config.container_service_client is not None:
@@ -78,6 +85,14 @@ class AKSClusterDriver(ClusterDriver):
         # exec_plugin token mint lives in #311 follow-up.
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
+        # Bring-into-management (#316). Inherits k8s_native's body
+        # via the management backend; AKS federated-credential
+        # exec_plugin token mint is irrelevant for the kubeconfig +
+        # service-account auth paths that route through
+        # ``build_api_client``.
+        self._management_backend: ManagementBackend = (
+            management_backend if management_backend is not None else default_management_backend()
+        )
 
     def apply_manifests(
         self,
@@ -97,7 +112,7 @@ class AKSClusterDriver(ClusterDriver):
                     manifest=m,
                     dry_run=dry_run,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
                 continue
             if outcome == "created":
@@ -125,7 +140,7 @@ class AKSClusterDriver(ClusterDriver):
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
@@ -321,6 +336,23 @@ class AKSClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    # ---- bring-into-management (#316) -----------------------------
+
+    def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
+        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+
+    def bring_into_management(
+        self,
+        cluster: ClusterContext,
+        *,
+        run_preflight: bool = True,
+    ) -> ManagementReport:
+        return run_bring_into_management(
+            backend=self._management_backend,
+            cluster=cluster,
+            run_preflight=run_preflight,
+        )
+
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:
             return self._k8s_cache[cluster]
@@ -335,7 +367,7 @@ class AKSClusterDriver(ClusterDriver):
                 resource_group_name=self._config.resource_group,
                 resource_name=self._config.cluster_name,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         endpoint = getattr(cluster, "fqdn", "") or getattr(
             cluster,

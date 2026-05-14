@@ -21,9 +21,11 @@ from typing import Any
 from _sdk.cluster import (
     ApplyResult,
     ClusterAuth,
+    ClusterContext,
     ClusterDriver,
     DeleteResult,
     ExecResult,
+    ManagementReport,
     Namespace,
     NamespaceState,
     PodInfo,
@@ -31,6 +33,12 @@ from _sdk.cluster import (
     PortForwardSession,
     RolloutResult,
     WorkloadStatus,
+)
+from k8s_native.management import (
+    ManagementBackend,
+    default_management_backend,
+    probe_cluster_capabilities,
+    run_bring_into_management,
 )
 from k8s_native.observability import (
     LivePodBackend,
@@ -81,6 +89,7 @@ class K8sNativeClusterDriver(ClusterDriver):
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
+        management_backend: ManagementBackend | None = None,
     ) -> None:
         self._config = config
         self._factory = k8s_client_factory or _build_k8s_client
@@ -90,6 +99,12 @@ class K8sNativeClusterDriver(ClusterDriver):
         # observability path is exercisable without a real apiserver.
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
+        # Bring-into-management backend (#316). Same swap-on-construction
+        # pattern as the observability backends; tests inject a fake
+        # that records what would have been applied / probed / awaited.
+        self._management_backend: ManagementBackend = (
+            management_backend if management_backend is not None else default_management_backend()
+        )
 
     # ---- apply / delete -------------------------------------------
 
@@ -116,7 +131,7 @@ class K8sNativeClusterDriver(ClusterDriver):
                     manifest=manifest,
                     dry_run=dry_run,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
                 continue
             if outcome == "created":
@@ -151,7 +166,7 @@ class K8sNativeClusterDriver(ClusterDriver):
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
@@ -402,6 +417,29 @@ class K8sNativeClusterDriver(ClusterDriver):
             container=container,
             tail_lines=tail_lines,
             follow=follow,
+        )
+
+    # ---- bring-into-management (#316) -----------------------------
+
+    def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
+        """Read-only capability probe. Used by the refresh path and
+        also called from inside ``bring_into_management`` after the
+        RBAC apply succeeds. Raises on auth / network failure."""
+        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+
+    def bring_into_management(
+        self,
+        cluster: ClusterContext,
+        *,
+        run_preflight: bool = True,
+    ) -> ManagementReport:
+        """Apply platform RBAC, probe capabilities, run a one-shot
+        preflight Job. ``run_preflight=False`` is the refresh path —
+        same RBAC reconcile + fresh probe but skip the Job."""
+        return run_bring_into_management(
+            backend=self._management_backend,
+            cluster=cluster,
+            run_preflight=run_preflight,
         )
 
     # ---- internals ------------------------------------------------

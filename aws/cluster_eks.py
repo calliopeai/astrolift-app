@@ -30,9 +30,11 @@ from typing import Any
 from _sdk.cluster import (
     ApplyResult,
     ClusterAuth,
+    ClusterContext,
     ClusterDriver,
     DeleteResult,
     ExecResult,
+    ManagementReport,
     Namespace,
     NamespaceState,
     PodInfo,
@@ -42,6 +44,12 @@ from _sdk.cluster import (
     WorkloadStatus,
 )
 from aws._errors import NotFoundError, map_client_error
+from k8s_native.management import (
+    ManagementBackend,
+    default_management_backend,
+    probe_cluster_capabilities,
+    run_bring_into_management,
+)
 from k8s_native.observability import (
     LivePodBackend,
     LogBackend,
@@ -76,6 +84,7 @@ class EKSClusterDriver(ClusterDriver):
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
+        management_backend: ManagementBackend | None = None,
     ) -> None:
         self._config = config
         if eks_client is not None:
@@ -101,6 +110,16 @@ class EKSClusterDriver(ClusterDriver):
         # exec_plugin row gets turned into kubeconfig (#309 follow-up).
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
+        # Bring-into-management (#316). The RBAC apply + capability
+        # probe + preflight Job body is the k8s_native canonical
+        # version; EKS auth is already routed back through the
+        # kubeconfig branch of ``build_api_client`` once the row's
+        # ``auth_config`` carries a kubeconfig blob, so no EKS-side
+        # override is needed today. ``exec_plugin`` auth remains
+        # pending the #309 follow-up.
+        self._management_backend: ManagementBackend = (
+            management_backend if management_backend is not None else default_management_backend()
+        )
 
     # ---- apply / delete -------------------------------------------
 
@@ -128,7 +147,7 @@ class EKSClusterDriver(ClusterDriver):
                     manifest=manifest,
                     dry_run=dry_run,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
                 continue
             if outcome == "created":
@@ -167,7 +186,7 @@ class EKSClusterDriver(ClusterDriver):
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
@@ -187,7 +206,7 @@ class EKSClusterDriver(ClusterDriver):
             ns = client.get_namespace(name=name)
         except _NotFound:
             return None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise RuntimeError(f"get_namespace {name}: {exc}") from exc
         return NamespaceState(
             name=ns["metadata"]["name"],
@@ -219,7 +238,7 @@ class EKSClusterDriver(ClusterDriver):
                 manifest=manifest,
                 dry_run=False,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise RuntimeError(f"ensure_namespace {name}: {exc}") from exc
         return Namespace(
             name=name,
@@ -239,7 +258,7 @@ class EKSClusterDriver(ClusterDriver):
             client.delete(kind="Namespace", namespace=None, name=name)
         except _NotFound:
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise RuntimeError(f"delete_namespace {name}: {exc}") from exc
 
         if not wait:
@@ -441,6 +460,23 @@ class EKSClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    # ---- bring-into-management (#316) -----------------------------
+
+    def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
+        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+
+    def bring_into_management(
+        self,
+        cluster: ClusterContext,
+        *,
+        run_preflight: bool = True,
+    ) -> ManagementReport:
+        return run_bring_into_management(
+            backend=self._management_backend,
+            cluster=cluster,
+            run_preflight=run_preflight,
+        )
+
     # ---- internals ------------------------------------------------
 
     def _k8s(self, cluster: str) -> Any:
@@ -463,7 +499,7 @@ class EKSClusterDriver(ClusterDriver):
             response = self._eks.describe_cluster(
                 name=self._config.cluster_name,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
         cluster = response["cluster"]
         endpoint = cluster["endpoint"]
@@ -480,7 +516,7 @@ class EKSClusterDriver(ClusterDriver):
         return a sentinel; the client factory uses it as a stub."""
         try:
             response = self._sts.get_caller_identity()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
         # Placeholder token. Real implementation uses awscli
         # `aws eks get-token` or signs the STS URL manually.
