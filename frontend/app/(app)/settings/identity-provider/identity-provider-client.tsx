@@ -14,6 +14,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -84,38 +85,41 @@ export function IdentityProviderClient() {
     awaitRefetchQueries: true,
   });
 
-  async function handleSetActive(idp: AstroliftIdentityProvider) {
+  const [activateTarget, setActivateTarget] =
+    React.useState<AstroliftIdentityProvider | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    React.useState<AstroliftIdentityProvider | null>(null);
+
+  function requestSetActive(idp: AstroliftIdentityProvider) {
     if (idp.isActive) return;
-    if (
-      !confirm(
-        `Switch the active identity provider to ${idp.name}? Users with active sessions stay logged in; the next sign-in goes through this provider.`,
-      )
-    ) {
+    setActivateTarget(idp);
+  }
+
+  function requestDelete(idp: AstroliftIdentityProvider) {
+    if (idp.isActive) {
+      toast.error("Cannot delete the active provider — set a different one first.");
       return;
     }
+    setDeleteTarget(idp);
+  }
+
+  async function handleSetActive(idp: AstroliftIdentityProvider) {
     const { data } = await setActive({ variables: { input: { id: idp.id } } });
     if (data?.setActiveIdentityProvider.ok) {
       toast.success(`Active provider: ${idp.name}`);
     } else {
-      toast.error(
+      throw new Error(
         data?.setActiveIdentityProvider.errors?.[0]?.message ?? "Failed",
       );
     }
   }
 
   async function handleDelete(idp: AstroliftIdentityProvider) {
-    if (idp.isActive) {
-      toast.error("Cannot delete the active provider — set a different one first.");
-      return;
-    }
-    if (!confirm(`Delete ${idp.name}? Users tied only to this IdP can no longer log in.`)) {
-      return;
-    }
     const { data } = await softDelete({ variables: { input: { id: idp.id } } });
     if (data?.softDeleteIdentityProvider.ok) {
       toast.success(`Deleted ${idp.name}`);
     } else {
-      toast.error(
+      throw new Error(
         data?.softDeleteIdentityProvider.errors?.[0]?.message ?? "Failed",
       );
     }
@@ -219,7 +223,7 @@ export function IdentityProviderClient() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleSetActive(idp)}
+                              onClick={() => requestSetActive(idp)}
                               disabled={switching}
                             >
                               Make active
@@ -228,7 +232,7 @@ export function IdentityProviderClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleDelete(idp)}
+                            onClick={() => requestDelete(idp)}
                             disabled={deleting || idp.isActive}
                           >
                             <Trash2Icon className="size-4" />
@@ -246,6 +250,37 @@ export function IdentityProviderClient() {
       </Card>
 
       <CreateIdentityProviderDialog open={open} onOpenChange={setOpen} />
+
+      <ConfirmDialog
+        open={activateTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setActivateTarget(null);
+        }}
+        title={
+          activateTarget
+            ? `Switch active provider to ${activateTarget.name}?`
+            : "Switch active provider?"
+        }
+        description="Users already signed in keep their sessions. The next sign-in routes through the new provider. If users only exist in the old provider, they'll be unable to log in until provisioned here."
+        confirmLabel="Switch provider"
+        onConfirm={async () => {
+          if (activateTarget) await handleSetActive(activateTarget);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `Delete ${deleteTarget.name}?` : "Delete identity provider?"}
+        description="Soft-deletes the IdP record. Users whose identity exists only in this provider can no longer sign in — provision them in the active provider first if they need continued access."
+        confirmLabel="Delete provider"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </PageShell>
   );
 }

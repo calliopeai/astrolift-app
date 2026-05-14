@@ -153,20 +153,17 @@ export function SourceProvidersClient() {
     awaitRefetchQueries: true,
   });
 
+  const [rotateSecretTarget, setRotateSecretTarget] =
+    React.useState<AstroliftSourceConnection | null>(null);
+
   async function handleRotateSecret(c: AstroliftSourceConnection) {
-    if (
-      !confirm(
-        `Generate a fresh webhook secret for ${c.name}? Any existing webhook signed with the old secret will start failing immediately — paste the new secret into the SCM host's webhook config.`
-      )
-    )
-      return;
     const { data } = await rotateSecret({
       variables: { input: { connectionId: c.id } },
     });
     if (data?.rotateWebhookSecret.ok && data.rotateWebhookSecret.data) {
       setRevealedSecret(data.rotateWebhookSecret.data);
     } else {
-      toast.error(data?.rotateWebhookSecret.errors?.[0]?.message ?? "Rotation failed");
+      throw new Error(data?.rotateWebhookSecret.errors?.[0]?.message ?? "Rotation failed");
     }
   }
 
@@ -346,7 +343,7 @@ export function SourceProvidersClient() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleRotateSecret(c)}
+                                onClick={() => setRotateSecretTarget(c)}
                                 disabled={rotateSecretState.loading}
                               >
                                 Webhook secret
@@ -517,6 +514,24 @@ export function SourceProvidersClient() {
         destructive
         onConfirm={async () => {
           if (deleteKeyTarget) await handleDeleteKey(deleteKeyTarget);
+        }}
+      />
+
+      <ConfirmDialog
+        open={rotateSecretTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRotateSecretTarget(null);
+        }}
+        title={
+          rotateSecretTarget
+            ? `Rotate webhook secret for ${rotateSecretTarget.name}?`
+            : "Rotate webhook secret?"
+        }
+        description="Generates a fresh secret and shows it once. Webhook deliveries signed with the old secret start failing immediately — paste the new value into the SCM host's webhook config before any pushes happen, or expect a short window where deploy triggers are rejected with a 401."
+        confirmLabel="Rotate secret"
+        destructive
+        onConfirm={async () => {
+          if (rotateSecretTarget) await handleRotateSecret(rotateSecretTarget);
         }}
       />
     </PageShell>

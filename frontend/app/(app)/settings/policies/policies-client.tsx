@@ -6,6 +6,7 @@ import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -53,13 +54,14 @@ export function PoliciesClient() {
     awaitRefetchQueries: true,
   });
 
+  const [deleteTarget, setDeleteTarget] = React.useState<AstroliftPolicy | null>(null);
+
   async function handleDelete(p: AstroliftPolicy) {
-    if (!confirm(`Delete policy ${p.slug}? Slug becomes reclaimable.`)) return;
     const { data } = await softDelete({ variables: { input: { id: p.id } } });
     if (data?.softDeletePolicy.ok) {
       toast.success(`Deleted ${p.slug}`);
     } else {
-      toast.error(data?.softDeletePolicy.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.softDeletePolicy.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -139,7 +141,7 @@ export function PoliciesClient() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDelete(p)}
+                        onClick={() => setDeleteTarget(p)}
                         disabled={deleting}
                       >
                         <Trash2Icon className="size-4" />
@@ -155,6 +157,20 @@ export function PoliciesClient() {
       </Card>
 
       <CreatePolicyDialog open={open} onOpenChange={setOpen} />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `Delete policy ${deleteTarget.slug}?` : "Delete policy?"}
+        description="Soft-deletes the policy. Any DENY rule it enforced stops applying immediately — operators previously blocked by this policy regain that access on their next request. The slug becomes reclaimable for a new policy."
+        confirmLabel="Delete policy"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </PageShell>
   );
 }

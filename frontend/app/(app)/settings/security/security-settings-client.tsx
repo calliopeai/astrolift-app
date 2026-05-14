@@ -12,6 +12,7 @@ import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,18 +56,17 @@ export function SecuritySettingsClient() {
   const sessions = data?.astroliftActiveSessions ?? [];
   const otherCount = sessions.filter((s) => !s.isCurrent).length;
 
-  async function handleSignOutAll() {
+  const [confirmSignOut, setConfirmSignOut] = React.useState(false);
+
+  function requestSignOutAll() {
     if (otherCount === 0) {
       toast.info("No other sessions to sign out.");
       return;
     }
-    if (
-      !confirm(
-        `Sign out of ${otherCount} other session${otherCount === 1 ? "" : "s"}? Your current session stays signed in.`,
-      )
-    ) {
-      return;
-    }
+    setConfirmSignOut(true);
+  }
+
+  async function handleSignOutAll() {
     const { data: resp } = await logoutAll({
       variables: { input: { keepCurrent: true } },
     });
@@ -76,7 +76,7 @@ export function SecuritySettingsClient() {
       );
       refetch();
     } else {
-      toast.error(
+      throw new Error(
         resp?.logoutAllSessions.errors?.[0]?.message ?? "Sign-out failed",
       );
     }
@@ -95,7 +95,7 @@ export function SecuritySettingsClient() {
             </CardDescription>
           </div>
           <Button
-            onClick={handleSignOutAll}
+            onClick={requestSignOutAll}
             variant="outline"
             disabled={signingOut || otherCount === 0}
           >
@@ -191,6 +191,16 @@ export function SecuritySettingsClient() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={confirmSignOut}
+        onOpenChange={setConfirmSignOut}
+        title={`Sign out of ${otherCount} other session${otherCount === 1 ? "" : "s"}?`}
+        description="Your current session in this tab stays signed in. Every other browser tab, mobile app, and CLI you've authenticated will need to log in again."
+        confirmLabel="Sign out everywhere else"
+        destructive
+        onConfirm={handleSignOutAll}
+      />
     </div>
   );
 }
