@@ -111,3 +111,21 @@ export const DELETE_SSH_DEPLOY_KEY = gql`
     }
   }
 `;
+
+export const PUSH_CI_WORKFLOW = gql`
+  mutation PushCiWorkflow($input: PushCiWorkflowInput!) {
+    pushCiWorkflow(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        commitSha
+        filePath
+        repoUrl
+      }
+    }
+  }
+`;

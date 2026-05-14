@@ -43,6 +43,27 @@ const TRIGGER_LABELS: Record<string, string> = {
   external_ci: "External CI",
 };
 
+// Connection kinds that hold a usable write-token. OAuth-app config
+// rows (kind ends in ``_oauth_app`` with no account_login) carry the
+// app's client secret, not a user token, so they can't push commits
+// until the OAuth dance produces a sibling ``_oauth_user`` row.
+const CI_PUSHABLE_KINDS = new Set<string>([
+  "github_oauth_user",
+  "github_app_install",
+  "github_pat",
+  "gitlab_oauth_user",
+  "gitlab_pat",
+]);
+
+function canPushCiWorkflow(state: WizardState): boolean {
+  return CI_PUSHABLE_KINDS.has(state.connectionKind);
+}
+
+function ciWorkflowPathFor(sourceKind: WizardState["sourceKind"]): string {
+  if (sourceKind === "gitlab") return ".gitlab-ci.yml";
+  return ".github/workflows/astrolift-deploy.yml";
+}
+
 export function ReviewSubmitStep({
   state,
   setState,
@@ -126,8 +147,8 @@ export function ReviewSubmitStep({
         <div>
           <h3 className="font-medium">What happens when you submit</h3>
           <p className="text-muted-foreground text-xs">
-            Toggle the side-effects you want. Grayed-out items aren&apos;t wired into the backend
-            yet — they ship as part of the follow-up work.
+            Toggle the side-effects you want. Items that depend on backend work that hasn&apos;t
+            shipped yet (webhook install for PAT / OAuth-User connections) stay grayed out.
           </p>
         </div>
 
@@ -162,12 +183,12 @@ export function ReviewSubmitStep({
             </Badge>
           </li>
 
-          <li className="flex items-center gap-3 p-3 opacity-70">
+          <li className="flex items-center gap-3 p-3">
             <label className="flex items-center">
               <input
                 type="checkbox"
                 checked={state.pushCiWorkflow}
-                disabled
+                disabled={!canPushCiWorkflow(state)}
                 onChange={(e) =>
                   setState((s) => ({
                     ...s,
@@ -180,18 +201,19 @@ export function ReviewSubmitStep({
               <span className="text-sm">
                 Push{" "}
                 <code className="bg-muted rounded px-1 py-0.5 font-mono">
-                  .github/workflows/astrolift-deploy.yml
+                  {ciWorkflowPathFor(state.sourceKind)}
                 </code>
               </span>
               <span className="text-muted-foreground text-xs">
-                A push-CI mutation (
-                <code className="bg-muted rounded px-1 py-0.5 font-mono">pushCiWorkflow</code>)
-                hasn&apos;t shipped yet. We&apos;ll capture the toggle for when it does.
+                {canPushCiWorkflow(state)
+                  ? "Commits a starter workflow that calls astro app deploy on every push to the deploy branch. You'll need to set ASTROLIFT_DEPLOY_TOKEN as a repo secret."
+                  : "Available for GitHub or GitLab user-OAuth connections (and GitHub App installs). The selected connection can't push commits."}
               </span>
             </div>
-            <Badge variant="outline" className="text-[10px]">
-              Coming soon
-            </Badge>
+            <StatusBadge
+              status={statusFor(sideEffects, "ci_workflow")}
+              error={errorFor(sideEffects, "ci_workflow")}
+            />
           </li>
 
           <li className="flex items-center gap-3 p-3">

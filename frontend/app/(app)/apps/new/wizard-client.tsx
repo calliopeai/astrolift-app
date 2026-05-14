@@ -12,6 +12,11 @@ import type {
   SourceKind,
   TriggerMode,
 } from "@/graphql/registry/registry.types";
+import { PUSH_CI_WORKFLOW } from "@/graphql/scm/scm.mutations";
+import type {
+  AstroliftPushCiWorkflowResult,
+  ScmConnectionKind,
+} from "@/graphql/scm/scm.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import { WizardShell, type WizardStep } from "./components/WizardShell";
@@ -24,6 +29,27 @@ import { ReviewSubmitStep, type SideEffectStep } from "./steps/ReviewSubmitStep"
 // Step shape — five steps plus a virtual "0" we never render.
 type StepNumber = 1 | 2 | 3 | 4 | 5;
 
+// Connection kinds that hold a usable write-token. OAuth-app config
+// rows carry the app's client secret rather than a user token, so they
+// can't drive a commit — pushCiWorkflow refuses them on the server
+// side, and we suppress the UI affordance for them as well.
+const CI_PUSHABLE_KINDS: ReadonlySet<string> = new Set([
+  "github_oauth_user",
+  "github_app_install",
+  "github_pat",
+  "gitlab_oauth_user",
+  "gitlab_pat",
+]);
+
+function isCiPushableKind(kind: ScmConnectionKind | ""): boolean {
+  return CI_PUSHABLE_KINDS.has(kind);
+}
+
+function ciWorkflowPathForSourceKind(sourceKind: SourceKind): string {
+  if (sourceKind === "gitlab") return ".gitlab-ci.yml";
+  return ".github/workflows/astrolift-deploy.yml";
+}
+
 // Wizard-side trigger mode. Mirrors the backend's `RegisterAppInput`
 // values — `cron` is persisted alongside a five-field expression
 // (see #290). Kept as its own alias so step components can import
@@ -35,6 +61,11 @@ export interface WizardState {
 
   // Step 1
   connectionId: string;
+  // The full connection kind discriminant — drives review-step
+  // affordances like the CI-workflow push checkbox, which only
+  // makes sense for github_* / gitlab_* (and OAuth-app config rows
+  // don't have a usable token).
+  connectionKind: ScmConnectionKind | "";
   sourceKind: SourceKind;
   sourceRepo: string;
   sourceUrl: string;
@@ -73,6 +104,7 @@ export function initialWizardState(): WizardState {
   return {
     step: 1,
     connectionId: "",
+    connectionKind: "",
     sourceKind: "github",
     sourceRepo: "",
     sourceUrl: "",
@@ -155,6 +187,10 @@ export function WizardClient() {
     awaitRefetchQueries: true,
   });
 
+  const [pushCiWorkflowMutation] = useMutation<{
+    pushCiWorkflow: MutationResult<AstroliftPushCiWorkflowResult>;
+  }>(PUSH_CI_WORKFLOW);
+
   // ---- Step movement ----
 
   const goTo = React.useCallback((next: StepNumber) => {
@@ -203,13 +239,26 @@ export function WizardClient() {
     setSubmitting(true);
     setSubmitError(null);
 
+    // The CI-workflow path is only valid for connection kinds that
+    // carry a write-token. Anything else (OAuth-app config rows,
+    // missing connection) gets the "skipped" badge with a friendly
+    // reason rather than a failed dispatch.
+    const ciWorkflowPath = ciWorkflowPathForSourceKind(state.sourceKind);
+    const ciWorkflowEnabled = state.pushCiWorkflow && isCiPushableKind(state.connectionKind);
+    const ciWorkflowSkippedNote =
+      state.pushCiWorkflow && !isCiPushableKind(state.connectionKind)
+        ? "Connection kind can't push commits — toggle ignored."
+        : !state.pushCiWorkflow
+          ? "Operator opted out."
+          : "";
+
     const plan: SideEffectStep[] = [
       { key: "register", label: "Register app", status: "pending" },
       {
         key: "ci_workflow",
-        label: ".github/workflows/astrolift-deploy.yml",
-        status: "skipped",
-        note: "Coming soon — pushCiWorkflow mutation pending",
+        label: ciWorkflowPath,
+        status: ciWorkflowEnabled ? "pending" : "skipped",
+        note: ciWorkflowEnabled ? undefined : ciWorkflowSkippedNote,
       },
       ...(state.triggerFirstDeploy
         ? [
@@ -259,6 +308,41 @@ export function WizardClient() {
       }
       update("register", { status: "done" });
       toast.success(`Registered ${result.data.slug}`);
+
+      // The CI-workflow push is best-effort: register has already
+      // succeeded, so we surface failure on the side-effect row
+      // rather than rolling the app back. The operator can re-run
+      // the push from the app detail page once they fix whatever
+      // caused the rejection (token rotated, branch protected, etc.).
+      if (ciWorkflowEnabled) {
+        update("ci_workflow", { status: "running" });
+        try {
+          const { data: pushData } = await pushCiWorkflowMutation({
+            variables: {
+              input: {
+                appId: result.data.id,
+                connectionId: state.connectionId,
+              },
+            },
+          });
+          const pushResult = pushData?.pushCiWorkflow;
+          if (!pushResult?.ok || !pushResult.data) {
+            const msg = pushResult?.errors?.[0]?.message ?? "pushCiWorkflow failed";
+            update("ci_workflow", { status: "failed", error: msg });
+          } else {
+            update("ci_workflow", {
+              status: "done",
+              note: pushResult.data.repoUrl
+                ? `Committed ${pushResult.data.commitSha.slice(0, 7)} — ${pushResult.data.repoUrl}`
+                : `Committed ${pushResult.data.commitSha.slice(0, 7)}`,
+            });
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "pushCiWorkflow failed";
+          update("ci_workflow", { status: "failed", error: msg });
+        }
+      }
+
       router.push(`/apps/${result.data.slug}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Register failed";
