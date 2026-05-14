@@ -106,6 +106,38 @@ class SshDeployKeyCreatedType:
     key: SshDeployKeyType
 
 
+@strawberry.type(name="AstroliftScmWebhookInstallation")
+class ScmWebhookInstallationType:
+    """One installed webhook on a remote repo, owned by this
+    organization via ``source_connection``.
+
+    ``provider_short_circuited`` is True when the install resolver
+    didn't actually hit the host's API because the connection kind
+    already delivers webhooks (GitHub Apps). The UI uses this to
+    show "Already installed via App" rather than "Installed".
+    """
+
+    id: GUID
+    source_connection_id: GUID
+    repo_full_name: str
+    hook_id: str
+    webhook_url: str
+    provider_short_circuited: bool
+    created_at: dt.datetime
+
+
+def webhook_install_to_type(row) -> ScmWebhookInstallationType:
+    return ScmWebhookInstallationType(
+        id=GUID(str(row.guid)),
+        source_connection_id=GUID(str(row.source_connection.guid)),
+        repo_full_name=row.repo_full_name,
+        hook_id=row.hook_id or "",
+        webhook_url=row.webhook_url or "",
+        provider_short_circuited=bool(row.provider_short_circuited),
+        created_at=row.created_at,
+    )
+
+
 def source_connection_to_type(c) -> SourceConnectionType:
     parent_guid: GUID | None = None
     if c.parent_oauth_app_id:

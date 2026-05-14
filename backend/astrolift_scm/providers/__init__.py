@@ -25,12 +25,14 @@ from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers.github import (
     GithubProviderError,
     fetch_github_file,
+    install_github_webhook,
     list_github_repos,
     put_github_file,
 )
 from astrolift_scm.providers.gitlab import (
     GitlabProviderError,
     fetch_gitlab_file,
+    install_gitlab_webhook,
     list_gitlab_projects,
     put_gitlab_file,
 )
@@ -208,4 +210,66 @@ def put_file(
     raise ProviderError(
         "UNSUPPORTED",
         f"file write for {connection.kind!r} not implemented yet",
+    )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class InstallWebhookResult:
+    """Outcome of installing a webhook on a SCM host. ``hook_id`` is
+    the host-side identifier so we can later rotate or delete it."""
+
+    hook_id: str
+    webhook_url: str
+
+
+def install_webhook(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    target_url: str,
+    secret: str,
+) -> InstallWebhookResult:
+    """Install a webhook on the host repo through ``connection``.
+
+    GitHub-App-install connections raise ProviderError("APP_INSTALLED")
+    so the resolver can short-circuit (those connections already
+    receive deliveries via the App's own webhook). The caller should
+    surface that case to the UI as "already installed via App" — no
+    actual hook is created.
+    """
+    if connection.kind == "github_app_install":
+        raise ProviderError(
+            "APP_INSTALLED",
+            "github_app_install connections already deliver webhooks via the GitHub App; "
+            "no per-repo install is required",
+            recoverable=True,
+        )
+
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            result = install_github_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                target_url=target_url,
+                secret=secret,
+            )
+            return InstallWebhookResult(hook_id=result.hook_id, webhook_url=result.webhook_url)
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITLAB_KINDS:
+        try:
+            result = install_gitlab_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                target_url=target_url,
+                secret=secret,
+            )
+            return InstallWebhookResult(hook_id=result.hook_id, webhook_url=result.webhook_url)
+        except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"webhook install for {connection.kind!r} not implemented yet",
     )

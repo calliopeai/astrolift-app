@@ -824,6 +824,22 @@ type AstroliftScmPushCiWorkflowResultMutationResult {
   data: AstroliftScmPushCiWorkflowResult
 }
 
+type AstroliftScmWebhookInstallation {
+  id: GUID!
+  sourceConnectionId: GUID!
+  repoFullName: String!
+  hookId: String!
+  webhookUrl: String!
+  providerShortCircuited: Boolean!
+  createdAt: DateTime!
+}
+
+type AstroliftScmWebhookInstallationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftScmWebhookInstallation
+}
+
 type AstroliftScmWebhookSecretReveal {
   connectionId: GUID!
   plaintextSecret: String!
@@ -1347,6 +1363,13 @@ input GroupOperationInput {
   operation: String!
 }
 
+input InstallScmWebhookInput {
+  connectionId: GUID!
+  repoFullName: String!
+  targetUrl: String = null
+  secret: String = null
+}
+
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
@@ -1630,6 +1653,7 @@ type Mutation {
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
   generateSshDeployKey(input: GenerateSshDeployKeyInput!): AstroliftSshDeployKeyCreatedMutationResult!
   rotateWebhookSecret(input: RotateWebhookSecretInput!): AstroliftScmWebhookSecretRevealMutationResult!
+  installScmWebhook(input: InstallScmWebhookInput!): AstroliftScmWebhookInstallationMutationResult!
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
   pushCiWorkflow(input: PushCiWorkflowInput!): AstroliftScmPushCiWorkflowResultMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
