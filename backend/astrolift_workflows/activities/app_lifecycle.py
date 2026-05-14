@@ -629,6 +629,73 @@ async def mark_running(deployment_id: int) -> None:
     d.transition_to(Deployment.Status.RUNNING)
 
 
+# ---- Preview teardown (Phase 3) -----------------------------------
+
+
+def _mark_preview_torn_down_sync(preview_environment_id: int) -> None:
+    from django.utils import timezone
+
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    p = PreviewEnvironment.all_objects.get(pk=preview_environment_id)
+    p.status = PreviewEnvironment.Status.TORN_DOWN
+    p.torn_down_at = timezone.now()
+    p.save(update_fields=["status", "torn_down_at", "updated_at", "version"])
+
+
+@activity.defn(name="astrolift.preview.mark_torn_down")
+async def mark_preview_torn_down(preview_environment_id: int) -> None:
+    """Flip the PreviewEnvironment row to TORN_DOWN + stamp torn_down_at."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_preview_torn_down_sync)(preview_environment_id)
+
+
+def _delete_preview_namespace_sync(preview_environment_id: int) -> str:
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from core.app_deploy import AppDeployError
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    p = PreviewEnvironment.all_objects.select_related(
+        "app_environment__tenant_cluster__provider_plugin",
+    ).get(pk=preview_environment_id)
+    cluster = p.app_environment.tenant_cluster
+    if cluster is None:
+        raise AppDeployError(
+            f"preview {p.pk} env has no tenant_cluster bound — cannot delete namespace",
+        )
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    # delete_namespace cascades all the namespaced resources k8s knows
+    # about (Deployments, Services, ConfigMaps, Secrets, PVCs, Ingresses).
+    # Pass wait=True so we don't return until the namespace is actually
+    # gone — operators see a clean teardown rather than a "torn-down"
+    # marker that lingers as a Terminating namespace.
+    driver.delete_namespace(ctx.slug, p.namespace, wait=True)
+    return p.namespace
+
+
+@activity.defn(name="astrolift.preview.delete_namespace")
+async def delete_preview_namespace(preview_environment_id: int) -> str:
+    """Delete the preview's Kubernetes namespace.
+
+    Cascades all namespaced resources. ``wait=True`` blocks until the
+    namespace is fully removed so the workflow's terminal event reflects
+    a clean cluster state rather than an in-flight Terminating phase.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    namespace = await sync_to_async(_delete_preview_namespace_sync)(preview_environment_id)
+    log.info(
+        "delete_preview_namespace removed namespace=%s",
+        namespace,
+        extra={"preview_environment_id": preview_environment_id},
+    )
+    return namespace
+
+
 def _create_rollback_deployment_sync(deployment_id: int) -> int:
     """Sync core of ``create_rollback_deployment``. Exposed as a
     plain function so unit tests can call it directly — sync_to_async
