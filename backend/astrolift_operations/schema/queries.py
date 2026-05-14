@@ -223,19 +223,28 @@ class OperationsQuery:
         window (monorail parity).
 
         Accepts ``time_range`` in ``5m | 1h | 24h | 7d | 30d``.
-        Returns ``None`` for an unknown app, an empty time_series
-        (and zeroes for the scalars) when there's no observability
-        backend wired AND no events to aggregate from.
+        Returns ``None`` for an unknown app.
 
-        Today the platform doesn't yet have a Prometheus / OTel
-        ingestion path wired into this resolver — see the
-        ``from:backend`` follow-up tracked separately. Until that
-        lands, we aggregate deploy counts from the real
-        ``Deployment`` rows in the window and synthesize the rate /
-        latency series deterministically from the app's guid so the
-        UI exercises every code path with stable, repeatable values.
+        Source resolution (#297):
+          1. The app's primary environment's ``tenant_cluster`` is
+             read for an embedded Prometheus endpoint
+             (``provider_config['prometheus_endpoint']``); when set,
+             the resolver issues PromQL against it for rate /
+             error-rate / latency percentiles.
+          2. If the endpoint is unreachable, the PromQL is malformed,
+             or no endpoint is configured, we fall back to the
+             deterministic synthetic series (hash-seeded from the
+             app's guid) so the UI never breaks on a misconfigured
+             cluster.
+          3. ``source`` flips to ``prometheus`` / ``otel`` on success
+             so the UI can label the data accordingly.
+
+        ``deploy_count`` is always aggregated from the real
+        ``Deployment`` rows in the window — independent of the
+        metrics backend.
         """
         from astrolift_lifecycle.models import Deployment
+        from astrolift_operations import prometheus_client
         from astrolift_registry.models import RegisteredApp
 
         if time_range not in _TIME_RANGE_SECONDS:
@@ -244,7 +253,7 @@ class OperationsQuery:
 
         app = (
             RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
-            .only("id", "guid", "slug")
+            .only("id", "guid", "slug", "k8s_namespace")
             .first()
         )
         if app is None:
@@ -261,60 +270,34 @@ class OperationsQuery:
             created_at__gte=window_start,
         ).count()
 
-        # Deterministic synthetic series: hash(guid + bucket_index)
-        # → stable float in [0, 1) so the UI sees identical numbers
-        # across reloads. Real ingest will swap this whole block.
-        seed = hashlib.sha256(str(app.guid).encode("utf-8")).hexdigest()
-        seed_int = int(seed[:16], 16)
-
-        def _norm(i: int, lo: float, hi: float) -> float:
-            r = (seed_int + i * 2654435761) & 0xFFFFFFFF
-            unit = r / 0xFFFFFFFF
-            return lo + (hi - lo) * unit
-
-        bucket_seconds = window_seconds / bucket_count
-        series: list[AppMetricsPointType] = []
-        rates: list[float] = []
-        errors: list[float] = []
-        latencies: list[float] = []
-        for i in range(bucket_count):
-            ts = window_start + timedelta(seconds=(i + 0.5) * bucket_seconds)
-            rate = round(_norm(i, 0.5, 80.0), 3)
-            err = round(_norm(i + 1000, 0.0, 0.05), 4)
-            p95 = round(_norm(i + 2000, 30.0, 750.0), 1)
-            series.append(
-                AppMetricsPointType(
-                    timestamp=ts,
-                    request_rate=rate,
-                    error_rate=err,
-                    latency_p95=p95,
+        prom_endpoint, prom_kind = _resolve_metrics_endpoint(app)
+        if prom_endpoint:
+            try:
+                return _query_prometheus_for_app(
+                    app_slug=app.slug,
+                    namespace=app.k8s_namespace or "",
+                    time_range=time_range,
+                    window_seconds=window_seconds,
+                    bucket_count=bucket_count,
+                    now=now,
+                    window_start=window_start,
+                    deploy_count=deploy_count,
+                    endpoint=prom_endpoint,
+                    source=prom_kind,
                 )
-            )
-            rates.append(rate)
-            errors.append(err)
-            latencies.append(p95)
+            except prometheus_client.PrometheusError:
+                # Fall through to synthetic — never let observability
+                # noise break the UI surface.
+                pass
 
-        def _avg(xs: list[float]) -> float:
-            return round(sum(xs) / len(xs), 4) if xs else 0.0
-
-        sorted_lat = sorted(latencies)
-        p50 = sorted_lat[len(sorted_lat) // 2] if sorted_lat else 0.0
-        p95_idx = max(0, int(round(0.95 * (len(sorted_lat) - 1))))
-        p99_idx = max(0, int(round(0.99 * (len(sorted_lat) - 1))))
-        p95 = sorted_lat[p95_idx] if sorted_lat else 0.0
-        p99 = sorted_lat[p99_idx] if sorted_lat else 0.0
-
-        return AppMetricsType(
+        return _synthetic_app_metrics(
             app_slug=app.slug,
+            app_guid=str(app.guid),
             time_range=time_range,
-            request_rate=_avg(rates),
-            error_rate=_avg(errors),
-            p50_latency_ms=float(p50),
-            p95_latency_ms=float(p95),
-            p99_latency_ms=float(p99),
+            window_seconds=window_seconds,
+            bucket_count=bucket_count,
+            window_start=window_start,
             deploy_count=deploy_count,
-            time_series=series,
-            source="synthetic",
         )
 
     @strawberry.field
@@ -359,3 +342,250 @@ def _decode_event_cursor(token: str):
         return dt.datetime.fromisoformat(ts), guid
     except (binascii.Error, ValueError, TypeError, json.JSONDecodeError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# astroliftAppMetrics — Prometheus + synthetic helpers (#297)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_metrics_endpoint(app) -> tuple[str | None, str]:
+    """Find the metrics endpoint for ``app`` from its primary env's
+    cluster. Returns ``(endpoint, source)`` where ``source`` is
+    ``"prometheus"`` (the default), ``"otel"`` (when the cluster's
+    config explicitly labels the endpoint as OTel), or ``""`` when
+    no endpoint is configured.
+
+    The endpoint and label live on ``TenantCluster.provider_config``
+    under the ``prometheus_endpoint`` / ``observability_kind`` keys —
+    operators set them via the cluster registration UI. Falls back
+    to no endpoint when the cluster has no envs, no provider_config,
+    or no endpoint key.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+
+    env = (
+        AppEnvironment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+        )
+        .select_related("tenant_cluster")
+        .order_by("name")
+        .first()
+    )
+    if env is None or env.tenant_cluster_id is None:
+        return None, ""
+    cluster = env.tenant_cluster
+    cfg = cluster.provider_config or {}
+    endpoint = (cfg.get("prometheus_endpoint") or "").strip()
+    if not endpoint:
+        return None, ""
+    kind = (cfg.get("observability_kind") or "").strip().lower() or "prometheus"
+    if kind not in {"prometheus", "otel"}:
+        # Unknown labels degrade to prometheus rather than failing —
+        # the wire protocol is the same.
+        kind = "prometheus"
+    return endpoint, kind
+
+
+def _query_prometheus_for_app(
+    *,
+    app_slug: str,
+    namespace: str,
+    time_range: str,
+    window_seconds: int,
+    bucket_count: int,
+    now,
+    window_start,
+    deploy_count: int,
+    endpoint: str,
+    source: str,
+) -> AppMetricsType:
+    """Run the four golden-signal PromQL queries for ``app_slug``
+    against ``endpoint`` and shape the result into ``AppMetricsType``.
+
+    PromQL contract (spec 08 §6):
+      * request_rate: ``sum(rate(http_requests_total{app=...}[5m]))``
+      * error_rate: ``... code=~"5.."`` over total
+      * p50/p95/p99: ``histogram_quantile`` over the request-latency
+        bucket histogram.
+
+    On any PromQL or transport failure the caller swallows the
+    exception and falls back to synthetic.
+    """
+    from astrolift_operations import prometheus_client
+
+    safe_app = prometheus_client.sanitize_label_value(app_slug)
+    # Rate window for short time_ranges (5m / 1h) is 1m for snappy
+    # response; longer windows widen to 5m so the rate is stable.
+    rate_window = "1m" if time_range in ("5m", "1h") else "5m"
+
+    labels = f'app="{safe_app}"'
+    if namespace:
+        labels += f',namespace="{prometheus_client.sanitize_label_value(namespace)}"'
+
+    rate_q = f"sum(rate(http_requests_total{{{labels}}}[{rate_window}]))"
+    err_q = f'sum(rate(http_requests_total{{{labels},code=~"5.."}}[{rate_window}]))'
+    p50_q = (
+        f"histogram_quantile(0.50, "
+        f"sum(rate(http_request_duration_seconds_bucket{{{labels}}}[{rate_window}])) by (le)"
+        f")"
+    )
+    p95_q = (
+        f"histogram_quantile(0.95, "
+        f"sum(rate(http_request_duration_seconds_bucket{{{labels}}}[{rate_window}])) by (le)"
+        f")"
+    )
+    p99_q = (
+        f"histogram_quantile(0.99, "
+        f"sum(rate(http_request_duration_seconds_bucket{{{labels}}}[{rate_window}])) by (le)"
+        f")"
+    )
+
+    rate_value = prometheus_client.query_instant(endpoint=endpoint, query=rate_q)
+    err_value = prometheus_client.query_instant(endpoint=endpoint, query=err_q)
+    p50_value = prometheus_client.query_instant(endpoint=endpoint, query=p50_q)
+    p95_value = prometheus_client.query_instant(endpoint=endpoint, query=p95_q)
+    p99_value = prometheus_client.query_instant(endpoint=endpoint, query=p99_q)
+
+    start_unix = int(window_start.timestamp())
+    end_unix = int(now.timestamp())
+    step_seconds = max(15, window_seconds // max(bucket_count, 1))
+
+    rate_rows = prometheus_client.query_range(
+        endpoint=endpoint,
+        query=rate_q,
+        start_unix=start_unix,
+        end_unix=end_unix,
+        step_seconds=step_seconds,
+    )
+    err_rows = prometheus_client.query_range(
+        endpoint=endpoint,
+        query=err_q,
+        start_unix=start_unix,
+        end_unix=end_unix,
+        step_seconds=step_seconds,
+    )
+    p95_rows = prometheus_client.query_range(
+        endpoint=endpoint,
+        query=p95_q,
+        start_unix=start_unix,
+        end_unix=end_unix,
+        step_seconds=step_seconds,
+    )
+
+    rate_buckets = prometheus_client.sum_range_to_buckets(
+        rate_rows,
+        bucket_count=bucket_count,
+        start_unix=start_unix,
+        end_unix=end_unix,
+    )
+    err_buckets = prometheus_client.sum_range_to_buckets(
+        err_rows,
+        bucket_count=bucket_count,
+        start_unix=start_unix,
+        end_unix=end_unix,
+    )
+    p95_buckets = prometheus_client.sum_range_to_buckets(
+        p95_rows,
+        bucket_count=bucket_count,
+        start_unix=start_unix,
+        end_unix=end_unix,
+    )
+
+    bucket_seconds = window_seconds / max(bucket_count, 1)
+    series: list[AppMetricsPointType] = []
+    for i in range(bucket_count):
+        ts = window_start + timedelta(seconds=(i + 0.5) * bucket_seconds)
+        series.append(
+            AppMetricsPointType(
+                timestamp=ts,
+                request_rate=round(rate_buckets[i], 4),
+                error_rate=round(err_buckets[i], 6),
+                # p95 from PromQL is seconds; expose ms to match the
+                # synthetic shape that the UI is already consuming.
+                latency_p95=round(p95_buckets[i] * 1000.0, 1),
+            )
+        )
+
+    return AppMetricsType(
+        app_slug=app_slug,
+        time_range=time_range,
+        request_rate=round(rate_value, 4),
+        # error_rate is dimensionless: errors / requests. Avoid div-by-0.
+        error_rate=round((err_value / rate_value) if rate_value > 0 else 0.0, 6),
+        p50_latency_ms=round(p50_value * 1000.0, 1),
+        p95_latency_ms=round(p95_value * 1000.0, 1),
+        p99_latency_ms=round(p99_value * 1000.0, 1),
+        deploy_count=deploy_count,
+        time_series=series,
+        source=source,
+    )
+
+
+def _synthetic_app_metrics(
+    *,
+    app_slug: str,
+    app_guid: str,
+    time_range: str,
+    window_seconds: int,
+    bucket_count: int,
+    window_start,
+    deploy_count: int,
+) -> AppMetricsType:
+    """Deterministic synthetic data — hash(guid + bucket_index) → stable
+    float in [0, 1). The UI sees identical numbers across reloads for
+    a given (app, window), which keeps the metrics surface useful as
+    a UI shape exercise when Prometheus is absent."""
+    seed = hashlib.sha256(app_guid.encode("utf-8")).hexdigest()
+    seed_int = int(seed[:16], 16)
+
+    def _norm(i: int, lo: float, hi: float) -> float:
+        r = (seed_int + i * 2654435761) & 0xFFFFFFFF
+        unit = r / 0xFFFFFFFF
+        return lo + (hi - lo) * unit
+
+    bucket_seconds = window_seconds / bucket_count
+    series: list[AppMetricsPointType] = []
+    rates: list[float] = []
+    errors: list[float] = []
+    latencies: list[float] = []
+    for i in range(bucket_count):
+        ts = window_start + timedelta(seconds=(i + 0.5) * bucket_seconds)
+        rate = round(_norm(i, 0.5, 80.0), 3)
+        err = round(_norm(i + 1000, 0.0, 0.05), 4)
+        p95 = round(_norm(i + 2000, 30.0, 750.0), 1)
+        series.append(
+            AppMetricsPointType(
+                timestamp=ts,
+                request_rate=rate,
+                error_rate=err,
+                latency_p95=p95,
+            )
+        )
+        rates.append(rate)
+        errors.append(err)
+        latencies.append(p95)
+
+    def _avg(xs: list[float]) -> float:
+        return round(sum(xs) / len(xs), 4) if xs else 0.0
+
+    sorted_lat = sorted(latencies)
+    p50 = sorted_lat[len(sorted_lat) // 2] if sorted_lat else 0.0
+    p95_idx = max(0, int(round(0.95 * (len(sorted_lat) - 1))))
+    p99_idx = max(0, int(round(0.99 * (len(sorted_lat) - 1))))
+    p95 = sorted_lat[p95_idx] if sorted_lat else 0.0
+    p99 = sorted_lat[p99_idx] if sorted_lat else 0.0
+
+    return AppMetricsType(
+        app_slug=app_slug,
+        time_range=time_range,
+        request_rate=_avg(rates),
+        error_rate=_avg(errors),
+        p50_latency_ms=float(p50),
+        p95_latency_ms=float(p95),
+        p99_latency_ms=float(p99),
+        deploy_count=deploy_count,
+        time_series=series,
+        source="synthetic",
+    )
