@@ -34,16 +34,18 @@ class ClustersQuery:
     @require_permission(Permission.APP_CREATE)
     @tenant_scoped()
     def astrolift_cluster_count(self, info: Info) -> int:
-        """Count of active clusters bound to the caller's org.
+        """Count of managed clusters bound to the caller's org.
 
         Used by the /apps/new wizard to gate Step 1: registering an
-        app with zero connected clusters is meaningless (the deploy
-        has nowhere to land). Scoped to ``APP_CREATE`` rather than
+        app with zero managed clusters is meaningless (the deploy has
+        nowhere to land). Scoped to ``APP_CREATE`` rather than
         ``CLUSTER_REGISTER`` because the natural caller is the app
         author, not the cluster operator — they need a shippable
         preflight signal even when they can't register clusters
         themselves. Soft-deleted and inactive clusters are excluded;
-        only rows that can actually accept a deploy count.
+        ``lifecycle = "managed"`` is required (#316 — registered rows
+        are metadata-only, not deploy targets until the operator has
+        brought them into management).
         """
         tenant = get_current_tenant()
         if tenant is None or tenant.organization_id is None:
@@ -52,6 +54,7 @@ class ClustersQuery:
             organization_id=tenant.organization_id,
             deleted_at__isnull=True,
             is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
         ).count()
 
     @strawberry.field

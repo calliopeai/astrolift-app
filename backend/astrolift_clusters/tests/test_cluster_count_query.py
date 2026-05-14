@@ -1,4 +1,4 @@
-"""Tests for the astrolift_cluster_count GraphQL query (#315).
+"""Tests for the astrolift_cluster_count GraphQL query (#315/#316).
 
 Used by the /apps/new wizard's Step 1 to decide whether to render
 the connection list or the "Connect a cluster first" empty state.
@@ -6,10 +6,12 @@ the connection list or the "Connect a cluster first" empty state.
 Boundaries pinned:
 
 * zero clusters -> 0
-* one active cluster -> 1
+* one active managed cluster -> 1
 * soft-deleted rows do not count
 * inactive rows do not count
 * clusters in another org do not count
+* registered-but-not-managed rows do not count (#316 — only the
+  managed lifecycle is a valid deploy target)
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ def test_count_is_zero_when_org_has_no_clusters(permission_resolver):
     assert n == 0
 
 
-def test_count_includes_active_clusters(permission_resolver):
+def test_count_includes_active_managed_clusters(permission_resolver):
     org = Organization.objects.create(name="Acme", slug="acme-active")
     plugin = _plugin("active")
     TenantCluster.objects.create(
@@ -71,11 +73,66 @@ def test_count_includes_active_clusters(permission_resolver):
         endpoint="https://invalid",
         auth_method=TenantCluster.AuthMethod.KUBECONFIG,
         auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
     )
     permission_resolver.grant(Permission.APP_CREATE)
     with _ctx(org):
         n = ClustersQuery().astrolift_cluster_count(_info())
     assert n == 1
+
+
+def test_count_excludes_registered_not_yet_managed(permission_resolver):
+    """A row that's registered but never brought into management is
+    metadata only — the wizard MUST refuse it as a deploy target so
+    the operator doesn't get a broken-cluster error at deploy time."""
+    org = Organization.objects.create(name="Acme", slug="acme-registered")
+    plugin = _plugin("registered")
+    TenantCluster.objects.create(
+        organization=org,
+        name="c1",
+        slug="c1",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        # default lifecycle = registered
+    )
+    permission_resolver.grant(Permission.APP_CREATE)
+    with _ctx(org):
+        n = ClustersQuery().astrolift_cluster_count(_info())
+    assert n == 0
+
+
+def test_count_excludes_managing_and_error(permission_resolver):
+    org = Organization.objects.create(name="Acme", slug="acme-managing")
+    plugin = _plugin("managing")
+    TenantCluster.objects.create(
+        organization=org,
+        name="c1",
+        slug="c1",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGING.value,
+    )
+    TenantCluster.objects.create(
+        organization=org,
+        name="c2",
+        slug="c2",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.ERROR.value,
+    )
+    permission_resolver.grant(Permission.APP_CREATE)
+    with _ctx(org):
+        n = ClustersQuery().astrolift_cluster_count(_info())
+    assert n == 0
 
 
 def test_count_excludes_soft_deleted(permission_resolver):

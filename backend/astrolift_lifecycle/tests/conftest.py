@@ -99,6 +99,10 @@ def cluster(org, provider_plugin):
         endpoint="https://dev.cluster.invalid",
         auth_method=TenantCluster.AuthMethod.KUBECONFIG,
         auth_config={},
+        # Deploy/lifecycle tests rely on this cluster being a valid
+        # deploy target; the registerApp + count gates require
+        # ``lifecycle = "managed"`` (#316).
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
     )
 
 

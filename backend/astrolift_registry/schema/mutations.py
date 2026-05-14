@@ -280,20 +280,23 @@ class RegistryMutation:
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
 
-        # An app is a deployment target — without a connected cluster
+        # An app is a deployment target — without a managed cluster
         # the platform has nowhere to roll the workload to and the
         # downstream deploy fails with an opaque "no cluster available"
-        # error. Reject up front instead. Soft-deleted and inactive
-        # clusters don't count: they can't accept a deploy.
+        # error. Reject up front instead. Soft-deleted, inactive, and
+        # not-yet-managed clusters don't count: only ``lifecycle =
+        # "managed"`` rows (#316) have platform RBAC + a passing
+        # preflight and can actually accept a deploy.
         cluster_count = TenantCluster.objects.filter(
             organization=project.organization,
             deleted_at__isnull=True,
             is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
         ).count()
         if cluster_count == 0:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                "No cluster connected. Visit /clusters to register one before adding apps.",
+                "No managed cluster connected. Visit /clusters and finish bringing a cluster into management before adding apps.",
                 field=None,
             )
 
