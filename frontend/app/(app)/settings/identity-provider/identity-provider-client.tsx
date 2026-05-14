@@ -3,11 +3,13 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  BookOpenIcon,
   CheckCircle2Icon,
   KeyRoundIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -125,12 +127,20 @@ export function IdentityProviderClient() {
       title="Identity providers"
       description="Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time."
       actions={
-        <Can permission="org.update">
-          <Button onClick={() => setOpen(true)}>
-            <PlusIcon className="size-4" />
-            New provider
+        <>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/documentation/identity-providers">
+              <BookOpenIcon className="size-4" />
+              Learn more
+            </Link>
           </Button>
-        </Can>
+          <Can permission="org.update">
+            <Button onClick={() => setOpen(true)}>
+              <PlusIcon className="size-4" />
+              New provider
+            </Button>
+          </Can>
+        </>
       }
     >
       {error && (
