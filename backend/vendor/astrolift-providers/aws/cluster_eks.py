@@ -29,6 +29,8 @@ from typing import Any
 
 from _sdk.cluster import (
     ApplyResult,
+    BootstrapComponent,
+    BootstrapOption,
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
@@ -482,6 +484,148 @@ class EKSClusterDriver(ClusterDriver):
             cluster=self._materialize_eks_auth_context(cluster),
             run_preflight=run_preflight,
         )
+
+    # ---- bootstrap recipe ----------------------------------------
+
+    def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
+        """EKS recipe — leans on AWS-native services where they're the
+        path of least resistance and falls back to in-cluster controllers
+        only where AWS doesn't provide a managed equivalent.
+
+        Native cloud paths:
+          - TLS: ACM via aws-load-balancer-controller annotations on
+            Ingress/Service (cert-manager only if the operator needs
+            internal mTLS or non-ALB cert flows).
+          - Storage: EBS CSI is an EKS managed addon (already provided
+            in the prd-eks-astrolift TF; not in the bootstrap recipe).
+          - Ingress: aws-load-balancer-controller renders Ingress as ALB.
+
+        Auth wiring:
+          - All controllers that need AWS API calls (LB controller,
+            external-dns, cluster-autoscaler) bind to IRSA roles
+            provisioned by the opscode TF. The recipe pre-fills the
+            ServiceAccount annotations with the role ARN pattern; the
+            install workflow resolves the actual ARN from the cluster
+            row's provider_config before invoking helm.
+        """
+        return [
+            BootstrapComponent(
+                key="tls_issuer",
+                title="TLS certificate strategy",
+                default_enabled=True,
+                rationale=(
+                    "EKS clusters typically use ACM for public TLS via the "
+                    "AWS Load Balancer Controller — operators issue certs "
+                    "in ACM (cheap, auto-renewed) and reference them by "
+                    "ARN on each Ingress. cert-manager is only needed for "
+                    "internal mTLS or non-ALB cert flows."
+                ),
+                helm_values={
+                    # 'acm' mode is the default — no chart values; the
+                    # LB controller picks up cert ARNs from Ingress
+                    # annotations operators set per-app.
+                },
+                requires=["aws-load-balancer-controller"],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("acm", "AWS Certificate Manager (recommended, ALB ingress)"),
+                            ("acme_letsencrypt_prod", "Let's Encrypt prod (cert-manager + Route53 DNS-01)"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging (testing)"),
+                            ("self_signed", "Self-signed (internal traffic only)"),
+                        ],
+                        default="acm",
+                    ),
+                ],
+            ),
+            BootstrapComponent(
+                key="aws-load-balancer-controller",
+                title="AWS Load Balancer Controller",
+                default_enabled=True,
+                rationale=(
+                    "Renders Kubernetes Ingress as AWS ALBs and Service "
+                    "type=LoadBalancer as NLBs. EKS doesn't ship a default "
+                    "Service controller; without this, ingress doesn't work. "
+                    "Bound to its IRSA role via ServiceAccount annotation."
+                ),
+                helm_values={
+                    "aws-load-balancer-controller": {
+                        "enabled": True,
+                        # cluster name + region resolved by the install
+                        # workflow from the cluster row's auth_config.
+                        "serviceAccount": {"create": True, "annotations": {}},
+                    },
+                },
+                requires=["irsa:aws-load-balancer-controller"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="external-dns",
+                title="external-dns (Route53)",
+                default_enabled=True,
+                rationale=(
+                    "Auto-creates Route53 records from Ingress + Service "
+                    "annotations. IRSA-bound; the install workflow scopes "
+                    "the role's permissions to the operator's Route53 "
+                    "hosted zone."
+                ),
+                helm_values={
+                    "external-dns": {
+                        "enabled": True,
+                        "provider": "aws",
+                        "sources": ["service", "ingress"],
+                        "serviceAccount": {"create": True, "annotations": {}},
+                    },
+                },
+                requires=["irsa:external-dns", "route53_zone_id"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="metrics-server",
+                title="metrics-server (HPA + kubectl top)",
+                default_enabled=True,
+                rationale=(
+                    "Required for HorizontalPodAutoscaler. EKS doesn't ship "
+                    "it as a managed addon (the upstream chart is what we use)."
+                ),
+                helm_values={"metricsServer": {"enabled": True}},
+                requires=[],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="kube-prometheus-stack",
+                title="Prometheus + Grafana + Alertmanager",
+                default_enabled=True,
+                rationale=(
+                    "Metrics scraping + dashboarding for the platform UI's "
+                    "cluster-status charts. Prom storage backed by EBS gp3 "
+                    "PVs (the EKS-installed default StorageClass)."
+                ),
+                helm_values={
+                    "kube-prometheus-stack": {
+                        "enabled": True,
+                        "prometheus": {
+                            "prometheusSpec": {
+                                "storageSpec": {
+                                    "volumeClaimTemplate": {
+                                        "spec": {
+                                            "storageClassName": "gp3",
+                                            "accessModes": ["ReadWriteOnce"],
+                                            "resources": {"requests": {"storage": "50Gi"}},
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        "grafana": {"enabled": True, "persistence": {"storageClassName": "gp3"}},
+                    },
+                },
+                requires=["storage:gp3"],
+                options=[],
+            ),
+        ]
 
     # ---- exec_plugin token materialization -----------------------
     #

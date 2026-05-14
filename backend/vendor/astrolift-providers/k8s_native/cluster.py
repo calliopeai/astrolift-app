@@ -20,6 +20,8 @@ from typing import Any
 
 from _sdk.cluster import (
     ApplyResult,
+    BootstrapComponent,
+    BootstrapOption,
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
@@ -441,6 +443,150 @@ class K8sNativeClusterDriver(ClusterDriver):
             cluster=cluster,
             run_preflight=run_preflight,
         )
+
+    # ---- bootstrap recipe ------------------------------------------
+
+    def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
+        """Vanilla k8s recipe — assumes nothing the cloud provides.
+
+        The operator must delegate a DNS subzone for external-dns and
+        Let's Encrypt DNS-01 challenges (the platform doesn't try to
+        manage public DNS roots for them). Storage defaults to
+        Longhorn; MetalLB provides LoadBalancer Service IPs since
+        bare-metal clusters don't get cloud LBs for free.
+        """
+        return [
+            BootstrapComponent(
+                key="tls_issuer",
+                title="TLS certificate strategy",
+                default_enabled=True,
+                rationale=(
+                    "Bare-metal clusters need cert-manager + an Issuer the "
+                    "platform can drive. Let's Encrypt requires a real "
+                    "delegated subzone for DNS-01; self-signed works for "
+                    "internal-only traffic."
+                ),
+                helm_values={
+                    "certManager": {"enabled": True, "installCRDs": True},
+                    "clusterIssuer": {"enabled": True},
+                },
+                requires=["subzone:dns (for Let's Encrypt DNS-01)"],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("acme_letsencrypt_prod", "Let's Encrypt production"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                            ("self_signed", "Self-signed (internal only)"),
+                        ],
+                        default="acme_letsencrypt_prod",
+                    ),
+                ],
+            ),
+            BootstrapComponent(
+                key="ingress-nginx",
+                title="Ingress controller (nginx)",
+                default_enabled=True,
+                rationale=(
+                    "Bare-metal clusters don't get a cloud ingress for free. "
+                    "ingress-nginx is the platform's default; pair it with "
+                    "MetalLB so its Service:LoadBalancer gets an IP."
+                ),
+                helm_values={"ingress-nginx": {"enabled": True}},
+                requires=["metallb"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="metallb",
+                title="MetalLB (LoadBalancer Service IP pool)",
+                default_enabled=True,
+                rationale=(
+                    "Without MetalLB, Service:LoadBalancer requests on "
+                    "bare-metal stay Pending forever. The operator must "
+                    "configure an IPAddressPool with a routable range."
+                ),
+                helm_values={"metallb": {"enabled": True}},
+                requires=["ip_pool: routable LB range"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="external-dns",
+                title="external-dns (delegated subzone)",
+                default_enabled=True,
+                rationale=(
+                    "Tenant apps need DNS records under a zone the cluster "
+                    "controls. Operator delegates a subzone (e.g. "
+                    "astrolift.example.com) to the cluster's DNS via NS "
+                    "records; external-dns writes A/CNAME entries there."
+                ),
+                helm_values={
+                    "external-dns": {
+                        "enabled": True,
+                        "provider": "rfc2136",
+                        "sources": ["service", "ingress"],
+                    },
+                },
+                requires=["subzone:dns (delegated)"],
+                options=[
+                    BootstrapOption(
+                        key="provider",
+                        label="DNS provider",
+                        choices=[
+                            ("rfc2136", "RFC 2136 dynamic update (BIND, knot, etc.)"),
+                            ("pdns", "PowerDNS"),
+                            ("cloudflare", "Cloudflare (API token)"),
+                        ],
+                        default="rfc2136",
+                    ),
+                ],
+            ),
+            BootstrapComponent(
+                key="storage",
+                title="Storage (Longhorn)",
+                default_enabled=True,
+                rationale=(
+                    "Longhorn provides replicated block storage on bare-metal "
+                    "node disks. Operators with existing CSI (Rook-Ceph, "
+                    "TopoLVM, NFS) should flip this off and configure that "
+                    "StorageClass separately."
+                ),
+                helm_values={
+                    "storageClasses": {"enabled": True, "longhorn": {"enabled": True}},
+                },
+                requires=["node_disks: dedicated disk path on each node"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="metrics-server",
+                title="metrics-server (HPA + kubectl top)",
+                default_enabled=True,
+                rationale=(
+                    "Required for HorizontalPodAutoscaler and ``kubectl top``. Not bundled in vanilla k8s distros."
+                ),
+                helm_values={"metricsServer": {"enabled": True}},
+                requires=[],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="kube-prometheus-stack",
+                title="Prometheus + Grafana + Alertmanager",
+                default_enabled=True,
+                rationale=(
+                    "The platform's metrics scraping + dashboarding stack. "
+                    "Disable if the operator points the OTel collector at an "
+                    "external Prometheus / Mimir / Datadog instead."
+                ),
+                helm_values={
+                    "kube-prometheus-stack": {
+                        "enabled": True,
+                        "grafana": {"enabled": True},
+                    },
+                },
+                requires=["storage:rwo for Prom + Grafana PVs"],
+                options=[],
+            ),
+        ]
 
     # ---- internals ------------------------------------------------
 
