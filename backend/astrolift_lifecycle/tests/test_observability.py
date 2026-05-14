@@ -269,9 +269,15 @@ async def test_on_app_log_yields_backend_lines(org, app, env, actor, permission_
     the test thread, which trips up cross-thread ORM access."""
     from types import SimpleNamespace
 
+    from asgiref.sync import sync_to_async
+
     _grant_read_logs(permission_resolver)
-    app.default_tenant_cluster = env.tenant_cluster
-    app.save(update_fields=["default_tenant_cluster"])
+
+    def _wire_cluster():
+        app.default_tenant_cluster = env.tenant_cluster
+        app.save(update_fields=["default_tenant_cluster"])
+
+    await sync_to_async(_wire_cluster, thread_sensitive=False)()
 
     lines = [
         LogLine(
@@ -315,9 +321,15 @@ async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_
     released."""
     from types import SimpleNamespace
 
+    from asgiref.sync import sync_to_async
+
     _grant_read_logs(permission_resolver)
-    app.default_tenant_cluster = env.tenant_cluster
-    app.save(update_fields=["default_tenant_cluster"])
+
+    def _wire_cluster():
+        app.default_tenant_cluster = env.tenant_cluster
+        app.save(update_fields=["default_tenant_cluster"])
+
+    await sync_to_async(_wire_cluster, thread_sensitive=False)()
 
     class _BlockingBackend:
         def __init__(self):
