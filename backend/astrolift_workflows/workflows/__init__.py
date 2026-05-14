@@ -17,14 +17,30 @@ from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.onboard_app import OnboardAppWorkflow
 from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
+from astrolift_workflows.workflows.scheduled import (
+    CapturePlatformCostSnapshotWorkflow,
+    DriftDetectionWorkflow,
+    PollScheduledJobRunsWorkflow,
+    PreviewGarbageCollectWorkflow,
+    PruneAuditLogWorkflow,
+    ReconcileClusterCapabilitiesWorkflow,
+    RehealWebhookSubscriptionsWorkflow,
+)
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
 
 __all__ = [
     "BringClusterIntoManagementWorkflow",
+    "CapturePlatformCostSnapshotWorkflow",
     "CronDeployTickWorkflow",
     "DeployAppWorkflow",
+    "DriftDetectionWorkflow",
     "OnboardAppWorkflow",
+    "PollScheduledJobRunsWorkflow",
+    "PreviewGarbageCollectWorkflow",
     "PromoteDeploymentWorkflow",
+    "PruneAuditLogWorkflow",
+    "ReconcileClusterCapabilitiesWorkflow",
+    "RehealWebhookSubscriptionsWorkflow",
     "RollbackDeploymentWorkflow",
     "TearDownPreviewWorkflow",
 ]

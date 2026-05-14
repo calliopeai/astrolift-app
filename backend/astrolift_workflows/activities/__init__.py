@@ -1,19 +1,22 @@
 """Temporal activities — durable, idempotent units of work.
 
 Each activity is a thin wrapper around a platform model + driver
-call. Implementations are deliberately no-ops at this stage; the
-worker will replace them with real driver-backed implementations as
-provider plugins land in the ``astrolift-providers`` repo.
+call. Activities resolve the relevant provider plugin (cluster,
+secrets, dns, registry, managed-service) on entry and dispatch
+through the canonical ``astrolift_drivers.registry`` interface so
+workflow code stays free of Django + driver imports.
 """
 
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
     create_promotion_deployment,
     create_rollback_deployment,
+    delete_preview_namespace,
     health_check,
     mark_app_provisioning,
     mark_app_ready,
     mark_deploying,
+    mark_preview_torn_down,
     mark_running,
     poll_rollout,
     pre_flight,
@@ -34,13 +37,26 @@ from astrolift_workflows.activities.cluster_management import (
     verify_reachability,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
+from astrolift_workflows.activities.scheduled import (
+    capture_platform_cost_snapshot,
+    detect_drift,
+    gc_stale_previews,
+    poll_scheduled_job_runs,
+    prune_audit_log,
+    reconcile_cluster_capabilities,
+    reheal_webhook_subscriptions,
+)
 
 __all__ = [
     "apply_manifests",
     "apply_platform_rbac",
+    "capture_platform_cost_snapshot",
     "create_promotion_deployment",
     "create_rollback_deployment",
+    "delete_preview_namespace",
+    "detect_drift",
     "dispatch_cron_deploys",
+    "gc_stale_previews",
     "health_check",
     "mark_app_provisioning",
     "mark_app_ready",
@@ -48,13 +64,18 @@ __all__ = [
     "mark_error",
     "mark_managed",
     "mark_managing",
+    "mark_preview_torn_down",
     "mark_running",
     "poll_rollout",
+    "poll_scheduled_job_runs",
     "pre_flight",
     "probe_capabilities",
     "provision_managed_services_initial",
     "provision_namespace",
     "provision_registry_repo",
+    "prune_audit_log",
+    "reconcile_cluster_capabilities",
+    "reheal_webhook_subscriptions",
     "render_manifests",
     "run_preflight_job",
     "update_secrets",
