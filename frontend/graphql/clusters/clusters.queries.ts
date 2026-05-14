@@ -75,6 +75,17 @@ export const SOFT_DELETE_MANAGED_DOMAIN = gql`
   }
 `;
 
+// Tenant-scoped count of active TenantCluster rows in the caller's
+// org. Used by the /apps/new wizard to gate Step 1 — if it's zero,
+// we refuse to walk the operator into a wizard whose deploy can't
+// land. Backed by the registry's PRECONDITION gate on registerApp
+// (#315), so this is a UX shortcut, not the source of truth.
+export const CLUSTER_COUNT = gql`
+  query ClusterCount {
+    astroliftClusterCount
+  }
+`;
+
 export const LIST_CLUSTERS = gql`
   query ListClusters {
     astroliftClusters {

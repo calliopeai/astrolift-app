@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { GitBranchIcon, LinkIcon, LockIcon, UnlockIcon } from "lucide-react";
+import { GitBranchIcon, LinkIcon, LockIcon, ServerIcon, UnlockIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
+import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import {
   Combobox,
@@ -23,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CLUSTER_COUNT } from "@/graphql/clusters/clusters.queries";
 import { LIST_AVAILABLE_REPOS, LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
 import type {
   AstroliftRemoteRepoList,
@@ -39,6 +41,10 @@ interface ConnectionsResp {
 
 interface ReposResp {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
+}
+
+interface ClusterCountResp {
+  astroliftClusterCount: number;
 }
 
 const KIND_TO_SOURCE_KIND: Record<ScmConnectionKind, SourceKind> = {
@@ -77,8 +83,20 @@ interface Props {
 }
 
 export function RepoPickerStep({ state, setState, setValid }: Props) {
+  // Cluster preflight (#315): registerApp refuses orgs with zero
+  // active clusters. We mirror the gate in the wizard so the operator
+  // doesn't walk through five steps to fail at submit. Querying ahead
+  // of the connections list keeps the empty-state UX coherent — no
+  // partial UI rendered behind the gate.
+  const clusterCount = useQuery<ClusterCountResp>(CLUSTER_COUNT, {
+    fetchPolicy: "cache-and-network",
+  });
+  const hasCluster = (clusterCount.data?.astroliftClusterCount ?? 0) > 0;
+  const clusterCountReady = clusterCount.data !== undefined;
+
   const connections = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS, {
     fetchPolicy: "cache-and-network",
+    skip: !hasCluster,
   });
 
   const usable = (connections.data?.astroliftSourceConnections ?? []).filter(
@@ -115,10 +133,13 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
   });
   const repoList = repos.data?.astroliftAvailableRepos;
 
-  // A repo is picked when sourceRepo + connectionId are both set.
+  // A repo is picked when sourceRepo + connectionId are both set
+  // AND the org has at least one connected cluster (#315). The
+  // backend would refuse on submit anyway; gating Next here keeps the
+  // operator from going further until the precondition is met.
   React.useEffect(() => {
-    setValid(Boolean(state.connectionId && state.sourceRepo));
-  }, [state.connectionId, state.sourceRepo, setValid]);
+    setValid(Boolean(hasCluster && state.connectionId && state.sourceRepo));
+  }, [hasCluster, state.connectionId, state.sourceRepo, setValid]);
 
   function pickRepo(fullName: string) {
     const repo = repoList?.repos.find((r) => r.fullName === fullName);
@@ -142,6 +163,27 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
       manifestErrors: [],
       manifestValid: false,
     }));
+  }
+
+  if (clusterCount.loading && !clusterCountReady) {
+    return (
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  if (clusterCountReady && !hasCluster) {
+    return (
+      <EmptyState
+        icon={<ServerIcon className="size-5" />}
+        title="Connect a cluster first"
+        description="Astrolift deploys apps to Kubernetes clusters you've registered. Connect at least one before adding apps."
+        actionHref="/clusters"
+        actionLabel="Manage clusters"
+      />
+    );
   }
 
   if (connections.loading && !connections.data) {

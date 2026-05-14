@@ -1919,6 +1919,7 @@ type Query {
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
   astroliftClusters: [AstroliftTenantCluster!]!
+  astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
   astroliftQuotas: [AstroliftQuota!]!
