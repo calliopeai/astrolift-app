@@ -23,22 +23,31 @@ from __future__ import annotations
 
 import base64
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from _sdk.cluster import (
     ApplyResult,
+    ClusterAuth,
     ClusterDriver,
     DeleteResult,
     ExecResult,
     Namespace,
     NamespaceState,
+    PodInfo,
+    PodLogLine,
     PortForwardSession,
     RolloutResult,
     WorkloadStatus,
 )
 from aws._errors import NotFoundError, map_client_error
+from k8s_native.observability import (
+    LivePodBackend,
+    LogBackend,
+    PodBackend,
+    default_log_backend,
+)
 
 
 @dataclass(frozen=True)
@@ -65,6 +74,8 @@ class EKSClusterDriver(ClusterDriver):
         eks_client: Any | None = None,
         sts_client: Any | None = None,
         k8s_client_factory: Callable[..., Any] | None = None,
+        pod_backend: PodBackend | None = None,
+        log_backend: LogBackend | None = None,
     ) -> None:
         self._config = config
         if eks_client is not None:
@@ -83,6 +94,13 @@ class EKSClusterDriver(ClusterDriver):
         # client without contacting a real apiserver.
         self._k8s_factory = k8s_client_factory or _build_k8s_client
         self._k8s_cache: dict[str, Any] = {}
+        # Pluggable runtime-observability backends (#299). Same shape
+        # as K8sNativeClusterDriver — the listing + log-streaming
+        # path is cloud-neutral as soon as the ClusterAuth blob is
+        # in hand; what's EKS-specific is *how* the operator's
+        # exec_plugin row gets turned into kubeconfig (#309 follow-up).
+        self._pod_backend: PodBackend = pod_backend or LivePodBackend()
+        self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
 
     # ---- apply / delete -------------------------------------------
 
@@ -120,8 +138,10 @@ class EKSClusterDriver(ClusterDriver):
             else:
                 unchanged.append(ref)
         return ApplyResult(
-            created=created, updated=updated,
-            unchanged=unchanged, errors=errors,
+            created=created,
+            updated=updated,
+            unchanged=unchanged,
+            errors=errors,
         )
 
     def delete_manifests(
@@ -140,7 +160,9 @@ class EKSClusterDriver(ClusterDriver):
             ref = f"{kind}/{name}"
             try:
                 client.delete(
-                    kind=kind, namespace=namespace, name=name,
+                    kind=kind,
+                    namespace=namespace,
+                    name=name,
                 )
                 deleted.append(ref)
             except _NotFound:
@@ -148,13 +170,17 @@ class EKSClusterDriver(ClusterDriver):
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
-            deleted=deleted, not_found=not_found, errors=errors,
+            deleted=deleted,
+            not_found=not_found,
+            errors=errors,
         )
 
     # ---- namespaces -----------------------------------------------
 
     def get_namespace(
-        self, cluster: str, name: str,
+        self,
+        cluster: str,
+        name: str,
     ) -> NamespaceState | None:
         client = self._k8s(cluster)
         try:
@@ -189,16 +215,24 @@ class EKSClusterDriver(ClusterDriver):
         }
         try:
             client.server_side_apply(
-                namespace=None, manifest=manifest, dry_run=False,
+                namespace=None,
+                manifest=manifest,
+                dry_run=False,
             )
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(f"ensure_namespace {name}: {exc}") from exc
         return Namespace(
-            name=name, labels=dict(labels), annotations=dict(annotations),
+            name=name,
+            labels=dict(labels),
+            annotations=dict(annotations),
         )
 
     def delete_namespace(
-        self, cluster: str, name: str, *, wait: bool = True,
+        self,
+        cluster: str,
+        name: str,
+        *,
+        wait: bool = True,
     ) -> None:
         client = self._k8s(cluster)
         try:
@@ -234,7 +268,9 @@ class EKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         try:
             obj = client.get(
-                kind=kind, namespace=namespace, name=name,
+                kind=kind,
+                namespace=namespace,
+                name=name,
             )
         except _NotFound as exc:
             raise NotFoundError(
@@ -244,7 +280,9 @@ class EKSClusterDriver(ClusterDriver):
         status = obj.get("status", {})
         spec = obj.get("spec", {})
         return WorkloadStatus(
-            kind=kind, name=name, namespace=namespace,
+            kind=kind,
+            name=name,
+            namespace=namespace,
             ready_replicas=int(status.get("readyReplicas", 0)),
             desired_replicas=int(
                 spec.get("replicas", status.get("replicas", 0)),
@@ -267,12 +305,16 @@ class EKSClusterDriver(ClusterDriver):
         while time.monotonic() < deadline:
             try:
                 status = self.get_workload_status(
-                    cluster=cluster, namespace=namespace,
-                    kind=kind, name=name,
+                    cluster=cluster,
+                    namespace=namespace,
+                    kind=kind,
+                    name=name,
                 )
             except NotFoundError:
                 return RolloutResult(
-                    success=False, kind=kind, name=name,
+                    success=False,
+                    kind=kind,
+                    name=name,
                     namespace=namespace,
                     message="workload not found",
                     timed_out=False,
@@ -280,33 +322,37 @@ class EKSClusterDriver(ClusterDriver):
             last_status = status
             if on_tick:
                 on_tick(status)
-            if (
-                status.ready_replicas == status.desired_replicas
-                and status.desired_replicas > 0
-            ):
+            if status.ready_replicas == status.desired_replicas and status.desired_replicas > 0:
                 return RolloutResult(
-                    success=True, kind=kind, name=name,
+                    success=True,
+                    kind=kind,
+                    name=name,
                     namespace=namespace,
-                    message=(
-                        f"{status.ready_replicas}/"
-                        f"{status.desired_replicas} ready"
-                    ),
+                    message=(f"{status.ready_replicas}/{status.desired_replicas} ready"),
                     timed_out=False,
                 )
             # Check for rollout failure conditions
             for cond in status.conditions:
-                if cond.get("type") == "Progressing" and cond.get(
-                    "status",
-                ) == "False":
+                if (
+                    cond.get("type") == "Progressing"
+                    and cond.get(
+                        "status",
+                    )
+                    == "False"
+                ):
                     return RolloutResult(
-                        success=False, kind=kind, name=name,
+                        success=False,
+                        kind=kind,
+                        name=name,
                         namespace=namespace,
                         message=cond.get("message", "Progressing=False"),
                         timed_out=False,
                     )
             time.sleep(min(15, max(1, timeout // 20)))
         return RolloutResult(
-            success=False, kind=kind, name=name,
+            success=False,
+            kind=kind,
+            name=name,
             namespace=namespace,
             message=(
                 last_status.conditions[-1].get("message", "")
@@ -331,7 +377,9 @@ class EKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         try:
             return client.exec_in_pod(
-                namespace=namespace, pod=pod, container=container,
+                namespace=namespace,
+                pod=pod,
+                container=container,
                 command=command,
             )
         except _NotFound as exc:
@@ -348,7 +396,49 @@ class EKSClusterDriver(ClusterDriver):
     ) -> PortForwardSession:
         client = self._k8s(cluster)
         return client.port_forward(
-            namespace=namespace, pod=pod, ports=ports,
+            namespace=namespace,
+            pod=pod,
+            ports=ports,
+        )
+
+    # ---- runtime observability (#299) -----------------------------
+
+    def list_pods(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        app_slug: str,
+    ) -> list[PodInfo]:
+        """Listing path is shared with k8s_native — the EKS-specific
+        bit (IRSA exec_plugin token mint) lives in #309 follow-up.
+        For now, ``auth_method=kubeconfig`` and
+        ``auth_method=service_account_token`` go through directly;
+        ``exec_plugin`` raises ClusterAuthError pointing at #309."""
+        return self._pod_backend.list_pods(
+            auth=auth,
+            namespace=namespace,
+            app_slug=app_slug,
+        )
+
+    def stream_logs(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str | None,
+        tail_lines: int,
+        follow: bool,
+    ) -> AsyncIterator[PodLogLine]:
+        """See ``list_pods`` — same shared k8s_native path."""
+        return self._log_backend.stream(
+            auth=auth,
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            tail_lines=tail_lines,
+            follow=follow,
         )
 
     # ---- internals ------------------------------------------------
@@ -418,7 +508,8 @@ def _build_k8s_client(
     ``k8s_client_factory`` arg so we don't need a live apiserver.
     """
     return _RealK8sClient(
-        endpoint=endpoint, ca_data=ca_data,
+        endpoint=endpoint,
+        ca_data=ca_data,
         token_provider=token_provider,
     )
 
@@ -446,7 +537,8 @@ class _RealK8sClient:
 
         ca_pem = base64.b64decode(ca_data)
         ca_file = tempfile.NamedTemporaryFile(
-            suffix=".crt", delete=False,
+            suffix=".crt",
+            delete=False,
         )
         ca_file.write(ca_pem)
         ca_file.close()
@@ -464,8 +556,7 @@ class _RealK8sClient:
 
     def server_side_apply(self, *, namespace, manifest, dry_run):
         raise NotImplementedError(
-            "server_side_apply requires live cluster — wire via "
-            "kubernetes.dynamic.DynamicClient at deploy time",
+            "server_side_apply requires live cluster — wire via kubernetes.dynamic.DynamicClient at deploy time",
         )
 
     def get(self, *, kind, namespace, name):
