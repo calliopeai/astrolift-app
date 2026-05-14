@@ -262,10 +262,11 @@ export function NavTree() {
               <div className="flex w-full items-center">
                 <Link
                   href="/settings/organization"
-                  className="flex flex-1 items-center gap-2 truncate"
+                  className="flex flex-1 items-center gap-2 min-w-0"
+                  title={tree.organization.name}
                 >
-                  <Building2Icon />
-                  <span className="truncate font-medium">
+                  <Building2Icon className="shrink-0" />
+                  <span className="break-words font-medium">
                     {tree.organization.name}
                   </span>
                 </Link>
@@ -339,10 +340,11 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
           <div className="flex w-full items-center">
             <Link
               href={`/teams?team=${encodeURIComponent(node.team.slug)}`}
-              className="flex flex-1 items-center gap-2 truncate"
+              className="flex flex-1 items-center gap-2 min-w-0"
+              title={node.team.name}
             >
-              <UsersIcon className="text-sidebar-foreground/70" />
-              <span className="truncate">{node.team.name}</span>
+              <UsersIcon className="shrink-0 text-sidebar-foreground/70" />
+              <span className="break-words">{node.team.name}</span>
             </Link>
             <CollapsibleTrigger
               className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
@@ -410,10 +412,11 @@ function ProjectNode({
           <div className="flex w-full items-center">
             <Link
               href={`/projects/${encodeURIComponent(node.project.slug)}`}
-              className="flex flex-1 items-center gap-2 truncate"
+              className="flex flex-1 items-center gap-2 min-w-0"
+              title={node.project.name}
             >
-              <FileBoxIcon className="text-sidebar-foreground/70" />
-              <span className="truncate">{node.project.name}</span>
+              <FileBoxIcon className="shrink-0 text-sidebar-foreground/70" />
+              <span className="break-words">{node.project.name}</span>
             </Link>
             <CollapsibleTrigger
               className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
@@ -459,13 +462,14 @@ function AppLeaf({ app, active }: AppLeafProps) {
         <Link
           href={`/apps/${app.slug}`}
           aria-current={active ? "page" : undefined}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 min-w-0"
+          title={app.name}
         >
           {statusIcon(app.status)}
-          <RocketIcon className="size-3.5 text-sidebar-foreground/60" />
+          <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60" />
           <span
             className={cn(
-              "truncate",
+              "break-words",
               active && "font-semibold text-sidebar-accent-foreground",
             )}
           >
