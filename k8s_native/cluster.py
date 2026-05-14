@@ -34,6 +34,7 @@ from _sdk.cluster import (
     PodLogLine,
     PortForwardSession,
     RolloutResult,
+    TeardownReport,
     WorkloadStatus,
 )
 from k8s_native.management import (
@@ -445,6 +446,32 @@ class K8sNativeClusterDriver(ClusterDriver):
         )
 
     # ---- bootstrap recipe ------------------------------------------
+
+    def teardown_cluster(
+        self,
+        cluster: ClusterContext,
+        *,
+        delete_cloud_infra: bool,
+    ) -> TeardownReport:
+        """Bare-metal teardown is always a no-op: the platform never
+        owned the nodes (operator-managed bare metal / k3s / kind / etc).
+
+        The decommission workflow's cleanup of platform-owned cluster-
+        side resources (RBAC, namespaces, registry secrets) is handled
+        by the existing ``remove_platform_rbac`` activity — this
+        method only covers cloud-managed-cluster destruction, which
+        bare metal doesn't have."""
+        return TeardownReport(
+            success=True,
+            skipped=[cluster.slug],
+            messages=[
+                "k8s_native (bare metal) clusters are operator-owned — the "
+                "platform never provisioned the underlying nodes or control "
+                "plane, so there's nothing to delete at the infrastructure "
+                "level. The platform RBAC bundle is removed via the existing "
+                "decommission workflow.",
+            ],
+        )
 
     def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
         """Vanilla k8s recipe — assumes nothing the cloud provides.

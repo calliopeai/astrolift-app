@@ -27,6 +27,7 @@ from _sdk.cluster import (
     PodInfo,
     PodLogLine,
     RolloutResult,
+    TeardownReport,
     WorkloadStatus,
 )
 from azure._errors import NotFoundError, map_api_error
@@ -353,6 +354,67 @@ class AKSClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=cluster,
             run_preflight=run_preflight,
+        )
+
+    # ---- cluster teardown (#337) ---------------------------------
+
+    def teardown_cluster(
+        self,
+        cluster: ClusterContext,
+        *,
+        delete_cloud_infra: bool,
+    ) -> TeardownReport:
+        """Delete the AKS managed cluster.
+
+        ``delete_cloud_infra=False`` is a no-op for symmetry with the
+        protocol — the cluster row is the platform's record; the AKS
+        cluster itself stays running.
+
+        When deleting, calls
+        ``managed_clusters.begin_delete(resource_group, cluster_name)``.
+        Azure cascades node-pool VMs + load balancers tagged with the
+        cluster's MC resource group. Resource group / VNet / IAM
+        roles are operator-owned and stay.
+
+        Idempotent: a ``ResourceNotFoundError`` (Azure SDK) on the
+        begin_delete call is treated as "already gone".
+        """
+        if not delete_cloud_infra:
+            return TeardownReport(
+                success=True,
+                skipped=[f"aks/{self._config.cluster_name}"],
+                messages=["delete_cloud_infra=false; AKS cluster left running"],
+            )
+        try:
+            poller = self._aks.managed_clusters.begin_delete(
+                resource_group_name=self._config.resource_group,
+                resource_name=self._config.cluster_name,
+            )
+            # Don't block on poller.result() here — Azure deletes take
+            # 5-10 min; the workflow's activity timeout would push the
+            # heartbeat ratio uncomfortably. The submission succeeding
+            # is the durable signal.
+            _ = poller
+        except Exception as exc:
+            mapped = map_api_error(exc)
+            if isinstance(mapped, NotFoundError):
+                return TeardownReport(
+                    success=True,
+                    skipped=[f"aks-cluster/{self._config.cluster_name} (already deleted)"],
+                    messages=["AKS cluster lookup returned 404 — already gone"],
+                )
+            return TeardownReport(
+                success=False,
+                error=f"managed_clusters.begin_delete failed: {mapped}",
+            )
+        return TeardownReport(
+            success=True,
+            deleted=[f"aks-cluster/{self._config.cluster_name}"],
+            messages=[
+                "managed_clusters.begin_delete submitted; node-pool VMs + "
+                "tagged load balancers cascade-delete in the MC_<rg> resource "
+                "group; full deletion typically completes in 5-10 min",
+            ],
         )
 
     # ---- bootstrap recipe ----------------------------------------
