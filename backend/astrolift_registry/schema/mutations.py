@@ -9,6 +9,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
+from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.types import RegisteredAppType, app_to_type
 from core.decorators import tenant_scoped
@@ -30,6 +31,9 @@ class RegisterAppInput:
     default_branch: str | None = None
     deploy_branch: str | None = None
     trigger_mode: str | None = None
+    # Five-field cron expression. Required when ``trigger_mode == 'cron'``
+    # and ignored otherwise; the resolver enforces both rules.
+    cron_expression: str | None = None
     # Optional: the wizard may pre-fetch the manifest (via
     # astroliftSourceFile) and pass the body here so the new app
     # boots with manifest_raw already populated. The onboarding
@@ -49,6 +53,7 @@ class UpdateAppInput:
     default_branch: str | None = None
     deploy_branch: str | None = None
     trigger_mode: str | None = None
+    cron_expression: str | None = None
     preview_enabled: bool | None = None
     is_active: bool | None = None
 
@@ -163,6 +168,25 @@ class RegistryMutation:
                     field="sourceRepo",
                 )
 
+        trigger_mode = input.trigger_mode or "auto_on_push"
+        cron_expression = ""
+        if trigger_mode == RegisteredApp.TriggerMode.CRON.value:
+            raw_cron = (input.cron_expression or "").strip()
+            if not raw_cron:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "cron expression is required when triggerMode is 'cron'",
+                    field="cronExpression",
+                )
+            try:
+                cron_expression = validate_cron_expression(raw_cron)
+            except CronValidationError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    str(exc),
+                    field="cronExpression",
+                )
+
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
@@ -177,7 +201,8 @@ class RegistryMutation:
             manifest_raw=input.manifest_raw or "",
             default_branch=input.default_branch or "main",
             deploy_branch=input.deploy_branch or input.default_branch or "main",
-            trigger_mode=input.trigger_mode or "auto_on_push",
+            trigger_mode=trigger_mode,
+            cron_expression=cron_expression,
             k8s_namespace=f"{project.organization.slug}-{input.slug}",
             subdomain=input.slug,
         )
@@ -192,6 +217,37 @@ class RegistryMutation:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
+        # Resolve the effective post-update trigger_mode + cron_expression
+        # together so we can enforce the 'cron mode requires expression'
+        # invariant whether the operator is flipping mode, expression,
+        # or both in the same call.
+        next_trigger_mode = input.trigger_mode if input.trigger_mode is not None else app.trigger_mode
+        if input.cron_expression is not None:
+            next_cron_raw = input.cron_expression.strip()
+        else:
+            next_cron_raw = app.cron_expression or ""
+
+        if next_trigger_mode == RegisteredApp.TriggerMode.CRON.value:
+            if not next_cron_raw:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "cron expression is required when triggerMode is 'cron'",
+                    field="cronExpression",
+                )
+            try:
+                next_cron_raw = validate_cron_expression(next_cron_raw)
+            except CronValidationError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    str(exc),
+                    field="cronExpression",
+                )
+        else:
+            # Flipping away from cron clears the expression — the field
+            # is only meaningful under cron mode and stale values would
+            # silently re-activate if mode flipped back.
+            next_cron_raw = ""
+
         for field in (
             "name",
             "description",
@@ -199,13 +255,14 @@ class RegistryMutation:
             "manifest_path",
             "default_branch",
             "deploy_branch",
-            "trigger_mode",
             "preview_enabled",
             "is_active",
         ):
             new_value = getattr(input, field)
             if new_value is not None:
                 setattr(app, field, new_value)
+        app.trigger_mode = next_trigger_mode
+        app.cron_expression = next_cron_raw
         app.save()
         return gql_success(app_to_type(app))
 

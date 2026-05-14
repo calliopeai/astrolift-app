@@ -28,6 +28,7 @@ class RegisteredApp(NamedBaseCoreModel):
         AUTO_ON_PUSH = "auto_on_push"
         MANUAL = "manual"
         EXTERNAL_CI = "external_ci"
+        CRON = "cron"
 
     class ProvisioningStatus(models.TextChoices):
         PENDING = "pending"
@@ -86,6 +87,12 @@ class RegisteredApp(NamedBaseCoreModel):
         choices=TriggerMode.choices,
         default=TriggerMode.AUTO_ON_PUSH,
     )
+    # Five-field cron expression (minute hour day month weekday). Only
+    # meaningful when ``trigger_mode == CRON``; empty otherwise. The
+    # scheduled-deploy workflow that consumes this is tracked
+    # separately — for now this is captured at registration time so
+    # the contract is stable when that workflow lands.
+    cron_expression = models.CharField(max_length=120, blank=True, default="")
     deploy_branch = models.CharField(max_length=128, default="main")
 
     # Latest preview screenshot URL for this app, written by the
