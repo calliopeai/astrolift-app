@@ -11,3 +11,29 @@ export const DEPLOYMENT_LIFECYCLE_STREAM = gql`
     }
   }
 `;
+
+export const ON_APP_LOG = gql`
+  subscription OnAppLog(
+    $appSlug: String!
+    $podName: String!
+    $workloadSlug: String
+    $container: String
+    $follow: Boolean
+    $tailLines: Int
+  ) {
+    astroliftOnAppLog(
+      appSlug: $appSlug
+      podName: $podName
+      workloadSlug: $workloadSlug
+      container: $container
+      follow: $follow
+      tailLines: $tailLines
+    ) {
+      podName
+      container
+      timestamp
+      message
+      stream
+    }
+  }
+`;

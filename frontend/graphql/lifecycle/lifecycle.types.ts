@@ -17,7 +17,10 @@
 import type {
   AstroliftAppEnvironment as GeneratedAppEnvironment,
   AstroliftAppHealthSummary as GeneratedAppHealthSummary,
+  AstroliftAppLogLine as GeneratedAppLogLine,
+  AstroliftAppPod as GeneratedAppPod,
   AstroliftCommandRun as GeneratedCommandRun,
+  AstroliftContainerStatus as GeneratedContainerStatus,
   AstroliftDeployment as GeneratedDeployment,
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
@@ -89,3 +92,32 @@ export type AstroliftScheduledJobRun = Omit<
 };
 
 export type AstroliftCommandRun = GeneratedCommandRun;
+
+// Observability — pod + log surface. The backend's status string is
+// a rolled-up surface label so it can contain k8s container-waiting
+// reasons (CrashLoopBackOff, ImagePullBackOff, …) in addition to
+// the raw pod phase. The narrow PodSurfaceStatus union catches the
+// common phases for switch-exhaustive UI styling; anything else
+// falls through to the generic "unknown" badge.
+export type PodSurfaceStatus =
+  | "Running"
+  | "Pending"
+  | "Succeeded"
+  | "Failed"
+  | "Unknown"
+  | "CrashLoopBackOff"
+  | "ImagePullBackOff"
+  | "ErrImagePull"
+  | "CreateContainerConfigError"
+  | "InvalidImageName"
+  | "CreateContainerError";
+
+export type LogStreamKind = "stdout" | "stderr";
+
+export type AstroliftContainerStatus = GeneratedContainerStatus;
+
+export type AstroliftAppPod = GeneratedAppPod;
+
+export type AstroliftAppLogLine = Omit<GeneratedAppLogLine, "stream"> & {
+  stream: LogStreamKind;
+};
