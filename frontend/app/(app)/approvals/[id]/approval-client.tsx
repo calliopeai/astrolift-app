@@ -7,6 +7,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
@@ -101,13 +102,9 @@ export function ApprovalClient({ id }: { id: string }) {
     d.status === "superseded";
   const failed = d.status === "failed";
 
+  const [confirmApprove, setConfirmApprove] = React.useState(false);
+
   async function handleApprove() {
-    if (
-      !confirm(
-        `Approve deploy of ${d!.imageTag} to ${d!.registeredAppSlug}/${d!.environmentName}?`,
-      )
-    )
-      return;
     const { data: result } = await approve({
       variables: { input: { id: d!.id } },
     });
@@ -116,7 +113,7 @@ export function ApprovalClient({ id }: { id: string }) {
       toast.success(`Approved — status now ${r.data?.status ?? "ok"}`);
       refetch().catch(() => {});
     } else {
-      toast.error(r?.errors[0]?.message ?? "approveDeployment failed");
+      throw new Error(r?.errors[0]?.message ?? "approveDeployment failed");
     }
   }
 
@@ -176,7 +173,7 @@ export function ApprovalClient({ id }: { id: string }) {
                 {can("app.approve_deploy") ? (
                   <Can permission="app.approve_deploy">
                     <Button
-                      onClick={handleApprove}
+                      onClick={() => setConfirmApprove(true)}
                       disabled={approveState.loading}
                     >
                       <CheckCircle2Icon className="size-4" /> Approve
@@ -234,6 +231,15 @@ export function ApprovalClient({ id }: { id: string }) {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmApprove}
+        onOpenChange={setConfirmApprove}
+        title={`Approve deploy of ${d.imageTag || d.id}?`}
+        description={`Unblocks the rollout to ${d.registeredAppSlug}/${d.environmentName}. The workflow resumes immediately and traffic shifts according to the configured strategy. Self-approval on a deploy you triggered is rejected by the backend.`}
+        confirmLabel="Approve deployment"
+        onConfirm={handleApprove}
+      />
     </PageShell>
   );
 }

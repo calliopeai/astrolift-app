@@ -10,6 +10,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -71,6 +72,8 @@ export function PreviewsClient() {
   const [tearDown, tearState] = useMutation<{
     tearDownPreview: MutationResultLite;
   }>(TEAR_DOWN_PREVIEW, { refetchQueries: refetch });
+
+  const [tearTarget, setTearTarget] = React.useState<AstroliftPreviewEnvironment | null>(null);
 
   return (
     <PageShell
@@ -163,25 +166,7 @@ export function PreviewsClient() {
                             size="sm"
                             variant="outline"
                             disabled={tearState.loading}
-                            onClick={async () => {
-                              if (
-                                !confirm(
-                                  `Tear down preview env for PR #${p.prNumber}? Namespace ${p.namespace} will be cleaned up.`,
-                                )
-                              )
-                                return;
-                              const { data: result } = await tearDown({
-                                variables: { input: { id: p.id } },
-                              });
-                              const r = result?.tearDownPreview;
-                              if (r?.ok) {
-                                toast.success(`Teardown enqueued`);
-                              } else {
-                                toast.error(
-                                  r?.errors[0]?.message ?? "Teardown failed",
-                                );
-                              }
-                            }}
+                            onClick={() => setTearTarget(p)}
                           >
                             <TrashIcon className="size-3" /> Tear down
                           </Button>
@@ -195,6 +180,37 @@ export function PreviewsClient() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={tearTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setTearTarget(null);
+        }}
+        title={
+          tearTarget
+            ? `Tear down preview for PR #${tearTarget.prNumber}?`
+            : "Tear down preview?"
+        }
+        description={
+          tearTarget
+            ? `Namespace ${tearTarget.namespace} is deleted and the hostname ${tearTarget.hostname} is released. The preview re-spins automatically on the next push to ${tearTarget.branch}.`
+            : "Namespace will be deleted and the hostname released."
+        }
+        confirmLabel="Tear down"
+        destructive
+        onConfirm={async () => {
+          if (!tearTarget) return;
+          const { data: result } = await tearDown({
+            variables: { input: { id: tearTarget.id } },
+          });
+          const r = result?.tearDownPreview;
+          if (r?.ok) {
+            toast.success(`Teardown enqueued`);
+          } else {
+            throw new Error(r?.errors[0]?.message ?? "Teardown failed");
+          }
+        }}
+      />
     </PageShell>
   );
 }

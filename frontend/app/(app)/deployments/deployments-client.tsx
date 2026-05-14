@@ -44,6 +44,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   ABORT_DEPLOYMENT,
   APPROVE_DEPLOYMENT,
@@ -179,50 +180,72 @@ export function DeploymentsClient() {
     if (result.ok) {
       toast.success(`${label}: ${result.data?.status ?? "ok"}`);
     } else {
-      toast.error(result.errors[0]?.message ?? `${label} failed`);
+      throw new Error(result.errors[0]?.message ?? `${label} failed`);
     }
   }
 
-  async function handleApprove(d: AstroliftDeployment) {
-    if (
-      !confirm(
-        `Approve deploy of ${d.imageTag} to ${d.registeredAppSlug}/${d.environmentName}?`,
-      )
-    )
-      return;
-    const { data } = await approve({ variables: { input: { id: d.id } } });
-    reportResult("approveDeployment", data?.approveDeployment);
+  type ActionKind = "approve" | "abort" | "rollback" | "redeploy";
+  const [pendingAction, setPendingAction] = React.useState<
+    { kind: ActionKind; deployment: AstroliftDeployment } | null
+  >(null);
+
+  async function runAction(kind: ActionKind, d: AstroliftDeployment) {
+    if (kind === "approve") {
+      const { data } = await approve({ variables: { input: { id: d.id } } });
+      reportResult("approveDeployment", data?.approveDeployment);
+    } else if (kind === "abort") {
+      const { data } = await abort({ variables: { input: { id: d.id } } });
+      reportResult("abortDeployment", data?.abortDeployment);
+    } else if (kind === "rollback") {
+      const { data } = await rollback({ variables: { input: { id: d.id } } });
+      reportResult("rollbackDeployment", data?.rollbackDeployment);
+    } else if (kind === "redeploy") {
+      const { data } = await redeploy({ variables: { input: { id: d.id } } });
+      reportResult("redeployApp", data?.redeployApp);
+    }
   }
-  async function handleAbort(d: AstroliftDeployment) {
-    if (
-      !confirm(
-        `Abort in-flight deploy of ${d.registeredAppSlug}/${d.environmentName}? This signals the workflow and marks the deployment failed.`,
-      )
-    )
-      return;
-    const { data } = await abort({ variables: { input: { id: d.id } } });
-    reportResult("abortDeployment", data?.abortDeployment);
-  }
-  async function handleRollback(d: AstroliftDeployment) {
-    if (
-      !confirm(
-        `Rollback ${d.registeredAppSlug}/${d.environmentName} to the previous revision? Creates a new rollback deployment.`,
-      )
-    )
-      return;
-    const { data } = await rollback({ variables: { input: { id: d.id } } });
-    reportResult("rollbackDeployment", data?.rollbackDeployment);
-  }
-  async function handleRedeploy(d: AstroliftDeployment) {
-    if (
-      !confirm(
+
+  const ACTION_COPY: Record<
+    ActionKind,
+    {
+      title: (d: AstroliftDeployment) => string;
+      description: (d: AstroliftDeployment) => string;
+      confirmLabel: string;
+      destructive: boolean;
+    }
+  > = {
+    approve: {
+      title: (d) => `Approve deploy of ${d.imageTag}?`,
+      description: (d) =>
+        `Unblocks the rollout to ${d.registeredAppSlug}/${d.environmentName}. The workflow resumes immediately.`,
+      confirmLabel: "Approve",
+      destructive: false,
+    },
+    abort: {
+      title: (d) =>
+        `Abort in-flight deploy of ${d.registeredAppSlug}/${d.environmentName}?`,
+      description: () =>
+        "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
+      confirmLabel: "Abort deploy",
+      destructive: true,
+    },
+    rollback: {
+      title: (d) =>
+        `Rollback ${d.registeredAppSlug}/${d.environmentName} to the previous revision?`,
+      description: () =>
+        "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
+      confirmLabel: "Rollback",
+      destructive: false,
+    },
+    redeploy: {
+      title: (d) =>
         `Redeploy ${d.imageTag} to ${d.registeredAppSlug}/${d.environmentName}?`,
-      )
-    )
-      return;
-    const { data } = await redeploy({ variables: { input: { id: d.id } } });
-    reportResult("redeployApp", data?.redeployApp);
-  }
+      description: () =>
+        "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
+      confirmLabel: "Redeploy",
+      destructive: false,
+    },
+  };
 
   return (
     <PageShell
@@ -362,14 +385,16 @@ export function DeploymentsClient() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {d.status === "pending_approval" && canApprove && (
-                              <DropdownMenuItem onClick={() => handleApprove(d)}>
+                              <DropdownMenuItem
+                                onClick={() => setPendingAction({ kind: "approve", deployment: d })}
+                              >
                                 <CheckIcon className="size-4" />
                                 Approve
                               </DropdownMenuItem>
                             )}
                             {IN_FLIGHT.includes(d.status) && canDeploy && (
                               <DropdownMenuItem
-                                onClick={() => handleAbort(d)}
+                                onClick={() => setPendingAction({ kind: "abort", deployment: d })}
                                 variant="destructive"
                               >
                                 <StopCircleIcon className="size-4" />
@@ -377,7 +402,9 @@ export function DeploymentsClient() {
                               </DropdownMenuItem>
                             )}
                             {d.status === "running" && canRollback && (
-                              <DropdownMenuItem onClick={() => handleRollback(d)}>
+                              <DropdownMenuItem
+                                onClick={() => setPendingAction({ kind: "rollback", deployment: d })}
+                              >
                                 <UndoIcon className="size-4" />
                                 Rollback
                               </DropdownMenuItem>
@@ -387,7 +414,11 @@ export function DeploymentsClient() {
                               d.status === "rolled_back" ||
                               d.status === "superseded") &&
                               canDeploy && (
-                                <DropdownMenuItem onClick={() => handleRedeploy(d)}>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    setPendingAction({ kind: "redeploy", deployment: d })
+                                  }
+                                >
                                   <RotateCcwIcon className="size-4" />
                                   Redeploy
                                 </DropdownMenuItem>
@@ -405,6 +436,26 @@ export function DeploymentsClient() {
       </Card>
 
       <StartDeploymentDialog open={openCreate} onOpenChange={setOpenCreate} />
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingAction(null);
+        }}
+        title={
+          pendingAction ? ACTION_COPY[pendingAction.kind].title(pendingAction.deployment) : ""
+        }
+        description={
+          pendingAction
+            ? ACTION_COPY[pendingAction.kind].description(pendingAction.deployment)
+            : ""
+        }
+        confirmLabel={pendingAction ? ACTION_COPY[pendingAction.kind].confirmLabel : "Confirm"}
+        destructive={pendingAction ? ACTION_COPY[pendingAction.kind].destructive : false}
+        onConfirm={async () => {
+          if (pendingAction) await runAction(pendingAction.kind, pendingAction.deployment);
+        }}
+      />
     </PageShell>
   );
 }
