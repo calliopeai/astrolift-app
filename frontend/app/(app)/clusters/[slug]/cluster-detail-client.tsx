@@ -191,11 +191,27 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
   // list view, just bigger.
   const actionButton: React.ReactNode = (() => {
     if (lifecycle === "managing") {
+      // 'managing' is normally short-lived (workflow is in flight).
+      // But the workflow can be lost — webservice + temporal env-var
+      // bugs at first-boot, worker not yet polling the right queue, or
+      // a temporal-server outage between mutation + worker pickup. In
+      // those cases the row sticks at 'managing' with nothing actually
+      // running. Refresh re-fires the workflow against the same
+      // workflow id; Temporal joins the existing run if there is one,
+      // otherwise starts fresh.
       return (
-        <Button variant="ghost" disabled>
-          <Loader2Icon className="size-4 animate-spin" />
-          Setup in progress…
-        </Button>
+        <Can permission="cluster.manage">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" disabled>
+              <Loader2Icon className="size-4 animate-spin" />
+              Setup in progress…
+            </Button>
+            <Button variant="outline" onClick={() => handleRefresh(true)} disabled={refreshing}>
+              <RefreshCcwIcon className="size-4" />
+              Force retrigger
+            </Button>
+          </div>
+        </Can>
       );
     }
     if (lifecycle === "managed") {
