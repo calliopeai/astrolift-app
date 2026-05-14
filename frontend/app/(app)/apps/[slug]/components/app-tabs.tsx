@@ -14,6 +14,7 @@ type TabKey =
   | "previews"
   | "domains"
   | "secrets"
+  | "security"
   | "members"
   | "settings";
 
@@ -78,6 +79,12 @@ const TABS: TabSpec[] = [
     label: "Secrets",
     href: (s) => `/apps/${s}/secrets`,
     match: (p, s) => p.startsWith(`/apps/${s}/secrets`) || p.startsWith(`/apps/${s}/tokens`),
+  },
+  {
+    key: "security",
+    label: "Security",
+    href: (s) => `/apps/${s}/security`,
+    match: (p, s) => p.startsWith(`/apps/${s}/security`),
   },
   {
     key: "members",
