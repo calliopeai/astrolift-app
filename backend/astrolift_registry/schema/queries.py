@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_lifecycle.models import AppEnvironment
@@ -18,6 +19,7 @@ from astrolift_registry.schema.types import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
 
 
 @strawberry.type
@@ -29,6 +31,89 @@ class RegistryQuery:
         qs = RegisteredApp.objects.select_related("organization", "team", "project").order_by("-created_at")[
             :200
         ]
+        return [app_to_type(a) for a in qs]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_apps(self, info: Info) -> list[RegisteredAppType]:
+        """Apps the viewer can reach by any RoleBinding on the app or
+        an ancestor (project / team / org).
+
+        Self-service surface — no ``@require_permission``: the viewer's
+        own bindings are what gate visibility. Returns an empty list
+        when there's no authenticated actor. Listed in the tenancy
+        guardrail EXEMPT set with this rationale.
+
+        Implementation: collect every active RoleBinding for the
+        caller, project the (scope_kind, scope_id) tuples, then
+        union-resolve to the set of app ids that are visible. An
+        ORG-scoped binding grants visibility to every app in the org;
+        TEAM/PROJECT-scoped grants visibility to every app under that
+        sub-tree; APP-scoped grants visibility to just that app.
+        Superusers see every app in their active tenant (matches the
+        permission resolver's superuser short-circuit).
+        """
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+
+        from astrolift_identity.models import RoleBinding
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+
+        User = get_user_model()
+        viewer = User.objects.filter(pk=tenant.actor_user_id).first()
+        if viewer is None:
+            return []
+
+        base_qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
+            deleted_at__isnull=True
+        )
+        if tenant.organization_id is not None:
+            base_qs = base_qs.filter(organization_id=tenant.organization_id)
+
+        if getattr(viewer, "is_superuser", False) and getattr(viewer, "is_active", True):
+            return [app_to_type(a) for a in base_qs.order_by("slug")[:200]]
+
+        now = timezone.now()
+        bindings = list(
+            RoleBinding.objects.filter(
+                user_id=tenant.actor_user_id,
+                deleted_at__isnull=True,
+            ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+        )
+        if not bindings:
+            return []
+
+        org_ids: set[int] = set()
+        team_ids: set[int] = set()
+        project_ids: set[int] = set()
+        app_ids: set[int] = set()
+        for b in bindings:
+            if b.scope_kind == RoleBinding.ScopeKind.ORG:
+                org_ids.add(b.scope_id)
+            elif b.scope_kind == RoleBinding.ScopeKind.TEAM:
+                team_ids.add(b.scope_id)
+            elif b.scope_kind == RoleBinding.ScopeKind.PROJECT:
+                project_ids.add(b.scope_id)
+            elif b.scope_kind == RoleBinding.ScopeKind.APP:
+                app_ids.add(b.scope_id)
+
+        scope_filter = Q()
+        if org_ids:
+            scope_filter |= Q(organization_id__in=org_ids)
+        if team_ids:
+            scope_filter |= Q(team_id__in=team_ids)
+        if project_ids:
+            scope_filter |= Q(project_id__in=project_ids)
+        if app_ids:
+            scope_filter |= Q(pk__in=app_ids)
+
+        if not scope_filter.children:
+            return []
+
+        qs = base_qs.filter(scope_filter).order_by("slug")[:200]
         return [app_to_type(a) for a in qs]
 
     @strawberry.field

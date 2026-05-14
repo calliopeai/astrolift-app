@@ -1828,6 +1828,7 @@ type Query {
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftApps: [AstroliftRegisteredApp!]!
+  astroliftMyApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload

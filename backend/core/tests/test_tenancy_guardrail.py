@@ -82,6 +82,10 @@ EXEMPT: dict[str, str] = {
     # Notifications are user-scoped: the resolver filters by the
     # caller's user_id directly, not by tenant.
     "OperationsQuery.astrolift_my_notifications": "self-service: caller's own notifications",
+    "RegistryQuery.astrolift_my_apps": (
+        "self-service: returns apps the caller can reach via their own RoleBindings"
+        " (any scope from app up to org). Permission visibility IS the gate."
+    ),
     "OperationsMutation.mark_notification_read": "self-service: marks the caller's own notification",
     "OperationsMutation.mark_all_notifications_read": "self-service: marks all the caller's notifications",
     # Token-based public approval (#125, spec 06 §4.6). The single-use
