@@ -9,6 +9,7 @@
 import type {
   AstroliftRemoteRepo as GeneratedRemoteRepo,
   AstroliftRemoteRepoList as GeneratedRemoteRepoList,
+  AstroliftScmPushCiWorkflowResult as GeneratedPushCiWorkflowResult,
   AstroliftScmWebhookSecretReveal as GeneratedScmWebhookSecretReveal,
   AstroliftSourceConnection as GeneratedSourceConnection,
   AstroliftSourceFile as GeneratedSourceFile,
@@ -57,5 +58,7 @@ export type AstroliftRemoteRepo = GeneratedRemoteRepo;
 export type AstroliftRemoteRepoList = GeneratedRemoteRepoList;
 
 export type AstroliftSourceFile = GeneratedSourceFile;
+
+export type AstroliftPushCiWorkflowResult = GeneratedPushCiWorkflowResult;
 
 export type { AstroliftGuid, MutationResult };

@@ -40,6 +40,10 @@ type AppdomainremovedpayloadMutationResult {
   data: Appdomainremovedpayload
 }
 
+input ApproveByTokenInput {
+  token: String!
+}
+
 type Appsecretwritepayload {
   appSlug: String!
   key: String!
@@ -1560,6 +1564,8 @@ type Mutation {
   configureProviderPlugin(input: ConfigureProviderPluginInput!): ProviderpluginconfigpayloadMutationResult!
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  approveDeploymentByToken(input: ApproveByTokenInput!): AstroliftDeploymentMutationResult!
+  rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
@@ -1822,6 +1828,7 @@ type Query {
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftApps: [AstroliftRegisteredApp!]!
+  astroliftMyApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
@@ -1899,6 +1906,11 @@ input RegisterTenantClusterInput {
   providerConfig: JSON = null
   ingressClass: String = null
   organizationScoped: Boolean! = true
+}
+
+input RejectByTokenInput {
+  token: String!
+  reason: String = null
 }
 
 input RemoveAppDomainInput {

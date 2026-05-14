@@ -57,6 +57,19 @@ const KIND_TO_SOURCE_KIND: Record<ScmConnectionKind, SourceKind> = {
   gitea_oauth_user: "gitea",
 };
 
+// Connection kinds that hold a usable write-token so pushCiWorkflow
+// can commit on the operator's behalf. OAuth-app config rows carry the
+// app's client secret, not a user token, so they're excluded. Mirrors
+// the constant on ReviewSubmitStep; duplicated here so step 1 can flip
+// the default toggle when the operator picks a connection.
+const CI_PUSHABLE_KINDS = new Set<string>([
+  "github_oauth_user",
+  "github_app_install",
+  "github_pat",
+  "gitlab_oauth_user",
+  "gitlab_pat",
+]);
+
 interface Props {
   state: WizardState;
   setState: React.Dispatch<React.SetStateAction<WizardState>>;
@@ -79,8 +92,13 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
       setState((s) => ({
         ...s,
         connectionId: c.id,
+        connectionKind: c.kind as ScmConnectionKind,
         connectionIsAppInstall: c.kind === "github_app_install",
         sourceKind: KIND_TO_SOURCE_KIND[c.kind as ScmConnectionKind] ?? "git_url",
+        // Default the CI-push toggle on for write-capable connections;
+        // operators can flip it off in step 5 if their repo already
+        // has a workflow they want to keep untouched.
+        pushCiWorkflow: CI_PUSHABLE_KINDS.has(c.kind),
       }));
     }
   }, [usable, state.connectionId, setState]);
@@ -167,12 +185,14 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
             setState((s) => ({
               ...s,
               connectionId: v,
+              connectionKind: conn ? (conn.kind as ScmConnectionKind) : "",
               connectionIsAppInstall: conn?.kind === "github_app_install",
               sourceKind: conn
                 ? (KIND_TO_SOURCE_KIND[conn.kind as ScmConnectionKind] ?? "git_url")
                 : s.sourceKind,
               sourceRepo: "",
               sourceUrl: "",
+              pushCiWorkflow: conn ? CI_PUSHABLE_KINDS.has(conn.kind) : s.pushCiWorkflow,
             }));
             setSearch("");
           }}
