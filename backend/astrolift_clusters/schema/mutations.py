@@ -114,7 +114,12 @@ def _kick_bring_into_management(
     )
 
 
-def _kick_decommission_cluster(*, cluster: TenantCluster, actor: Actor) -> None:
+def _kick_decommission_cluster(
+    *,
+    cluster: TenantCluster,
+    actor: Actor,
+    delete_cloud_infra: bool = False,
+) -> None:
     """Flip the row to ``decommissioning`` + enqueue the workflow.
 
     The workflow re-asserts the state on entry, so this synchronous
@@ -124,6 +129,10 @@ def _kick_decommission_cluster(*, cluster: TenantCluster, actor: Actor) -> None:
     helper does NOT save until the workflow itself has confirmed the
     drained state. Operators see the same spinner-then-error UX that
     bring-into-management uses.
+
+    ``delete_cloud_infra`` is the operator's opt-in for the destructive
+    half of decommission — when True the workflow additionally calls
+    the driver's ``teardown_cluster`` after RBAC removal.
     """
     cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
     cluster.last_management_error = ""
@@ -138,7 +147,11 @@ def _kick_decommission_cluster(*, cluster: TenantCluster, actor: Actor) -> None:
     start_workflow(
         "DecommissionClusterWorkflow",
         args=[
-            DecommissionClusterInput(cluster_id=cluster.pk, actor=actor),
+            DecommissionClusterInput(
+                cluster_id=cluster.pk,
+                actor=actor,
+                delete_cloud_infra=delete_cloud_infra,
+            ),
         ],
         workflow_id=_decommission_workflow_id(str(cluster.guid)),
     )
@@ -211,6 +224,12 @@ class BringClusterIntoManagementInputType:
 @strawberry.input
 class DecommissionClusterInputType:
     cluster_id: GUID
+    # Explicit opt-in for the destructive half of decommission. False
+    # (default) only lifts the platform RBAC and leaves the underlying
+    # EKS/GKE/AKS cluster running. True ALSO calls the driver's
+    # teardown_cluster to delete the cloud-managed cluster.
+    # UI surfaces this as a separate "danger zone" checkbox.
+    delete_cloud_infra: bool = False
 
 
 @strawberry.input
@@ -410,7 +429,11 @@ class ClustersMutation:
 
         actor = _actor_from_request(info)
         with transaction.atomic():
-            _kick_decommission_cluster(cluster=cluster, actor=actor)
+            _kick_decommission_cluster(
+                cluster=cluster,
+                actor=actor,
+                delete_cloud_infra=bool(input.delete_cloud_infra),
+            )
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field

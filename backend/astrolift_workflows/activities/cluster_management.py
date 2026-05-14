@@ -27,6 +27,7 @@ them with explicit retry policies.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from temporalio import activity
 
@@ -333,3 +334,55 @@ async def mark_decommissioned(cluster_id: int) -> None:
 
     activity.heartbeat()
     await sync_to_async(_mark_decommissioned_sync)(cluster_id)
+
+
+def _teardown_cluster_infra_sync(cluster_id: int, delete_cloud_infra: bool) -> dict[str, Any]:
+    """Delete the cluster's cloud infrastructure (EKS / GKE / AKS) via
+    the provider driver's ``teardown_cluster``. Returns a serializable
+    dict view of the ``TeardownReport`` so the workflow event log
+    captures what was deleted.
+
+    The driver decides what "delete" means per cloud:
+      - aws: drain node groups → delete Fargate profiles → delete cluster
+      - gcp: container.delete_cluster (cascades node pools)
+      - azure: managed_clusters.begin_delete (cascades MC resource group)
+      - k8s_native: no-op (bare metal is operator-owned)
+
+    Idempotent per driver. The activity itself is idempotent at the DB
+    layer too — re-running on a decommissioned row that's already had
+    its cloud infra deleted just gets a report of "all already gone".
+    """
+    from astrolift_clusters.models import TenantCluster
+    from core.cluster_management import ClusterManagementError, teardown_cluster_dispatch
+
+    cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    try:
+        report = teardown_cluster_dispatch(cluster=cluster, delete_cloud_infra=delete_cloud_infra)
+    except ClusterManagementError as exc:
+        raise RuntimeError(str(exc)) from exc
+    if not report.success:
+        # Driver returned structured failure — raise so Temporal retries
+        # per the activity's RetryPolicy and the workflow can flip to
+        # error if all retries exhaust.
+        raise RuntimeError(report.error or "teardown_cluster reported failure")
+    return {
+        "success": True,
+        "deleted": list(report.deleted),
+        "skipped": list(report.skipped),
+        "messages": list(report.messages),
+    }
+
+
+@activity.defn(name="astrolift.cluster.teardown_cluster_infra")
+async def teardown_cluster_infra(
+    cluster_id: int,
+    delete_cloud_infra: bool = False,
+) -> dict[str, Any]:
+    """Delete the cluster's cloud infrastructure. Gated on the operator
+    explicitly opting in via ``delete_cloud_infra=True``; default is a
+    no-op for symmetry with the protocol (the historical decommission
+    behavior leaves the cluster running, just removes platform RBAC)."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_teardown_cluster_infra_sync)(cluster_id, delete_cloud_infra)

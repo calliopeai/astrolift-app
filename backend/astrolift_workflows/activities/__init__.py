@@ -38,6 +38,7 @@ from astrolift_workflows.activities.cluster_management import (
     probe_capabilities,
     remove_platform_rbac,
     run_preflight_job,
+    teardown_cluster_infra,
     verify_reachability,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
@@ -97,6 +98,7 @@ __all__ = [
     "render_manifests",
     "run_preflight_job",
     "switch_app_env_binding",
+    "teardown_cluster_infra",
     "update_secrets",
     "validate_migration_target",
     "verify_reachability",

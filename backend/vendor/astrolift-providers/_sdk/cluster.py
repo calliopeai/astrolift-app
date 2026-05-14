@@ -290,6 +290,41 @@ class PortForwardSession:
     def close(self) -> None: ...
 
 
+# ---- Cluster teardown (#337) --------------------------------------
+#
+# Inverse of ``bring_into_management``: deletes the cluster's
+# *infrastructure* (EKS / GKE / AKS managed cluster, node pools, the
+# cluster row's bound cloud resources). Distinct from
+# ``DecommissionClusterWorkflow`` which only removes the platform's
+# RBAC bundle from the cluster — that leaves the cluster running and
+# operator-owned. Teardown is the "delete the cluster entirely" flow.
+#
+# Returns a structured report so the workflow can record the outcome
+# on the TenantCluster row and the UI can surface what was actually
+# deleted (or skipped — bare-metal clusters return an "operator-owned;
+# nothing to delete" no-op result).
+
+
+@dataclass(frozen=True)
+class TeardownReport:
+    """Outcome of ``teardown_cluster``.
+
+    ``deleted`` is the list of cloud resource identifiers the driver
+    removed (cluster ARN, node group names, etc.). ``skipped`` is
+    resources the driver elected not to touch (operator-owned, in
+    use, manual cleanup required). ``messages`` is operator-facing
+    info to surface in the UI. ``error`` is set when the teardown
+    failed mid-flight — the workflow flips lifecycle to ``error``
+    and persists the message.
+    """
+
+    success: bool
+    deleted: list[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
+    error: str = ""
+
+
 # ---- Bootstrap recipe (cluster prereqs install) -------------------
 #
 # After a cluster is brought into management the platform offers an
@@ -559,5 +594,36 @@ class ClusterDriver(Protocol):
         pre-tuned for the provider (IRSA ARNs, regions, managed-cert
         wiring), preconditions, and optional sub-options the operator
         can pick from at install time (e.g. tls_issuer mode).
+        """
+        ...
+
+    # ---- Cluster teardown (#337) ----------------------------------
+
+    def teardown_cluster(
+        self,
+        cluster: ClusterContext,
+        *,
+        delete_cloud_infra: bool,
+    ) -> TeardownReport:
+        """Delete the cluster's cloud infrastructure.
+
+        When ``delete_cloud_infra=False`` this is a no-op returning
+        ``TeardownReport(success=True, skipped=[<cluster>])`` — the
+        decommission workflow uses that mode for "remove platform
+        management but leave the cluster running" (the historical
+        decommission behavior).
+
+        When ``delete_cloud_infra=True`` the driver deletes the
+        managed cluster (eks.delete_cluster /
+        container.delete_cluster / aks.delete_managed_cluster) plus
+        any node pools the platform tagged as platform-managed.
+        Bare-metal (``k8s_native``) returns ``success=True,
+        skipped=[<cluster>]`` with an operator-facing message — the
+        platform never owned the underlying nodes.
+
+        Must be idempotent: re-running on a half-torn-down cluster
+        reaches the same terminal state. The kube apiserver may
+        become unreachable mid-flight; drivers should handle that
+        gracefully (the cluster IS being deleted).
         """
         ...
