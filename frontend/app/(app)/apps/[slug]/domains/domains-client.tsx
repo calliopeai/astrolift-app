@@ -2,12 +2,14 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  BookOpenIcon,
   CopyIcon,
   GlobeIcon,
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -124,12 +126,20 @@ export function AppDomainsClient({ slug }: { slug: string }) {
       title="Custom domains"
       description={`Hostnames bound to ${slug}. Add a domain, copy the validation TXT record into your DNS provider, then click Recheck once it propagates.`}
       actions={
-        <Can permission="app.deploy">
-          <Button onClick={() => setOpen(true)}>
-            <PlusIcon className="size-4" />
-            Add domain
+        <>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/documentation/custom-domains">
+              <BookOpenIcon className="size-4" />
+              Learn more
+            </Link>
           </Button>
-        </Can>
+          <Can permission="app.deploy">
+            <Button onClick={() => setOpen(true)}>
+              <PlusIcon className="size-4" />
+              Add domain
+            </Button>
+          </Can>
+        </>
       }
     >
       <Card>

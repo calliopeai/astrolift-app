@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
+import { BookOpenIcon, PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -68,10 +69,18 @@ export function PoliciesClient() {
       title="ABAC policies"
       description="Runtime predicates evaluated after RBAC. Policies can only deny — they never grant beyond role bindings."
       actions={
-        <Button onClick={() => setOpen(true)}>
-          <PlusIcon className="size-4" />
-          New policy
-        </Button>
+        <>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/documentation/policies">
+              <BookOpenIcon className="size-4" />
+              Learn more
+            </Link>
+          </Button>
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon className="size-4" />
+            New policy
+          </Button>
+        </>
       }
     >
       <Card>
