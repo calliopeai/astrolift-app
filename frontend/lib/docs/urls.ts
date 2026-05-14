@@ -1,44 +1,27 @@
 /**
- * Canonical operator-doc URLs.
+ * Canonical in-app documentation routes.
  *
- * Two destinations:
- * - `primary`: the rendered MkDocs page on astrolift.dev. Final URL
- *   shape lands when the docs site is wired up; the const below is
- *   a placeholder so a single edit cascades through every in-app
- *   reference.
- * - `wiki`: the GitHub wiki copy. Per the wiki rule (flat file
- *   structure, no subdirectories), every page lives at the wiki
- *   repo root as `Page-Name.md`.
+ * The 5 operator doc pages (custom-domains, source-providers,
+ * identity-providers, policies, webhooks) ship from
+ * `app/(app)/documentation/`. Every "Learn more" button in the product
+ * should route through this map so that when a doc page is renamed or
+ * moved, the in-app links migrate in lockstep.
  *
- * Both are exposed because they exist for different reasons:
- * - astrolift.dev = canonical, operator-facing, MkDocs-rendered.
- * - wiki = quick-edit, searchable inside GitHub, doesn't need a
- *   site rebuild on edit.
- *
- * The .md source in `docs/operators/` in this repo is the upstream
- * for both; a sync step (CI or manual) keeps the wiki + astrolift.dev
- * fresh.
+ * For external references (third-party SCM provider docs, hosted MkDocs
+ * pages once the public docs site is live), keep the URL inline at the
+ * call site — those have nothing to do with the in-app router.
  */
 
-export const DOCS_BASE = "https://astrolift.dev";
-export const WIKI_BASE = "https://github.com/calliopeai/astrolift-app/wiki";
-
-interface DocLink {
-  primary: string;
-  wiki: string;
-  label: string;
-}
-
 export const DOC_LINKS = {
-  scmGithubOauth: {
-    // Covers both the one-click GitHub-App manifest flow (primary path)
-    // and the legacy paste-credentials options (PAT, pre-registered
-    // OAuth App). Wiki page lives at the repo root per the flat-file
-    // wiki convention.
-    primary: `${DOCS_BASE}/scm-github-oauth/`,
-    wiki: `${WIKI_BASE}/SCM-GitHub-OAuth-Setup`,
-    label: "Source-provider setup guide",
-  },
-} as const satisfies Record<string, DocLink>;
+  customDomains: "/documentation/custom-domains",
+  sourceProviders: "/documentation/source-providers",
+  identityProviders: "/documentation/identity-providers",
+  policies: "/documentation/policies",
+  webhooks: "/documentation/webhooks",
+  introduction: "/documentation/introduction",
+  getStarted: "/documentation/get-started",
+  tutorials: "/documentation/tutorials",
+  changelog: "/documentation/changelog",
+} as const satisfies Record<string, `/documentation/${string}`>;
 
 export type DocLinkKey = keyof typeof DOC_LINKS;

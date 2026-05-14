@@ -39,6 +39,7 @@ import {
   SOFT_DELETE_IDENTITY_PROVIDER,
 } from "@/graphql/identity/identity.mutations";
 import { LIST_IDENTITY_PROVIDERS } from "@/graphql/identity/identity.queries";
+import { DOC_LINKS } from "@/lib/docs/urls";
 import type {
   AstroliftIdentityProvider,
   MutationResult,
@@ -129,7 +130,7 @@ export function IdentityProviderClient() {
       actions={
         <>
           <Button asChild size="sm" variant="outline">
-            <Link href="/documentation/identity-providers">
+            <Link href={DOC_LINKS.identityProviders}>
               <BookOpenIcon className="size-4" />
               Learn more
             </Link>

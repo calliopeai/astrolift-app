@@ -25,6 +25,7 @@ import {
   SOFT_DELETE_POLICY,
 } from "@/graphql/identity/identity.mutations";
 import { LIST_POLICIES } from "@/graphql/identity/identity.queries";
+import { DOC_LINKS } from "@/lib/docs/urls";
 import type {
   AstroliftPolicy,
   MutationResult,
@@ -71,7 +72,7 @@ export function PoliciesClient() {
       actions={
         <>
           <Button asChild size="sm" variant="outline">
-            <Link href="/documentation/policies">
+            <Link href={DOC_LINKS.policies}>
               <BookOpenIcon className="size-4" />
               Learn more
             </Link>

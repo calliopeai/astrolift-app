@@ -44,6 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { CREATE_WEBHOOK, DELETE_WEBHOOK } from "@/graphql/operations/operations.mutations";
 import { LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
+import { DOC_LINKS } from "@/lib/docs/urls";
 import type {
   AstroliftWebhookSecretReveal,
   AstroliftWebhookSubscription,
@@ -136,7 +137,7 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
       actions={
         <>
           <Button asChild size="sm" variant="outline">
-            <Link href="/documentation/webhooks">
+            <Link href={DOC_LINKS.webhooks}>
               <BookOpenIcon className="size-4" />
               Learn more
             </Link>

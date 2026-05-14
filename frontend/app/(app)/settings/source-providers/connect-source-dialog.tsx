@@ -25,6 +25,7 @@ import {
 import { CONNECT_SOURCE } from "@/graphql/scm/scm.mutations";
 import { LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
 import { DOC_LINKS } from "@/lib/docs/urls";
+import Link from "next/link";
 import type {
   AstroliftSourceConnection,
   MutationResult,
@@ -195,24 +196,10 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
             platform secrets backend (default: local Fernet derived from
             <code> SECRET_KEY</code>; switch to AWS Secrets Manager / GCP
             Secret Manager / Azure Key Vault per install).{" "}
-            <a
-              href={DOC_LINKS.scmGithubOauth.primary}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              {DOC_LINKS.scmGithubOauth.label}
-            </a>{" "}
-            (
-            <a
-              href={DOC_LINKS.scmGithubOauth.wiki}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              wiki
-            </a>
-            ).
+            <Link href={DOC_LINKS.sourceProviders} className="underline">
+              Source-provider setup guide
+            </Link>
+            .
           </SheetDescription>
         </SheetHeader>
         <form

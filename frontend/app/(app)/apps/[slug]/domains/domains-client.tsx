@@ -46,6 +46,7 @@ import {
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_APP_DOMAINS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { DOC_LINKS } from "@/lib/docs/urls";
 
 interface AppDomain {
   id: string;
@@ -128,7 +129,7 @@ export function AppDomainsClient({ slug }: { slug: string }) {
       actions={
         <>
           <Button asChild size="sm" variant="outline">
-            <Link href="/documentation/custom-domains">
+            <Link href={DOC_LINKS.customDomains}>
               <BookOpenIcon className="size-4" />
               Learn more
             </Link>
