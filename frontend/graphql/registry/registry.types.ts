@@ -23,7 +23,11 @@ export type SourceKind =
   | "gitea"
   | "git_url";
 
-export type TriggerMode = "auto_on_push" | "manual" | "external_ci";
+export type TriggerMode =
+  | "auto_on_push"
+  | "manual"
+  | "external_ci"
+  | "cron";
 
 export type WorkloadKind = "deployment" | "statefulset" | "job" | "cronjob";
 

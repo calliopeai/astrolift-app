@@ -1,6 +1,6 @@
 "use client";
 
-import { ClockIcon, HandIcon, InfoIcon, ShieldCheckIcon, ZapIcon } from "lucide-react";
+import { ClockIcon, HandIcon, ShieldCheckIcon, ZapIcon } from "lucide-react";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +34,6 @@ const TRIGGER_MODES: Array<{
     label: "Cron schedule",
     description: "Deploy on a recurring schedule.",
     icon: ClockIcon,
-    comingSoon: true,
   },
   {
     value: "manual",
@@ -118,16 +117,7 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
       )}
 
       {state.triggerMode === "cron" && (
-        <section className="flex flex-col gap-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-4">
-          <div className="flex items-start gap-2">
-            <InfoIcon className="mt-0.5 size-4 text-amber-600 dark:text-amber-400" />
-            <p className="text-muted-foreground text-xs">
-              The backend doesn&apos;t carry a schedule field yet — we&apos;ll capture the cron
-              expression here, but the app will be registered with{" "}
-              <code className="bg-muted rounded px-1 py-0.5 font-mono">manual</code> mode until
-              scheduled triggers ship.
-            </p>
-          </div>
+        <section className="flex flex-col gap-3 rounded-md border p-4">
           <div className="space-y-2">
             <Label htmlFor="cron-expression">Cron expression</Label>
             <Input
