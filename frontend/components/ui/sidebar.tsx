@@ -22,7 +22,11 @@ import { PanelLeftIcon } from "lucide-react";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = "16rem";
+// Bumped from the shadcn default 16rem → 18rem so deeply-nested nav
+// rows (Org → Team → Project → App) still have room to render the
+// label after indentation eats half the gutter. The mobile width is
+// already 18rem so this just unifies the two.
+const SIDEBAR_WIDTH = "18rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
