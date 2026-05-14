@@ -8,9 +8,12 @@ import {
   GlobeIcon,
   GraduationCapIcon,
   KeyRoundIcon,
+  ListTreeIcon,
   RocketIcon,
   ScaleIcon,
   ScrollIcon,
+  ServerCogIcon,
+  SettingsIcon,
   WebhookIcon,
 } from "lucide-react";
 
@@ -26,6 +29,7 @@ const navSections: { label: string; links: { href: string; label: string; icon: 
   {
     label: "Operator guides",
     links: [
+      { href: "/documentation/cluster-prerequisites", label: "Cluster prerequisites", icon: ServerCogIcon },
       { href: "/documentation/custom-domains", label: "Custom domains", icon: GlobeIcon },
       { href: "/documentation/source-providers", label: "Source providers", icon: GitBranchIcon },
       { href: "/documentation/identity-providers", label: "Identity providers", icon: KeyRoundIcon },
@@ -35,7 +39,11 @@ const navSections: { label: string; links: { href: string; label: string; icon: 
   },
   {
     label: "Reference",
-    links: [{ href: "/documentation/changelog", label: "Changelog", icon: ScrollIcon }],
+    links: [
+      { href: "/documentation/configuration", label: "Configuration", icon: SettingsIcon },
+      { href: "/documentation/webhook-events", label: "Webhook events", icon: ListTreeIcon },
+      { href: "/documentation/changelog", label: "Changelog", icon: ScrollIcon },
+    ],
   },
 ];
 

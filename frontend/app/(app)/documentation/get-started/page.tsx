@@ -1,9 +1,25 @@
+import Link from "next/link";
+
 export default function GetStartedPage() {
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold">Get Started</h1>
         <p className="text-muted-foreground mt-2 text-sm">Up and running in five minutes.</p>
+      </div>
+
+      <div className="bg-muted/40 text-muted-foreground rounded-md border p-4 text-sm leading-relaxed">
+        <strong className="text-foreground">Configuration.</strong> The
+        steps below assume the bundled docker-compose env file. For a
+        non-local deployment, the{" "}
+        <Link
+          href="/documentation/configuration"
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          configuration reference
+        </Link>{" "}
+        lists every environment variable Astrolift reads, with defaults
+        and which ones the operator must set.
       </div>
 
       <section className="flex flex-col gap-4">

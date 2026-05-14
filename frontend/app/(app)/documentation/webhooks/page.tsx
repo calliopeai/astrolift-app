@@ -269,6 +269,16 @@ ALERT_FIRED`}</code>
         <ul className="text-muted-foreground flex flex-col gap-1.5 text-sm">
           <li>
             <Link
+              href="/documentation/webhook-events"
+              className="text-foreground underline-offset-2 hover:underline"
+            >
+              Webhook events
+            </Link>{" "}
+            — payload schema and JSON examples for every event you can
+            subscribe to.
+          </li>
+          <li>
+            <Link
               href="/documentation/source-providers"
               className="text-foreground underline-offset-2 hover:underline"
             >
