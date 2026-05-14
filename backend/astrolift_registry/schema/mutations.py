@@ -99,6 +99,24 @@ class SyncManifestFromRepoInput:
 
 
 @strawberry.input
+class TransferAppInput:
+    """Move a registered app to a different team or project.
+
+    Both targets are optional — at least one must be provided. When
+    only ``target_team_id`` is given, the app moves under that team
+    and re-anchors its project to a project under the new team
+    (callers normally pair this with ``target_project_id``).
+    Transfers across organizations are NOT permitted: source and
+    target must share an org. Use a separate workflow (federation)
+    for cross-org moves.
+    """
+
+    app_id: GUID
+    target_team_id: GUID | None = None
+    target_project_id: GUID | None = None
+
+
+@strawberry.input
 class PushManifestToRepoInput:
     """Open a PR against the source repo with the staged TOML.
 
@@ -336,6 +354,109 @@ class RegistryMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         app.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="app.transfer")
+    @require_permission(Permission.APP_TRANSFER, Permission.APP_CREATE)
+    @tenant_scoped()
+    def transfer_app(self, info: Info, input: TransferAppInput) -> MutationResultType[RegisteredAppType]:
+        """Re-parent an app to a different team / project within the
+        same org.
+
+        Permission contract (matches monorail):
+        - ``app.transfer`` on the source app (caller is moving it OUT)
+        - ``app.create`` on the destination team/project (caller is
+          claiming a new home)
+
+        Both checks are enforced by the ``@require_permission`` stack
+        at the top — the scope-aware variant would tighten this further
+        but isn't yet wired through the resolver decorator surface.
+        Cross-org transfers are refused; use the federation flow for
+        those instead.
+        """
+        from astrolift_identity.models import Project, Team
+
+        app = (
+            RegisteredApp.objects.select_related("organization", "team", "project")
+            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        if input.target_team_id is None and input.target_project_id is None:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "provide at least one of targetTeamId or targetProjectId",
+                field="targetTeamId",
+            )
+
+        next_team = app.team
+        next_project = app.project
+
+        if input.target_team_id is not None:
+            team = (
+                Team.objects.select_related("organization")
+                .filter(guid=str(input.target_team_id), deleted_at__isnull=True)
+                .first()
+            )
+            if team is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "target team not found",
+                    field="targetTeamId",
+                )
+            if team.organization_id != app.organization_id:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "cross-organization transfer is not permitted",
+                    field="targetTeamId",
+                )
+            next_team = team
+
+        if input.target_project_id is not None:
+            project = (
+                Project.objects.select_related("organization", "team")
+                .filter(guid=str(input.target_project_id), deleted_at__isnull=True)
+                .first()
+            )
+            if project is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "target project not found",
+                    field="targetProjectId",
+                )
+            if project.organization_id != app.organization_id:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "cross-organization transfer is not permitted",
+                    field="targetProjectId",
+                )
+            next_project = project
+            # If the caller didn't pin a team, follow the project's
+            # team (otherwise the app would dangle out-of-tree).
+            if input.target_team_id is None:
+                next_team = project.team
+
+        # When only target_team_id was set, the existing project must
+        # belong to the new team or the tree breaks. Refuse rather
+        # than silently re-anchoring the project to the new team.
+        if next_project.team_id != next_team.id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "project does not belong to the target team — specify targetProjectId",
+                field="targetProjectId",
+            )
+
+        if app.team_id == next_team.id and app.project_id == next_project.id:
+            # No-op: nothing to do. Return success so callers can
+            # treat the mutation as idempotent.
+            return gql_success(app_to_type(app))
+
+        app.team = next_team
+        app.project = next_project
+        app.save(update_fields=["team", "project", "updated_at", "version"])
+        return gql_success(app_to_type(app))
 
     @strawberry.field
     @mutation_audit(action="app.update_manifest")
