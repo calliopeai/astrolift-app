@@ -101,11 +101,109 @@ async def provision_namespace(registered_app_id: int, app_environment_id: int | 
     )
 
 
+def _provision_registry_repo_sync(registered_app_id: int) -> str:
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+    from core.app_deploy import AppDeployError, driver_for_capability
+
+    app = RegisteredApp.all_objects.select_related("organization").get(pk=registered_app_id)
+    if app.registry_repo_uri:
+        # Already provisioned — idempotent fast-path.
+        return app.registry_repo_uri
+    # Pick a cluster whose provider plugin registers a ``registry``
+    # driver. The driver is plugin-scoped not cluster-scoped, but the
+    # ImageRegistryDriver constructor takes the plugin config, so any
+    # bound cluster works as long as the plugin is consistent.
+    env = (
+        AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True)
+        .select_related("tenant_cluster__provider_plugin")
+        .first()
+    )
+    if env is None or env.tenant_cluster is None:
+        raise AppDeployError(
+            f"app {app.slug!r} has no environment bound to a cluster — can't pick a registry plugin",
+        )
+    registry_driver = driver_for_capability(env.tenant_cluster, "registry")
+    repo_name = f"{app.organization.slug}/{app.slug}"
+    repo = registry_driver.ensure_repo(repo_name)
+    app.registry_repo_uri = repo.uri
+    app.save(update_fields=["registry_repo_uri", "updated_at", "version"])
+    return repo.uri
+
+
 @activity.defn(name="astrolift.app.provision_registry_repo")
 async def provision_registry_repo(registered_app_id: int) -> str:
+    """Create the app's container registry repository.
+
+    Calls the provider plugin's ``ImageRegistryDriver.ensure_repo`` with
+    ``<org-slug>/<app-slug>`` and persists the returned URI onto
+    ``RegisteredApp.registry_repo_uri`` so subsequent renders use it as
+    the image repository. Idempotent — re-runs return the existing URI.
+    """
+    from asgiref.sync import sync_to_async
+
     activity.heartbeat()
-    log.info("provision_registry_repo placeholder", extra={"registered_app_id": registered_app_id})
-    return ""
+    uri = await sync_to_async(_provision_registry_repo_sync)(registered_app_id)
+    log.info("provision_registry_repo uri=%s", uri, extra={"registered_app_id": registered_app_id})
+    return uri
+
+
+def _provision_managed_services_initial_sync(
+    registered_app_id: int,
+    app_environment_id: int,
+) -> list[int]:
+    from astrolift_drivers.registry import DriverNotFound, plugins
+    from astrolift_services.models import ManagedService
+    from core.app_deploy import AppDeployError
+    from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+
+    rows = list(
+        ManagedService.objects.filter(
+            registered_app_id=registered_app_id,
+            app_environment_id=app_environment_id,
+            deleted_at__isnull=True,
+        ).select_related("app_environment__tenant_cluster__provider_plugin"),
+    )
+    if not rows:
+        return []
+    provisioned: list[int] = []
+    for ms in rows:
+        cluster = ms.app_environment.tenant_cluster
+        if cluster is None:
+            raise AppDeployError(
+                f"managed service {ms.pk} env has no tenant_cluster bound",
+            )
+        plugin_slug = cluster.provider_plugin.slug
+        # plugin_loader flattens managed-service drivers into the same
+        # plugins.get() namespace via synthetic role names — see
+        # astrolift_clusters/plugin_loader.py line ~50.
+        variant = getattr(ms, "variant", "") or ""
+        try:
+            driver_cls = plugins.get(plugin_slug, f"managed:{ms.kind}:{variant}")
+        except DriverNotFound:
+            # Try the empty-variant default — some plugins register
+            # ``managed:postgres:`` rather than ``managed:postgres:cnpg``.
+            try:
+                driver_cls = plugins.get(plugin_slug, f"managed:{ms.kind}:")
+            except DriverNotFound as exc:
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: plugin {plugin_slug!r} has no managed-service driver "
+                    f"for kind={ms.kind!r} variant={variant!r}",
+                ) from exc
+        cfg = _config_for(plugin_slug, cluster)
+        driver = driver_cls(config=cfg)
+        # ManagedServiceDriver.provision takes a ProvisionSpec dataclass
+        # built from the ManagedService row's stored spec dict. Drivers
+        # return a ProvisionResult with the external reference id, which
+        # we persist for later observability + teardown.
+        spec_payload = getattr(ms, "spec", {}) or {}
+        result = driver.provision(spec=spec_payload)
+        ref = getattr(result, "ref", "") or getattr(result, "id", "") or getattr(result, "name", "")
+        if ref:
+            ms.backend_ref = str(ref)
+            ms.save(update_fields=["backend_ref", "updated_at", "version"])
+        provisioned.append(ms.pk)
+    return provisioned
 
 
 @activity.defn(name="astrolift.app.provision_managed_services_initial")
@@ -113,11 +211,28 @@ async def provision_managed_services_initial(
     registered_app_id: int,
     app_environment_id: int,
 ) -> list[int]:
+    """Provision the app's bound managed services (DBs, caches, queues).
+
+    For each ``ManagedService`` row attached to (app, env), resolve the
+    plugin-scoped driver (``(kind, variant)`` → ``ManagedServiceDriver``),
+    call ``provision(name, spec)``, and persist the returned backend
+    reference for later observability. Apps with no managed services
+    no-op cleanly. The cluster's ``provider_plugin`` determines which
+    driver runs.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    ids = await sync_to_async(_provision_managed_services_initial_sync)(
+        registered_app_id,
+        app_environment_id,
+    )
     log.info(
-        "provision_managed_services_initial placeholder",
+        "provision_managed_services_initial provisioned %d service(s)",
+        len(ids),
         extra={"registered_app_id": registered_app_id, "app_environment_id": app_environment_id},
     )
-    return []
+    return ids
 
 
 def _pre_flight_sync(deployment_id: int) -> None:
@@ -269,14 +384,152 @@ async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
     return summary
 
 
+def _update_secrets_sync(deployment_id: int) -> int:
+    import base64
+
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_services.models import AppSecretBundleRef
+    from core.app_deploy import (
+        AppDeployError,
+        driver_for_capability,
+        driver_for_deployment,
+    )
+
+    d = Deployment.all_objects.select_related(
+        "registered_app__organization",
+        "app_environment__tenant_cluster__provider_plugin",
+    ).get(pk=deployment_id)
+    cluster_driver, ctx, namespace = driver_for_deployment(d)
+
+    refs = list(
+        AppSecretBundleRef.objects.filter(
+            registered_app=d.registered_app,
+            app_environment=d.app_environment,
+            deleted_at__isnull=True,
+        ).select_related("secret_bundle"),
+    )
+    if not refs:
+        return 0
+
+    secrets_backend = driver_for_capability(d.app_environment.tenant_cluster, "secrets")
+    resources: list[dict[str, Any]] = []
+    for ref in refs:
+        bundle = ref.secret_bundle
+        kvs = secrets_backend.get(bundle.backend_ref)
+        if kvs is None:
+            raise AppDeployError(
+                f"secret bundle {bundle.slug!r} backend_ref {bundle.backend_ref!r} not found in secrets backend",
+            )
+        prefix = (ref.prefix or "").strip()
+        data: dict[str, str] = {}
+        for k, v in kvs.items():
+            full_key = f"{prefix}{k}" if prefix else k
+            data[full_key] = base64.b64encode(str(v).encode("utf-8")).decode("ascii")
+        resources.append(
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {
+                    "name": bundle.slug,
+                    "namespace": namespace,
+                    "labels": {
+                        "astrolift.io/managed-by": "astrolift",
+                        "astrolift.io/secret-bundle": bundle.slug,
+                    },
+                },
+                "type": "Opaque",
+                "data": data,
+            },
+        )
+    result = cluster_driver.apply_manifests(ctx.slug, namespace, resources)
+    if not result.ok:
+        raise AppDeployError(
+            f"update_secrets apply failed for deployment {deployment_id}: " + "; ".join(result.errors),
+        )
+    return len(resources)
+
+
 @activity.defn(name="astrolift.deploy.update_secrets")
-async def update_secrets(deployment_id: int) -> None:
-    log.info("update_secrets placeholder", extra={"deployment_id": deployment_id})
+async def update_secrets(deployment_id: int) -> int:
+    """Materialize the app's secret bundles into Kubernetes Secrets.
+
+    Each ``AppSecretBundleRef`` for (app, env) becomes one k8s Secret
+    named after the SecretBundle's slug, with values fetched from the
+    platform secrets backend driver and base64-encoded. Apps with no
+    secret bundles configured no-op cleanly.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    n = await sync_to_async(_update_secrets_sync)(deployment_id)
+    log.info("update_secrets materialized %d bundle(s)", n, extra={"deployment_id": deployment_id})
+    return n
+
+
+def _wait_dns_sync(deployment_id: int, timeout_seconds: int) -> int:
+    import socket
+    import time
+
+    from astrolift_lifecycle.models import CustomDomain, Deployment
+    from core.app_deploy import AppDeployError
+
+    d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
+    hostnames: list[str] = []
+    # AppEnvironment.managed_domain — the platform-issued subdomain.
+    md = d.app_environment.managed_domain
+    if md is not None:
+        host = getattr(md, "hostname", "") or getattr(md, "fqdn", "")
+        if host:
+            hostnames.append(host)
+    # Per-app custom domains pointing at this env. CustomDomain has
+    # registered_app + app_environment FKs.
+    for cd in CustomDomain.objects.filter(
+        registered_app=d.registered_app,
+        app_environment=d.app_environment,
+        deleted_at__isnull=True,
+    ):
+        host = getattr(cd, "hostname", "")
+        if host:
+            hostnames.append(host)
+
+    if not hostnames:
+        return 0
+
+    deadline = time.monotonic() + timeout_seconds
+    pending = list(hostnames)
+    while pending and time.monotonic() < deadline:
+        still: list[str] = []
+        for host in pending:
+            try:
+                socket.gethostbyname(host)
+            except OSError:
+                still.append(host)
+        pending = still
+        if pending:
+            time.sleep(5)
+    if pending:
+        raise AppDeployError(
+            f"DNS did not propagate within {timeout_seconds}s for: {', '.join(pending)}",
+        )
+    return len(hostnames)
 
 
 @activity.defn(name="astrolift.deploy.wait_dns")
-async def wait_dns(deployment_id: int) -> None:
+async def wait_dns(deployment_id: int, timeout_seconds: int = 120) -> int:
+    """Wait for the app's hostnames to resolve via DNS.
+
+    Covers the managed-domain hostname + every CustomDomain bound to
+    this (app, env). Apps without any domains exit immediately. Uses
+    stdlib ``socket.gethostbyname`` against the local resolver — same
+    view a browser hitting the load balancer will get. Loop polls
+    every 5s up to ``timeout_seconds``.
+    """
+    from asgiref.sync import sync_to_async
+
     activity.heartbeat()
+    n = await sync_to_async(_wait_dns_sync)(deployment_id, timeout_seconds)
+    log.info("wait_dns resolved %d hostname(s)", n, extra={"deployment_id": deployment_id})
+    return n
 
 
 def _poll_rollout_sync(deployment_id: int, timeout_seconds: int) -> bool:
