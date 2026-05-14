@@ -83,11 +83,13 @@ interface Props {
 }
 
 export function RepoPickerStep({ state, setState, setValid }: Props) {
-  // Cluster preflight (#315): registerApp refuses orgs with zero
-  // active clusters. We mirror the gate in the wizard so the operator
+  // Cluster preflight (#315/#316): registerApp refuses orgs with zero
+  // managed clusters. We mirror the gate in the wizard so the operator
   // doesn't walk through five steps to fail at submit. Querying ahead
   // of the connections list keeps the empty-state UX coherent — no
-  // partial UI rendered behind the gate.
+  // partial UI rendered behind the gate. The backend's
+  // astroliftClusterCount tightened in #316 to require lifecycle =
+  // "managed" — registered-only rows no longer count.
   const clusterCount = useQuery<ClusterCountResp>(CLUSTER_COUNT, {
     fetchPolicy: "cache-and-network",
   });
@@ -134,7 +136,7 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
   const repoList = repos.data?.astroliftAvailableRepos;
 
   // A repo is picked when sourceRepo + connectionId are both set
-  // AND the org has at least one connected cluster (#315). The
+  // AND the org has at least one managed cluster (#315/#316). The
   // backend would refuse on submit anyway; gating Next here keeps the
   // operator from going further until the precondition is met.
   React.useEffect(() => {
@@ -178,8 +180,8 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
     return (
       <EmptyState
         icon={<ServerIcon className="size-5" />}
-        title="Connect a cluster first"
-        description="Astrolift deploys apps to Kubernetes clusters you've registered. Connect at least one before adding apps."
+        title="No managed clusters yet"
+        description="Astrolift deploys apps to Kubernetes clusters that have been brought into management (#316). Connect a cluster, install prereqs, then click Bring into management."
         actionHref="/clusters"
         actionLabel="Manage clusters"
       />
