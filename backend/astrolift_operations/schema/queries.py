@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
+from datetime import timedelta
 
 import strawberry
+from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
@@ -22,6 +25,8 @@ from astrolift_operations.models import (
 from astrolift_operations.schema.types import (
     AlertEventType,
     AlertRuleType,
+    AppMetricsPointType,
+    AppMetricsType,
     AuditEventType,
     EventPageType,
     EventType,
@@ -39,6 +44,21 @@ from astrolift_operations.schema.types import (
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+_TIME_RANGE_SECONDS = {
+    "5m": 5 * 60,
+    "1h": 60 * 60,
+    "24h": 24 * 60 * 60,
+    "7d": 7 * 24 * 60 * 60,
+    "30d": 30 * 24 * 60 * 60,
+}
+_TIME_RANGE_BUCKETS = {
+    "5m": 12,  # one point per 25s
+    "1h": 12,  # one point per 5m
+    "24h": 24,  # one point per hour
+    "7d": 28,  # one point per 6h
+    "30d": 30,  # one point per day
+}
 
 
 @strawberry.type
@@ -189,6 +209,113 @@ class OperationsQuery:
             qs = qs.filter(target_id=target_id)
         qs = qs.order_by("-created_at")[:200]
         return [alert_rule_to_type(r) for r in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_METRICS)
+    @tenant_scoped()
+    def astrolift_app_metrics(
+        self,
+        info: Info,
+        app_slug: str,
+        time_range: str = "1h",
+    ) -> AppMetricsType | None:
+        """Golden-signal time-series for one app over the requested
+        window (monorail parity).
+
+        Accepts ``time_range`` in ``5m | 1h | 24h | 7d | 30d``.
+        Returns ``None`` for an unknown app, an empty time_series
+        (and zeroes for the scalars) when there's no observability
+        backend wired AND no events to aggregate from.
+
+        Today the platform doesn't yet have a Prometheus / OTel
+        ingestion path wired into this resolver — see the
+        ``from:backend`` follow-up tracked separately. Until that
+        lands, we aggregate deploy counts from the real
+        ``Deployment`` rows in the window and synthesize the rate /
+        latency series deterministically from the app's guid so the
+        UI exercises every code path with stable, repeatable values.
+        """
+        from astrolift_lifecycle.models import Deployment
+        from astrolift_registry.models import RegisteredApp
+
+        if time_range not in _TIME_RANGE_SECONDS:
+            valid = ", ".join(sorted(_TIME_RANGE_SECONDS.keys()))
+            raise ValueError(f"time_range must be one of {valid}")
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "guid", "slug")
+            .first()
+        )
+        if app is None:
+            return None
+
+        window_seconds = _TIME_RANGE_SECONDS[time_range]
+        bucket_count = _TIME_RANGE_BUCKETS[time_range]
+        now = timezone.now()
+        window_start = now - timedelta(seconds=window_seconds)
+
+        deploy_count = Deployment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+            created_at__gte=window_start,
+        ).count()
+
+        # Deterministic synthetic series: hash(guid + bucket_index)
+        # → stable float in [0, 1) so the UI sees identical numbers
+        # across reloads. Real ingest will swap this whole block.
+        seed = hashlib.sha256(str(app.guid).encode("utf-8")).hexdigest()
+        seed_int = int(seed[:16], 16)
+
+        def _norm(i: int, lo: float, hi: float) -> float:
+            r = (seed_int + i * 2654435761) & 0xFFFFFFFF
+            unit = r / 0xFFFFFFFF
+            return lo + (hi - lo) * unit
+
+        bucket_seconds = window_seconds / bucket_count
+        series: list[AppMetricsPointType] = []
+        rates: list[float] = []
+        errors: list[float] = []
+        latencies: list[float] = []
+        for i in range(bucket_count):
+            ts = window_start + timedelta(seconds=(i + 0.5) * bucket_seconds)
+            rate = round(_norm(i, 0.5, 80.0), 3)
+            err = round(_norm(i + 1000, 0.0, 0.05), 4)
+            p95 = round(_norm(i + 2000, 30.0, 750.0), 1)
+            series.append(
+                AppMetricsPointType(
+                    timestamp=ts,
+                    request_rate=rate,
+                    error_rate=err,
+                    latency_p95=p95,
+                )
+            )
+            rates.append(rate)
+            errors.append(err)
+            latencies.append(p95)
+
+        def _avg(xs: list[float]) -> float:
+            return round(sum(xs) / len(xs), 4) if xs else 0.0
+
+        sorted_lat = sorted(latencies)
+        p50 = sorted_lat[len(sorted_lat) // 2] if sorted_lat else 0.0
+        p95_idx = max(0, int(round(0.95 * (len(sorted_lat) - 1))))
+        p99_idx = max(0, int(round(0.99 * (len(sorted_lat) - 1))))
+        p95 = sorted_lat[p95_idx] if sorted_lat else 0.0
+        p99 = sorted_lat[p99_idx] if sorted_lat else 0.0
+
+        return AppMetricsType(
+            app_slug=app.slug,
+            time_range=time_range,
+            request_rate=_avg(rates),
+            error_rate=_avg(errors),
+            p50_latency_ms=float(p50),
+            p95_latency_ms=float(p95),
+            p99_latency_ms=float(p99),
+            deploy_count=deploy_count,
+            time_series=series,
+            source="synthetic",
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
