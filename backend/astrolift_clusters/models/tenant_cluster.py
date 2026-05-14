@@ -20,6 +20,24 @@ class TenantCluster(NamedBaseCoreModel):
         EXEC_PLUGIN = "exec_plugin"
         SERVICE_ACCOUNT_TOKEN = "service_account_token"
 
+    class Lifecycle(models.TextChoices):
+        """Cluster management lifecycle (#316).
+
+        ``registered`` rows carry metadata + auth shape only — they are
+        not deploy targets. ``managing`` rows have an in-flight
+        ``BringClusterIntoManagementWorkflow``. ``managed`` rows have
+        had platform RBAC applied, capabilities probed, and a preflight
+        Job complete successfully and are deploy-eligible. ``error``
+        rows hit a recoverable failure during the workflow; the
+        operator inspects ``last_management_error`` and clicks Retry
+        (which restarts the workflow). Spec ref: issue #316.
+        """
+
+        REGISTERED = "registered"
+        MANAGING = "managing"
+        MANAGED = "managed"
+        ERROR = "error"
+
     class DeliveryMode(models.TextChoices):
         """Spec 07 §2 — how rendered manifests reach this cluster."""
 
@@ -64,6 +82,21 @@ class TenantCluster(NamedBaseCoreModel):
     capabilities = models.JSONField(default=dict, blank=True)
     capabilities_probed_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+
+    # Bring-into-management state machine (#316). Default ``registered``
+    # so a row created via the existing register_tenant_cluster mutation
+    # is metadata-only until the operator explicitly opts the cluster
+    # into platform management. ``managed_at`` is the last successful
+    # bring/refresh transition; ``last_management_error`` carries the
+    # last activity's failure message and is cleared on the next
+    # successful transition.
+    lifecycle = models.CharField(
+        max_length=32,
+        choices=Lifecycle.choices,
+        default=Lifecycle.REGISTERED,
+    )
+    last_management_error = models.TextField(blank=True, default="")
+    managed_at = models.DateTimeField(null=True, blank=True)
 
     delivery_mode = models.CharField(
         max_length=32,

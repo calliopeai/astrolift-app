@@ -24,6 +24,9 @@ class TenantClusterType:
     capabilities: JSON
     capabilities_probed_at: dt.datetime | None
     created_at: dt.datetime
+    lifecycle: str
+    last_management_error: str
+    managed_at: dt.datetime | None
 
 
 @strawberry.type(name="AstroliftManagedDomain")
@@ -62,6 +65,9 @@ def cluster_to_type(cluster) -> TenantClusterType:
         capabilities=cluster.capabilities or {},
         capabilities_probed_at=cluster.capabilities_probed_at,
         created_at=cluster.created_at,
+        lifecycle=cluster.lifecycle,
+        last_management_error=cluster.last_management_error or "",
+        managed_at=cluster.managed_at,
     )
 
 

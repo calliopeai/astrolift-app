@@ -65,6 +65,7 @@ def _scaffold():
         endpoint="https://invalid",
         auth_method=TenantCluster.AuthMethod.KUBECONFIG,
         auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
     )
     return org, project
 
