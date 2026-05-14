@@ -1561,6 +1561,7 @@ type Mutation {
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
   softDeleteApp(input: SoftDeleteAppInput!): SoftdeletepayloadMutationResult!
+  transferApp(input: TransferAppInput!): AstroliftRegisteredAppMutationResult!
   updateManifest(input: UpdateManifestInput!): ManifeststagepayloadMutationResult!
   syncManifestFromRepo(input: SyncManifestFromRepoInput!): ManifeststagepayloadMutationResult!
   pushManifestToRepo(input: PushManifestToRepoInput!): ManifestpushpayloadMutationResult!
@@ -2054,6 +2055,12 @@ input TestNotificationInput {
 
 input TestWebhookInput {
   id: GUID!
+}
+
+input TransferAppInput {
+  appId: GUID!
+  targetTeamId: GUID = null
+  targetProjectId: GUID = null
 }
 
 type TransitionLogEntry {

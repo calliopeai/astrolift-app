@@ -948,6 +948,24 @@ type AstroliftWebhookSubscriptionMutationResult {
   data: AstroliftWebhookSubscription
 }
 
+type AstroliftWebhookTestResult {
+  subscriptionId: GUID!
+  url: String!
+  delivered: Boolean!
+  statusCode: Int
+  durationMs: Int!
+  responseBodyExcerpt: String!
+  error: String!
+  deliveryId: String!
+  timestamp: DateTime!
+}
+
+type AstroliftWebhookTestResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftWebhookTestResult
+}
+
 type AstroliftWorkflowRun {
   id: GUID!
   workflowKind: String!
@@ -1543,12 +1561,15 @@ type Mutation {
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
   softDeleteApp(input: SoftDeleteAppInput!): SoftdeletepayloadMutationResult!
+  transferApp(input: TransferAppInput!): AstroliftRegisteredAppMutationResult!
   updateManifest(input: UpdateManifestInput!): ManifeststagepayloadMutationResult!
   syncManifestFromRepo(input: SyncManifestFromRepoInput!): ManifeststagepayloadMutationResult!
   pushManifestToRepo(input: PushManifestToRepoInput!): ManifestpushpayloadMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
+  testWebhookSubscription(input: TestWebhookInput!): AstroliftWebhookTestResultMutationResult!
+  testNotificationChannel(input: TestNotificationInput!): AstroliftNotificationMutationResult!
   markNotificationRead(input: MarkNotificationReadInput!): AstroliftNotificationMutationResult!
   markAllNotificationsRead: MarkallreadpayloadMutationResult!
   createAlertRule(input: CreateAlertRuleInput!): AstroliftAlertRuleMutationResult!
@@ -2025,6 +2046,21 @@ input SyncManifestFromRepoInput {
 
 input TearDownPreviewInputGql {
   id: GUID!
+}
+
+input TestNotificationInput {
+  id: GUID!
+  message: String = null
+}
+
+input TestWebhookInput {
+  id: GUID!
+}
+
+input TransferAppInput {
+  appId: GUID!
+  targetTeamId: GUID = null
+  targetProjectId: GUID = null
 }
 
 type TransitionLogEntry {
