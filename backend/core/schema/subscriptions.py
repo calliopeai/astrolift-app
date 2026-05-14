@@ -13,7 +13,7 @@ client-side reconnect + auth on the handshake.
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 import strawberry
 from strawberry.types import Info
@@ -36,11 +36,15 @@ class DeploymentLifecycleEventType:
 
 
 @strawberry.type
-class Subscription:
+class _CoreSubscription:
+    """Subscriptions native to ``core``. Merged with per-app
+    subscription types into the schema-level :class:`Subscription`
+    below so each domain owns its own surface without one root
+    file becoming a dumping ground."""
 
     @strawberry.subscription
     async def astrolift_deployment_lifecycle_stream(
-        self, info: Info, app_slug: Optional[str] = None
+        self, info: Info, app_slug: str | None = None
     ) -> AsyncGenerator[DeploymentLifecycleEventType, None]:
         """Push every Deployment status transition for the current
         org (or for a single app when ``app_slug`` is given).
@@ -70,9 +74,7 @@ class Subscription:
         # If we came in over WS, the cookie-aware handler stashed the
         # tenant on the context. Pin it on the contextvar so the rest
         # of the platform's tenant-aware code sees it.
-        ws_tenant: Optional[TenantContext] = getattr(
-            info.context, "_ws_tenant", None
-        )
+        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
         if ws_tenant is not None:
             set_current_tenant(ws_tenant)
 
@@ -84,11 +86,11 @@ class Subscription:
         topic = f"deployment.lifecycle.{org_id}"
         if app_slug:
             app_guid = await sync_to_async(
-                lambda: RegisteredApp.objects.filter(
-                    organization_id=org_id, slug=app_slug
+                lambda: (
+                    RegisteredApp.objects.filter(organization_id=org_id, slug=app_slug)
+                    .values_list("guid", flat=True)
+                    .first()
                 )
-                .values_list("guid", flat=True)
-                .first()
             )()
             if app_guid is None:
                 return
@@ -112,19 +114,18 @@ class Subscription:
         the same broker swap as deployment.lifecycle.
         """
         from core.models import Notification
+
         last_id = None
 
         # Get initial last notification ID
-        latest = Notification.objects.filter(
-            user=info.context.user
-        ).order_by('-created_at').first()
+        latest = Notification.objects.filter(user=info.context.user).order_by("-created_at").first()
         if latest:
             last_id = latest.pk
 
         while True:
             await asyncio.sleep(2)  # Poll every 2 seconds
             try:
-                qs = Notification.objects.filter(user=info.context.user).order_by('-created_at')
+                qs = Notification.objects.filter(user=info.context.user).order_by("-created_at")
                 if last_id:
                     qs = qs.filter(pk__gt=last_id)
                 for notif in qs[:10]:
@@ -140,22 +141,39 @@ class Subscription:
         Yields submission IDs as they arrive.
         """
         from forms.models import FormSubmission
+
         last_id = None
 
-        latest = FormSubmission.objects.filter(
-            form__slug=slug
-        ).order_by('-submitted_at').first()
+        latest = FormSubmission.objects.filter(form__slug=slug).order_by("-submitted_at").first()
         if latest:
             last_id = latest.pk
 
         while True:
             await asyncio.sleep(2)
             try:
-                qs = FormSubmission.objects.filter(form__slug=slug).order_by('-submitted_at')
+                qs = FormSubmission.objects.filter(form__slug=slug).order_by("-submitted_at")
                 if last_id:
                     qs = qs.filter(pk__gt=last_id)
                 for sub in qs[:10]:
-                    yield f'New submission #{sub.pk}'
+                    yield f"New submission #{sub.pk}"
                     last_id = max(last_id or 0, sub.pk) if isinstance(sub.pk, int) else sub.pk
             except Exception:
                 pass
+
+
+# ---- Schema-level Subscription -------------------------------------
+#
+# Per-app subscription types layer onto the core surface by multiple
+# inheritance — same pattern Query / Mutation use in config/schema.py.
+# Add a new submodule's subscriptions by importing it here and
+# extending the bases tuple.
+
+from astrolift_lifecycle.schema.subscriptions import (  # noqa: E402
+    LifecycleSubscription,
+)
+
+
+@strawberry.type
+class Subscription(_CoreSubscription, LifecycleSubscription):
+    """Composed subscription root — see also Query / Mutation in
+    ``config.schema``."""

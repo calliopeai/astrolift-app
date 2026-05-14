@@ -169,6 +169,26 @@ type AstroliftAppHealthSummary {
   hasRecentFailure: Boolean!
 }
 
+type AstroliftAppLogLine {
+  podName: String!
+  container: String!
+  timestamp: DateTime!
+  message: String!
+  stream: String!
+}
+
+type AstroliftAppPod {
+  name: String!
+  workload: String!
+  status: String!
+  phase: String!
+  ready: Boolean!
+  restarts: Int!
+  age: DateTime
+  node: String!
+  containerStatuses: [AstroliftContainerStatus!]!
+}
+
 type AstroliftAppSecret {
   id: String!
   key: String!
@@ -257,6 +277,16 @@ type AstroliftContainer {
   healthcheckValue: String!
   healthcheckPort: Int
   workloadSlug: String!
+}
+
+type AstroliftContainerStatus {
+  name: String!
+  ready: Boolean!
+  restarts: Int!
+  image: String!
+  state: String!
+  waitingReason: String!
+  terminatedReason: String!
 }
 
 type AstroliftCostSnapshot {
@@ -657,6 +687,7 @@ type AstroliftRegisteredApp {
   previewMaxActive: Int!
   previewEnabled: Boolean!
   triggerMode: String!
+  cronExpression: String!
   deployBranch: String!
   previewScreenshotUrl: String!
   createdAt: DateTime!
@@ -750,6 +781,18 @@ type AstroliftScheduledJobRun {
   exitCode: Int
   logExcerpt: String!
   createdAt: DateTime!
+}
+
+type AstroliftScmPushCiWorkflowResult {
+  commitSha: String!
+  filePath: String!
+  repoUrl: String!
+}
+
+type AstroliftScmPushCiWorkflowResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftScmPushCiWorkflowResult
 }
 
 type AstroliftScmWebhookSecretReveal {
@@ -1535,6 +1578,7 @@ type Mutation {
   generateSshDeployKey(input: GenerateSshDeployKeyInput!): AstroliftSshDeployKeyCreatedMutationResult!
   rotateWebhookSecret(input: RotateWebhookSecretInput!): AstroliftScmWebhookSecretRevealMutationResult!
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
+  pushCiWorkflow(input: PushCiWorkflowInput!): AstroliftScmPushCiWorkflowResultMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
@@ -1719,6 +1763,14 @@ input ProvisionManagedServiceInput {
   config: JSON = null
 }
 
+input PushCiWorkflowInput {
+  appId: GUID!
+  connectionId: GUID!
+  branch: String = null
+  commitMessage: String = null
+  filePath: String = null
+}
+
 input PushManifestToRepoInput {
   id: GUID!
   prTitle: String = null
@@ -1785,6 +1837,7 @@ type Query {
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
   astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
+  astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
@@ -1830,6 +1883,7 @@ input RegisterAppInput {
   defaultBranch: String = null
   deployBranch: String = null
   triggerMode: String = null
+  cronExpression: String = null
   manifestRaw: String = null
 }
 
@@ -1946,6 +2000,7 @@ type Subscription {
   astroliftDeploymentLifecycleStream(appSlug: String = null): AstroliftDeploymentLifecycleEvent!
   notificationReceived: String!
   formSubmissionReceived(slug: String!): String!
+  astroliftOnAppLog(appSlug: String!, podName: String!, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100): AstroliftAppLogLine!
 }
 
 type SwitchUserResult {
@@ -1992,6 +2047,7 @@ input UpdateAppInput {
   defaultBranch: String = null
   deployBranch: String = null
   triggerMode: String = null
+  cronExpression: String = null
   previewEnabled: Boolean = null
   isActive: Boolean = null
 }

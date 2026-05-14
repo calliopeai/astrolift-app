@@ -22,6 +22,7 @@ from astrolift_lifecycle.schema.types import (
     AppDomainType,
     AppEnvironmentType,
     AppHealthSummaryType,
+    AppPodType,
     CommandRunType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
@@ -35,11 +36,14 @@ from astrolift_lifecycle.schema.types import (
     deploy_token_to_type,
     deployment_log_to_type,
     deployment_to_type,
+    pod_info_to_type,
     preview_to_type,
     scheduled_job_run_to_type,
 )
 from astrolift_registry.models import RegisteredApp
 from core.decorators import tenant_scoped
+from core.k8s.client import ClusterClientError, namespace_for_app
+from core.k8s.pods import list_app_pods
 from core.permissions import Permission, require_permission
 
 
@@ -268,6 +272,75 @@ class LifecycleQuery:
             .order_by("-created_at")[:100]
         )
         return [app_domain_to_type(d) for d in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_app_pods(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+    ) -> list[AppPodType]:
+        """Live pod state for an app from the runtime cluster.
+
+        Cluster resolution prefers the named ``environment_name``'s
+        ``tenant_cluster`` when given, falling back to the app's
+        ``default_tenant_cluster``. Namespace mirrors what the
+        manifest renderer uses (``app.k8s_namespace`` when set,
+        else ``f"{org_slug}-{app_slug}"``).
+
+        Returns an empty list (no GraphQL error) when:
+          - the app has no cluster wired yet
+          - the cluster row is misconfigured (missing kubeconfig,
+            unknown auth method, etc.)
+          - the K8s API call fails (cluster offline, network)
+
+        The UI renders the empty list as "no pods yet" rather than
+        an error state — there's no actionable thing for the user
+        to do about a transient cluster outage and we don't want
+        to break the page over it. Cluster outages surface via
+        platform-event alerts instead.
+        """
+        app = (
+            RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+            .filter(slug=app_slug, deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return []
+
+        cluster = None
+        if environment_name:
+            env = (
+                AppEnvironment.objects.select_related("tenant_cluster")
+                .filter(
+                    registered_app=app,
+                    name=environment_name,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+        if cluster is None:
+            cluster = app.default_tenant_cluster
+        if cluster is None or not getattr(cluster, "is_active", True):
+            return []
+
+        namespace = namespace_for_app(app)
+        try:
+            pods = list_app_pods(
+                cluster=cluster,
+                namespace=namespace,
+                app_slug=app.slug,
+            )
+        except ClusterClientError:
+            return []
+        except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
+            # Cluster transient errors (timeouts, 5xx) keep the UI
+            # alive; the platform-event log carries the diagnostic.
+            return []
+        return [pod_info_to_type(p) for p in pods]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
