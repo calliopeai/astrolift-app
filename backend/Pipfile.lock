@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "207e2589904b6bfd11950e825bbe2a04d9ce1f0c7ccb680ced719b7a5c4b3472"
+            "sha256": "445fd30d7568fc4aba1beee2e56f443ce3ef6608df2085a0c2d223fbbcd24c11"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -711,13 +711,6 @@
             "markers": "python_version >= '3.10'",
             "version": "==3.17.1"
         },
-        "durationpy": {
-            "hashes": [
-                "sha256:1fa6893409a6e739c9c72334fc65cca1f355dbdd93405d30f726deb5bde42fba",
-                "sha256:3b41e1b601234296b4fb368338fdcd3e13e0b4fb5b67345948f4f2bf9868b286"
-            ],
-            "version": "==0.10"
-        },
         "ecs-logging": {
             "hashes": [
                 "sha256:42da72191a98bd724d105e126ca8d7c81fc82b0d7bbbe4bb1584c34e61042cfc",
@@ -1218,15 +1211,6 @@
             "markers": "python_version >= '3.9'",
             "version": "==2025.9.1"
         },
-        "kubernetes": {
-            "hashes": [
-                "sha256:39e2b33b46e5834ef6c3985ebfe2047ab39135d41de51ce7641a7ca5b372a13d",
-                "sha256:3d00d344944239821458b9efd484d6df9f011da367ecb155dadf9513f05f09ee"
-            ],
-            "index": "pypi",
-            "markers": "python_version >= '3.6'",
-            "version": "==35.0.0"
-        },
         "msgpack": {
             "hashes": [
                 "sha256:0051fffef5a37ca2cd16978ae4f0aef92f164df86823871b5162812bebecd8e2",
@@ -1463,14 +1447,6 @@
             ],
             "markers": "python_version >= '3.10'",
             "version": "==1.4.0"
-        },
-        "oauthlib": {
-            "hashes": [
-                "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9",
-                "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1"
-            ],
-            "markers": "python_version >= '3.8'",
-            "version": "==3.3.1"
         },
         "opensearch-dsl": {
             "hashes": [
@@ -2163,14 +2139,6 @@
             "markers": "python_version >= '3.10'",
             "version": "==2.34.1"
         },
-        "requests-oauthlib": {
-            "hashes": [
-                "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36",
-                "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9"
-            ],
-            "markers": "python_version >= '3.4'",
-            "version": "==2.0.0"
-        },
         "rpds-py": {
             "hashes": [
                 "sha256:07ae8a593e1c3c6b82ca3292efbe73c30b61332fd612e05abee07c79359f292f",
@@ -2599,14 +2567,6 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==1.1.1"
-        },
-        "websocket-client": {
-            "hashes": [
-                "sha256:9e813624b6eb619999a97dc7958469217c3176312b3a16a4bd1bc7e08a46ec98",
-                "sha256:af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef"
-            ],
-            "markers": "python_version >= '3.9'",
-            "version": "==1.9.0"
         },
         "websockets": {
             "hashes": [
