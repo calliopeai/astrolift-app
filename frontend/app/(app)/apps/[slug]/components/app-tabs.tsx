@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,6 @@ type TabKey =
 
 interface TabSpec {
   key: TabKey;
-  label: string;
   href: (slug: string) => string;
   /** Sub-paths that should still highlight this tab when matched. */
   match: (pathname: string, slug: string) => boolean;
@@ -29,13 +29,11 @@ interface TabSpec {
 const TABS: TabSpec[] = [
   {
     key: "overview",
-    label: "Overview",
     href: (s) => `/apps/${s}`,
     match: (p, s) => p === `/apps/${s}`,
   },
   {
     key: "deployments",
-    label: "Deployments",
     href: (s) => `/apps/${s}/deployments`,
     match: (p, s) =>
       p === `/apps/${s}/deployments` ||
@@ -46,55 +44,46 @@ const TABS: TabSpec[] = [
   },
   {
     key: "workloads",
-    label: "Workloads",
     href: (s) => `/apps/${s}/workloads`,
     match: (p, s) => p.startsWith(`/apps/${s}/workloads`),
   },
   {
     key: "observability",
-    label: "Observability",
     href: (s) => `/apps/${s}/observability`,
     match: (p, s) => p.startsWith(`/apps/${s}/observability`),
   },
   {
     key: "console",
-    label: "Console",
     href: (s) => `/apps/${s}/console`,
     match: (p, s) => p.startsWith(`/apps/${s}/console`),
   },
   {
     key: "previews",
-    label: "Previews",
     href: (s) => `/apps/${s}/previews`,
     match: (p, s) => p.startsWith(`/apps/${s}/previews`),
   },
   {
     key: "domains",
-    label: "Domains",
     href: (s) => `/apps/${s}/domains`,
     match: (p, s) => p.startsWith(`/apps/${s}/domains`),
   },
   {
     key: "secrets",
-    label: "Secrets",
     href: (s) => `/apps/${s}/secrets`,
     match: (p, s) => p.startsWith(`/apps/${s}/secrets`) || p.startsWith(`/apps/${s}/tokens`),
   },
   {
     key: "security",
-    label: "Security",
     href: (s) => `/apps/${s}/security`,
     match: (p, s) => p.startsWith(`/apps/${s}/security`),
   },
   {
     key: "members",
-    label: "Members",
     href: (s) => `/apps/${s}/members`,
     match: (p, s) => p.startsWith(`/apps/${s}/members`),
   },
   {
     key: "settings",
-    label: "Settings",
     href: (s) => `/apps/${s}/config`,
     match: (p, s) =>
       p.startsWith(`/apps/${s}/config`) ||
@@ -116,12 +105,13 @@ interface AppTabsProps {
  * their pages; this just gives the page a tabbed top-level identity.
  */
 export function AppTabs({ slug, active }: AppTabsProps) {
+  const t = useTranslations("apps.tabs");
   const pathname = usePathname() ?? "";
   const activeKey: TabKey = active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
 
   return (
     <nav
-      aria-label="App sections"
+      aria-label={t("ariaLabel")}
       className="border-border -mx-6 flex gap-1 overflow-x-auto border-b px-6"
     >
       {TABS.map((tab) => {
@@ -136,7 +126,7 @@ export function AppTabs({ slug, active }: AppTabsProps) {
               isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {tab.label}
+            {t(tab.key)}
             {isActive && (
               <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
             )}

@@ -8,6 +8,7 @@ import {
   RocketIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
@@ -35,19 +36,20 @@ const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending">
 };
 
 export function AppsClient() {
+  const t = useTranslations("apps.list");
   const { data, loading } = useQuery<Resp>(LIST_APPS);
   const apps = data?.astroliftApps ?? [];
 
   return (
     <PageShell
-      title="Apps"
-      description="Repositories registered for deployment. Each app has workloads, environments, deployments, secrets, and managed services attached."
+      title={t("title")}
+      description={t("description")}
       actions={
         <Can permission="app.create">
           <Button asChild>
             <Link href="/apps/new">
               <PlusIcon className="size-4" />
-              Register app
+              {t("register")}
             </Link>
           </Button>
         </Can>
@@ -64,10 +66,10 @@ export function AppsClient() {
           <CardContent className="p-8">
             <EmptyState
               icon={<RocketIcon className="size-5" />}
-              title="No apps registered yet"
-              description="Register a Git repository — we parse its astrolift.toml, provision a namespace and registry repo, and roll the first deployment from a Temporal workflow."
+              title={t("empty.title")}
+              description={t("empty.description")}
               actionHref="/apps/new"
-              actionLabel="Register your first app"
+              actionLabel={t("empty.action")}
             />
           </CardContent>
         </Card>
@@ -112,10 +114,11 @@ export function AppsClient() {
 
                   <div className="text-muted-foreground flex items-center justify-between text-xs">
                     <span>
-                      branch <span className="font-mono">{app.deployBranch}</span>
+                      {t("branchLabel")}{" "}
+                      <span className="font-mono">{app.deployBranch}</span>
                     </span>
                     <span className="group-hover:text-foreground inline-flex items-center gap-1">
-                      Open <ExternalLinkIcon className="size-3" />
+                      {t("open")} <ExternalLinkIcon className="size-3" />
                     </span>
                   </div>
                 </CardContent>
