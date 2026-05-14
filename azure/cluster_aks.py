@@ -15,6 +15,8 @@ from typing import Any
 
 from _sdk.cluster import (
     ApplyResult,
+    BootstrapComponent,
+    BootstrapOption,
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
@@ -352,6 +354,92 @@ class AKSClusterDriver(ClusterDriver):
             cluster=cluster,
             run_preflight=run_preflight,
         )
+
+    # ---- bootstrap recipe ----------------------------------------
+
+    def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
+        """AKS recipe — uses Azure-native paths where they're the
+        easiest option, falls back to in-cluster controllers where
+        Azure doesn't provide a managed equivalent."""
+        return [
+            BootstrapComponent(
+                key="tls_issuer",
+                title="TLS certificate strategy",
+                default_enabled=True,
+                rationale=(
+                    "Application Gateway with Key Vault-backed certs is "
+                    "the AKS-native path (no in-cluster controller needed). "
+                    "cert-manager + ACME-LetsEncrypt or self-signed available "
+                    "when the operator runs nginx ingress instead."
+                ),
+                helm_values={},
+                requires=[],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("appgw_keyvault", "Application Gateway + Key Vault (recommended)"),
+                            ("acme_letsencrypt_prod", "Let's Encrypt prod (cert-manager + Azure DNS DNS-01)"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                            ("self_signed", "Self-signed (internal only)"),
+                        ],
+                        default="appgw_keyvault",
+                    ),
+                ],
+            ),
+            BootstrapComponent(
+                key="external-dns",
+                title="external-dns (Azure DNS)",
+                default_enabled=True,
+                rationale=(
+                    "Auto-creates Azure DNS records from Ingress + "
+                    "Service annotations. Bound to a managed identity via "
+                    "Azure AD Federated Identity Credentials."
+                ),
+                helm_values={
+                    "external-dns": {
+                        "enabled": True,
+                        "provider": "azure",
+                        "sources": ["service", "ingress"],
+                    },
+                },
+                requires=["federated_identity:external-dns", "azuredns_zone"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="metrics-server",
+                title="metrics-server (HPA + kubectl top)",
+                default_enabled=False,
+                rationale=(
+                    "AKS ships metrics-server as part of the cluster by "
+                    "default — only enable if the cluster was created "
+                    "without it (legacy bootstrap or custom node config)."
+                ),
+                helm_values={"metricsServer": {"enabled": True}},
+                requires=[],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="kube-prometheus-stack",
+                title="Prometheus + Grafana + Alertmanager",
+                default_enabled=True,
+                rationale=(
+                    "Metrics scraping + dashboarding. Persistent disk via "
+                    "Azure-managed-disk StorageClass; operators on Azure "
+                    "Monitor for containers can disable this and point "
+                    "the OTel collector at Log Analytics instead."
+                ),
+                helm_values={
+                    "kube-prometheus-stack": {
+                        "enabled": True,
+                        "grafana": {"enabled": True},
+                    },
+                },
+                requires=["storage:rwo"],
+                options=[],
+            ),
+        ]
 
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:
