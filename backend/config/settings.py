@@ -382,6 +382,13 @@ config_merger.merge_settings(globals())
 
 CRONJOBS = []
 
+# Temporal durable-workflow enable flag. Default ON; set
+# ASTROLIFT_TEMPORAL_ENABLED=false at deploy time to disable globally
+# (e.g. compose stacks without a Temporal server). Operators can also
+# flip this at runtime via the Constance entry below — Constance wins
+# when set, the env var is the seed default on first boot.
+ASTROLIFT_TEMPORAL_ENABLED = env_bool("ASTROLIFT_TEMPORAL_ENABLED", True)
+
 CONSTANCE_CONFIG = {
     "TIME_ZONE": (TIME_ZONE, "System timezone"),
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
@@ -389,6 +396,13 @@ CONSTANCE_CONFIG = {
     "AUTH0_REGISTER_NEW_USER": (False, "Register new users in Auth0"),
     "SEARCH_PROFILE_ENABLED": (False, "Enables opensearch for profile search"),
     "EMAIL_NOTIFICATIONS": (False, "Enables the platform to send Email Notifications"),
+    "TEMPORAL_ENABLED": (
+        ASTROLIFT_TEMPORAL_ENABLED,
+        "Enable the durable-workflow runtime. When False the client returns synthetic handles "
+        "instead of starting workflows — useful for dev/test envs without a Temporal server. "
+        "Seeded from the ASTROLIFT_TEMPORAL_ENABLED env var (default True) and can be toggled "
+        "at runtime here.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -399,6 +413,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
+    "Workflows": {"fields": ("TEMPORAL_ENABLED",), "collapse": False},
 }
 
 INTERNAL_IPS = [

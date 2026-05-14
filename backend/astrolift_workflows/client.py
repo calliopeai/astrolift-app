@@ -45,10 +45,26 @@ _client: Any = None  # temporalio.client.Client | None
 
 
 def _temporal_enabled() -> bool:
-    flag = getattr(settings, "ASTROLIFT_TEMPORAL_ENABLED", None)
-    if flag is None:
-        return not settings.DEBUG
-    return bool(flag)
+    # Default ON. Two override knobs, in priority order:
+    #   1. ``constance.config.TEMPORAL_ENABLED`` — admin-flippable at
+    #      runtime via /app/admin/constance/. Wins when set so an
+    #      operator can disable the runtime without a redeploy.
+    #   2. ``settings.ASTROLIFT_TEMPORAL_ENABLED`` — env-var-backed
+    #      deploy-time default (also seeds the Constance row on first
+    #      boot). Defaults True.
+    # The DEBUG-derived legacy fallback was removed because
+    # DJANGO_CONFIGURATION=Dev (the only config the published image
+    # boots cleanly with) leaves DEBUG truthy, which silently turned
+    # the entire workflow runtime into a no-op in prd.
+    try:
+        from constance import config as constance_config
+
+        return bool(getattr(constance_config, "TEMPORAL_ENABLED", True))
+    except Exception:
+        # Constance unavailable (no DB, migrations not applied, plugin
+        # disabled) — fall through to the env-backed default.
+        pass
+    return bool(getattr(settings, "ASTROLIFT_TEMPORAL_ENABLED", True))
 
 
 async def _get_client_async() -> Any:
