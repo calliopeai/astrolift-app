@@ -26,6 +26,7 @@ PERMISSIONS: dict[str, dict[str, str]] = {
     "audit_log.read": {"slug": "audit_log.read", "resource": "audit_log", "verb": "read"},
     "billing.read": {"slug": "billing.read", "resource": "billing", "verb": "read"},
     "billing.update": {"slug": "billing.update", "resource": "billing", "verb": "update"},
+    "cluster.manage": {"slug": "cluster.manage", "resource": "cluster", "verb": "manage"},
     "cluster.register": {"slug": "cluster.register", "resource": "cluster", "verb": "register"},
     "cluster.unregister": {"slug": "cluster.unregister", "resource": "cluster", "verb": "unregister"},
     "cluster.update": {"slug": "cluster.update", "resource": "cluster", "verb": "update"},
