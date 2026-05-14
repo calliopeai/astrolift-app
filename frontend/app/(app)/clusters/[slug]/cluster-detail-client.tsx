@@ -11,6 +11,7 @@ import {
   PlayIcon,
   RefreshCcwIcon,
   ShieldIcon,
+  Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -20,6 +21,16 @@ import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +51,7 @@ import {
 } from "@/components/ui/table";
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
+  DECOMMISSION_CLUSTER,
   LIST_CLUSTERS,
   REFRESH_CLUSTER_MANAGEMENT,
 } from "@/graphql/clusters/clusters.queries";
@@ -133,6 +145,42 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
     refetchQueries: [{ query: LIST_CLUSTERS }],
     awaitRefetchQueries: true,
   });
+  const [decommission, { loading: decommissioning }] = useMutation<{
+    decommissionCluster: MutationResult<AstroliftTenantCluster>;
+  }>(DECOMMISSION_CLUSTER, {
+    refetchQueries: [{ query: LIST_CLUSTERS }],
+    awaitRefetchQueries: true,
+  });
+  // Decommission confirmation modal state. Two-step opt-in: open the
+  // modal, then within the modal explicitly check "also delete cloud
+  // infrastructure" if the operator wants the destructive path. Default
+  // is the safe "just remove platform management" flow.
+  const [decommissionOpen, setDecommissionOpen] = React.useState(false);
+  const [decommissionDeleteInfra, setDecommissionDeleteInfra] = React.useState(false);
+
+  async function handleDecommission() {
+    if (!cluster) return;
+    const { data } = await decommission({
+      variables: {
+        input: {
+          clusterId: cluster.id,
+          deleteCloudInfra: decommissionDeleteInfra,
+        },
+      },
+    });
+    if (data?.decommissionCluster.ok) {
+      toast.success(
+        decommissionDeleteInfra
+          ? `Decommissioning ${cluster.slug} + deleting cloud infrastructure`
+          : `Decommissioning ${cluster.slug} (cluster left running)`,
+      );
+      setDecommissionOpen(false);
+      // Reset the destructive flag so the next open starts safe.
+      setDecommissionDeleteInfra(false);
+    } else {
+      toast.error(data?.decommissionCluster.errors?.[0]?.message ?? "Failed");
+    }
+  }
 
   async function handleBring() {
     if (!cluster) return;
@@ -226,6 +274,17 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
               <PlayIcon className="size-4" />
               Re-run preflight
             </Button>
+            <Can permission="cluster.unregister">
+              <Button
+                variant="ghost"
+                onClick={() => setDecommissionOpen(true)}
+                disabled={decommissioning}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2Icon className="size-4" />
+                Decommission
+              </Button>
+            </Can>
           </div>
         </Can>
       );
@@ -417,6 +476,56 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
           </p>
         </div>
       )}
+
+      <AlertDialog open={decommissionOpen} onOpenChange={setDecommissionOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Decommission {cluster.slug}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The platform will stop managing this cluster — its lifecycle flips
+              to <strong>decommissioned</strong> and it&apos;s removed from the
+              active-cluster picker for new app deploys. Existing apps already
+              bound to this cluster must be migrated first; the workflow refuses
+              when bindings are active.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={decommissionDeleteInfra}
+                onChange={(e) => setDecommissionDeleteInfra(e.target.checked)}
+                className="mt-0.5 size-4 rounded border-destructive/50 accent-destructive cursor-pointer"
+              />
+              <span>
+                <strong className="text-destructive">
+                  Also delete cloud infrastructure.
+                </strong>{" "}
+                <span className="text-muted-foreground">
+                  This calls the {cluster.providerPluginSlug} driver&apos;s{" "}
+                  <code className="font-mono text-xs">teardown_cluster</code> and
+                  irreversibly deletes the underlying managed cluster (node
+                  groups / Fargate profiles cascade-delete). The
+                  cloud-controlled VPC / IAM / DNS roots remain operator-owned.
+                  Leave unchecked to keep the cluster running.
+                </span>
+              </span>
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDecommission}
+              disabled={decommissioning}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {decommissionDeleteInfra
+                ? "Decommission + delete cluster"
+                : "Decommission"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }
