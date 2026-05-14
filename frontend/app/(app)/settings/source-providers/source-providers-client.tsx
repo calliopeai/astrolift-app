@@ -207,7 +207,7 @@ export function SourceProvidersClient() {
           <div className="flex flex-col items-end gap-1">
             <div className="flex flex-wrap justify-end gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href="/documentation/source-providers">
+                <Link href={DOC_LINKS.sourceProviders}>
                   <BookOpenIcon className="size-4" />
                   Setup guide
                 </Link>
@@ -223,14 +223,12 @@ export function SourceProvidersClient() {
                 </Button>
               </Can>
             </div>
-            <a
-              href={DOC_LINKS.scmGithubOauth.wiki}
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              href={DOC_LINKS.sourceProviders}
               className="text-muted-foreground text-[11px] underline"
             >
-              one-click GitHub flow + GitLab wizard — also on the wiki
-            </a>
+              one-click GitHub flow + GitLab wizard — full walkthrough
+            </Link>
           </div>
         </CardHeader>
         <CardContent className="p-0">
