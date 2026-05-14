@@ -10,6 +10,13 @@ Both gates we care about:
   - APP_READ_LOGS permission denial returns empty / never yields.
   - Tenant scoping — the @tenant_scoped decorator raises when no
     tenant is bound; we exercise that via the contextvar.
+
+After #299 the kubernetes-client SDK calls live in the
+``astrolift-providers`` ClusterDriver — these tests drive the
+resolver through ``core.cluster_observability``, which dispatches
+to the driver. Tests install pluggable backends through the
+``*_for_tests`` helpers instead of swapping module-level globals
+in ``core.k8s.*`` (which doesn't exist anymore).
 """
 
 from __future__ import annotations
@@ -18,19 +25,27 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
+from _sdk.cluster import (
+    ContainerStatusInfo,
+    PodInfo,
+    PodLogLine,
+)
 
 from astrolift_lifecycle.schema.queries import LifecycleQuery
 from astrolift_lifecycle.schema.subscriptions import LifecycleSubscription
-from core.decorators import TenantRequired
-from core.k8s.logs import LogLine, set_log_backend
-from core.k8s.pods import (
-    ContainerStatusInfo,
-    PodInfo,
-    install_pod_backend_function,
-    reset_pod_backend,
+from core.cluster_observability import (
+    reset_log_backend_for_tests,
+    reset_pod_backend_for_tests,
+    set_log_backend_for_tests,
+    set_pod_backend_for_tests,
 )
+from core.decorators import TenantRequired
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext, tenant_context
+
+# Alias the SDK PodLogLine so the rest of the file (which used the
+# old ``LogLine`` name) keeps reading naturally.
+LogLine = PodLogLine
 
 pytestmark = pytest.mark.django_db
 
@@ -49,10 +64,44 @@ def _tenant_for(org, actor):
     return tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id))
 
 
+class _FixedPodBackend:
+    """Stand-in for the live driver pod backend — returns the same
+    list regardless of ``auth`` / ``namespace`` / ``app_slug``. The
+    test wires this through ``set_pod_backend_for_tests`` so the
+    driver dispatch path runs end-to-end."""
+
+    def __init__(self, pods):
+        self._pods = list(pods)
+
+    def list_pods(self, *, auth, namespace, app_slug):
+        return list(self._pods)
+
+
 def _install_pods(pods):
-    install_pod_backend_function(
-        lambda *, cluster, namespace, app_slug: list(pods),
-    )
+    set_pod_backend_for_tests(_FixedPodBackend(pods))
+
+
+class _FnPodBackend:
+    def __init__(self, fn):
+        self._fn = fn
+
+    def list_pods(self, *, auth, namespace, app_slug):
+        # Translate the new ``auth`` keyword back to the old
+        # ``cluster``-keyed signature so existing tests keep their
+        # assertion shape (they introspect cluster.slug). The auth
+        # carries the slug, so build a SimpleNamespace stand-in.
+        from types import SimpleNamespace
+
+        cluster = SimpleNamespace(slug=auth.slug)
+        return self._fn(cluster=cluster, namespace=namespace, app_slug=app_slug)
+
+
+def install_pod_backend_function(fn):
+    set_pod_backend_for_tests(_FnPodBackend(fn))
+
+
+def reset_pod_backend():
+    reset_pod_backend_for_tests()
 
 
 def _fake_pod(**overrides):
@@ -290,7 +339,7 @@ async def test_on_app_log_yields_backend_lines(org, app, env, actor, permission_
         for i in range(3)
     ]
     backend = _FakeLogBackend(lines)
-    set_log_backend(backend)
+    set_log_backend_for_tests(backend)
     try:
         with _tenant_for(org, actor):
             sub = LifecycleSubscription()
@@ -305,9 +354,7 @@ async def test_on_app_log_yields_backend_lines(org, app, env, actor, permission_
             )
             result = await _collect_first_n(gen, 3)
     finally:
-        from core.k8s.logs import reset_log_backend
-
-        reset_log_backend()
+        reset_log_backend_for_tests()
 
     assert [r.message for r in result] == ["hello 0", "hello 1", "hello 2"]
     assert all(r.pod_name == "hello-app-web-1" for r in result)
@@ -357,7 +404,7 @@ async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_
                 raise
 
     backend = _BlockingBackend()
-    set_log_backend(backend)
+    set_log_backend_for_tests(backend)
     try:
         with _tenant_for(org, actor):
             sub = LifecycleSubscription()
@@ -378,9 +425,7 @@ async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_
             assert first.message == "tick"
             await gen.aclose()
     finally:
-        from core.k8s.logs import reset_log_backend
-
-        reset_log_backend()
+        reset_log_backend_for_tests()
 
     assert backend.cancelled is True
 
@@ -393,7 +438,7 @@ async def test_on_app_log_denies_without_permission(org, app, env, actor, permis
     from types import SimpleNamespace
 
     # No grants — APP_READ_LOGS missing.
-    set_log_backend(_FakeLogBackend([]))
+    set_log_backend_for_tests(_FakeLogBackend([]))
     try:
         with _tenant_for(org, actor):
             sub = LifecycleSubscription()
@@ -410,9 +455,7 @@ async def test_on_app_log_denies_without_permission(org, app, env, actor, permis
             async for line in gen:
                 collected.append(line)
     finally:
-        from core.k8s.logs import reset_log_backend
-
-        reset_log_backend()
+        reset_log_backend_for_tests()
 
     assert collected == []
 
@@ -426,7 +469,7 @@ async def test_on_app_log_completes_without_cluster(org, app, actor, permission_
     from types import SimpleNamespace
 
     _grant_read_logs(permission_resolver)
-    set_log_backend(_FakeLogBackend([]))
+    set_log_backend_for_tests(_FakeLogBackend([]))
     try:
         with _tenant_for(org, actor):
             sub = LifecycleSubscription()
@@ -443,8 +486,6 @@ async def test_on_app_log_completes_without_cluster(org, app, actor, permission_
             async for line in gen:
                 collected.append(line)
     finally:
-        from core.k8s.logs import reset_log_backend
-
-        reset_log_backend()
+        reset_log_backend_for_tests()
 
     assert collected == []

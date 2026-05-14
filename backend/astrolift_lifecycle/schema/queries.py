@@ -41,9 +41,12 @@ from astrolift_lifecycle.schema.types import (
     scheduled_job_run_to_type,
 )
 from astrolift_registry.models import RegisteredApp
+from core.cluster_observability import (
+    ClusterObservabilityError,
+    list_app_pods,
+    namespace_for_app,
+)
 from core.decorators import tenant_scoped
-from core.k8s.client import ClusterClientError, namespace_for_app
-from core.k8s.pods import list_app_pods
 from core.permissions import Permission, require_permission
 
 
@@ -334,7 +337,7 @@ class LifecycleQuery:
                 namespace=namespace,
                 app_slug=app.slug,
             )
-        except ClusterClientError:
+        except ClusterObservabilityError:
             return []
         except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
             # Cluster transient errors (timeouts, 5xx) keep the UI
