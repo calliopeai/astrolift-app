@@ -347,7 +347,12 @@ async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_
                         message="tick",
                         stream="stdout",
                     )
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, GeneratorExit):
+                # ``aclose()`` on the outer generator throws
+                # ``GeneratorExit`` down the chain; ``asyncio.CancelledError``
+                # is what propagates when a task is cancelled. The
+                # production backend's finally-release path runs in
+                # either case, so we want the test to cover both.
                 self.cancelled = True
                 raise
 
