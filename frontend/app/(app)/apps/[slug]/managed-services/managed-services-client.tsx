@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -82,6 +83,7 @@ const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
 
 export function ManagedServicesClient({ slug }: { slug: string }) {
   const [open, setOpen] = React.useState(false);
+  const [deprovisionTarget, setDeprovisionTarget] = React.useState<ManagedService | null>(null);
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
   });
@@ -116,18 +118,11 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   const envList = envs.data?.astroliftEnvironments ?? [];
 
   async function handleDeprovision(s: ManagedService) {
-    if (
-      !confirm(
-        `Deprovision ${s.kind}/${s.name} (${s.environmentName})? Soft-deletes the row and signals the workflow to tear down upstream resources. This is irreversible once upstream teardown completes.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await deprovision({ variables: { input: { id: s.id } } });
     if (data?.deprovisionManagedService.ok) {
       toast.success(`Deprovisioning ${s.name}`);
     } else {
-      toast.error(
+      throw new Error(
         data?.deprovisionManagedService.errors?.[0]?.message ?? "Deprovision failed",
       );
     }
@@ -200,7 +195,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                             variant="ghost"
                             size="icon"
                             className="size-8"
-                            onClick={() => handleDeprovision(s)}
+                            onClick={() => setDeprovisionTarget(s)}
                             disabled={busy}
                           >
                             <Trash2Icon className="size-4" />
@@ -236,6 +231,28 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
           return false;
         }}
         busy={busy}
+      />
+
+      <ConfirmDialog
+        open={deprovisionTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeprovisionTarget(null);
+        }}
+        title={
+          deprovisionTarget
+            ? `Deprovision ${deprovisionTarget.kind}/${deprovisionTarget.name}?`
+            : "Deprovision managed service?"
+        }
+        description={
+          deprovisionTarget
+            ? `Soft-deletes the row in ${deprovisionTarget.environmentName} and signals the workflow loop to tear down upstream resources. Irreversible once upstream teardown completes.`
+            : "Soft-deletes the row and signals the workflow loop to tear down upstream resources."
+        }
+        confirmLabel="Deprovision"
+        destructive
+        onConfirm={async () => {
+          if (deprovisionTarget) await handleDeprovision(deprovisionTarget);
+        }}
       />
     </PageShell>
   );

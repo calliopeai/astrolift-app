@@ -14,6 +14,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -98,16 +99,14 @@ export function AppDomainsClient({ slug }: { slug: string }) {
   const busy =
     addState.loading || removeState.loading || recheckState.loading;
   const list = domains.data?.astroliftAppDomains ?? [];
+  const [removeTarget, setRemoveTarget] = React.useState<AppDomain | null>(null);
 
   async function handleRemove(d: AppDomain) {
-    if (!confirm(`Remove ${d.hostname}? Soft-deletes the binding; cert is freed for re-add.`)) {
-      return;
-    }
     const { data } = await remove({ variables: { input: { id: d.id } } });
     if (data?.removeAppDomain.ok) {
       toast.success(`Removed ${d.hostname}`);
     } else {
-      toast.error(data?.removeAppDomain.errors?.[0]?.message ?? "Remove failed");
+      throw new Error(data?.removeAppDomain.errors?.[0]?.message ?? "Remove failed");
     }
   }
 
@@ -219,7 +218,7 @@ export function AppDomainsClient({ slug }: { slug: string }) {
                           variant="ghost"
                           size="icon"
                           className="size-8"
-                          onClick={() => handleRemove(d)}
+                          onClick={() => setRemoveTarget(d)}
                           disabled={busy}
                         >
                           <Trash2Icon className="size-4" />
@@ -257,6 +256,20 @@ export function AppDomainsClient({ slug }: { slug: string }) {
           return false;
         }}
         busy={busy}
+      />
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRemoveTarget(null);
+        }}
+        title={removeTarget ? `Remove ${removeTarget.hostname}?` : "Remove domain?"}
+        description="Soft-deletes the app↔hostname binding. The cert is freed and the hostname becomes available to re-add to another app. The DNS record at your provider is unaffected."
+        confirmLabel="Remove domain"
+        destructive
+        onConfirm={async () => {
+          if (removeTarget) await handleRemove(removeTarget);
+        }}
       />
     </PageShell>
   );

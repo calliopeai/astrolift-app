@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,8 @@ export function AppMembersClient({ slug }: { slug: string }) {
     awaitRefetchQueries: true,
   });
 
+  const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
+
   const a = app.data?.astroliftApp ?? null;
   const allBindings = bindings.data?.astroliftRoleBindings ?? [];
   const roleList = roles.data?.astroliftRoles ?? [];
@@ -72,18 +75,11 @@ export function AppMembersClient({ slug }: { slug: string }) {
   const appRoles = roleList.filter((r) => r.scopeLevel === "APP");
 
   async function handleRevoke(rb: AstroliftRoleBinding) {
-    if (
-      !confirm(
-        `Revoke ${rb.role.slug} from ${rb.user?.username ?? rb.groupExternalId}?`,
-      )
-    ) {
-      return;
-    }
     const { data } = await revoke({ variables: { input: { id: rb.id } } });
     if (data?.revokeRoleBinding.ok) {
       toast.success("Role revoked");
     } else {
-      toast.error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
     }
   }
 
@@ -198,7 +194,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
                           variant="ghost"
                           size="icon"
                           className="size-8"
-                          onClick={() => handleRevoke(rb)}
+                          onClick={() => setRevokeTarget(rb)}
                           disabled={revoking}
                         >
                           <Trash2Icon className="size-4" />
@@ -213,6 +209,26 @@ export function AppMembersClient({ slug }: { slug: string }) {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={
+          revokeTarget
+            ? `Revoke ${revokeTarget.role.slug} from ${
+                revokeTarget.user?.username ?? revokeTarget.groupExternalId
+              }?`
+            : "Revoke role?"
+        }
+        description="Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions."
+        confirmLabel="Revoke role"
+        destructive
+        onConfirm={async () => {
+          if (revokeTarget) await handleRevoke(revokeTarget);
+        }}
+      />
     </PageShell>
   );
 }

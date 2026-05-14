@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -97,6 +98,8 @@ function PendingRow({
 }) {
   const fmt = useFormatters();
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [confirmApprove, setConfirmApprove] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
 
   const [approve] = useMutation<MutResp>(APPROVE_DEPLOYMENT);
   const [abort] = useMutation<MutResp>(ABORT_DEPLOYMENT);
@@ -104,7 +107,6 @@ function PendingRow({
   const shortTag = (deployment.imageTag ?? deployment.id).slice(0, 10);
 
   async function handleApprove() {
-    if (!confirm(`Approve ${shortTag} and start the rollout?`)) return;
     setBusy("approve");
     try {
       const { data } = await approve({
@@ -113,7 +115,7 @@ function PendingRow({
       if (data?.approveDeployment?.ok) {
         toast.success(`Approved ${shortTag}.`);
       } else {
-        toast.error(data?.approveDeployment?.errors?.[0]?.message ?? "Approve failed.");
+        throw new Error(data?.approveDeployment?.errors?.[0]?.message ?? "Approve failed.");
       }
     } finally {
       setBusy(null);
@@ -122,7 +124,6 @@ function PendingRow({
   }
 
   async function handleReject() {
-    if (!confirm(`Reject ${shortTag}? The deployment will be aborted.`)) return;
     setBusy("reject");
     try {
       const { data } = await abort({
@@ -131,7 +132,7 @@ function PendingRow({
       if (data?.abortDeployment?.ok) {
         toast.success("Deployment rejected.");
       } else {
-        toast.error(data?.abortDeployment?.errors?.[0]?.message ?? "Reject failed.");
+        throw new Error(data?.abortDeployment?.errors?.[0]?.message ?? "Reject failed.");
       }
     } finally {
       setBusy(null);
@@ -164,7 +165,7 @@ function PendingRow({
           <Button
             size="sm"
             variant="ghost"
-            onClick={handleReject}
+            onClick={() => setConfirmReject(true)}
             disabled={busy !== null}
             className="text-muted-foreground hover:text-destructive gap-1"
           >
@@ -175,7 +176,7 @@ function PendingRow({
             )}
             Reject
           </Button>
-          <Button size="sm" onClick={handleApprove} disabled={busy !== null} className="gap-1">
+          <Button size="sm" onClick={() => setConfirmApprove(true)} disabled={busy !== null} className="gap-1">
             {busy === "approve" ? (
               <Loader2Icon className="size-3.5 animate-spin" />
             ) : (
@@ -185,6 +186,27 @@ function PendingRow({
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmApprove}
+        onOpenChange={setConfirmApprove}
+        title={`Approve ${shortTag}?`}
+        description={`This unblocks the rollout to ${
+          deployment.environmentName ?? "the target environment"
+        }. Workflow resumes immediately — there is no way to pause it again before traffic shifts.`}
+        confirmLabel="Approve & deploy"
+        onConfirm={handleApprove}
+      />
+
+      <ConfirmDialog
+        open={confirmReject}
+        onOpenChange={setConfirmReject}
+        title={`Reject ${shortTag}?`}
+        description="The pending deployment is aborted. CI must re-trigger to create a fresh deployment for review."
+        confirmLabel="Reject"
+        destructive
+        onConfirm={handleReject}
+      />
     </div>
   );
 }

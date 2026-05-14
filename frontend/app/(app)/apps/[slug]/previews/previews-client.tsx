@@ -12,6 +12,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -92,6 +93,9 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   const list = previews.data?.astroliftPreviewEnvironments ?? [];
   const active = list.filter((p) => p.status !== "torn_down");
   const stale = active.filter(isStale);
+  const [tearDownTarget, setTearDownTarget] = React.useState<AstroliftPreviewEnvironment | null>(
+    null,
+  );
 
   if (app.loading && !a) {
     return (
@@ -116,19 +120,12 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   }
 
   async function handleTearDown(p: AstroliftPreviewEnvironment) {
-    if (
-      !confirm(
-        `Tear down preview for PR #${p.prNumber}? Namespace ${p.namespace} will be cleaned up.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await tearDown({ variables: { input: { id: p.id } } });
     const r = data?.tearDownPreview;
     if (r?.ok) {
       toast.success(`Teardown enqueued for PR #${p.prNumber}`);
     } else {
-      toast.error(r?.errors[0]?.message ?? "Teardown failed");
+      throw new Error(r?.errors[0]?.message ?? "Teardown failed");
     }
   }
 
@@ -278,7 +275,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                             size="sm"
                             variant="outline"
                             disabled={tearState.loading}
-                            onClick={() => handleTearDown(p)}
+                            onClick={() => setTearDownTarget(p)}
                           >
                             <TrashIcon className="size-3" /> Tear down
                           </Button>
@@ -298,6 +295,28 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
         {a.previewMaxActive === 1 ? "" : "s"} per app · stale threshold{" "}
         {STALE_DAYS}d.
       </p>
+
+      <ConfirmDialog
+        open={tearDownTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setTearDownTarget(null);
+        }}
+        title={
+          tearDownTarget
+            ? `Tear down preview for PR #${tearDownTarget.prNumber}?`
+            : "Tear down preview?"
+        }
+        description={
+          tearDownTarget
+            ? `Namespace ${tearDownTarget.namespace} will be deleted, its ingress hostname (${tearDownTarget.hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to ${tearDownTarget.branch}.`
+            : "Namespace will be deleted and the hostname released."
+        }
+        confirmLabel="Tear down"
+        destructive
+        onConfirm={async () => {
+          if (tearDownTarget) await handleTearDown(tearDownTarget);
+        }}
+      />
     </PageShell>
   );
 }
