@@ -17,5 +17,5 @@ rsync -av --delete \
 
 Then update `SOURCE_COMMIT` below and commit.
 
-- **SOURCE_COMMIT**: `d1c47ad85a4322ff00a33c21fccbb991d5d82293`
+- **SOURCE_COMMIT**: `ea2b4b5746f1d90e3886dbe6382dbe881678fd26`
 - **Upstream repo**: `git@github.com:calliopeai/astrolift-providers.git`
