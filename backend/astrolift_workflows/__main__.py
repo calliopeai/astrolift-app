@@ -46,11 +46,24 @@ async def _run() -> None:
     log = logging.getLogger("astrolift.worker")
     address = getattr(settings, "TEMPORAL_ADDRESS", "localhost:7233")
     namespace = getattr(settings, "TEMPORAL_NAMESPACE", "default")
+    # ``client.py`` defaults workflow dispatches to settings.TEMPORAL_TASK_QUEUE
+    # which is ``astrolift-main`` (see astrolift_workflows.client._task_queue).
+    # The spec'd per-concern queues (deploy/provision/observability) are the
+    # routing destinations once resolvers start passing an explicit
+    # ``task_queue=`` argument. Until every call site is migrated we have to
+    # poll BOTH the default queue AND the spec'd ones so workflows started
+    # without explicit routing actually get picked up.
+    default_queue = getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main")
 
     log.info("connecting to temporal address=%s namespace=%s", address, namespace)
     client = await Client.connect(address, namespace=namespace)
 
-    queues = (TASK_QUEUE_DEPLOY, TASK_QUEUE_PROVISION, TASK_QUEUE_OBSERVABILITY)
+    queues = (
+        TASK_QUEUE_DEPLOY,
+        TASK_QUEUE_PROVISION,
+        TASK_QUEUE_OBSERVABILITY,
+        default_queue,
+    )
     workers = [
         Worker(
             client,
