@@ -387,6 +387,7 @@ def _record_approval_vote_and_maybe_start(
             DeployAppInput(
                 registered_app_id=app.pk,
                 app_environment_id=env.pk,
+                deployment_id=deployment.pk,
                 image_tags={"app": deployment.image_tag},
                 trigger_kind=deployment.trigger_kind,
                 actor=actor,
@@ -541,6 +542,7 @@ class LifecycleMutation:
                         DeployAppInput(
                             registered_app_id=app.pk,
                             app_environment_id=env.pk,
+                            deployment_id=deployment.pk,
                             image_tags={"app": input.image_tag},
                             trigger_kind=input.trigger_kind,
                             actor=actor,
@@ -902,6 +904,7 @@ class LifecycleMutation:
                         DeployAppInput(
                             registered_app_id=source.registered_app_id,
                             app_environment_id=source.app_environment_id,
+                            deployment_id=new_deploy.pk,
                             image_tags={"app": source.image_tag},
                             trigger_kind=Deployment.TriggerKind.MANUAL.value,
                             actor=actor,

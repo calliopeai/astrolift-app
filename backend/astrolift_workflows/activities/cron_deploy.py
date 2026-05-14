@@ -153,6 +153,7 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
                     DeployAppInput(
                         registered_app_id=app.pk,
                         app_environment_id=env.pk,
+                        deployment_id=deployment.pk,
                         image_tags={"app": image_tag},
                         trigger_kind=Deployment.TriggerKind.SCHEDULED.value,
                         actor=actor,

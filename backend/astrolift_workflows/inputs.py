@@ -33,6 +33,7 @@ class OnboardAppInput:
 class DeployAppInput:
     registered_app_id: int
     app_environment_id: int
+    deployment_id: int
     image_tags: dict[str, str]
     trigger_kind: str
     actor: Actor

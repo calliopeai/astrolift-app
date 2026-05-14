@@ -38,10 +38,67 @@ async def mark_app_ready(registered_app_id: int) -> None:
     app.transition_provisioning(RegisteredApp.ProvisioningStatus.READY)
 
 
+def _provision_namespace_sync(registered_app_id: int, app_environment_id: int | None) -> str:
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+    from core.app_deploy import AppDeployError, namespace_for_app
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    app = RegisteredApp.all_objects.select_related("organization").get(pk=registered_app_id)
+    cluster: TenantCluster | None = None
+    if app_environment_id is not None:
+        env = AppEnvironment.all_objects.select_related("tenant_cluster").get(pk=app_environment_id)
+        cluster = env.tenant_cluster
+    if cluster is None:
+        # Fall back: the app may have a single environment, in which case
+        # we provision in that cluster. If there are zero or multiple
+        # environments the caller must pass app_environment_id.
+        envs = list(
+            AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).select_related(
+                "tenant_cluster",
+            ),
+        )
+        if len(envs) != 1:
+            raise AppDeployError(
+                f"app {app.slug!r} has {len(envs)} environments; pass app_environment_id explicitly",
+            )
+        cluster = envs[0].tenant_cluster
+    if cluster is None:
+        raise AppDeployError(f"app {app.slug!r} env has no tenant_cluster bound")
+    namespace = namespace_for_app(app)
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    labels = {
+        "astrolift.io/managed-by": "astrolift",
+        "astrolift.io/organization": app.organization.slug,
+        "astrolift.io/app": app.slug,
+    }
+    annotations = {
+        "astrolift.io/registered-app-id": str(app.pk),
+    }
+    driver.ensure_namespace(ctx.slug, namespace, labels, annotations)
+    return namespace
+
+
 @activity.defn(name="astrolift.app.provision_namespace")
-async def provision_namespace(registered_app_id: int) -> None:
+async def provision_namespace(registered_app_id: int, app_environment_id: int | None = None) -> None:
+    """Create the app's Kubernetes namespace on its bound cluster.
+
+    Idempotent — ``driver.ensure_namespace`` server-side-applies labels +
+    annotations so re-runs reconcile rather than fail. The labels carry
+    organization + app slug so cluster-wide queries can scope to
+    astrolift-managed namespaces.
+    """
+    from asgiref.sync import sync_to_async
+
     activity.heartbeat()
-    log.info("provision_namespace placeholder", extra={"registered_app_id": registered_app_id})
+    namespace = await sync_to_async(_provision_namespace_sync)(registered_app_id, app_environment_id)
+    log.info(
+        "provision_namespace ensured namespace=%s",
+        namespace,
+        extra={"registered_app_id": registered_app_id, "app_environment_id": app_environment_id},
+    )
 
 
 @activity.defn(name="astrolift.app.provision_registry_repo")
@@ -63,10 +120,44 @@ async def provision_managed_services_initial(
     return []
 
 
+def _pre_flight_sync(deployment_id: int) -> None:
+    from astrolift_lifecycle.models import Deployment
+    from core.app_deploy import AppDeployError, cluster_for_deployment
+
+    d = Deployment.all_objects.select_related("registered_app__organization", "app_environment").get(
+        pk=deployment_id,
+    )
+    if not d.image_tag:
+        raise AppDeployError(f"deployment {deployment_id} has no image_tag set")
+    app = d.registered_app
+    if not (app.manifest_raw or "").strip():
+        raise AppDeployError(
+            f"app {app.slug!r} has no saved manifest — open the Manifest tab or re-run the registration wizard",
+        )
+    # Probe the cluster is bound + reachable shape; the actual auth
+    # check happens at apply time when the driver opens a real client.
+    cluster = cluster_for_deployment(d)
+    if cluster.lifecycle != cluster.Lifecycle.MANAGED.value:
+        raise AppDeployError(
+            f"cluster {cluster.slug!r} is in lifecycle {cluster.lifecycle!r}, not managed — "
+            "bring it into management before deploying",
+        )
+
+
 @activity.defn(name="astrolift.deploy.pre_flight")
 async def pre_flight(deployment_id: int) -> None:
+    """Read-only validation gate before any cluster mutation.
+
+    Catches the obvious "you can't deploy because X" cases up front so
+    operators get a clear pre-deploy error rather than an opaque apply
+    failure. Validates: deployment has an image_tag, app has a saved
+    manifest, env is bound to a cluster, and the cluster is in the
+    ``managed`` lifecycle.
+    """
+    from asgiref.sync import sync_to_async
+
     activity.heartbeat()
-    log.info("pre_flight placeholder", extra={"deployment_id": deployment_id})
+    await sync_to_async(_pre_flight_sync)(deployment_id)
 
 
 @activity.defn(name="astrolift.deploy.mark_deploying")
@@ -124,10 +215,58 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     return {"resources": resources}
 
 
+def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
+    from astrolift_lifecycle.models import Deployment
+    from core.app_deploy import (
+        AppDeployError,
+        driver_for_deployment,
+        render_resources_for_deployment,
+    )
+
+    d = Deployment.all_objects.select_related(
+        "registered_app__organization",
+        "app_environment__tenant_cluster",
+    ).get(pk=deployment_id)
+    driver, ctx, namespace = driver_for_deployment(d)
+    resources = render_resources_for_deployment(d)
+    if not resources:
+        raise AppDeployError(
+            f"manifest for app {d.registered_app.slug!r} rendered to zero resources — "
+            "check the workloads/services block in astrolift.toml",
+        )
+    result = driver.apply_manifests(ctx.slug, namespace, resources)
+    if not result.ok:
+        raise AppDeployError(
+            f"apply_manifests failed for deployment {deployment_id}: " + "; ".join(result.errors),
+        )
+    return {
+        "created": list(result.created),
+        "updated": list(result.updated),
+        "unchanged": list(result.unchanged),
+    }
+
+
 @activity.defn(name="astrolift.deploy.apply_manifests")
-async def apply_manifests(deployment_id: int) -> None:
+async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
+    """Apply the rendered manifest set to the deployment's cluster.
+
+    Uses server-side apply (idempotent) via the cluster driver. Returns
+    the ``ApplyResult`` shape ({created/updated/unchanged}) so the
+    workflow event log carries which resources actually changed for an
+    operator-facing diff view.
+    """
+    from asgiref.sync import sync_to_async
+
     activity.heartbeat()
-    log.info("apply_manifests placeholder", extra={"deployment_id": deployment_id})
+    summary = await sync_to_async(_apply_manifests_sync)(deployment_id)
+    log.info(
+        "apply_manifests created=%d updated=%d unchanged=%d",
+        len(summary["created"]),
+        len(summary["updated"]),
+        len(summary["unchanged"]),
+        extra={"deployment_id": deployment_id},
+    )
+    return summary
 
 
 @activity.defn(name="astrolift.deploy.update_secrets")
@@ -140,15 +279,93 @@ async def wait_dns(deployment_id: int) -> None:
     activity.heartbeat()
 
 
+def _poll_rollout_sync(deployment_id: int, timeout_seconds: int) -> bool:
+    from astrolift_lifecycle.models import Deployment
+    from core.app_deploy import (
+        AppDeployError,
+        driver_for_deployment,
+        render_resources_for_deployment,
+        workloads_from_resources,
+    )
+
+    d = Deployment.all_objects.select_related(
+        "registered_app__organization",
+        "app_environment__tenant_cluster",
+    ).get(pk=deployment_id)
+    driver, ctx, namespace = driver_for_deployment(d)
+    resources = render_resources_for_deployment(d)
+    workloads = workloads_from_resources(resources)
+    if not workloads:
+        # Pure-service manifests (no Deployments/StatefulSets/DaemonSets)
+        # are trivially "rolled out" the moment apply_manifests returns.
+        return True
+    for kind, name in workloads:
+        result = driver.poll_rollout(ctx.slug, namespace, kind, name, timeout_seconds)
+        if not result.success:
+            raise AppDeployError(
+                f"rollout {kind}/{name} in {namespace} failed: {result.message}"
+                + (" (timed out)" if result.timed_out else ""),
+            )
+    return True
+
+
 @activity.defn(name="astrolift.deploy.poll_rollout")
-async def poll_rollout(deployment_id: int) -> bool:
+async def poll_rollout(deployment_id: int, timeout_seconds: int = 600) -> bool:
+    """Wait for every Deployment / StatefulSet / DaemonSet in the
+    rendered manifest set to roll out successfully.
+
+    Driven by the cluster driver's ``poll_rollout`` which ticks at least
+    every 15s. Activity timeout in the workflow caps the overall window;
+    ``timeout_seconds`` is the per-workload cap (default 10 min, matches
+    the ClusterDriver protocol default).
+    """
+    from asgiref.sync import sync_to_async
+
     activity.heartbeat()
+    return await sync_to_async(_poll_rollout_sync)(deployment_id, timeout_seconds)
+
+
+def _health_check_sync(deployment_id: int) -> bool:
+    from astrolift_lifecycle.models import Deployment
+    from core.app_deploy import (
+        AppDeployError,
+        driver_for_deployment,
+        render_resources_for_deployment,
+        workloads_from_resources,
+    )
+
+    d = Deployment.all_objects.select_related(
+        "registered_app__organization",
+        "app_environment__tenant_cluster",
+    ).get(pk=deployment_id)
+    driver, ctx, namespace = driver_for_deployment(d)
+    resources = render_resources_for_deployment(d)
+    workloads = workloads_from_resources(resources)
+    if not workloads:
+        return True
+    for kind, name in workloads:
+        status = driver.get_workload_status(ctx.slug, namespace, kind, name)
+        if status.ready_replicas < status.desired_replicas:
+            raise AppDeployError(
+                f"workload {kind}/{name} in {namespace} not healthy: "
+                f"ready={status.ready_replicas} desired={status.desired_replicas}",
+            )
     return True
 
 
 @activity.defn(name="astrolift.deploy.health_check")
 async def health_check(deployment_id: int) -> bool:
-    return True
+    """Post-rollout readiness check.
+
+    Cross-verifies what ``poll_rollout`` saw — every workload's
+    ``ready_replicas`` should equal its ``desired_replicas`` at this
+    point. Catches edge cases where rollout returns success but a pod
+    flapped in the brief window before we sampled.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_health_check_sync)(deployment_id)
 
 
 @activity.defn(name="astrolift.deploy.mark_running")

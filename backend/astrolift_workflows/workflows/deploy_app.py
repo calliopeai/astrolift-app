@@ -15,7 +15,6 @@ from temporalio import workflow
 
 from astrolift_workflows.inputs import DeployAppInput, WorkflowResult
 
-
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
         apply_manifests,
@@ -24,6 +23,7 @@ with workflow.unsafe.imports_passed_through():
         mark_running,
         poll_rollout,
         pre_flight,
+        provision_namespace,
         render_manifests,
         update_secrets,
         wait_dns,
@@ -44,12 +44,22 @@ class DeployAppWorkflow:
 
     @workflow.run
     async def run(self, input: DeployAppInput) -> WorkflowResult:
-        # Resolve / create the deployment row out-of-band before this
-        # workflow starts; the workflow operates on its id.
-        deployment_id = input.app_environment_id  # placeholder
+        # The mutation creates the Deployment row + workflow_run, passes
+        # the deployment_id in here, and the workflow operates on that
+        # specific row. Earlier revisions used app_environment_id as
+        # placeholder — that always loaded the wrong record because the
+        # activities key on the deployment, not the env.
+        deployment_id = input.deployment_id
 
         await workflow.execute_activity(pre_flight, deployment_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(mark_deploying, deployment_id, start_to_close_timeout=_TIMEOUT)
+        # provision_namespace runs *before* render so the namespace
+        # exists when apply_manifests creates Services/Secrets in it.
+        await workflow.execute_activity(
+            provision_namespace,
+            args=[input.registered_app_id, input.app_environment_id],
+            start_to_close_timeout=_TIMEOUT,
+        )
         await workflow.execute_activity(render_manifests, deployment_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(apply_manifests, deployment_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(update_secrets, deployment_id, start_to_close_timeout=_TIMEOUT)
