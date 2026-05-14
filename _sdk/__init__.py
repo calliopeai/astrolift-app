@@ -55,10 +55,14 @@ from _sdk.capabilities import (
 )
 
 # Pod observability shapes (#299) — re-exported so backend resolvers
-# only depend on the public SDK surface.
+# only depend on the public SDK surface. ``ClusterContext`` +
+# ``ManagementReport`` join them in the #316 bring-into-management
+# surface for the same reason.
 from _sdk.cluster import (
     ClusterAuth,
+    ClusterContext,
     ContainerStatusInfo,
+    ManagementReport,
     PodInfo,
     PodLogLine,
 )
@@ -147,6 +151,7 @@ __all__ = [
     "BuildDriver",
     "ClusterAuth",
     "ClusterCapabilities",
+    "ClusterContext",
     "ClusterDriver",
     "CompositionRegistry",
     "ContainerStatusInfo",
@@ -176,6 +181,7 @@ __all__ = [
     "ManagedServiceEntry",
     "ManagedServiceKind",
     "ManagedServiceRegistry",
+    "ManagementReport",
     "MetricsDriver",
     "MigrationCatalog",
     "MigrationRecipe",
