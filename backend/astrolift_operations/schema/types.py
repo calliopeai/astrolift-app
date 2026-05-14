@@ -226,6 +226,48 @@ def alert_event_to_type(e) -> AlertEventType:
     )
 
 
+@strawberry.type(name="AstroliftAppMetricsPoint")
+class AppMetricsPointType:
+    """One row of the time-series body."""
+
+    timestamp: dt.datetime
+    request_rate: float
+    error_rate: float
+    latency_p95: float
+
+
+@strawberry.type(name="AstroliftAppMetrics")
+class AppMetricsType:
+    """Golden-signal rollup for one app over the chosen window.
+
+    ``time_range`` accepts: ``5m``, ``1h``, ``24h``, ``7d``, ``30d``
+    (matches monorail). Aggregates derive from the cluster's
+    Prometheus / OTel endpoint when wired; today the resolver
+    falls back to deterministic synthetic data so the UI surface
+    exists end-to-end. ``source`` reflects which path produced the
+    row: ``prometheus`` | ``synthetic``.
+    """
+
+    app_slug: str
+    time_range: str
+    request_rate: float
+    """Requests per second, averaged over the window."""
+
+    error_rate: float
+    """Fraction of requests that returned 5xx (0.0–1.0)."""
+
+    p50_latency_ms: float
+    p95_latency_ms: float
+    p99_latency_ms: float
+
+    deploy_count: int
+    """Deployments started against the app in the window."""
+
+    time_series: list[AppMetricsPointType]
+    source: str
+    """``prometheus`` | ``synthetic``."""
+
+
 @strawberry.type(name="AstroliftWebhookTestResult")
 class WebhookTestResultType:
     """One ad-hoc test delivery against a webhook subscription.

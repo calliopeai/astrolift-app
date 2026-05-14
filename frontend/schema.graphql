@@ -181,6 +181,26 @@ type AstroliftAppLogLine {
   stream: String!
 }
 
+type AstroliftAppMetrics {
+  appSlug: String!
+  timeRange: String!
+  requestRate: Float!
+  errorRate: Float!
+  p50LatencyMs: Float!
+  p95LatencyMs: Float!
+  p99LatencyMs: Float!
+  deployCount: Int!
+  timeSeries: [AstroliftAppMetricsPoint!]!
+  source: String!
+}
+
+type AstroliftAppMetricsPoint {
+  timestamp: DateTime!
+  requestRate: Float!
+  errorRate: Float!
+  latencyP95: Float!
+}
+
 type AstroliftAppPod {
   name: String!
   workload: String!
@@ -1847,6 +1867,7 @@ type Query {
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
+  astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftApps: [AstroliftRegisteredApp!]!
   astroliftMyApps: [AstroliftRegisteredApp!]!
