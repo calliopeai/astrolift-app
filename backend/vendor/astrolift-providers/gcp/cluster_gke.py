@@ -14,6 +14,8 @@ from typing import Any
 
 from _sdk.cluster import (
     ApplyResult,
+    BootstrapComponent,
+    BootstrapOption,
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
@@ -355,6 +357,84 @@ class GKEClusterDriver(ClusterDriver):
             cluster=cluster,
             run_preflight=run_preflight,
         )
+
+    # ---- bootstrap recipe ----------------------------------------
+
+    def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
+        """GKE recipe — uses GCP-native paths where they're the
+        easiest option, falls back to in-cluster controllers when
+        they aren't.
+
+        GKE already provides metrics + an ingress (GCE ingress
+        controller) so those don't appear in the recipe by default;
+        the operator opts in to nginx + metrics-server only when
+        replacing the native pieces.
+        """
+        return [
+            BootstrapComponent(
+                key="tls_issuer",
+                title="TLS certificate strategy",
+                default_enabled=True,
+                rationale=(
+                    "GKE supports Google-managed SSL certs via the "
+                    "ManagedCertificate CRD — least operational overhead. "
+                    "cert-manager + ACME-LetsEncrypt available when "
+                    "operators need a portable cert flow."
+                ),
+                helm_values={},
+                requires=[],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("gke_managed", "Google-managed certs (recommended, GCE ingress)"),
+                            ("acme_letsencrypt_prod", "Let's Encrypt prod (cert-manager + Cloud DNS DNS-01)"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                            ("self_signed", "Self-signed (internal only)"),
+                        ],
+                        default="gke_managed",
+                    ),
+                ],
+            ),
+            BootstrapComponent(
+                key="external-dns",
+                title="external-dns (Cloud DNS)",
+                default_enabled=True,
+                rationale=(
+                    "Auto-creates Cloud DNS records from Ingress + "
+                    "Service annotations. Bound to a GCP service account "
+                    "via Workload Identity."
+                ),
+                helm_values={
+                    "external-dns": {
+                        "enabled": True,
+                        "provider": "google",
+                        "sources": ["service", "ingress"],
+                    },
+                },
+                requires=["workload_identity:external-dns", "clouddns_zone"],
+                options=[],
+            ),
+            BootstrapComponent(
+                key="kube-prometheus-stack",
+                title="Prometheus + Grafana + Alertmanager",
+                default_enabled=True,
+                rationale=(
+                    "Metrics scraping + dashboarding. Persistent disk via "
+                    "the GKE-default pd-standard StorageClass; flip to "
+                    "pd-ssd in helm values for higher write throughput."
+                ),
+                helm_values={
+                    "kube-prometheus-stack": {
+                        "enabled": True,
+                        "grafana": {"enabled": True},
+                    },
+                },
+                requires=["storage:rwo"],
+                options=[],
+            ),
+        ]
 
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:

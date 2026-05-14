@@ -290,6 +290,85 @@ class PortForwardSession:
     def close(self) -> None: ...
 
 
+# ---- Bootstrap recipe (cluster prereqs install) -------------------
+#
+# After a cluster is brought into management the platform offers an
+# install step that lays down the controllers + operators tenant
+# deploys depend on. The recipe is driver-specific — each provider
+# knows which components the cloud already provides natively, which
+# need helm-install on the cluster, and how to wire each to the
+# cloud's auth model (IRSA on AWS, Workload Identity on GCP, Federated
+# Identity on Azure, rfc2136 / self-signed on bare metal).
+
+
+@dataclass(frozen=True)
+class BootstrapOption:
+    """One operator-pickable sub-choice on a BootstrapComponent.
+
+    Example: ``tls_issuer.mode = acm | acme_letsencrypt_prod |
+    acme_letsencrypt_staging | self_signed``. The UI renders a select;
+    the workflow merges the chosen value into ``helm_values`` before
+    installing.
+    """
+
+    key: str
+    """Stable identifier — used as the override key the operator sends
+    back when picking a value (e.g. ``mode``, ``ingress_class``)."""
+
+    label: str
+    """Human-readable label shown next to the select in the UI."""
+
+    choices: list[tuple[str, str]] = field(default_factory=list)
+    """``[(value, label), ...]`` — first element is the wire value the
+    workflow consumes, second is the UI label."""
+
+    default: str = ""
+    """Default ``value`` (from ``choices``) when the operator doesn't
+    explicitly pick one."""
+
+
+@dataclass(frozen=True)
+class BootstrapComponent:
+    """One installable prerequisite in the driver's recipe.
+
+    ``helm_values`` is the *pre-tuned* default value set the workflow
+    will pass to ``helm install`` if the operator enables this
+    component. Driver implementations bake provider-specific knobs
+    (IRSA role ARN, managed-DNS provider, ACM cert handling, etc.)
+    into this dict so the operator doesn't have to know.
+    """
+
+    key: str
+    """Stable identifier; matches the top-level key in the
+    astrolift-prereqs chart's values.yaml (``cert-manager``,
+    ``external-dns``, ``kube-prometheus-stack``, etc.)."""
+
+    title: str
+    """Human-readable name shown in the UI checkbox list."""
+
+    default_enabled: bool
+    """Driver's opinion on whether this should be on by default for
+    THIS provider. Operators can flip it off."""
+
+    rationale: str
+    """One-line explanation of *why* this is enabled / skipped on this
+    provider. Surfaced as the helper text under the checkbox so
+    operators learn the design as they read."""
+
+    helm_values: dict[str, Any] = field(default_factory=dict)
+    """Pre-tuned helm values for the subchart this component installs.
+    The workflow merges operator overrides on top before invoking helm."""
+
+    requires: list[str] = field(default_factory=list)
+    """Preconditions the workflow checks before installing — e.g.
+    ``irsa:cert-manager`` (an IRSA role must exist on AWS), or
+    ``subzone:dns`` (operator must have delegated a DNS subzone)."""
+
+    options: list[BootstrapOption] = field(default_factory=list)
+    """Operator-pickable sub-options for this component. Empty list
+    means no sub-choices; the component is on/off only."""
+
+
 class ClusterDriver(Protocol):
     """Protocol for applying, querying, and managing Kubernetes objects on a target cluster.
 
@@ -451,5 +530,34 @@ class ClusterDriver(Protocol):
         fresh probe + RBAC reconcile without paying the Job's
         60-second wall clock. The workflow flips this back to
         ``True`` when the resolver passes ``forcePreflight=true``.
+        """
+        ...
+
+    # ---- Bootstrap recipe (#???: cluster prereqs install) -----------
+    #
+    # Once a cluster is ``managed``, the platform offers an opinionated
+    # "make this cluster uniform" step that installs the controllers
+    # and operators a tenant deploy depends on (cert-manager, ingress
+    # controller, external-dns, metrics-server, Prometheus, etc.).
+    # The list + their default helm values is provider-specific: AWS
+    # leans on IRSA + ACM via the ALB controller; GCP uses managed
+    # certs + Workload Identity; bare-metal uses ACME-LetsEncrypt or
+    # self-signed cert-manager + MetalLB + Longhorn.
+    #
+    # ``bootstrap_components`` is the read-only declaration the
+    # control plane fetches when rendering the install card on the
+    # cluster detail page; the operator picks a subset + tweaks values
+    # and fires ``InstallClusterPrereqsWorkflow`` which runs a one-shot
+    # Job (the astrolift-cli image, chart embedded) in
+    # ``astrolift-system`` with the resolved helm values.
+
+    def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
+        """Return the provider's opinionated install recipe.
+
+        Each component carries a key, default-enabled bool, rationale
+        string explaining the choice for this provider, helm values
+        pre-tuned for the provider (IRSA ARNs, regions, managed-cert
+        wiring), preconditions, and optional sub-options the operator
+        can pick from at install time (e.g. tls_issuer mode).
         """
         ...
