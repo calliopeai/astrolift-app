@@ -11,6 +11,7 @@ See ``specs/04`` §6.1.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 from core.models.base import NamedBaseCoreModel
@@ -93,7 +94,32 @@ class RegisteredApp(NamedBaseCoreModel):
     # separately — for now this is captured at registration time so
     # the contract is stable when that workflow lands.
     cron_expression = models.CharField(max_length=120, blank=True, default="")
+    # When ``trigger_mode == 'cron'``, this flag pauses scheduled
+    # dispatch without flipping the mode (which would also clear the
+    # cron expression). The dispatcher tick skips paused apps; manual
+    # deploys are unaffected.
+    cron_paused = models.BooleanField(default=False)
     deploy_branch = models.CharField(max_length=128, default="main")
+
+    # Approval policy (#291). Applies in addition to (and OR'd with)
+    # ``AppEnvironment.required_approvals`` — whichever path requires
+    # more approvers wins. Empty approver sets with
+    # ``requires_approval=True`` mean any user holding the
+    # ``app.approve_deploy`` permission on the app's org can approve.
+    requires_approval = models.BooleanField(default=False)
+    approver_team = models.ForeignKey(
+        "astrolift_identity.Team",
+        related_name="approver_for_apps",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    approver_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="approver_for_apps",
+        blank=True,
+    )
+    minimum_approvals = models.PositiveIntegerField(default=1)
 
     # Latest preview screenshot URL for this app, written by the
     # platform's screenshotter service (spec 09 §4.21). Stays empty

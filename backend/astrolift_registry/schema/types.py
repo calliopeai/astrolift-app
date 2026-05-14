@@ -47,8 +47,17 @@ class RegisteredAppType:
     preview_enabled: bool
     trigger_mode: str
     cron_expression: str
+    cron_paused: bool
     deploy_branch: str
     preview_screenshot_url: str
+
+    # Approval policy (#291). ``approver_team_id`` is the team's GUID
+    # (or null when no team gate is set); ``approver_user_ids`` are
+    # Django user PKs as strings (matching ``AstroliftUser.id``).
+    requires_approval: bool
+    approver_team_id: GUID | None
+    approver_user_ids: list[str]
+    minimum_approvals: int
 
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -137,8 +146,13 @@ def app_to_type(app) -> RegisteredAppType:
         preview_enabled=app.preview_enabled,
         trigger_mode=app.trigger_mode,
         cron_expression=app.cron_expression or "",
+        cron_paused=bool(app.cron_paused),
         deploy_branch=app.deploy_branch,
         preview_screenshot_url=app.preview_screenshot_url or "",
+        requires_approval=bool(app.requires_approval),
+        approver_team_id=(GUID(str(app.approver_team.guid)) if app.approver_team_id else None),
+        approver_user_ids=[str(uid) for uid in app.approver_users.values_list("pk", flat=True)],
+        minimum_approvals=int(app.minimum_approvals or 1),
         created_at=app.created_at,
         updated_at=app.updated_at,
         deleted_at=app.deleted_at,

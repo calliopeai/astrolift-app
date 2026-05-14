@@ -254,7 +254,11 @@ def _record_workflow_run(
 
 
 def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredApp, AppEnvironment] | None:
-    app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).first()
+    app = (
+        RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+        .select_related("approver_team")
+        .first()
+    )
     if app is None:
         return None
     env = (
@@ -269,6 +273,47 @@ def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredAp
     if env is None:
         return None
     return app, env
+
+
+def _required_approvals_for(app: RegisteredApp, env: AppEnvironment) -> int:
+    """How many approvals does this deploy need?
+
+    Whichever of the env-level (``required_approvals``) or app-level
+    (``minimum_approvals`` when ``requires_approval`` is on) policy
+    is stricter wins. Returns 0 when neither path gates the deploy.
+    """
+    env_min = int(env.required_approvals or 0)
+    app_min = int(app.minimum_approvals or 0) if app.requires_approval else 0
+    return max(env_min, app_min)
+
+
+def _is_eligible_approver(app: RegisteredApp, *, user_id: int) -> bool:
+    """Does ``user_id`` satisfy the app-level approver eligibility?
+
+    When ``requires_approval`` is off, the app-level set imposes no
+    constraint (env-level approvals fall back to the holder of
+    ``app.approve_deploy`` — that's the permission check at the
+    resolver). When on, the user must be either in the
+    ``approver_users`` set or a member of ``approver_team``; an
+    empty set with ``requires_approval`` on means 'any approver-
+    permission holder', which the permission gate already covers.
+    """
+    if not app.requires_approval:
+        return True
+    if app.approver_users.filter(pk=user_id).exists():
+        return True
+    if app.approver_team_id is None:
+        # No team and no user set → fall through to permission gate.
+        return not app.approver_users.exists()
+    from astrolift_identity.models import Member
+
+    return Member.objects.filter(
+        user_id=user_id,
+        scope_kind=Member.ScopeKind.TEAM,
+        scope_id=app.approver_team_id,
+        is_active=True,
+        deleted_at__isnull=True,
+    ).exists()
 
 
 def _lookup_deployment_by_token(
@@ -406,16 +451,15 @@ class LifecycleMutation:
         tenant = get_current_tenant()
 
         with transaction.atomic():
+            approvals_required = _required_approvals_for(app, env)
             initial_status = (
-                Deployment.Status.PENDING_APPROVAL
-                if env.required_approvals > 0
-                else Deployment.Status.PENDING
+                Deployment.Status.PENDING_APPROVAL if approvals_required > 0 else Deployment.Status.PENDING
             )
 
-            # Mint an emailed-approval magic link when the env gates on
-            # human approvals. Plaintext is returned in the published
-            # lifecycle event (operators wire that to email/Slack);
-            # only the hash + expiry persist on the row.
+            # Mint an emailed-approval magic link when the deploy gates
+            # on human approvals. Plaintext is returned in the
+            # published lifecycle event (operators wire that to
+            # email/Slack); only the hash + expiry persist on the row.
             approval_token_plaintext: str | None = None
             approval_token_hash = ""
             approval_token_expires_at = None
@@ -432,7 +476,7 @@ class LifecycleMutation:
                 status=initial_status.value,
                 image_tag=input.image_tag,
                 image_digest=input.image_digest or "",
-                approvals_required=env.required_approvals,
+                approvals_required=approvals_required,
                 approvals_received=0,
                 approval_token_hash=approval_token_hash,
                 approval_token_expires_at=approval_token_expires_at,
@@ -525,12 +569,70 @@ class LifecycleMutation:
                 "cannot approve your own deployment",
             )
 
+        if actor.user_id and not _is_eligible_approver(
+            deployment.registered_app,
+            user_id=actor.user_id,
+        ):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "you are not in this app's approver set",
+            )
+
         with transaction.atomic():
             _record_approval_vote_and_maybe_start(
                 deployment,
                 actor,
                 organization_id=tenant.organization_id if tenant else None,
             )
+
+        return gql_success(deployment_to_type(deployment))
+
+    @strawberry.field
+    @mutation_audit(action="deployment.reject")
+    @require_permission(Permission.APP_APPROVE_DEPLOY)
+    @tenant_scoped()
+    def reject_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
+        """Reject a pending_approval deploy from in-band.
+
+        Mirrors :meth:`reject_deployment_by_token` but requires an
+        authenticated approver. ANY rejection short-circuits to
+        FAILED — one nay kills the deploy, matching the quorum
+        policy in :mod:`astrolift_lifecycle.approval`.
+        """
+        deployment = (
+            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if deployment is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
+        if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"deployment is in status {deployment.status}, expected pending_approval",
+            )
+
+        actor = _actor_from_request(info)
+        if actor.user_id and deployment.triggered_by_user_id == actor.user_id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cannot reject your own deployment",
+            )
+        if actor.user_id and not _is_eligible_approver(
+            deployment.registered_app,
+            user_id=actor.user_id,
+        ):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "you are not in this app's approver set",
+            )
+
+        with transaction.atomic():
+            if deployment.workflow_run_id:
+                wf_id = deployment.workflow_run.workflow_id  # type: ignore[union-attr]
+                if not signal_workflow(wf_id, "abort"):
+                    terminate_workflow(wf_id, reason="reject_deployment mutation")
+            deployment.transition_to(Deployment.Status.FAILED)
 
         return gql_success(deployment_to_type(deployment))
 
@@ -747,8 +849,9 @@ class LifecycleMutation:
                 f"environment {env.name!r} has deploys paused",
             )
 
+        approvals_required = _required_approvals_for(source.registered_app, env)
         initial_status = (
-            Deployment.Status.PENDING_APPROVAL if env.required_approvals > 0 else Deployment.Status.PENDING
+            Deployment.Status.PENDING_APPROVAL if approvals_required > 0 else Deployment.Status.PENDING
         )
 
         with transaction.atomic():
@@ -762,7 +865,7 @@ class LifecycleMutation:
                 image_tag=source.image_tag,
                 image_digest=source.image_digest,
                 config_snapshot=source.config_snapshot,
-                approvals_required=env.required_approvals,
+                approvals_required=approvals_required,
                 approvals_received=0,
                 promoted_from=source,
             )

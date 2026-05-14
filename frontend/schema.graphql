@@ -712,8 +712,13 @@ type AstroliftRegisteredApp {
   previewEnabled: Boolean!
   triggerMode: String!
   cronExpression: String!
+  cronPaused: Boolean!
   deployBranch: String!
   previewScreenshotUrl: String!
+  requiresApproval: Boolean!
+  approverTeamId: GUID
+  approverUserIds: [String!]!
+  minimumApprovals: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
@@ -1605,6 +1610,7 @@ type Mutation {
   configureProviderPlugin(input: ConfigureProviderPluginInput!): ProviderpluginconfigpayloadMutationResult!
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  rejectDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   approveDeploymentByToken(input: ApproveByTokenInput!): AstroliftDeploymentMutationResult!
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
@@ -1933,6 +1939,10 @@ input RegisterAppInput {
   deployBranch: String = null
   triggerMode: String = null
   cronExpression: String = null
+  requiresApproval: Boolean = null
+  approverTeamId: GUID = null
+  approverUserIds: [String!] = null
+  minimumApprovals: Int = null
   manifestRaw: String = null
 }
 
@@ -2119,6 +2129,11 @@ input UpdateAppInput {
   cronExpression: String = null
   previewEnabled: Boolean = null
   isActive: Boolean = null
+  requiresApproval: Boolean = null
+  approverTeamId: GUID = null
+  approverUserIds: [String!] = null
+  minimumApprovals: Int = null
+  cronPaused: Boolean = null
 }
 
 input UpdateIdentityProviderInput {

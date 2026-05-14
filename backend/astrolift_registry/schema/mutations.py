@@ -8,7 +8,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
-from astrolift_identity.models import Project
+from astrolift_identity.models import Project, Team
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.types import RegisteredAppType, app_to_type
@@ -34,6 +34,16 @@ class RegisterAppInput:
     # Five-field cron expression. Required when ``trigger_mode == 'cron'``
     # and ignored otherwise; the resolver enforces both rules.
     cron_expression: str | None = None
+    # Approval policy (#291). ``approver_team_id`` is the team GUID;
+    # ``approver_user_ids`` are Django user PKs as strings (matching
+    # ``AstroliftUser.id`` shape — the User model is the stock Django
+    # one with integer PKs). An empty approver set with
+    # ``requires_approval=True`` means anyone with the
+    # ``app.approve_deploy`` permission on the org may approve.
+    requires_approval: bool | None = None
+    approver_team_id: GUID | None = None
+    approver_user_ids: list[str] | None = None
+    minimum_approvals: int | None = None
     # Optional: the wizard may pre-fetch the manifest (via
     # astroliftSourceFile) and pass the body here so the new app
     # boots with manifest_raw already populated. The onboarding
@@ -56,6 +66,17 @@ class UpdateAppInput:
     cron_expression: str | None = None
     preview_enabled: bool | None = None
     is_active: bool | None = None
+    # Approval policy (#291). See ``RegisterAppInput`` for semantics.
+    # ``approver_user_ids`` is treated as a full replacement set when
+    # provided (None leaves the existing set untouched).
+    requires_approval: bool | None = None
+    approver_team_id: GUID | None = None
+    approver_user_ids: list[str] | None = None
+    minimum_approvals: int | None = None
+    # ``cron_paused`` controls scheduled-deploy dispatch without
+    # touching ``trigger_mode``. Pausing keeps the cron expression
+    # intact so resume re-enables fire-on-schedule immediately.
+    cron_paused: bool | None = None
 
 
 @strawberry.input
@@ -155,6 +176,96 @@ def _actor():
     return get_user_model().objects.filter(pk=actor_id).first()
 
 
+def _resolve_approval_inputs(
+    *,
+    organization,
+    requires_approval,
+    approver_team_id,
+    approver_user_ids,
+    minimum_approvals,
+):
+    """Resolve the approval-policy input set against the org scope.
+
+    Returns a ``(values, error)`` tuple. On success, ``values`` is a
+    dict of resolved values: ``requires_approval`` (bool), ``team``
+    (Team | None), ``user_ids`` (tuple[int, ...] | None — None means
+    'leave untouched'), ``minimum_approvals`` (int). On failure,
+    ``error`` is the MutationResult failure envelope.
+
+    Each cross-org reference (team / user) is refused with a clear
+    field-tagged validation error rather than silently dropped — the
+    wizard surfaces these inline.
+    """
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
+    team = None
+    if approver_team_id is not None:
+        team = (
+            Team.objects.filter(guid=str(approver_team_id), deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if team is None:
+            return None, gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "approver team not found",
+                field="approverTeamId",
+            )
+        if team.organization_id != organization.id:
+            return None, gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "approver team must belong to the same organization as the app",
+                field="approverTeamId",
+            )
+
+    user_ids: tuple[int, ...] | None = None
+    if approver_user_ids is not None:
+        # Empty list is meaningful ("clear approver users"); leave as
+        # the empty tuple. Otherwise parse each value as an integer
+        # User pk (matching ``AstroliftUser.id``) and refuse unknowns.
+        raw = list(approver_user_ids)
+        parsed: list[int] = []
+        for raw_id in raw:
+            try:
+                parsed.append(int(str(raw_id).strip()))
+            except (TypeError, ValueError):
+                return None, gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"approverUserIds entry {raw_id!r} is not a valid user id",
+                    field="approverUserIds",
+                )
+        if parsed:
+            found = set(User.objects.filter(pk__in=parsed).values_list("pk", flat=True))
+            missing = [pk for pk in parsed if pk not in found]
+            if missing:
+                return None, gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"approver users not found: {sorted(missing)}",
+                    field="approverUserIds",
+                )
+            user_ids = tuple(parsed)
+        else:
+            user_ids = ()
+
+    if minimum_approvals is not None and minimum_approvals < 1:
+        return None, gql_failure(
+            ErrorCode.VALIDATION.value,
+            "minimumApprovals must be at least 1",
+            field="minimumApprovals",
+        )
+
+    resolved = {
+        "requires_approval": bool(requires_approval) if requires_approval is not None else None,
+        "team": team,
+        "team_provided": approver_team_id is not None,
+        "user_ids": user_ids,
+        "minimum_approvals": minimum_approvals,
+    }
+    return resolved, None
+
+
 @strawberry.type
 class RegistryMutation:
     @strawberry.field
@@ -205,6 +316,16 @@ class RegistryMutation:
                     field="cronExpression",
                 )
 
+        approval, err = _resolve_approval_inputs(
+            organization=project.organization,
+            requires_approval=input.requires_approval,
+            approver_team_id=input.approver_team_id,
+            approver_user_ids=input.approver_user_ids,
+            minimum_approvals=input.minimum_approvals,
+        )
+        if err is not None:
+            return err
+
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
@@ -223,7 +344,16 @@ class RegistryMutation:
             cron_expression=cron_expression,
             k8s_namespace=f"{project.organization.slug}-{input.slug}",
             subdomain=input.slug,
+            requires_approval=bool(approval["requires_approval"])
+            if approval["requires_approval"] is not None
+            else False,
+            approver_team=approval["team"],
+            minimum_approvals=approval["minimum_approvals"]
+            if approval["minimum_approvals"] is not None
+            else 1,
         )
+        if approval["user_ids"] is not None:
+            app.approver_users.set(approval["user_ids"])
         return gql_success(app_to_type(app))
 
     @strawberry.field
@@ -266,6 +396,16 @@ class RegistryMutation:
             # silently re-activate if mode flipped back.
             next_cron_raw = ""
 
+        approval, err = _resolve_approval_inputs(
+            organization=app.organization,
+            requires_approval=input.requires_approval,
+            approver_team_id=input.approver_team_id,
+            approver_user_ids=input.approver_user_ids,
+            minimum_approvals=input.minimum_approvals,
+        )
+        if err is not None:
+            return err
+
         for field in (
             "name",
             "description",
@@ -275,13 +415,27 @@ class RegistryMutation:
             "deploy_branch",
             "preview_enabled",
             "is_active",
+            "cron_paused",
         ):
             new_value = getattr(input, field)
             if new_value is not None:
                 setattr(app, field, new_value)
         app.trigger_mode = next_trigger_mode
         app.cron_expression = next_cron_raw
+        # Flipping away from cron implicitly clears the paused flag —
+        # the field is only meaningful while we're actually firing on
+        # schedule.
+        if next_trigger_mode != RegisteredApp.TriggerMode.CRON.value:
+            app.cron_paused = False
+        if approval["requires_approval"] is not None:
+            app.requires_approval = bool(approval["requires_approval"])
+        if approval["team_provided"]:
+            app.approver_team = approval["team"]
+        if approval["minimum_approvals"] is not None:
+            app.minimum_approvals = approval["minimum_approvals"]
         app.save()
+        if approval["user_ids"] is not None:
+            app.approver_users.set(approval["user_ids"])
         return gql_success(app_to_type(app))
 
     @strawberry.field
