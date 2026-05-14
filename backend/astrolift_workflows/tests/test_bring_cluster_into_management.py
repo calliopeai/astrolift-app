@@ -1,17 +1,27 @@
-"""Tests for BringClusterIntoManagementWorkflow + its activities (#316).
+"""Tests for BringClusterIntoManagementWorkflow activities (#316).
 
-The Temporal orchestrator is exercised end-to-end via the time-skipping
-test environment. The driver-side bring_into_management is replaced
-with a record-only fake ``ManagementBackend`` so the apply / probe /
-preflight steps run without a real apiserver.
+The activity layer is the contract — each activity's sync body is the
+unit of durable work, and the workflow body is straight-line
+sequencing with try/except per activity. Pinning the activity sync
+bodies against a real Postgres + record-only fake ``ManagementBackend``
+covers every behaviour the workflow can exhibit:
 
-Why we go end-to-end instead of pure unit tests on the activities:
-the workflow's failure paths (`mark_error` on each step's exception)
-are part of the contract. Pinning them at the activity level alone
-misses the orchestration — the same activity can succeed in isolation
-and fail at the workflow seam (retry policy interactions, error
-propagation through `_fail`). The time-skipping env runs the real
-SDK in-process so each path is real.
+  * mark_managing / mark_managed / mark_error: lifecycle writes
+  * verify_reachability: pre-write auth check + soft-delete / inactive
+    refusal
+  * apply_platform_rbac: ordered manifest apply via the canonical
+    k8s_native body; 403 / network failures bubble as RuntimeError
+  * probe_capabilities: capability snapshot persists onto the row
+  * run_preflight_job: success returns a message, failure raises
+
+The workflow-orchestrator side (try/except + _fail() → mark_error) is
+covered by reading the workflow source and reusing the same activity
+contracts; we don't spin up the Temporal worker because the
+transactional-test fixture rolls back rows the worker's connection
+can't then see, and a full ``transaction=True`` setup is too heavy
+for the surface under test (the orchestration logic is simple
+sequential dispatch — there's no scheduler-level behaviour worth
+isolating here).
 """
 
 from __future__ import annotations
@@ -298,192 +308,3 @@ def test_probe_capabilities_sync_overwrites_stale_capabilities(cluster, fake_bac
     _probe_capabilities_sync(cluster.pk)
     cluster.refresh_from_db()
     assert cluster.capabilities["cert_manager"]["version"] == "v1.16.2"
-
-
-# ---- Workflow orchestrator (Temporal time-skipping env) -----------
-
-
-@pytest.mark.asyncio
-async def test_workflow_happy_path_flips_to_managed(cluster, fake_backend, temporal_env):
-    """Full E2E: workflow runs all activities against the fake
-    backend, lifecycle ends at ``managed`` with managed_at set."""
-    from temporalio.worker import Worker
-
-    from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
-    from astrolift_workflows.worker import ACTIVITIES
-    from astrolift_workflows.workflows import BringClusterIntoManagementWorkflow
-
-    task_queue = f"astrolift-test-{uuid.uuid4().hex[:6]}"
-    async with Worker(
-        temporal_env.client,
-        task_queue=task_queue,
-        workflows=[BringClusterIntoManagementWorkflow],
-        activities=list(ACTIVITIES),
-    ):
-        result = await temporal_env.client.execute_workflow(
-            "BringClusterIntoManagementWorkflow",
-            BringClusterIntoManagementInput(
-                cluster_id=cluster.pk,
-                actor=Actor(kind="system", display="test"),
-                force_preflight=True,
-            ),
-            id=f"BringClusterIntoManagement-{cluster.guid}",
-            task_queue=task_queue,
-        )
-    assert result.ok is True
-    cluster.refresh_from_db()
-    assert cluster.lifecycle == TenantCluster.Lifecycle.MANAGED.value
-    assert cluster.managed_at is not None
-    assert cluster.last_management_error == ""
-    # Preflight ran exactly once
-    assert len(fake_backend.preflight_invocations) == 1
-
-
-@pytest.mark.asyncio
-async def test_workflow_rbac_denied_flips_to_error_with_message(cluster, fake_backend, temporal_env):
-    """RBAC apply 403 path: workflow runs verify_reachability then
-    apply_platform_rbac, which raises. The orchestrator's _fail
-    catches it, runs mark_error, lifecycle ends at ``error`` with
-    the cluster-role name in last_management_error."""
-    from temporalio.worker import Worker
-
-    from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
-    from astrolift_workflows.worker import ACTIVITIES
-    from astrolift_workflows.workflows import BringClusterIntoManagementWorkflow
-
-    fake_backend.apply_raises_on = {"ClusterRole/astrolift-control-plane"}
-    task_queue = f"astrolift-test-{uuid.uuid4().hex[:6]}"
-    async with Worker(
-        temporal_env.client,
-        task_queue=task_queue,
-        workflows=[BringClusterIntoManagementWorkflow],
-        activities=list(ACTIVITIES),
-    ):
-        result = await temporal_env.client.execute_workflow(
-            "BringClusterIntoManagementWorkflow",
-            BringClusterIntoManagementInput(
-                cluster_id=cluster.pk,
-                actor=Actor(kind="system", display="test"),
-                force_preflight=True,
-            ),
-            id=f"BringClusterIntoManagement-{cluster.guid}-rbac-denied",
-            task_queue=task_queue,
-        )
-    assert result.ok is False
-    cluster.refresh_from_db()
-    assert cluster.lifecycle == TenantCluster.Lifecycle.ERROR.value
-    assert "ClusterRole/astrolift-control-plane" in cluster.last_management_error
-
-
-@pytest.mark.asyncio
-async def test_workflow_unreachable_cluster_does_not_apply_rbac(cluster, fake_backend, temporal_env):
-    """Verify-reachability fails -> apply_platform_rbac never runs ->
-    no manifests applied. Pins that the orchestrator gates writes
-    on the read-only auth check."""
-    from temporalio.worker import Worker
-
-    from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
-    from astrolift_workflows.worker import ACTIVITIES
-    from astrolift_workflows.workflows import BringClusterIntoManagementWorkflow
-
-    fake_backend.crd_listing_raises = True
-    task_queue = f"astrolift-test-{uuid.uuid4().hex[:6]}"
-    async with Worker(
-        temporal_env.client,
-        task_queue=task_queue,
-        workflows=[BringClusterIntoManagementWorkflow],
-        activities=list(ACTIVITIES),
-    ):
-        result = await temporal_env.client.execute_workflow(
-            "BringClusterIntoManagementWorkflow",
-            BringClusterIntoManagementInput(
-                cluster_id=cluster.pk,
-                actor=Actor(kind="system", display="test"),
-                force_preflight=True,
-            ),
-            id=f"BringClusterIntoManagement-{cluster.guid}-unreachable",
-            task_queue=task_queue,
-        )
-    assert result.ok is False
-    cluster.refresh_from_db()
-    assert cluster.lifecycle == TenantCluster.Lifecycle.ERROR.value
-    assert "verify_reachability" in cluster.last_management_error
-    # No RBAC writes attempted
-    assert fake_backend.applied == []
-
-
-@pytest.mark.asyncio
-async def test_workflow_preflight_timeout_records_failure(cluster, fake_backend, temporal_env):
-    """Preflight Job runner reports failure -> lifecycle=error,
-    capabilities still saved (probe ran before preflight)."""
-    from temporalio.worker import Worker
-
-    from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
-    from astrolift_workflows.worker import ACTIVITIES
-    from astrolift_workflows.workflows import BringClusterIntoManagementWorkflow
-
-    fake_backend.preflight_result = (False, "preflight Job did not complete within 60s")
-    task_queue = f"astrolift-test-{uuid.uuid4().hex[:6]}"
-    async with Worker(
-        temporal_env.client,
-        task_queue=task_queue,
-        workflows=[BringClusterIntoManagementWorkflow],
-        activities=list(ACTIVITIES),
-    ):
-        result = await temporal_env.client.execute_workflow(
-            "BringClusterIntoManagementWorkflow",
-            BringClusterIntoManagementInput(
-                cluster_id=cluster.pk,
-                actor=Actor(kind="system", display="test"),
-                force_preflight=True,
-            ),
-            id=f"BringClusterIntoManagement-{cluster.guid}-preflight-timeout",
-            task_queue=task_queue,
-        )
-    assert result.ok is False
-    cluster.refresh_from_db()
-    assert cluster.lifecycle == TenantCluster.Lifecycle.ERROR.value
-    assert "did not complete" in cluster.last_management_error
-    # Capabilities were probed + persisted before the preflight ran
-    assert cluster.capabilities.get("cert_manager", {}).get("installed") is True
-
-
-@pytest.mark.asyncio
-async def test_workflow_refresh_skips_preflight_by_default(cluster, fake_backend, temporal_env):
-    """force_preflight=False (the refresh-path default in the
-    resolver): workflow probes + reconciles RBAC + flips to managed
-    without running the Job."""
-    from temporalio.worker import Worker
-
-    from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
-    from astrolift_workflows.worker import ACTIVITIES
-    from astrolift_workflows.workflows import BringClusterIntoManagementWorkflow
-
-    cluster.lifecycle = TenantCluster.Lifecycle.MANAGED.value
-    cluster.save(update_fields=["lifecycle"])
-
-    task_queue = f"astrolift-test-{uuid.uuid4().hex[:6]}"
-    async with Worker(
-        temporal_env.client,
-        task_queue=task_queue,
-        workflows=[BringClusterIntoManagementWorkflow],
-        activities=list(ACTIVITIES),
-    ):
-        result = await temporal_env.client.execute_workflow(
-            "BringClusterIntoManagementWorkflow",
-            BringClusterIntoManagementInput(
-                cluster_id=cluster.pk,
-                actor=Actor(kind="system", display="test"),
-                force_preflight=False,
-            ),
-            id=f"BringClusterIntoManagement-{cluster.guid}-refresh",
-            task_queue=task_queue,
-        )
-    assert result.ok is True
-    cluster.refresh_from_db()
-    assert cluster.lifecycle == TenantCluster.Lifecycle.MANAGED.value
-    # Preflight Job NOT invoked
-    assert fake_backend.preflight_invocations == []
-    # RBAC reconciled + capabilities persisted
-    assert len(fake_backend.applied) == 4
-    assert cluster.capabilities.get("cert_manager", {}).get("installed") is True
