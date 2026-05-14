@@ -62,6 +62,10 @@ websockets = "*"
 # Used by the manifest auto-discoverer (#119) to serialise the
 # inferred manifest dict into a TOML string for the UI / SCM PR.
 tomli-w = "*"
+# Kubernetes Python client — backs the runtime observability surface
+# (astroliftAppPods + onAppLog) by talking to each tenant cluster's
+# apiserver. Lazy-imported in core.k8s; tests stub the adapter.
+kubernetes = ">=29.0.0"
 
 [dev-packages]
 django-debug-toolbar = "*"
