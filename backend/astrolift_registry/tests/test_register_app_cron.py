@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations import (
@@ -41,6 +42,29 @@ def _scaffold():
         team=team,
         name="Demo",
         slug="demo",
+    )
+    # register_app requires at least one active cluster in the org
+    # (#315). bulk_create the plugin to dodge BaseCoreModel.save's
+    # numeric ``version`` collision with the CharField on the model.
+    [plugin] = ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="Local",
+                slug="local",
+                capabilities_manifest={},
+                config_schema={},
+            )
+        ]
+    )
+    TenantCluster.objects.create(
+        organization=org,
+        name="local",
+        slug="local",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
     )
     return org, project
 

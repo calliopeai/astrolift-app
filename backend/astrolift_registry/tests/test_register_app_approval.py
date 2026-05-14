@@ -46,8 +46,11 @@ def actor():
 
 
 @pytest.fixture
-def org():
-    return Organization.objects.create(name="Acme", slug="acme-approval")
+def org(seed_cluster):
+    org = Organization.objects.create(name="Acme", slug="acme-approval")
+    # register_app requires at least one active cluster in the org (#315).
+    seed_cluster(org, slug="approval")
+    return org
 
 
 @pytest.fixture
