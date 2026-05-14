@@ -30,6 +30,12 @@ const SIDEBAR_WIDTH = "18rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const SIDEBAR_WIDTH_STORAGE_KEY = "astrolift:sidebar-width";
+// Constraints on the operator-resized width. Below 14rem the nested
+// app rows become unreadable; above 32rem the sidebar starts eating
+// the main content area on smaller displays.
+const SIDEBAR_WIDTH_MIN_PX = 224; // 14rem
+const SIDEBAR_WIDTH_MAX_PX = 512; // 32rem
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -39,6 +45,12 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  // Operator-controlled width override. ``null`` = use SIDEBAR_WIDTH
+  // default; any other string is a CSS length consumed as
+  // ``--sidebar-width``. Persisted to localStorage so the value
+  // survives a page reload.
+  width: string | null;
+  setWidth: (next: string | null) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -67,6 +79,34 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+
+  // Persisted width override. localStorage so it survives reloads;
+  // hydration-safe lazy init so SSR renders with the default width
+  // and the client picks up the override on first effect.
+  const [width, _setWidth] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      if (stored) {
+        _setWidth(stored);
+      }
+    } catch {
+      // localStorage may be unavailable (incognito, SSR straggler) —
+      // fall through to the default width.
+    }
+  }, []);
+  const setWidth = React.useCallback((next: string | null) => {
+    _setWidth(next);
+    try {
+      if (next == null) {
+        window.localStorage.removeItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, next);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -118,8 +158,10 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      width,
+      setWidth,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width, setWidth]
   );
 
   return (
@@ -128,7 +170,7 @@ function SidebarProvider({
         data-slot="sidebar-wrapper"
         style={
           {
-            "--sidebar-width": SIDEBAR_WIDTH,
+            "--sidebar-width": width ?? SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
@@ -242,8 +284,80 @@ function Sidebar({
         >
           {children}
         </div>
+        {/* Drag handle on the trailing edge — operators grab this to
+            resize the sidebar. Hidden when collapsed because there's
+            nothing to widen. */}
+        {collapsible !== "none" ? <SidebarResizeHandle side={side} /> : null}
       </div>
     </div>
+  );
+}
+
+function SidebarResizeHandle({ side }: { side: "left" | "right" }) {
+  const { setWidth, state } = useSidebar();
+  const draggingRef = React.useRef(false);
+
+  const onPointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (state !== "expanded") return;
+      e.preventDefault();
+      draggingRef.current = true;
+      // Capture so pointer-move fires even when the cursor leaves the
+      // handle's bounding box (which happens immediately during a drag).
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [state],
+  );
+
+  const onPointerMove = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!draggingRef.current) return;
+      // For a left-side sidebar the new width is the pointer's X.
+      // For a right-side sidebar it's the viewport width minus X.
+      const raw = side === "left" ? e.clientX : window.innerWidth - e.clientX;
+      const clamped = Math.max(SIDEBAR_WIDTH_MIN_PX, Math.min(SIDEBAR_WIDTH_MAX_PX, raw));
+      setWidth(`${clamped}px`);
+    },
+    [side, setWidth],
+  );
+
+  const onPointerUp = React.useCallback(() => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
+
+  const onDoubleClick = React.useCallback(() => {
+    // Snap back to the design default — quick recovery when an
+    // operator drags too far in either direction.
+    setWidth(null);
+  }, [setWidth]);
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize sidebar (double-click to reset)"
+      title="Drag to resize · double-click to reset"
+      data-slot="sidebar-resize-handle"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onDoubleClick={onDoubleClick}
+      className={cn(
+        // Pinned to the trailing edge of the fixed sidebar container.
+        // Thin (4px wide invisible hit target with a 1px visible line
+        // that highlights on hover) so it never visually competes
+        // with the sidebar contents but is easy enough to grab.
+        "group/handle absolute top-0 z-20 h-full w-1 cursor-col-resize touch-none transition-colors",
+        side === "left" ? "right-0" : "left-0",
+        "hover:bg-sidebar-border/40 group-data-[state=collapsed]:hidden",
+      )}
+    />
   );
 }
 
