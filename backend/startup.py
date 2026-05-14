@@ -59,6 +59,11 @@ ON_STARTUP = [
     # is upsert-style and reads from the in-process plugin registry that
     # AstroliftClustersConfig.ready() populated; safe to run on every boot.
     "bootstrap_provider_plugins",
+    # Optional first-cluster seed. Silent no-op when ASTROLIFT_CLUSTER_SLUG
+    # is unset; auto-discovers EKS values when ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS
+    # is truthy. Lets operators register their first cluster at deploy time
+    # rather than clicking through the UI form before the dashboard works.
+    "register_tenant_cluster",
 ]
 
 logger.warning("[STARTUP] Running startup... ==================================")
