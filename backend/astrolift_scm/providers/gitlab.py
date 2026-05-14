@@ -243,3 +243,203 @@ def fetch_gitlab_file(
         raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}") from exc
     except urllib.error.URLError as exc:
         raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class GitlabPutFileResult:
+    commit_sha: str
+    file_path: str
+    web_url: str
+
+
+def _gitlab_files_url(base: str, repo_full_name: str, path: str) -> str:
+    project_path = urllib.parse.quote(repo_full_name, safe="")
+    file_path_q = urllib.parse.quote(path, safe="")
+    return f"{base}/api/v4/projects/{project_path}/repository/files/{file_path_q}"
+
+
+def _gitlab_file_exists(
+    *,
+    token: str,
+    base: str,
+    repo_full_name: str,
+    path: str,
+    branch: str,
+) -> bool:
+    """HEAD-equivalent: GitLab's metadata endpoint returns 200 when the
+    file exists on ``branch`` and 404 when it doesn't. We use this to
+    pick POST (create) vs PUT (update); GitLab's API rejects POST on an
+    existing path with 400, so guessing is not optional."""
+    url = f"{_gitlab_files_url(base, repo_full_name, path)}?ref={urllib.parse.quote(branch)}"
+    req = urllib.request.Request(
+        url,
+        method="HEAD",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return 200 <= resp.status < 300
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+
+def put_gitlab_file(
+    connection,
+    *,
+    repo_full_name: str,
+    path: str,
+    branch: str,
+    content: str,
+    commit_message: str,
+) -> GitlabPutFileResult:
+    """Create or update a single file at ``path`` on ``branch`` via
+    GitLab's repository-files API.
+
+    POST creates, PUT updates; trying POST against an existing path
+    400s. We HEAD first to pick the method, then issue the write.
+
+    GitLab's response carries ``file_path`` and ``branch`` but *not*
+    a commit SHA, so we follow up with a single GET against the
+    branch's commit head to surface the SHA we just produced. That
+    matches what an operator would see in the GitLab UI right after
+    the commit."""
+    token = _token(connection)
+    base = _api_base(connection)
+
+    exists = _gitlab_file_exists(
+        token=token,
+        base=base,
+        repo_full_name=repo_full_name,
+        path=path,
+        branch=branch,
+    )
+
+    body = json.dumps(
+        {
+            "branch": branch,
+            "content": content,
+            "commit_message": commit_message,
+            "encoding": "text",
+        }
+    ).encode("utf-8")
+    method = "PUT" if exists else "POST"
+
+    url = _gitlab_files_url(base, repo_full_name, path)
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GitlabProviderError(
+                "NOT_FOUND",
+                f"GitLab couldn't find {repo_full_name}@{branch}. Check the connection's project access.",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError(
+            "API_ERROR",
+            f"GitLab returned {exc.code}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+    file_path = (payload or {}).get("file_path") or path
+    commit_sha = _gitlab_branch_head_sha(
+        token=token,
+        base=base,
+        repo_full_name=repo_full_name,
+        branch=branch,
+    )
+    web_url = _gitlab_blob_url(
+        base=base,
+        repo_full_name=repo_full_name,
+        branch=branch,
+        file_path=file_path,
+    )
+    return GitlabPutFileResult(commit_sha=commit_sha, file_path=file_path, web_url=web_url)
+
+
+def _gitlab_branch_head_sha(
+    *,
+    token: str,
+    base: str,
+    repo_full_name: str,
+    branch: str,
+) -> str:
+    project_path = urllib.parse.quote(repo_full_name, safe="")
+    branch_q = urllib.parse.quote(branch, safe="")
+    url = f"{base}/api/v4/projects/{project_path}/repository/branches/{branch_q}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+    commit = (payload or {}).get("commit") or {}
+    sha = commit.get("id") or ""
+    if not sha:
+        raise GitlabProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitLab branch response didn't include commit.id",
+        )
+    return sha
+
+
+def _gitlab_blob_url(*, base: str, repo_full_name: str, branch: str, file_path: str) -> str:
+    """Best-effort blob URL for ``file_path`` on ``branch``. GitLab's
+    file endpoint doesn't return a web URL; we synthesize one from the
+    API base. For SaaS gitlab.com the API host doubles as the web host;
+    self-hosted installs that split the two will need an override on
+    the connection (out of scope for this issue)."""
+    project = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/"))
+    safe_path = "/".join(urllib.parse.quote(p, safe="") for p in file_path.split("/"))
+    return f"{base}/{project}/-/blob/{urllib.parse.quote(branch)}/{safe_path}"
