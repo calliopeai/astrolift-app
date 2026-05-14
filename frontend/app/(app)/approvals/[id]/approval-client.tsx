@@ -64,6 +64,8 @@ export function ApprovalClient({ id }: { id: string }) {
     refetchQueries: [{ query: GET_DEPLOYMENT, variables: { id } }],
   });
 
+  const [confirmApprove, setConfirmApprove] = React.useState(false);
+
   if (loading && !d) {
     return (
       <PageShell title="Approve deployment" description="Loading…">
@@ -101,8 +103,6 @@ export function ApprovalClient({ id }: { id: string }) {
     d.status === "rolled_back" ||
     d.status === "superseded";
   const failed = d.status === "failed";
-
-  const [confirmApprove, setConfirmApprove] = React.useState(false);
 
   async function handleApprove() {
     const { data: result } = await approve({
