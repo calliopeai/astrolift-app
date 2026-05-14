@@ -120,6 +120,39 @@ def _decrypt_client_secret(config: SourceConnection) -> str:
     return plaintext.decode("utf-8")
 
 
+def _resolve_client_secret(config: SourceConnection) -> str:
+    """Decrypt the user-to-server OAuth client_secret for ``config``.
+
+    The column the secret lives in is kind-dependent:
+
+      - ``github_oauth_app`` / ``gitlab_oauth_app`` / other classic OAuth
+        Apps: the OAuth client_secret IS the row's only secret, so it
+        lives in ``secret_ciphertext``.
+      - ``github_app_install``: ``secret_ciphertext`` holds the App's
+        RSA PEM (used to mint installation tokens). The user-to-server
+        OAuth ``client_secret`` lives in
+        ``oauth_client_secret_ciphertext`` — populated by the manifest
+        exchange in ``scm_app_manifest.github_app_manifest_callback``.
+
+    For ``github_app_install`` rows we do NOT fall back to
+    ``secret_ciphertext`` if the OAuth column is empty: that column
+    holds the PEM, and silently sending the PEM to GitHub as a
+    client_secret would be a confusing leak. The caller should treat
+    the empty-string return as "operator must re-register the App".
+    """
+    if config.kind == "github_app_install":
+        if not config.oauth_client_secret_ciphertext:
+            return ""
+        plaintext = decrypt(
+            EncryptedSecret(
+                backend_kind=config.oauth_client_secret_backend_kind,
+                backend_ref=bytes(config.oauth_client_secret_ciphertext),
+            )
+        )
+        return plaintext.decode("utf-8")
+    return _decrypt_client_secret(config)
+
+
 def _store_pending_state(
     request: HttpRequest,
     *,
@@ -267,7 +300,16 @@ def github_callback(request: HttpRequest) -> Any:
     if org_id is None or org_id != config.organization_id:
         return _redirect_with_error(return_to, "org_mismatch")
 
-    client_secret = _decrypt_client_secret(config)
+    try:
+        client_secret = _resolve_client_secret(config)
+    except RuntimeError:
+        # github_app_install row registered before the OAuth column
+        # existed, or before the manifest flow learned to persist the
+        # client_secret. Operator must re-register the App.
+        return _redirect_with_error(return_to, "config_missing_oauth_secret")
+    if not client_secret:
+        return _redirect_with_error(return_to, "config_missing_oauth_secret")
+
     access_token, err = _resolve_user_token_via_post(
         GITHUB_TOKEN_EXCHANGE,
         {
