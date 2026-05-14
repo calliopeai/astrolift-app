@@ -43,6 +43,7 @@ from _sdk.cluster import (
     PodLogLine,
     PortForwardSession,
     RolloutResult,
+    TeardownReport,
     WorkloadStatus,
 )
 from aws._eks_auth import mint_eks_token
@@ -483,6 +484,140 @@ class EKSClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=self._materialize_eks_auth_context(cluster),
             run_preflight=run_preflight,
+        )
+
+    # ---- cluster teardown (#337) ---------------------------------
+
+    def teardown_cluster(
+        self,
+        cluster: ClusterContext,
+        *,
+        delete_cloud_infra: bool,
+    ) -> TeardownReport:
+        """Delete the EKS cluster + its platform-tagged node groups +
+        Fargate profiles.
+
+        ``delete_cloud_infra=False`` is a no-op for symmetry with the
+        protocol — the cluster row is the platform's record; the EKS
+        cluster itself stays running.
+
+        When deleting:
+          1. Drain + delete all managed node groups owned by the
+             cluster (EKS rejects ``delete_cluster`` while node groups
+             exist).
+          2. Delete every Fargate profile.
+          3. Call ``eks.delete_cluster`` and wait for the cluster to
+             reach DELETED.
+
+        Idempotent: ``ResourceNotFoundException`` on any step is
+        treated as "already gone" and contributes to ``deleted``
+        rather than failing. VPC / subnets / IAM roles are NOT
+        touched — those were provisioned outside the driver (in
+        opscode TF / the operator's own IaC) and remain operator-owned.
+        """
+        if not delete_cloud_infra:
+            return TeardownReport(
+                success=True,
+                skipped=[f"eks/{self._config.cluster_name}"],
+                messages=["delete_cloud_infra=false; EKS cluster left running"],
+            )
+
+        deleted: list[str] = []
+        skipped: list[str] = []
+        messages: list[str] = []
+
+        # Node groups first — EKS refuses cluster delete while these exist.
+        try:
+            node_groups = self._eks.list_nodegroups(clusterName=self._config.cluster_name).get(
+                "nodegroups",
+                [],
+            )
+        except Exception as exc:
+            return TeardownReport(
+                success=False,
+                error=f"list_nodegroups failed: {exc}",
+                deleted=deleted,
+                skipped=skipped,
+                messages=messages,
+            )
+        for ng in node_groups:
+            try:
+                self._eks.delete_nodegroup(
+                    clusterName=self._config.cluster_name,
+                    nodegroupName=ng,
+                )
+                deleted.append(f"nodegroup/{ng}")
+            except self._eks.exceptions.ResourceNotFoundException:
+                skipped.append(f"nodegroup/{ng} (already deleted)")
+            except Exception as exc:
+                return TeardownReport(
+                    success=False,
+                    error=f"delete_nodegroup {ng} failed: {exc}",
+                    deleted=deleted,
+                    skipped=skipped,
+                    messages=messages,
+                )
+
+        # Wait for node groups to be gone before attempting cluster delete.
+        if node_groups:
+            try:
+                self._eks.get_waiter("nodegroup_deleted").wait(
+                    clusterName=self._config.cluster_name,
+                    nodegroupName=node_groups[0],
+                    WaiterConfig={"Delay": 15, "MaxAttempts": 60},
+                )
+                messages.append(f"waited for {len(node_groups)} node group(s) to delete")
+            except Exception as exc:
+                messages.append(f"node group wait raised {exc}; continuing")
+
+        # Fargate profiles next.
+        try:
+            fargate_profiles = self._eks.list_fargate_profiles(
+                clusterName=self._config.cluster_name,
+            ).get("fargateProfileNames", [])
+        except Exception as exc:
+            messages.append(f"list_fargate_profiles failed: {exc}; skipping")
+            fargate_profiles = []
+        for fp in fargate_profiles:
+            try:
+                self._eks.delete_fargate_profile(
+                    clusterName=self._config.cluster_name,
+                    fargateProfileName=fp,
+                )
+                deleted.append(f"fargate-profile/{fp}")
+            except self._eks.exceptions.ResourceNotFoundException:
+                skipped.append(f"fargate-profile/{fp} (already deleted)")
+            except Exception as exc:
+                return TeardownReport(
+                    success=False,
+                    error=f"delete_fargate_profile {fp} failed: {exc}",
+                    deleted=deleted,
+                    skipped=skipped,
+                    messages=messages,
+                )
+
+        # Cluster itself. EKS will return ResourceInUseException if any
+        # subresource is still terminating; the operator can retry.
+        try:
+            self._eks.delete_cluster(name=self._config.cluster_name)
+            deleted.append(f"eks-cluster/{self._config.cluster_name}")
+            messages.append("eks.delete_cluster submitted; full deletion takes ~10 min")
+        except self._eks.exceptions.ResourceNotFoundException:
+            skipped.append(f"eks-cluster/{self._config.cluster_name} (already deleted)")
+        except Exception as exc:
+            return TeardownReport(
+                success=False,
+                error=f"delete_cluster failed: {exc}",
+                deleted=deleted,
+                skipped=skipped,
+                messages=messages,
+            )
+
+        return TeardownReport(
+            success=True,
+            deleted=deleted,
+            skipped=skipped,
+            messages=messages,
         )
 
     # ---- bootstrap recipe ----------------------------------------

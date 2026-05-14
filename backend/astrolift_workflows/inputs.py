@@ -102,10 +102,20 @@ class DecommissionClusterInput:
     is bound to the cluster — operators must migrate or delete those
     envs first. The decommissioned terminal state preserves the row
     for audit; the cluster is not deploy-eligible from that point.
+
+    ``delete_cloud_infra`` is the explicit opt-in for the destructive
+    half of decommission. When False (default) the workflow only
+    removes the platform RBAC bundle from the cluster — the cluster
+    itself keeps running and is operator-owned. When True the
+    workflow ALSO calls into the driver's ``teardown_cluster`` which
+    deletes the EKS / GKE / AKS managed cluster (bare-metal stays an
+    operator concern). UI surfaces this as a separate confirmation
+    checkbox so the destructive path can't be triggered accidentally.
     """
 
     cluster_id: int
     actor: Actor
+    delete_cloud_infra: bool = False
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

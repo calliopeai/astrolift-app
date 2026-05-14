@@ -180,11 +180,56 @@ def probe_cluster_capabilities_dispatch(
     return driver.probe_capabilities(ctx)
 
 
+def teardown_cluster_dispatch(*, cluster: TenantCluster, delete_cloud_infra: bool) -> Any:
+    """Run the driver's ``teardown_cluster`` against ``cluster``.
+
+    Returns the driver's ``TeardownReport``. Raises
+    :class:`ClusterManagementError` when the driver can't be
+    constructed (plugin missing, auth invalid, ...). When the driver
+    returns ``success=False`` with a non-empty ``error``, the workflow
+    layer flips the row to error lifecycle and surfaces the message.
+    Drivers handle "already gone" idempotently; the activity does NOT
+    treat that as failure.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "teardown_cluster"):
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver does not implement teardown_cluster",
+        )
+    ctx = _context_for_cluster(cluster)
+    return driver.teardown_cluster(ctx, delete_cloud_infra=delete_cloud_infra)
+
+
+def bootstrap_components_dispatch(*, cluster: TenantCluster) -> list[Any]:
+    """Return the driver's bootstrap recipe for ``cluster``.
+
+    Read-only — no cluster API calls; the recipe is a static
+    declaration each driver provides. Returns a list of
+    ``BootstrapComponent`` dataclasses (from ``_sdk.cluster``); the
+    resolver layer converts them to GraphQL types. Falls back to an
+    empty list when the driver doesn't implement
+    ``bootstrap_components`` (older providers); the UI renders
+    "no recipe available for this provider" rather than crashing.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "bootstrap_components"):
+        return []
+    ctx = _context_for_cluster(cluster)
+    try:
+        return list(driver.bootstrap_components(ctx))
+    except Exception as exc:
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver bootstrap_components raised {exc}",
+        ) from exc
+
+
 __all__ = [
     "ClusterManagementError",
     "ClusterObservabilityError",  # re-exported so callers have one import
+    "bootstrap_components_dispatch",
     "bring_cluster_into_management",
     "probe_cluster_capabilities_dispatch",
     "reset_management_backend_for_tests",
     "set_management_backend_for_tests",
+    "teardown_cluster_dispatch",
 ]

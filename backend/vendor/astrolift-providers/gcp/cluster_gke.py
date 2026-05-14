@@ -26,6 +26,7 @@ from _sdk.cluster import (
     PodInfo,
     PodLogLine,
     RolloutResult,
+    TeardownReport,
     WorkloadStatus,
 )
 from gcp._errors import NotFoundError, map_api_error
@@ -356,6 +357,59 @@ class GKEClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=cluster,
             run_preflight=run_preflight,
+        )
+
+    # ---- cluster teardown (#337) ---------------------------------
+
+    def teardown_cluster(
+        self,
+        cluster: ClusterContext,
+        *,
+        delete_cloud_infra: bool,
+    ) -> TeardownReport:
+        """Delete the GKE cluster + its node pools.
+
+        ``delete_cloud_infra=False`` is a no-op for symmetry with the
+        protocol — the cluster row is the platform's record; the GKE
+        cluster itself stays running.
+
+        When deleting, calls ``container.delete_cluster`` (which
+        cascade-deletes node pools, persistent disks tagged with the
+        cluster's autopilot/standard tag, etc.). VPC / subnets / IAM
+        bindings are operator-owned and stay.
+
+        Idempotent: a ``404`` on cluster lookup is treated as "already
+        gone".
+        """
+        if not delete_cloud_infra:
+            return TeardownReport(
+                success=True,
+                skipped=[f"gke/{self._config.cluster_name}"],
+                messages=["delete_cloud_infra=false; GKE cluster left running"],
+            )
+        cluster_ref = (
+            f"projects/{self._config.project_id}/locations/{self._config.location}/clusters/{self._config.cluster_name}"
+        )
+        try:
+            self._container.delete_cluster(name=cluster_ref)
+        except NotFoundError:
+            return TeardownReport(
+                success=True,
+                skipped=[f"gke-cluster/{self._config.cluster_name} (already deleted)"],
+                messages=["GKE cluster lookup returned 404 — already gone"],
+            )
+        except Exception as exc:
+            return TeardownReport(
+                success=False,
+                error=f"container.delete_cluster failed: {map_api_error(exc)}",
+            )
+        return TeardownReport(
+            success=True,
+            deleted=[f"gke-cluster/{self._config.cluster_name}"],
+            messages=[
+                "container.delete_cluster submitted; node pools + tagged PDs "
+                "cascade-delete; full deletion typically completes in 5-10 min",
+            ],
         )
 
     # ---- bootstrap recipe ----------------------------------------
