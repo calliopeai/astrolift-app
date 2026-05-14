@@ -24,11 +24,11 @@ import { ReviewSubmitStep, type SideEffectStep } from "./steps/ReviewSubmitStep"
 // Step shape — five steps plus a virtual "0" we never render.
 type StepNumber = 1 | 2 | 3 | 4 | 5;
 
-// Wizard-side trigger superset. The backend's `RegisterAppInput`
-// currently only carries `auto_on_push | manual | external_ci`; `cron`
-// is captured here but is informational until the backend exposes
-// scheduled triggers (see follow-up issue noted in ReviewSubmitStep).
-export type WizardTriggerMode = TriggerMode | "cron";
+// Wizard-side trigger mode. Mirrors the backend's `RegisterAppInput`
+// values — `cron` is persisted alongside a five-field expression
+// (see #290). Kept as its own alias so step components can import
+// the union without reaching for the full registry type module.
+export type WizardTriggerMode = TriggerMode;
 
 export interface WizardState {
   step: StepNumber;
@@ -203,14 +203,6 @@ export function WizardClient() {
     setSubmitting(true);
     setSubmitError(null);
 
-    // The backend only knows about `auto_on_push | manual | external_ci`.
-    // `cron` and approval flags are captured for future use; for now we
-    // submit `manual` if the operator chose `cron`, so the app is at
-    // least registered and the operator can wire the schedule via the
-    // detail page once that mutation lands.
-    const submittedTriggerMode: TriggerMode =
-      state.triggerMode === "cron" ? "manual" : state.triggerMode;
-
     const plan: SideEffectStep[] = [
       { key: "register", label: "Register app", status: "pending" },
       {
@@ -251,7 +243,9 @@ export function WizardClient() {
             manifestRaw: state.manifestRaw.trim() || null,
             defaultBranch: state.defaultBranch.trim() || "main",
             deployBranch: state.deployBranch.trim() || "main",
-            triggerMode: submittedTriggerMode,
+            triggerMode: state.triggerMode,
+            cronExpression:
+              state.triggerMode === "cron" ? state.cronExpression.trim() : null,
           },
         },
       });

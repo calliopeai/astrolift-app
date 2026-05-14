@@ -25,6 +25,7 @@ const APP_FIELDS = `
   previewMaxActive
   previewEnabled
   triggerMode
+  cronExpression
   deployBranch
   previewScreenshotUrl
   rawManifest

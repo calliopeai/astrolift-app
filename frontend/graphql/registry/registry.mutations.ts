@@ -42,6 +42,7 @@ export const UPDATE_APP = gql`
         defaultBranch
         deployBranch
         triggerMode
+        cronExpression
         previewEnabled
         isActive
       }

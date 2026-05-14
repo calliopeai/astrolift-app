@@ -2,6 +2,7 @@
 
 import { useMutation } from "@apollo/client/react";
 import {
+  ClockIcon,
   GitBranchIcon,
   HandIcon,
   Loader2Icon,
@@ -47,6 +48,11 @@ const MODE_META: Record<
     label: "External CI",
     icon: ServerCogIcon,
     hint: "Your CI calls Astrolift with a deploy token. No webhook.",
+  },
+  cron: {
+    label: "Cron schedule",
+    icon: ClockIcon,
+    hint: "Deploys run on a recurring schedule defined by the cron expression.",
   },
 };
 
@@ -119,6 +125,7 @@ function EditStrategySheet({
   const [triggerMode, setTriggerMode] = useState<TriggerMode>(app.triggerMode);
   const [deployBranch, setDeployBranch] = useState(app.deployBranch || app.defaultBranch);
   const [previewEnabled, setPreviewEnabled] = useState(app.previewEnabled);
+  const [cronExpression, setCronExpression] = useState(app.cronExpression || "");
 
   const [save, { loading }] = useMutation<UpdateResp>(UPDATE_APP, {
     refetchQueries: [{ query: GET_APP, variables: { slug: app.slug } }],
@@ -133,6 +140,11 @@ function EditStrategySheet({
           triggerMode,
           deployBranch: deployBranch.trim() || null,
           previewEnabled,
+          // The backend ignores cron_expression unless mode == 'cron',
+          // and requires it when mode == 'cron'. Send the trimmed value
+          // straight through; validation lives server-side.
+          cronExpression:
+            triggerMode === "cron" ? cronExpression.trim() : null,
         },
       },
     });
@@ -163,10 +175,28 @@ function EditStrategySheet({
               className="border-input bg-background rounded-md border px-2 py-2 text-sm"
             >
               <option value="auto_on_push">Auto on push</option>
+              <option value="cron">Cron schedule</option>
               <option value="manual">Manual only</option>
               <option value="external_ci">External CI</option>
             </select>
           </label>
+
+          {triggerMode === "cron" && (
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-muted-foreground text-xs">Cron expression</span>
+              <input
+                type="text"
+                value={cronExpression}
+                onChange={(e) => setCronExpression(e.target.value)}
+                placeholder="0 6 * * *"
+                className="border-input bg-background rounded-md border px-2 py-2 font-mono text-sm"
+              />
+              <span className="text-muted-foreground text-[11px]">
+                Five fields (minute hour day month weekday). The backend rejects malformed
+                expressions.
+              </span>
+            </label>
+          )}
 
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-muted-foreground text-xs">Deploy branch</span>
