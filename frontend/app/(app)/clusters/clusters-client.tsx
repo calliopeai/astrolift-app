@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -21,10 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  LIST_CLUSTERS,
-  UNREGISTER_TENANT_CLUSTER,
-} from "@/graphql/clusters/clusters.queries";
+import { LIST_CLUSTERS, UNREGISTER_TENANT_CLUSTER } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
@@ -36,6 +34,9 @@ interface Resp {
 
 export function ClustersClient() {
   const [open, setOpen] = React.useState(false);
+  const [unregisterTarget, setUnregisterTarget] = React.useState<AstroliftTenantCluster | null>(
+    null
+  );
   const { data, loading } = useQuery<Resp>(LIST_CLUSTERS);
   const [unregister, { loading: deleting }] = useMutation<{
     unregisterTenantCluster: MutationResult<{ id: string; deleted: boolean }>;
@@ -45,20 +46,11 @@ export function ClustersClient() {
   });
 
   async function handleUnregister(c: AstroliftTenantCluster) {
-    if (
-      !confirm(
-        `Unregister cluster ${c.slug}? Refused if any active app still targets it.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await unregister({ variables: { input: { id: c.id } } });
     if (data?.unregisterTenantCluster.ok) {
       toast.success(`Unregistered ${c.slug}`);
     } else {
-      toast.error(
-        data?.unregisterTenantCluster.errors?.[0]?.message ?? "Failed",
-      );
+      throw new Error(data?.unregisterTenantCluster.errors?.[0]?.message ?? "Failed");
     }
   }
 
@@ -112,28 +104,17 @@ export function ClustersClient() {
                       <StatusDot status={c.isActive ? "ok" : "muted"} />
                     </TableCell>
                     <TableCell>
-                      <a
-                        href={`/clusters/${c.slug}`}
-                        className="hover:underline"
-                      >
+                      <a href={`/clusters/${c.slug}`} className="hover:underline">
                         <div className="font-medium">{c.name}</div>
-                        <div className="text-muted-foreground font-mono text-xs">
-                          {c.slug}
-                        </div>
+                        <div className="text-muted-foreground font-mono text-xs">{c.slug}</div>
                       </a>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{c.providerPluginSlug}</Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {c.region || "—"}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {c.authMethod}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {c.ingressClass}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{c.region || "—"}</TableCell>
+                    <TableCell className="font-mono text-xs">{c.authMethod}</TableCell>
+                    <TableCell className="font-mono text-xs">{c.ingressClass}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {c.capabilitiesProbedAt
                         ? new Date(c.capabilitiesProbedAt).toLocaleString()
@@ -144,7 +125,7 @@ export function ClustersClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleUnregister(c)}
+                          onClick={() => setUnregisterTarget(c)}
                           disabled={deleting}
                         >
                           <Trash2Icon className="size-4" />
@@ -161,6 +142,22 @@ export function ClustersClient() {
       </Card>
 
       <RegisterClusterDialog open={open} onOpenChange={setOpen} />
+
+      <ConfirmDialog
+        open={unregisterTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setUnregisterTarget(null);
+        }}
+        title={
+          unregisterTarget ? `Unregister cluster ${unregisterTarget.slug}?` : "Unregister cluster?"
+        }
+        description="Refused if any active app still targets this cluster. The cluster's kubeconfig and probed capabilities are removed from the control plane."
+        confirmLabel="Unregister"
+        destructive
+        onConfirm={async () => {
+          if (unregisterTarget) await handleUnregister(unregisterTarget);
+        }}
+      />
     </PageShell>
   );
 }

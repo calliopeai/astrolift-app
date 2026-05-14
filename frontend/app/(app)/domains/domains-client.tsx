@@ -5,6 +5,7 @@ import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,7 @@ const defaultForBadge: Record<string, string> = {
 export function DomainsClient() {
   const { data, loading } = useQuery<Resp>(LIST_MANAGED_DOMAINS);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<AstroliftManagedDomain | null>(null);
   const [zone, setZone] = React.useState("");
   const [dnsDriver, setDnsDriver] = React.useState("route53");
   const [defaultFor, setDefaultFor] = React.useState("none");
@@ -107,12 +109,11 @@ export function DomainsClient() {
   }
 
   async function handleDelete(d: AstroliftManagedDomain) {
-    if (!confirm(`Delete managed domain ${d.zone}?`)) return;
     const { data } = await softDelete({ variables: { input: { id: d.id } } });
     if (data?.softDeleteManagedDomain.ok) {
       toast.success(`Deleted ${d.zone}`);
     } else {
-      toast.error(data?.softDeleteManagedDomain.errors?.[0]?.message ?? "Failed");
+      throw new Error(data?.softDeleteManagedDomain.errors?.[0]?.message ?? "Failed");
     }
   }
 
@@ -175,7 +176,7 @@ export function DomainsClient() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDelete(d)}
+                        onClick={() => setDeleteTarget(d)}
                         disabled={deleting}
                       >
                         <Trash2Icon className="size-4" />
@@ -195,8 +196,8 @@ export function DomainsClient() {
           <SheetHeader>
             <SheetTitle>Add managed domain</SheetTitle>
             <SheetDescription>
-              Bind a DNS zone to a DnsDriver. Tenant apps and previews under
-              this zone get records created/updated automatically by the driver.
+              Bind a DNS zone to a DnsDriver. Tenant apps and previews under this zone get records
+              created/updated automatically by the driver.
             </SheetDescription>
           </SheetHeader>
           <form onSubmit={handleCreate} className="flex flex-1 flex-col gap-4 px-4 pb-4">
@@ -258,6 +259,22 @@ export function DomainsClient() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={
+          deleteTarget ? `Delete managed domain ${deleteTarget.zone}?` : "Delete managed domain?"
+        }
+        description="Existing apps using hostnames in this zone keep their current DNS records, but new records will no longer be created or updated. Re-add the zone to resume management."
+        confirmLabel="Delete zone"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </PageShell>
   );
 }

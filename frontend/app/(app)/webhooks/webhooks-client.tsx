@@ -3,17 +3,20 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  BookOpenIcon,
   CheckCircle2Icon,
   CopyIcon,
   PlusIcon,
   Trash2Icon,
   WebhookIcon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,10 +42,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import {
-  CREATE_WEBHOOK,
-  DELETE_WEBHOOK,
-} from "@/graphql/operations/operations.mutations";
+import { CREATE_WEBHOOK, DELETE_WEBHOOK } from "@/graphql/operations/operations.mutations";
 import { LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
 import type {
   AstroliftWebhookSecretReveal,
@@ -64,8 +64,8 @@ const SUGGESTED_EVENTS = [
 
 export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
   const [open, setOpen] = React.useState(false);
-  const [reveal, setReveal] =
-    React.useState<AstroliftWebhookSecretReveal | null>(null);
+  const [reveal, setReveal] = React.useState<AstroliftWebhookSecretReveal | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<AstroliftWebhookSubscription | null>(null);
   const [url, setUrl] = React.useState("");
   const [eventsRaw, setEventsRaw] = React.useState(SUGGESTED_EVENTS.join("\n"));
 
@@ -104,19 +104,16 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
       setOpen(false);
       setUrl("");
     } else {
-      toast.error(
-        data?.createWebhookSubscription.errors?.[0]?.message ?? "Create failed",
-      );
+      toast.error(data?.createWebhookSubscription.errors?.[0]?.message ?? "Create failed");
     }
   }
 
   async function handleDelete(s: AstroliftWebhookSubscription) {
-    if (!confirm(`Delete webhook to ${s.url}?`)) return;
     const { data } = await deleteWebhook({ variables: { input: { id: s.id } } });
     if (data?.deleteWebhookSubscription.ok) {
       toast.success("Deleted");
     } else {
-      toast.error(data?.deleteWebhookSubscription.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.deleteWebhookSubscription.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -137,27 +134,33 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
           : "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
       }
       actions={
-        <Can permission="webhook.create">
-          <Button onClick={() => setOpen(true)}>
-            <PlusIcon className="size-4" />
-            New webhook
+        <>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/documentation/webhooks">
+              <BookOpenIcon className="size-4" />
+              Learn more
+            </Link>
           </Button>
-        </Can>
+          <Can permission="webhook.create">
+            <Button onClick={() => setOpen(true)}>
+              <PlusIcon className="size-4" />
+              New webhook
+            </Button>
+          </Can>
+        </>
       }
     >
       {reveal && (
         <Card className="border-emerald-500/30 bg-emerald-500/5">
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2Icon className="text-emerald-600 size-4" />
+              <CheckCircle2Icon className="size-4 text-emerald-600" />
               <p className="text-sm font-medium">
-                Webhook to{" "}
-                <span className="font-mono">{reveal.subscription.url}</span> created
+                Webhook to <span className="font-mono">{reveal.subscription.url}</span> created
               </p>
             </div>
             <p className="text-muted-foreground text-xs">
-              Save the HMAC secret below — it&apos;s never shown again. We store
-              only its SHA-256.
+              Save the HMAC secret below — it&apos;s never shown again. We store only its SHA-256.
             </p>
             <div className="flex items-center gap-2">
               <code className="bg-background flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
@@ -206,9 +209,7 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
               <TableBody>
                 {list.map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="max-w-xs truncate font-mono text-xs">
-                      {s.url}
-                    </TableCell>
+                    <TableCell className="max-w-xs truncate font-mono text-xs">{s.url}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {s.events.slice(0, 3).map((e) => (
@@ -248,7 +249,7 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleDelete(s)}
+                          onClick={() => setDeleteTarget(s)}
                           disabled={deleting}
                         >
                           <Trash2Icon className="size-4" />
@@ -269,9 +270,8 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
           <SheetHeader>
             <SheetTitle>New webhook</SheetTitle>
             <SheetDescription>
-              The HMAC secret is shown once at creation; we store only the
-              SHA-256. Use it to verify the X-Astrolift-Signature header on
-              incoming deliveries.
+              The HMAC secret is shown once at creation; we store only the SHA-256. Use it to verify
+              the X-Astrolift-Signature header on incoming deliveries.
             </SheetDescription>
           </SheetHeader>
           <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
@@ -297,8 +297,7 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
                 className="font-mono text-xs"
               />
               <p className="text-muted-foreground text-xs">
-                One per line, or comma/space separated. <code>*</code> matches all
-                events.
+                One per line, or comma/space separated. <code>*</code> matches all events.
               </p>
             </div>
             <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
@@ -312,6 +311,24 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title="Delete webhook?"
+        description={
+          deleteTarget
+            ? `${deleteTarget.url} will stop receiving events immediately. Past deliveries stay in the audit log.`
+            : undefined
+        }
+        confirmLabel="Delete webhook"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </PageShell>
   );
 }

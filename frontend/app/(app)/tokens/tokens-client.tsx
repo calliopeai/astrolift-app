@@ -13,6 +13,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  CREATE_API_TOKEN,
-  REVOKE_API_TOKEN,
-} from "@/graphql/identity/identity.mutations";
+import { CREATE_API_TOKEN, REVOKE_API_TOKEN } from "@/graphql/identity/identity.mutations";
 import { LIST_API_TOKENS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftApiToken,
@@ -56,8 +54,8 @@ export function TokensClient() {
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [expiresInDays, setExpiresInDays] = React.useState("90");
-  const [createdToken, setCreatedToken] =
-    React.useState<AstroliftApiTokenPlaintext | null>(null);
+  const [createdToken, setCreatedToken] = React.useState<AstroliftApiTokenPlaintext | null>(null);
+  const [revokeTarget, setRevokeTarget] = React.useState<AstroliftApiToken | null>(null);
 
   const tokens = useQuery<Resp>(LIST_API_TOKENS);
 
@@ -95,14 +93,11 @@ export function TokensClient() {
   }
 
   async function handleRevoke(t: AstroliftApiToken) {
-    if (!confirm(`Revoke token ${t.name}? Existing CLIs/bots using it stop working immediately.`)) {
-      return;
-    }
     const { data } = await revokeToken({ variables: { input: { id: t.id } } });
     if (data?.revokeApiToken.ok) {
       toast.success("Revoked");
     } else {
-      toast.error(data?.revokeApiToken.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeApiToken.errors?.[0]?.message ?? "Revoke failed");
     }
   }
 
@@ -131,14 +126,14 @@ export function TokensClient() {
         <Card className="border-emerald-500/30 bg-emerald-500/5">
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2Icon className="text-emerald-600 size-4" />
+              <CheckCircle2Icon className="size-4 text-emerald-600" />
               <p className="text-sm font-medium">
                 Token <span className="font-mono">{createdToken.apiToken.name}</span> created
               </p>
             </div>
             <p className="text-muted-foreground text-xs">
-              Copy the value below now — it&apos;s never shown again. We store
-              only the SHA-256 hash and the last 4 characters.
+              Copy the value below now — it&apos;s never shown again. We store only the SHA-256 hash
+              and the last 4 characters.
             </p>
             <div className="flex items-center gap-2">
               <code className="bg-background flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
@@ -189,16 +184,12 @@ export function TokensClient() {
                 {list.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      …{t.tokenLast4}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">…{t.tokenLast4}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(t.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {t.expiresAt
-                        ? new Date(t.expiresAt).toLocaleDateString()
-                        : "never"}
+                      {t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : "never"}
                     </TableCell>
                     <TableCell>
                       {t.isRevoked ? (
@@ -215,7 +206,7 @@ export function TokensClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleRevoke(t)}
+                          onClick={() => setRevokeTarget(t)}
                           disabled={revoking || t.isRevoked}
                         >
                           <Trash2Icon className="size-4" />
@@ -236,8 +227,8 @@ export function TokensClient() {
           <SheetHeader>
             <SheetTitle>New API token</SheetTitle>
             <SheetDescription>
-              The plaintext is shown exactly once after creation. Save it
-              somewhere secure — there&apos;s no way to retrieve it later.
+              The plaintext is shown exactly once after creation. Save it somewhere secure —
+              there&apos;s no way to retrieve it later.
             </SheetDescription>
           </SheetHeader>
           <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
@@ -252,8 +243,7 @@ export function TokensClient() {
                 required
               />
               <p className="text-muted-foreground text-xs">
-                Descriptive — appears in the audit log next to every action this
-                token takes.
+                Descriptive — appears in the audit log next to every action this token takes.
               </p>
             </div>
             <div className="space-y-2">
@@ -281,6 +271,20 @@ export function TokensClient() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={revokeTarget ? `Revoke token ${revokeTarget.name}?` : "Revoke token?"}
+        description="Existing CLIs and bots using this token stop working immediately. There's no way to un-revoke — mint a new token if you need to restore access."
+        confirmLabel="Revoke token"
+        destructive
+        onConfirm={async () => {
+          if (revokeTarget) await handleRevoke(revokeTarget);
+        }}
+      />
     </PageShell>
   );
 }

@@ -5,8 +5,9 @@ import { PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,10 +22,7 @@ import {
 } from "@/components/ui/table";
 import { SOFT_DELETE_TEAM } from "@/graphql/identity/identity.mutations";
 import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
-import type {
-  AstroliftTeam,
-  MutationResult,
-} from "@/graphql/identity/identity.types";
+import type { AstroliftTeam, MutationResult } from "@/graphql/identity/identity.types";
 
 import { CreateTeamDialog } from "./create-team-dialog";
 
@@ -34,6 +32,7 @@ interface TeamsResp {
 
 export function TeamsClient() {
   const [open, setOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<AstroliftTeam | null>(null);
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
 
   const [softDeleteTeam, { loading: deleting }] = useMutation<{
@@ -44,13 +43,6 @@ export function TeamsClient() {
   });
 
   async function handleDelete(team: AstroliftTeam) {
-    if (
-      !confirm(
-        `Delete team ${team.slug}? Soft delete only — slug becomes reclaimable.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await softDeleteTeam({
       variables: { input: { id: team.id } },
     });
@@ -58,7 +50,7 @@ export function TeamsClient() {
     if (result?.ok) {
       toast.success(`Deleted ${team.slug}`);
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(result?.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -107,10 +99,10 @@ export function TeamsClient() {
                 {list.map((team) => (
                   <TableRow key={team.id}>
                     <TableCell className="font-medium">{team.name}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="text-muted-foreground font-mono text-xs">
                       {team.slug}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-muted-foreground text-sm">
                       {new Date(team.createdAt).toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "short",
@@ -122,7 +114,7 @@ export function TeamsClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleDelete(team)}
+                          onClick={() => setDeleteTarget(team)}
                           disabled={deleting}
                         >
                           <Trash2Icon className="size-4" />
@@ -139,6 +131,20 @@ export function TeamsClient() {
       </Card>
 
       <CreateTeamDialog open={open} onOpenChange={setOpen} />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `Delete team ${deleteTarget.slug}?` : "Delete team?"}
+        description="Soft delete only — the slug becomes reclaimable. Projects under this team stay visible until reassigned."
+        confirmLabel="Delete team"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </PageShell>
   );
 }
