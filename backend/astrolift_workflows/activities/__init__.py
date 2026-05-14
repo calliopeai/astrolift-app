@@ -24,11 +24,13 @@ from astrolift_workflows.activities.app_lifecycle import (
     update_secrets,
     wait_dns,
 )
+from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
 
 __all__ = [
     "apply_manifests",
     "create_promotion_deployment",
     "create_rollback_deployment",
+    "dispatch_cron_deploys",
     "health_check",
     "mark_app_provisioning",
     "mark_app_ready",
