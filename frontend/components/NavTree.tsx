@@ -259,13 +259,23 @@ export function NavTree() {
               tooltip={tree.organization.name}
               className="group/org"
             >
-              <CollapsibleTrigger className="w-full">
-                <Building2Icon />
-                <span className="truncate font-medium">
-                  {tree.organization.name}
-                </span>
-                <ChevronRightIcon className="ml-auto size-3.5 transition-transform group-data-[state=open]/org:rotate-90" />
-              </CollapsibleTrigger>
+              <div className="flex w-full items-center">
+                <Link
+                  href="/settings/organization"
+                  className="flex flex-1 items-center gap-2 truncate"
+                >
+                  <Building2Icon />
+                  <span className="truncate font-medium">
+                    {tree.organization.name}
+                  </span>
+                </Link>
+                <CollapsibleTrigger
+                  className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+                  aria-label={`Toggle ${tree.organization.name}`}
+                >
+                  <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]/org:rotate-90" />
+                </CollapsibleTrigger>
+              </div>
             </SidebarMenuButton>
             <CollapsibleContent>
               <SidebarMenuSub>
@@ -325,12 +335,22 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
-        <SidebarMenuSubButton asChild className="group/team cursor-pointer">
-          <CollapsibleTrigger className="w-full">
-            <UsersIcon className="text-sidebar-foreground/70" />
-            <span className="truncate">{node.team.name}</span>
-            <ChevronRightIcon className="ml-auto size-3 transition-transform group-data-[state=open]/team:rotate-90" />
-          </CollapsibleTrigger>
+        <SidebarMenuSubButton asChild className="group/team">
+          <div className="flex w-full items-center">
+            <Link
+              href={`/teams?team=${encodeURIComponent(node.team.slug)}`}
+              className="flex flex-1 items-center gap-2 truncate"
+            >
+              <UsersIcon className="text-sidebar-foreground/70" />
+              <span className="truncate">{node.team.name}</span>
+            </Link>
+            <CollapsibleTrigger
+              className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              aria-label={`Toggle ${node.team.name}`}
+            >
+              <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/team:rotate-90" />
+            </CollapsibleTrigger>
+          </div>
         </SidebarMenuSubButton>
         <CollapsibleContent>
           <SidebarMenuSub>
@@ -386,12 +406,22 @@ function ProjectNode({
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
-        <SidebarMenuSubButton asChild className="group/project cursor-pointer">
-          <CollapsibleTrigger className="w-full">
-            <FileBoxIcon className="text-sidebar-foreground/70" />
-            <span className="truncate">{node.project.name}</span>
-            <ChevronRightIcon className="ml-auto size-3 transition-transform group-data-[state=open]/project:rotate-90" />
-          </CollapsibleTrigger>
+        <SidebarMenuSubButton asChild className="group/project">
+          <div className="flex w-full items-center">
+            <Link
+              href={`/projects/${encodeURIComponent(node.project.slug)}`}
+              className="flex flex-1 items-center gap-2 truncate"
+            >
+              <FileBoxIcon className="text-sidebar-foreground/70" />
+              <span className="truncate">{node.project.name}</span>
+            </Link>
+            <CollapsibleTrigger
+              className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              aria-label={`Toggle ${node.project.name}`}
+            >
+              <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/project:rotate-90" />
+            </CollapsibleTrigger>
+          </div>
         </SidebarMenuSubButton>
         <CollapsibleContent>
           <SidebarMenuSub>
