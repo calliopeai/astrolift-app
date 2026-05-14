@@ -89,6 +89,7 @@ class Permission(enum.StrEnum):
     CLUSTER_REGISTER = "cluster.register"
     CLUSTER_UPDATE = "cluster.update"
     CLUSTER_UNREGISTER = "cluster.unregister"
+    CLUSTER_MANAGE = "cluster.manage"
     PROVIDER_PLUGIN_READ = "provider_plugin.read"
     PROVIDER_PLUGIN_CONFIGURE = "provider_plugin.configure"
 

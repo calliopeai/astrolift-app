@@ -66,6 +66,20 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         _READ_ALL,
     ),
     (
+        "cluster_owner",
+        "ORG",
+        "Cluster Owner",
+        "Register, update, unregister, and bring tenant clusters into management.",
+        (
+            Permission.CLUSTER_REGISTER,
+            Permission.CLUSTER_UPDATE,
+            Permission.CLUSTER_UNREGISTER,
+            Permission.CLUSTER_MANAGE,
+            Permission.PROVIDER_PLUGIN_READ,
+            Permission.PROVIDER_PLUGIN_CONFIGURE,
+        ),
+    ),
+    (
         "team_owner",
         "TEAM",
         "Team Owner",
