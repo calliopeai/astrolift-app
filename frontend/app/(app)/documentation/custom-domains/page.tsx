@@ -18,6 +18,20 @@ export default function CustomDomainsPage() {
         </p>
       </div>
 
+      <div className="bg-muted/40 text-muted-foreground rounded-md border p-4 text-sm leading-relaxed">
+        <strong className="text-foreground">Cluster prerequisites.</strong>{" "}
+        This guide assumes the tenant cluster already runs cert-manager
+        and an ingress controller. If you&apos;re bringing your own
+        cluster, work through{" "}
+        <Link
+          href="/documentation/cluster-prerequisites"
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          Cluster prerequisites
+        </Link>{" "}
+        first.
+      </div>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">When you need this</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">

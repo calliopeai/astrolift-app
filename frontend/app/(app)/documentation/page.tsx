@@ -6,9 +6,12 @@ import {
   GlobeIcon,
   GraduationCapIcon,
   KeyRoundIcon,
+  ListTreeIcon,
   RocketIcon,
   ScaleIcon,
   ScrollIcon,
+  ServerCogIcon,
+  SettingsIcon,
   WebhookIcon,
 } from "lucide-react";
 
@@ -56,6 +59,13 @@ const sections: { label: string; cards: DocCard[] }[] = [
     label: "Operator guides",
     cards: [
       {
+        href: "/documentation/cluster-prerequisites",
+        title: "Cluster prerequisites",
+        description:
+          "What a tenant cluster needs (cert-manager, ingress, external-dns) before Astrolift can use it.",
+        icon: ServerCogIcon,
+      },
+      {
         href: "/documentation/custom-domains",
         title: "Custom domains",
         description:
@@ -95,6 +105,20 @@ const sections: { label: string; cards: DocCard[] }[] = [
   {
     label: "Reference",
     cards: [
+      {
+        href: "/documentation/configuration",
+        title: "Configuration",
+        description:
+          "Every environment variable Astrolift reads — purpose, defaults, and who sets them.",
+        icon: SettingsIcon,
+      },
+      {
+        href: "/documentation/webhook-events",
+        title: "Webhook events",
+        description:
+          "Payload schema and JSON examples for every outbound webhook event.",
+        icon: ListTreeIcon,
+      },
       {
         href: "/documentation/changelog",
         title: "Changelog",
