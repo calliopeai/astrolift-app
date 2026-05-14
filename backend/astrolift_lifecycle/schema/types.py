@@ -292,3 +292,90 @@ def deploy_token_to_type(t) -> DeployTokenType:
         registered_app_slug=t.registered_app.slug,
         created_at=t.created_at,
     )
+
+
+# ---- Pod state (runtime cluster) ------------------------------------
+
+
+@strawberry.type(name="AstroliftContainerStatus")
+class ContainerStatusType:
+    """One container slot's runtime state.
+
+    ``state`` is ``running`` | ``waiting`` | ``terminated`` |
+    ``unknown``. ``waiting_reason`` / ``terminated_reason`` carry
+    the K8s reason string — that's where actionable diagnostics
+    live (``CrashLoopBackOff``, ``ImagePullBackOff``, …)."""
+
+    name: str
+    ready: bool
+    restarts: int
+    image: str
+    state: str
+    waiting_reason: str
+    terminated_reason: str
+
+
+@strawberry.type(name="AstroliftAppPod")
+class AppPodType:
+    """A single pod from the runtime cluster, namespace-scoped to
+    the app.
+
+    ``status`` is the rolled-up surface status — the worst of the
+    raw ``phase`` and any container waiting/terminated reasons.
+    ``phase`` is preserved separately so the UI can show both when
+    they diverge (e.g. phase=Running but a sidecar is in
+    CrashLoopBackOff)."""
+
+    name: str
+    workload: str
+    status: str
+    phase: str
+    ready: bool
+    restarts: int
+    age: dt.datetime | None
+    node: str
+    container_statuses: list[ContainerStatusType]
+
+
+def container_status_to_type(c) -> ContainerStatusType:
+    return ContainerStatusType(
+        name=c.name,
+        ready=c.ready,
+        restarts=c.restart_count,
+        image=c.image,
+        state=c.state,
+        waiting_reason=c.waiting_reason,
+        terminated_reason=c.terminated_reason,
+    )
+
+
+def pod_info_to_type(p) -> AppPodType:
+    return AppPodType(
+        name=p.name,
+        workload=p.workload,
+        status=p.status,
+        phase=p.phase,
+        ready=p.ready,
+        restarts=p.restarts,
+        age=p.age,
+        node=p.node,
+        container_statuses=[container_status_to_type(c) for c in p.container_statuses],
+    )
+
+
+@strawberry.type(name="AstroliftAppLogLine")
+class AppLogLineType:
+    """One log line from a pod/container in the runtime cluster.
+
+    ``stream`` is ``stdout`` | ``stderr``. The default
+    kubernetes-client API doesn't separate the two on the wire — all
+    container output arrives interleaved — so the streaming backend
+    flags everything as ``stdout`` unless an alternative backend
+    (test fakes, future per-container stderr support) emits
+    otherwise."""
+
+    pod_name: str
+    container: str
+    timestamp: dt.datetime
+    message: str
+    stream: str
