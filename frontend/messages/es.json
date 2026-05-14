@@ -2,16 +2,10 @@
   "nav": {
     "section": "Plataforma",
     "playground": "Playground",
-    "models": "Modelos",
     "documentation": "Documentación",
     "settings": "Configuración",
-    "table": "Tabla",
-    "form": "Formulario",
     "history": "Historial",
     "starred": "Favoritos",
-    "genesis": "Genesis",
-    "explorer": "Explorador",
-    "quantum": "Quantum",
     "introduction": "Introducción",
     "getStarted": "Empezar",
     "tutorials": "Tutoriales",
@@ -20,8 +14,7 @@
     "team": "Equipo",
     "billing": "Facturación",
     "limits": "Límites",
-    "hooks": "Hooks",
-    "secured": "Página segura"
+    "hooks": "Hooks"
   },
   "user": {
     "account": "Cuenta",
