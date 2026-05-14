@@ -253,16 +253,29 @@ async def stream_app_logs(
     follow: bool = True,
 ) -> AsyncIterator[LogLine]:
     """Resolver-facing entry point. Yields log lines until the
-    backend signals EOF or the consumer cancels."""
-    async for line in _BACKEND.stream(
+    backend signals EOF or the consumer cancels.
+
+    Explicit iterate-and-close: ``async for`` doesn't call
+    ``aclose()`` on the underlying iterator when this generator is
+    closed via ``aclose()`` from the caller; the inner gen would
+    stay alive until GC. We bind the iterator and close it in
+    finally so the kubernetes-client urllib3 connection is
+    released back to the pool on disconnect."""
+    inner = _BACKEND.stream(
         cluster=cluster,
         namespace=namespace,
         pod_name=pod_name,
         container=container,
         tail_lines=tail_lines,
         follow=follow,
-    ):
-        yield line
+    )
+    try:
+        async for line in inner:
+            yield line
+    finally:
+        aclose = getattr(inner, "aclose", None)
+        if aclose is not None:
+            await aclose()
 
 
 def install_log_backend_function(

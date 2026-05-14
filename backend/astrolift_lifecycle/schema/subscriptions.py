@@ -137,18 +137,29 @@ class LifecycleSubscription:
         if app is None or cluster is None:
             return
 
-        async for line in stream_app_logs(
+        # Explicit iterate + finally so a consumer disconnect
+        # (``aclose()`` on this generator throwing GeneratorExit at
+        # the yield below) tears down the inner backend generator
+        # before this frame unwinds. ``async for`` alone does NOT
+        # call ``aclose()`` on its iterator under cancellation —
+        # the inner gen would stay alive until GC, which means a
+        # urllib3 connection leak on the production path.
+        inner = stream_app_logs(
             cluster=cluster,
             namespace=namespace,
             pod_name=pod_name,
             container=container,
             tail_lines=tail_lines,
             follow=follow,
-        ):
-            yield AppLogLineType(
-                pod_name=line.pod_name,
-                container=line.container,
-                timestamp=line.timestamp,
-                message=line.message,
-                stream=line.stream,
-            )
+        )
+        try:
+            async for line in inner:
+                yield AppLogLineType(
+                    pod_name=line.pod_name,
+                    container=line.container,
+                    timestamp=line.timestamp,
+                    message=line.message,
+                    stream=line.stream,
+                )
+        finally:
+            await inner.aclose()
