@@ -344,10 +344,11 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
     webhook_secret GitHub generated for the manifest's hook, and the
     private-key PEM (RSA). We store the PEM in ``secret_ciphertext``
     (encrypted), the App ID in ``oauth_client_id``, the webhook secret
-    in ``webhook_secret_ciphertext``, and the client_secret in a new
-    field we don't currently model — for now we don't need the OAuth
-    user flow off this App, so we drop the client_secret on the floor.
-    (If we want per-user OAuth via the App later, add another column.)
+    in ``webhook_secret_ciphertext``, and the user-to-server OAuth
+    ``client_secret`` in ``oauth_client_secret_ciphertext`` — that
+    secret is what ``scm_oauth.github_callback`` needs to redeem the
+    user's authorization code for an access token when they click
+    "Connect my GitHub" against this App row.
     """
     state_in = request.GET.get("state", "")
     code = request.GET.get("code", "")
@@ -384,6 +385,7 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
     app_id = str(payload.get("id") or "")
     pem = (payload.get("pem") or "").encode("utf-8")
     webhook_secret_plain = (payload.get("webhook_secret") or "").encode("utf-8")
+    client_secret_plain = (payload.get("client_secret") or "").encode("utf-8")
     app_slug = (payload.get("slug") or "").strip()
     owner = payload.get("owner") or {}
     owner_login = (owner.get("login") or "").strip()
@@ -405,10 +407,16 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
         update_fields["webhook_secret_backend_kind"] = webhook_encrypted.backend_kind
         update_fields["webhook_secret_ciphertext"] = webhook_encrypted.backend_ref
 
-    # We deliberately drop the OAuth client_secret — the manifest flow's
-    # client_secret is for an OAuth user flow we don't use here. If we
-    # ever add "Sign in with GitHub via this App" we'll bring it back;
-    # today it would just sit decrypt-able-in-the-DB for no win.
+    # The user-to-server OAuth client_secret is needed by the "Connect
+    # my GitHub" dance (auth1.scm_oauth.github_callback) to redeem the
+    # user's code at /login/oauth/access_token. Stored in a column
+    # separate from ``secret_ciphertext`` (which holds the App's PEM)
+    # so a single row can carry both credentials.
+    if client_secret_plain:
+        client_secret_encrypted = encrypt_at_rest(client_secret_plain)
+        update_fields["oauth_client_secret_backend_kind"] = client_secret_encrypted.backend_kind
+        update_fields["oauth_client_secret_ciphertext"] = client_secret_encrypted.backend_ref
+
     for k, v in update_fields.items():
         setattr(connection, k, v)
     connection.save()

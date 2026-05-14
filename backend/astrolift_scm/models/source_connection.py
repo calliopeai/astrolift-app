@@ -126,6 +126,15 @@ class SourceConnection(BaseCoreModel):
     oauth_client_id = models.CharField(max_length=256, blank=True, default="")
     oauth_redirect_uri = models.CharField(max_length=512, blank=True, default="")
 
+    # User-to-server OAuth client_secret for GitHub-App rows. The App's
+    # manifest exchange returns this alongside the PEM; the PEM is the
+    # installation-token signing key (goes in secret_ciphertext above)
+    # and this is the per-user OAuth dance secret. Separate column so
+    # the App row can do both things at once without column re-use.
+    # Blank-by-default; only github_app_install rows populate it.
+    oauth_client_secret_backend_kind = models.CharField(max_length=32, blank=True, default="")
+    oauth_client_secret_ciphertext = models.BinaryField(blank=True, default=b"")
+
     # Visibility scope = what the resolver is allowed to surface
     # when listing repos through this connection.
     repo_visibility_scopes = models.JSONField(default=list, blank=True)
