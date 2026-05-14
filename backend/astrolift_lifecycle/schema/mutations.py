@@ -63,6 +63,7 @@ from astrolift_workflows.inputs import (
     RollbackInput,
     TearDownPreviewInput,
 )
+from config.features import Feature, is_enabled
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -412,6 +413,25 @@ def _record_approval_vote_and_maybe_start(
 # ---------------------------------------------------------------------------
 
 
+_DEPLOY_PIPELINE_DISABLED_MSG = (
+    "deploy pipeline is not yet enabled in this environment — the "
+    "apply/secrets/dns/rollout activities are still being implemented. "
+    "Cluster adoption (bringClusterIntoManagement) is fully wired and "
+    "remains usable. Set FEATURE_DEPLOY_PIPELINE=true on the webservice "
+    "+ worker once the activity implementations have landed."
+)
+
+
+def _deploy_pipeline_disabled() -> bool:
+    """True when the deploy pipeline feature flag is off.
+
+    Used at the top of resolvers whose workflows still depend on stub
+    activities (start_deployment, rollback_deployment, tear_down_preview)
+    to short-circuit with a clear error envelope.
+    """
+    return not is_enabled(Feature.DEPLOY_PIPELINE)
+
+
 @strawberry.type
 class LifecycleMutation:
     @strawberry.field
@@ -419,6 +439,8 @@ class LifecycleMutation:
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
     def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
+        if _deploy_pipeline_disabled():
+            return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
         if input.trigger_kind not in _VALID_TRIGGER_KINDS:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -753,6 +775,8 @@ class LifecycleMutation:
     def rollback_deployment(
         self, info: Info, input: DeploymentByIdInput
     ) -> MutationResultType[DeploymentType]:
+        if _deploy_pipeline_disabled():
+            return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True)
@@ -956,6 +980,8 @@ class LifecycleMutation:
     def tear_down_preview(
         self, info: Info, input: TearDownPreviewInputGql
     ) -> MutationResultType[DeploymentType]:
+        if _deploy_pipeline_disabled():
+            return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
         preview = (
             PreviewEnvironment.objects.select_related("registered_app")
             .filter(guid=str(input.id), deleted_at__isnull=True)
