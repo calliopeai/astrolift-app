@@ -112,6 +112,31 @@ export const LIST_CLUSTERS = gql`
 // Bring-into-management (#316). Returns the cluster row in
 // "managing" state; the list view polls LIST_CLUSTERS to render
 // the transition.
+// Decommission path. `deleteCloudInfra: false` (default) only lifts
+// the platform RBAC bundle; the underlying EKS/GKE/AKS cluster stays
+// running and operator-owned. `deleteCloudInfra: true` ADDITIONALLY
+// calls the driver's teardown_cluster which deletes the cloud-
+// managed cluster (node groups, Fargate profiles, etc.). Surfaced in
+// the UI as an explicit "danger zone" checkbox.
+export const DECOMMISSION_CLUSTER = gql`
+  mutation DecommissionCluster($input: DecommissionClusterInputType!) {
+    decommissionCluster(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        lifecycle
+        lastManagementError
+      }
+    }
+  }
+`;
+
 export const BRING_CLUSTER_INTO_MANAGEMENT = gql`
   mutation BringClusterIntoManagement($input: BringClusterIntoManagementInputType!) {
     bringClusterIntoManagement(input: $input) {
