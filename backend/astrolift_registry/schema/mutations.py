@@ -5,6 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from astrolift_clusters.models import TenantCluster
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -278,6 +279,23 @@ class RegistryMutation:
         )
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+
+        # An app is a deployment target — without a connected cluster
+        # the platform has nowhere to roll the workload to and the
+        # downstream deploy fails with an opaque "no cluster available"
+        # error. Reject up front instead. Soft-deleted and inactive
+        # clusters don't count: they can't accept a deploy.
+        cluster_count = TenantCluster.objects.filter(
+            organization=project.organization,
+            deleted_at__isnull=True,
+            is_active=True,
+        ).count()
+        if cluster_count == 0:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "No cluster connected. Visit /clusters to register one before adding apps.",
+                field=None,
+            )
 
         if RegisteredApp.objects.filter(organization=project.organization, slug=input.slug).exists():
             return gql_failure(

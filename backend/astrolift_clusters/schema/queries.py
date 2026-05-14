@@ -18,6 +18,7 @@ from astrolift_clusters.schema.types import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
 
 
 @strawberry.type
@@ -28,6 +29,30 @@ class ClustersQuery:
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
         qs = TenantCluster.objects.select_related("organization", "provider_plugin").order_by("slug")[:200]
         return [cluster_to_type(c) for c in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_CREATE)
+    @tenant_scoped()
+    def astrolift_cluster_count(self, info: Info) -> int:
+        """Count of active clusters bound to the caller's org.
+
+        Used by the /apps/new wizard to gate Step 1: registering an
+        app with zero connected clusters is meaningless (the deploy
+        has nowhere to land). Scoped to ``APP_CREATE`` rather than
+        ``CLUSTER_REGISTER`` because the natural caller is the app
+        author, not the cluster operator — they need a shippable
+        preflight signal even when they can't register clusters
+        themselves. Soft-deleted and inactive clusters are excluded;
+        only rows that can actually accept a deploy count.
+        """
+        tenant = get_current_tenant()
+        if tenant is None or tenant.organization_id is None:
+            return 0
+        return TenantCluster.objects.filter(
+            organization_id=tenant.organization_id,
+            deleted_at__isnull=True,
+            is_active=True,
+        ).count()
 
     @strawberry.field
     @require_permission(Permission.PROVIDER_PLUGIN_READ)
