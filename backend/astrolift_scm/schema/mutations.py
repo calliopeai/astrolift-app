@@ -87,6 +87,35 @@ class RotateWebhookSecretInput:
     connection_id: GUID
 
 
+@strawberry.input
+class PushCiWorkflowInput:
+    """Drop the canonical Astrolift deploy workflow into the source
+    repo via the named connection.
+
+    All fields except ``app_id`` and ``connection_id`` have defaults
+    derived from the registered app, so the wizard's checkbox needs
+    only the two GUIDs to call this mutation.
+
+    Commit attribution follows the connection kind:
+      * ``*_oauth_user`` / ``*_pat`` → the user / token owner on the
+        SCM host.
+      * ``github_app_install`` → the GitHub App's bot identity.
+    """
+
+    app_id: GUID
+    connection_id: GUID
+    branch: str | None = None
+    commit_message: str | None = None
+    file_path: str | None = None
+
+
+@strawberry.type(name="AstroliftScmPushCiWorkflowResult")
+class PushCiWorkflowResult:
+    commit_sha: str
+    file_path: str
+    repo_url: str
+
+
 @strawberry.type(name="AstroliftScmWebhookSecretReveal")
 class WebhookSecretReveal:
     """Plaintext secret returned once on rotation; never re-fetchable.
@@ -346,3 +375,137 @@ class ScmMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "key not found")
         row.soft_delete()
         return gql_success(ssh_key_to_type(row))
+
+    @strawberry.field
+    @mutation_audit(action="scm.push_ci_workflow")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def push_ci_workflow(
+        self, info: Info, input: PushCiWorkflowInput
+    ) -> MutationResultType[PushCiWorkflowResult]:
+        """Render the Astrolift deploy workflow for ``app`` and PUT it
+        into the source repo via ``connection``.
+
+        Commits to ``branch`` (defaulting to the app's
+        ``default_branch``). Re-running the mutation overwrites the
+        file in place — the GitHub driver discovers the existing blob
+        SHA before PUTing so the second call lands as an update,
+        not a 422.
+        """
+        from astrolift_scm.ci_templates import (
+            default_workflow_path_for,
+            render_workflow_for,
+        )
+        from astrolift_scm.providers import ProviderError, put_file
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+
+        app = (
+            RegisteredApp.objects.filter(
+                guid=str(input.app_id),
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        conn = SourceConnection.objects.filter(
+            guid=str(input.connection_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if conn is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "connection not found",
+                field="connectionId",
+            )
+        if not conn.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "connection is inactive; reconnect first",
+                field="connectionId",
+            )
+        if conn.is_orphaned:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "connection is orphaned (upstream revoked or uninstalled)",
+                field="connectionId",
+            )
+        if conn.is_oauth_app_config:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "this is an OAuth-app config row; complete the OAuth dance to create a token connection first",
+                field="connectionId",
+            )
+
+        # Source-host parity: a GitHub app can't push to a GitLab repo
+        # and vice versa. Bitbucket / Gitea have no CI template yet —
+        # surface that cleanly rather than crashing in render.
+        try:
+            file_path = (input.file_path or default_workflow_path_for(app.source_kind)).lstrip("/")
+        except ValueError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="appId",
+            )
+
+        host_prefix = conn.kind.split("_", 1)[0]
+        if host_prefix != app.source_kind:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"connection host {host_prefix!r} doesn't match app source_kind {app.source_kind!r}",
+                field="connectionId",
+            )
+
+        if not app.source_repo:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "app has no source repo configured",
+                field="appId",
+            )
+
+        branch = (input.branch or app.default_branch or "main").strip()
+        commit_message = (input.commit_message or "Add Astrolift deploy workflow").strip()
+        if not commit_message:
+            commit_message = "Add Astrolift deploy workflow"
+
+        try:
+            content = render_workflow_for(
+                source_kind=app.source_kind,
+                app_slug=app.slug,
+                deploy_branch=app.deploy_branch or None,
+            )
+        except ValueError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc), field="appId")
+
+        try:
+            result = put_file(
+                conn,
+                repo_full_name=app.source_repo,
+                path=file_path,
+                branch=branch,
+                content=content,
+                commit_message=commit_message,
+            )
+        except ProviderError as exc:
+            return gql_failure(
+                exc.code,
+                exc.message,
+                field="connectionId" if exc.code == "AUTH_FAILED" else None,
+            )
+
+        return gql_success(
+            PushCiWorkflowResult(
+                commit_sha=result.commit_sha,
+                file_path=result.file_path,
+                repo_url=result.web_url,
+            )
+        )
