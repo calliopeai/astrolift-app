@@ -26,11 +26,13 @@ from astrolift_scm.providers.github import (
     GithubProviderError,
     fetch_github_file,
     list_github_repos,
+    put_github_file,
 )
 from astrolift_scm.providers.gitlab import (
     GitlabProviderError,
     fetch_gitlab_file,
     list_gitlab_projects,
+    put_gitlab_file,
 )
 
 
@@ -134,4 +136,76 @@ def fetch_file(
     raise ProviderError(
         "UNSUPPORTED",
         f"file fetch for {connection.kind!r} not implemented yet",
+    )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PutFileResult:
+    """Outcome of writing a file to a remote repo through a connection.
+
+    ``commit_sha`` is the SHA of the commit that landed the change;
+    ``web_url`` is the host-side URL the operator can open to see the
+    file. ``file_path`` echoes the path the host actually wrote (which
+    may differ from the requested one if the host normalizes it)."""
+
+    commit_sha: str
+    file_path: str
+    web_url: str
+
+
+def put_file(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    path: str,
+    branch: str,
+    content: str,
+    commit_message: str,
+) -> PutFileResult:
+    """Create or update ``path`` on ``branch`` of ``repo_full_name``.
+
+    Auth follows the connection's stored credential — user-bearer
+    tokens (PAT / OAuth-user) commit-attribute to the underlying user
+    on the SCM host; App-installation tokens attribute to the App's
+    bot identity. Existing files are updated in-place (the GitHub
+    driver looks up the blob SHA first, GitLab picks PUT vs POST)."""
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            result = put_github_file(
+                connection,
+                repo_full_name=repo_full_name,
+                path=path,
+                branch=branch,
+                content=content,
+                commit_message=commit_message,
+            )
+            return PutFileResult(
+                commit_sha=result.commit_sha,
+                file_path=result.file_path,
+                web_url=result.web_url,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITLAB_KINDS:
+        try:
+            result = put_gitlab_file(
+                connection,
+                repo_full_name=repo_full_name,
+                path=path,
+                branch=branch,
+                content=content,
+                commit_message=commit_message,
+            )
+            return PutFileResult(
+                commit_sha=result.commit_sha,
+                file_path=result.file_path,
+                web_url=result.web_url,
+            )
+        except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"file write for {connection.kind!r} not implemented yet",
     )

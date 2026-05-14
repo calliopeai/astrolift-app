@@ -22,6 +22,7 @@ set at install time.
 
 from __future__ import annotations
 
+import base64
 import dataclasses
 import json
 import urllib.error
@@ -273,3 +274,162 @@ def fetch_github_file(
         raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
     except urllib.error.URLError as exc:
         raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PutFileResult:
+    commit_sha: str
+    file_path: str
+    web_url: str
+
+
+def _github_contents_url(base: str, repo_full_name: str, path: str) -> str:
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    safe_path = "/".join(urllib.parse.quote(p, safe="") for p in path.split("/"))
+    return f"{base}/repos/{safe_repo}/contents/{safe_path}"
+
+
+def _github_existing_sha(
+    *,
+    token: str,
+    base: str,
+    repo_full_name: str,
+    path: str,
+    branch: str,
+) -> str | None:
+    """Discover the blob SHA of an existing file on ``branch`` so we can
+    PUT an update instead of failing 422. Returns None when the file
+    doesn't exist yet (the create path). Bubbles auth failures as
+    GithubProviderError so the caller sees the same envelope shape it
+    would on any other API call."""
+    url = f"{_github_contents_url(base, repo_full_name, path)}?ref={urllib.parse.quote(branch)}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+    if isinstance(payload, dict):
+        sha = payload.get("sha")
+        if isinstance(sha, str):
+            return sha
+    # Directory listing or unexpected payload — treat as "no file here".
+    return None
+
+
+def put_github_file(
+    connection,
+    *,
+    repo_full_name: str,
+    path: str,
+    branch: str,
+    content: str,
+    commit_message: str,
+) -> PutFileResult:
+    """Create or update a file at ``path`` on ``branch`` via the
+    GitHub Contents API.
+
+    GitHub's PUT /repos/{owner}/{repo}/contents/{path} is the same
+    endpoint for create and update; the difference is whether you
+    include the existing blob ``sha``. We discover that with a GET
+    first so the caller doesn't need to know whether the file is
+    already present.
+
+    The auth header follows the connection's mode:
+      * ``token <pat-or-oauth-user-token>`` for ``github_pat`` and
+        ``github_oauth_user`` (commit attribution = the user who owns
+        the token).
+      * ``Bearer <installation-token>`` for ``github_app_install``
+        (commit attribution = the GitHub App as a bot)."""
+    token = _token(connection)
+    base = _api_base(connection)
+    is_app_install = connection.kind == "github_app_install"
+    auth_header = f"Bearer {token}" if is_app_install else f"token {token}"
+
+    existing_sha = _github_existing_sha(
+        token=token,
+        base=base,
+        repo_full_name=repo_full_name,
+        path=path,
+        branch=branch,
+    )
+
+    body: dict[str, str] = {
+        "message": commit_message,
+        "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+        "branch": branch,
+    }
+    if existing_sha:
+        body["sha"] = existing_sha
+
+    url = _github_contents_url(base, repo_full_name, path)
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        method="PUT",
+        headers={
+            "Authorization": auth_header,
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GithubProviderError(
+                "NOT_FOUND",
+                f"GitHub couldn't find {repo_full_name}@{branch}. Check the connection's repo access.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError(
+            "API_ERROR",
+            f"GitHub returned {exc.code}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+    commit = (payload or {}).get("commit") or {}
+    content_meta = (payload or {}).get("content") or {}
+    commit_sha = commit.get("sha") or ""
+    web_url = content_meta.get("html_url") or commit.get("html_url") or ""
+    file_path = content_meta.get("path") or path
+    if not commit_sha:
+        raise GithubProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitHub PUT contents response didn't include commit.sha",
+        )
+    return PutFileResult(commit_sha=commit_sha, file_path=file_path, web_url=web_url)
