@@ -73,6 +73,36 @@ def _make_oauth_app(org, kind, *, client_id="abc123", client_secret=b"shh", api_
     )
 
 
+def _make_github_app_install(
+    org,
+    *,
+    client_id="Iv1.fake-app",
+    pem=b"-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n",
+    oauth_client_secret=b"ghs_app_secret",
+):
+    """Persist a github_app_install row with PEM in secret_ciphertext
+    and user-to-server OAuth client_secret in oauth_client_secret_*.
+
+    Mirrors the row shape that ``scm_app_manifest.github_app_manifest_callback``
+    writes after a successful manifest exchange."""
+    pem_enc = encrypt_at_rest(pem)
+    cs_enc = encrypt_at_rest(oauth_client_secret)
+    return SourceConnection.objects.create(
+        organization=org,
+        kind="github_app_install",
+        display_name="GitHub App: astrolift-test",
+        oauth_client_id=client_id,
+        oauth_redirect_uri="",
+        secret_backend_kind=pem_enc.backend_kind,
+        secret_ciphertext=pem_enc.backend_ref,
+        oauth_client_secret_backend_kind=cs_enc.backend_kind,
+        oauth_client_secret_ciphertext=cs_enc.backend_ref,
+        installation_id="12345",
+        account_login="acme-corp",
+        is_active=True,
+    )
+
+
 def _login(client, user):
     client.force_login(user)
 
@@ -199,6 +229,120 @@ def test_github_callback_persists_user_token(org_user_member):
         )
     ).decode()
     assert plain == "gho_TestToken"
+
+
+def test_resolve_client_secret_per_kind(org_user_member):
+    """The dispatcher reads the OAuth client_secret out of different
+    columns depending on the row's kind:
+
+      - github_oauth_app: the only secret on the row is the OAuth
+        client_secret, so it lives in ``secret_ciphertext``.
+      - github_app_install: ``secret_ciphertext`` holds the App's PEM,
+        so the user-to-server OAuth client_secret lives in
+        ``oauth_client_secret_ciphertext``.
+    """
+    from auth1.scm_oauth import _resolve_client_secret
+
+    org, _ = org_user_member
+    oauth_app = _make_oauth_app(org, "github_oauth_app", client_secret=b"oauth-app-secret")
+    app_install = _make_github_app_install(org, oauth_client_secret=b"app-install-secret")
+    assert _resolve_client_secret(oauth_app) == "oauth-app-secret"
+    assert _resolve_client_secret(app_install) == "app-install-secret"
+
+
+def test_github_callback_against_app_install_parent(org_user_member):
+    """End-to-end happy path against a github_app_install parent row:
+    the callback decrypts the user-to-server OAuth client_secret from
+    the new column, POSTs it to the token endpoint, and creates a
+    github_oauth_user child row tied back to the App-install parent.
+
+    Asserts the token POST received the App's user-to-server
+    client_secret (not the PEM) so the GitHub exchange would actually
+    succeed against real GitHub."""
+    org, user = org_user_member
+    parent = _make_github_app_install(org, oauth_client_secret=b"app-install-secret")
+    client = Client()
+    _login(client, user)
+
+    client.get(
+        "/app/auth1/scm/github/start",
+        {"config_id": str(parent.guid)},
+    )
+    state = client.session["scm_oauth_state"]["state"]
+
+    captured_payload: dict = {}
+
+    def _fake_post(url, payload):
+        captured_payload.update(payload)
+        return "gho_TestToken", None
+
+    with (
+        patch("auth1.scm_oauth._resolve_user_token_via_post", side_effect=_fake_post),
+        patch("auth1.scm_oauth._resolve_github_login", return_value="alice"),
+    ):
+        resp = client.get(
+            "/app/auth1/scm/github/callback",
+            {"state": state, "code": "the-code"},
+        )
+
+    assert resp.status_code == 302
+    assert "scm_connected=alice" in resp["Location"]
+
+    # The token exchange used the App's user-to-server client_secret,
+    # not the PEM that lives in secret_ciphertext.
+    assert captured_payload["client_id"] == "Iv1.fake-app"
+    assert captured_payload["client_secret"] == "app-install-secret"
+
+    row = SourceConnection.objects.get(
+        organization=org,
+        kind="github_oauth_user",
+        user=user,
+        parent_oauth_app=parent,
+    )
+    assert row.account_login == "alice"
+    assert row.display_name == "GitHub: alice"
+    plain = decrypt(
+        EncryptedSecret(
+            backend_kind=row.secret_backend_kind,
+            backend_ref=bytes(row.secret_ciphertext),
+        )
+    ).decode()
+    assert plain == "gho_TestToken"
+
+
+def test_github_callback_app_install_without_oauth_secret_errors(org_user_member):
+    """An App-install row registered before the manifest flow persisted
+    client_secret (or one where the operator paste-imported only the
+    PEM) must surface a clean ``config_missing_oauth_secret`` error
+    rather than blowing up on a `decrypt(empty)` or silently sending
+    the PEM as the OAuth secret to GitHub."""
+    org, user = org_user_member
+    # Manually persist an App-install row with the PEM but no OAuth
+    # client_secret — emulates the pre-fix legacy state.
+    pem_enc = encrypt_at_rest(b"-----BEGIN RSA PRIVATE KEY-----\nx\n-----END RSA PRIVATE KEY-----\n")
+    parent = SourceConnection.objects.create(
+        organization=org,
+        kind="github_app_install",
+        oauth_client_id="Iv1.legacy",
+        secret_backend_kind=pem_enc.backend_kind,
+        secret_ciphertext=pem_enc.backend_ref,
+        account_login="acme-corp",
+        installation_id="999",
+        is_active=True,
+    )
+    client = Client()
+    _login(client, user)
+    client.get(
+        "/app/auth1/scm/github/start",
+        {"config_id": str(parent.guid)},
+    )
+    state = client.session["scm_oauth_state"]["state"]
+    resp = client.get(
+        "/app/auth1/scm/github/callback",
+        {"state": state, "code": "the-code"},
+    )
+    assert resp.status_code == 302
+    assert "scm_error=config_missing_oauth_secret" in resp["Location"]
 
 
 # ---------------------------------------------------------------------------
