@@ -957,6 +957,9 @@ type AstroliftTenantCluster {
   capabilities: JSON!
   capabilitiesProbedAt: DateTime
   createdAt: DateTime!
+  lifecycle: String!
+  lastManagementError: String!
+  managedAt: DateTime
 }
 
 type AstroliftTenantClusterMutationResult {
@@ -1073,6 +1076,10 @@ type AvailableTransition {
   toState: String!
   label: String!
   conditionsMet: Boolean!
+}
+
+input BringClusterIntoManagementInputType {
+  clusterId: GUID!
 }
 
 input BulkImportAppSecretsInput {
@@ -1626,6 +1633,8 @@ type Mutation {
   acknowledgeAlertEvent(input: AcknowledgeAlertEventInput!): AstroliftAlertEventMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
+  bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
+  refreshClusterManagement(input: RefreshClusterManagementInputType!): AstroliftTenantClusterMutationResult!
   unregisterTenantCluster(input: UnregisterTenantClusterInput!): SoftdeletepayloadMutationResult!
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
@@ -1949,6 +1958,11 @@ type Query {
 
 input RecheckDomainValidationInput {
   id: GUID!
+}
+
+input RefreshClusterManagementInputType {
+  clusterId: GUID!
+  forcePreflight: Boolean! = false
 }
 
 input RegisterAppInput {

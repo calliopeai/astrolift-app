@@ -2,14 +2,20 @@
 Operator mutations for the cluster fleet.
 
 Gated by ``cluster.register`` / ``cluster.update`` /
-``cluster.unregister`` / ``provider_plugin.configure``. None of these
-talk to a real cloud — they're in-database registrations that the
-provider drivers consume on the next reconcile / probe pass.
+``cluster.unregister`` / ``cluster.manage`` /
+``provider_plugin.configure``. The register/update/unregister
+mutations are in-database registrations that the provider drivers
+consume on the next reconcile / probe pass. The manage mutations
+(``bringClusterIntoManagement`` / ``refreshClusterManagement``)
+kick a Temporal workflow that talks to the real cluster.
 """
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
+from django.db import transaction
 from strawberry.types import Info
 
 from astrolift_clusters.models import (
@@ -28,12 +34,76 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_workflows.client import start_workflow
+from astrolift_workflows.inputs import Actor, BringClusterIntoManagementInput
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
+logger = logging.getLogger(__name__)
+
 JSON = strawberry.scalars.JSON
+
+
+def _bring_workflow_id(cluster_guid: str) -> str:
+    """Workflow id pattern — re-firing the same cluster joins the
+    existing run rather than spawning a parallel one."""
+    return f"BringClusterIntoManagement-{cluster_guid}"
+
+
+def _actor_from_request(info: Info) -> Actor:
+    """Same shape as ``astrolift_lifecycle.schema.mutations``. Inlined
+    rather than imported to keep the lifecycle/cluster apps free of
+    cross-app schema imports."""
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) if request else None
+    if user is not None and getattr(user, "is_authenticated", False):
+        return Actor(
+            kind="user",
+            user_id=user.pk,
+            display=getattr(user, "username", "") or "",
+        )
+    tenant = get_current_tenant()
+    if tenant and tenant.actor_user_id:
+        return Actor(kind="user", user_id=tenant.actor_user_id, display="")
+    return Actor(kind="system", display="system")
+
+
+def _kick_bring_into_management(
+    *,
+    cluster: TenantCluster,
+    actor: Actor,
+    force_preflight: bool,
+) -> None:
+    """Flip the row to ``managing`` (so the UI shows the spinner
+    immediately) + enqueue the workflow.
+
+    The workflow's first activity re-asserts ``managing`` to cover
+    the worker-crash case where the row was already flipped by this
+    helper; that's fine because ``mark_managing`` is idempotent.
+    """
+    cluster.lifecycle = TenantCluster.Lifecycle.MANAGING.value
+    cluster.last_management_error = ""
+    cluster.save(
+        update_fields=[
+            "lifecycle",
+            "last_management_error",
+            "updated_at",
+            "version",
+        ]
+    )
+    start_workflow(
+        "BringClusterIntoManagementWorkflow",
+        args=[
+            BringClusterIntoManagementInput(
+                cluster_id=cluster.pk,
+                actor=actor,
+                force_preflight=force_preflight,
+            )
+        ],
+        workflow_id=_bring_workflow_id(str(cluster.guid)),
+    )
 
 
 @strawberry.input
@@ -93,6 +163,17 @@ class ConfigureProviderPluginInput:
     plugin_slug: str
     config: JSON
     organization_scoped: bool = True
+
+
+@strawberry.input
+class BringClusterIntoManagementInputType:
+    cluster_id: GUID
+
+
+@strawberry.input
+class RefreshClusterManagementInputType:
+    cluster_id: GUID
+    force_preflight: bool = False
 
 
 @strawberry.type
@@ -176,6 +257,74 @@ class ClustersMutation:
         if input.ingress_class is not None:
             cluster.ingress_class = input.ingress_class
         cluster.save()
+        return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(action="cluster.bring_into_management")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def bring_cluster_into_management(
+        self, info: Info, input: BringClusterIntoManagementInputType
+    ) -> MutationResultType[TenantClusterType]:
+        """Operator-driven transition from ``registered`` to ``managed``
+        (or ``error`` on failure). Returns the row in ``managing`` state
+        so the UI can poll for completion. Idempotent — re-running
+        against a managing/managed row no-ops the lifecycle flip and
+        joins the in-flight workflow."""
+        cluster = TenantCluster.objects.filter(guid=str(input.cluster_id), deleted_at__isnull=True).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        if not cluster.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cluster is inactive — re-activate before bringing into management",
+            )
+        if cluster.lifecycle == TenantCluster.Lifecycle.MANAGING.value:
+            # Already in flight — surface the current state without
+            # re-kicking the workflow (the existing run picks up the
+            # same workflow id anyway, but skipping the DB write
+            # keeps the row's updated_at stable for the UI).
+            return gql_success(cluster_to_type(cluster))
+
+        actor = _actor_from_request(info)
+        with transaction.atomic():
+            _kick_bring_into_management(
+                cluster=cluster,
+                actor=actor,
+                force_preflight=True,
+            )
+        return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(action="cluster.refresh_management")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def refresh_cluster_management(
+        self, info: Info, input: RefreshClusterManagementInputType
+    ) -> MutationResultType[TenantClusterType]:
+        """Same workflow as ``bringClusterIntoManagement`` but accepts
+        already-managed rows — the operator hits this when prereqs
+        change out-of-band (cert-manager upgraded, ingress controller
+        swapped) and wants the capabilities snapshot refreshed.
+
+        ``forcePreflight=true`` re-runs the Job; default false skips
+        it for a fast probe + RBAC reconcile."""
+        cluster = TenantCluster.objects.filter(guid=str(input.cluster_id), deleted_at__isnull=True).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        if not cluster.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cluster is inactive — re-activate before refreshing management",
+            )
+
+        actor = _actor_from_request(info)
+        with transaction.atomic():
+            _kick_bring_into_management(
+                cluster=cluster,
+                actor=actor,
+                force_preflight=bool(input.force_preflight),
+            )
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
