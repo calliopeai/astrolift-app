@@ -133,5 +133,71 @@
       "resultConfirmed": "Confirmado — elemento eliminado.",
       "resultCancelled": "Cancelado."
     }
+  },
+  "apps": {
+    "list": {
+      "title": "Aplicaciones",
+      "description": "Repositorios registrados para implementación. Cada aplicación tiene cargas de trabajo, entornos, implementaciones, secretos y servicios gestionados adjuntos.",
+      "register": "Registrar aplicación",
+      "empty": {
+        "title": "Aún no hay aplicaciones registradas",
+        "description": "Registra un repositorio Git — analizamos su astrolift.toml, aprovisionamos un namespace y un repositorio de registro, y desplegamos la primera implementación desde un workflow de Temporal.",
+        "action": "Registra tu primera aplicación"
+      },
+      "branchLabel": "rama",
+      "open": "Abrir"
+    },
+    "tabs": {
+      "ariaLabel": "Secciones de la aplicación",
+      "overview": "Resumen",
+      "deployments": "Implementaciones",
+      "workloads": "Cargas de trabajo",
+      "observability": "Observabilidad",
+      "console": "Consola",
+      "previews": "Vistas previas",
+      "domains": "Dominios",
+      "secrets": "Secretos",
+      "security": "Seguridad",
+      "members": "Miembros",
+      "settings": "Ajustes"
+    }
+  },
+  "settingsIndex": {
+    "title": "Ajustes",
+    "description": "Configura la identidad, seguridad y superficies de la plataforma.",
+    "sections": {
+      "organization": {
+        "title": "Organización",
+        "description": "Nombre visible, sitio web, predeterminados de retención."
+      },
+      "identityProvider": {
+        "title": "Proveedor de identidad",
+        "description": "Configuración OIDC / SAML + aprovisionamiento SCIM."
+      },
+      "sourceProviders": {
+        "title": "Proveedores de código fuente",
+        "description": "Conecta GitHub / GitLab / Gitea + gestiona claves SSH de despliegue."
+      },
+      "policies": {
+        "title": "Políticas ABAC",
+        "description": "Predicados en tiempo de ejecución sobre RBAC."
+      },
+      "profile": {
+        "title": "Perfil",
+        "description": "Tema + idioma."
+      },
+      "security": {
+        "title": "Seguridad",
+        "description": "Sesiones activas, MFA, elevación de administrador."
+      },
+      "notifications": {
+        "title": "Notificaciones",
+        "description": "Bandeja de aprobaciones, alertas e invitaciones."
+      },
+      "apiTokens": {
+        "title": "Tokens de API",
+        "description": "Tokens portadores de larga duración para CLI y bots."
+      }
+    }
   }
 }

@@ -8,6 +8,7 @@ import {
   ShieldIcon,
   UserCircleIcon,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 
 import { PageShell } from "@/components/PageShell";
@@ -19,65 +20,33 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-const sections = [
-  {
-    href: "/settings/organization",
-    icon: BuildingIcon,
-    title: "Organization",
-    description: "Display name, website, retention defaults.",
-  },
-  {
-    href: "/settings/identity-provider",
-    icon: KeyRoundIcon,
-    title: "Identity provider",
-    description: "OIDC / SAML config + SCIM provisioning.",
-  },
-  {
-    href: "/settings/source-providers",
-    icon: GitBranchIcon,
-    title: "Source providers",
-    description: "Connect GitHub / GitLab / Gitea + manage SSH deploy keys.",
-  },
-  {
-    href: "/settings/policies",
-    icon: ScaleIcon,
-    title: "ABAC policies",
-    description: "Runtime predicates layered on top of RBAC.",
-  },
-  {
-    href: "/settings/profile",
-    icon: UserCircleIcon,
-    title: "Profile",
-    description: "Theme + locale.",
-  },
-  {
-    href: "/settings/security",
-    icon: ShieldIcon,
-    title: "Security",
-    description: "Active sessions, MFA, admin elevation.",
-  },
-  {
-    href: "/settings/notifications",
-    icon: BellIcon,
-    title: "Notifications",
-    description: "Inbox of approvals, alerts, invitations.",
-  },
-  {
-    href: "/tokens",
-    icon: KeyIcon,
-    title: "API tokens",
-    description: "Long-lived bearer tokens for CLIs and bots.",
-  },
+type SectionKey =
+  | "organization"
+  | "identityProvider"
+  | "sourceProviders"
+  | "policies"
+  | "profile"
+  | "security"
+  | "notifications"
+  | "apiTokens";
+
+const sections: { key: SectionKey; href: string; icon: typeof BellIcon }[] = [
+  { key: "organization", href: "/settings/organization", icon: BuildingIcon },
+  { key: "identityProvider", href: "/settings/identity-provider", icon: KeyRoundIcon },
+  { key: "sourceProviders", href: "/settings/source-providers", icon: GitBranchIcon },
+  { key: "policies", href: "/settings/policies", icon: ScaleIcon },
+  { key: "profile", href: "/settings/profile", icon: UserCircleIcon },
+  { key: "security", href: "/settings/security", icon: ShieldIcon },
+  { key: "notifications", href: "/settings/notifications", icon: BellIcon },
+  { key: "apiTokens", href: "/tokens", icon: KeyIcon },
 ];
 
 export const metadata = { title: "Settings · Astrolift" };
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const t = await getTranslations("settingsIndex");
   return (
-    <PageShell
-      title="Settings"
-      description="Configure the platform's identity, security, and surfaces."
-    >
+    <PageShell title={t("title")} description={t("description")}>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {sections.map((s) => (
           <Link key={s.href} href={s.href} className="contents">
@@ -87,11 +56,15 @@ export default function SettingsPage() {
                   <s.icon className="size-4" />
                 </div>
                 <div>
-                  <CardTitle className="text-base">{s.title}</CardTitle>
+                  <CardTitle className="text-base">
+                    {t(`sections.${s.key}.title`)}
+                  </CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                <CardDescription>{s.description}</CardDescription>
+                <CardDescription>
+                  {t(`sections.${s.key}.description`)}
+                </CardDescription>
               </CardContent>
             </Card>
           </Link>

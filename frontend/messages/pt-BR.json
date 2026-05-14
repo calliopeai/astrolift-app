@@ -137,5 +137,71 @@
       "resultConfirmed": "Confirmed — item deleted.",
       "resultCancelled": "Cancelled."
     }
+  },
+  "apps": {
+    "list": {
+      "title": "Aplicativos",
+      "description": "Repositórios registrados para implantação. Cada aplicativo tem workloads, ambientes, implantações, segredos e serviços gerenciados associados.",
+      "register": "Registrar aplicativo",
+      "empty": {
+        "title": "Nenhum aplicativo registrado ainda",
+        "description": "Registre um repositório Git — analisamos o astrolift.toml, provisionamos um namespace e um repositório de registry e iniciamos a primeira implantação via workflow do Temporal.",
+        "action": "Registrar seu primeiro aplicativo"
+      },
+      "branchLabel": "branch",
+      "open": "Abrir"
+    },
+    "tabs": {
+      "ariaLabel": "Seções do aplicativo",
+      "overview": "Visão geral",
+      "deployments": "Implantações",
+      "workloads": "Workloads",
+      "observability": "Observabilidade",
+      "console": "Console",
+      "previews": "Pré-visualizações",
+      "domains": "Domínios",
+      "secrets": "Segredos",
+      "security": "Segurança",
+      "members": "Membros",
+      "settings": "Configurações"
+    }
+  },
+  "settingsIndex": {
+    "title": "Configurações",
+    "description": "Configure a identidade, segurança e superfícies da plataforma.",
+    "sections": {
+      "organization": {
+        "title": "Organização",
+        "description": "Nome de exibição, site, padrões de retenção."
+      },
+      "identityProvider": {
+        "title": "Provedor de identidade",
+        "description": "Configuração OIDC / SAML + provisionamento SCIM."
+      },
+      "sourceProviders": {
+        "title": "Provedores de código-fonte",
+        "description": "Conecte GitHub / GitLab / Gitea + gerencie chaves SSH de deploy."
+      },
+      "policies": {
+        "title": "Políticas ABAC",
+        "description": "Predicados de runtime sobre o RBAC."
+      },
+      "profile": {
+        "title": "Perfil",
+        "description": "Tema + idioma."
+      },
+      "security": {
+        "title": "Segurança",
+        "description": "Sessões ativas, MFA, elevação de admin."
+      },
+      "notifications": {
+        "title": "Notificações",
+        "description": "Caixa de entrada de aprovações, alertas e convites."
+      },
+      "apiTokens": {
+        "title": "Tokens de API",
+        "description": "Tokens de portador de longa duração para CLIs e bots."
+      }
+    }
   }
 }

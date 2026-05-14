@@ -133,5 +133,71 @@
       "resultConfirmed": "Bestätigt — Element gelöscht.",
       "resultCancelled": "Abgebrochen."
     }
+  },
+  "apps": {
+    "list": {
+      "title": "Apps",
+      "description": "Für die Bereitstellung registrierte Repositories. Jede App hat zugeordnete Workloads, Umgebungen, Bereitstellungen, Secrets und verwaltete Dienste.",
+      "register": "App registrieren",
+      "empty": {
+        "title": "Noch keine Apps registriert",
+        "description": "Registriere ein Git-Repository — wir parsen die astrolift.toml, stellen einen Namespace und ein Registry-Repository bereit und führen die erste Bereitstellung über einen Temporal-Workflow aus.",
+        "action": "Erste App registrieren"
+      },
+      "branchLabel": "Branch",
+      "open": "Öffnen"
+    },
+    "tabs": {
+      "ariaLabel": "App-Bereiche",
+      "overview": "Übersicht",
+      "deployments": "Bereitstellungen",
+      "workloads": "Workloads",
+      "observability": "Observability",
+      "console": "Konsole",
+      "previews": "Previews",
+      "domains": "Domänen",
+      "secrets": "Secrets",
+      "security": "Sicherheit",
+      "members": "Mitglieder",
+      "settings": "Einstellungen"
+    }
+  },
+  "settingsIndex": {
+    "title": "Einstellungen",
+    "description": "Konfiguriere Identität, Sicherheit und Oberflächen der Plattform.",
+    "sections": {
+      "organization": {
+        "title": "Organisation",
+        "description": "Anzeigename, Website, Aufbewahrungs-Standardwerte."
+      },
+      "identityProvider": {
+        "title": "Identity Provider",
+        "description": "OIDC / SAML-Konfiguration + SCIM-Bereitstellung."
+      },
+      "sourceProviders": {
+        "title": "Quellanbieter",
+        "description": "GitHub / GitLab / Gitea verbinden + SSH-Deploy-Keys verwalten."
+      },
+      "policies": {
+        "title": "ABAC-Richtlinien",
+        "description": "Laufzeitprädikate über RBAC."
+      },
+      "profile": {
+        "title": "Profil",
+        "description": "Theme + Sprache."
+      },
+      "security": {
+        "title": "Sicherheit",
+        "description": "Aktive Sitzungen, MFA, Admin-Elevation."
+      },
+      "notifications": {
+        "title": "Benachrichtigungen",
+        "description": "Posteingang für Freigaben, Alerts und Einladungen."
+      },
+      "apiTokens": {
+        "title": "API-Tokens",
+        "description": "Langlebige Bearer-Tokens für CLIs und Bots."
+      }
+    }
   }
 }

@@ -137,5 +137,71 @@
       "resultConfirmed": "Confirmed — item deleted.",
       "resultCancelled": "Cancelled."
     }
+  },
+  "apps": {
+    "list": {
+      "title": "Apps",
+      "description": "Repositories registered for deployment. Each app has workloads, environments, deployments, secrets, and managed services attached.",
+      "register": "Register app",
+      "empty": {
+        "title": "No apps registered yet",
+        "description": "Register a Git repository — we parse its astrolift.toml, provision a namespace and registry repo, and roll the first deployment from a Temporal workflow.",
+        "action": "Register your first app"
+      },
+      "branchLabel": "branch",
+      "open": "Open"
+    },
+    "tabs": {
+      "ariaLabel": "App sections",
+      "overview": "Overview",
+      "deployments": "Deployments",
+      "workloads": "Workloads",
+      "observability": "Observability",
+      "console": "Console",
+      "previews": "Previews",
+      "domains": "Domains",
+      "secrets": "Secrets",
+      "security": "Security",
+      "members": "Members",
+      "settings": "Settings"
+    }
+  },
+  "settingsIndex": {
+    "title": "Settings",
+    "description": "Configure the platform's identity, security, and surfaces.",
+    "sections": {
+      "organization": {
+        "title": "Organization",
+        "description": "Display name, website, retention defaults."
+      },
+      "identityProvider": {
+        "title": "Identity provider",
+        "description": "OIDC / SAML config + SCIM provisioning."
+      },
+      "sourceProviders": {
+        "title": "Source providers",
+        "description": "Connect GitHub / GitLab / Gitea + manage SSH deploy keys."
+      },
+      "policies": {
+        "title": "ABAC policies",
+        "description": "Runtime predicates layered on top of RBAC."
+      },
+      "profile": {
+        "title": "Profile",
+        "description": "Theme + locale."
+      },
+      "security": {
+        "title": "Security",
+        "description": "Active sessions, MFA, admin elevation."
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "Inbox of approvals, alerts, invitations."
+      },
+      "apiTokens": {
+        "title": "API tokens",
+        "description": "Long-lived bearer tokens for CLIs and bots."
+      }
+    }
   }
 }
