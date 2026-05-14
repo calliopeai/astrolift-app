@@ -115,6 +115,16 @@ class Deployment(BaseCoreModel):
     approvals_required = models.PositiveIntegerField(default=0)
     approvals_received = models.PositiveIntegerField(default=0)
 
+    # Emailed-approval magic link (#125, spec 06 §4.6). Plaintext is
+    # surfaced exactly once in the deployment-creation event payload;
+    # only the SHA-256 hash + expiry persist here. The public
+    # approve_deployment_by_token / reject_deployment_by_token
+    # mutations match presented tokens against this hash — the token
+    # IS the auth proof, so the resolver runs unauthenticated.
+    approval_token_hash = models.CharField(max_length=128, blank=True, default="")
+    approval_token_expires_at = models.DateTimeField(null=True, blank=True)
+    approval_token_used_at = models.DateTimeField(null=True, blank=True)
+
     started_at = models.DateTimeField(null=True, blank=True)
     succeeded_at = models.DateTimeField(null=True, blank=True)
     failed_at = models.DateTimeField(null=True, blank=True)

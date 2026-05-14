@@ -32,6 +32,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_lifecycle.approval import mint_magic_link
 from astrolift_lifecycle.models import (
     AppEnvironment,
     CustomDomain,
@@ -93,6 +94,28 @@ class StartDeploymentInput:
 @strawberry.input
 class DeploymentByIdInput:
     id: GUID
+
+
+@strawberry.input
+class ApproveByTokenInput:
+    """Public mutation input — the token is the auth proof.
+
+    No tenant context, no permission check: the SHA-256 of ``token``
+    must match an active, unconsumed, unexpired
+    ``Deployment.approval_token_hash``."""
+
+    token: str
+
+
+@strawberry.input
+class RejectByTokenInput:
+    """Public mutation input — same auth model as ``ApproveByTokenInput``.
+
+    ``reason`` is recorded on the deployment's lifecycle event for the
+    audit trail."""
+
+    token: str
+    reason: str | None = None
 
 
 @strawberry.input
@@ -248,6 +271,97 @@ def _resolve_app_env(app_slug: str, environment_name: str) -> tuple[RegisteredAp
     return app, env
 
 
+def _lookup_deployment_by_token(
+    presented_plaintext: str,
+) -> tuple[Deployment | None, MutationResultType[DeploymentType] | None]:
+    """Find the deployment whose ``approval_token_hash`` matches the
+    presented plaintext, or return the appropriate failure envelope.
+
+    Single error message across every failure path so callers can't
+    distinguish "no such token" from "expired" from "already used" via
+    timing.
+    """
+    import hashlib
+
+    presented = (presented_plaintext or "").strip()
+    INVALID = gql_failure(
+        ErrorCode.PERMISSION_DENIED.value,
+        "approval token invalid",
+        field="token",
+    )
+    if not presented:
+        return None, INVALID
+
+    digest = hashlib.sha256(presented.encode("utf-8")).hexdigest()
+    deployment = (
+        Deployment.objects.select_related("registered_app", "app_environment", "workload")
+        .filter(
+            approval_token_hash=digest,
+            deleted_at__isnull=True,
+        )
+        .first()
+    )
+    if deployment is None:
+        return None, INVALID
+    if deployment.approval_token_used_at is not None:
+        return None, INVALID
+    if deployment.approval_token_expires_at is None or deployment.approval_token_expires_at <= timezone.now():
+        return None, INVALID
+    if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
+        return None, INVALID
+    return deployment, None
+
+
+def _record_approval_vote_and_maybe_start(
+    deployment: Deployment,
+    actor: Actor,
+    organization_id: int | None,
+) -> None:
+    """Increment ``approvals_received`` and, if quorum is now met,
+    transition the deploy to PENDING + enqueue the DeployAppWorkflow.
+
+    Shared by :meth:`approve_deployment` (auth-required, called by an
+    operator) and :meth:`approve_deployment_by_token` (public, called
+    by the holder of an emailed magic link). Callers wrap this in
+    ``transaction.atomic`` and persist the deployment row themselves
+    when no transition fires.
+    """
+    deployment.approvals_received += 1
+    if deployment.approvals_received < deployment.approvals_required:
+        deployment.save(update_fields=["approvals_received", "updated_at", "version"])
+        return
+
+    deployment.transition_to(Deployment.Status.PENDING)
+    app = deployment.registered_app
+    env = deployment.app_environment
+    wf_id = _deploy_workflow_id(str(app.guid), str(env.guid))
+    handle = start_workflow(
+        "DeployAppWorkflow",
+        args=[
+            DeployAppInput(
+                registered_app_id=app.pk,
+                app_environment_id=env.pk,
+                image_tags={"app": deployment.image_tag},
+                trigger_kind=deployment.trigger_kind,
+                actor=actor,
+            )
+        ],
+        workflow_id=wf_id,
+    )
+    if handle.enqueued:
+        run = _record_workflow_run(
+            kind="DeployAppWorkflow",
+            workflow_id=handle.workflow_id,
+            run_id=handle.run_id,
+            organization_id=organization_id,
+            registered_app_id=app.pk,
+            app_environment_id=env.pk,
+            actor=actor,
+        )
+        deployment.workflow_run = run
+        deployment.save(update_fields=["workflow_run", "updated_at", "version"])
+
+
 # ---------------------------------------------------------------------------
 # Root mutation type
 # ---------------------------------------------------------------------------
@@ -297,6 +411,19 @@ class LifecycleMutation:
                 if env.required_approvals > 0
                 else Deployment.Status.PENDING
             )
+
+            # Mint an emailed-approval magic link when the env gates on
+            # human approvals. Plaintext is returned in the published
+            # lifecycle event (operators wire that to email/Slack);
+            # only the hash + expiry persist on the row.
+            approval_token_plaintext: str | None = None
+            approval_token_hash = ""
+            approval_token_expires_at = None
+            if initial_status is Deployment.Status.PENDING_APPROVAL:
+                issued = mint_magic_link(now=timezone.now())
+                approval_token_plaintext = issued.plaintext_token
+                approval_token_hash = issued.token_hash
+                approval_token_expires_at = issued.expires_at
             deployment = Deployment.objects.create(
                 registered_app=app,
                 app_environment=env,
@@ -307,12 +434,38 @@ class LifecycleMutation:
                 image_digest=input.image_digest or "",
                 approvals_required=env.required_approvals,
                 approvals_received=0,
+                approval_token_hash=approval_token_hash,
+                approval_token_expires_at=approval_token_expires_at,
                 ci_actor_kind=(input.ci_actor_kind or "").strip(),
                 commit_sha=(input.commit_sha or "").strip(),
                 branch=(input.branch or "").strip(),
                 ci_run_url=(input.ci_run_url or "").strip(),
                 ci_provider=(input.ci_provider or "").strip(),
             )
+
+            if approval_token_plaintext:
+                # Surface the plaintext exactly once, on the
+                # deploy.approval_token.minted lifecycle event.
+                # Notification/webhook fan-out picks this up.
+                try:
+                    from core.pubsub import publish_sync
+
+                    publish_sync(
+                        f"deployment.approval_token.minted.{app.organization_id}",
+                        {
+                            "deployment_id": str(deployment.guid),
+                            "registered_app_slug": app.slug,
+                            "environment_name": env.name,
+                            "approval_token": approval_token_plaintext,
+                            "expires_at": (
+                                approval_token_expires_at.isoformat() if approval_token_expires_at else ""
+                            ),
+                        },
+                    )
+                except Exception:
+                    import logging
+
+                    logging.getLogger(__name__).warning("approval token publish failed", exc_info=True)
 
             if initial_status is Deployment.Status.PENDING:
                 wf_id = _deploy_workflow_id(str(app.guid), str(env.guid))
@@ -373,39 +526,85 @@ class LifecycleMutation:
             )
 
         with transaction.atomic():
-            deployment.approvals_received += 1
-            if deployment.approvals_received >= deployment.approvals_required:
-                deployment.transition_to(Deployment.Status.PENDING)
-                app = deployment.registered_app
-                env = deployment.app_environment
-                wf_id = _deploy_workflow_id(str(app.guid), str(env.guid))
-                handle = start_workflow(
-                    "DeployAppWorkflow",
-                    args=[
-                        DeployAppInput(
-                            registered_app_id=app.pk,
-                            app_environment_id=env.pk,
-                            image_tags={"app": deployment.image_tag},
-                            trigger_kind=deployment.trigger_kind,
-                            actor=actor,
-                        )
-                    ],
-                    workflow_id=wf_id,
-                )
-                if handle.enqueued:
-                    run = _record_workflow_run(
-                        kind="DeployAppWorkflow",
-                        workflow_id=handle.workflow_id,
-                        run_id=handle.run_id,
-                        organization_id=tenant.organization_id if tenant else None,
-                        registered_app_id=app.pk,
-                        app_environment_id=env.pk,
-                        actor=actor,
-                    )
-                    deployment.workflow_run = run
-                    deployment.save(update_fields=["workflow_run", "updated_at", "version"])
-            else:
-                deployment.save(update_fields=["approvals_received", "updated_at", "version"])
+            _record_approval_vote_and_maybe_start(
+                deployment,
+                actor,
+                organization_id=tenant.organization_id if tenant else None,
+            )
+
+        return gql_success(deployment_to_type(deployment))
+
+    # ---- Public token-based approve / reject (#125, spec 06 §4.6) ----
+    #
+    # These two resolvers are **public** by design: no auth, no
+    # @tenant_scoped, no @require_permission. The token itself is the
+    # auth proof — operators wire ``deployment.approval_token.minted``
+    # events to email/Slack, the recipient clicks a link with the
+    # token in the URL, and the UI calls these mutations. The hash-
+    # at-rest pattern means a leaked DB never leaks usable tokens.
+    #
+    # Listed in the tenancy guardrail's EXEMPT set with this rationale.
+
+    @strawberry.field
+    @mutation_audit(action="deployment.approve_by_token")
+    def approve_deployment_by_token(
+        self, info: Info, input: ApproveByTokenInput
+    ) -> MutationResultType[DeploymentType]:
+        deployment, err = _lookup_deployment_by_token(input.token)
+        if err is not None:
+            return err
+
+        # Self-approval guard doesn't apply here: the token issuer
+        # would have to leak it to the deployer for self-approve, and
+        # the *issuance* is what gates approval policy. Token mint is
+        # done at start_deployment time inside the platform.
+        actor = Actor(kind="token", display="approval_token")
+
+        with transaction.atomic():
+            deployment.approval_token_used_at = timezone.now()
+            deployment.save(
+                update_fields=[
+                    "approval_token_used_at",
+                    "updated_at",
+                    "version",
+                ]
+            )
+            _record_approval_vote_and_maybe_start(
+                deployment,
+                actor,
+                organization_id=deployment.registered_app.organization_id,
+            )
+
+        return gql_success(deployment_to_type(deployment))
+
+    @strawberry.field
+    @mutation_audit(action="deployment.reject_by_token")
+    def reject_deployment_by_token(
+        self, info: Info, input: RejectByTokenInput
+    ) -> MutationResultType[DeploymentType]:
+        deployment, err = _lookup_deployment_by_token(input.token)
+        if err is not None:
+            return err
+
+        reason = (input.reason or "rejected via approval token").strip()
+
+        with transaction.atomic():
+            deployment.approval_token_used_at = timezone.now()
+            deployment.save(
+                update_fields=[
+                    "approval_token_used_at",
+                    "updated_at",
+                    "version",
+                ]
+            )
+            # Terminal: reject moves pending_approval → failed and
+            # stops any workflow that might already be running (none
+            # should be at this state, but defense in depth).
+            if deployment.workflow_run_id:
+                wf_id = deployment.workflow_run.workflow_id  # type: ignore[union-attr]
+                if not signal_workflow(wf_id, "abort"):
+                    terminate_workflow(wf_id, reason=f"reject_by_token: {reason}")
+            deployment.transition_to(Deployment.Status.FAILED)
 
         return gql_success(deployment_to_type(deployment))
 

@@ -84,6 +84,17 @@ EXEMPT: dict[str, str] = {
     "OperationsQuery.astrolift_my_notifications": "self-service: caller's own notifications",
     "OperationsMutation.mark_notification_read": "self-service: marks the caller's own notification",
     "OperationsMutation.mark_all_notifications_read": "self-service: marks all the caller's notifications",
+    # Token-based public approval (#125, spec 06 §4.6). The single-use
+    # magic link in the operator's email is the auth proof — by
+    # construction the resolver runs unauthenticated, hash-at-rest in
+    # the DB row is the source of truth. Bot/email integrations
+    # cannot supply tenant context.
+    "LifecycleMutation.approve_deployment_by_token": (
+        "public: approval magic-link token IS the auth proof; no tenant context at the point of click"
+    ),
+    "LifecycleMutation.reject_deployment_by_token": (
+        "public: rejection magic-link token IS the auth proof; no tenant context at the point of click"
+    ),
 }
 
 
