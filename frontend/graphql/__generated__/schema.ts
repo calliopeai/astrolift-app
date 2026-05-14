@@ -977,6 +977,9 @@ export type AstroliftTenantCluster = {
   id: Scalars['GUID']['output'];
   ingressClass: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
+  lastManagementError: Scalars['String']['output'];
+  lifecycle: Scalars['String']['output'];
+  managedAt?: Maybe<Scalars['DateTime']['output']>;
   name: Scalars['String']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
   providerPluginSlug: Scalars['String']['output'];
@@ -1098,6 +1101,10 @@ export type AvailableTransition = {
   fromState: Scalars['String']['output'];
   label: Scalars['String']['output'];
   toState: Scalars['String']['output'];
+};
+
+export type BringClusterIntoManagementInputType = {
+  clusterId: Scalars['GUID']['input'];
 };
 
 export type BulkImportAppSecretsInput = {
@@ -1480,6 +1487,7 @@ export type Mutation = {
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
+  bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
@@ -1570,6 +1578,7 @@ export type Mutation = {
   pushManifestToRepo: ManifestpushpayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
+  refreshClusterManagement: AstroliftTenantClusterMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
@@ -1682,6 +1691,11 @@ export type MutationApproveDeploymentByTokenArgs = {
 
 export type MutationAttachSecretBundleArgs = {
   input: AttachSecretBundleInput;
+};
+
+
+export type MutationBringClusterIntoManagementArgs = {
+  input: BringClusterIntoManagementInputType;
 };
 
 
@@ -2019,6 +2033,11 @@ export type MutationRecheckDomainValidationArgs = {
 
 export type MutationRedeployAppArgs = {
   input: DeploymentByIdInput;
+};
+
+
+export type MutationRefreshClusterManagementArgs = {
+  input: RefreshClusterManagementInputType;
 };
 
 
@@ -2838,6 +2857,11 @@ export type QueryWorkflowInstancesArgs = {
 
 export type RecheckDomainValidationInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type RefreshClusterManagementInputType = {
+  clusterId: Scalars['GUID']['input'];
+  forcePreflight: Scalars['Boolean']['input'];
 };
 
 export type RegisterAppInput = {
