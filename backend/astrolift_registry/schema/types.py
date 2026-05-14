@@ -46,6 +46,7 @@ class RegisteredAppType:
     preview_max_active: int
     preview_enabled: bool
     trigger_mode: str
+    cron_expression: str
     deploy_branch: str
     preview_screenshot_url: str
 
@@ -135,6 +136,7 @@ def app_to_type(app) -> RegisteredAppType:
         preview_max_active=app.preview_max_active,
         preview_enabled=app.preview_enabled,
         trigger_mode=app.trigger_mode,
+        cron_expression=app.cron_expression or "",
         deploy_branch=app.deploy_branch,
         preview_screenshot_url=app.preview_screenshot_url or "",
         created_at=app.created_at,
