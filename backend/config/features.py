@@ -37,6 +37,14 @@ class Feature(StrEnum):
     TEMPORAL = "temporal"
     OPENSEARCH = "opensearch"
     FILE_UPLOADS = "file_uploads"
+    # Gate for the app deploy pipeline (start/promote/rollback/teardown +
+    # onboard). Off by default until the apply/secrets/dns/rollout activities
+    # in astrolift_workflows/activities/app_lifecycle.py are real driver
+    # implementations rather than log-only placeholders. Flip to true once
+    # those land so operators stop seeing the "deploy pipeline disabled" error
+    # envelope. Cluster adoption (`bringClusterIntoManagement`) is not gated
+    # — its workflow is fully implemented end-to-end.
+    DEPLOY_PIPELINE = "deploy_pipeline"
 
 
 # Feature -> environment variable -> default
@@ -45,6 +53,7 @@ FEATURE_DEFAULTS = {
     Feature.TEMPORAL: ("FEATURE_TEMPORAL", True),
     Feature.OPENSEARCH: ("FEATURE_OPENSEARCH", True),
     Feature.FILE_UPLOADS: ("FEATURE_FILE_UPLOADS", True),
+    Feature.DEPLOY_PIPELINE: ("FEATURE_DEPLOY_PIPELINE", False),
 }
 
 # Feature -> Django apps that belong to it
