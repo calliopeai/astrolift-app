@@ -6,8 +6,9 @@ import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SOFT_DELETE_PROJECT } from "@/graphql/identity/identity.mutations";
-import {
-  LIST_PROJECTS,
-  LIST_TEAMS,
-} from "@/graphql/identity/identity.queries";
+import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftProject,
   AstroliftTeam,
@@ -43,6 +41,7 @@ interface TeamsResp {
 
 export function ProjectsClient() {
   const [open, setOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<AstroliftProject | null>(null);
   const projects = useQuery<Resp>(LIST_PROJECTS);
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
 
@@ -54,7 +53,6 @@ export function ProjectsClient() {
   });
 
   async function handleDelete(p: AstroliftProject) {
-    if (!confirm(`Delete project ${p.team.slug}/${p.slug}?`)) return;
     const { data } = await softDeleteProject({
       variables: { input: { id: p.id } },
     });
@@ -62,7 +60,7 @@ export function ProjectsClient() {
     if (result?.ok) {
       toast.success(`Deleted ${p.slug}`);
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(result?.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -100,9 +98,7 @@ export function ProjectsClient() {
                     : "Group your apps under a project so cost and quotas roll up cleanly."
                 }
                 actionHref={teams.data?.astroliftTeams.length === 0 ? "/teams" : undefined}
-                actionLabel={
-                  teams.data?.astroliftTeams.length === 0 ? "Manage teams" : undefined
-                }
+                actionLabel={teams.data?.astroliftTeams.length === 0 ? "Manage teams" : undefined}
               />
             </div>
           ) : (
@@ -119,10 +115,7 @@ export function ProjectsClient() {
                 {list.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
-                      <Link
-                        href={`/projects/${p.slug}`}
-                        className="hover:underline"
-                      >
+                      <Link href={`/projects/${p.slug}`} className="hover:underline">
                         <div className="font-medium">{p.name}</div>
                         <div className="text-muted-foreground font-mono text-xs">
                           {p.team.slug}/{p.slug}
@@ -132,7 +125,7 @@ export function ProjectsClient() {
                     <TableCell>
                       <Badge variant="secondary">{p.team.slug}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-muted-foreground text-sm">
                       {new Date(p.createdAt).toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "short",
@@ -144,7 +137,7 @@ export function ProjectsClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleDelete(p)}
+                          onClick={() => setDeleteTarget(p)}
                           disabled={deleting}
                         >
                           <Trash2Icon className="size-4" />
@@ -164,6 +157,24 @@ export function ProjectsClient() {
         open={open}
         onOpenChange={setOpen}
         teams={teams.data?.astroliftTeams ?? []}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+        title={
+          deleteTarget
+            ? `Delete project ${deleteTarget.team.slug}/${deleteTarget.slug}?`
+            : "Delete project?"
+        }
+        description="Soft delete — apps remain visible until you reassign them. The slug becomes reclaimable."
+        confirmLabel="Delete project"
+        destructive
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
       />
     </PageShell>
   );

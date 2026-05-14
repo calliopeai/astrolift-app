@@ -20,18 +20,13 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
@@ -50,25 +45,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SOFT_DELETE_PROJECT } from "@/graphql/identity/identity.mutations";
-import {
-  LIST_MEMBERS,
-  LIST_PROJECTS,
-} from "@/graphql/identity/identity.queries";
+import { LIST_MEMBERS, LIST_PROJECTS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftMember,
   AstroliftProject,
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
-import type {
-  AstroliftRegisteredApp,
-  ProvisioningStatus,
-} from "@/graphql/registry/registry.types";
+import type { AstroliftRegisteredApp, ProvisioningStatus } from "@/graphql/registry/registry.types";
 
-const statusDot: Record<
-  ProvisioningStatus,
-  "ok" | "warn" | "error" | "pending"
-> = {
+const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending"> = {
   ready: "ok",
   pending: "warn",
   provisioning: "pending",
@@ -88,6 +74,7 @@ interface MembersResp {
 export function ProjectDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const projects = useQuery<ProjectsResp>(LIST_PROJECTS);
   const apps = useQuery<AppsResp>(LIST_APPS);
@@ -105,10 +92,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   // typical org with O(10) projects. A focused project read will
   // matter for orgs with hundreds of projects (#TBD backend ticket).
   const project = projects.data?.astroliftProjects.find((p) => p.slug === slug);
-  const projectApps =
-    apps.data?.astroliftApps.filter(
-      (a) => a.projectSlug === slug,
-    ) ?? [];
+  const projectApps = apps.data?.astroliftApps.filter((a) => a.projectSlug === slug) ?? [];
 
   // Members of this project: scopeKind=PROJECT and scopeId matches the
   // project's id. Org-wide members also inherit access — surface those
@@ -116,7 +100,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
   // clear which are direct vs inherited.
   const directMembers =
     members.data?.astroliftMembers.filter(
-      (m) => m.scopeKind === "PROJECT" && m.scopeId === project?.id,
+      (m) => m.scopeKind === "PROJECT" && m.scopeId === project?.id
     ) ?? [];
 
   if (projects.loading && !project) {
@@ -144,13 +128,6 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
 
   async function handleDelete() {
     if (!project) return;
-    if (
-      !confirm(
-        `Delete project ${project.team.slug}/${project.slug}? Soft delete — apps remain visible until you reassign them.`,
-      )
-    ) {
-      return;
-    }
     const { data } = await softDelete({
       variables: { input: { id: project.id } },
     });
@@ -158,16 +135,12 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
       toast.success(`Deleted ${project.slug}`);
       router.push("/projects");
     } else {
-      toast.error(data?.softDeleteProject.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.softDeleteProject.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
-  const activeApps = projectApps.filter(
-    (a) => a.provisioningStatus === "ready",
-  ).length;
-  const failingApps = projectApps.filter(
-    (a) => a.provisioningStatus === "failed",
-  ).length;
+  const activeApps = projectApps.filter((a) => a.provisioningStatus === "ready").length;
+  const failingApps = projectApps.filter((a) => a.provisioningStatus === "failed").length;
 
   return (
     <PageShell
@@ -181,10 +154,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
         <nav aria-label="breadcrumb" className="text-muted-foreground text-sm">
           <ol className="flex flex-wrap items-center gap-1">
             <li>
-              <Link
-                href="/teams"
-                className="hover:text-foreground hover:underline"
-              >
+              <Link href="/teams" className="hover:text-foreground hover:underline">
                 {project.organization.slug}
               </Link>
             </li>
@@ -192,19 +162,14 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               <ChevronRightIcon className="size-3" />
             </li>
             <li>
-              <Link
-                href="/teams"
-                className="hover:text-foreground hover:underline"
-              >
+              <Link href="/teams" className="hover:text-foreground hover:underline">
                 {project.team.slug}
               </Link>
             </li>
             <li>
               <ChevronRightIcon className="size-3" />
             </li>
-            <li className="text-foreground font-mono text-xs">
-              {project.slug}
-            </li>
+            <li className="text-foreground font-mono text-xs">{project.slug}</li>
           </ol>
         </nav>
       }
@@ -227,11 +192,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           icon={RocketIcon}
           label="Registered apps"
           value={projectApps.length}
-          sub={
-            failingApps > 0
-              ? `${failingApps} failing`
-              : `${activeApps} ready`
-          }
+          sub={failingApps > 0 ? `${failingApps} failing` : `${activeApps} ready`}
           tone={failingApps > 0 ? "warn" : undefined}
         />
         <StatTile
@@ -255,8 +216,8 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
             <RocketIcon className="size-4" /> Apps in this project
           </CardTitle>
           <CardDescription>
-            Registered apps associated with {project.team.slug}/{project.slug}.
-            Click a row to open the app detail page.
+            Registered apps associated with {project.team.slug}/{project.slug}. Click a row to open
+            the app detail page.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -294,21 +255,14 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                       <StatusDot status={statusDot[a.provisioningStatus]} />
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={`/apps/${a.slug}`}
-                        className="hover:underline"
-                      >
+                      <Link href={`/apps/${a.slug}`} className="hover:underline">
                         <div className="font-medium">{a.name}</div>
-                        <div className="text-muted-foreground font-mono text-xs">
-                          {a.slug}
-                        </div>
+                        <div className="text-muted-foreground font-mono text-xs">{a.slug}</div>
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm">
                       {a.sourceRepo ? (
-                        <span className="font-mono text-xs">
-                          {a.sourceRepo}
-                        </span>
+                        <span className="font-mono text-xs">{a.sourceRepo}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -348,8 +302,8 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
               <ShieldIcon className="size-4" /> Project members
             </CardTitle>
             <CardDescription>
-              Members with explicit access granted at the project scope.
-              Org-wide and team-wide members are not listed here.
+              Members with explicit access granted at the project scope. Org-wide and team-wide
+              members are not listed here.
             </CardDescription>
           </div>
           <Can permission="org.manage_members">
@@ -379,19 +333,12 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           ) : (
             <ul className="divide-y">
               {directMembers.map((m) => (
-                <li
-                  key={m.id}
-                  className="flex items-center justify-between px-6 py-3"
-                >
+                <li key={m.id} className="flex items-center justify-between px-6 py-3">
                   <div>
-                    <div className="font-medium">
-                      {m.user.username || m.user.email}
-                    </div>
+                    <div className="font-medium">{m.user.username || m.user.email}</div>
                     <div className="text-muted-foreground text-xs">
                       {m.user.email} · joined{" "}
-                      {m.joinedAt
-                        ? new Date(m.joinedAt).toLocaleDateString()
-                        : "—"}
+                      {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : "—"}
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs uppercase">
@@ -420,38 +367,31 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                 <dt className="text-muted-foreground">Name</dt>
                 <dd className="col-span-2">{project.name}</dd>
                 <dt className="text-muted-foreground">Slug</dt>
-                <dd className="col-span-2 font-mono text-xs">
-                  {project.slug}
-                </dd>
+                <dd className="col-span-2 font-mono text-xs">{project.slug}</dd>
                 <dt className="text-muted-foreground">Team</dt>
-                <dd className="col-span-2 font-mono text-xs">
-                  {project.team.slug}
-                </dd>
+                <dd className="col-span-2 font-mono text-xs">{project.team.slug}</dd>
                 <dt className="text-muted-foreground">Created</dt>
                 <dd className="col-span-2 text-xs">
                   {new Date(project.createdAt).toLocaleString()}
                 </dd>
               </dl>
               <p className="text-muted-foreground text-xs">
-                Project rename ships when the backend mutation lands; the
-                slug is intentionally immutable so downstream cost
-                allocation stays stable across rename.
+                Project rename ships when the backend mutation lands; the slug is intentionally
+                immutable so downstream cost allocation stays stable across rename.
               </p>
             </section>
             <section className="space-y-2">
-              <h3 className="text-destructive text-sm font-medium">
-                Danger zone
-              </h3>
+              <h3 className="text-destructive text-sm font-medium">Danger zone</h3>
               <p className="text-muted-foreground text-xs">
-                Soft delete removes this project from listings. Apps
-                attached to it remain visible until reassigned.
+                Soft delete removes this project from listings. Apps attached to it remain visible
+                until reassigned.
               </p>
               <Can permission="project.delete">
                 <Button
                   variant="outline"
                   className="text-destructive border-destructive/40"
                   disabled={deleting}
-                  onClick={handleDelete}
+                  onClick={() => setConfirmOpen(true)}
                 >
                   <Trash2Icon className="size-4" />
                   Delete project
@@ -466,6 +406,16 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete project ${project.team.slug}/${project.slug}?`}
+        description="Soft delete — apps remain visible until you reassign them. The slug becomes reclaimable."
+        confirmLabel="Delete project"
+        destructive
+        onConfirm={handleDelete}
+      />
     </PageShell>
   );
 }
@@ -488,18 +438,14 @@ function StatTile({ icon: Icon, label, value, sub, tone }: StatTileProps) {
   return (
     <Card className={accent}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-muted-foreground text-sm font-medium">
-          {label}
-        </CardTitle>
+        <CardTitle className="text-muted-foreground text-sm font-medium">{label}</CardTitle>
         <div className="bg-primary/10 text-primary rounded-md p-1.5">
           <Icon className="h-4 w-4" />
         </div>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold tabular-nums">{value}</p>
-        {sub != null && (
-          <p className="text-muted-foreground mt-1 text-xs">{sub}</p>
-        )}
+        {sub != null && <p className="text-muted-foreground mt-1 text-xs">{sub}</p>}
       </CardContent>
     </Card>
   );

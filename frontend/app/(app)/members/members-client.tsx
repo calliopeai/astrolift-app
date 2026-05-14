@@ -1,18 +1,13 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  MailIcon,
-  ShieldIcon,
-  Trash2Icon,
-  UserPlusIcon,
-  UsersIcon,
-} from "lucide-react";
+import { MailIcon, ShieldIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,10 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  REVOKE_INVITATION,
-  REVOKE_ROLE_BINDING,
-} from "@/graphql/identity/identity.mutations";
+import { REVOKE_INVITATION, REVOKE_ROLE_BINDING } from "@/graphql/identity/identity.mutations";
 import {
   LIST_INVITATIONS,
   LIST_MEMBERS,
@@ -67,9 +59,14 @@ const scopeBadge: Record<string, string> = {
   APP: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 
+type RevokeTarget =
+  | { kind: "invitation"; invitation: AstroliftInvitation }
+  | { kind: "binding"; binding: AstroliftRoleBinding };
+
 export function MembersClient() {
   const [open, setOpen] = React.useState(false);
   const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [revokeTarget, setRevokeTarget] = React.useState<RevokeTarget | null>(null);
   const members = useQuery<MembersResp>(LIST_MEMBERS);
   const bindings = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
@@ -89,28 +86,22 @@ export function MembersClient() {
   });
 
   async function handleRevokeInvite(inv: AstroliftInvitation) {
-    if (!confirm(`Revoke invitation for ${inv.email}?`)) return;
     const { data } = await revokeInvite({
       variables: { input: { id: inv.id } },
     });
     if (data?.revokeInvitation.ok) {
       toast.success("Invitation revoked");
     } else {
-      toast.error(
-        data?.revokeInvitation.errors?.[0]?.message ?? "Revoke failed",
-      );
+      throw new Error(data?.revokeInvitation.errors?.[0]?.message ?? "Revoke failed");
     }
   }
 
   async function handleRevoke(rb: AstroliftRoleBinding) {
-    if (!confirm(`Revoke ${rb.role.slug} from ${rb.user?.username ?? rb.groupExternalId}?`)) {
-      return;
-    }
     const { data } = await revokeBinding({ variables: { input: { id: rb.id } } });
     if (data?.revokeRoleBinding.ok) {
       toast.success("Role revoked");
     } else {
-      toast.error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
     }
   }
 
@@ -133,11 +124,7 @@ export function MembersClient() {
       actions={
         <div className="flex items-center gap-2">
           <Can permission="org.manage_members">
-            <Button
-              variant="outline"
-              onClick={() => setInviteOpen(true)}
-              disabled={roles.loading}
-            >
+            <Button variant="outline" onClick={() => setInviteOpen(true)} disabled={roles.loading}>
               <MailIcon className="size-4" />
               Invite
             </Button>
@@ -208,9 +195,7 @@ export function MembersClient() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={m.isActive ? "default" : "secondary"}>
-                          {m.lifecycle}
-                        </Badge>
+                        <Badge variant={m.isActive ? "default" : "secondary"}>{m.lifecycle}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {m.joinedAt
@@ -273,9 +258,7 @@ export function MembersClient() {
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{b.role.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        {b.role.slug}
-                      </div>
+                      <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
                     </TableCell>
                     <TableCell>
                       <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
@@ -290,7 +273,7 @@ export function MembersClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleRevoke(b)}
+                          onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
                           disabled={revoking}
                         >
                           <Trash2Icon className="size-4" />
@@ -350,9 +333,7 @@ export function MembersClient() {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={
-                          inv.status === "pending" ? "default" : "secondary"
-                        }
+                        variant={inv.status === "pending" ? "default" : "secondary"}
                         className="capitalize"
                       >
                         {inv.status}
@@ -370,7 +351,12 @@ export function MembersClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleRevokeInvite(inv)}
+                            onClick={() =>
+                              setRevokeTarget({
+                                kind: "invitation",
+                                invitation: inv,
+                              })
+                            }
                             disabled={revokingInvite}
                           >
                             <Trash2Icon className="size-4" />
@@ -396,6 +382,35 @@ export function MembersClient() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         roles={roles.data?.astroliftRoles ?? []}
+      />
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={
+          revokeTarget?.kind === "invitation"
+            ? `Revoke invitation for ${revokeTarget.invitation.email}?`
+            : revokeTarget?.kind === "binding"
+              ? `Revoke ${revokeTarget.binding.role.slug} from ${revokeTarget.binding.user?.username ?? revokeTarget.binding.groupExternalId}?`
+              : "Revoke?"
+        }
+        description={
+          revokeTarget?.kind === "invitation"
+            ? "The pending invitation link stops working immediately. You can re-send a fresh invitation if needed."
+            : "The user loses the permissions this role granted. Other role bindings, if any, remain in effect."
+        }
+        confirmLabel="Revoke"
+        destructive
+        onConfirm={async () => {
+          if (!revokeTarget) return;
+          if (revokeTarget.kind === "invitation") {
+            await handleRevokeInvite(revokeTarget.invitation);
+          } else {
+            await handleRevoke(revokeTarget.binding);
+          }
+        }}
       />
     </PageShell>
   );

@@ -13,10 +13,12 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +88,10 @@ export function SourceProvidersClient() {
   const [openConnectGitlab, setOpenConnectGitlab] = React.useState(false);
   const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
   const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [disconnectTarget, setDisconnectTarget] = React.useState<AstroliftSourceConnection | null>(
+    null
+  );
+  const [deleteKeyTarget, setDeleteKeyTarget] = React.useState<AstroliftSshDeployKey | null>(null);
 
   const conns = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
 
@@ -106,7 +112,7 @@ export function SourceProvidersClient() {
     } else if (err === "app_base_url_not_public") {
       toast.error(
         "GitHub can't reach this install. Set APP_BASE_URL on the backend to your public URL (e.g. https://astrolift.example.com) and redeploy.",
-        { duration: 10_000 },
+        { duration: 10_000 }
       );
     } else if (err) {
       toast.error(`SCM OAuth: ${err.replace(/_/g, " ")}`);
@@ -168,24 +174,15 @@ export function SourceProvidersClient() {
   const keyList = keys.data?.astroliftSshDeployKeys ?? [];
 
   async function handleDisconnect(c: AstroliftSourceConnection) {
-    if (
-      !confirm(
-        `Disconnect ${c.name}? Apps using this connection will lose access until you connect again.`
-      )
-    ) {
-      return;
-    }
     const { data } = await disconnect({ variables: { input: { id: c.id } } });
     if (data?.disconnectSource.ok) toast.success(`Disconnected ${c.name}`);
-    else toast.error(data?.disconnectSource.errors?.[0]?.message ?? "Disconnect failed");
+    else throw new Error(data?.disconnectSource.errors?.[0]?.message ?? "Disconnect failed");
   }
 
   async function handleDeleteKey(k: AstroliftSshDeployKey) {
-    if (!confirm(`Delete SSH key ${k.name}? Remove it from any repo deploy-key lists first.`))
-      return;
     const { data } = await deleteKey({ variables: { input: { id: k.id } } });
     if (data?.deleteSshDeployKey.ok) toast.success(`Deleted ${k.name}`);
-    else toast.error(data?.deleteSshDeployKey.errors?.[0]?.message ?? "Delete failed");
+    else throw new Error(data?.deleteSshDeployKey.errors?.[0]?.message ?? "Delete failed");
   }
 
   return (
@@ -210,10 +207,10 @@ export function SourceProvidersClient() {
           <div className="flex flex-col items-end gap-1">
             <div className="flex flex-wrap justify-end gap-2">
               <Button asChild size="sm" variant="outline">
-                <a href={DOC_LINKS.scmGithubOauth.primary} target="_blank" rel="noreferrer">
+                <Link href="/documentation/source-providers">
                   <BookOpenIcon className="size-4" />
                   Setup guide
-                </a>
+                </Link>
               </Button>
               <Can permission="scm.connect">
                 <Button size="sm" onClick={() => setOpenConnectGithub(true)}>
@@ -362,7 +359,7 @@ export function SourceProvidersClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleDisconnect(c)}
+                            onClick={() => setDisconnectTarget(c)}
                             disabled={disconnectState.loading}
                           >
                             <Trash2Icon className="size-4" />
@@ -444,7 +441,7 @@ export function SourceProvidersClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleDeleteKey(k)}
+                          onClick={() => setDeleteKeyTarget(k)}
                           disabled={deleteKeyState.loading}
                         >
                           <Trash2Icon className="size-4" />
@@ -496,6 +493,34 @@ export function SourceProvidersClient() {
       {revealedSecret && (
         <WebhookSecretReveal reveal={revealedSecret} onClose={() => setRevealedSecret(null)} />
       )}
+
+      <ConfirmDialog
+        open={disconnectTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDisconnectTarget(null);
+        }}
+        title={disconnectTarget ? `Disconnect ${disconnectTarget.name}?` : "Disconnect?"}
+        description="Apps using this connection lose access until you reconnect. Webhooks signed with the old secret will fail until the integration is set up again."
+        confirmLabel="Disconnect"
+        destructive
+        onConfirm={async () => {
+          if (disconnectTarget) await handleDisconnect(disconnectTarget);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteKeyTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteKeyTarget(null);
+        }}
+        title={deleteKeyTarget ? `Delete SSH key ${deleteKeyTarget.name}?` : "Delete SSH key?"}
+        description="Remove the matching public key from any repo deploy-key lists first, otherwise git operations will fail abruptly. The private key is erased from the secrets backend."
+        confirmLabel="Delete key"
+        destructive
+        onConfirm={async () => {
+          if (deleteKeyTarget) await handleDeleteKey(deleteKeyTarget);
+        }}
+      />
     </PageShell>
   );
 }
