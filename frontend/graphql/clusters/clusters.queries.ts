@@ -102,6 +102,55 @@ export const LIST_CLUSTERS = gql`
       capabilities
       capabilitiesProbedAt
       createdAt
+      lifecycle
+      lastManagementError
+      managedAt
+    }
+  }
+`;
+
+// Bring-into-management (#316). Returns the cluster row in
+// "managing" state; the list view polls LIST_CLUSTERS to render
+// the transition.
+export const BRING_CLUSTER_INTO_MANAGEMENT = gql`
+  mutation BringClusterIntoManagement($input: BringClusterIntoManagementInputType!) {
+    bringClusterIntoManagement(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        lifecycle
+        lastManagementError
+        managedAt
+      }
+    }
+  }
+`;
+
+// Refresh path — same workflow, accepts already-managed clusters.
+// ``forcePreflight`` re-runs the preflight Job; default false skips
+// it for a fast probe + RBAC reconcile.
+export const REFRESH_CLUSTER_MANAGEMENT = gql`
+  mutation RefreshClusterManagement($input: RefreshClusterManagementInputType!) {
+    refreshClusterManagement(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        lifecycle
+        lastManagementError
+        managedAt
+      }
     }
   }
 `;
