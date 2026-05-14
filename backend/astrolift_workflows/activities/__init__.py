@@ -29,14 +29,25 @@ from astrolift_workflows.activities.app_lifecycle import (
 )
 from astrolift_workflows.activities.cluster_management import (
     apply_platform_rbac,
+    ensure_cluster_drained,
+    mark_decommissioned,
+    mark_decommissioning,
     mark_error,
     mark_managed,
     mark_managing,
     probe_capabilities,
+    remove_platform_rbac,
     run_preflight_job,
     verify_reachability,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
+from astrolift_workflows.activities.migration import (
+    apply_to_target_cluster,
+    drain_source_cluster,
+    poll_rollout_on_target,
+    switch_app_env_binding,
+    validate_migration_target,
+)
 from astrolift_workflows.activities.scheduled import (
     capture_platform_cost_snapshot,
     detect_drift,
@@ -50,16 +61,21 @@ from astrolift_workflows.activities.scheduled import (
 __all__ = [
     "apply_manifests",
     "apply_platform_rbac",
+    "apply_to_target_cluster",
     "capture_platform_cost_snapshot",
     "create_promotion_deployment",
     "create_rollback_deployment",
     "delete_preview_namespace",
     "detect_drift",
     "dispatch_cron_deploys",
+    "drain_source_cluster",
+    "ensure_cluster_drained",
     "gc_stale_previews",
     "health_check",
     "mark_app_provisioning",
     "mark_app_ready",
+    "mark_decommissioned",
+    "mark_decommissioning",
     "mark_deploying",
     "mark_error",
     "mark_managed",
@@ -67,6 +83,7 @@ __all__ = [
     "mark_preview_torn_down",
     "mark_running",
     "poll_rollout",
+    "poll_rollout_on_target",
     "poll_scheduled_job_runs",
     "pre_flight",
     "probe_capabilities",
@@ -76,9 +93,12 @@ __all__ = [
     "prune_audit_log",
     "reconcile_cluster_capabilities",
     "reheal_webhook_subscriptions",
+    "remove_platform_rbac",
     "render_manifests",
     "run_preflight_job",
+    "switch_app_env_binding",
     "update_secrets",
+    "validate_migration_target",
     "verify_reachability",
     "wait_dns",
 ]

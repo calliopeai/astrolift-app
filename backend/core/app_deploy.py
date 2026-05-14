@@ -117,6 +117,39 @@ def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
         ) from exc
 
 
+def driver_for_target_cluster(
+    deployment: Deployment,
+    target_cluster_id: int,
+) -> tuple[Any, Any, str]:
+    """Return ``(driver, cluster_context, namespace)`` for applying a
+    deployment to an arbitrary cluster — used by the migration workflow
+    to apply against the *target* cluster rather than the env's currently
+    bound source cluster.
+
+    Reads the target ``TenantCluster`` row by id and builds the driver
+    + context against it. Namespace is still derived from the app — the
+    namespace name is cluster-agnostic.
+    """
+    from astrolift_clusters.models import TenantCluster
+
+    try:
+        cluster = TenantCluster.all_objects.get(pk=target_cluster_id)
+    except TenantCluster.DoesNotExist as exc:
+        raise AppDeployError(f"target cluster {target_cluster_id} not found") from exc
+    if cluster.lifecycle != cluster.Lifecycle.MANAGED.value:
+        raise AppDeployError(
+            f"target cluster {cluster.slug!r} lifecycle is {cluster.lifecycle!r}, not managed — "
+            "bring it into management before migrating apps to it",
+        )
+    try:
+        driver = _driver_for_cluster(cluster)
+    except ClusterManagementError as exc:
+        raise AppDeployError(str(exc)) from exc
+    ctx = _context_for_cluster(cluster)
+    namespace = namespace_for_app(deployment.registered_app)
+    return driver, ctx, namespace
+
+
 def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
@@ -176,6 +209,7 @@ __all__ = [
     "cluster_for_deployment",
     "driver_for_capability",
     "driver_for_deployment",
+    "driver_for_target_cluster",
     "namespace_for_app",
     "render_resources_for_deployment",
     "workloads_from_resources",

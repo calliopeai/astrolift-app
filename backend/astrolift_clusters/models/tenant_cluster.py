@@ -30,13 +30,19 @@ class TenantCluster(NamedBaseCoreModel):
         Job complete successfully and are deploy-eligible. ``error``
         rows hit a recoverable failure during the workflow; the
         operator inspects ``last_management_error`` and clicks Retry
-        (which restarts the workflow). Spec ref: issue #316.
+        (which restarts the workflow). ``decommissioning`` rows have an
+        in-flight ``DecommissionClusterWorkflow`` removing platform
+        RBAC + clearing app bindings; ``decommissioned`` rows are
+        terminal — kept for audit but no longer deploy-eligible and not
+        shown in the active-cluster picker. Spec ref: issue #316.
         """
 
         REGISTERED = "registered"
         MANAGING = "managing"
         MANAGED = "managed"
         ERROR = "error"
+        DECOMMISSIONING = "decommissioning"
+        DECOMMISSIONED = "decommissioned"
 
     class DeliveryMode(models.TextChoices):
         """Spec 07 §2 — how rendered manifests reach this cluster."""

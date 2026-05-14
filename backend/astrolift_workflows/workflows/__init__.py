@@ -13,7 +13,11 @@ from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
 from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflow
+from astrolift_workflows.workflows.decommission_cluster import (
+    DecommissionClusterWorkflow,
+)
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
+from astrolift_workflows.workflows.migrate_app import MigrateAppWorkflow
 from astrolift_workflows.workflows.onboard_app import OnboardAppWorkflow
 from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
@@ -32,8 +36,10 @@ __all__ = [
     "BringClusterIntoManagementWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
     "CronDeployTickWorkflow",
+    "DecommissionClusterWorkflow",
     "DeployAppWorkflow",
     "DriftDetectionWorkflow",
+    "MigrateAppWorkflow",
     "OnboardAppWorkflow",
     "PollScheduledJobRunsWorkflow",
     "PreviewGarbageCollectWorkflow",

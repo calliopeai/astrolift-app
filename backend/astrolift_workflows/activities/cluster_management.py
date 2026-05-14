@@ -217,3 +217,119 @@ async def mark_managing(cluster_id: int) -> None:
 
     activity.heartbeat()
     await sync_to_async(_mark_managing_sync)(cluster_id)
+
+
+# ---- Cluster decommission ----------------------------------------------
+#
+# Inverse of bring-into-management: lifts the platform RBAC, severs app
+# bindings, and flips the row to ``decommissioned``. Designed to be
+# triggered manually by an operator (the removeClusterFromManagement
+# mutation) when the cluster is being torn down out-of-band, OR by an
+# admin reclaim flow when an organization is being offboarded.
+
+
+def _ensure_cluster_drained_sync(cluster_id: int) -> int:
+    """Refuse to decommission a cluster that still has bound app envs.
+
+    Returns 0 when the cluster is drained. Raises with a clear message
+    listing the count of bound envs otherwise. ``AppEnvironment.tenant_cluster``
+    is a non-nullable PROTECT FK — operators must migrate the envs to a
+    new cluster (via ``MigrateAppWorkflow``) or delete them before
+    decommission can proceed.
+    """
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_lifecycle.models import AppEnvironment
+    from core.cluster_management import ClusterManagementError
+
+    cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    bound_count = AppEnvironment.objects.filter(
+        tenant_cluster=cluster,
+        deleted_at__isnull=True,
+    ).count()
+    if bound_count > 0:
+        raise ClusterManagementError(
+            f"cluster {cluster.slug!r} has {bound_count} active app environment(s) bound — "
+            "migrate them to a different cluster or delete them first",
+        )
+    return 0
+
+
+@activity.defn(name="astrolift.cluster.ensure_drained")
+async def ensure_cluster_drained(cluster_id: int) -> int:
+    """Refuse decommission when app envs are bound to this cluster."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_ensure_cluster_drained_sync)(cluster_id)
+
+
+def _mark_decommissioning_sync(cluster_id: int) -> None:
+    from astrolift_clusters.models import TenantCluster
+
+    cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
+        return
+    cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
+    cluster.last_management_error = ""
+    cluster.save(update_fields=["lifecycle", "last_management_error", "updated_at", "version"])
+
+
+@activity.defn(name="astrolift.cluster.mark_decommissioning")
+async def mark_decommissioning(cluster_id: int) -> None:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_decommissioning_sync)(cluster_id)
+
+
+def _remove_platform_rbac_sync(cluster_id: int) -> str:
+    """Delete the ``astrolift-system`` namespace, which cascades the
+    platform RBAC bundle (ServiceAccount + ClusterRole +
+    ClusterRoleBinding + the Job machinery used at preflight time).
+
+    Idempotent — ``delete_namespace`` is a no-op when the namespace is
+    already gone, so a re-run on a half-decommissioned cluster reaches
+    a clean terminal state. Failures bubble up; the workflow flips to
+    ERROR and the operator can retry.
+    """
+    from astrolift_clusters.models import TenantCluster
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    # delete_namespace(wait=True) blocks until k8s reports the namespace
+    # gone — picking that over wait=False so the workflow's terminal
+    # state reflects a clean cluster rather than a Terminating phase.
+    driver.delete_namespace(ctx.slug, "astrolift-system", wait=True)
+    return "astrolift-system"
+
+
+@activity.defn(name="astrolift.cluster.remove_platform_rbac")
+async def remove_platform_rbac(cluster_id: int) -> str:
+    """Lift the platform RBAC bundle — inverse of apply_platform_rbac."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_remove_platform_rbac_sync)(cluster_id)
+
+
+def _mark_decommissioned_sync(cluster_id: int) -> None:
+
+    from astrolift_clusters.models import TenantCluster
+
+    cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONED.value
+    cluster.last_management_error = ""
+    # managed_at is preserved as a historical marker — when this cluster
+    # was last in the deploy pool. Operators can audit the lifecycle
+    # arc without consulting the workflow_run log.
+    cluster.save(update_fields=["lifecycle", "last_management_error", "updated_at", "version"])
+
+
+@activity.defn(name="astrolift.cluster.mark_decommissioned")
+async def mark_decommissioned(cluster_id: int) -> None:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_decommissioned_sync)(cluster_id)
