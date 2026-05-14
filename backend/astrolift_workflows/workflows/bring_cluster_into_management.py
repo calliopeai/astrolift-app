@@ -54,7 +54,12 @@ with workflow.unsafe.imports_passed_through():
 # means run_preflight_job is the long pole; everything else should
 # complete within seconds against a healthy apiserver.
 _QUICK_TIMEOUT = timedelta(minutes=2)
-_PREFLIGHT_TIMEOUT = timedelta(minutes=3)
+# The driver's PREFLIGHT_TIMEOUT_SECONDS is 300s (Fargate cold-start
+# headroom); the activity wrapper polls on top of that plus needs slack
+# for the activity to actually return after the Job completes. Keep
+# this comfortably above the driver cap so Temporal doesn't cancel the
+# activity mid-Job.
+_PREFLIGHT_TIMEOUT = timedelta(minutes=7)
 
 # Don't retry the mark_error activity — it's the last-resort writer.
 # Retrying it on its own failure (DB unreachable) can mask the original
