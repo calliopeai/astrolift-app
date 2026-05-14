@@ -1,7 +1,15 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { MailIcon, ShieldIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  MailIcon,
+  ShieldIcon,
+  Trash2Icon,
+  UserMinusIcon,
+  UserPlusIcon,
+  UsersIcon,
+} from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -9,6 +17,16 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,6 +123,36 @@ export function MembersClient() {
     }
   }
 
+  // Right-to-delete (GDPR) — anonymize a user's PII while preserving
+  // audit-log structural records. The backend mutation tracked in #312
+  // is not on main yet; the affordance ships gated + disabled so the
+  // permission gate, copy, and double-confirm flow are reviewable. The
+  // `coming soon` banner inside the dialog makes the gap explicit.
+  const ANONYMIZE_BACKEND_READY = false;
+  const [anonymizeTarget, setAnonymizeTarget] = React.useState<AstroliftMember | null>(null);
+  const [anonymizeAcknowledged, setAnonymizeAcknowledged] = React.useState(false);
+
+  function openAnonymizeDialog(m: AstroliftMember) {
+    setAnonymizeAcknowledged(false);
+    setAnonymizeTarget(m);
+  }
+
+  async function handleAnonymize(_m: AstroliftMember) {
+    if (!ANONYMIZE_BACKEND_READY) {
+      throw new Error(
+        "anonymizeUser mutation not on main yet — tracked in #312. Re-enable once the backend wiring lands.",
+      );
+    }
+    // Wiring placeholder. When #312 lands:
+    //   const { data } = await anonymizeUser({
+    //     variables: { input: { userGid: m.user.id } },
+    //   });
+    //   if (!data?.anonymizeUser.ok) {
+    //     throw new Error(data?.anonymizeUser.errors?.[0]?.message ?? "Anonymize failed");
+    //   }
+    //   toast.success("User data anonymized.");
+  }
+
   const memberList = members.data?.astroliftMembers ?? [];
   const bindingList = bindings.data?.astroliftRoleBindings ?? [];
 
@@ -165,11 +213,13 @@ export function MembersClient() {
                   <TableHead>Roles</TableHead>
                   <TableHead>Lifecycle</TableHead>
                   <TableHead>Joined</TableHead>
+                  <TableHead className="w-12 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {memberList.map((m) => {
                   const userBindings = bindingsByUser.get(m.user.id) ?? [];
+                  const alreadyAnonymized = m.lifecycle === "anonymized";
                   return (
                     <TableRow key={m.id}>
                       <TableCell>
@@ -201,6 +251,24 @@ export function MembersClient() {
                         {m.joinedAt
                           ? new Date(m.joinedAt).toLocaleDateString()
                           : new Date(m.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Can permission="org.manage_members">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={alreadyAnonymized}
+                            onClick={() => openAnonymizeDialog(m)}
+                            aria-label={`Anonymize ${m.user.username}`}
+                            title={
+                              alreadyAnonymized
+                                ? "Already anonymized"
+                                : "Anonymize user data (GDPR right-to-delete)"
+                            }
+                          >
+                            <UserMinusIcon className="size-4" />
+                          </Button>
+                        </Can>
                       </TableCell>
                     </TableRow>
                   );
@@ -412,6 +480,176 @@ export function MembersClient() {
           }
         }}
       />
+
+      <AnonymizeUserDialog
+        target={anonymizeTarget}
+        onOpenChange={(next) => {
+          if (!next) setAnonymizeTarget(null);
+        }}
+        acknowledged={anonymizeAcknowledged}
+        onAcknowledgedChange={setAnonymizeAcknowledged}
+        backendReady={ANONYMIZE_BACKEND_READY}
+        onConfirm={async () => {
+          if (anonymizeTarget) await handleAnonymize(anonymizeTarget);
+        }}
+      />
     </PageShell>
+  );
+}
+
+interface AnonymizeUserDialogProps {
+  target: AstroliftMember | null;
+  onOpenChange: (open: boolean) => void;
+  acknowledged: boolean;
+  onAcknowledgedChange: (next: boolean) => void;
+  backendReady: boolean;
+  onConfirm: () => Promise<void>;
+}
+
+/**
+ * Right-to-delete (GDPR Art. 17) anonymization flow. Double-confirm:
+ * the operator must (a) check the "I understand this is irreversible"
+ * box before the destructive action button enables, and (b) click that
+ * button. The dialog stays open while the mutation is in flight; on
+ * error sonner surfaces the message so the operator can retry.
+ *
+ * The flow is laid out as an explicit list of what gets scrubbed and
+ * what stays so the operator can verify the blast radius before
+ * acting — `core/anonymization.py` is the source of truth for the
+ * field set.
+ */
+function AnonymizeUserDialog({
+  target,
+  onOpenChange,
+  acknowledged,
+  onAcknowledgedChange,
+  backendReady,
+  onConfirm,
+}: AnonymizeUserDialogProps) {
+  const [pending, setPending] = React.useState(false);
+
+  async function handleConfirm(e: React.MouseEvent) {
+    e.preventDefault();
+    if (pending || !acknowledged || !backendReady) return;
+    setPending(true);
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message ? err.message : "Anonymize failed";
+      toast.error(message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const fullName = target?.user.username ?? "";
+  const open = target !== null;
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (pending && !next) return;
+        onOpenChange(next);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Anonymize {fullName}?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4">
+              {!backendReady && (
+                <div className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-2 rounded-md border p-3 text-xs">
+                  <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">Backend wiring pending</p>
+                    <p className="mt-0.5">
+                      The Anonymize button is disabled until the
+                      <code className="bg-amber-500/10 mx-1 rounded px-1 font-mono">
+                        anonymizeUser
+                      </code>
+                      mutation lands. The flow, copy, and double-confirm
+                      below are reviewable; tracking under{" "}
+                      <a
+                        href="https://github.com/calliopeai/astrolift-app/issues/312"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        #312
+                      </a>
+                      .
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+                  This will scrub
+                </p>
+                <ul className="text-muted-foreground list-disc space-y-0.5 pl-5 text-xs">
+                  <li>
+                    <code className="bg-muted rounded px-1 font-mono">email</code>{" "}
+                    → SHA-256 hash, not reversible
+                  </li>
+                  <li>
+                    First and last name → <code className="bg-muted rounded px-1 font-mono">[redacted]</code>
+                  </li>
+                  <li>Username → deterministic placeholder bound to the user ID</li>
+                  <li>Phone, avatar URL → removed</li>
+                  <li>Past audit-event payloads → IP, user-agent, email scrubbed in place</li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+                  This preserves
+                </p>
+                <ul className="text-muted-foreground list-disc space-y-0.5 pl-5 text-xs">
+                  <li>
+                    Audit-log structural records (timestamps, action types,
+                    affected resources)
+                  </li>
+                  <li>FK relationships from past actions — referential integrity stays intact</li>
+                  <li>
+                    Member <code className="bg-muted rounded px-1 font-mono">lifecycle</code>{" "}
+                    flips to <code className="bg-muted rounded px-1 font-mono">anonymized</code>; role bindings are revoked
+                  </li>
+                </ul>
+              </div>
+
+              <p className="text-destructive font-medium">
+                <strong>This action is irreversible.</strong> Re-running it on the same user
+                is a no-op; the original PII cannot be restored.
+              </p>
+
+              <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4"
+                  checked={acknowledged}
+                  onChange={(e) => onAcknowledgedChange(e.target.checked)}
+                  disabled={pending}
+                />
+                <span>I understand this is irreversible.</span>
+              </label>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={pending || !acknowledged || !backendReady}
+            onClick={handleConfirm}
+          >
+            {pending ? "Anonymizing…" : "Anonymize user data"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
