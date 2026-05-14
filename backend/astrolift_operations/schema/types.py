@@ -224,3 +224,30 @@ def alert_event_to_type(e) -> AlertEventType:
         summary=e.summary or "",
         detail=e.detail or {},
     )
+
+
+@strawberry.type(name="AstroliftWebhookTestResult")
+class WebhookTestResultType:
+    """One ad-hoc test delivery against a webhook subscription.
+
+    Operators trigger this from the UI's 'Send test event' button.
+    The platform synthesizes a ``webhook.test`` payload, signs it
+    with the subscription's secret derivation key, and posts it
+    synchronously so the operator gets an immediate response code
+    + latency reading — distinct from the async delivery worker
+    that handles real events.
+
+    ``status_code`` is null when the request failed at the transport
+    layer (DNS, TCP, TLS) before any HTTP exchange happened. The
+    ``error`` field carries that diagnostic; ``duration_ms`` still
+    reflects how long we waited before giving up."""
+
+    subscription_id: GUID
+    url: str
+    delivered: bool
+    status_code: int | None
+    duration_ms: int
+    response_body_excerpt: str
+    error: str
+    delivery_id: str
+    timestamp: dt.datetime

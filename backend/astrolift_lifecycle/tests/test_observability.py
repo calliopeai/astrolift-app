@@ -257,15 +257,21 @@ async def _collect_first_n(gen, n: int, timeout: float = 1.0):
     return out
 
 
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_on_app_log_yields_backend_lines(org, app, env, actor, permission_resolver):
     """Subscription yields each line the backend produces, mapping
-    the LogLine dataclass into the GraphQL type."""
+    the LogLine dataclass into the GraphQL type.
+
+    Uses transaction=True so the ORM rows are visible from the
+    subscription resolver's ``sync_to_async`` thread — the default
+    django_db wraps each test in a savepoint that's only visible from
+    the test thread, which trips up cross-thread ORM access."""
     from types import SimpleNamespace
 
     _grant_read_logs(permission_resolver)
     app.default_tenant_cluster = env.tenant_cluster
-    await asyncio.to_thread(app.save, update_fields=["default_tenant_cluster"])
+    app.save(update_fields=["default_tenant_cluster"])
 
     lines = [
         LogLine(
@@ -301,6 +307,7 @@ async def test_on_app_log_yields_backend_lines(org, app, env, actor, permission_
     assert all(r.pod_name == "hello-app-web-1" for r in result)
 
 
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_resolver):
     """Closing the async generator early (subscriber disconnect)
@@ -310,7 +317,7 @@ async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_
 
     _grant_read_logs(permission_resolver)
     app.default_tenant_cluster = env.tenant_cluster
-    await asyncio.to_thread(app.save, update_fields=["default_tenant_cluster"])
+    app.save(update_fields=["default_tenant_cluster"])
 
     class _BlockingBackend:
         def __init__(self):
@@ -361,6 +368,7 @@ async def test_on_app_log_tears_down_on_cancel(org, app, env, actor, permission_
     assert backend.cancelled is True
 
 
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_on_app_log_denies_without_permission(org, app, env, actor, permission_resolver):
     """Subscription resolver checks APP_READ_LOGS before opening
@@ -392,6 +400,7 @@ async def test_on_app_log_denies_without_permission(org, app, env, actor, permis
     assert collected == []
 
 
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_on_app_log_completes_without_cluster(org, app, actor, permission_resolver):
     """If the app has no cluster wired, the subscription completes
