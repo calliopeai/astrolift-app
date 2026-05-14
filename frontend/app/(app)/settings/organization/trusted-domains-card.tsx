@@ -5,6 +5,7 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -118,20 +119,17 @@ export function TrustedDomainsCard() {
     }
   }
 
+  const [removeTarget, setRemoveTarget] =
+    React.useState<AstroliftOrganizationAllowlistedDomain | null>(null);
+
   async function handleRemove(row: AstroliftOrganizationAllowlistedDomain) {
-    if (
-      !confirm(
-        `Remove ${row.domain} from the allowlist? Existing members keep their access.`,
-      )
-    )
-      return;
     const { data } = await removeDomain({
       variables: { input: { id: row.id } },
     });
     if (data?.removeOrganizationAllowlistDomain.ok) {
       toast.success(`Removed ${row.domain}`);
     } else {
-      toast.error(
+      throw new Error(
         data?.removeOrganizationAllowlistDomain.errors?.[0]?.message ??
           "Remove failed",
       );
@@ -252,7 +250,7 @@ export function TrustedDomainsCard() {
                       variant="ghost"
                       size="sm"
                       disabled={removing}
-                      onClick={() => handleRemove(row)}
+                      onClick={() => setRemoveTarget(row)}
                       aria-label={`Remove ${row.domain}`}
                     >
                       <Trash2Icon className="size-4" />
@@ -264,6 +262,20 @@ export function TrustedDomainsCard() {
           </Table>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRemoveTarget(null);
+        }}
+        title={removeTarget ? `Remove ${removeTarget.domain}?` : "Remove domain?"}
+        description="New sign-ins from this domain stop auto-joining the org and need an explicit invitation. Existing members keep their access and role bindings — this is a forward-only change."
+        confirmLabel="Remove domain"
+        destructive
+        onConfirm={async () => {
+          if (removeTarget) await handleRemove(removeTarget);
+        }}
+      />
     </Card>
   );
 }
