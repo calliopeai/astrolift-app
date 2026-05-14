@@ -207,6 +207,28 @@ class RegistryQuery:
         namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
         image = image_tag or "preview"
 
+        # Apps registered before the wizard's manifest step shipped, or
+        # whose `astrolift.toml` failed to fetch from the source repo,
+        # have empty `manifest_raw`. Surface a friendlier error than
+        # the parser's "required string 'name' is missing or empty" so
+        # the UI can point the operator at the manifest editor.
+        if not (app.manifest_raw or "").strip():
+            return RenderedManifestType(
+                app_slug=app.slug,
+                environment_name=env_name,
+                image_tag=image,
+                namespace=namespace,
+                resources=[],
+                error=(
+                    "No manifest saved for this app yet. Open the Manifest "
+                    "tab and paste your astrolift.toml, or re-run the app "
+                    "registration wizard to fetch from the source repo."
+                ),
+                error_path=None,
+                error_line=None,
+                error_column=None,
+            )
+
         try:
             normalized = normalize(
                 parse_raw(app.manifest_raw),
