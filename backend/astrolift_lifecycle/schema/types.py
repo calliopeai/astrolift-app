@@ -229,6 +229,25 @@ def preview_to_type(p) -> PreviewEnvironmentType:
     )
 
 
+@strawberry.type(name="AstroliftAppDomainRequiredRecord")
+class AppDomainRequiredRecordType:
+    """One DNS record the operator must add (or that the platform
+    will create on their behalf when the parent zone is managed).
+
+    ``propagated`` flips True once the validation workflow sees the
+    record at the authoritative nameserver. The UI renders a per-row
+    status badge.
+    """
+
+    kind: str
+    name: str
+    value: str
+    ttl: int
+    propagated: bool
+    last_checked_at: str | None
+    message: str
+
+
 @strawberry.type(name="AstroliftAppDomain")
 class AppDomainType:
     """A custom domain bound to a registered app. ``cert_state``
@@ -237,7 +256,8 @@ class AppDomainType:
     id: GUID
     hostname: str
     cert_state: str
-    """pending | validated | failed (mirrors CustomDomain.ValidationStatus)"""
+    """pending | validating | validated | failed (mirrors
+    ``CustomDomain.ValidationStatus``)."""
 
     validation_method: str
     validation_token: str
@@ -245,6 +265,14 @@ class AppDomainType:
     is_active: bool
     registered_app_slug: str
     created_at: dt.datetime
+
+    # ---- handshake surface (#397) ---------------------------------
+
+    txt_challenge_token: str
+    expected_cname_target: str
+    required_dns_records: list[AppDomainRequiredRecordType]
+    is_platform_managed_zone: bool
+    last_validation_error: str
 
 
 def app_domain_to_type(d) -> AppDomainType:
@@ -254,10 +282,26 @@ def app_domain_to_type(d) -> AppDomainType:
         cert_state=d.validation_status,
         validation_method=d.validation_method,
         validation_token=d.validation_value or "",
-        last_checked_at=d.updated_at,
+        last_checked_at=d.last_checked_at or d.updated_at,
         is_active=d.is_active,
         registered_app_slug=d.registered_app.slug,
         created_at=d.created_at,
+        txt_challenge_token=d.txt_challenge_token or "",
+        expected_cname_target=d.expected_cname_target or "",
+        required_dns_records=[
+            AppDomainRequiredRecordType(
+                kind=r.get("kind", ""),
+                name=r.get("name", ""),
+                value=r.get("value", ""),
+                ttl=int(r.get("ttl", 300)),
+                propagated=bool(r.get("propagated", False)),
+                last_checked_at=r.get("last_checked_at"),
+                message=r.get("message", ""),
+            )
+            for r in (d.required_dns_records or [])
+        ],
+        is_platform_managed_zone=bool(d.is_platform_managed_zone),
+        last_validation_error=d.last_validation_error or "",
     )
 
 

@@ -108,6 +108,26 @@ class TearDownPreviewInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class ValidateCustomDomainInput:
+    """Input for ``ValidateCustomDomainWorkflow`` (#397).
+
+    Drives the DNS handshake validation: probes the authoritative
+    nameservers for each row in ``CustomDomain.required_dns_records``,
+    flips ``propagated=True`` per-row, and transitions the parent
+    row's ``validation_status`` to ``validated`` or ``failed`` once
+    all required records have propagated (or any one of them has
+    failed past the retry budget).
+
+    When the domain's parent zone is a platform-managed ``ManagedDomain``
+    the workflow ALSO writes the required records via the bound
+    cluster's ``DnsDriver.ensure_record`` before probing.
+    """
+
+    custom_domain_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class InstallClusterPrereqsInput:
     """Input for ``InstallClusterPrereqsWorkflow`` (#66).
 

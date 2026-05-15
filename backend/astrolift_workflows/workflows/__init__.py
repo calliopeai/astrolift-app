@@ -38,6 +38,9 @@ from astrolift_workflows.workflows.scheduled import (
 )
 from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
+from astrolift_workflows.workflows.validate_custom_domain import (
+    ValidateCustomDomainWorkflow,
+)
 
 __all__ = [
     "BringClusterIntoManagementWorkflow",
@@ -59,4 +62,5 @@ __all__ = [
     "RollbackDeploymentWorkflow",
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
+    "ValidateCustomDomainWorkflow",
 ]

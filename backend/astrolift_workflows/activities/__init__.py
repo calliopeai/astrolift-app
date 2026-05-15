@@ -50,6 +50,11 @@ from astrolift_workflows.activities.cluster_management import (
     verify_reachability,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
+from astrolift_workflows.activities.custom_domain import (
+    ensure_platform_managed_records,
+    probe_required_records,
+    transition_domain_status,
+)
 from astrolift_workflows.activities.install_prereqs import (
     install_cluster_prereqs,
 )
@@ -89,6 +94,7 @@ __all__ = [
     "dispatch_cron_deploys",
     "drain_source_cluster",
     "ensure_cluster_drained",
+    "ensure_platform_managed_records",
     "finalize_managed_service_deletion",
     "gc_stale_previews",
     "health_check",
@@ -112,6 +118,7 @@ __all__ = [
     "poll_scheduled_job_runs",
     "pre_flight",
     "probe_capabilities",
+    "probe_required_records",
     "provision_managed_services_initial",
     "provision_namespace",
     "provision_registry_repo",
@@ -125,6 +132,7 @@ __all__ = [
     "soft_delete_app_records",
     "switch_app_env_binding",
     "teardown_cluster_infra",
+    "transition_domain_status",
     "update_secrets",
     "validate_migration_target",
     "verify_reachability",
