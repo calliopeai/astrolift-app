@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { AlertTriangleIcon } from "lucide-react";
+import { AlertTriangleIcon, CheckIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -15,7 +15,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LIST_CLUSTERS } from "@/graphql/clusters/clusters.queries";
+import {
+  CLUSTER_LIFECYCLE_AUDIT,
+  LIST_CLUSTERS,
+} from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
 import { ClusterTabs } from "../components/cluster-tabs";
@@ -100,28 +103,7 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Lifecycle + activity</CardTitle>
-          <CardDescription>
-            What the platform itself did to this cluster — registered →
-            managing → managed transitions, recent workflow runs, and
-            app bindings.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-muted-foreground text-sm">
-          Apps bound view, recent workflows view, and lifecycle
-          timeline land in the next PR. The bound-app count is already
-          surfaced on the{" "}
-          <Link
-            href={`/clusters/${slug}`}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Overview tab
-          </Link>
-          .
-        </CardContent>
-      </Card>
+      <LifecycleTimelineCard clusterId={cluster.id} />
 
       <Card>
         <CardHeader>
@@ -139,5 +121,95 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+// ─── Lifecycle timeline card (#68 slice 2) ───────────────────────────────
+// Backed by ``astroliftClusterLifecycleAudit`` — filters MutationAuditLog
+// for cluster-targeted operations referencing this cluster's guid/slug
+// and renders a vertical timeline (operation, outcome, actor, time).
+
+interface LifecycleAuditEntry {
+  operation: string;
+  variables: Record<string, unknown>;
+  success: boolean;
+  errors: string[];
+  timestamp: string;
+  actor: string | null;
+}
+
+interface LifecycleAuditResp {
+  astroliftClusterLifecycleAudit: LifecycleAuditEntry[];
+}
+
+function LifecycleTimelineCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<LifecycleAuditResp>(CLUSTER_LIFECYCLE_AUDIT, {
+    variables: { clusterId, limit: 50 },
+    pollInterval: 30000,
+  });
+  const entries = data?.astroliftClusterLifecycleAudit ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Lifecycle + activity</CardTitle>
+        <CardDescription>
+          Every mutation that targeted this cluster — registered →
+          managing → managed transitions, refreshes, prereq installs,
+          decommission attempts. Sourced from the platform audit log.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading && entries.length === 0 ? (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : entries.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No lifecycle events recorded yet. Operator mutations
+            against this cluster will show up here.
+          </p>
+        ) : (
+          <ol className="border-border relative space-y-3 border-l pl-6">
+            {entries.map((e, i) => (
+              <li key={`${e.timestamp}-${i}`} className="relative">
+                <span
+                  className={
+                    "absolute -left-[27px] flex size-5 items-center justify-center rounded-full " +
+                    (e.success
+                      ? "bg-emerald-500/15 text-emerald-600"
+                      : "bg-destructive/15 text-destructive")
+                  }
+                >
+                  {e.success ? (
+                    <CheckIcon className="size-3" />
+                  ) : (
+                    <XIcon className="size-3" />
+                  )}
+                </span>
+                <div className="flex flex-wrap items-baseline gap-2 text-sm">
+                  <code className="font-mono text-xs">{e.operation}</code>
+                  {e.actor && (
+                    <span className="text-muted-foreground text-xs">
+                      by {e.actor}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground ml-auto text-xs">
+                    {new Date(e.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                {!e.success && e.errors.length > 0 && (
+                  <p className="text-destructive mt-1 line-clamp-2 text-xs">
+                    {e.errors[0]}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   );
 }

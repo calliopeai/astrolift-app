@@ -10,6 +10,7 @@ from astrolift_clusters.models import (
 )
 from astrolift_clusters.schema.types import (
     BootstrapPlanType,
+    ClusterLifecycleAuditEntryType,
     ManagedDomainType,
     ProviderPluginType,
     TenantClusterType,
@@ -73,6 +74,72 @@ class ClustersQuery:
     def astrolift_provider_plugins(self, info: Info) -> list[ProviderPluginType]:
         qs = ProviderPlugin.objects.order_by("slug")[:100]
         return [plugin_to_type(p) for p in qs]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_lifecycle_audit(
+        self, info: Info, cluster_id: GUID, limit: int = 50,
+    ) -> list[ClusterLifecycleAuditEntryType]:
+        """Cluster-scoped slice of the mutation audit log (#68 slice 2).
+
+        Filters ``MutationAuditLog`` by cluster-targeted operations
+        whose ``variables`` JSON references this cluster's guid. The
+        resolver surfaces a flat list of "what happened to this
+        cluster, in what order, by whom" — the workhorse for the
+        cluster-detail Status tab's lifecycle timeline card.
+        """
+        from core.schema.audit import MutationAuditLog
+
+        cluster = TenantCluster.objects.filter(
+            guid=str(cluster_id), deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return []
+
+        # Operations we care about for cluster lifecycle:
+        # - registerTenantCluster / updateTenantCluster / unregister
+        # - bringClusterIntoManagement / refreshClusterManagement
+        # - decommissionCluster
+        # - installClusterPrereqs
+        # - configureProviderPlugin (when the plugin in question is bound)
+        prefixes = (
+            "cluster.",
+            "managed_domain.",
+            "provider_plugin.",
+        )
+        qs = (
+            MutationAuditLog.objects.select_related("user")
+            .order_by("-timestamp")
+        )
+        cluster_guid = str(cluster.guid)
+        cluster_slug = cluster.slug
+        out: list[ClusterLifecycleAuditEntryType] = []
+        for log in qs.iterator(chunk_size=200):
+            if not any(log.operation.startswith(p) for p in prefixes):
+                continue
+            # JSON-references via either guid or slug match. Stringify
+            # variables once and substring-match — cheap, no JSON-path
+            # required on the DB side.
+            variables_str = str(log.variables) if log.variables else ""
+            if (
+                cluster_guid not in variables_str
+                and cluster_slug not in variables_str
+            ):
+                continue
+            out.append(
+                ClusterLifecycleAuditEntryType(
+                    operation=log.operation,
+                    variables=log.variables,
+                    success=log.success,
+                    errors=log.errors,
+                    timestamp=log.timestamp,
+                    actor=(log.user.username if log.user else None),
+                ),
+            )
+            if len(out) >= limit:
+                break
+        return out
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_REGISTER)
