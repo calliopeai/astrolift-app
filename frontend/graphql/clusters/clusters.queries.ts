@@ -194,6 +194,15 @@ export const LIST_MANAGED_DOMAINS = gql`
   }
 `;
 
+// Active app count bound to a cluster (#393). Counts both
+// ``RegisteredApp.default_tenant_cluster`` and per-env
+// ``AppEnvironment.tenant_cluster`` bindings.
+export const CLUSTER_APP_COUNT = gql`
+  query ClusterAppCount($clusterId: GUID!) {
+    astroliftAppCountForCluster(clusterId: $clusterId)
+  }
+`;
+
 // Driver-recipe bootstrap plan (#67). Static read — the recipe lives in
 // the driver code, so this resolver does no cluster API calls. UI
 // renders the components as an interactive checklist and feeds the
