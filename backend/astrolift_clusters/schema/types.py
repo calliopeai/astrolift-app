@@ -197,3 +197,42 @@ class ClusterLifecycleAuditEntryType:
     """Username of the operator who fired the mutation; null when the
     mutation was fired by a system / service account or when the user
     row was soft-deleted after the audit landed."""
+
+
+# ---- Cluster health (#68 slice 1) ---------------------------------
+
+
+@strawberry.type(name="AstroliftClusterPodPhase")
+class PodPhaseSummaryType:
+    """Pod-phase rollup row for the Cluster Status tab Live-health
+    card. One per (namespace, phase) bucket."""
+
+    namespace: str
+    phase: str
+    count: int
+
+
+@strawberry.type(name="AstroliftClusterEvent")
+class ClusterEventType:
+    """A recent Kubernetes Event surfaced for operator triage.
+    Default filter is ``Warning`` events; the resolver's
+    ``event_type`` arg can broaden if needed."""
+
+    namespace: str
+    name: str
+    reason: str
+    message: str
+    type: str
+    count: int
+    first_seen: str
+    last_seen: str
+    involved_object: str
+
+
+@strawberry.type(name="AstroliftClusterHealth")
+class ClusterHealthType:
+    """Live-health summary returned by ``astroliftClusterHealth``."""
+
+    cluster_id: GUID
+    pods: list[PodPhaseSummaryType]
+    events: list[ClusterEventType]

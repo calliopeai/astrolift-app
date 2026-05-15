@@ -10,8 +10,11 @@ from astrolift_clusters.models import (
 )
 from astrolift_clusters.schema.types import (
     BootstrapPlanType,
+    ClusterEventType,
+    ClusterHealthType,
     ClusterLifecycleAuditEntryType,
     ManagedDomainType,
+    PodPhaseSummaryType,
     ProviderPluginType,
     TenantClusterType,
     bootstrap_plan_to_type,
@@ -167,6 +170,74 @@ class ClustersQuery:
             tenant_cluster=cluster, deleted_at__isnull=True,
         ).values_list("registered_app_id", flat=True)
         return len(set(default_bound) | set(env_bound))
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_health(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        event_limit: int = 50,
+    ) -> ClusterHealthType | None:
+        """Driver-backed pod-phase rollup + recent K8s Warning events
+        for ``cluster_id`` (#68 slice 1).
+
+        Calls into the driver's ``list_pod_phase_summary`` +
+        ``list_events`` methods. Defaults to the ``astrolift-system``
+        namespace; broader scoping happens once the workflow layer
+        knows which app namespaces are bound.
+
+        Returns ``None`` when the cluster row is missing; returns a
+        summary with empty pods/events lists when the driver can't
+        reach the apiserver (no creds, unreachable). The UI surfaces
+        that case as "no health data available" without erroring.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cluster_health_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(
+                guid=str(cluster_id), deleted_at__isnull=True,
+            )
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return None
+        try:
+            payload = cluster_health_dispatch(
+                cluster=cluster, event_limit=event_limit,
+            )
+        except ClusterManagementError:
+            payload = {"pods": [], "events": []}
+        return ClusterHealthType(
+            cluster_id=GUID(str(cluster.guid)),
+            pods=[
+                PodPhaseSummaryType(
+                    namespace=p["namespace"],
+                    phase=p["phase"],
+                    count=int(p["count"]),
+                )
+                for p in payload["pods"]
+            ],
+            events=[
+                ClusterEventType(
+                    namespace=e["namespace"],
+                    name=e["name"],
+                    reason=e["reason"],
+                    message=e["message"],
+                    type=e["type"],
+                    count=int(e["count"]),
+                    first_seen=e["first_seen"],
+                    last_seen=e["last_seen"],
+                    involved_object=e["involved_object"],
+                )
+                for e in payload["events"]
+            ],
+        )
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_MANAGE)
