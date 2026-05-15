@@ -75,6 +75,33 @@ class ClustersQuery:
         return [plugin_to_type(p) for p in qs]
 
     @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_app_count_for_cluster(self, info: Info, cluster_id: GUID) -> int:
+        """Active apps bound to a specific cluster (#393).
+
+        Counts ``RegisteredApp`` rows whose ``default_tenant_cluster``
+        is the cluster OR whose ``AppEnvironment.tenant_cluster``
+        targets it (either binding mechanism counts). Tenant-scoped;
+        soft-deleted rows excluded.
+        """
+        from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_registry.models import RegisteredApp
+
+        cluster = TenantCluster.objects.filter(
+            guid=str(cluster_id), deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return 0
+        default_bound = RegisteredApp.objects.filter(
+            default_tenant_cluster=cluster, deleted_at__isnull=True,
+        ).values_list("pk", flat=True)
+        env_bound = AppEnvironment.objects.filter(
+            tenant_cluster=cluster, deleted_at__isnull=True,
+        ).values_list("registered_app_id", flat=True)
+        return len(set(default_bound) | set(env_bound))
+
+    @strawberry.field
     @require_permission(Permission.CLUSTER_MANAGE)
     @tenant_scoped()
     def astrolift_cluster_bootstrap_plan(self, info: Info, cluster_id: GUID) -> BootstrapPlanType | None:
