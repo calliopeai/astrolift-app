@@ -49,6 +49,16 @@ import { LIST_APP_DOMAINS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
 
+interface RequiredDnsRecord {
+  kind: string;
+  name: string;
+  value: string;
+  ttl: number;
+  propagated: boolean;
+  lastCheckedAt?: string | null;
+  message: string;
+}
+
 interface AppDomain {
   id: string;
   hostname: string;
@@ -59,6 +69,12 @@ interface AppDomain {
   isActive: boolean;
   registeredAppSlug: string;
   createdAt: string;
+  // #397 handshake surface
+  txtChallengeToken: string;
+  expectedCnameTarget: string;
+  isPlatformManagedZone: boolean;
+  lastValidationError: string;
+  requiredDnsRecords: RequiredDnsRecord[];
 }
 
 interface Resp {
@@ -69,7 +85,15 @@ const CERT_TONE: Record<string, "ok" | "warn" | "error" | "pending"> = {
   validated: "ok",
   active: "ok",
   pending: "warn",
+  validating: "pending",
   failed: "error",
+};
+
+const CERT_LABEL: Record<string, string> = {
+  pending: "Awaiting DNS",
+  validating: "Validating…",
+  validated: "Validated",
+  failed: "Failed",
 };
 
 export function AppDomainsClient({ slug }: { slug: string }) {
@@ -142,97 +166,36 @@ export function AppDomainsClient({ slug }: { slug: string }) {
         </>
       }
     >
-      <Card>
-        <CardContent className="p-0">
-          {domains.loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<GlobeIcon className="size-5" />}
-                title="No custom domains yet"
-                description="Add a hostname like checkout.acme.com to point at this app's primary public workload."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>Hostname</TableHead>
-                  <TableHead>Cert state</TableHead>
-                  <TableHead>Validation</TableHead>
-                  <TableHead>Last checked</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="w-8">
-                      <StatusDot status={CERT_TONE[d.certState] ?? "pending"} />
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{d.hostname}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {d.certState}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <div className="text-muted-foreground">
-                        {d.validationMethod || "—"}
-                      </div>
-                      {d.validationToken && (
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(d.validationToken);
-                            toast.success("Token copied");
-                          }}
-                          className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] hover:underline"
-                        >
-                          <CopyIcon className="size-3" />
-                          {d.validationToken.slice(0, 32)}…
-                        </button>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {d.lastCheckedAt
-                        ? new Date(d.lastCheckedAt).toLocaleString()
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Can permission="app.deploy">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleRecheck(d)}
-                          disabled={busy}
-                        >
-                          <RefreshCwIcon className="size-3.5" />
-                          Recheck
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => setRemoveTarget(d)}
-                          disabled={busy}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Remove</span>
-                        </Button>
-                      </Can>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {domains.loading && list.length === 0 ? (
+        <Card>
+          <CardContent className="space-y-2 p-6">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </CardContent>
+        </Card>
+      ) : list.length === 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <EmptyState
+              icon={<GlobeIcon className="size-5" />}
+              title="No custom domains yet"
+              description="Add a hostname like checkout.acme.com to point at this app's primary public workload."
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {list.map((d) => (
+            <DomainHandshakeCard
+              key={d.id}
+              domain={d}
+              busy={busy}
+              onRecheck={() => handleRecheck(d)}
+              onRemove={() => setRemoveTarget(d)}
+            />
+          ))}
+        </div>
+      )}
 
       <AddDomainSheet
         open={open}
@@ -352,5 +315,157 @@ function AddDomainSheet({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ─── DomainHandshakeCard (#397) ──────────────────────────────────────────
+// One card per CustomDomain row. Renders the operator-facing handshake:
+// the required DNS records + per-record propagation status. When the
+// parent zone is platform-managed the records still render but with
+// "Platform-managed" copy explaining the operator doesn't need to do
+// anything.
+
+function DomainHandshakeCard({
+  domain,
+  busy,
+  onRecheck,
+  onRemove,
+}: {
+  domain: AppDomain;
+  busy: boolean;
+  onRecheck: () => void;
+  onRemove: () => void;
+}) {
+  const tone = CERT_TONE[domain.certState] ?? "pending";
+  const label = CERT_LABEL[domain.certState] ?? domain.certState;
+  const records = domain.requiredDnsRecords ?? [];
+  const allPropagated =
+    records.length > 0 && records.every((r) => r.propagated);
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-5">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <StatusDot status={tone} />
+          <code className="font-mono text-base">{domain.hostname}</code>
+          <Badge variant="secondary">{label}</Badge>
+          {domain.isPlatformManagedZone && (
+            <Badge variant="outline" className="text-[10px]">
+              Platform-managed zone
+            </Badge>
+          )}
+          <span className="text-muted-foreground ml-auto text-xs">
+            {domain.lastCheckedAt
+              ? `Last checked ${new Date(domain.lastCheckedAt).toLocaleString()}`
+              : "Not checked yet"}
+          </span>
+          <Can permission="app.deploy">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRecheck}
+              disabled={busy}
+            >
+              <RefreshCwIcon className="size-3.5" />
+              Recheck
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={onRemove}
+              disabled={busy}
+            >
+              <Trash2Icon className="size-4" />
+              <span className="sr-only">Remove</span>
+            </Button>
+          </Can>
+        </div>
+
+        {domain.lastValidationError && (
+          <div className="border-destructive/30 bg-destructive/5 rounded-md border p-2 text-xs">
+            <span className="text-destructive font-medium">
+              Validation error:
+            </span>{" "}
+            <span className="text-muted-foreground">
+              {domain.lastValidationError}
+            </span>
+          </div>
+        )}
+
+        {records.length > 0 ? (
+          <div className="space-y-2">
+            <div className="text-muted-foreground text-xs">
+              {domain.isPlatformManagedZone
+                ? "Platform-managed records — astrolift owns the zone and creates these via the DNS driver. No operator action needed; the recheck below is a probe."
+                : domain.certState === "validated"
+                  ? "These records are live in your DNS. Cert active."
+                  : "Add these records to your authoritative DNS, then click Recheck. The platform queries your zone's nameservers directly so propagation typically takes < 5 min."}
+            </div>
+            <div className="border-border rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-6"></TableHead>
+                    <TableHead className="w-16">Type</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead className="w-16">TTL</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {records.map((r, i) => (
+                    <TableRow key={`${r.kind}-${r.name}-${i}`}>
+                      <TableCell>
+                        <StatusDot
+                          status={r.propagated ? "ok" : "pending"}
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {r.kind}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs break-all">
+                        {r.name}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs break-all">
+                        {r.value}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {r.ttl}s
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(r.value);
+                            toast.success(`${r.kind} value copied`);
+                          }}
+                          className="hover:bg-muted rounded p-1"
+                          title="Copy value"
+                        >
+                          <CopyIcon className="size-3.5" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {allPropagated && domain.certState !== "validated" && (
+              <p className="text-muted-foreground text-xs">
+                All records propagated. Validation should flip to{" "}
+                <code className="font-mono">validated</code> on the
+                next workflow tick (or click Recheck to force one).
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Handshake not generated yet — re-add the domain to refresh
+            its required records.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

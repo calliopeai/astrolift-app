@@ -10,6 +10,19 @@ const APP_DOMAIN_FIELDS = `
   isActive
   registeredAppSlug
   createdAt
+  txtChallengeToken
+  expectedCnameTarget
+  isPlatformManagedZone
+  lastValidationError
+  requiredDnsRecords {
+    kind
+    name
+    value
+    ttl
+    propagated
+    lastCheckedAt
+    message
+  }
 `;
 
 export const ADD_APP_DOMAIN = gql`
