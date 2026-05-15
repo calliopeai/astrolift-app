@@ -32,3 +32,13 @@ STORAGES = {  # noqa: F811
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+
+# Drop whitenoise from MIDDLEWARE too — when a test spins up the
+# WSGI app (e.g. via Django ``Client`` for webhook tests), the
+# middleware list is what gets walked, and whitenoise's
+# ``WhiteNoiseMiddleware.__init__`` tries to import the package
+# even if STORAGES no longer points at it.
+MIDDLEWARE = [  # noqa: F811
+    m for m in MIDDLEWARE  # type: ignore[name-defined]  # noqa: F405
+    if "whitenoise" not in m
+]

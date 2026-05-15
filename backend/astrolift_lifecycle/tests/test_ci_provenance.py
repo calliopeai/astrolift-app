@@ -20,9 +20,16 @@ from core.permissions import Permission
 pytestmark = pytest.mark.django_db
 
 
-def test_start_deployment_persists_ci_metadata(org, app, env, fake_info, permission_resolver):
+def test_start_deployment_persists_ci_metadata(
+    org, app, env, fake_info, permission_resolver, settings,
+):
     """The StartDeploymentInput accepts every CI field as optional;
     when set, they land on the Deployment row verbatim."""
+    # Disable Temporal — test is about DB persistence, not workflow
+    # enqueueing. The kill switch lives on
+    # ``settings.ASTROLIFT_TEMPORAL_ENABLED`` and short-circuits
+    # ``start_workflow`` before any Temporal-server I/O.
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
     permission_resolver.grant(Permission.APP_DEPLOY)
 
     from core.tenancy import TenantContext, tenant_context
