@@ -32,6 +32,7 @@ from aws.ingress_alb import ALBIngressDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
+from aws.managed.redis_elasticache import ElastiCacheRedisDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
 from aws.tls_acm import ACMDriver
@@ -51,13 +52,13 @@ PLUGIN = ProviderPlugin(
         "ingress": ALBIngressDriver,
     },
     managed_service_drivers={
-        # #35 + #351 — shipping the high-traffic kinds now (web app +
-        # queue + bucket + relational DB). Pending per backlog tickets:
-        # postgres/aurora, redis/elasticache, nosql/dynamodb,
-        # pubsub/sns, filesystem/efs.
+        # #35 + #351 + #352 — high-traffic kinds (web app + queue +
+        # bucket + relational DB + cache). Pending per backlog tickets:
+        # postgres/aurora, nosql/dynamodb, pubsub/sns, filesystem/efs.
         ("object_store", "s3"): S3Driver,
         ("queue", "sqs"): SQSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
+        ("redis", "elasticache"): ElastiCacheRedisDriver,
     },
     config_schema={
         "type": "object",
