@@ -301,6 +301,24 @@ type AstroliftClusterBootstrapPlan {
   components: [AstroliftClusterBootstrapComponent!]!
 }
 
+type AstroliftClusterEvent {
+  namespace: String!
+  name: String!
+  reason: String!
+  message: String!
+  type: String!
+  count: Int!
+  firstSeen: String!
+  lastSeen: String!
+  involvedObject: String!
+}
+
+type AstroliftClusterHealth {
+  clusterId: GUID!
+  pods: [AstroliftClusterPodPhase!]!
+  events: [AstroliftClusterEvent!]!
+}
+
 type AstroliftClusterLifecycleAuditEntry {
   operation: String!
   variables: JSON!
@@ -308,6 +326,12 @@ type AstroliftClusterLifecycleAuditEntry {
   errors: [String!]!
   timestamp: DateTime!
   actor: String
+}
+
+type AstroliftClusterPodPhase {
+  namespace: String!
+  phase: String!
+  count: Int!
 }
 
 type AstroliftCommandRun {
@@ -1999,6 +2023,7 @@ type Query {
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
   astroliftClusterLifecycleAudit(clusterId: GUID!, limit: Int! = 50): [AstroliftClusterLifecycleAuditEntry!]!
   astroliftAppCountForCluster(clusterId: GUID!): Int!
+  astroliftClusterHealth(clusterId: GUID!, eventLimit: Int! = 50): AstroliftClusterHealth
   astroliftClusterBootstrapPlan(clusterId: GUID!): AstroliftClusterBootstrapPlan
   astroliftQuotas: [AstroliftQuota!]!
   astroliftBudgets: [AstroliftBudget!]!

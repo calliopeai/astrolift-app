@@ -223,11 +223,70 @@ def bootstrap_components_dispatch(*, cluster: TenantCluster) -> list[Any]:
         ) from exc
 
 
+def cluster_health_dispatch(
+    *,
+    cluster: TenantCluster,
+    namespaces: list[str] | None = None,
+    event_limit: int = 50,
+) -> dict[str, Any]:
+    """Driver-backed pod-phase rollup + recent Warning events (#68
+    slice 1). Returns a dict ``{"pods": [...], "events": [...]}``
+    with the dataclasses converted to plain dicts so the GraphQL
+    resolver layer can return them without strawberry-side coercion.
+
+    Per-driver failure to resolve a kube client (no exec_plugin
+    creds, unreachable apiserver) yields empty lists rather than an
+    exception — the UI surfaces "no data" instead of erroring out
+    the whole status tab.
+    """
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    try:
+        pods = driver.list_pod_phase_summary(ctx, namespaces=namespaces)
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_pod_phase_summary raised {exc}",
+        ) from exc
+    try:
+        events = driver.list_events(
+            ctx, namespaces=namespaces, limit=event_limit,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_events raised {exc}",
+        ) from exc
+    return {
+        "pods": [
+            {
+                "namespace": p.namespace,
+                "phase": p.phase,
+                "count": p.count,
+            }
+            for p in pods
+        ],
+        "events": [
+            {
+                "namespace": e.namespace,
+                "name": e.name,
+                "reason": e.reason,
+                "message": e.message,
+                "type": e.type,
+                "count": e.count,
+                "first_seen": e.first_seen,
+                "last_seen": e.last_seen,
+                "involved_object": e.involved_object,
+            }
+            for e in events
+        ],
+    }
+
+
 __all__ = [
     "ClusterManagementError",
     "ClusterObservabilityError",  # re-exported so callers have one import
     "bootstrap_components_dispatch",
     "bring_cluster_into_management",
+    "cluster_health_dispatch",
     "probe_cluster_capabilities_dispatch",
     "reset_management_backend_for_tests",
     "set_management_backend_for_tests",

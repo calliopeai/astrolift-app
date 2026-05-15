@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  CLUSTER_HEALTH,
   CLUSTER_LIFECYCLE_AUDIT,
   LIST_CLUSTERS,
 } from "@/graphql/clusters/clusters.queries";
@@ -85,23 +86,7 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
     >
       <ClusterTabs slug={slug} active="status" />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Live health</CardTitle>
-          <CardDescription>
-            Real-time signals from the cluster — pod phases, recent
-            warning events, control-plane reachability — sourced
-            directly from the cluster driver.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-muted-foreground text-sm">
-          Coming soon. Wired in the next PR once the
-          <code className="font-mono mx-1 text-xs">ClusterDriver.list_events</code>
-          and
-          <code className="font-mono mx-1 text-xs">list_pods</code>
-          protocol methods land on each cloud driver.
-        </CardContent>
-      </Card>
+      <LiveHealthCard clusterId={cluster.id} />
 
       <LifecycleTimelineCard clusterId={cluster.id} />
 
@@ -208,6 +193,145 @@ function LifecycleTimelineCard({ clusterId }: { clusterId: string }) {
               </li>
             ))}
           </ol>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Live health card (#68 slice 1) ──────────────────────────────────────
+// Backed by ``astroliftClusterHealth`` — driver calls into the kube API
+// for pod phases + recent Warning events. Empty payload = no data
+// available (no creds / unreachable apiserver / bare-metal); UI surfaces
+// that case rather than erroring out.
+
+interface PodPhase {
+  namespace: string;
+  phase: string;
+  count: number;
+}
+
+interface ClusterEvent {
+  namespace: string;
+  name: string;
+  reason: string;
+  message: string;
+  type: string;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  involvedObject: string;
+}
+
+interface HealthResp {
+  astroliftClusterHealth: {
+    clusterId: string;
+    pods: PodPhase[];
+    events: ClusterEvent[];
+  } | null;
+}
+
+const PHASE_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  Running: "default",
+  Succeeded: "secondary",
+  Pending: "outline",
+  Failed: "destructive",
+  Unknown: "outline",
+};
+
+function LiveHealthCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<HealthResp>(CLUSTER_HEALTH, {
+    variables: { clusterId, eventLimit: 25 },
+    pollInterval: 30000,
+  });
+  const payload = data?.astroliftClusterHealth;
+  const pods = payload?.pods ?? [];
+  const events = payload?.events ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Live health</CardTitle>
+        <CardDescription>
+          Pod-phase rollup + recent Warning events across the
+          platform&apos;s managed namespaces. Sourced directly from
+          the cluster driver; polls every 30s.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading && pods.length === 0 && events.length === 0 ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <>
+            <div>
+              <h3 className="text-muted-foreground mb-2 text-xs uppercase tracking-wide">
+                Pods
+              </h3>
+              {pods.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No pod data available — the driver couldn&apos;t
+                  reach the apiserver, or no astrolift-managed pods
+                  are running.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {pods.map((p) => (
+                    <Badge
+                      key={`${p.namespace}-${p.phase}`}
+                      variant={PHASE_VARIANT[p.phase] ?? "outline"}
+                      className="gap-1.5"
+                    >
+                      <span className="font-mono text-[10px]">{p.namespace}</span>
+                      <span className="opacity-60">·</span>
+                      <span>{p.phase}</span>
+                      <span className="opacity-60">·</span>
+                      <span>{p.count}</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-muted-foreground mb-2 text-xs uppercase tracking-wide">
+                Recent warnings
+              </h3>
+              {events.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No recent warning events. (A green Live health
+                  state is the expected baseline.)
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {events.map((e, i) => (
+                    <li
+                      key={`${e.namespace}-${e.name}-${i}`}
+                      className="border-border rounded-md border p-2 text-sm"
+                    >
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <code className="font-mono text-xs">{e.reason}</code>
+                        <span className="text-muted-foreground text-xs">
+                          {e.involvedObject}
+                        </span>
+                        {e.count > 1 && (
+                          <Badge variant="outline" className="text-[10px]">
+                            ×{e.count}
+                          </Badge>
+                        )}
+                        <span className="text-muted-foreground ml-auto text-xs">
+                          {e.lastSeen
+                            ? new Date(e.lastSeen).toLocaleString()
+                            : "—"}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
+                        {e.message}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

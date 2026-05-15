@@ -194,6 +194,32 @@ export const LIST_MANAGED_DOMAINS = gql`
   }
 `;
 
+// Driver-backed pod-phase rollup + recent Warning events (#68 slice 1).
+// Drives the Live-health card on the Status tab.
+export const CLUSTER_HEALTH = gql`
+  query ClusterHealth($clusterId: GUID!, $eventLimit: Int) {
+    astroliftClusterHealth(clusterId: $clusterId, eventLimit: $eventLimit) {
+      clusterId
+      pods {
+        namespace
+        phase
+        count
+      }
+      events {
+        namespace
+        name
+        reason
+        message
+        type
+        count
+        firstSeen
+        lastSeen
+        involvedObject
+      }
+    }
+  }
+`;
+
 // Cluster-scoped slice of the mutation audit log (#68 slice 2). Drives
 // the Lifecycle timeline card on the Status tab.
 export const CLUSTER_LIFECYCLE_AUDIT = gql`
