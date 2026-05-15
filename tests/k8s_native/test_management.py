@@ -287,7 +287,11 @@ def test_happy_path_applies_rbac_probes_and_runs_preflight():
     inv = backend.preflight_invocations[0]
     assert inv["namespace"] == ASTROLIFT_NAMESPACE
     assert inv["name"].startswith("astrolift-preflight-")
-    assert inv["timeout_seconds"] == 60
+    # Preflight timeout: 600s (10 min) gives Fargate cold-start
+    # headroom — short timeouts repeatedly fired before the pod
+    # could schedule, leaving the operator with a misleading
+    # "preflight failed" instead of "still warming up".
+    assert inv["timeout_seconds"] == 600
     # Capabilities snapshot landed in the report
     assert report.capabilities["cert_manager"]["installed"] is True
     assert report.capabilities["storage_classes"] == ["gp3"]
