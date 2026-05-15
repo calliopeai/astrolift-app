@@ -22,6 +22,7 @@ from astrolift_workflows.activities import (
     dispatch_cron_deploys,
     drain_source_cluster,
     ensure_cluster_drained,
+    ensure_platform_managed_records,
     finalize_managed_service_deletion,
     gc_stale_previews,
     health_check,
@@ -45,6 +46,7 @@ from astrolift_workflows.activities import (
     poll_scheduled_job_runs,
     pre_flight,
     probe_capabilities,
+    probe_required_records,
     provision_managed_services_initial,
     provision_namespace,
     provision_registry_repo,
@@ -58,6 +60,7 @@ from astrolift_workflows.activities import (
     soft_delete_app_records,
     switch_app_env_binding,
     teardown_cluster_infra,
+    transition_domain_status,
     update_secrets,
     validate_migration_target,
     verify_reachability,
@@ -83,6 +86,7 @@ from astrolift_workflows.workflows import (
     RollbackDeploymentWorkflow,
     TearDownAppWorkflow,
     TearDownPreviewWorkflow,
+    ValidateCustomDomainWorkflow,
 )
 
 WORKFLOWS = (
@@ -105,6 +109,7 @@ WORKFLOWS = (
     RollbackDeploymentWorkflow,
     TearDownAppWorkflow,
     TearDownPreviewWorkflow,
+    ValidateCustomDomainWorkflow,
 )
 
 ACTIVITIES = (
@@ -121,6 +126,7 @@ ACTIVITIES = (
     dispatch_cron_deploys,
     drain_source_cluster,
     ensure_cluster_drained,
+    ensure_platform_managed_records,
     finalize_managed_service_deletion,
     gc_stale_previews,
     health_check,
@@ -144,6 +150,7 @@ ACTIVITIES = (
     poll_scheduled_job_runs,
     pre_flight,
     probe_capabilities,
+    probe_required_records,
     provision_managed_services_initial,
     provision_namespace,
     provision_registry_repo,
@@ -157,6 +164,7 @@ ACTIVITIES = (
     soft_delete_app_records,
     switch_app_env_binding,
     teardown_cluster_infra,
+    transition_domain_status,
     update_secrets,
     validate_migration_target,
     verify_reachability,

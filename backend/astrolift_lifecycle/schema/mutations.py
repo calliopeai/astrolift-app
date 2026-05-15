@@ -445,6 +445,47 @@ def _deploy_pipeline_disabled() -> bool:
     return not is_enabled(Feature.DEPLOY_PIPELINE)
 
 
+def _kick_validate_custom_domain(domain) -> None:
+    """Enqueue ``ValidateCustomDomainWorkflow`` for a CustomDomain row.
+
+    Flips the row to ``validating`` so the UI shows the in-flight
+    state immediately, then starts the workflow with a deterministic
+    id so re-firing the same domain joins the existing run rather
+    than spawning a parallel one (matches the cluster bring-into-
+    management pattern).
+    """
+    from astrolift_workflows.client import start_workflow
+    from astrolift_workflows.inputs import (
+        Actor,
+        ValidateCustomDomainInput,
+    )
+
+    domain.validation_status = CustomDomain.ValidationStatus.VALIDATING
+    domain.last_validation_error = ""
+    domain.save(
+        update_fields=[
+            "validation_status",
+            "last_validation_error",
+            "updated_at",
+            "version",
+        ],
+    )
+    # Actor is best-effort — the audit middleware captures the human
+    # actor on the mutation row separately, but the workflow needs
+    # *some* identity for its own audit trail.
+    actor = Actor(kind="system", display="custom-domain-handshake")
+    start_workflow(
+        "ValidateCustomDomainWorkflow",
+        args=[
+            ValidateCustomDomainInput(
+                custom_domain_id=domain.pk,
+                actor=actor,
+            ),
+        ],
+        workflow_id=f"ValidateCustomDomainWorkflow-{domain.guid}",
+    )
+
+
 @strawberry.type
 class LifecycleMutation:
     @strawberry.field
@@ -1178,11 +1219,65 @@ class LifecycleMutation:
                     field="hostname",
                 )
             return gql_success(app_domain_to_type(existing))
+
+        # Build the handshake — challenge token + the per-record list
+        # the operator must add to their authoritative DNS (or that
+        # the platform will create itself when the parent zone is
+        # managed). The validation workflow consumes
+        # ``required_dns_records`` to know what to probe.
+        from astrolift_clusters.models import ManagedDomain
+        from astrolift_lifecycle.custom_domain_handshake import (
+            build_handshake,
+            hostname_parent_zone,
+            resolve_cluster_ingress_target,
+        )
+
+        parent_zone = hostname_parent_zone(host)
+        managed_zone = ManagedDomain.objects.filter(
+            zone=parent_zone,
+            deleted_at__isnull=True,
+        ).first()
+        # Best-effort cluster pick: prefer the app's default tenant
+        # cluster; fall back to whatever cluster the managed-zone
+        # row binds. Either way the operator-facing CNAME target is
+        # stable.
+        cluster = getattr(app, "default_tenant_cluster", None)
+        cluster_slug = cluster.slug if cluster is not None else "default"
+        cname_target = resolve_cluster_ingress_target(
+            cluster_slug=cluster_slug,
+            managed_domain_zone=managed_zone.zone if managed_zone else None,
+        )
+        handshake = build_handshake(
+            hostname=host,
+            cluster_ingress_target=cname_target,
+            is_platform_managed_zone=managed_zone is not None,
+            validation_method=method,
+        )
+
         domain = CustomDomain.objects.create(
             registered_app=app,
             hostname=host,
             validation_method=method,
+            txt_challenge_token=handshake.txt_challenge_token,
+            expected_cname_target=handshake.expected_cname_target,
+            required_dns_records=[
+                {
+                    "kind": r.kind,
+                    "name": r.name,
+                    "value": r.value,
+                    "ttl": r.ttl,
+                    "propagated": r.propagated,
+                    "last_checked_at": r.last_checked_at,
+                    "message": r.message,
+                }
+                for r in handshake.required_records
+            ],
+            is_platform_managed_zone=handshake.is_platform_managed_zone,
         )
+        # Fire the validation workflow on creation so platform-managed
+        # zones auto-create their records + first DNS probe runs
+        # without the operator having to click Recheck.
+        _kick_validate_custom_domain(domain)
         return gql_success(app_domain_to_type(domain))
 
     @strawberry.field
@@ -1217,17 +1312,24 @@ class LifecycleMutation:
         info: Info,
         input: RecheckDomainValidationInput,
     ) -> MutationResultType[AppDomainType]:
-        """Trigger a re-check of cert / DNS validation. The DNS
-        polling loop runs out-of-band; this mutation just bumps
-        ``updated_at`` so the UI can show 'last_checked_at' moved
-        forward and pick up state changes from the polling loop."""
-        domain = CustomDomain.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        """Fire ``ValidateCustomDomainWorkflow`` for the row (#397).
+
+        Idempotent: re-firing the same workflow id joins the existing
+        run rather than starting a parallel one. The workflow probes
+        the authoritative nameservers, updates per-record propagation
+        state on ``required_dns_records``, and transitions
+        ``validation_status`` to ``validated`` or ``failed``.
+        """
+        domain = CustomDomain.objects.filter(
+            guid=str(input.id),
+            deleted_at__isnull=True,
+        ).first()
         if domain is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "domain not found",
             )
-        domain.save(update_fields=["updated_at", "version"])
+        _kick_validate_custom_domain(domain)
         return gql_success(app_domain_to_type(domain))
 
     # ---- Deploy tokens (#281) ------------------------------------

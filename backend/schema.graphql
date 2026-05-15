@@ -137,12 +137,27 @@ type AstroliftAppDomain {
   isActive: Boolean!
   registeredAppSlug: String!
   createdAt: DateTime!
+  txtChallengeToken: String!
+  expectedCnameTarget: String!
+  requiredDnsRecords: [AstroliftAppDomainRequiredRecord!]!
+  isPlatformManagedZone: Boolean!
+  lastValidationError: String!
 }
 
 type AstroliftAppDomainMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAppDomain
+}
+
+type AstroliftAppDomainRequiredRecord {
+  kind: String!
+  name: String!
+  value: String!
+  ttl: Int!
+  propagated: Boolean!
+  lastCheckedAt: String
+  message: String!
 }
 
 type AstroliftAppEnvironment {

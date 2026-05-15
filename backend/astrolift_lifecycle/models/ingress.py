@@ -62,6 +62,7 @@ class ProjectIngress(BaseCoreModel):
 class CustomDomain(BaseCoreModel):
     class ValidationStatus(models.TextChoices):
         PENDING = "pending"
+        VALIDATING = "validating"
         VALIDATED = "validated"
         FAILED = "failed"
 
@@ -89,6 +90,64 @@ class CustomDomain(BaseCoreModel):
     validation_value = models.CharField(max_length=255, blank=True, default="")
     certificate_id = models.CharField(max_length=255, blank=True, default="")
     is_active = models.BooleanField(default=True)
+
+    # ---- handshake surface (#397) ---------------------------------
+
+    txt_challenge_token = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=(
+            "Random token the operator pastes into a TXT record at "
+            "``_astrolift-challenge.<hostname>`` so DNS-TXT validation "
+            "can confirm they control the hostname."
+        ),
+    )
+    expected_cname_target = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=(
+            "Cluster ingress hostname the operator's CNAME should "
+            "point at. Captured at addAppDomain time so the operator "
+            "sees a stable target even if the cluster's resolver "
+            "shape changes later."
+        ),
+    )
+    required_dns_records = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "List of ``{kind, name, value, ttl, propagated, "
+            "last_checked_at, message}`` rows the operator must add "
+            "to their authoritative DNS for the hostname to validate. "
+            "When the parent zone is platform-managed, the platform "
+            "creates these via ``DnsDriver.ensure_record`` and the "
+            "rows reflect the platform's own create state."
+        ),
+    )
+    is_platform_managed_zone = models.BooleanField(
+        default=False,
+        help_text=(
+            "True when the hostname's parent zone matches a row in "
+            "``ManagedDomain`` — the platform owns the zone and "
+            "creates the records automatically. False when the "
+            "operator's authoritative DNS is somewhere the platform "
+            "can't write to and they have to add records themselves."
+        ),
+    )
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    last_validation_error = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text=(
+            "Operator-facing reason the most recent validation pass "
+            "failed (e.g., 'TXT record not found at _astrolift-"
+            "challenge.example.com — still propagating?'). Cleared on "
+            "successful validation."
+        ),
+    )
 
     class Meta:
         constraints = [
