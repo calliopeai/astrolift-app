@@ -138,8 +138,18 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        # force_destroy: in CNPG the only guard is the reclaim policy
+        # on the underlying PVCs. Real deletion would patch
+        # spec.storage.reclaimPolicy=Delete and override pod-disruption-
+        # budgets before delete; this render-only stub accepts the flag
+        # for Protocol symmetry and lets the workflow proceed.
+        del force_destroy
         _, cluster_name = spec.handle.partition("/")[0::2]
         if self._config.cluster_driver is None:
             return DeprovisionResult(

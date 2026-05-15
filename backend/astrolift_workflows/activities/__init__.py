@@ -42,6 +42,11 @@ from astrolift_workflows.activities.cluster_management import (
     verify_reachability,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
+from astrolift_workflows.activities.managed_service_lifecycle import (
+    deprovision_managed_service,
+    finalize_managed_service_deletion,
+    mark_managed_service_deprovisioning,
+)
 from astrolift_workflows.activities.migration import (
     apply_to_target_cluster,
     drain_source_cluster,
@@ -67,10 +72,12 @@ __all__ = [
     "create_promotion_deployment",
     "create_rollback_deployment",
     "delete_preview_namespace",
+    "deprovision_managed_service",
     "detect_drift",
     "dispatch_cron_deploys",
     "drain_source_cluster",
     "ensure_cluster_drained",
+    "finalize_managed_service_deletion",
     "gc_stale_previews",
     "health_check",
     "mark_app_provisioning",
@@ -80,6 +87,7 @@ __all__ = [
     "mark_deploying",
     "mark_error",
     "mark_managed",
+    "mark_managed_service_deprovisioning",
     "mark_managing",
     "mark_preview_torn_down",
     "mark_running",

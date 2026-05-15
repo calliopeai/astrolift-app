@@ -94,8 +94,13 @@ class ServiceBusDriver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        del delete_data, force_destroy
         _, _, queue_name = spec.handle.partition("/")
         try:
             self._client.queues.delete(

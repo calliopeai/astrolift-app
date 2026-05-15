@@ -94,8 +94,16 @@ class BlobStorageDriver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        # force_destroy: Azure Blob has soft-delete + immutability
+        # policies as guards. A real impl would disable both and
+        # delete; this stub accepts the flag for Protocol symmetry.
+        del force_destroy
         _, _, container_name = spec.handle.partition("/")
         if not delete_data:
             return DeprovisionResult(

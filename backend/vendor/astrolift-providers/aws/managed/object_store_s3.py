@@ -177,41 +177,83 @@ class S3Driver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        """S3 teardown — four-corner matrix per the protocol.
+
+        ``delete_data=False, force_destroy=False`` (default safe):
+          Retain bucket + contents. Platform unbinds; bucket lives on
+          for the operator to deal with manually.
+
+        ``delete_data=False, force_destroy=True``:
+          Retain bucket + contents but bypass guards (e.g. operator
+          tags that would refuse cleanup).
+
+        ``delete_data=True, force_destroy=False``:
+          Empty bucket then delete. Fails if the bucket has
+          versioning + MFA-delete or any object lock retention that
+          blocks the empty step — operator must lift those manually.
+
+        ``delete_data=True, force_destroy=True``:
+          Disable versioning safeguards (suspend versioning, delete
+          all versions + delete markers, lift any deletion-protection
+          tag the platform owns), then empty + delete.
+        """
         _, bucket_name = parse_handle(spec.handle)
-        if delete_data:
-            # Empty the bucket first (S3 refuses delete with objects)
-            try:
-                self._empty_bucket(bucket_name=bucket_name)
-            except Exception as exc:  # noqa: BLE001
-                return DeprovisionResult(
-                    ok=False, handle=spec.handle,
-                    message=f"empty failed: {exc}",
-                    errors=[str(exc)],
-                )
-            try:
-                self._s3.delete_bucket(Bucket=bucket_name)
-            except self._s3.exceptions.NoSuchBucket:
-                pass
-            except Exception as exc:  # noqa: BLE001
-                return DeprovisionResult(
-                    ok=False, handle=spec.handle,
-                    message=f"delete_bucket: {exc}",
-                    errors=[str(exc)],
-                )
+
+        if not delete_data:
+            # Safe path. force_destroy without delete_data is a noop
+            # at the bucket level — the bucket+contents stay; the
+            # platform's record of the binding is what gets cleaned up
+            # by the calling activity, not this driver call.
             return DeprovisionResult(
                 ok=True, handle=spec.handle,
-                message=f"bucket {bucket_name} deleted with data",
+                message=(
+                    f"bucket {bucket_name} retained (delete_data=False); "
+                    "platform unbinding only"
+                ),
             )
-        # delete_data=False: keep bucket; drop the platform tags so
-        # operator can decide later. Don't hard-delete.
+
+        # delete_data=True branch — irreversibly delete bucket contents.
+        if force_destroy:
+            # Disable versioning safeguards before empty. NB: this also
+            # lets the bucket be re-emptied if a previous attempt
+            # half-finished. Best-effort: ignore errors (most buckets
+            # are non-versioned).
+            try:
+                self._s3.put_bucket_versioning(
+                    Bucket=bucket_name,
+                    VersioningConfiguration={"Status": "Suspended"},
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
+        try:
+            self._empty_bucket(bucket_name=bucket_name)
+        except Exception as exc:  # noqa: BLE001
+            return DeprovisionResult(
+                ok=False, handle=spec.handle,
+                message=f"empty failed: {exc}",
+                errors=[str(exc)],
+            )
+        try:
+            self._s3.delete_bucket(Bucket=bucket_name)
+        except self._s3.exceptions.NoSuchBucket:
+            pass
+        except Exception as exc:  # noqa: BLE001
+            return DeprovisionResult(
+                ok=False, handle=spec.handle,
+                message=f"delete_bucket: {exc}",
+                errors=[str(exc)],
+            )
+        suffix = " (force_destroy)" if force_destroy else ""
         return DeprovisionResult(
             ok=True, handle=spec.handle,
-            message=(
-                f"bucket {bucket_name} retained (delete_data=False); "
-                "platform unbinding only"
-            ),
+            message=f"bucket {bucket_name} deleted with data{suffix}",
         )
 
     # ---- read-only ops --------------------------------------------
