@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/table";
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
+  CLUSTER_APP_COUNT,
   CLUSTER_BOOTSTRAP_PLAN,
   DECOMMISSION_CLUSTER,
   INSTALL_CLUSTER_PREREQS,
@@ -380,6 +381,8 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
             <p className="font-mono text-sm">{cluster.region || "—"}</p>
           </CardContent>
         </Card>
+
+        <AppsBoundCard clusterId={cluster.id} />
       </div>
 
       {lifecycle === "error" && cluster.lastManagementError && (
@@ -894,6 +897,41 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
           </Button>
         </Can>
       </div>
+    </Card>
+  );
+}
+
+// ─── Apps-bound count card (#393) ───────────────────────────────────────
+// Single-number summary of how many active apps target this cluster
+// (via default_tenant_cluster FK OR per-env binding). Backs the
+// operator's question "what's the blast radius of decommissioning?".
+
+interface AppCountResp {
+  astroliftAppCountForCluster: number;
+}
+
+function AppsBoundCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<AppCountResp>(CLUSTER_APP_COUNT, {
+    variables: { clusterId },
+    pollInterval: 30000,
+  });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-muted-foreground text-sm">Apps bound</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-5 w-12" />
+        ) : (
+          <p className="text-sm">
+            <span className="text-2xl font-semibold">
+              {data?.astroliftAppCountForCluster ?? 0}
+            </span>{" "}
+            <span className="text-muted-foreground">active</span>
+          </p>
+        )}
+      </CardContent>
     </Card>
   );
 }
