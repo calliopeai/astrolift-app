@@ -97,6 +97,25 @@ export default function ClusterPrerequisitesPage() {
         </p>
       </div>
 
+      <div className="border-primary/30 bg-primary/5 rounded-md border p-4 text-sm">
+        <p className="font-medium">One-shot install via the CLI</p>
+        <p className="text-muted-foreground mt-1">
+          For a one-shot install of the prereqs below — driver-tuned for
+          your provider — run{" "}
+          <code className="font-mono text-xs">astro cluster bootstrap --cluster-slug &lt;slug&gt;</code>{" "}
+          from your terminal. The CLI plants Flux + the platform&apos;s
+          umbrella chart, then the cluster detail page&apos;s bootstrap
+          card lets you reconcile the selection over time.{" "}
+          <Link
+            href="/downloads"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            Install the CLI
+          </Link>
+          .
+        </p>
+      </div>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">When you need this</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
