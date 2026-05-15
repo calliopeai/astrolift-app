@@ -52,6 +52,7 @@ from astrolift_workflows.activities.cluster_management import (
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
 from astrolift_workflows.activities.custom_domain import (
     ensure_platform_managed_records,
+    issue_custom_domain_certificate,
     probe_required_records,
     transition_domain_status,
 )
@@ -99,6 +100,7 @@ __all__ = [
     "gc_stale_previews",
     "health_check",
     "install_cluster_prereqs",
+    "issue_custom_domain_certificate",
     "list_app_managed_service_ids",
     "mark_app_deregistered",
     "mark_app_provisioning",

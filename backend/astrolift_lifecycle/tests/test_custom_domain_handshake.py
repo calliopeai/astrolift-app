@@ -6,15 +6,12 @@ exercise it without spinning up models / drivers / a workflow stack.
 
 from __future__ import annotations
 
-import pytest
-
 from astrolift_lifecycle.custom_domain_handshake import (
     build_handshake,
     generate_challenge_token,
     hostname_parent_zone,
     resolve_cluster_ingress_target,
 )
-
 
 # ---- generate_challenge_token ----------------------------------------
 
@@ -167,8 +164,13 @@ def test_handshake_to_dict_shape():
     }
     for r in d["required_records"]:
         assert set(r.keys()) == {
-            "kind", "name", "value", "ttl",
-            "propagated", "last_checked_at", "message",
+            "kind",
+            "name",
+            "value",
+            "ttl",
+            "propagated",
+            "last_checked_at",
+            "message",
         }
 
 

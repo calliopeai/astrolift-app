@@ -326,3 +326,88 @@ async def transition_domain_status(
         extra={"custom_domain_id": custom_domain_id},
     )
     return final
+
+
+def _issue_cert_sync(custom_domain_id: int) -> dict[str, Any]:
+    """Call the bound cluster's ``TlsDriver.ensure_certificate`` for
+    the domain. Persists the returned cert id onto
+    ``CustomDomain.certificate_id`` so the UI can show "cert active"
+    + the ingress renderer can wire it to the workload's listener.
+
+    Strategy picks itself by driver: AWS clusters use
+    ``acm_dns_validated`` (DNS-01 happens via Route53 once we already
+    own the records), GCP uses ``gcp_managed_cert``, Azure uses
+    ``azure_managed_cert``, k8s_native uses ``letsencrypt`` (cert-
+    manager + LE / HTTP-01). The driver impl owns the strategy
+    default; the activity only passes the hostname.
+    """
+    from astrolift_lifecycle.models import CustomDomain
+
+    d = CustomDomain.all_objects.select_related("registered_app").get(
+        pk=custom_domain_id,
+    )
+    if d.certificate_id:
+        return {
+            "ok": True,
+            "certificate_id": d.certificate_id,
+            "message": "certificate already issued",
+        }
+    cluster = getattr(d.registered_app, "default_tenant_cluster", None)
+    if cluster is None:
+        return {
+            "ok": False,
+            "certificate_id": "",
+            "message": "app has no default_tenant_cluster — no TLS driver to call",
+        }
+    try:
+        from core.cluster_observability import _driver_for_capability  # type: ignore[attr-defined]
+
+        tls_driver = _driver_for_capability(cluster, "tls")
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "certificate_id": "",
+            "message": f"tls driver unresolvable: {exc}",
+        }
+    try:
+        cert = tls_driver.ensure_certificate(d.hostname)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "certificate_id": "",
+            "message": f"ensure_certificate: {exc}",
+        }
+    cert_id = getattr(cert, "id", "") or ""
+    if cert_id:
+        d.certificate_id = cert_id
+        d.save(
+            update_fields=[
+                "certificate_id",
+                "updated_at",
+                "version",
+            ],
+        )
+    return {
+        "ok": bool(cert_id),
+        "certificate_id": cert_id,
+        "message": f"certificate id={cert_id}",
+    }
+
+
+@activity.defn(name="astrolift.custom_domain.issue_certificate")
+async def issue_custom_domain_certificate(
+    custom_domain_id: int,
+) -> dict[str, Any]:
+    """Fire ``TlsDriver.ensure_certificate`` for a validated domain
+    + persist the returned cert id on the row."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    result = await sync_to_async(_issue_cert_sync)(custom_domain_id)
+    log.info(
+        "issue_custom_domain_certificate ok=%s certificate_id=%s",
+        result.get("ok"),
+        result.get("certificate_id"),
+        extra={"custom_domain_id": custom_domain_id},
+    )
+    return result

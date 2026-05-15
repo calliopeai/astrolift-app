@@ -35,6 +35,7 @@ from astrolift_workflows.inputs import (
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
         ensure_platform_managed_records,
+        issue_custom_domain_certificate,
         probe_required_records,
         transition_domain_status,
     )
@@ -122,12 +123,32 @@ class ValidateCustomDomainWorkflow:
                 start_to_close_timeout=_QUICK_TIMEOUT,
                 retry_policy=_ENSURE_RETRY,
             )
+            # Cert issuance happens after validation flips. We don't
+            # block the workflow on a long ACM / cert-manager cycle —
+            # the activity submits the request + writes the returned
+            # cert id back to the row; the renderer picks it up on
+            # the next deploy. Failures here log + return ok=True
+            # for the validation surface; the cert state is tracked
+            # separately on ``CustomDomain.certificate_id`` so the UI
+            # can show "validated, certificate issuing…" without
+            # conflating the two states.
+            cert_result: dict | None = None
+            try:
+                cert_result = await workflow.execute_activity(
+                    issue_custom_domain_certificate,
+                    domain_id,
+                    start_to_close_timeout=timedelta(minutes=10),
+                    retry_policy=_ENSURE_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001
+                cert_result = {"ok": False, "message": str(exc)}
             return WorkflowResult(
                 ok=True,
                 message="custom domain validated",
                 data={
                     "ensure": ensure_result if isinstance(ensure_result, dict) else None,
                     "probe": last_probe,
+                    "cert": cert_result,
                 },
             )
 
