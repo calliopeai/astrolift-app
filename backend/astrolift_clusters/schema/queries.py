@@ -83,7 +83,10 @@ class ClustersQuery:
     @require_permission(Permission.CLUSTER_REGISTER)
     @tenant_scoped()
     def astrolift_cluster_lifecycle_audit(
-        self, info: Info, cluster_id: GUID, limit: int = 50,
+        self,
+        info: Info,
+        cluster_id: GUID,
+        limit: int = 50,
     ) -> list[ClusterLifecycleAuditEntryType]:
         """Cluster-scoped slice of the mutation audit log (#68 slice 2).
 
@@ -96,7 +99,8 @@ class ClustersQuery:
         from core.schema.audit import MutationAuditLog
 
         cluster = TenantCluster.objects.filter(
-            guid=str(cluster_id), deleted_at__isnull=True,
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
         ).first()
         if cluster is None:
             return []
@@ -112,10 +116,7 @@ class ClustersQuery:
             "managed_domain.",
             "provider_plugin.",
         )
-        qs = (
-            MutationAuditLog.objects.select_related("user")
-            .order_by("-timestamp")
-        )
+        qs = MutationAuditLog.objects.select_related("user").order_by("-timestamp")
         cluster_guid = str(cluster.guid)
         cluster_slug = cluster.slug
         out: list[ClusterLifecycleAuditEntryType] = []
@@ -126,10 +127,7 @@ class ClustersQuery:
             # variables once and substring-match — cheap, no JSON-path
             # required on the DB side.
             variables_str = str(log.variables) if log.variables else ""
-            if (
-                cluster_guid not in variables_str
-                and cluster_slug not in variables_str
-            ):
+            if cluster_guid not in variables_str and cluster_slug not in variables_str:
                 continue
             out.append(
                 ClusterLifecycleAuditEntryType(
@@ -164,7 +162,8 @@ class ClustersQuery:
         from astrolift_workflows.client import list_workflows_for_cluster
 
         cluster = TenantCluster.objects.filter(
-            guid=str(cluster_id), deleted_at__isnull=True,
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
         ).first()
         if cluster is None:
             return []
@@ -196,15 +195,18 @@ class ClustersQuery:
         from astrolift_registry.models import RegisteredApp
 
         cluster = TenantCluster.objects.filter(
-            guid=str(cluster_id), deleted_at__isnull=True,
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
         ).first()
         if cluster is None:
             return 0
         default_bound = RegisteredApp.objects.filter(
-            default_tenant_cluster=cluster, deleted_at__isnull=True,
+            default_tenant_cluster=cluster,
+            deleted_at__isnull=True,
         ).values_list("pk", flat=True)
         env_bound = AppEnvironment.objects.filter(
-            tenant_cluster=cluster, deleted_at__isnull=True,
+            tenant_cluster=cluster,
+            deleted_at__isnull=True,
         ).values_list("registered_app_id", flat=True)
         return len(set(default_bound) | set(env_bound))
 
@@ -237,7 +239,8 @@ class ClustersQuery:
 
         cluster = (
             TenantCluster.objects.filter(
-                guid=str(cluster_id), deleted_at__isnull=True,
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
             )
             .select_related("provider_plugin")
             .first()
@@ -246,7 +249,8 @@ class ClustersQuery:
             return None
         try:
             payload = cluster_health_dispatch(
-                cluster=cluster, event_limit=event_limit,
+                cluster=cluster,
+                event_limit=event_limit,
             )
         except ClusterManagementError:
             payload = {"pods": [], "events": []}

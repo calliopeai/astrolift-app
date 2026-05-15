@@ -30,7 +30,8 @@ log = logging.getLogger("astrolift_workflows.activities.install_prereqs")
 
 
 def _merge_helm_values(
-    base: dict[str, Any], overrides: dict[str, str],
+    base: dict[str, Any],
+    overrides: dict[str, str],
 ) -> dict[str, Any]:
     """Apply per-option overrides on top of the driver's helm_values.
 
@@ -121,26 +122,28 @@ def _install_cluster_prereqs_sync(
     # install on a fresh cluster doesn't fail with "HelmRepository
     # not found". Idempotent; cluster_driver.apply_manifests is a
     # server-side-apply call.
-    resources.insert(0, {
-        "apiVersion": "source.toolkit.fluxcd.io/v1",
-        "kind": "HelmRepository",
-        "metadata": {
-            "name": "astrolift-prereqs",
-            "namespace": target_namespace,
-            "labels": {"astrolift.io/managed-by": "platform"},
+    resources.insert(
+        0,
+        {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "HelmRepository",
+            "metadata": {
+                "name": "astrolift-prereqs",
+                "namespace": target_namespace,
+                "labels": {"astrolift.io/managed-by": "platform"},
+            },
+            "spec": {
+                "interval": "1h",
+                "url": "oci://ghcr.io/calliopeai/astrolift-prereqs",
+                "type": "oci",
+            },
         },
-        "spec": {
-            "interval": "1h",
-            "url": "oci://ghcr.io/calliopeai/astrolift-prereqs",
-            "type": "oci",
-        },
-    })
+    )
 
     result = driver.apply_manifests(ctx.slug, target_namespace, resources)
     if not result.ok:
         raise AppDeployError(
-            f"install_cluster_prereqs apply failed: "
-            + "; ".join(result.errors),
+            "install_cluster_prereqs apply failed: " + "; ".join(result.errors),
         )
 
     return {
@@ -172,7 +175,9 @@ async def install_cluster_prereqs(
 
     activity.heartbeat()
     result = await sync_to_async(_install_cluster_prereqs_sync)(
-        cluster_id, selected_keys, option_overrides,
+        cluster_id,
+        selected_keys,
+        option_overrides,
     )
     log.info(
         "install_cluster_prereqs applied=%d skipped=%d",

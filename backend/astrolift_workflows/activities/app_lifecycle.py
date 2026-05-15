@@ -459,7 +459,8 @@ def _update_secrets_sync(deployment_id: int) -> int:
     # ---- operator-authored secret bundles --------------------------
     if refs:
         secrets_backend = driver_for_capability(
-            d.app_environment.tenant_cluster, "secrets",
+            d.app_environment.tenant_cluster,
+            "secrets",
         )
         for ref in refs:
             bundle = ref.secret_bundle
@@ -511,11 +512,13 @@ def _update_secrets_sync(deployment_id: int) -> int:
         bindings_data: dict[str, str] = {}
         seen_keys: set[str] = set()
         secrets_backend = driver_for_capability(
-            d.app_environment.tenant_cluster, "secrets",
+            d.app_environment.tenant_cluster,
+            "secrets",
         )
         for svc in services:
             for binding in ManagedServiceBinding.objects.filter(
-                managed_service=svc, deleted_at__isnull=True,
+                managed_service=svc,
+                deleted_at__isnull=True,
             ).order_by("env_key"):
                 env_key = binding.env_key
                 if env_key in seen_keys:
@@ -542,8 +545,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
                     if isinstance(resolved, dict):
                         if not resolved:
                             raise AppDeployError(
-                                f"binding {env_key} resolved to an "
-                                f"empty secret",
+                                f"binding {env_key} resolved to an empty secret",
                             )
                         raw_value = str(next(iter(resolved.values())))
                     else:
@@ -554,9 +556,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
                     raw_value.encode("utf-8"),
                 ).decode("ascii")
 
-        bindings_secret_name = (
-            f"astrolift-bindings-{d.registered_app.slug}"
-        )
+        bindings_secret_name = f"astrolift-bindings-{d.registered_app.slug}"
         resources.append(
             {
                 "apiVersion": "v1",
@@ -582,8 +582,7 @@ def _update_secrets_sync(deployment_id: int) -> int:
     result = cluster_driver.apply_manifests(ctx.slug, namespace, resources)
     if not result.ok:
         raise AppDeployError(
-            f"update_secrets apply failed for deployment {deployment_id}: "
-            + "; ".join(result.errors),
+            f"update_secrets apply failed for deployment {deployment_id}: " + "; ".join(result.errors),
         )
     return len(resources)
 

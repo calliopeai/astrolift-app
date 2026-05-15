@@ -114,7 +114,8 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
     envs = list(
         AppEnvironment.objects.filter(
-            registered_app=app, deleted_at__isnull=True,
+            registered_app=app,
+            deleted_at__isnull=True,
         ).select_related("tenant_cluster__provider_plugin"),
     )
     deleted: list[str] = []
@@ -122,9 +123,7 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
         cluster = env.tenant_cluster
         if cluster is None:
             continue
-        namespace = app.k8s_namespace or (
-            f"{app.organization.slug}-{app.slug}"
-        )
+        namespace = app.k8s_namespace or (f"{app.organization.slug}-{app.slug}")
         try:
             driver = _driver_for_cluster(cluster)
             ctx = _context_for_cluster(cluster)
@@ -133,7 +132,10 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
         except Exception as exc:  # noqa: BLE001 — log + continue
             log.warning(
                 "delete_namespace failed for app=%s cluster=%s ns=%s: %s",
-                app.slug, cluster.slug, namespace, exc,
+                app.slug,
+                cluster.slug,
+                namespace,
+                exc,
             )
     return deleted
 

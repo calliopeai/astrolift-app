@@ -559,9 +559,7 @@ class RegistryMutation:
     @mutation_audit(action="app.tear_down")
     @require_permission(Permission.APP_DELETE)
     @tenant_scoped()
-    def tear_down_app(
-        self, info: Info, input: TearDownAppInput
-    ) -> MutationResultType[_SoftDeletePayload]:
+    def tear_down_app(self, info: Info, input: TearDownAppInput) -> MutationResultType[_SoftDeletePayload]:
         """Fires ``TearDownAppWorkflow`` (#358) — symmetric inverse
         of onboarding. Fans out per-binding ``DeprovisionManagedService``
         workflows, deletes app's k8s namespaces, revokes deploy
@@ -574,11 +572,14 @@ class RegistryMutation:
         from astrolift_workflows.client import start_workflow
         from astrolift_workflows.inputs import (
             Actor,
+        )
+        from astrolift_workflows.inputs import (
             TearDownAppInput as TearDownInput,
         )
 
         app = RegisteredApp.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True,
+            guid=str(input.id),
+            deleted_at__isnull=True,
         ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")

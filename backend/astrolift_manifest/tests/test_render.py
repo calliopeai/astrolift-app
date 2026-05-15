@@ -343,9 +343,7 @@ def test_cronjob_renders_with_schedule():
 
 def test_env_from_absent_when_no_refs():
     out = _render((_deployment_workload(),))
-    container = next(r for r in out if r["kind"] == "Deployment")[
-        "spec"
-    ]["template"]["spec"]["containers"][0]
+    container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert "envFrom" not in container
 
 
@@ -357,9 +355,7 @@ def test_env_from_injects_secret_refs_into_primary_container():
             "astrolift-bindings-hello",
         ],
     )
-    container = next(r for r in out if r["kind"] == "Deployment")[
-        "spec"
-    ]["template"]["spec"]["containers"][0]
+    container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert container["envFrom"] == [
         {"secretRef": {"name": "app-shared"}},
         {"secretRef": {"name": "astrolift-bindings-hello"}},
@@ -374,9 +370,7 @@ def test_env_from_threads_into_every_container():
         (_deployment_workload(containers=(_container(), side)),),
         env_from_secret_refs=["astrolift-bindings-hello"],
     )
-    containers = next(r for r in out if r["kind"] == "Deployment")[
-        "spec"
-    ]["template"]["spec"]["containers"]
+    containers = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"]
     assert len(containers) == 2
     for c in containers:
         assert c["envFrom"] == [
@@ -399,9 +393,7 @@ def test_env_from_propagates_to_cronjob_pods():
         environment_name="prod",
         env_from_secret_refs=["astrolift-bindings-hello"],
     )
-    pod = next(r for r in out if r["kind"] == "CronJob")[
-        "spec"
-    ]["jobTemplate"]["spec"]["template"]["spec"]
+    pod = next(r for r in out if r["kind"] == "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]
     assert pod["containers"][0]["envFrom"] == [
         {"secretRef": {"name": "astrolift-bindings-hello"}},
     ]
@@ -415,9 +407,7 @@ def test_env_from_preserves_inline_env():
         (_deployment_workload(containers=(c,)),),
         env_from_secret_refs=["app-shared"],
     )
-    container = next(r for r in out if r["kind"] == "Deployment")[
-        "spec"
-    ]["template"]["spec"]["containers"][0]
+    container = next(r for r in out if r["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert container["env"] == [{"name": "FOO", "value": "bar"}]
     assert container["envFrom"] == [{"secretRef": {"name": "app-shared"}}]
 

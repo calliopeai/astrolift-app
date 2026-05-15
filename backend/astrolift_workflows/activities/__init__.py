@@ -27,6 +27,14 @@ from astrolift_workflows.activities.app_lifecycle import (
     update_secrets,
     wait_dns,
 )
+from astrolift_workflows.activities.app_teardown import (
+    delete_app_namespaces,
+    list_app_managed_service_ids,
+    mark_app_deregistered,
+    mark_app_tearing_down,
+    revoke_app_deploy_tokens,
+    soft_delete_app_records,
+)
 from astrolift_workflows.activities.cluster_management import (
     apply_platform_rbac,
     ensure_cluster_drained,
@@ -40,14 +48,6 @@ from astrolift_workflows.activities.cluster_management import (
     run_preflight_job,
     teardown_cluster_infra,
     verify_reachability,
-)
-from astrolift_workflows.activities.app_teardown import (
-    delete_app_namespaces,
-    list_app_managed_service_ids,
-    mark_app_deregistered,
-    mark_app_tearing_down,
-    revoke_app_deploy_tokens,
-    soft_delete_app_records,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
 from astrolift_workflows.activities.install_prereqs import (

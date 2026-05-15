@@ -32,6 +32,7 @@ async def mark_managed_service_deprovisioning(
     managed_service_id: int,
 ) -> None:
     from asgiref.sync import sync_to_async
+
     from astrolift_services.models import ManagedService
 
     await sync_to_async(_mark_status_sync)(
@@ -111,7 +112,9 @@ async def deprovision_managed_service(
 
     activity.heartbeat()
     result = await sync_to_async(_deprovision_sync)(
-        managed_service_id, delete_data, force_destroy,
+        managed_service_id,
+        delete_data,
+        force_destroy,
     )
     log.info(
         "deprovision_managed_service result=%s",

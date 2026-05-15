@@ -249,7 +249,9 @@ def cluster_health_dispatch(
         ) from exc
     try:
         events = driver.list_events(
-            ctx, namespaces=namespaces, limit=event_limit,
+            ctx,
+            namespaces=namespaces,
+            limit=event_limit,
         )
     except Exception as exc:  # noqa: BLE001
         raise ClusterManagementError(

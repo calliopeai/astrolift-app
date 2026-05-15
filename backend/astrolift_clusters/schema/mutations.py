@@ -484,7 +484,8 @@ class ClustersMutation:
         into the cluster-status tab.
         """
         cluster = TenantCluster.objects.filter(
-            guid=str(input.cluster_id), deleted_at__isnull=True,
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
         ).first()
         if cluster is None:
             return gql_failure(

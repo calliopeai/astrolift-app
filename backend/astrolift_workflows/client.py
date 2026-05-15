@@ -161,14 +161,15 @@ def terminate_workflow(workflow_id: str, reason: str) -> bool:
 
 @async_to_sync
 async def _list_for_cluster_async(
-    cluster_guid: str, limit: int,
+    cluster_guid: str,
+    limit: int,
 ) -> list[dict[str, Any]]:
     client = await _get_client_async()
     # Workflow ids the cluster workflows use all end in the cluster's
     # guid (BringClusterIntoManagement-<guid>, DecommissionCluster-
     # Workflow-<guid>, InstallClusterPrereqsWorkflow-<guid>, ...).
     # Temporal's visibility query language lets us pattern-match.
-    query = f"WorkflowId STARTS_WITH \"\" AND WorkflowId LIKE \"%{cluster_guid}%\""
+    query = f'WorkflowId STARTS_WITH "" AND WorkflowId LIKE "%{cluster_guid}%"'
     rows: list[dict[str, Any]] = []
     try:
         async for run in client.list_workflows(query=query):
@@ -177,12 +178,8 @@ async def _list_for_cluster_async(
                     "workflow_id": run.id,
                     "workflow_type": run.workflow_type,
                     "status": run.status.name if run.status else "UNKNOWN",
-                    "started_at": (
-                        run.start_time.isoformat() if run.start_time else ""
-                    ),
-                    "closed_at": (
-                        run.close_time.isoformat() if run.close_time else ""
-                    ),
+                    "started_at": (run.start_time.isoformat() if run.start_time else ""),
+                    "closed_at": (run.close_time.isoformat() if run.close_time else ""),
                     "run_id": run.run_id or "",
                 },
             )
@@ -195,7 +192,9 @@ async def _list_for_cluster_async(
 
 
 def list_workflows_for_cluster(
-    cluster_guid: str, *, limit: int = 10,
+    cluster_guid: str,
+    *,
+    limit: int = 10,
 ) -> list[dict[str, Any]]:
     """Recent workflow runs targeting a specific cluster (#394).
 
