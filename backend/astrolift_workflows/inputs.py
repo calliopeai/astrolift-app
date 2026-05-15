@@ -108,6 +108,26 @@ class TearDownPreviewInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class InstallClusterPrereqsInput:
+    """Input for ``InstallClusterPrereqsWorkflow`` (#66).
+
+    Captures the operator's bootstrap-recipe selection so the
+    workflow can render Flux HelmReleases for the chosen subset.
+
+    ``selected_components`` is the list of ``BootstrapComponent.key``
+    values the operator checked in the cluster-detail bootstrap
+    card. ``option_overrides`` is keyed by component.key with an
+    inner dict of option.key → chosen value (from option.choices).
+    Idempotent: re-running with a different selection converges.
+    """
+
+    cluster_id: int
+    actor: Actor
+    selected_components: tuple[str, ...]
+    option_overrides: dict[str, dict[str, str]]
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class TearDownAppInput:
     """Input for ``TearDownAppWorkflow`` (#358).
 

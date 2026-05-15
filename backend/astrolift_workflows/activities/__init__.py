@@ -50,6 +50,9 @@ from astrolift_workflows.activities.app_teardown import (
     soft_delete_app_records,
 )
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
+from astrolift_workflows.activities.install_prereqs import (
+    install_cluster_prereqs,
+)
 from astrolift_workflows.activities.managed_service_lifecycle import (
     deprovision_managed_service,
     finalize_managed_service_deletion,
@@ -89,6 +92,7 @@ __all__ = [
     "finalize_managed_service_deletion",
     "gc_stale_previews",
     "health_check",
+    "install_cluster_prereqs",
     "list_app_managed_service_ids",
     "mark_app_deregistered",
     "mark_app_provisioning",
