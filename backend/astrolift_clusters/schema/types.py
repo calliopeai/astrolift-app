@@ -236,3 +236,25 @@ class ClusterHealthType:
     cluster_id: GUID
     pods: list[PodPhaseSummaryType]
     events: list[ClusterEventType]
+
+
+# ---- Recent cluster workflows (#394) -------------------------------
+
+
+@strawberry.type(name="AstroliftClusterWorkflowRun")
+class ClusterWorkflowRunType:
+    """One row in the Recent workflows card on the Status tab.
+    Sourced from Temporal's visibility API filtered to workflow ids
+    that reference this cluster's guid."""
+
+    workflow_id: str
+    workflow_type: str
+    status: str
+    """RUNNING / COMPLETED / FAILED / CANCELED / TERMINATED / etc.
+    Mirrored verbatim from Temporal's WorkflowExecutionStatus enum."""
+
+    started_at: str
+    closed_at: str
+    """Empty when the workflow is still RUNNING."""
+
+    run_id: str

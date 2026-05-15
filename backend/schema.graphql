@@ -334,6 +334,15 @@ type AstroliftClusterPodPhase {
   count: Int!
 }
 
+type AstroliftClusterWorkflowRun {
+  workflowId: String!
+  workflowType: String!
+  status: String!
+  startedAt: String!
+  closedAt: String!
+  runId: String!
+}
+
 type AstroliftCommandRun {
   id: GUID!
   registeredAppSlug: String!
@@ -2022,6 +2031,7 @@ type Query {
   astroliftManagedDomains: [AstroliftManagedDomain!]!
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
   astroliftClusterLifecycleAudit(clusterId: GUID!, limit: Int! = 50): [AstroliftClusterLifecycleAuditEntry!]!
+  astroliftRecentClusterWorkflows(clusterId: GUID!, limit: Int! = 10): [AstroliftClusterWorkflowRun!]!
   astroliftAppCountForCluster(clusterId: GUID!): Int!
   astroliftClusterHealth(clusterId: GUID!, eventLimit: Int! = 50): AstroliftClusterHealth
   astroliftClusterBootstrapPlan(clusterId: GUID!): AstroliftClusterBootstrapPlan

@@ -13,6 +13,7 @@ from astrolift_clusters.schema.types import (
     ClusterEventType,
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
+    ClusterWorkflowRunType,
     ManagedDomainType,
     PodPhaseSummaryType,
     ProviderPluginType,
@@ -143,6 +144,42 @@ class ClustersQuery:
             if len(out) >= limit:
                 break
         return out
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_recent_cluster_workflows(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        limit: int = 10,
+    ) -> list[ClusterWorkflowRunType]:
+        """Recent Temporal workflow runs targeting ``cluster_id`` (#394).
+
+        Pulled live from Temporal's visibility API; doesn't duplicate
+        state into a local table. Empty when Temporal is disabled or
+        when the visibility query fails — the UI's empty-state copy
+        is identical to "no runs yet" in either case.
+        """
+        from astrolift_workflows.client import list_workflows_for_cluster
+
+        cluster = TenantCluster.objects.filter(
+            guid=str(cluster_id), deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return []
+        rows = list_workflows_for_cluster(str(cluster.guid), limit=limit)
+        return [
+            ClusterWorkflowRunType(
+                workflow_id=r.get("workflow_id", ""),
+                workflow_type=r.get("workflow_type", ""),
+                status=r.get("status", "UNKNOWN"),
+                started_at=r.get("started_at", ""),
+                closed_at=r.get("closed_at", ""),
+                run_id=r.get("run_id", ""),
+            )
+            for r in rows
+        ]
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_REGISTER)

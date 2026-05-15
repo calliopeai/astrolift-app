@@ -19,6 +19,7 @@ import {
   CLUSTER_HEALTH,
   CLUSTER_LIFECYCLE_AUDIT,
   LIST_CLUSTERS,
+  RECENT_CLUSTER_WORKFLOWS,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
@@ -87,6 +88,8 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
       <ClusterTabs slug={slug} active="status" />
 
       <LiveHealthCard clusterId={cluster.id} />
+
+      <RecentWorkflowsCard clusterId={cluster.id} />
 
       <LifecycleTimelineCard clusterId={cluster.id} />
 
@@ -332,6 +335,104 @@ function LiveHealthCard({ clusterId }: { clusterId: string }) {
               )}
             </div>
           </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Recent workflows card (#394) ────────────────────────────────────────
+// Pulled live from Temporal's visibility API filtered by workflow ids
+// that reference this cluster's guid. Empty when Temporal is disabled
+// or the query fails — identical empty-state copy in both cases.
+
+interface ClusterWorkflowRun {
+  workflowId: string;
+  workflowType: string;
+  status: string;
+  startedAt: string;
+  closedAt: string;
+  runId: string;
+}
+
+interface RecentWorkflowsResp {
+  astroliftRecentClusterWorkflows: ClusterWorkflowRun[];
+}
+
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  RUNNING: "secondary",
+  COMPLETED: "default",
+  FAILED: "destructive",
+  CANCELED: "outline",
+  TERMINATED: "destructive",
+  TIMED_OUT: "destructive",
+  CONTINUED_AS_NEW: "outline",
+};
+
+function RecentWorkflowsCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<RecentWorkflowsResp>(RECENT_CLUSTER_WORKFLOWS, {
+    variables: { clusterId, limit: 10 },
+    pollInterval: 15000,
+  });
+  const runs = data?.astroliftRecentClusterWorkflows ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Recent workflows</CardTitle>
+        <CardDescription>
+          Temporal runs targeting this cluster — BringClusterInto-
+          Management, Refresh, Decommission, InstallClusterPrereqs,
+          DriftDetection. Polls every 15s while a run is in flight.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading && runs.length === 0 ? (
+          <Skeleton className="h-24 w-full" />
+        ) : runs.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No workflow runs recorded yet. Operator actions like Bring
+            into management, Refresh, or Install prereqs will appear
+            here.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {runs.map((r) => {
+              const duration =
+                r.closedAt && r.startedAt
+                  ? Math.max(
+                      0,
+                      Math.round(
+                        (new Date(r.closedAt).getTime() -
+                          new Date(r.startedAt).getTime()) /
+                          1000,
+                      ),
+                    )
+                  : null;
+              return (
+                <li
+                  key={r.workflowId + r.runId}
+                  className="border-border flex flex-wrap items-baseline gap-2 rounded-md border p-2 text-sm"
+                >
+                  <code className="font-mono text-xs">{r.workflowType}</code>
+                  <Badge
+                    variant={STATUS_VARIANT[r.status] ?? "outline"}
+                    className="text-[10px]"
+                  >
+                    {r.status}
+                  </Badge>
+                  <span className="text-muted-foreground ml-auto text-xs">
+                    {r.startedAt
+                      ? new Date(r.startedAt).toLocaleString()
+                      : "—"}
+                    {duration !== null && (
+                      <span className="opacity-60"> · {duration}s</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </CardContent>
     </Card>
