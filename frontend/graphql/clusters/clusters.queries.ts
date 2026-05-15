@@ -194,6 +194,21 @@ export const LIST_MANAGED_DOMAINS = gql`
   }
 `;
 
+// Cluster-scoped slice of the mutation audit log (#68 slice 2). Drives
+// the Lifecycle timeline card on the Status tab.
+export const CLUSTER_LIFECYCLE_AUDIT = gql`
+  query ClusterLifecycleAudit($clusterId: GUID!, $limit: Int) {
+    astroliftClusterLifecycleAudit(clusterId: $clusterId, limit: $limit) {
+      operation
+      variables
+      success
+      errors
+      timestamp
+      actor
+    }
+  }
+`;
+
 // Active app count bound to a cluster (#393). Counts both
 // ``RegisteredApp.default_tenant_cluster`` and per-env
 // ``AppEnvironment.tenant_cluster`` bindings.

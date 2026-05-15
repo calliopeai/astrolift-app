@@ -173,3 +173,27 @@ def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
         provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
         components=[_bootstrap_component_to_type(c) for c in components],
     )
+
+
+# ---- Cluster lifecycle audit timeline (#68 slice 2) ---------------
+
+
+@strawberry.type(name="AstroliftClusterLifecycleAuditEntry")
+class ClusterLifecycleAuditEntryType:
+    """One row in the cluster's lifecycle timeline — a mutation that
+    targeted this cluster, with the operator + outcome attached."""
+
+    operation: str
+    """The GraphQL mutation operation name (e.g. ``cluster.bring``)."""
+
+    variables: JSON
+    """The mutation's input payload, redacted by the audit middleware
+    for any secret-shaped keys."""
+
+    success: bool
+    errors: list[str]
+    timestamp: dt.datetime
+    actor: str | None
+    """Username of the operator who fired the mutation; null when the
+    mutation was fired by a system / service account or when the user
+    row was soft-deleted after the audit landed."""
