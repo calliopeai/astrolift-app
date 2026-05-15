@@ -285,9 +285,11 @@ function Sidebar({
           {children}
         </div>
         {/* Drag handle on the trailing edge — operators grab this to
-            resize the sidebar. Hidden when collapsed because there's
-            nothing to widen. */}
-        {collapsible !== "none" ? <SidebarResizeHandle side={side} /> : null}
+            resize the sidebar. The ``collapsible === "none"`` branch
+            already early-returned above, so by here ``collapsible``
+            is narrowed to ``"offcanvas" | "icon"`` and the handle
+            always renders. */}
+        <SidebarResizeHandle side={side} />
       </div>
     </div>
   );
