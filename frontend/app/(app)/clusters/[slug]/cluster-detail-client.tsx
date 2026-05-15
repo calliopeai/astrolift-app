@@ -467,15 +467,33 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
           <p className="font-medium">Missing platform prerequisites</p>
           <p className="text-muted-foreground mt-1">
             One or more headline prereqs (cert-manager, ingress controller) aren&apos;t detected.
-            Tenant deploys may fail at TLS / ingress provisioning. See{" "}
-            <Link
-              href="/documentation/cluster-prerequisites"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              cluster prerequisites
-            </Link>
-            .
+            Tenant deploys may fail at TLS / ingress provisioning. Two paths to fix:
           </p>
+          <ul className="text-muted-foreground mt-2 ml-4 list-disc space-y-1">
+            <li>
+              Use the bootstrap recipe card below to apply driver-tuned prereqs
+              via Flux (recommended for managed clusters).
+            </li>
+            <li>
+              Run{" "}
+              <code className="font-mono text-xs">astro cluster bootstrap --cluster-slug {cluster.slug}</code>{" "}
+              from your terminal for the one-shot CLI path.{" "}
+              <Link href="/downloads" className="text-primary underline-offset-4 hover:underline">
+                Install the CLI
+              </Link>
+              .
+            </li>
+            <li>
+              See{" "}
+              <Link
+                href="/documentation/cluster-prerequisites"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                cluster prerequisites
+              </Link>{" "}
+              for manual install commands per controller.
+            </li>
+          </ul>
         </div>
       )}
 
