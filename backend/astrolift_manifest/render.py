@@ -332,9 +332,7 @@ def _render_container(
         # synthesized managed-service bindings Secret. Later refs
         # shadow earlier keys per k8s envFrom semantics, so the
         # caller orders bundles first then bindings.
-        spec["envFrom"] = [
-            {"secretRef": {"name": ref}} for ref in env_from_secret_refs
-        ]
+        spec["envFrom"] = [{"secretRef": {"name": ref}} for ref in env_from_secret_refs]
     probe = _render_probe(c)
     if probe is not None:
         spec["livenessProbe"] = probe

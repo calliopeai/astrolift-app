@@ -53,7 +53,7 @@ FEATURE_DEFAULTS = {
     Feature.TEMPORAL: ("FEATURE_TEMPORAL", True),
     Feature.OPENSEARCH: ("FEATURE_OPENSEARCH", True),
     Feature.FILE_UPLOADS: ("FEATURE_FILE_UPLOADS", True),
-    Feature.DEPLOY_PIPELINE: ("FEATURE_DEPLOY_PIPELINE", False),
+    Feature.DEPLOY_PIPELINE: ("FEATURE_DEPLOY_PIPELINE", True),
 }
 
 # Feature -> Django apps that belong to it

@@ -8,9 +8,6 @@ without any platform context.
 
 from __future__ import annotations
 
-import pytest
-
-
 # ---- _merge_helm_values --------------------------------------------------
 
 
