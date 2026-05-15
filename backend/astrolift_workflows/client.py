@@ -56,6 +56,14 @@ def _temporal_enabled() -> bool:
     # DJANGO_CONFIGURATION=Dev (the only config the published image
     # boots cleanly with) leaves DEBUG truthy, which silently turned
     # the entire workflow runtime into a no-op in prd.
+    # Explicit ``settings.ASTROLIFT_TEMPORAL_ENABLED = False`` is a
+    # hard kill switch — tests set it via the django ``settings``
+    # fixture; ops can set it via env for emergency shutdown without
+    # touching constance. True or unset falls through to the
+    # constance-then-settings precedence below.
+    settings_override = getattr(settings, "ASTROLIFT_TEMPORAL_ENABLED", None)
+    if settings_override is False:
+        return False
     try:
         from constance import config as constance_config
 
@@ -64,7 +72,7 @@ def _temporal_enabled() -> bool:
         # Constance unavailable (no DB, migrations not applied, plugin
         # disabled) — fall through to the env-backed default.
         pass
-    return bool(getattr(settings, "ASTROLIFT_TEMPORAL_ENABLED", True))
+    return bool(settings_override) if settings_override is not None else True
 
 
 async def _get_client_async() -> Any:
