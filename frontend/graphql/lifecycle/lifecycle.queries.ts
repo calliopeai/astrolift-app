@@ -181,6 +181,19 @@ export const LIST_APP_DOMAINS = gql`
       isActive
       registeredAppSlug
       createdAt
+      txtChallengeToken
+      expectedCnameTarget
+      isPlatformManagedZone
+      lastValidationError
+      requiredDnsRecords {
+        kind
+        name
+        value
+        ttl
+        propagated
+        lastCheckedAt
+        message
+      }
     }
   }
 `;
