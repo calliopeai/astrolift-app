@@ -39,6 +39,7 @@ STORAGES = {  # noqa: F811
 # ``WhiteNoiseMiddleware.__init__`` tries to import the package
 # even if STORAGES no longer points at it.
 MIDDLEWARE = [  # noqa: F811
-    m for m in MIDDLEWARE  # type: ignore[name-defined]  # noqa: F405
+    m
+    for m in MIDDLEWARE  # type: ignore[name-defined]  # noqa: F405
     if "whitenoise" not in m
 ]

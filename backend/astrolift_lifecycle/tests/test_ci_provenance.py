@@ -21,7 +21,12 @@ pytestmark = pytest.mark.django_db
 
 
 def test_start_deployment_persists_ci_metadata(
-    org, app, env, fake_info, permission_resolver, settings,
+    org,
+    app,
+    env,
+    fake_info,
+    permission_resolver,
+    settings,
 ):
     """The StartDeploymentInput accepts every CI field as optional;
     when set, they land on the Deployment row verbatim."""

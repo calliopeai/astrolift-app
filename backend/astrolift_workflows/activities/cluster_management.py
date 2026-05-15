@@ -316,7 +316,6 @@ async def remove_platform_rbac(cluster_id: int) -> str:
 
 
 def _mark_decommissioned_sync(cluster_id: int) -> None:
-
     from astrolift_clusters.models import TenantCluster
 
     cluster = TenantCluster.all_objects.get(pk=cluster_id)
