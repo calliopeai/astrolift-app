@@ -293,6 +293,12 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     ``{"resources": [...]}`` so the workflow has a single-key Temporal
     payload (stable across renderer evolution) and so ``apply_manifests``
     can pick up the same shape unchanged.
+
+    Auto-injects ``envFrom: secretRef:`` for every active
+    ``AppSecretBundleRef`` plus the synthesized
+    ``astrolift-bindings-<app-slug>`` Secret holding managed-service
+    connection envelopes — so workloads get DATABASE_URL / REDIS_URL /
+    etc. without the operator having to wire each var by hand.
     """
     from asgiref.sync import sync_to_async
 
@@ -304,15 +310,39 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     activity.heartbeat()
 
     def _gather():
+        from astrolift_services.models import AppSecretBundleRef, ManagedService
+
         d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
         app = d.registered_app
         env = d.app_environment
         # Render off the stored TOML — never re-fetch from the repo at
         # apply time so deployments are reproducible after force-pushes.
         manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
-        return manifest, app, env, d
 
-    manifest, app, env, d = await sync_to_async(_gather)()
+        # Build the envFrom list: operator-authored bundles first
+        # (predictable, debuggable, lexicographic), then the platform-
+        # synthesized bindings Secret so binding keys can shadow a
+        # bundle on intentional collisions (e.g., operator overrides
+        # DATABASE_URL).
+        bundle_secret_names = sorted(
+            AppSecretBundleRef.objects.filter(
+                registered_app=app,
+                app_environment=env,
+                deleted_at__isnull=True,
+            ).values_list("secret_bundle__slug", flat=True),
+        )
+        has_bindings = ManagedService.objects.filter(
+            registered_app=app,
+            app_environment=env,
+            deleted_at__isnull=True,
+        ).exists()
+        env_from = list(bundle_secret_names)
+        if has_bindings:
+            env_from.append(_bindings_secret_name(app.slug))
+
+        return manifest, app, env, d, env_from
+
+    manifest, app, env, d, env_from = await sync_to_async(_gather)()
 
     namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
     resources = _render(
@@ -321,13 +351,24 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         image_tag=d.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
         environment_name=env.name,
+        env_from_secret_refs=env_from,
     )
     log.info(
-        "render_manifests produced %d resource(s)",
+        "render_manifests produced %d resource(s) with envFrom=%s",
         len(resources),
+        env_from,
         extra={"deployment_id": deployment_id},
     )
-    return {"resources": resources}
+    return {"resources": resources, "env_from_secret_refs": env_from}
+
+
+def _bindings_secret_name(app_slug: str) -> str:
+    """Synthetic k8s Secret name for the per-app managed-service
+    connection envelope. Kept in one helper so the producer (in
+    ``update_secrets``) and the consumer (``render_manifests``) can
+    never drift apart.
+    """
+    return f"astrolift-bindings-{app_slug}"
 
 
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
@@ -388,7 +429,11 @@ def _update_secrets_sync(deployment_id: int) -> int:
     import base64
 
     from astrolift_lifecycle.models import Deployment
-    from astrolift_services.models import AppSecretBundleRef
+    from astrolift_services.models import (
+        AppSecretBundleRef,
+        ManagedService,
+        ManagedServiceBinding,
+    )
     from core.app_deploy import (
         AppDeployError,
         driver_for_capability,
@@ -408,43 +453,137 @@ def _update_secrets_sync(deployment_id: int) -> int:
             deleted_at__isnull=True,
         ).select_related("secret_bundle"),
     )
-    if not refs:
-        return 0
 
-    secrets_backend = driver_for_capability(d.app_environment.tenant_cluster, "secrets")
     resources: list[dict[str, Any]] = []
-    for ref in refs:
-        bundle = ref.secret_bundle
-        kvs = secrets_backend.get(bundle.backend_ref)
-        if kvs is None:
-            raise AppDeployError(
-                f"secret bundle {bundle.slug!r} backend_ref {bundle.backend_ref!r} not found in secrets backend",
+
+    # ---- operator-authored secret bundles --------------------------
+    if refs:
+        secrets_backend = driver_for_capability(
+            d.app_environment.tenant_cluster, "secrets",
+        )
+        for ref in refs:
+            bundle = ref.secret_bundle
+            kvs = secrets_backend.get(bundle.backend_ref)
+            if kvs is None:
+                raise AppDeployError(
+                    f"secret bundle {bundle.slug!r} backend_ref "
+                    f"{bundle.backend_ref!r} not found in secrets backend",
+                )
+            prefix = (ref.prefix or "").strip()
+            data: dict[str, str] = {}
+            for k, v in kvs.items():
+                full_key = f"{prefix}{k}" if prefix else k
+                data[full_key] = base64.b64encode(
+                    str(v).encode("utf-8"),
+                ).decode("ascii")
+            resources.append(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Secret",
+                    "metadata": {
+                        "name": bundle.slug,
+                        "namespace": namespace,
+                        "labels": {
+                            "astrolift.io/managed-by": "astrolift",
+                            "astrolift.io/secret-bundle": bundle.slug,
+                        },
+                    },
+                    "type": "Opaque",
+                    "data": data,
+                },
             )
-        prefix = (ref.prefix or "").strip()
-        data: dict[str, str] = {}
-        for k, v in kvs.items():
-            full_key = f"{prefix}{k}" if prefix else k
-            data[full_key] = base64.b64encode(str(v).encode("utf-8")).decode("ascii")
+
+    # ---- synthesized managed-service bindings Secret --------------
+    # One k8s Secret per (app, env) named ``astrolift-bindings-<slug>``
+    # carrying the connection envelope for every active ManagedService
+    # bound to this app+env. Resolves the driver-side ValueRefs (literal
+    # or secret_ref) into raw values so workloads see a flat env-var
+    # surface — they don't need to know whether DATABASE_PASSWORD came
+    # from Secrets Manager or was inlined.
+    services = list(
+        ManagedService.objects.filter(
+            registered_app=d.registered_app,
+            app_environment=d.app_environment,
+            deleted_at__isnull=True,
+        ).order_by("kind", "name"),
+    )
+    if services:
+        bindings_data: dict[str, str] = {}
+        seen_keys: set[str] = set()
+        secrets_backend = driver_for_capability(
+            d.app_environment.tenant_cluster, "secrets",
+        )
+        for svc in services:
+            for binding in ManagedServiceBinding.objects.filter(
+                managed_service=svc, deleted_at__isnull=True,
+            ).order_by("env_key"):
+                env_key = binding.env_key
+                if env_key in seen_keys:
+                    # Last writer wins per spec 05 §10. We keep declared
+                    # order: services iterate sorted by (kind, name),
+                    # bindings inside a service sorted by env_key.
+                    pass
+                seen_keys.add(env_key)
+                raw_value: str
+                if binding.is_secret:
+                    # env_value_ref is a secrets-backend reference (ARN
+                    # or path); resolve via the cluster's secrets driver.
+                    resolved = secrets_backend.get(binding.env_value_ref)
+                    if resolved is None:
+                        raise AppDeployError(
+                            f"binding {svc.kind}/{svc.name}#{env_key} "
+                            f"references missing secret "
+                            f"{binding.env_value_ref!r}",
+                        )
+                    # ``get`` returns a dict for bundles; for a single
+                    # binding we expect either a single-key dict or a
+                    # str-stringifiable value. Take the value verbatim
+                    # if it's a string; otherwise pick the first value.
+                    if isinstance(resolved, dict):
+                        if not resolved:
+                            raise AppDeployError(
+                                f"binding {env_key} resolved to an "
+                                f"empty secret",
+                            )
+                        raw_value = str(next(iter(resolved.values())))
+                    else:
+                        raw_value = str(resolved)
+                else:
+                    raw_value = binding.env_value_ref
+                bindings_data[env_key] = base64.b64encode(
+                    raw_value.encode("utf-8"),
+                ).decode("ascii")
+
+        bindings_secret_name = (
+            f"astrolift-bindings-{d.registered_app.slug}"
+        )
         resources.append(
             {
                 "apiVersion": "v1",
                 "kind": "Secret",
                 "metadata": {
-                    "name": bundle.slug,
+                    "name": bindings_secret_name,
                     "namespace": namespace,
                     "labels": {
                         "astrolift.io/managed-by": "astrolift",
-                        "astrolift.io/secret-bundle": bundle.slug,
+                        "astrolift.io/bindings-for": d.registered_app.slug,
+                    },
+                    "annotations": {
+                        "astrolift.io/binding-count": str(len(bindings_data)),
                     },
                 },
                 "type": "Opaque",
-                "data": data,
+                "data": bindings_data,
             },
         )
+
+    if not resources:
+        return 0
     result = cluster_driver.apply_manifests(ctx.slug, namespace, resources)
     if not result.ok:
         raise AppDeployError(
-            f"update_secrets apply failed for deployment {deployment_id}: " + "; ".join(result.errors),
+            f"update_secrets apply failed for deployment {deployment_id}: "
+            + "; ".join(result.errors),
         )
     return len(resources)
 

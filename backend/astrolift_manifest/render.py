@@ -58,6 +58,7 @@ def render_manifests(
     image_repository: str,
     environment_name: str,
     labels: dict[str, str] | None = None,
+    env_from_secret_refs: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Render every workload in ``manifest`` into a list of K8s dicts.
 
@@ -66,12 +67,22 @@ def render_manifests(
     sets every container's image. Per-container image overrides
     (``image_ref`` on the container) take precedence so a sidecar can
     pin its own image.
+
+    ``env_from_secret_refs`` is the list of k8s Secret names every
+    primary container should pull ``envFrom: secretRef:`` from. The
+    deploy pipeline computes this from the app's active
+    ``AppSecretBundleRef`` rows + the synthesized
+    ``astrolift-bindings-<app-slug>`` Secret holding managed-service
+    connection envelopes. Order matters: later secrets shadow earlier
+    keys on collision per k8s envFrom semantics, so bindings appear
+    after operator-authored bundles.
     """
     base_labels = {
         "astrolift.dev/app": manifest.name,
         "astrolift.dev/environment": environment_name,
         **(labels or {}),
     }
+    env_from = list(env_from_secret_refs or [])
 
     out: list[dict[str, Any]] = []
     for w in manifest.workloads:
@@ -88,6 +99,7 @@ def render_manifests(
                     image_tag=image_tag,
                     image_repository=image_repository,
                     labels=wl_labels,
+                    env_from_secret_refs=env_from,
                 )
             )
             svc = _render_service(w, namespace=namespace, labels=wl_labels)
@@ -104,6 +116,7 @@ def render_manifests(
                     image_tag=image_tag,
                     image_repository=image_repository,
                     labels=wl_labels,
+                    env_from_secret_refs=env_from,
                 )
             )
         # statefulset / job land in follow-up render modules.
@@ -123,6 +136,7 @@ def _render_deployment(
     image_tag: str,
     image_repository: str,
     labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     selector = {"astrolift.dev/workload": w.name, "astrolift.dev/app": labels["astrolift.dev/app"]}
     return {
@@ -142,6 +156,7 @@ def _render_deployment(
                     w,
                     image_tag=image_tag,
                     image_repository=image_repository,
+                    env_from_secret_refs=env_from_secret_refs,
                 ),
             },
         },
@@ -155,6 +170,7 @@ def _render_cronjob(
     image_tag: str,
     image_repository: str,
     labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     if not w.schedule:
         # Should not happen — parser rejects cronjob without schedule.
@@ -180,6 +196,7 @@ def _render_cronjob(
                                 w,
                                 image_tag=image_tag,
                                 image_repository=image_repository,
+                                env_from_secret_refs=env_from_secret_refs,
                             ),
                             "restartPolicy": "OnFailure",
                         },
@@ -274,6 +291,7 @@ def _pod_spec(
     *,
     image_tag: str,
     image_repository: str,
+    env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         "containers": [
@@ -282,6 +300,7 @@ def _pod_spec(
                 workload=w,
                 image_tag=image_tag,
                 image_repository=image_repository,
+                env_from_secret_refs=env_from_secret_refs,
             )
             for c in w.containers
         ],
@@ -294,6 +313,7 @@ def _render_container(
     workload: WorkloadManifest,
     image_tag: str,
     image_repository: str,
+    env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     spec: dict[str, Any] = {
         "name": c.name,
@@ -307,6 +327,14 @@ def _render_container(
         spec["args"] = list(c.args)
     if c.env:
         spec["env"] = [{"name": name, "value": value} for name, value in c.env]
+    if env_from_secret_refs:
+        # Auto-inject every operator-authored SecretBundle + the
+        # synthesized managed-service bindings Secret. Later refs
+        # shadow earlier keys per k8s envFrom semantics, so the
+        # caller orders bundles first then bindings.
+        spec["envFrom"] = [
+            {"secretRef": {"name": ref}} for ref in env_from_secret_refs
+        ]
     probe = _render_probe(c)
     if probe is not None:
         spec["livenessProbe"] = probe

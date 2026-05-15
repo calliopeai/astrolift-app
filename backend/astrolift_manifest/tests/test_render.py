@@ -338,6 +338,90 @@ def test_cronjob_renders_with_schedule():
     assert all(r["kind"] != "Service" for r in out)
 
 
+# ---- envFrom injection (#353) ----------------------------------------
+
+
+def test_env_from_absent_when_no_refs():
+    out = _render((_deployment_workload(),))
+    container = next(r for r in out if r["kind"] == "Deployment")[
+        "spec"
+    ]["template"]["spec"]["containers"][0]
+    assert "envFrom" not in container
+
+
+def test_env_from_injects_secret_refs_into_primary_container():
+    out = _render(
+        (_deployment_workload(),),
+        env_from_secret_refs=[
+            "app-shared",
+            "astrolift-bindings-hello",
+        ],
+    )
+    container = next(r for r in out if r["kind"] == "Deployment")[
+        "spec"
+    ]["template"]["spec"]["containers"][0]
+    assert container["envFrom"] == [
+        {"secretRef": {"name": "app-shared"}},
+        {"secretRef": {"name": "astrolift-bindings-hello"}},
+    ]
+
+
+def test_env_from_threads_into_every_container():
+    """Sidecars need the same bindings — the deploy lane assumes
+    every container in the pod gets the connection envelope."""
+    side = _container(name="sidecar", is_primary=False, port=0)
+    out = _render(
+        (_deployment_workload(containers=(_container(), side)),),
+        env_from_secret_refs=["astrolift-bindings-hello"],
+    )
+    containers = next(r for r in out if r["kind"] == "Deployment")[
+        "spec"
+    ]["template"]["spec"]["containers"]
+    assert len(containers) == 2
+    for c in containers:
+        assert c["envFrom"] == [
+            {"secretRef": {"name": "astrolift-bindings-hello"}},
+        ]
+
+
+def test_env_from_propagates_to_cronjob_pods():
+    w = WorkloadManifest(
+        name="nightly",
+        kind="cronjob",
+        schedule="0 0 * * *",
+        containers=(_container(name="job", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+        env_from_secret_refs=["astrolift-bindings-hello"],
+    )
+    pod = next(r for r in out if r["kind"] == "CronJob")[
+        "spec"
+    ]["jobTemplate"]["spec"]["template"]["spec"]
+    assert pod["containers"][0]["envFrom"] == [
+        {"secretRef": {"name": "astrolift-bindings-hello"}},
+    ]
+
+
+def test_env_from_preserves_inline_env():
+    """envFrom is additive — inline ``env:`` literals on the
+    container survive alongside the injected envFrom refs."""
+    c = _container(env=(("FOO", "bar"),))
+    out = _render(
+        (_deployment_workload(containers=(c,)),),
+        env_from_secret_refs=["app-shared"],
+    )
+    container = next(r for r in out if r["kind"] == "Deployment")[
+        "spec"
+    ]["template"]["spec"]["containers"][0]
+    assert container["env"] == [{"name": "FOO", "value": "bar"}]
+    assert container["envFrom"] == [{"secretRef": {"name": "app-shared"}}]
+
+
 def test_cronjob_without_schedule_raises():
     """Belt-and-suspenders: parser guarantees this can't happen via
     the public API, but the renderer's invariant still holds."""
