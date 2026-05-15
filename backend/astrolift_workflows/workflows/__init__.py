@@ -33,6 +33,7 @@ from astrolift_workflows.workflows.scheduled import (
     ReconcileClusterCapabilitiesWorkflow,
     RehealWebhookSubscriptionsWorkflow,
 )
+from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
 
 __all__ = [
@@ -52,5 +53,6 @@ __all__ = [
     "ReconcileClusterCapabilitiesWorkflow",
     "RehealWebhookSubscriptionsWorkflow",
     "RollbackDeploymentWorkflow",
+    "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
 ]

@@ -108,6 +108,25 @@ class TearDownPreviewInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class TearDownAppInput:
+    """Input for ``TearDownAppWorkflow`` (#358).
+
+    Symmetric inverse of ``OnboardAppWorkflow``. Fans out the managed-
+    service deprovision per binding, deletes the app's k8s namespaces,
+    revokes deploy tokens, and soft-deletes the platform rows.
+
+    ``delete_data`` + ``force_destroy`` propagate to the child
+    ``DeprovisionManagedServiceWorkflow`` per the SDK's four-corner
+    safety matrix. UI surfaces both as separate explicit checkboxes.
+    """
+
+    registered_app_id: int
+    actor: Actor
+    delete_data: bool = False
+    force_destroy: bool = False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class BringClusterIntoManagementInput:
     """Input for ``BringClusterIntoManagementWorkflow`` (#316).
 

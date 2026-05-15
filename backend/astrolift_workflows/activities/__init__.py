@@ -41,6 +41,14 @@ from astrolift_workflows.activities.cluster_management import (
     teardown_cluster_infra,
     verify_reachability,
 )
+from astrolift_workflows.activities.app_teardown import (
+    delete_app_namespaces,
+    list_app_managed_service_ids,
+    mark_app_deregistered,
+    mark_app_tearing_down,
+    revoke_app_deploy_tokens,
+    soft_delete_app_records,
+)
 from astrolift_workflows.activities.cron_deploy import dispatch_cron_deploys
 from astrolift_workflows.activities.managed_service_lifecycle import (
     deprovision_managed_service,
@@ -71,6 +79,7 @@ __all__ = [
     "capture_platform_cost_snapshot",
     "create_promotion_deployment",
     "create_rollback_deployment",
+    "delete_app_namespaces",
     "delete_preview_namespace",
     "deprovision_managed_service",
     "detect_drift",
@@ -80,8 +89,11 @@ __all__ = [
     "finalize_managed_service_deletion",
     "gc_stale_previews",
     "health_check",
+    "list_app_managed_service_ids",
+    "mark_app_deregistered",
     "mark_app_provisioning",
     "mark_app_ready",
+    "mark_app_tearing_down",
     "mark_decommissioned",
     "mark_decommissioning",
     "mark_deploying",
@@ -104,7 +116,9 @@ __all__ = [
     "reheal_webhook_subscriptions",
     "remove_platform_rbac",
     "render_manifests",
+    "revoke_app_deploy_tokens",
     "run_preflight_job",
+    "soft_delete_app_records",
     "switch_app_env_binding",
     "teardown_cluster_infra",
     "update_secrets",
