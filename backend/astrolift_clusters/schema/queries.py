@@ -9,13 +9,16 @@ from astrolift_clusters.models import (
     TenantCluster,
 )
 from astrolift_clusters.schema.types import (
+    BootstrapPlanType,
     ManagedDomainType,
     ProviderPluginType,
     TenantClusterType,
+    bootstrap_plan_to_type,
     cluster_to_type,
     domain_to_type,
     plugin_to_type,
 )
+from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -70,3 +73,38 @@ class ClustersQuery:
     def astrolift_provider_plugins(self, info: Info) -> list[ProviderPluginType]:
         qs = ProviderPlugin.objects.order_by("slug")[:100]
         return [plugin_to_type(p) for p in qs]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def astrolift_cluster_bootstrap_plan(self, info: Info, cluster_id: GUID) -> BootstrapPlanType | None:
+        """Driver-owned bootstrap recipe for ``cluster_id``.
+
+        Static declaration — no cluster API calls; the recipe lives in
+        the driver code. Each provider plugin returns an opinionated
+        list of components (cert-manager, ingress, external-dns,
+        Prometheus, ...) with provider-tuned helm values and
+        operator-pickable sub-options. The UI renders the list as an
+        interactive checklist and feeds the operator's selections to
+        ``installClusterPrereqs``.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            bootstrap_components_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return None
+        try:
+            components = bootstrap_components_dispatch(cluster=cluster)
+        except ClusterManagementError:
+            # Driver couldn't be built (plugin missing, config invalid).
+            # Return an empty recipe rather than raising — the UI shows
+            # the cluster anyway, just without an install checklist.
+            components = []
+        return bootstrap_plan_to_type(cluster, components)

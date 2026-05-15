@@ -92,3 +92,84 @@ def plugin_to_type(plugin) -> ProviderPluginType:
         capabilities_manifest=plugin.capabilities_manifest or {},
         is_enabled=plugin.is_enabled,
     )
+
+
+# ---- Bootstrap plan (driver-recipe surface for the cluster page) ---
+
+
+@strawberry.type(name="AstroliftClusterBootstrapOptionChoice")
+class BootstrapOptionChoiceType:
+    """One value + label pair inside a ``BootstrapOptionType.choices``."""
+
+    value: str
+    label: str
+
+
+@strawberry.type(name="AstroliftClusterBootstrapOption")
+class BootstrapOptionType:
+    """An operator-pickable sub-choice on a BootstrapComponent — e.g.
+    ``mode`` on a ``tls_issuer`` component with choices ACM / ACME-LE /
+    self-signed."""
+
+    key: str
+    label: str
+    default: str
+    choices: list[BootstrapOptionChoiceType]
+
+
+@strawberry.type(name="AstroliftClusterBootstrapComponent")
+class BootstrapComponentType:
+    """One installable prerequisite in the driver's recipe."""
+
+    key: str
+    title: str
+    default_enabled: bool
+    rationale: str
+    helm_values: JSON
+    requires: list[str]
+    options: list[BootstrapOptionType]
+
+
+@strawberry.type(name="AstroliftClusterBootstrapPlan")
+class BootstrapPlanType:
+    """Read-only declaration the cluster detail page renders as an
+    interactive checklist. The operator picks components + option
+    values; the mutation feeds the result to InstallClusterPrereqsWorkflow."""
+
+    cluster_id: GUID
+    """The cluster this recipe applies to."""
+
+    provider_plugin_slug: str
+    """Provider whose recipe this is — used for "Recipe from aws driver"
+    badge in the UI."""
+
+    components: list[BootstrapComponentType]
+
+
+def _bootstrap_option_to_type(opt) -> BootstrapOptionType:
+    return BootstrapOptionType(
+        key=opt.key,
+        label=opt.label,
+        default=opt.default,
+        choices=[BootstrapOptionChoiceType(value=value, label=label) for value, label in opt.choices],
+    )
+
+
+def _bootstrap_component_to_type(component) -> BootstrapComponentType:
+    return BootstrapComponentType(
+        key=component.key,
+        title=component.title,
+        default_enabled=component.default_enabled,
+        rationale=component.rationale,
+        helm_values=component.helm_values or {},
+        requires=list(component.requires),
+        options=[_bootstrap_option_to_type(o) for o in component.options],
+    )
+
+
+def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
+    return BootstrapPlanType(
+        cluster_id=GUID(str(cluster.guid)),
+        provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
+        components=[_bootstrap_component_to_type(c) for c in components],
+    )

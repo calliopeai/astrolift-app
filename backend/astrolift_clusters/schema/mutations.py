@@ -39,6 +39,7 @@ from astrolift_workflows.inputs import (
     Actor,
     BringClusterIntoManagementInput,
     DecommissionClusterInput,
+    InstallClusterPrereqsInput,
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -238,6 +239,32 @@ class RefreshClusterManagementInputType:
     force_preflight: bool = False
 
 
+@strawberry.input
+class BootstrapOptionOverride:
+    """One operator-set option value to flow into the install workflow."""
+
+    component_key: str
+    option_key: str
+    value: str
+
+
+@strawberry.input
+class InstallClusterPrereqsInputType:
+    """``installClusterPrereqs`` mutation input (#66).
+
+    The operator submits the cluster + which components they chose
+    + the per-option overrides as a flat triple list (component_key,
+    option_key, value). The mutation re-shapes the triples into the
+    nested dict the workflow consumes.
+    """
+
+    cluster_id: GUID
+    selected_components: list[str]
+    option_overrides: list[BootstrapOptionOverride] = strawberry.field(
+        default_factory=list,
+    )
+
+
 @strawberry.type
 class _SoftDeletePayload:
     id: GUID
@@ -434,6 +461,62 @@ class ClustersMutation:
                 actor=actor,
                 delete_cloud_infra=bool(input.delete_cloud_infra),
             )
+        return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(action="cluster.install_prereqs")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def install_cluster_prereqs(
+        self, info: Info, input: InstallClusterPrereqsInputType
+    ) -> MutationResultType[TenantClusterType]:
+        """Apply the operator's bootstrap-recipe selection to the
+        cluster (#66). Fires ``InstallClusterPrereqsWorkflow``.
+
+        The mutation collects the operator's chosen components + per-
+        option overrides; the workflow renders one Flux ``HelmRelease``
+        per chosen component into ``astrolift-system`` and the
+        cluster's Flux controller reconciles. Idempotent — re-running
+        with a different selection converges the in-cluster state.
+
+        Returns the cluster row immediately; the in-flight workflow
+        state and individual HelmRelease ``status`` subresources flow
+        into the cluster-status tab.
+        """
+        cluster = TenantCluster.objects.filter(
+            guid=str(input.cluster_id), deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "cluster not found",
+                field="clusterId",
+            )
+        if not cluster.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cluster is inactive — re-activate before installing prereqs",
+            )
+
+        # Reshape the flat triple list into the nested dict the
+        # workflow consumes.
+        overrides: dict[str, dict[str, str]] = {}
+        for o in input.option_overrides or []:
+            overrides.setdefault(o.component_key, {})[o.option_key] = o.value
+
+        actor = _actor_from_request(info)
+        start_workflow(
+            "InstallClusterPrereqsWorkflow",
+            args=[
+                InstallClusterPrereqsInput(
+                    cluster_id=cluster.pk,
+                    actor=actor,
+                    selected_components=tuple(input.selected_components),
+                    option_overrides=overrides,
+                ),
+            ],
+            workflow_id=f"InstallClusterPrereqsWorkflow-{cluster.guid}",
+        )
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field

@@ -20,6 +20,9 @@ from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.deprovision_managed_service import (
     DeprovisionManagedServiceWorkflow,
 )
+from astrolift_workflows.workflows.install_cluster_prereqs import (
+    InstallClusterPrereqsWorkflow,
+)
 from astrolift_workflows.workflows.migrate_app import MigrateAppWorkflow
 from astrolift_workflows.workflows.onboard_app import OnboardAppWorkflow
 from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWorkflow
@@ -44,6 +47,7 @@ __all__ = [
     "DeployAppWorkflow",
     "DeprovisionManagedServiceWorkflow",
     "DriftDetectionWorkflow",
+    "InstallClusterPrereqsWorkflow",
     "MigrateAppWorkflow",
     "OnboardAppWorkflow",
     "PollScheduledJobRunsWorkflow",
