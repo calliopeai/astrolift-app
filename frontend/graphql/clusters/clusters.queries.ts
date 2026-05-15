@@ -194,6 +194,59 @@ export const LIST_MANAGED_DOMAINS = gql`
   }
 `;
 
+// Driver-recipe bootstrap plan (#67). Static read — the recipe lives in
+// the driver code, so this resolver does no cluster API calls. UI
+// renders the components as an interactive checklist and feeds the
+// operator's selections to ``installClusterPrereqs``.
+export const CLUSTER_BOOTSTRAP_PLAN = gql`
+  query ClusterBootstrapPlan($clusterId: GUID!) {
+    astroliftClusterBootstrapPlan(clusterId: $clusterId) {
+      clusterId
+      providerPluginSlug
+      components {
+        key
+        title
+        defaultEnabled
+        rationale
+        helmValues
+        requires
+        options {
+          key
+          label
+          default
+          choices {
+            value
+            label
+          }
+        }
+      }
+    }
+  }
+`;
+
+// Fires InstallClusterPrereqsWorkflow with the operator's selection
+// (#66). Returns the cluster row; FE polls cluster lifecycle while
+// the workflow runs. Idempotent: re-running with a different
+// selection converges via Flux reconcile.
+export const INSTALL_CLUSTER_PREREQS = gql`
+  mutation InstallClusterPrereqs($input: InstallClusterPrereqsInputType!) {
+    installClusterPrereqs(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        lifecycle
+        lastManagementError
+      }
+    }
+  }
+`;
+
 export const LIST_PROVIDER_PLUGINS = gql`
   query ListProviderPlugins {
     astroliftProviderPlugins {
