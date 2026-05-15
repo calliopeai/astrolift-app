@@ -21,6 +21,7 @@ import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import { ClusterTabs } from "./components/cluster-tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -343,6 +344,8 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
       }
       actions={actionButton}
     >
+      <ClusterTabs slug={slug} active="overview" />
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
