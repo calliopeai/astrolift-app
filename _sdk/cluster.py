@@ -404,6 +404,46 @@ class BootstrapComponent:
     means no sub-choices; the component is on/off only."""
 
 
+@dataclass(frozen=True)
+class PodPhaseSummary:
+    """Pod-phase rollup for the Cluster Status tab (#68 slice 1).
+
+    One row per (namespace, phase) bucket. The driver returns the
+    aggregated count rather than streaming raw Pod objects so the
+    workflow + UI never need to chunk through large fleets.
+    """
+
+    namespace: str
+    phase: str
+    """Kubernetes pod phase — ``Pending`` / ``Running`` / ``Succeeded``
+    / ``Failed`` / ``Unknown``. Mirrored verbatim from the API."""
+
+    count: int
+
+
+@dataclass(frozen=True)
+class ClusterEvent:
+    """A recent Kubernetes Event surfaced to the operator for triage.
+
+    Mirrored 1:1 from the API; the driver filters to ``Warning`` type
+    by default but the contract lets the workflow request a broader
+    range. ``involved_object`` is the ``kind/name`` of the object the
+    event targets ("Pod/api-7d-x9k1q") so the UI can deep-link.
+    """
+
+    namespace: str
+    name: str
+    reason: str
+    message: str
+    type: str  # Normal | Warning
+    count: int
+    """K8s coalesces repeated events; this is the running count."""
+
+    first_seen: str  # RFC3339 timestamp
+    last_seen: str
+    involved_object: str
+
+
 class ClusterDriver(Protocol):
     """Protocol for applying, querying, and managing Kubernetes objects on a target cluster.
 
@@ -625,5 +665,50 @@ class ClusterDriver(Protocol):
         reaches the same terminal state. The kube apiserver may
         become unreachable mid-flight; drivers should handle that
         gracefully (the cluster IS being deleted).
+        """
+        ...
+
+    # ---- Cluster health (#68 slice 1) -----------------------------
+
+    def list_pod_phase_summary(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+    ) -> list[PodPhaseSummary]:
+        """Pod-phase rollup across the operator-facing namespaces.
+
+        Drivers list pods (or query the API server's
+        ``/api/v1/pods`` with the appropriate ``fieldSelector``) and
+        aggregate by ``(namespace, phase)``. The Cluster Status tab
+        renders the result as a one-glance "is anything red".
+
+        ``namespaces=None`` defaults to ``["astrolift-system"]`` plus
+        every namespace currently bound to a platform-managed
+        AppEnvironment — drivers don't filter on the caller's behalf,
+        the workflow layer threads the list in.
+
+        Bare-metal drivers without API-server credentials may return
+        an empty list; the UI surfaces "no pod data available".
+        """
+        ...
+
+    def list_events(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+        event_type: str | None = "Warning",
+        limit: int = 50,
+    ) -> list[ClusterEvent]:
+        """Recent Kubernetes Events across the operator-facing
+        namespaces, defaulting to ``Warning`` events for the typical
+        triage flow. ``event_type=None`` returns all types.
+
+        Drivers return at most ``limit`` events, newest first, with
+        the standard fields the API surfaces (reason, message, count
+        of repeats, first/last seen, involved object). Bare-metal
+        drivers without API-server credentials may return an empty
+        list — the UI's empty-state copy covers that case.
         """
         ...

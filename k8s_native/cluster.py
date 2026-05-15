@@ -25,6 +25,7 @@ from _sdk.cluster import (
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
+    ClusterEvent,
     DeleteResult,
     ExecResult,
     ManagementReport,
@@ -32,6 +33,7 @@ from _sdk.cluster import (
     NamespaceState,
     PodInfo,
     PodLogLine,
+    PodPhaseSummary,
     PortForwardSession,
     RolloutResult,
     TeardownReport,
@@ -614,6 +616,48 @@ class K8sNativeClusterDriver(ClusterDriver):
                 options=[],
             ),
         ]
+
+    # ---- Cluster health (#68 slice 1) -----------------------------
+
+    def list_pod_phase_summary(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+    ) -> list[PodPhaseSummary]:
+        from _sdk._kube_health import (
+            default_namespaces,
+            pod_phase_summary_from_client,
+        )
+
+        try:
+            client = self._k8s(cluster.slug)
+        except Exception:  # noqa: BLE001 — no creds / unreachable
+            return []
+        return pod_phase_summary_from_client(
+            client, namespaces=default_namespaces(namespaces),
+        )
+
+    def list_events(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+        event_type: str | None = "Warning",
+        limit: int = 50,
+    ) -> list[ClusterEvent]:
+        from _sdk._kube_health import default_namespaces, events_from_client
+
+        try:
+            client = self._k8s(cluster.slug)
+        except Exception:  # noqa: BLE001
+            return []
+        return events_from_client(
+            client,
+            namespaces=default_namespaces(namespaces),
+            event_type=event_type,
+            limit=limit,
+        )
 
     # ---- internals ------------------------------------------------
 
