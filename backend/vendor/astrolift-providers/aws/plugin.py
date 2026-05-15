@@ -25,17 +25,16 @@ or another plugin contributes the missing role.
 """
 
 from _sdk.base import ProviderPlugin
-
 from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.object_store_s3 import S3Driver
+from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
 from aws.tls_acm import ACMDriver
-
 
 # Plugin manifest. Drivers map a canonical role name → concrete
 # class implementing that role's protocol.
@@ -52,12 +51,13 @@ PLUGIN = ProviderPlugin(
         "ingress": ALBIngressDriver,
     },
     managed_service_drivers={
-        # #35 — partial: shipping S3 + SQS now (covers
-        # 'web app + queue + bucket' deploy MVP). Pending:
-        # postgres/rds, postgres/aurora, redis/elasticache,
-        # nosql/dynamodb, pubsub/sns, filesystem/efs.
+        # #35 + #351 — shipping the high-traffic kinds now (web app +
+        # queue + bucket + relational DB). Pending per backlog tickets:
+        # postgres/aurora, redis/elasticache, nosql/dynamodb,
+        # pubsub/sns, filesystem/efs.
         ("object_store", "s3"): S3Driver,
         ("queue", "sqs"): SQSDriver,
+        ("postgres", "rds"): RDSPostgresDriver,
     },
     config_schema={
         "type": "object",
