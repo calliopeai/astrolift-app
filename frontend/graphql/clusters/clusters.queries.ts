@@ -220,6 +220,22 @@ export const CLUSTER_HEALTH = gql`
   }
 `;
 
+// Recent Temporal workflow runs targeting this cluster (#394). Pulled
+// live from Temporal's visibility API; empty when Temporal is
+// disabled or the query fails.
+export const RECENT_CLUSTER_WORKFLOWS = gql`
+  query RecentClusterWorkflows($clusterId: GUID!, $limit: Int) {
+    astroliftRecentClusterWorkflows(clusterId: $clusterId, limit: $limit) {
+      workflowId
+      workflowType
+      status
+      startedAt
+      closedAt
+      runId
+    }
+  }
+`;
+
 // Cluster-scoped slice of the mutation audit log (#68 slice 2). Drives
 // the Lifecycle timeline card on the Status tab.
 export const CLUSTER_LIFECYCLE_AUDIT = gql`
