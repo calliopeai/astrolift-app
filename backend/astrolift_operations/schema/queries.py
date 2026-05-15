@@ -220,7 +220,7 @@ class OperationsQuery:
         time_range: str = "1h",
     ) -> AppMetricsType | None:
         """Golden-signal time-series for one app over the requested
-        window (monorail parity).
+        window.
 
         Accepts ``time_range`` in ``5m | 1h | 24h | 7d | 30d``.
         Returns ``None`` for an unknown app.

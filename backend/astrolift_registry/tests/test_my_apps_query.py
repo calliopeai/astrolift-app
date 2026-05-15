@@ -1,5 +1,4 @@
-"""Tests for ``astrolift_my_apps`` — viewer-scoped app list (#312-like
-monorail parity).
+"""Tests for ``astrolift_my_apps`` — viewer-scoped app list (#312).
 
 The resolver is self-service: it returns the set of registered apps
 the caller can reach by any active RoleBinding on the app, project,
