@@ -91,6 +91,31 @@ class SoftDeleteAppInput:
     id: GUID
 
 
+@strawberry.input
+class TearDownAppInput:
+    """Two-axis safety for ``tearDownApp`` (#358).
+
+    ``deleteData`` False (default): graceful per-binding deprovision —
+    final snapshots taken, retained buckets, etc. The artifacts
+    survive for operator-initiated restore.
+
+    ``deleteData`` True: irreversibly delete persistent state on
+    every bound managed service.
+
+    ``forceDestroy`` False (default): respect cloud-side deletion
+    protection. Bound services with protection on will refuse and
+    surface to the operator via the workflow result.
+
+    ``forceDestroy`` True: bypass guards (--atomic cleanup).
+
+    UI surfaces both as separate explicit checkboxes.
+    """
+
+    id: GUID
+    delete_data: bool = False
+    force_destroy: bool = False
+
+
 @strawberry.type
 class _SoftDeletePayload:
     id: GUID
@@ -529,6 +554,59 @@ class RegistryMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         app.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="app.tear_down")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def tear_down_app(
+        self, info: Info, input: TearDownAppInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        """Fires ``TearDownAppWorkflow`` (#358) — symmetric inverse
+        of onboarding. Fans out per-binding ``DeprovisionManagedService``
+        workflows, deletes app's k8s namespaces, revokes deploy
+        tokens, and soft-deletes the platform rows.
+
+        Returns immediately with ``deleted=false``; the workflow
+        flips the row to ``deregistered`` once teardown converges.
+        """
+        from astrolift_registry.models import RegisteredApp
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import (
+            Actor,
+            TearDownAppInput as TearDownInput,
+        )
+
+        app = RegisteredApp.objects.filter(
+            guid=str(input.id), deleted_at__isnull=True,
+        ).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        request = info.context.request  # type: ignore[attr-defined]
+        user = getattr(request, "user", None)
+        actor = Actor(
+            kind="user",
+            user_id=getattr(user, "pk", None) if user is not None else None,
+            display=str(
+                getattr(user, "email", "") or getattr(user, "username", ""),
+            ),
+        )
+        start_workflow(
+            "TearDownAppWorkflow",
+            args=[
+                TearDownInput(
+                    registered_app_id=app.pk,
+                    actor=actor,
+                    delete_data=bool(input.delete_data),
+                    force_destroy=bool(input.force_destroy),
+                ),
+            ],
+            workflow_id=f"TearDownAppWorkflow-{app.guid}",
+        )
+        return gql_success(
+            _SoftDeletePayload(id=input.id, deleted=False),
+        )
 
     @strawberry.field
     @mutation_audit(action="app.transfer")
