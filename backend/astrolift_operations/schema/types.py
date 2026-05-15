@@ -240,8 +240,8 @@ class AppMetricsPointType:
 class AppMetricsType:
     """Golden-signal rollup for one app over the chosen window.
 
-    ``time_range`` accepts: ``5m``, ``1h``, ``24h``, ``7d``, ``30d``
-    (matches monorail). Aggregates derive from the cluster's
+    ``time_range`` accepts: ``5m``, ``1h``, ``24h``, ``7d``, ``30d``.
+    Aggregates derive from the cluster's
     Prometheus / OTel endpoint when wired; today the resolver
     falls back to deterministic synthetic data so the UI surface
     exists end-to-end. ``source`` reflects which path produced the

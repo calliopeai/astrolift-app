@@ -616,7 +616,7 @@ class RegistryMutation:
         """Re-parent an app to a different team / project within the
         same org.
 
-        Permission contract (matches monorail):
+        Permission contract:
         - ``app.transfer`` on the source app (caller is moving it OUT)
         - ``app.create`` on the destination team/project (caller is
           claiming a new home)
