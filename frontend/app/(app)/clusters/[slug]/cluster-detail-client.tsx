@@ -51,7 +51,9 @@ import {
 } from "@/components/ui/table";
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
+  CLUSTER_BOOTSTRAP_PLAN,
   DECOMMISSION_CLUSTER,
+  INSTALL_CLUSTER_PREREQS,
   LIST_CLUSTERS,
   REFRESH_CLUSTER_MANAGEMENT,
 } from "@/graphql/clusters/clusters.queries";
@@ -477,6 +479,8 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
         </div>
       )}
 
+      <BootstrapPlanCard clusterId={cluster.id} />
+
       <AlertDialog open={decommissionOpen} onOpenChange={setDecommissionOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -639,5 +643,239 @@ function Field({
       <dt className="text-muted-foreground text-xs uppercase tracking-wide">{label}</dt>
       <dd className={mono ? "font-mono text-sm break-all" : "text-sm"}>{value}</dd>
     </div>
+  );
+}
+
+// ─── Bootstrap plan card (#67 + #66) ─────────────────────────────────────
+// Reads the driver's bootstrap recipe and renders it as an interactive
+// checklist. Operator picks components + option values; clicking Install
+// fires InstallClusterPrereqsWorkflow which applies one Flux HelmRelease
+// per chosen component to ``astrolift-system``. Idempotent — re-running
+// with a different selection converges.
+
+interface BootstrapOptionChoice {
+  value: string;
+  label: string;
+}
+
+interface BootstrapOption {
+  key: string;
+  label: string;
+  default: string;
+  choices: BootstrapOptionChoice[];
+}
+
+interface BootstrapComponent {
+  key: string;
+  title: string;
+  defaultEnabled: boolean;
+  rationale: string;
+  requires: string[];
+  options: BootstrapOption[];
+  helmValues: Record<string, unknown>;
+}
+
+interface BootstrapPlan {
+  clusterId: string;
+  providerPluginSlug: string;
+  components: BootstrapComponent[];
+}
+
+interface BootstrapPlanResp {
+  astroliftClusterBootstrapPlan: BootstrapPlan | null;
+}
+
+function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<BootstrapPlanResp>(CLUSTER_BOOTSTRAP_PLAN, {
+    variables: { clusterId },
+  });
+  const plan = data?.astroliftClusterBootstrapPlan ?? null;
+
+  // Local selection state. Defaults derive from the recipe — the operator
+  // sees the driver's opinion checked already; they un-check what they
+  // don't want and pick non-default option values for what they do.
+  const [selected, setSelected] = React.useState<Record<string, boolean>>({});
+  const [optionValues, setOptionValues] = React.useState<
+    Record<string, Record<string, string>>
+  >({});
+
+  React.useEffect(() => {
+    if (!plan) return;
+    const nextSel: Record<string, boolean> = {};
+    const nextOpts: Record<string, Record<string, string>> = {};
+    for (const c of plan.components) {
+      nextSel[c.key] = c.defaultEnabled;
+      const opts: Record<string, string> = {};
+      for (const o of c.options) opts[o.key] = o.default || o.choices[0]?.value || "";
+      nextOpts[c.key] = opts;
+    }
+    setSelected(nextSel);
+    setOptionValues(nextOpts);
+  }, [plan]);
+
+  const [install, { loading: installing }] = useMutation<{
+    installClusterPrereqs: MutationResult<{ id: string; slug: string }>;
+  }>(INSTALL_CLUSTER_PREREQS);
+
+  async function handleInstall() {
+    if (!plan) return;
+    const selectedComponents = plan.components
+      .filter((c) => selected[c.key])
+      .map((c) => c.key);
+    const optionOverrides: { componentKey: string; optionKey: string; value: string }[] = [];
+    for (const c of plan.components) {
+      if (!selected[c.key]) continue;
+      for (const o of c.options) {
+        const v = optionValues[c.key]?.[o.key];
+        if (v && v !== o.default) {
+          optionOverrides.push({ componentKey: c.key, optionKey: o.key, value: v });
+        }
+      }
+    }
+    const { data } = await install({
+      variables: {
+        input: { clusterId, selectedComponents, optionOverrides },
+      },
+    });
+    if (data?.installClusterPrereqs.ok) {
+      toast.success(`Installing ${selectedComponents.length} prereq(s)`);
+    } else {
+      toast.error(
+        data?.installClusterPrereqs.errors?.[0]?.message ?? "Install failed",
+      );
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bootstrap recipe</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!plan || plan.components.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bootstrap recipe</CardTitle>
+          <CardDescription>
+            No driver recipe available for this provider. Install platform
+            prerequisites manually or via the <code className="font-mono text-xs">astro
+            cluster bootstrap</code> CLI.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <PlayIcon className="size-4" />
+          Bootstrap recipe
+        </CardTitle>
+        <CardDescription>
+          Driver recipe from <Badge variant="outline" className="font-mono text-[10px] mx-1">
+            {plan.providerPluginSlug || "unknown"}
+          </Badge>
+          — pre-tuned helm values per component. Re-installing converges
+          via Flux; un-checking a previously-installed component deletes
+          its HelmRelease on the next install.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {plan.components.map((c) => (
+          <div key={c.key} className="rounded-md border p-3">
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={!!selected[c.key]}
+                onChange={(e) =>
+                  setSelected((s) => ({ ...s, [c.key]: e.target.checked }))
+                }
+                className="mt-1 size-4 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="font-medium">{c.title}</div>
+                <div className="text-muted-foreground text-xs mt-0.5">
+                  {c.rationale}
+                </div>
+                {c.requires.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {c.requires.map((r) => (
+                      <Badge key={r} variant="secondary" className="font-mono text-[10px]">
+                        requires: {r}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </label>
+            {selected[c.key] && c.options.length > 0 && (
+              <div className="ml-7 mt-3 space-y-2">
+                {c.options.map((o) => (
+                  <div key={o.key} className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs w-32 truncate">
+                      {o.label}
+                    </span>
+                    <select
+                      value={optionValues[c.key]?.[o.key] ?? o.default}
+                      onChange={(e) =>
+                        setOptionValues((prev) => ({
+                          ...prev,
+                          [c.key]: {
+                            ...(prev[c.key] ?? {}),
+                            [o.key]: e.target.value,
+                          },
+                        }))
+                      }
+                      className="border-input bg-background flex-1 rounded-md border px-2 py-1 text-xs"
+                    >
+                      {o.choices.map((ch) => (
+                        <option key={ch.value} value={ch.value}>
+                          {ch.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </CardContent>
+      <div className="flex items-center justify-between border-t px-6 py-3">
+        <span className="text-muted-foreground text-xs">
+          {selectedCount} of {plan.components.length} selected
+        </span>
+        <Can permission="cluster.manage">
+          <Button
+            size="sm"
+            onClick={handleInstall}
+            disabled={installing || selectedCount === 0}
+          >
+            {installing ? (
+              <>
+                <Loader2Icon className="size-3 animate-spin" />
+                Installing…
+              </>
+            ) : (
+              <>
+                <PlayIcon className="size-3" />
+                Install / reconcile
+              </>
+            )}
+          </Button>
+        </Can>
+      </div>
+    </Card>
   );
 }
