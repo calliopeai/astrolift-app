@@ -105,8 +105,16 @@ class GCSDriver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        # force_destroy: GCS has retention policies + object holds as
+        # guards. A real impl would release holds + waive retention
+        # before delete; this stub accepts the flag for symmetry.
+        del force_destroy
         _, _, bucket_name = spec.handle.partition("/")
         if not delete_data:
             return DeprovisionResult(

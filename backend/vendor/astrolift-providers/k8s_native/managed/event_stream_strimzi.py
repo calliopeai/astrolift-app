@@ -116,8 +116,13 @@ class StrimziKafkaDriver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        del delete_data, force_destroy
         return DeprovisionResult(
             ok=True, handle=spec.handle,
             message="delete via Kafka CRD removal",

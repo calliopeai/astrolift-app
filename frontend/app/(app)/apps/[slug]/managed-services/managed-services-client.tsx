@@ -6,10 +6,19 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,6 +93,14 @@ const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
 export function ManagedServicesClient({ slug }: { slug: string }) {
   const [open, setOpen] = React.useState(false);
   const [deprovisionTarget, setDeprovisionTarget] = React.useState<ManagedService | null>(null);
+  const [deleteData, setDeleteData] = React.useState(false);
+  const [forceDestroy, setForceDestroy] = React.useState(false);
+  React.useEffect(() => {
+    if (deprovisionTarget === null) {
+      setDeleteData(false);
+      setForceDestroy(false);
+    }
+  }, [deprovisionTarget]);
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
   });
@@ -118,9 +135,26 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   const envList = envs.data?.astroliftEnvironments ?? [];
 
   async function handleDeprovision(s: ManagedService) {
-    const { data } = await deprovision({ variables: { input: { id: s.id } } });
+    const { data } = await deprovision({
+      variables: {
+        input: {
+          id: s.id,
+          deleteData,
+          forceDestroy,
+        },
+      },
+    });
     if (data?.deprovisionManagedService.ok) {
-      toast.success(`Deprovisioning ${s.name}`);
+      const verb =
+        deleteData && forceDestroy
+          ? "Force-deprovisioning + deleting data for"
+          : deleteData
+            ? "Deprovisioning + deleting data for"
+            : forceDestroy
+              ? "Force-deprovisioning"
+              : "Deprovisioning";
+      toast.success(`${verb} ${s.name}`);
+      setDeprovisionTarget(null);
     } else {
       throw new Error(
         data?.deprovisionManagedService.errors?.[0]?.message ?? "Deprovision failed",
@@ -233,27 +267,95 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
         busy={busy}
       />
 
-      <ConfirmDialog
+      <AlertDialog
         open={deprovisionTarget !== null}
         onOpenChange={(next) => {
           if (!next) setDeprovisionTarget(null);
         }}
-        title={
-          deprovisionTarget
-            ? `Deprovision ${deprovisionTarget.kind}/${deprovisionTarget.name}?`
-            : "Deprovision managed service?"
-        }
-        description={
-          deprovisionTarget
-            ? `Soft-deletes the row in ${deprovisionTarget.environmentName} and signals the workflow loop to tear down upstream resources. Irreversible once upstream teardown completes.`
-            : "Soft-deletes the row and signals the workflow loop to tear down upstream resources."
-        }
-        confirmLabel="Deprovision"
-        destructive
-        onConfirm={async () => {
-          if (deprovisionTarget) await handleDeprovision(deprovisionTarget);
-        }}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deprovisionTarget
+                ? `Deprovision ${deprovisionTarget.kind}/${deprovisionTarget.name}?`
+                : "Deprovision managed service?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deprovisionTarget
+                ? `Tears down the backing resource in ${deprovisionTarget.environmentName} via the cloud's driver and soft-deletes the platform row. The workflow surfaces the in-flight state until the cloud confirms deletion.`
+                : "Tears down the backing resource and soft-deletes the platform row."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4 space-y-3">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <label className="flex cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={deleteData}
+                  onChange={(e) => setDeleteData(e.target.checked)}
+                  className="mt-0.5 size-4 cursor-pointer rounded border-destructive/50 accent-destructive"
+                />
+                <span>
+                  <strong className="text-destructive">Delete persistent data.</strong>{" "}
+                  <span className="text-muted-foreground">
+                    Skip the final snapshot / retained-backup path; empty buckets,
+                    purge queues, drop databases. Unchecked (default), the driver
+                    keeps a restorable artifact alongside the resource teardown.
+                  </span>
+                </span>
+              </label>
+            </div>
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <label className="flex cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={forceDestroy}
+                  onChange={(e) => setForceDestroy(e.target.checked)}
+                  className="mt-0.5 size-4 cursor-pointer rounded border-destructive/50 accent-destructive"
+                />
+                <span>
+                  <strong className="text-destructive">
+                    Force destroy (--atomic).
+                  </strong>{" "}
+                  <span className="text-muted-foreground">
+                    Bypass cloud-side safety guards: suspend bucket versioning,
+                    ignore deletion-protection flags, terminate active sessions,
+                    ignore lingering bindings. Equivalent to Terraform&apos;s{" "}
+                    <code className="font-mono text-xs">force_destroy = true</code>.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deprovisionState.loading}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (deprovisionTarget) {
+                  try {
+                    await handleDeprovision(deprovisionTarget);
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error ? err.message : "Deprovision failed",
+                    );
+                  }
+                }
+              }}
+            >
+              {deleteData && forceDestroy
+                ? "Force destroy + delete data"
+                : deleteData
+                  ? "Deprovision + delete data"
+                  : forceDestroy
+                    ? "Force deprovision"
+                    : "Deprovision"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

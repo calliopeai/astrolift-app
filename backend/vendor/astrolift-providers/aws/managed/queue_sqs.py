@@ -187,8 +187,19 @@ class SQSDriver(ManagedServiceDriver):
         )
 
     def deprovision(
-        self, spec: DeprovisionSpec, *, delete_data: bool = False,
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
     ) -> DeprovisionResult:
+        # Queues have no persistent-state semantic worth preserving:
+        # in-flight messages cannot be snapshotted, and a retained
+        # empty queue serves no purpose. Both flags are accepted for
+        # Protocol symmetry but neither changes the outcome — the
+        # queue is deleted. force_destroy has no SQS-side guard to
+        # bypass (no deletion protection, no min-retention).
+        del delete_data, force_destroy
         _, queue_name = parse_handle(spec.handle)
         try:
             queue_url = self._queue_url(queue_name=queue_name)
@@ -198,10 +209,6 @@ class SQSDriver(ManagedServiceDriver):
                 message=f"queue {queue_name} already gone",
             )
 
-        # Per spec: queues never snapshot (in-flight messages have
-        # no recovery value); delete_data is essentially always True
-        # for queues. The flag is kept for API symmetry; we always
-        # delete the queue.
         try:
             self._sqs.delete_queue(QueueUrl=queue_url)
         except Exception as exc:  # noqa: BLE001

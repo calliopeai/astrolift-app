@@ -99,7 +99,27 @@ class UpdateManagedServiceInput:
 
 @strawberry.input
 class DeprovisionManagedServiceInput:
+    """Two-axis safety surface for the managed-service deprovision (#320).
+
+    ``deleteData`` False (default): the driver takes the safest deletion
+    path — RDS final-snapshot, S3 retains contents, queues drain. The
+    artifact survives for later restore.
+
+    ``deleteData`` True: irreversibly delete persistent state.
+
+    ``forceDestroy`` False (default): respect cloud-side deletion-
+    protection flags; refuse with an error message when a guard trips.
+
+    ``forceDestroy`` True: bypass guards (suspend versioning, ignore
+    deletion-protection, --atomic cleanup). Terraform-style semantic.
+
+    The UI surfaces both as separate explicit checkboxes so destructive
+    paths can't be triggered accidentally.
+    """
+
     id: GUID
+    delete_data: bool = False
+    force_destroy: bool = False
 
 
 @strawberry.type
@@ -486,12 +506,23 @@ class ServicesMutation:
         info: Info,
         input: DeprovisionManagedServiceInput,
     ) -> MutationResultType[_ManagedServiceDeletedPayload]:
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import (
+            Actor,
+            DeprovisionManagedServiceInput as DeprovisionInput,
+        )
+
         svc = ManagedService.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if svc is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "managed service not found",
             )
+
+        # Flip to DEPROVISIONING so the UI shows the in-flight state
+        # immediately. The workflow re-asserts on entry; the platform
+        # row is only soft-deleted by the workflow's finalize activity
+        # AFTER the driver confirms the backend resource is gone.
         svc.status = ManagedService.Status.DEPROVISIONING
         svc.save(
             update_fields=[
@@ -500,10 +531,29 @@ class ServicesMutation:
                 "version",
             ]
         )
-        svc.soft_delete()
+
+        request = info.context.request  # type: ignore[attr-defined]
+        user = getattr(request, "user", None)
+        actor = Actor(
+            kind="user",
+            user_id=getattr(user, "pk", None) if user is not None else None,
+            display=str(getattr(user, "email", "") or getattr(user, "username", "")),
+        )
+        start_workflow(
+            "DeprovisionManagedServiceWorkflow",
+            args=[
+                DeprovisionInput(
+                    managed_service_id=svc.pk,
+                    actor=actor,
+                    delete_data=bool(input.delete_data),
+                    force_destroy=bool(input.force_destroy),
+                ),
+            ],
+            workflow_id=f"DeprovisionManagedServiceWorkflow-{svc.guid}",
+        )
         return gql_success(
             _ManagedServiceDeletedPayload(
                 id=input.id,
-                deleted=True,
+                deleted=False,  # workflow finalizes the soft-delete
             )
         )

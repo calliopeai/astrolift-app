@@ -133,7 +133,50 @@ class ManagedServiceDriver(Protocol):
 
     def update(self, spec: UpdateSpec) -> UpdateResult: ...
 
-    def deprovision(self, spec: DeprovisionSpec, *, delete_data: bool = False) -> DeprovisionResult: ...
+    def deprovision(
+        self,
+        spec: DeprovisionSpec,
+        *,
+        delete_data: bool = False,
+        force_destroy: bool = False,
+    ) -> DeprovisionResult:
+        """Tear down the managed service.
+
+        Two-axis safety design:
+
+          ``delete_data`` controls what happens to PERSISTENT STATE:
+            - False (default): retain data. Drivers do whatever the
+              cloud's safest deletion path is — RDS / Aurora take a
+              final snapshot; S3 / GCS / Blob keep the bucket
+              contents; ElastiCache / Memorystore export a backup
+              before delete; queues drain rather than purge; etc.
+              Operator can restore later from the retained artifact.
+            - True: irreversibly delete data. Skip final snapshot,
+              empty bucket contents, purge queue, etc.
+
+          ``force_destroy`` controls SAFETY GUARDS:
+            - False (default): respect cloud-side deletion protection,
+              refuse if active bindings exist, require bucket-empty
+              before delete-bucket, etc. Errors out with a clear
+              message the operator can act on.
+            - True: bypass guards. Disable deletion-protection flags
+              on the resource, empty buckets even when non-empty,
+              terminate active sessions, ignore bindings (the calling
+              workflow has already detached them or is consciously
+              orphaning them).
+
+        Four corners of the matrix:
+          delete_data=False, force_destroy=False (default): graceful,
+            keep state, respect guards. Refuses on hard cases.
+          delete_data=True,  force_destroy=False: delete state, respect
+            guards. The 'I want this gone but only if it's safe.'
+          delete_data=False, force_destroy=True: keep state but bypass
+            guards. Useful for orphan cleanup where final snapshot
+            already exists.
+          delete_data=True,  force_destroy=True: nuke. Equivalent to
+            Terraform's ``force_destroy = true`` semantic.
+        """
+        ...
 
     def status(self, handle: ServiceHandle) -> ServiceStatus: ...
 

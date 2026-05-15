@@ -73,6 +73,35 @@ class ProvisionManagedServiceInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class DeprovisionManagedServiceInput:
+    """Input for ``DeprovisionManagedServiceWorkflow`` (#320).
+
+    Two-axis safety matches the SDK Protocol on
+    ``ManagedServiceDriver.deprovision``:
+
+      ``delete_data`` controls what happens to persistent state.
+        False (default): drivers take the safest deletion path —
+        final-snapshot RDS, retain bucket contents, drain queues,
+        export Redis backups. The artifact survives for later restore.
+        True: irreversibly delete state alongside the resource.
+
+      ``force_destroy`` controls safety guards (Terraform semantic).
+        False (default): respect cloud-side deletion-protection flags,
+        refuse when guards trip, error with a clear operator message.
+        True: bypass guards (suspend versioning, terminate sessions,
+        ignore deletion-protection, --atomic cleanup).
+
+    Together they form the four-corner matrix described in the SDK
+    docstring. UI surfaces both as separate explicit checkboxes.
+    """
+
+    managed_service_id: int
+    actor: Actor
+    delete_data: bool = False
+    force_destroy: bool = False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class TearDownPreviewInput:
     preview_environment_id: int
     actor: Actor
