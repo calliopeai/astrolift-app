@@ -103,7 +103,9 @@ test:
 	# pytest-django imports `configurations` whenever DJANGO_CONFIGURATION
 	# is set; we use plain Django settings now, so unset it for the test
 	# run. Settings.py reads it as a label too — falls back to default.
-	$(COMPOSE) exec -e DJANGO_SETTINGS_MODULE=config.settings $(CONTAINER) sh -lc 'unset DJANGO_CONFIGURATION; pytest -x'
+	# Test-only settings drop the whitenoise static-files backend so the
+	# suite doesn't drag in a runtime-only dep (#396).
+	$(COMPOSE) exec -e DJANGO_SETTINGS_MODULE=config.test_settings $(CONTAINER) sh -lc 'unset DJANGO_CONFIGURATION; pytest -x'
 
 fmt:
 	cd backend && ruff format . && ruff check --fix .

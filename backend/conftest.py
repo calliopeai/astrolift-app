@@ -34,7 +34,17 @@ _label = os.environ.pop("DJANGO_CONFIGURATION", None)
 if _label is not None:
     os.environ.setdefault("ASTROLIFT_ENV_LABEL", _label)
 
-import pytest  # noqa: E402  (must follow the env-pop above)
+# Force Django app-loading BEFORE any per-app conftest imports run.
+# Without this the lifecycle / workflows / clusters conftests trip
+# ``AppRegistryNotReady`` when they import model classes at module
+# scope. pytest-django's own pytest_configure runs after the
+# conftest-collection import phase has already touched models. (#396)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.test_settings")
+import django  # noqa: E402
+
+django.setup()
+
+import pytest  # noqa: E402  (must follow the env-pop + django.setup above)
 
 from core.permissions import register_permission_resolver  # noqa: E402
 from core.request_context import generate_ulid, set_request_id  # noqa: E402
