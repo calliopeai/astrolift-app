@@ -32,6 +32,7 @@ const APP_FIELDS = `
   rawManifestStaged
   lastSyncedHash
   manifestSyncState
+  lastResyncAt
   createdAt
   updatedAt
   deletedAt
@@ -142,6 +143,23 @@ export const LIST_CONTAINERS = gql`
       healthcheckValue
       healthcheckPort
       workloadSlug
+    }
+  }
+`;
+
+export const LIST_APP_TEAM_ACCESSES = gql`
+  query ListAppTeamAccesses($appSlug: String!) {
+    astroliftAppTeamAccesses(appSlug: $appSlug) {
+      id
+      appId
+      appSlug
+      teamId
+      teamSlug
+      teamName
+      accessLevel
+      isHome
+      createdAt
+      updatedAt
     }
   }
 `;

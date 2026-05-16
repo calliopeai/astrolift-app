@@ -7,12 +7,14 @@ from django.db.models import Q
 from strawberry.types import Info
 
 from astrolift_lifecycle.models import AppEnvironment
-from astrolift_registry.models import Container, RegisteredApp, Workload
+from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
+    AppTeamAccessType,
     ContainerType,
     RegisteredAppType,
     RenderedManifestType,
     WorkloadType,
+    app_team_access_to_type,
     app_to_type,
     container_to_type,
     workload_to_type,
@@ -124,6 +126,32 @@ class RegistryQuery:
             RegisteredApp.objects.select_related("organization", "team", "project").filter(slug=slug).first()
         )
         return app_to_type(app) if app else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_team_accesses(self, info: Info, app_slug: str) -> list[AppTeamAccessType]:
+        """List every team that holds active access to ``app_slug``.
+
+        Includes the home-team row (``is_home=true``) plus any
+        additional teams granted via ``grantTeamAccessToApp``.
+        Backfilled deployments will show exactly one row (the home
+        team at ``OWNER``) until the operator grants more teams.
+        """
+
+        app = (
+            RegisteredApp.objects.select_related("team")
+            .filter(slug=app_slug, deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return []
+        rows = (
+            AppTeamAccess.objects.select_related("registered_app", "team")
+            .filter(registered_app=app, deleted_at__isnull=True)
+            .order_by("team__slug")
+        )
+        return [app_team_access_to_type(r, home_team_id=app.team_id) for r in rows]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

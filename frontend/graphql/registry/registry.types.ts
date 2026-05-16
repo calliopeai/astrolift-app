@@ -3,6 +3,7 @@
  */
 
 import type {
+  AstroliftAppTeamAccess as GeneratedAppTeamAccess,
   AstroliftContainer as GeneratedContainer,
   AstroliftRegisteredApp as GeneratedRegisteredApp,
   AstroliftWorkload as GeneratedWorkload,
@@ -55,4 +56,13 @@ export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {
 
 export type AstroliftContainer = Omit<GeneratedContainer, "healthcheckKind"> & {
   healthcheckKind: HealthcheckKind;
+};
+
+export type AppTeamAccessLevel = "viewer" | "deployer" | "owner";
+
+export type AstroliftAppTeamAccess = Omit<
+  GeneratedAppTeamAccess,
+  "accessLevel"
+> & {
+  accessLevel: AppTeamAccessLevel;
 };

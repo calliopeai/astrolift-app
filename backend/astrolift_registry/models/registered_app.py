@@ -127,6 +127,13 @@ class RegisteredApp(NamedBaseCoreModel):
     # falls back to a branded placeholder while empty.
     preview_screenshot_url = models.URLField(blank=True, default="", max_length=1024)
 
+    # Timestamp of the last operator-initiated "Resync from source"
+    # (#386). Distinct from ``updated_at`` which moves on every save;
+    # this only advances when the manifest_sync service runs against
+    # the repo. Surfaces on the Settings page so operators can see
+    # "Last resynced 5 minutes ago" without grepping audit logs.
+    last_resync_at = models.DateTimeField(null=True, blank=True)
+
     default_tenant_cluster = models.ForeignKey(
         "astrolift_clusters.TenantCluster",
         related_name="registered_apps",

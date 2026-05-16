@@ -121,3 +121,97 @@ export const PUSH_MANIFEST_TO_REPO = gql`
     }
   }
 `;
+
+const APP_TEAM_ACCESS_FIELDS = `
+  id
+  appId
+  appSlug
+  teamId
+  teamSlug
+  teamName
+  accessLevel
+  isHome
+  createdAt
+  updatedAt
+`;
+
+export const MOVE_APP_TO_TEAM = gql`
+  mutation MoveAppToTeam($input: MoveAppToTeamInput!) {
+    moveAppToTeam(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        teamSlug
+        projectSlug
+      }
+    }
+  }
+`;
+
+export const GRANT_TEAM_ACCESS_TO_APP = gql`
+  mutation GrantTeamAccessToApp($input: GrantTeamAccessInput!) {
+    grantTeamAccessToApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${APP_TEAM_ACCESS_FIELDS}
+      }
+    }
+  }
+`;
+
+export const REVOKE_TEAM_ACCESS_FROM_APP = gql`
+  mutation RevokeTeamAccessFromApp($input: RevokeTeamAccessInput!) {
+    revokeTeamAccessFromApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
+/**
+ * Re-fetch the deploy branch's astrolift.toml and reconcile workloads,
+ * env, managed services, and schedules — the "Resync from source"
+ * button on the Settings landing (#386). Non-destructive on staged
+ * drafts; surfaces a one-line summary in the success toast.
+ */
+export const RESYNC_MANIFEST_FROM_REPO = gql`
+  mutation ResyncAstroliftManifestFromRepo($input: ResyncManifestFromRepoInput!) {
+    resyncAstroliftManifestFromRepo(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        syncState
+        summary
+        workloadsAdded
+        workloadsRemoved
+        workloadsChanged
+        managedServicesAdded
+        managedServicesRemoved
+        envKeysChanged
+        schedulesChanged
+      }
+    }
+  }
+`;

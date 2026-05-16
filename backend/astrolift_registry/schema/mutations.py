@@ -11,8 +11,13 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project, Team
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
-from astrolift_registry.models import RegisteredApp
-from astrolift_registry.schema.types import RegisteredAppType, app_to_type
+from astrolift_registry.models import AppTeamAccess, RegisteredApp
+from astrolift_registry.schema.types import (
+    AppTeamAccessType,
+    RegisteredAppType,
+    app_team_access_to_type,
+    app_to_type,
+)
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -164,6 +169,46 @@ class TransferAppInput:
 
 
 @strawberry.input
+class MoveAppToTeamInput:
+    """Change the app's primary / home team.
+
+    Pairs with ``transferApp`` for the FK move; the difference here is
+    that ``moveAppToTeam`` also keeps the ``AppTeamAccess`` join table
+    coherent: the target team gets an active ``OWNER`` row materialized
+    if it didn't already have one, and the *previous* home team is
+    downgraded to ``DEPLOYER`` so its existing access isn't silently
+    revoked. A direct revoke would be the wrong default — the
+    operator can call ``revokeTeamAccessFromApp`` explicitly when
+    they actually want the old team to lose access. Downgrade-only is
+    safer than revoke-on-move and preserves the audit trail.
+    """
+
+    app_id: GUID
+    target_team_id: GUID
+
+
+@strawberry.input
+class GrantTeamAccessInput:
+    """Grant or update a team's access to an app.
+
+    ``accessLevel`` is one of ``viewer`` / ``deployer`` / ``owner``;
+    the mutation upserts so re-granting at the same level is
+    idempotent and changing the level on an existing row is a
+    one-call update.
+    """
+
+    app_id: GUID
+    team_id: GUID
+    access_level: str
+
+
+@strawberry.input
+class RevokeTeamAccessInput:
+    app_id: GUID
+    team_id: GUID
+
+
+@strawberry.input
 class PushManifestToRepoInput:
     """Open a PR against the source repo with the staged TOML.
 
@@ -200,6 +245,76 @@ def _actor():
     from django.contrib.auth import get_user_model
 
     return get_user_model().objects.filter(pk=actor_id).first()
+
+
+def _ensure_owner_access(app, team_id: int, *, actor=None) -> None:
+    """Idempotently materialize an active ``AppTeamAccess(OWNER)``
+    row for ``(app, team_id)``.
+
+    - If no row exists, create one at OWNER.
+    - If a soft-deleted row exists, restore + promote to OWNER.
+    - If a live row exists at a lower level, promote it to OWNER.
+    - If a live row at OWNER exists, no-op.
+    """
+
+    live = AppTeamAccess.objects.filter(registered_app=app, team_id=team_id, deleted_at__isnull=True).first()
+    if live is not None:
+        if live.access_level != AppTeamAccess.AccessLevel.OWNER.value:
+            live.access_level = AppTeamAccess.AccessLevel.OWNER.value
+            live.save(update_fields=["access_level", "updated_at", "version"])
+        return
+
+    soft_deleted = (
+        AppTeamAccess.all_objects.filter(registered_app=app, team_id=team_id)
+        .exclude(deleted_at__isnull=True)
+        .order_by("-deleted_at")
+        .first()
+    )
+    if soft_deleted is not None:
+        soft_deleted.deleted_at = None
+        soft_deleted.deleted_by = None
+        soft_deleted.access_level = AppTeamAccess.AccessLevel.OWNER.value
+        soft_deleted.save(
+            update_fields=[
+                "deleted_at",
+                "deleted_by",
+                "access_level",
+                "updated_at",
+                "version",
+            ]
+        )
+        return
+
+    AppTeamAccess.objects.create(
+        registered_app=app,
+        team_id=team_id,
+        access_level=AppTeamAccess.AccessLevel.OWNER.value,
+    )
+
+
+def _downgrade_to_deployer(app, team_id: int, *, actor=None) -> None:
+    """Move the previous home team's grant to ``DEPLOYER`` rather
+    than revoke it on move. The previous team keeps write+deploy
+    access until the operator explicitly revokes — preserving
+    in-flight humans' access and the audit trail.
+
+    Creates a new DEPLOYER row when no active grant existed (the FK
+    was the only thing pointing at that team).
+    """
+
+    if team_id is None:
+        return
+    live = AppTeamAccess.objects.filter(registered_app=app, team_id=team_id, deleted_at__isnull=True).first()
+    if live is None:
+        AppTeamAccess.objects.create(
+            registered_app=app,
+            team_id=team_id,
+            access_level=AppTeamAccess.AccessLevel.DEPLOYER.value,
+        )
+        return
+    if live.access_level == AppTeamAccess.AccessLevel.OWNER.value:
+        live.access_level = AppTeamAccess.AccessLevel.DEPLOYER.value
+        live.save(update_fields=["access_level", "updated_at", "version"])
 
 
 def _resolve_approval_inputs(
@@ -290,6 +405,42 @@ def _resolve_approval_inputs(
         "minimum_approvals": minimum_approvals,
     }
     return resolved, None
+
+
+@strawberry.input
+class ResyncManifestFromRepoInput:
+    """Re-fetch ``astrolift.toml`` from the deploy branch and
+    reconcile workloads / env / managed services / schedules.
+
+    Non-destructive on staged drafts: when the DB has an unpushed
+    staged manifest AND the repo has new content, the mutation
+    refuses (status="diverged") rather than clobbering the draft.
+    The destructive equivalent is ``syncManifestFromRepo`` (#277).
+    """
+
+    app_slug: str
+
+
+@strawberry.type
+class ResyncManifestPayload:
+    """Payload of ``resyncAstroliftManifestFromRepo`` (#386).
+
+    ``sync_state`` is one of ``in_sync``, ``applied``, ``diverged``,
+    ``fetch_failed``. ``summary`` is the human-readable one-liner
+    the UI surfaces in the success toast. The per-bucket diff
+    fields let the FE render a more detailed breakdown when
+    ``applied``.
+    """
+
+    sync_state: str
+    summary: str
+    workloads_added: list[str]
+    workloads_removed: list[str]
+    workloads_changed: list[str]
+    managed_services_added: list[str]
+    managed_services_removed: list[str]
+    env_keys_changed: int
+    schedules_changed: int
 
 
 @strawberry.type
@@ -882,5 +1033,261 @@ class RegistryMutation:
                 pr_url="",
                 branch_name=branch,
                 note="scm_pending",
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.move_to_team")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def move_app_to_team(
+        self, info: Info, input: MoveAppToTeamInput
+    ) -> MutationResultType[RegisteredAppType]:
+        """Move the app's primary / home team to ``targetTeamId``.
+
+        Distinct from ``transferApp`` (which re-parents to a target
+        team *and* project): this mutation focuses on the team
+        membership semantics. It re-points ``RegisteredApp.team`` to
+        the target team and keeps the ``AppTeamAccess`` join table
+        in sync — the target team gains an OWNER row (idempotent) and
+        the previous home team is downgraded to DEPLOYER (or
+        materialized at DEPLOYER if no row existed) rather than
+        revoked. Downgrade-only is the safer default; the previous
+        team's existing humans don't lose access mid-flight, and the
+        operator can ``revokeTeamAccessFromApp`` explicitly later.
+        """
+
+        app = (
+            RegisteredApp.objects.select_related("organization", "team", "project")
+            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        target = (
+            Team.objects.select_related("organization")
+            .filter(guid=str(input.target_team_id), deleted_at__isnull=True)
+            .first()
+        )
+        if target is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "target team not found",
+                field="targetTeamId",
+            )
+        if target.organization_id != app.organization_id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cross-organization move is not permitted",
+                field="targetTeamId",
+            )
+
+        # The existing project must belong to the new team or the tree
+        # breaks. ``transferApp`` allows callers to specify a new
+        # project alongside; ``moveAppToTeam`` keeps the API narrow
+        # (team-only) and refuses orphaning the project.
+        if app.project.team_id != target.id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "the app's project belongs to a different team — use transferApp to move both",
+                field="targetTeamId",
+            )
+
+        previous_team_id = app.team_id
+        if previous_team_id == target.id:
+            # No-op when already on the target team — but still ensure
+            # an OWNER row exists for it.
+            _ensure_owner_access(app, target.id, actor=_actor())
+            return gql_success(app_to_type(app))
+
+        app.team = target
+        app.save(update_fields=["team", "updated_at", "version"])
+
+        _ensure_owner_access(app, target.id, actor=_actor())
+        _downgrade_to_deployer(app, previous_team_id, actor=_actor())
+
+        return gql_success(app_to_type(app))
+
+    @strawberry.field
+    @mutation_audit(action="app.grant_team_access")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def grant_team_access_to_app(
+        self, info: Info, input: GrantTeamAccessInput
+    ) -> MutationResultType[AppTeamAccessType]:
+        """Upsert a team's access to an app at the requested level.
+
+        Re-granting at the same level is idempotent (no row change);
+        changing the level updates the existing row in place. The
+        unique constraint over ``(app, team) WHERE deleted_at IS
+        NULL`` prevents duplicate active grants.
+        """
+
+        normalized_level = (input.access_level or "").strip().lower()
+        valid_levels = {choice.value for choice in AppTeamAccess.AccessLevel}
+        if normalized_level not in valid_levels:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"accessLevel must be one of {sorted(valid_levels)}",
+                field="accessLevel",
+            )
+
+        app = (
+            RegisteredApp.objects.select_related("organization", "team")
+            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        team = (
+            Team.objects.select_related("organization")
+            .filter(guid=str(input.team_id), deleted_at__isnull=True)
+            .first()
+        )
+        if team is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
+
+        if team.organization_id != app.organization_id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "team must belong to the same organization as the app",
+                field="teamId",
+            )
+
+        access = (
+            AppTeamAccess.objects.select_related("registered_app", "team")
+            .filter(registered_app=app, team=team, deleted_at__isnull=True)
+            .first()
+        )
+        if access is None:
+            access = AppTeamAccess.objects.create(
+                registered_app=app,
+                team=team,
+                access_level=normalized_level,
+            )
+        elif access.access_level != normalized_level:
+            access.access_level = normalized_level
+            access.save(update_fields=["access_level", "updated_at", "version"])
+
+        # Refresh so app + team relations are populated for the
+        # type-conversion path.
+        access = AppTeamAccess.objects.select_related("registered_app", "team").filter(pk=access.pk).first()
+        return gql_success(app_team_access_to_type(access, home_team_id=app.team_id))
+
+    @strawberry.field
+    @mutation_audit(action="app.revoke_team_access")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def revoke_team_access_from_app(
+        self, info: Info, input: RevokeTeamAccessInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        """Soft-delete the team's access grant to the app.
+
+        Refuses when the grant being revoked is the last active OWNER
+        row — that would orphan the app. Operators must promote
+        another team to OWNER or move the app to a different home
+        team first.
+        """
+
+        app = (
+            RegisteredApp.objects.select_related("organization", "team")
+            .filter(guid=str(input.app_id), deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
+
+        team = (
+            Team.objects.select_related("organization")
+            .filter(guid=str(input.team_id), deleted_at__isnull=True)
+            .first()
+        )
+        if team is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
+
+        access = AppTeamAccess.objects.filter(registered_app=app, team=team, deleted_at__isnull=True).first()
+        if access is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "team has no active access grant on this app",
+                field="teamId",
+            )
+
+        if access.access_level == AppTeamAccess.AccessLevel.OWNER.value:
+            remaining_owners = (
+                AppTeamAccess.objects.filter(
+                    registered_app=app,
+                    access_level=AppTeamAccess.AccessLevel.OWNER.value,
+                    deleted_at__isnull=True,
+                )
+                .exclude(pk=access.pk)
+                .count()
+            )
+            if remaining_owners == 0:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "cannot revoke the last OWNER grant — promote another team first or move the app",
+                    field="teamId",
+                )
+
+        access.soft_delete(by=_actor())
+        return gql_success(
+            _SoftDeletePayload(id=GUID(str(access.guid)), deleted=True),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.manifest.resync_from_repo")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def resync_astrolift_manifest_from_repo(
+        self,
+        info: Info,
+        input: ResyncManifestFromRepoInput,
+    ) -> MutationResultType[ResyncManifestPayload]:
+        """Re-fetch the manifest from the source repo + reconcile (#386).
+
+        Wraps the ``manifest_sync.resync_app_manifest_from_repo``
+        service in the standard tenant/permission/audit envelope.
+        Returns a payload the UI uses to render a summary toast and
+        update the last-sync timestamp inline.
+        """
+        from astrolift_registry.services.manifest_sync import (
+            resync_app_manifest_from_repo,
+            summarize_changes,
+        )
+
+        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        result = resync_app_manifest_from_repo(app)
+        # ``fetch_failed`` and ``diverged`` are envelope-level errors —
+        # nothing was applied, the UI should surface the message in
+        # an error toast.
+        if result.status == "fetch_failed":
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                result.error or "fetch failed",
+            )
+        if result.status == "diverged":
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                result.error or "manifest diverged from repo",
+            )
+
+        summary = "Already in sync." if result.status == "in_sync" else summarize_changes(result.changes)
+        return gql_success(
+            ResyncManifestPayload(
+                sync_state=result.status,
+                summary=summary,
+                workloads_added=list(result.changes.workloads_added),
+                workloads_removed=list(result.changes.workloads_removed),
+                workloads_changed=list(result.changes.workloads_changed),
+                managed_services_added=list(result.changes.managed_services_added),
+                managed_services_removed=list(result.changes.managed_services_removed),
+                env_keys_changed=int(result.changes.env_keys_changed),
+                schedules_changed=int(result.changes.schedules_changed),
             )
         )

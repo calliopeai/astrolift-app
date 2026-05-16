@@ -62,6 +62,53 @@ class RegisteredAppType:
     created_at: dt.datetime
     updated_at: dt.datetime
     deleted_at: dt.datetime | None
+    # Last operator-initiated "Resync from source" timestamp (#386).
+    # Null until the operator has clicked the button for the first
+    # time; surfaces on the Settings page as relative time.
+    last_resync_at: dt.datetime | None
+
+
+@strawberry.type(name="AstroliftAppTeamAccess")
+class AppTeamAccessType:
+    """A team's access grant to an app.
+
+    Joins ``RegisteredApp`` and ``Team`` with an ``access_level`` of
+    ``viewer`` / ``deployer`` / ``owner``. Returned by
+    ``astroliftAppTeamAccesses(appSlug)`` so the FE can render the
+    Teams card on the app-detail page.
+
+    ``is_home`` flags the row that mirrors ``RegisteredApp.team`` —
+    the app's primary / home team. Frontend uses this to render the
+    home-team affordance separately and to refuse revoking the
+    home-team grant directly (callers must move the app to a
+    different home team first).
+    """
+
+    id: GUID
+    app_id: GUID
+    app_slug: str
+    team_id: GUID
+    team_slug: str
+    team_name: str
+    access_level: str
+    is_home: bool
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+def app_team_access_to_type(access, *, home_team_id: int) -> AppTeamAccessType:
+    return AppTeamAccessType(
+        id=GUID(str(access.guid)),
+        app_id=GUID(str(access.registered_app.guid)),
+        app_slug=access.registered_app.slug,
+        team_id=GUID(str(access.team.guid)),
+        team_slug=access.team.slug,
+        team_name=access.team.name,
+        access_level=access.access_level,
+        is_home=access.team_id == home_team_id,
+        created_at=access.created_at,
+        updated_at=access.updated_at,
+    )
 
 
 @strawberry.type(name="AstroliftWorkload")
@@ -156,6 +203,7 @@ def app_to_type(app) -> RegisteredAppType:
         created_at=app.created_at,
         updated_at=app.updated_at,
         deleted_at=app.deleted_at,
+        last_resync_at=app.last_resync_at,
     )
 
 

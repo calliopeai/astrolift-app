@@ -13,6 +13,7 @@ import {
   PauseIcon,
   PlayIcon,
   PlugIcon,
+  RefreshCwIcon,
   SettingsIcon,
   Trash2Icon,
   UsersIcon,
@@ -34,11 +35,14 @@ import { PAUSE_APP_INGRESS, RESUME_APP_INGRESS } from "@/graphql/lifecycle/lifec
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { RESYNC_MANIFEST_FROM_REPO } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AppTabs } from "../components/app-tabs";
 import { ControlsSection } from "../components/controls-section";
+import { TeamsCard } from "../components/teams-card";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -173,7 +177,11 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />
 
+      <ResyncSourceSection appSlug={a.slug} lastResyncAt={a.lastResyncAt ?? null} />
+
       <IngressControlsSection appSlug={a.slug} />
+
+      <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />
 
       <div className="flex flex-col gap-3">
         {LINK_SECTIONS.map((s) => (
@@ -183,6 +191,112 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <DangerZoneCard />
     </PageShell>
+  );
+}
+
+// ─── resync from source ───────────────────────────────────────────────────────
+
+/**
+ * "Resync from source" button for the Settings landing (#386).
+ *
+ * Re-fetches `astrolift.toml` from the deploy branch and reconciles
+ * workloads / env / managed services / schedules. The mutation is
+ * non-destructive on staged drafts — if the operator has local edits
+ * pending, the backend refuses with a CONFLICT and surfaces that as an
+ * error toast so the draft survives.
+ *
+ * The relative "Last resynced …" timestamp re-renders whenever the
+ * mutation completes (we refetch `GET_APP`).
+ */
+interface ResyncResp {
+  resyncAstroliftManifestFromRepo: MutationResult<{
+    syncState: string;
+    summary: string;
+    workloadsAdded: string[];
+    workloadsRemoved: string[];
+    workloadsChanged: string[];
+    managedServicesAdded: string[];
+    managedServicesRemoved: string[];
+    envKeysChanged: number;
+    schedulesChanged: number;
+  }>;
+}
+
+function ResyncSourceSection({
+  appSlug,
+  lastResyncAt,
+}: {
+  appSlug: string;
+  lastResyncAt: string | null;
+}) {
+  const fmt = useFormatters();
+  const [resync, { loading }] = useMutation<ResyncResp>(RESYNC_MANIFEST_FROM_REPO, {
+    refetchQueries: [{ query: GET_APP, variables: { slug: appSlug } }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleResync() {
+    try {
+      const { data } = await resync({ variables: { input: { appSlug } } });
+      const env = data?.resyncAstroliftManifestFromRepo;
+      if (!env) {
+        toast.error("Resync failed: no response from backend.");
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? "Resync failed.");
+        return;
+      }
+      const payload = env.data;
+      if (!payload) {
+        toast.error("Resync returned no payload.");
+        return;
+      }
+      if (payload.syncState === "in_sync") {
+        toast.success("Already in sync.");
+      } else {
+        toast.success(payload.summary);
+      }
+    } catch (err) {
+      // Apollo network error / unexpected throw — surface verbatim so
+      // the operator can copy/paste into a ticket.
+      toast.error(err instanceof Error ? err.message : "Resync failed.");
+    }
+  }
+
+  return (
+    <section className="rounded-lg border p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Resync from source</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Re-read <span className="font-mono">astrolift.toml</span> from the deploy branch and
+            apply env, workload, schedule, and managed-service changes. Non-destructive on local
+            staged drafts.
+          </p>
+        </div>
+        <Can permission="app.update">
+          <Button size="sm" variant="outline" onClick={handleResync} disabled={loading}>
+            {loading ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCwIcon className="size-3.5" />
+            )}
+            {loading ? "Resyncing…" : "Resync from source"}
+          </Button>
+        </Can>
+      </div>
+      <p className="text-muted-foreground text-[11px]">
+        {lastResyncAt ? (
+          <>
+            Last resynced{" "}
+            <span className="text-foreground">{fmt.formatRelativeTime(lastResyncAt)}</span>.
+          </>
+        ) : (
+          "Never resynced from source."
+        )}
+      </p>
+    </section>
   );
 }
 
