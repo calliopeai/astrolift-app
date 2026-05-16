@@ -33,6 +33,7 @@ from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
+from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
 from gcp.tls_managed import GCPManagedCertDriver
@@ -56,6 +57,7 @@ PLUGIN = ProviderPlugin(
         ("postgres", "cloudsql"): CloudSQLPostgresDriver,
         ("mysql", "cloudsql"): CloudSQLMySQLDriver,
         ("redis", "memorystore"): MemorystoreRedisDriver,
+        ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
     },
     config_schema={
         "type": "object",

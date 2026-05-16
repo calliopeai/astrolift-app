@@ -50,6 +50,7 @@ from azure.managed.queue_servicebus import (
     AzureServiceBusDriver,
     ServiceBusDriver,
 )
+from azure.managed.vector_search import AzureAISearchVectorDriver
 from azure.registry_acr import ACRDriver
 from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
@@ -74,6 +75,7 @@ PLUGIN = ProviderPlugin(
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
     },
     config_schema={
         "type": "object",
