@@ -28,9 +28,11 @@ from __future__ import annotations
 
 import base64
 import time
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 from _sdk.cluster import (
     ApplyResult,
@@ -76,9 +78,12 @@ class EKSConfig:
     """The EKS cluster name (used in DescribeCluster + GetToken).
     Distinct from the platform's logical 'cluster' identifier."""
 
-    sts_token_lifetime_seconds: int = 60
-    """How long to ask STS to make the token valid for. EKS caps
-    at 14 minutes; we ask for 60s + re-fetch per operation."""
+    sts_token_lifetime_seconds: int = 900
+    """How long to ask STS to make the presigned URL valid for. EKS's
+    IAM authenticator caps at 15 minutes (900s); the k8s client does
+    not auto-retry on 401, so a longer window matches the EKS
+    GetToken upper bound and avoids spurious mid-operation auth
+    failures on first-rollout deploys (#359)."""
 
     exec_plugin_token_ttl_seconds: int = 13 * 60
     """How long the observability-path token cache holds a minted
@@ -169,6 +174,7 @@ class EKSClusterDriver(ClusterDriver):
             lambda cluster_name, region: mint_eks_token(
                 cluster_name=cluster_name,
                 region=region,
+                expires_in_seconds=self._config.sts_token_lifetime_seconds,
             )
         )
         # Monotonic clock is parametrized so the cache-TTL tests can
@@ -247,7 +253,7 @@ class EKSClusterDriver(ClusterDriver):
                     name=name,
                 )
                 deleted.append(ref)
-            except _NotFound:
+            except _NotFoundError:
                 not_found.append(ref)
             except Exception as exc:
                 errors.append(f"{ref}: {exc}")
@@ -267,7 +273,7 @@ class EKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         try:
             ns = client.get_namespace(name=name)
-        except _NotFound:
+        except _NotFoundError:
             return None
         except Exception as exc:
             raise RuntimeError(f"get_namespace {name}: {exc}") from exc
@@ -319,7 +325,7 @@ class EKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         try:
             client.delete(kind="Namespace", namespace=None, name=name)
-        except _NotFound:
+        except _NotFoundError:
             return
         except Exception as exc:
             raise RuntimeError(f"delete_namespace {name}: {exc}") from exc
@@ -354,7 +360,7 @@ class EKSClusterDriver(ClusterDriver):
                 namespace=namespace,
                 name=name,
             )
-        except _NotFound as exc:
+        except _NotFoundError as exc:
             raise NotFoundError(
                 f"{kind}/{name} in namespace {namespace}",
             ) from exc
@@ -464,7 +470,7 @@ class EKSClusterDriver(ClusterDriver):
                 container=container,
                 command=command,
             )
-        except _NotFound as exc:
+        except _NotFoundError as exc:
             raise NotFoundError(
                 f"pod {pod} in namespace {namespace}",
             ) from exc
@@ -1022,7 +1028,7 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return pod_phase_summary_from_client(
             client, namespaces=default_namespaces(namespaces),
@@ -1040,13 +1046,32 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return events_from_client(
             client,
             namespaces=default_namespaces(namespaces),
             event_type=event_type,
             limit=limit,
+        )
+
+    def list_workload_health(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+    ):
+        from _sdk._kube_health import (
+            default_namespaces,
+            workload_health_from_client,
+        )
+
+        try:
+            client = self._k8s(cluster.slug)
+        except Exception:
+            return []
+        return workload_health_from_client(
+            client, namespaces=default_namespaces(namespaces),
         )
 
     # ---- internals ------------------------------------------------
@@ -1080,11 +1105,14 @@ class EKSClusterDriver(ClusterDriver):
         AWS-IAM-Authenticator protocol (presigned STS GetCallerIdentity
         URL with ``x-k8s-aws-id`` header). Re-minted per operation
         rather than cached; STS rejects URLs older than 15 minutes,
-        but we set a 60s expiry so a leaked URL is useless quickly."""
+        so we ask for the EKS ceiling (``sts_token_lifetime_seconds``,
+        default 900) to avoid spurious mid-operation auth failures
+        on first-rollout deploys (#359)."""
         try:
             return mint_eks_token(
                 cluster_name=self._config.cluster_name,
                 region=self._config.region,
+                expires_in_seconds=self._config.sts_token_lifetime_seconds,
             )
         except Exception as exc:
             raise map_client_error(exc) from exc
@@ -1093,7 +1121,7 @@ class EKSClusterDriver(ClusterDriver):
 # ---- Internal client + exception types -----------------------------
 
 
-class _NotFound(Exception):
+class _NotFoundError(Exception):
     """Raised by the k8s client wrapper when a resource doesn't exist."""
 
 
