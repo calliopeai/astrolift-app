@@ -156,12 +156,13 @@ def test_writer_can_be_temporarily_replaced_under_test():
     def fake_writer(env):
         captured.append(env)
 
-    from astrolift_operations.event_writer import write_event_envelope
+    import core.events as _events_mod
 
+    previous = _events_mod._writer
     register_event_writer(fake_writer)
     try:
         EventEmitter.emit("custom.event", {"k": "v"}, organization_id=1)
         assert len(captured) == 1
         assert captured[0].event_type == "custom.event"
     finally:
-        register_event_writer(write_event_envelope)
+        register_event_writer(previous)
