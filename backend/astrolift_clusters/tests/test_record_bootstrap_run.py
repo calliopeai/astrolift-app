@@ -54,16 +54,18 @@ def _no_opensearch_profile_index(monkeypatch):
 @pytest.fixture
 def captured_events():
     """Replace the default event writer with a list-capturing one for
-    the duration of the test, then restore. Lets us assert on the
-    ``cluster.bootstrap_run`` emit without poking at the Event model
-    directly (which the in-process emit path also exercises via the
-    operations app's writer)."""
-    from core.events import _log_event
+    the duration of the test, then restore *whatever was previously
+    installed* — typically the persistent DB writer registered by
+    astrolift_operations.apps.ready. Restoring to ``_log_event``
+    unconditionally (the previous shape) broke any later test in the
+    suite that relied on emit() landing rows in the Event table."""
+    import core.events as _events_mod
 
     captured: list = []
+    previous = _events_mod._writer
     register_event_writer(captured.append)
     yield captured
-    register_event_writer(_log_event)
+    register_event_writer(previous)
 
 
 @pytest.fixture
