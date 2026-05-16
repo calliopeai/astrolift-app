@@ -544,22 +544,35 @@ def _record_approval_vote_and_maybe_start(
 
 
 _DEPLOY_PIPELINE_DISABLED_MSG = (
-    "deploy pipeline is not yet enabled in this environment — the "
-    "apply/secrets/dns/rollout activities are still being implemented. "
-    "Cluster adoption (bringClusterIntoManagement) is fully wired and "
-    "remains usable. Set FEATURE_DEPLOY_PIPELINE=true on the webservice "
-    "+ worker once the activity implementations have landed."
+    "deploy pipeline is disabled in this environment. Cluster adoption "
+    "(bringClusterIntoManagement) is unaffected and remains usable. "
+    "Flip DEPLOY_PIPELINE_ENABLED to True in /app/admin/constance/ to "
+    "re-enable rollouts at runtime, or seed the default via the "
+    "FEATURE_DEPLOY_PIPELINE env var on the webservice + worker."
 )
 
 
 def _deploy_pipeline_disabled() -> bool:
-    """True when the deploy pipeline feature flag is off.
+    """True when the deploy pipeline gate is off.
 
-    Used at the top of resolvers whose workflows still depend on stub
-    activities (start_deployment, rollback_deployment, tear_down_preview)
+    Used at the top of resolvers whose workflows depend on the deploy
+    pipeline (start_deployment, promote, rollback, tear_down_preview)
     to short-circuit with a clear error envelope.
+
+    Precedence (mirrors ``_temporal_enabled`` in
+    ``astrolift_workflows.client``): the Constance row wins so an
+    operator can pause rollouts from the admin without a redeploy;
+    the ``FEATURE_DEPLOY_PIPELINE`` env var seeds the Constance
+    default on first boot. If Constance is unavailable (DB not
+    migrated, plugin disabled) we fall back to the env-backed
+    default via ``config.features.is_enabled``.
     """
-    return not is_enabled(Feature.DEPLOY_PIPELINE)
+    try:
+        from constance import config as constance_config
+
+        return not bool(getattr(constance_config, "DEPLOY_PIPELINE_ENABLED", True))
+    except Exception:
+        return not is_enabled(Feature.DEPLOY_PIPELINE)
 
 
 def _kick_validate_custom_domain(domain) -> None:

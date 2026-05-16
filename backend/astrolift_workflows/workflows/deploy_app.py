@@ -30,7 +30,8 @@ with workflow.unsafe.imports_passed_through():
     )
 
 
-_TIMEOUT = timedelta(minutes=15)
+# Fargate cold-starts + image-pull can exceed 15m on first rollout (#359).
+_TIMEOUT = timedelta(minutes=20)
 
 
 @workflow.defn(name="DeployAppWorkflow")

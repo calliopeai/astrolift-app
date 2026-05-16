@@ -396,6 +396,13 @@ CRONJOBS = []
 # when set, the env var is the seed default on first boot.
 ASTROLIFT_TEMPORAL_ENABLED = env_bool("ASTROLIFT_TEMPORAL_ENABLED", True)
 
+# Deploy-pipeline gate. Default ON. Seeded from FEATURE_DEPLOY_PIPELINE
+# at boot, runtime-toggleable via /app/admin/constance/ so operators
+# can pause start/promote/rollback/teardown without a redeploy
+# (parity with TEMPORAL_ENABLED). When False every gated mutation
+# returns a PRECONDITION envelope; cluster adoption is not gated.
+ASTROLIFT_DEPLOY_PIPELINE_ENABLED = env_bool("FEATURE_DEPLOY_PIPELINE", True)
+
 CONSTANCE_CONFIG = {
     "TIME_ZONE": (TIME_ZONE, "System timezone"),
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
@@ -410,6 +417,13 @@ CONSTANCE_CONFIG = {
         "Seeded from the ASTROLIFT_TEMPORAL_ENABLED env var (default True) and can be toggled "
         "at runtime here.",
     ),
+    "DEPLOY_PIPELINE_ENABLED": (
+        ASTROLIFT_DEPLOY_PIPELINE_ENABLED,
+        "Enable the app deploy pipeline (start/promote/rollback/teardown). When False those "
+        "mutations short-circuit with a PRECONDITION envelope so operators can pause rollouts "
+        "without a redeploy. Cluster adoption (bringClusterIntoManagement) is not gated. "
+        "Seeded from the FEATURE_DEPLOY_PIPELINE env var (default True).",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -420,7 +434,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
-    "Workflows": {"fields": ("TEMPORAL_ENABLED",), "collapse": False},
+    "Workflows": {"fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED"), "collapse": False},
 }
 
 INTERNAL_IPS = [
