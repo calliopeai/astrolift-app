@@ -188,6 +188,36 @@ export const REVOKE_TEAM_ACCESS_FROM_APP = gql`
 `;
 
 /**
+ * Re-parent an app to a project (or unassign when `projectGuid: null`).
+ * Powers the Settings landing "Assign project" card (#391). The
+ * backend follows the project's team so the nav tree stays coherent;
+ * the FE just refetches `GET_APP` + the nav-tree query so the new
+ * grouping renders immediately.
+ */
+export const ASSIGN_APP_TO_PROJECT = gql`
+  mutation AssignAstroliftAppToProject($input: AssignAppToProjectInput!) {
+    assignAstroliftAppToProject(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        teamSlug
+        teamName
+        teamId
+        projectSlug
+        projectName
+        projectId
+      }
+    }
+  }
+`;
+
+/**
  * Re-fetch the deploy branch's astrolift.toml and reconcile workloads,
  * env, managed services, and schedules — the "Resync from source"
  * button on the Settings landing (#386). Non-destructive on staged

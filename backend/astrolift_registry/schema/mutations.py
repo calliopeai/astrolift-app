@@ -408,6 +408,59 @@ def _resolve_approval_inputs(
 
 
 @strawberry.input
+class AssignAppToProjectInput:
+    """Re-assign an app to a project, or unassign it (#391).
+
+    ``project_guid`` is None to unassign — the app's ``project`` FK
+    goes to NULL and the app falls into the team's "Unassigned" nav
+    bucket. Otherwise the project is resolved by GUID and must share
+    the app's organization. Cross-org assignment is refused.
+    """
+
+    app_slug: str
+    project_guid: GUID | None = None
+
+
+def _viewer_can_access_project(*, project, viewer) -> bool:
+    """True when ``viewer`` has any active RoleBinding that reaches
+    ``project`` — directly or via an ancestor scope.
+
+    Mirrors the read-side resolution done in ``astrolift_my_apps``
+    (queries.py): a binding at ORG level covers every project in the
+    org; TEAM covers every project under the team; PROJECT covers the
+    project itself. APP-scope bindings don't cover the project — a
+    user with app-only access to one app under a project shouldn't be
+    able to retarget OTHER apps onto that project.
+
+    Superusers short-circuit to True so a platform operator can fix
+    nav scoping without needing an explicit grant.
+    """
+    if viewer is None:
+        return False
+    if getattr(viewer, "is_superuser", False) and getattr(viewer, "is_active", True):
+        return True
+
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from astrolift_identity.models import RoleBinding
+
+    now = timezone.now()
+    bindings = RoleBinding.objects.filter(
+        user_id=viewer.pk,
+        deleted_at__isnull=True,
+    ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+    for binding in bindings:
+        if binding.scope_kind == RoleBinding.ScopeKind.ORG and binding.scope_id == project.organization_id:
+            return True
+        if binding.scope_kind == RoleBinding.ScopeKind.TEAM and binding.scope_id == project.team_id:
+            return True
+        if binding.scope_kind == RoleBinding.ScopeKind.PROJECT and binding.scope_id == project.id:
+            return True
+    return False
+
+
+@strawberry.input
 class ResyncManifestFromRepoInput:
     """Re-fetch ``astrolift.toml`` from the deploy branch and
     reconcile workloads / env / managed services / schedules.
@@ -1291,3 +1344,91 @@ class RegistryMutation:
                 schedules_changed=int(result.changes.schedules_changed),
             )
         )
+
+    @strawberry.field
+    @mutation_audit(action="app.assign_project")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def assign_astrolift_app_to_project(
+        self,
+        info: Info,
+        input: AssignAppToProjectInput,
+    ) -> MutationResultType[RegisteredAppType]:
+        """Re-parent an app to a project, or unassign it (#391).
+
+        Distinct from ``transferApp``: this mutation focuses on the
+        nav-tree + RBAC-scoping use case the Settings "Assign project"
+        card surfaces. It only moves ``project`` (and follows the
+        project's team) and only refuses cross-org targets — it does
+        not touch ``AppTeamAccess`` grants or the approval policy.
+
+        Permission contract:
+        - ``app.update`` on the source app (decorator gate).
+        - Resolver-body check: the actor must have an active
+          RoleBinding that reaches the destination project (ORG,
+          TEAM, or PROJECT scope). Without that, the operator could
+          park an app under a project they have no other visibility
+          into — a silent privilege-escalation surface.
+
+        ``project_guid=None`` unassigns the app. The team FK is
+        preserved on unassign because removing both would orphan the
+        app from the home-team workflow entirely; the nav tree
+        already handles "team has unassigned apps" as a first-class
+        bucket.
+        """
+        app = (
+            RegisteredApp.objects.select_related("organization", "team", "project")
+            .filter(slug=input.app_slug, deleted_at__isnull=True)
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        viewer = _actor()
+
+        if input.project_guid is None:
+            # Unassign — clear the FK. No project-side permission check
+            # is needed: removing scope is the safer direction. Idempotent
+            # when already unassigned.
+            if app.project_id is not None:
+                app.project = None
+                app.save(update_fields=["project", "updated_at", "version"])
+            return gql_success(app_to_type(app))
+
+        project = (
+            Project.objects.select_related("organization", "team")
+            .filter(guid=str(input.project_guid), deleted_at__isnull=True)
+            .first()
+        )
+        if project is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "project not found",
+                field="projectGuid",
+            )
+        if project.organization_id != app.organization_id:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "project must belong to the same organization as the app",
+                field="projectGuid",
+            )
+
+        if not _viewer_can_access_project(project=project, viewer=viewer):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "you do not have access to the target project",
+                field="projectGuid",
+            )
+
+        # Idempotent: re-assigning to the current project is a no-op
+        # and we don't gratuitously bump updated_at.
+        if app.project_id == project.id and app.team_id == project.team_id:
+            return gql_success(app_to_type(app))
+
+        app.project = project
+        # Follow the project's team so the tree stays coherent — an app
+        # under project P should live under P.team in the nav tree,
+        # never dangle under a different team's branch.
+        app.team = project.team
+        app.save(update_fields=["project", "team", "updated_at", "version"])
+        return gql_success(app_to_type(app))

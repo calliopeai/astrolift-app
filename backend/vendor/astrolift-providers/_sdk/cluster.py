@@ -444,6 +444,40 @@ class ClusterEvent:
     involved_object: str
 
 
+@dataclass(frozen=True)
+class WorkloadHealth:
+    """Per-Deployment health row for the Cluster Status tab (#362).
+
+    The pod-phase rollup answers "is anything red"; this answers
+    "which workload is red". One row per Deployment across the
+    operator-facing namespaces; the driver leaves further
+    aggregation (StatefulSet, DaemonSet) for a future protocol bump
+    — the platform's current manifest renderer always uses
+    Deployments for tenant workloads.
+
+    ``restart_count_24h`` is the sum of container ``restartCount``
+    across pods owned by the Deployment whose containers' last
+    restart fell inside the trailing 24h. Drivers that can't compute
+    the per-window restart count (no ContainerStatus parsing
+    available) report ``0`` rather than failing; the UI distinguishes
+    "0 restarts in 24h" from "no data" only when the whole row is
+    absent.
+
+    ``last_image_deployed_at`` is the Deployment's
+    ``status.conditions[type=Progressing,reason=NewReplicaSetAvailable]``
+    last-transition time, RFC3339-stringified. Empty string when the
+    Deployment has never rolled (just created) or when the condition
+    isn't present (older k8s versions).
+    """
+
+    namespace: str
+    name: str
+    desired_replicas: int
+    ready_replicas: int
+    restart_count_24h: int
+    last_image_deployed_at: str
+
+
 class ClusterDriver(Protocol):
     """Protocol for applying, querying, and managing Kubernetes objects on a target cluster.
 
@@ -710,5 +744,23 @@ class ClusterDriver(Protocol):
         of repeats, first/last seen, involved object). Bare-metal
         drivers without API-server credentials may return an empty
         list — the UI's empty-state copy covers that case.
+        """
+        ...
+
+    def list_workload_health(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+    ) -> list[WorkloadHealth]:
+        """Per-Deployment health rollup across the operator-facing
+        namespaces (#362). Drivers list Deployments via the apps/v1
+        API and aggregate restart counts by walking the owned pods.
+
+        ``namespaces=None`` follows the same fallback as the pod /
+        event methods (``astrolift-system`` only) — the workflow
+        layer is responsible for threading in the bound app
+        namespaces. Bare-metal drivers without API-server credentials
+        return an empty list; the UI surfaces "no workload data".
         """
         ...

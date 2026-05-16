@@ -283,12 +283,57 @@ def cluster_health_dispatch(
     }
 
 
+def cluster_workload_health_dispatch(
+    *,
+    cluster: TenantCluster,
+    namespaces: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Driver-backed per-Deployment health rollup for the Status tab
+    (#362). Returns a list of plain dicts so the resolver layer can
+    convert without strawberry-side coercion:
+
+        [{"namespace", "name", "desired_replicas", "ready_replicas",
+          "restart_count_24h", "last_image_deployed_at"}, ...]
+
+    Drivers that can't reach the apiserver (no creds, network) return
+    an empty list rather than raising — the UI surfaces "no workload
+    data available" without taking the whole Status tab down. Driver-
+    resolution failure (plugin missing, protocol gap) raises
+    ``ClusterManagementError``; the resolver swallows that into the
+    same empty-list outcome.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "list_workload_health"):
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver does not implement list_workload_health",
+        )
+    ctx = _context_for_cluster(cluster)
+    try:
+        rows = driver.list_workload_health(ctx, namespaces=namespaces)
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_workload_health raised {exc}",
+        ) from exc
+    return [
+        {
+            "namespace": w.namespace,
+            "name": w.name,
+            "desired_replicas": int(w.desired_replicas),
+            "ready_replicas": int(w.ready_replicas),
+            "restart_count_24h": int(w.restart_count_24h),
+            "last_image_deployed_at": w.last_image_deployed_at,
+        }
+        for w in rows
+    ]
+
+
 __all__ = [
     "ClusterManagementError",
     "ClusterObservabilityError",  # re-exported so callers have one import
     "bootstrap_components_dispatch",
     "bring_cluster_into_management",
     "cluster_health_dispatch",
+    "cluster_workload_health_dispatch",
     "probe_cluster_capabilities_dispatch",
     "reset_management_backend_for_tests",
     "set_management_backend_for_tests",

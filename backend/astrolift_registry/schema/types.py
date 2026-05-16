@@ -20,7 +20,17 @@ class RegisteredAppType:
 
     organization_slug: str
     team_slug: str
+    # ``project_slug`` is empty when the app is unassigned (#391).
+    # ``project_id`` / ``project_name`` / ``team_id`` / ``team_name``
+    # are the shape the Settings "Assign project" card consumes — flat
+    # scalars rather than a nested AstroliftProject type so the
+    # registry schema doesn't have to import / re-export the identity
+    # type and risk the cross-app re-decoration class of bug.
     project_slug: str
+    project_id: GUID | None
+    project_name: str
+    team_id: GUID | None
+    team_name: str
 
     source_kind: str
     source_repo: str
@@ -178,6 +188,7 @@ def app_to_type(app) -> RegisteredAppType:
             last_synced_hash=app.last_synced_hash or "",
         )
     )
+    project = app.project if app.project_id else None
     return RegisteredAppType(
         id=GUID(str(app.guid)),
         slug=app.slug,
@@ -185,7 +196,11 @@ def app_to_type(app) -> RegisteredAppType:
         description=app.description or "",
         organization_slug=app.organization.slug,
         team_slug=app.team.slug,
-        project_slug=app.project.slug,
+        project_slug=project.slug if project else "",
+        project_id=GUID(str(project.guid)) if project else None,
+        project_name=project.name if project else "",
+        team_id=GUID(str(app.team.guid)),
+        team_name=app.team.name,
         source_kind=app.source_kind,
         source_repo=app.source_repo,
         source_url=app.source_url,
