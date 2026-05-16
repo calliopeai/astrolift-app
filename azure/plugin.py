@@ -42,6 +42,7 @@ from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
     AzureBlobStorageDriver,
@@ -84,6 +85,7 @@ PLUGIN = ProviderPlugin(
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
         ("time_series", "azure_monitor_prometheus"): AzureMonitorPrometheusDriver,
         ("email", "azure_acs"): AzureCommunicationEmailDriver,
+        ("model_endpoint", "azure_openai"): AzureOpenAIDriver,
     },
     config_schema={
         "type": "object",

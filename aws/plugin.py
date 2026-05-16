@@ -31,6 +31,7 @@ from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.dynamodb import DynamoDBDriver
 from aws.managed.email_ses import AmazonSESDriver
+from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
@@ -70,6 +71,7 @@ PLUGIN = ProviderPlugin(
         ("search", "opensearch"): OpenSearchSearchDriver,
         ("time_series", "timestream"): TimestreamDriver,
         ("email", "ses"): AmazonSESDriver,
+        ("model_endpoint", "bedrock"): AmazonBedrockDriver,
     },
     config_schema={
         "type": "object",
