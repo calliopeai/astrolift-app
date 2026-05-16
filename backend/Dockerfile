@@ -34,6 +34,19 @@ RUN pip install --no-cache-dir pynacl
 # pytest.ini sets ``asyncio_mode = auto`` so the plugin must be loaded.
 RUN pip install --no-cache-dir pytest-asyncio
 
+# tomli_w: declared in Pipfile for the manifest auto-discoverer
+# (#119) which emits inferred TOML; the lock isn't regenerated in
+# tandem on every image build, so install explicitly the same way
+# pynacl / pytest-asyncio are handled above. Backend tests for
+# astrolift_manifest + astrolift_services import it at module
+# scope.
+RUN pip install --no-cache-dir tomli_w
+
+# starlette: declared in Pipfile for the ASGI subscription path
+# (core/exec_ws) — strawberry.asgi imports it unconditionally. Same
+# install-explicitly pattern until the lock catches up.
+RUN pip install --no-cache-dir starlette
+
 COPY . .
 
 # Provider plugins (astrolift-providers, vendored under backend/vendor) ship
