@@ -197,9 +197,12 @@ export function CiSetupSection({
 // with the repo's libsodium public key and PUTs them as GitHub Actions
 // secrets via the viewer's personal GitHub OAuth connection. The deploy
 // token is rotated as part of the call — there's no other way to land a
-// sealable plaintext for the `ASTROLIFT_DEPLOY_TOKEN` slot. The previous
-// hash stays valid through the model's grace window (1h default) so in-
-// flight CI keeps working until it picks up the new secret.
+// sealable plaintext for the `ASTROLIFT_DEPLOY_TOKEN` slot. The rotate
+// is *immediate* (no grace window) so the dialog copy reflects reality:
+// the old token stops working the moment GitHub accepts the new sealed
+// value. Operators clicking this affordance have been warned in the
+// confirm dialog; in-flight CI runs holding the previous token will
+// have to be re-kicked once the new secret lands.
 // ---------------------------------------------------------------------
 
 interface PushCiSecretsResp {

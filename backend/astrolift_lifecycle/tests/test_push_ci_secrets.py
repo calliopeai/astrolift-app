@@ -212,10 +212,13 @@ def test_push_secrets_rotates_token_and_pushes_all_five(
     assert payload.rotated_token_last_4 != original_plaintext[-4:]
     assert len(payload.rotated_token_last_4) == 4
 
-    # The token row rotated in-place: hash changed, previous hash parked.
+    # The token row rotated in-place: hash changed, previous hash
+    # revoked immediately (no grace window — the ``Push & rotate``
+    # affordance promises immediate cutover in its confirm dialog).
     token_row.refresh_from_db()
     assert token_row.token_hash != original_hash
-    assert token_row.previous_token_hash == original_hash
+    assert token_row.previous_token_hash == ""
+    assert token_row.previous_token_expires_at is None
     assert token_row.last_rotated_at is not None
 
     # All five secrets PUT, no extra calls.
@@ -272,7 +275,7 @@ def test_push_secrets_sealed_values_round_trip(
     # Deploy token plaintext: shape is alft_dt_<urlsafe>; we don't have
     # the plaintext in the response (only last4), so assert format.
     token_plain = _decrypt("ASTROLIFT_DEPLOY_TOKEN")
-    assert token_plain.startswith("alft_dt_") or token_plain.startswith("alfdt_")
+    assert token_plain.startswith(("alft_dt_", "alfdt_"))
     assert token_plain[-4:] == result.data.rotated_token_last_4
 
 

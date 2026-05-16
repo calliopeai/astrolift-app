@@ -10,9 +10,11 @@ the round-trip for them.
 The deploy-token slot is the one that doesn't fall out of the model:
 its plaintext only exists at mint time and we can't fish it back out
 of the hash. So this service *rotates* the app's deploy token as part
-of the push — that produces fresh plaintext we can seal + PUT, and
-the previous hash is parked in the model's grace window so live CI
-runners keep working until they pick up the new secret.
+of the push — that produces fresh plaintext we can seal + PUT. The
+rotation is *immediate* (no grace window) so the ``Push & rotate``
+affordance's confirm-dialog copy reflects reality: the old token
+stops working the moment GitHub accepts the new sealed value. In-
+flight CI runs holding the previous token will need to be re-kicked.
 
 The personal-OAuth connection is the auth surface (per #395): we use
 the *viewer's* GitHub identity, not an org-level PAT, so the resulting
@@ -135,9 +137,7 @@ def seal_secret_for_repo(public_key_b64: str, value: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _pick_personal_github_connection(
-    *, organization_id: int, user_id: int
-) -> SourceConnection | None:
+def _pick_personal_github_connection(*, organization_id: int, user_id: int) -> SourceConnection | None:
     """Return the viewer's active personal GitHub OAuth connection in
     the app's org, or None when no usable row exists.
 
@@ -304,13 +304,20 @@ def _put_repo_secret(
 
 
 def _rotate_or_issue_deploy_token(app: RegisteredApp, *, by_user_id: int | None) -> str:
-    """Pick the app's freshest active deploy token and rotate it; if no
-    rows exist, mint a brand-new one named for the CI push.
+    """Pick the app's freshest active deploy token and rotate it with
+    an immediate cutover; if no rows exist, mint a brand-new one
+    named for the CI push.
 
-    Returns the new plaintext. Surfaces the existing rotation grace
-    window — runners holding the old token keep working for the
-    default grace period (1h) so the PUT/distribute round-trip doesn't
-    immediately break in-flight CI builds.
+    Returns the new plaintext. The ``Push & rotate`` affordance is an
+    explicit, operator-initiated rotation: the dialog promises that
+    the old token stops working immediately, and that's the safer
+    security posture for an action labeled "rotate now". The
+    grace-window path on ``rotate_token`` (default 1h) remains the
+    right default for *implicit* rotations triggered elsewhere — the
+    grace exists to keep in-flight CI alive during an operator-
+    transparent rotation. Here the operator IS rotating on purpose
+    and has been warned, so we skip grace and revoke the old hash
+    in the same transaction.
     """
     token = (
         DeployToken.objects.filter(
@@ -322,7 +329,7 @@ def _rotate_or_issue_deploy_token(app: RegisteredApp, *, by_user_id: int | None)
         .first()
     )
     if token is not None:
-        _row, plaintext = rotate_token(token)
+        _row, plaintext = rotate_token(token, immediate=True)
         return plaintext
     _row, plaintext = issue_token(
         app=app,
@@ -367,8 +374,7 @@ def push_astrolift_ci_secrets(
 
     if app.source_kind in {"gitlab", "bitbucket", "gitea", "git_url"}:
         raise NotImplementedError(
-            "Pushing CI secrets is GitHub-only for now; "
-            "configure GitLab/Bitbucket variables manually."
+            "Pushing CI secrets is GitHub-only for now; " "configure GitLab/Bitbucket variables manually."
         )
     if app.source_kind != "github":
         raise PushSecretsError(
@@ -380,10 +386,7 @@ def push_astrolift_ci_secrets(
     if not viewer_id or not getattr(viewer_user, "is_authenticated", False):
         raise PushSecretsError(
             "NO_PERSONAL_CONNECTION",
-            (
-                "Connect your GitHub account first "
-                "(Account drawer → Connected accounts)."
-            ),
+            ("Connect your GitHub account first " "(Account drawer → Connected accounts)."),
         )
 
     connection = _pick_personal_github_connection(
@@ -393,10 +396,7 @@ def push_astrolift_ci_secrets(
     if connection is None:
         raise PushSecretsError(
             "NO_PERSONAL_CONNECTION",
-            (
-                "Connect your GitHub account first "
-                "(Account drawer → Connected accounts)."
-            ),
+            ("Connect your GitHub account first " "(Account drawer → Connected accounts)."),
         )
 
     try:
