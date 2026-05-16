@@ -2,7 +2,29 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Protocol
+
+
+@dataclass(frozen=True)
+class IdentityBinding:
+    """Operator-facing binding snapshot returned by
+    ``WorkloadIdentityDriver.describe_identity``.
+
+    ``kind`` carries the binding flavour so the UI can render the right
+    affordances per cloud. ``trust_policy_summary`` is a 1-line
+    human-readable abstract — full trust JSON is too dense for the card,
+    operators drill into the cloud console for that. ``last_used_at`` is
+    None when the cloud doesn't record last-use (or we haven't fetched
+    the credential report yet) — the UI renders that as "—" rather than
+    erroring."""
+
+    kind: str
+    """``"irsa" | "workload_identity" | "federated" | "unknown"``."""
+
+    role_arn_or_principal: str
+    trust_policy_summary: str
+    last_used_at: str | None = None
 
 
 class WorkloadIdentityDriver(Protocol):
@@ -32,3 +54,18 @@ class WorkloadIdentityDriver(Protocol):
     def attach_policy(self, role: str, policy: str) -> None: ...
 
     def delete_identity_role(self, role: str) -> None: ...
+
+    # ---- observability reads (default: not implemented) --------------
+    #
+    # See the same note on DnsDriver — additive, raises by default so
+    # non-AWS drivers stay shape-compatible without forced stubs. AWS
+    # overrides in ``aws/identity_irsa.py``.
+
+    def describe_identity(
+        self,
+        app_slug: str,
+    ) -> IdentityBinding | None:
+        """Return the identity bound to the given app, or ``None`` when
+        no binding exists yet. The default raises so non-AWS drivers
+        stay shape-compatible without forced stubs."""
+        raise NotImplementedError("not implemented for this driver")
