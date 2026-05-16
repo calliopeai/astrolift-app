@@ -39,6 +39,7 @@ class FakeBucket:
     blobs: list[Any] = field(default_factory=list)
     deleted: bool = False
     patches: int = 0
+    retention_policy: Any = None
 
     def patch(self) -> None:
         self.patches += 1
@@ -54,9 +55,19 @@ class FakeBucket:
 class FakeBlob:
     name: str
     deleted: bool = False
+    event_based_hold: bool = False
+    temporary_hold: bool = False
+    patches: int = 0
 
     def delete(self) -> None:
+        if self.event_based_hold or self.temporary_hold:
+            raise RuntimeError(
+                f"object {self.name} is on hold; cannot delete",
+            )
         self.deleted = True
+
+    def patch(self) -> None:
+        self.patches += 1
 
 
 class FakeStorageClient:
@@ -210,3 +221,139 @@ def test_bucket_name_canonicalization(driver: GCSDriver) -> None:
     assert name == name.lower()
     assert "--" not in name
     assert len(name) <= 63
+
+
+# ---- four-corner deprovision matrix --------------------------------
+
+
+def test_deprovision_retain_with_force_destroy_is_safe_path(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    """delete_data=False + force_destroy=True is a no-op at the
+    bucket level — the bucket is retained either way."""
+    result = driver.provision(_spec())
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=False, force_destroy=True,
+    )
+    assert deprov.ok
+    assert len(fake_storage.buckets) == 1
+    bucket = list(fake_storage.buckets.values())[0]
+    assert bucket.deleted is False
+
+
+def test_deprovision_atomic_both_flags_deletes_with_message(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    result = driver.provision(_spec())
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True, force_destroy=True,
+    )
+    assert deprov.ok
+    assert "force_destroy" in deprov.message
+
+
+def test_deprovision_refuses_when_retention_policy_active(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    """Active retention policy + force_destroy=False errors out
+    cleanly."""
+    result = driver.provision(_spec())
+    bucket = list(fake_storage.buckets.values())[0]
+    bucket.retention_policy = {"retentionPeriod": 86400}
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True, force_destroy=False,
+    )
+    assert not deprov.ok
+    assert "retention" in deprov.message.lower()
+    assert bucket.deleted is False
+
+
+def test_deprovision_force_destroy_clears_unlocked_retention(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    result = driver.provision(_spec())
+    bucket = list(fake_storage.buckets.values())[0]
+    bucket.retention_policy = {
+        "retentionPeriod": 86400, "isLocked": False,
+    }
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True, force_destroy=True,
+    )
+    assert deprov.ok
+    assert bucket.retention_policy is None
+    assert bucket.deleted is True
+
+
+def test_deprovision_refuses_locked_retention_even_with_force(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    """A locked retention policy CANNOT be cleared via the API —
+    GCS contract. The driver surfaces this distinctly."""
+    result = driver.provision(_spec())
+    bucket = list(fake_storage.buckets.values())[0]
+    bucket.retention_policy = {
+        "retentionPeriod": 86400, "isLocked": True,
+    }
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True, force_destroy=True,
+    )
+    assert not deprov.ok
+    assert "locked" in deprov.message.lower()
+    assert bucket.deleted is False
+
+
+def test_deprovision_force_destroy_releases_object_holds(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    result = driver.provision(_spec())
+    bucket = list(fake_storage.buckets.values())[0]
+    held = FakeBlob(name="held", event_based_hold=True)
+    soft_held = FakeBlob(name="soft", temporary_hold=True)
+    bucket.blobs.extend([held, soft_held])
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True, force_destroy=True,
+    )
+    assert deprov.ok
+    assert held.deleted and soft_held.deleted
+    assert held.event_based_hold is False
+    assert soft_held.temporary_hold is False
+    assert bucket.deleted is True
+
+
+def test_deprovision_held_objects_block_default_delete(
+    driver: GCSDriver, fake_storage: FakeStorageClient,
+) -> None:
+    """delete_data=True without force_destroy fails when an object
+    has a hold — the FakeBlob's delete raises and the driver
+    surfaces it."""
+    result = driver.provision(_spec())
+    bucket = list(fake_storage.buckets.values())[0]
+    bucket.blobs.append(FakeBlob(name="x", event_based_hold=True))
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=result.handle),
+        delete_data=True, force_destroy=False,
+    )
+    assert not deprov.ok
+    assert bucket.deleted is False
+
+
+def test_deprovision_idempotent_already_gone(
+    driver: GCSDriver,
+) -> None:
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle="object_store/never-existed"),
+        delete_data=True,
+    )
+    assert deprov.ok
+    assert "already gone" in deprov.message
