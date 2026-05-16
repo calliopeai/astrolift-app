@@ -10,13 +10,14 @@ Drivers shipped:
 - GCPIngressDriver (#37) — IngressDriver, multi-variant
   (gce_ingress / gateway_api)
 
-Managed services (#41 MVP — symmetry with AWS S3 + SQS):
+Managed services (#363 + #370 GCP slice — full symmetry with AWS):
 - GCSDriver — object_store/gcs
 - PubSubDriver — queue/pubsub
+- CloudSQLPostgresDriver — postgres/cloudsql
+- CloudSQLMySQLDriver — mysql/cloudsql
+- MemorystoreRedisDriver — redis/memorystore
 
 Pending (separate tickets, follow-on managed services):
-- CloudSQL (postgres / mysql)
-- Memorystore (redis / memcached)
 - Filestore (filesystem)
 - Firestore / Bigtable (nosql)
 """
@@ -27,6 +28,7 @@ from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
+from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
@@ -52,6 +54,8 @@ PLUGIN = ProviderPlugin(
         ("object_store", "gcs"): GCSDriver,
         ("queue", "pubsub"): PubSubDriver,
         ("postgres", "cloudsql"): CloudSQLPostgresDriver,
+        ("mysql", "cloudsql"): CloudSQLMySQLDriver,
+        ("redis", "memorystore"): MemorystoreRedisDriver,
     },
     config_schema={
         "type": "object",
