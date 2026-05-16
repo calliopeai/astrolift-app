@@ -565,6 +565,17 @@ type AstroliftDeploymentMutationResult {
   data: AstroliftDeployment
 }
 
+type AstroliftDeregisterAppPayload {
+  workflowId: String!
+  stillLiveResources: [String!]!
+}
+
+type AstroliftDeregisterAppPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftDeregisterAppPayload
+}
+
 type AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: GUID!
   disconnectedId: GUID
@@ -590,6 +601,20 @@ type AstroliftEvent {
 type AstroliftEventPage {
   items: [AstroliftEvent!]!
   nextCursor: String
+}
+
+type AstroliftForceRedeployPayload {
+  deploymentsCancelled: Int!
+  k8sObjectsDeleted: Int!
+  workflowDispatched: Boolean!
+  runUrl: String
+  dispatchMessage: String
+}
+
+type AstroliftForceRedeployPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftForceRedeployPayload
 }
 
 type AstroliftIdentityProvider {
@@ -1025,6 +1050,18 @@ type AstroliftRoleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRole
+}
+
+type AstroliftRunJobOncePayload {
+  runName: String!
+  namespace: String!
+  logsUrl: String
+}
+
+type AstroliftRunJobOncePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRunJobOncePayload
 }
 
 type AstroliftScheduledJobRun {
@@ -1592,6 +1629,11 @@ input DeprovisionManagedServiceInput {
   forceDestroy: Boolean! = false
 }
 
+input DeregisterAppInput {
+  appSlug: String!
+  confirmName: String!
+}
+
 input DetachSecretBundleInput {
   attachmentId: GUID!
 }
@@ -1662,6 +1704,12 @@ type FileUploadResult {
   preSignedUrl: String
   publicUrl: String
   id: ID
+}
+
+input ForceRedeployInput {
+  appSlug: String!
+  environmentName: String = null
+  confirmSlug: String!
 }
 
 """UUID v7 — the platform's external identifier."""
@@ -2030,6 +2078,9 @@ type Mutation {
   installAstroliftSourceWebhook(input: InstallSourceWebhookInput!): AstroliftInstallSourceWebhookPayloadMutationResult!
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
   pushAstroliftCiWorkflowToRepo(input: PushCiWorkflowToRepoInput!): AstroliftPushCiWorkflowPayloadMutationResult!
+  deregisterAstroliftApp(input: DeregisterAppInput!): AstroliftDeregisterAppPayloadMutationResult!
+  forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
+  runAstroliftJobOnce(input: RunJobOnceInput!): AstroliftRunJobOncePayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -2470,6 +2521,12 @@ input RotateSecretBundleInput {
 
 input RotateWebhookSecretInput {
   connectionId: GUID!
+}
+
+input RunJobOnceInput {
+  appSlug: String!
+  environmentName: String!
+  jobSlug: String!
 }
 
 input ScaleWorkloadInput {

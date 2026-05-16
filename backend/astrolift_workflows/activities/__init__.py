@@ -7,6 +7,11 @@ through the canonical ``astrolift_drivers.registry`` interface so
 workflow code stays free of Django + driver imports.
 """
 
+from astrolift_workflows.activities.app_deregister import (
+    delete_app_source_webhook,
+    list_app_secret_targets,
+    revoke_app_secret_bundle_refs,
+)
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
     create_promotion_deployment,
@@ -115,6 +120,7 @@ __all__ = [
     "create_promotion_deployment",
     "create_rollback_deployment",
     "delete_app_namespaces",
+    "delete_app_source_webhook",
     "delete_preview_namespace",
     "delete_secret_from_cluster",
     "deprovision_app_certificate",
@@ -135,6 +141,7 @@ __all__ = [
     "issue_custom_domain_certificate",
     "list_active_secret_bundle_targets",
     "list_app_managed_service_ids",
+    "list_app_secret_targets",
     "list_bundles_due_for_refresh",
     "mark_app_deregistered",
     "mark_app_provisioning",
@@ -166,6 +173,7 @@ __all__ = [
     "remove_platform_rbac",
     "render_manifests",
     "revoke_app_deploy_tokens",
+    "revoke_app_secret_bundle_refs",
     "run_preflight_job",
     "soft_delete_app_records",
     "switch_app_env_binding",

@@ -24,6 +24,7 @@ from collections.abc import Iterable
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers.github import (
     GithubProviderError,
+    delete_github_webhook,
     fetch_github_file,
     install_github_webhook,
     list_github_repos,
@@ -272,4 +273,34 @@ def install_webhook(
     raise ProviderError(
         "UNSUPPORTED",
         f"webhook install for {connection.kind!r} not implemented yet",
+    )
+
+
+def delete_webhook(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    hook_id: str,
+) -> None:
+    """Delete a webhook on the host repo through ``connection``.
+
+    Idempotent: a missing hook (404) is treated as the desired end
+    state. GitHub-App-install connections raise UNSUPPORTED — those
+    never install a per-repo hook in the first place, so there is
+    nothing to delete; the caller treats the case as a clean no-op.
+    """
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            delete_github_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                hook_id=hook_id,
+            )
+            return
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"webhook delete for {connection.kind!r} not implemented yet",
     )

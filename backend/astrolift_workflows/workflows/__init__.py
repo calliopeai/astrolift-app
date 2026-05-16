@@ -20,6 +20,7 @@ from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.deprovision_managed_service import (
     DeprovisionManagedServiceWorkflow,
 )
+from astrolift_workflows.workflows.deregister_app import DeregisterAppWorkflow
 from astrolift_workflows.workflows.install_cluster_prereqs import (
     InstallClusterPrereqsWorkflow,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "DeleteSecretBundleFromClustersWorkflow",
     "DeployAppWorkflow",
     "DeprovisionManagedServiceWorkflow",
+    "DeregisterAppWorkflow",
     "DriftDetectionWorkflow",
     "InstallClusterPrereqsWorkflow",
     "MigrateAppWorkflow",

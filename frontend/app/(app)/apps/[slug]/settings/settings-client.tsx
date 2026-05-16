@@ -5,21 +5,25 @@ import {
   AlertTriangleIcon,
   ChevronRightIcon,
   FileCodeIcon,
+  FlameIcon,
   GlobeIcon,
   KeyIcon,
   LineChartIcon,
   Loader2Icon,
   LockIcon,
   PauseIcon,
+  PlayCircleIcon,
   PlayIcon,
   PlugIcon,
   RefreshCwIcon,
   SettingsIcon,
+  TimerIcon,
   Trash2Icon,
   UsersIcon,
   WebhookIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -27,17 +31,42 @@ import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PAUSE_APP_INGRESS, RESUME_APP_INGRESS } from "@/graphql/lifecycle/lifecycle.mutations";
+import {
+  DEREGISTER_APP,
+  FORCE_REDEPLOY,
+  PAUSE_APP_INGRESS,
+  RESUME_APP_INGRESS,
+  RUN_JOB_ONCE,
+} from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { RESYNC_MANIFEST_FROM_REPO } from "@/graphql/registry/registry.mutations";
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AppTabs } from "../components/app-tabs";
@@ -202,6 +231,20 @@ export function SettingsClient({ slug }: { slug: string }) {
                   ecrPushRoleArn={a.ecrPushRoleArn}
                   sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
                 />
+                <ForceRedeploySection appSlug={a.slug} />
+              </React.Fragment>
+            );
+          }
+          // Apps without a source repo still benefit from the force-
+          // redeploy card — the cancel + delete steps don't depend on
+          // the CI pipeline. Slot it directly under deploy-strategy
+          // when the CI block is hidden so the visual hierarchy
+          // matches the with-repo path.
+          if (s.key === "deploy-strategy" && !a.sourceRepo) {
+            return (
+              <React.Fragment key="deploy-strategy-with-force-redeploy">
+                {card}
+                <ForceRedeploySection appSlug={a.slug} />
               </React.Fragment>
             );
           }
@@ -209,7 +252,9 @@ export function SettingsClient({ slug }: { slug: string }) {
         })}
       </div>
 
-      <DangerZoneCard />
+      <RunScheduledJobCard appSlug={a.slug} />
+
+      <DangerZoneCard appSlug={a.slug} appName={a.name} />
     </PageShell>
   );
 }
@@ -468,43 +513,599 @@ function SettingsLinkCard({ section, slug }: { section: LinkSection; slug: strin
   );
 }
 
-// ─── danger zone ──────────────────────────────────────────────────────────────
+// ─── force redeploy recovery (#389) ───────────────────────────────────────────
+
+interface ForceRedeployResp {
+  forceAstroliftRedeploy: MutationResult<{
+    deploymentsCancelled: number;
+    k8sObjectsDeleted: number;
+    workflowDispatched: boolean;
+    runUrl: string | null;
+    dispatchMessage: string | null;
+  }>;
+}
 
 /**
- * Placeholder for the hard-deregister + full teardown flow (tracked in
- * #392). Rendered as a disabled card so the surface is visible but
- * inert until the workflow ships.
+ * Destructive recovery card for wedged apps (#389).
+ *
+ * Three steps run in order: cancel in-flight Deployment rows, delete
+ * the per-workload k8s objects (Deployment / Service / Ingress /
+ * CronJob plus bare-slug fallbacks), then re-dispatch the deploy CI
+ * workflow. Permission gate is `app.deploy` plus `app.update` —
+ * matching the backend's stacked-permission resolver.
+ *
+ * Confirmation modal requires the operator to type the app's slug,
+ * matching the backend's `confirmSlug` muscle-memory guard. The
+ * `Continue` button only enables once the typed slug equals the
+ * app's slug exactly.
  */
-function DangerZoneCard() {
+function ForceRedeploySection({ appSlug }: { appSlug: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [typed, setTyped] = React.useState("");
+  const [forceRedeploy, { loading }] = useMutation<ForceRedeployResp>(FORCE_REDEPLOY);
+
+  // Reset the typed slug each time the modal closes so a reopened
+  // dialog starts blank — the confirmation is per-attempt.
+  React.useEffect(() => {
+    if (!open) {
+      setTyped("");
+    }
+  }, [open]);
+
+  const slugMatches = typed.trim() === appSlug;
+
+  async function handleConfirm() {
+    if (!slugMatches) return;
+    try {
+      const { data } = await forceRedeploy({
+        variables: { input: { appSlug, confirmSlug: typed.trim() } },
+      });
+      const env = data?.forceAstroliftRedeploy;
+      if (!env) {
+        toast.error("Force redeploy failed: no response from backend.");
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? "Force redeploy failed.");
+        return;
+      }
+      const payload = env.data;
+      if (!payload) {
+        toast.error("Force redeploy returned no payload.");
+        return;
+      }
+      const counts =
+        `Cancelled ${payload.deploymentsCancelled} deploy(s), deleted ${payload.k8sObjectsDeleted}` +
+        " k8s object(s).";
+      if (payload.workflowDispatched) {
+        const tail = payload.runUrl ? ` Watch run: ${payload.runUrl}` : "";
+        toast.success(`${counts} Workflow dispatched.${tail}`, { duration: 8000 });
+      } else {
+        // Partial success — cancellation + delete still landed even
+        // though the CI dispatch failed. The operator can re-fire the
+        // dispatch via the CI-setup section once the host is reachable.
+        toast.warning(
+          `${counts} Workflow dispatch failed: ${payload.dispatchMessage ?? "unknown error"}`,
+          { duration: 10000 }
+        );
+      }
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Force redeploy failed.");
+    }
+  }
+
   return (
     <Card className="border-destructive/40">
       <CardHeader className="flex flex-row items-start gap-3 space-y-0">
         <div className="bg-destructive/10 text-destructive shrink-0 rounded-md p-2.5">
-          <Trash2Icon className="size-5" />
+          <FlameIcon className="size-5" />
         </div>
         <div className="flex-1">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            Danger zone
-            <Badge variant="outline" className="text-[10px] tracking-wide uppercase">
-              Coming soon
-            </Badge>
-          </CardTitle>
+          <CardTitle className="text-base">Force redeploy</CardTitle>
           <CardDescription className="mt-1">
-            Hard deregister this app and tear down every attached resource — workloads,
-            environments, secrets, domains, and managed services. Irreversible. Tracked in #392.
+            Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload
+            Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the
+            rollout window opens.
           </CardDescription>
         </div>
       </CardHeader>
       <CardContent>
-        <Can permission="app.delete">
-          <Button variant="destructive" disabled>
-            <Trash2Icon className="size-4" />
-            Hard deregister + teardown
-          </Button>
+        <Can permission="app.deploy">
+          <Can permission="app.update">
+            <Button variant="destructive" onClick={() => setOpen(true)} disabled={loading}>
+              {loading ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <FlameIcon className="size-4" />
+              )}
+              Force redeploy
+            </Button>
+          </Can>
         </Can>
         <p className="text-muted-foreground mt-2 text-[11px]">
-          For now, use <span className="font-mono">Delete</span> on the overview tab for a soft
-          delete (recoverable for 30 days).
+          Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a
+          rename or a deploy row that won't reconcile.
+        </p>
+      </CardContent>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <FlameIcon className="text-destructive size-4" />
+              Force redeploy {appSlug}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This cancels any pending deploys, deletes the app's running Kubernetes objects
+              (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live
+              traffic drops briefly while the rollout window opens. Environments with required
+              approvals still go through the approver flow.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="force-redeploy-confirm" className="text-xs">
+              Type <span className="text-foreground font-mono text-xs">{appSlug}</span> to confirm:
+            </Label>
+            <Input
+              id="force-redeploy-confirm"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={appSlug}
+              autoComplete="off"
+              spellCheck={false}
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                // We hand-roll the click handler so the modal stays
+                // open on backend rejection — AlertDialogAction's
+                // default behavior closes regardless of return value.
+                e.preventDefault();
+                void handleConfirm();
+              }}
+              disabled={!slugMatches || loading}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              {loading ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              Force redeploy
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
+// ─── danger zone ──────────────────────────────────────────────────────────────
+
+/**
+ * Hard-deregister + full teardown surface (#392).
+ *
+ * Fires `DeregisterAppWorkflow` with a deterministic workflow id so
+ * re-firing the mutation (same `app_slug`) joins the existing run via
+ * Temporal de-dup — partial-failure resume is a one-click retry from
+ * the same surface.
+ *
+ * The destructive button stays disabled until the operator types the
+ * app's name verbatim (muscle-memory guard) — the backend enforces
+ * the same check server-side via the `confirm_name` field on
+ * `DeregisterAppInput`.
+ */
+const TEARDOWN_RESOURCE_LABELS: { key: string; label: string; detail: string }[] = [
+  {
+    key: "k8s_namespace",
+    label: "Kubernetes namespace",
+    detail: "Deployments, Services, Ingresses, ConfigMaps, PVCs, Pods.",
+  },
+  {
+    key: "managed_services",
+    label: "Managed services",
+    detail:
+      "Postgres / Redis / object storage — irreversibly deleted with delete_data + force_destroy.",
+  },
+  {
+    key: "registry_repo",
+    label: "Image registry repo",
+    detail: "Archives the per-app repo + clears the stored URI.",
+  },
+  {
+    key: "identity_role",
+    label: "Workload identity role",
+    detail: "Deletes the IRSA / WI / FI role bound to the app's ServiceAccount.",
+  },
+  {
+    key: "materialized_secrets",
+    label: "Cluster secrets",
+    detail: "Drops materialized k8s Secrets + revokes the app's secret-bundle refs.",
+  },
+  {
+    key: "source_webhook",
+    label: "Source-host webhook",
+    detail: "Removes the push-event hook the platform installed on the source repo.",
+  },
+  {
+    key: "deploy_tokens",
+    label: "Deploy tokens",
+    detail: "Revokes every active deploy token so CI / cron pointed at the app fails loudly.",
+  },
+];
+
+interface DeregisterResp {
+  deregisterAstroliftApp: MutationResult<{
+    workflowId: string;
+    stillLiveResources: string[];
+  }>;
+}
+
+function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string }) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [confirm, setConfirm] = React.useState("");
+  const [stillLive, setStillLive] = React.useState<string[]>([]);
+  const [deregister, { loading }] = useMutation<DeregisterResp>(DEREGISTER_APP);
+
+  // Reset transient state whenever the modal closes so a re-open is
+  // fresh; preserve `stillLive` between resume attempts so the
+  // operator can see what's outstanding without reopening clean.
+  React.useEffect(() => {
+    if (!open) {
+      setConfirm("");
+    }
+  }, [open]);
+
+  const armed = confirm.trim() === appName && !loading;
+
+  async function handleConfirm() {
+    if (!armed) return;
+    try {
+      const { data } = await deregister({
+        variables: { input: { appSlug, confirmName: confirm.trim() } },
+      });
+      const env = data?.deregisterAstroliftApp;
+      if (!env) {
+        toast.error("Deregister failed: no response from backend.");
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? "Deregister failed.");
+        return;
+      }
+      const payload = env.data;
+      if (!payload) {
+        toast.error("Deregister returned no payload.");
+        return;
+      }
+      // Partial-failure resume returns the still-live list; the
+      // mutation itself accepts the resume so a retry from this
+      // surface is the recovery path. Initial kickoff returns an
+      // empty list — happy-path redirect.
+      if (payload.stillLiveResources.length > 0) {
+        setStillLive(payload.stillLiveResources);
+        toast.warning(
+          `Resume pending — ${payload.stillLiveResources.length} resource class(es) still live.`,
+        );
+        return;
+      }
+      toast.success(
+        `Deregistering — workflow ${payload.workflowId}. Check the app's Workflows tab for progress.`,
+      );
+      setOpen(false);
+      router.push("/apps");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Deregister failed.");
+    }
+  }
+
+  return (
+    <>
+      <Card className="border-destructive/40">
+        <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+          <div className="bg-destructive/10 text-destructive shrink-0 rounded-md p-2.5">
+            <Trash2Icon className="size-5" />
+          </div>
+          <div className="flex-1">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              Danger zone
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Hard deregister this app and tear down every attached resource — workloads,
+              environments, secrets, domains, managed services. Irreversible.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Can permission="app.delete">
+            <Button variant="destructive" onClick={() => setOpen(true)}>
+              <Trash2Icon className="size-4" />
+              Deregister app
+            </Button>
+          </Can>
+          {stillLive.length > 0 ? (
+            <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+              <p className="text-amber-700 dark:text-amber-400">
+                Last attempt left {stillLive.length} resource class(es) live:
+              </p>
+              <ul className="text-foreground mt-1 list-disc pl-5 font-mono text-[11px]">
+                {stillLive.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              <Can permission="app.delete">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setOpen(true)}
+                  disabled={loading}
+                >
+                  Retry deregister
+                </Button>
+              </Can>
+            </div>
+          ) : (
+            <p className="text-muted-foreground mt-2 text-[11px]">
+              For a recoverable delete, use <span className="font-mono">Delete</span> on the
+              overview tab (soft delete, 30-day recovery window).
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangleIcon className="text-destructive size-5" />
+              Deregister {appName}?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  This destroys the following resource classes for this app. The action is
+                  irreversible.
+                </p>
+                <ul className="bg-muted/40 space-y-2 rounded-md border p-3 text-xs">
+                  {TEARDOWN_RESOURCE_LABELS.map((r) => (
+                    <li key={r.key} className="flex flex-col gap-0.5">
+                      <span className="text-foreground font-medium">{r.label}</span>
+                      <span className="text-muted-foreground">{r.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="space-y-1.5">
+                  <Label htmlFor="deregister-confirm" className="text-xs">
+                    To confirm, type the app&apos;s name:{" "}
+                    <span className="font-mono">{appName}</span>
+                  </Label>
+                  <Input
+                    id="deregister-confirm"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirm();
+              }}
+              disabled={!armed}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <Trash2Icon className="size-4" />
+              )}
+              {loading ? "Deregistering…" : "Deregister app"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// ─── run scheduled job once (#390) ────────────────────────────────────────────
+
+interface WorkloadsResp {
+  astroliftWorkloads: AstroliftWorkload[];
+}
+
+interface EnvsListResp {
+  astroliftEnvironments: AstroliftAppEnvironment[];
+}
+
+interface RunJobOnceResp {
+  runAstroliftJobOnce: MutationResult<{
+    runName: string;
+    namespace: string;
+    logsUrl: string | null;
+  }>;
+}
+
+/**
+ * "Run scheduled job once" card on the settings landing (#390).
+ *
+ * Lists the app's manifest-declared cronjob workloads and dispatches
+ * a single ad-hoc k8s Job built from the selected workload's
+ * jobTemplate. The schedule is untouched — recurring runs continue
+ * on their own. The card hides entirely when the manifest has zero
+ * cronjob workloads so the surface stays uncluttered for apps that
+ * don't ship any.
+ *
+ * Permission gate matches the backend: ``app.deploy`` is required to
+ * land the Job on the tenant cluster. On success, the toast carries
+ * the freshly-applied Job name and a link to the scheduled-job-runs
+ * page where the run materializes once the cluster picks it up.
+ */
+function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
+  const router = useRouter();
+  const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
+    variables: { appSlug },
+    fetchPolicy: "cache-and-network",
+  });
+  const envs = useQuery<EnvsListResp>(LIST_ENVIRONMENTS, {
+    variables: { appSlug },
+    fetchPolicy: "cache-and-network",
+  });
+  const [runJobOnce, { loading }] = useMutation<RunJobOnceResp>(RUN_JOB_ONCE);
+
+  const cronJobs = (workloads.data?.astroliftWorkloads ?? []).filter(
+    (w) => w.kind === "cronjob",
+  );
+  const environments = envs.data?.astroliftEnvironments ?? [];
+
+  const [jobSlugOverride, setJobSlugOverride] = React.useState<string | null>(null);
+  const [envNameOverride, setEnvNameOverride] = React.useState<string | null>(null);
+  // Default to the first entry of each list — keeps the card actionable
+  // for the common single-cronjob, single-env app without an extra
+  // click. The operator's explicit selection (when one exists) wins.
+  const jobSlug = jobSlugOverride ?? cronJobs[0]?.slug ?? "";
+  const envName = envNameOverride ?? environments[0]?.name ?? "";
+
+  // Hide the card while the workloads query is still in flight on
+  // the first load — flashing an empty card then a populated one
+  // is worse than waiting a tick. Hide it permanently when the
+  // manifest has zero cronjob workloads.
+  if (workloads.loading && !workloads.data) {
+    return null;
+  }
+  if (cronJobs.length === 0) {
+    return null;
+  }
+
+  async function handleRun() {
+    if (!jobSlug || !envName) return;
+    try {
+      const { data } = await runJobOnce({
+        variables: {
+          input: {
+            appSlug,
+            environmentName: envName,
+            jobSlug,
+          },
+        },
+      });
+      const env = data?.runAstroliftJobOnce;
+      if (!env) {
+        toast.error("Run failed: no response from backend.");
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? "Run failed.");
+        return;
+      }
+      const payload = env.data;
+      if (!payload) {
+        toast.error("Run returned no payload.");
+        return;
+      }
+      const message = `Started job ${payload.runName} in ${payload.namespace}.`;
+      const logsUrl = payload.logsUrl;
+      if (logsUrl) {
+        toast.success(message, {
+          duration: 8000,
+          action: {
+            label: "View runs",
+            onClick: () => router.push(logsUrl),
+          },
+        });
+      } else {
+        toast.success(message);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Run failed.");
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+        <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
+          <TimerIcon className="size-5" />
+        </div>
+        <div className="flex-1">
+          <CardTitle className="text-base">Run scheduled job once</CardTitle>
+          <CardDescription className="mt-1">
+            Dispatch a one-shot run of a manifest-declared cron job without changing its schedule.
+            Recurring runs continue on their own.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <div className="grid gap-1.5">
+            <Label htmlFor="run-job-job-slug" className="text-xs">
+              Job
+            </Label>
+            <Select value={jobSlug} onValueChange={setJobSlugOverride}>
+              <SelectTrigger id="run-job-job-slug" className="w-full">
+                <SelectValue placeholder="Select a job" />
+              </SelectTrigger>
+              <SelectContent>
+                {cronJobs.map((w) => (
+                  <SelectItem key={w.slug} value={w.slug}>
+                    <span className="font-mono text-xs">{w.slug}</span>
+                    {w.schedule ? (
+                      <span className="text-muted-foreground ml-2 text-[11px]">{w.schedule}</span>
+                    ) : null}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="run-job-env" className="text-xs">
+              Environment
+            </Label>
+            <Select value={envName} onValueChange={setEnvNameOverride}>
+              <SelectTrigger id="run-job-env" className="w-full">
+                <SelectValue placeholder="Select an environment" />
+              </SelectTrigger>
+              <SelectContent>
+                {environments.map((e) => (
+                  <SelectItem key={e.id} value={e.name}>
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Can permission="app.deploy">
+            <Button
+              onClick={handleRun}
+              disabled={loading || !jobSlug || !envName}
+              className="sm:self-end"
+            >
+              {loading ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <PlayCircleIcon className="size-4" />
+              )}
+              Run now
+            </Button>
+          </Can>
+        </div>
+        <p className="text-muted-foreground mt-3 text-[11px]">
+          The job inherits the cronjob&apos;s pod spec verbatim. Manual runs are recorded alongside
+          scheduled runs on the{" "}
+          <Link href={`/apps/${appSlug}/jobs`} className="underline">
+            jobs page
+          </Link>
+          .
         </p>
       </CardContent>
     </Card>

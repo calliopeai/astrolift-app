@@ -469,3 +469,91 @@ export const PUSH_CI_SECRETS_TO_REPO = gql`
     }
   }
 `;
+
+// --- Force redeploy recovery (#389) -------------------------------
+//
+// Recovery action for wedged apps. The mutation cancels any in-flight
+// Deployment rows, deletes the per-workload k8s objects (Deployment /
+// Service / Ingress / CronJob plus bare-slug fallbacks), and re-fires
+// the CI deploy workflow. ``confirmSlug`` must equal the app's slug —
+// the muscle-memory guard the Settings modal binds the typed-slug
+// field to. Dispatch failures don't roll back the cancellation +
+// delete steps; the payload's ``workflowDispatched`` flag + counts
+// carry the partial-success shape into the success toast.
+
+export const FORCE_REDEPLOY = gql`
+  mutation ForceAstroliftRedeploy($input: ForceRedeployInput!) {
+    forceAstroliftRedeploy(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        deploymentsCancelled
+        k8sObjectsDeleted
+        workflowDispatched
+        runUrl
+        dispatchMessage
+      }
+    }
+  }
+`;
+
+// --- Danger-zone hard deregister (#392) ----------------------------
+//
+// Tears down every per-app cloud resource and soft-deletes the
+// platform rows once teardown converges. The mutation kicks off the
+// ``DeregisterAppWorkflow`` and returns the deterministic workflow
+// id immediately — the FE redirects to the org's app list and the
+// workflow does the per-resource work async. Re-firing the mutation
+// (same ``app_slug``) joins the existing run via Temporal de-dup so
+// a partial failure is a one-click retry from the same surface.
+
+export const DEREGISTER_APP = gql`
+  mutation DeregisterAstroliftApp($input: DeregisterAppInput!) {
+    deregisterAstroliftApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        workflowId
+        stillLiveResources
+      }
+    }
+  }
+`;
+
+// --- Run scheduled job once (#390) --------------------------------
+//
+// Spawn a one-shot k8s Job from a manifest-declared CronJob without
+// touching the schedule. The backend re-renders the cronjob's
+// jobTemplate as a standalone Job with a fresh name
+// ``<job_slug>-manual-<8hex>`` and applies it through the cluster
+// driver. Recorded as a ``ScheduledJobRun`` with
+// ``triggerKind="manual"`` so the existing jobs surface picks it up
+// alongside controller-spawned runs. ``logsUrl`` points at the
+// scheduled-job-runs page on success — the toast links there so the
+// operator can watch the run materialize.
+
+export const RUN_JOB_ONCE = gql`
+  mutation RunAstroliftJobOnce($input: RunJobOnceInput!) {
+    runAstroliftJobOnce(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        runName
+        namespace
+        logsUrl
+      }
+    }
+  }
+`;

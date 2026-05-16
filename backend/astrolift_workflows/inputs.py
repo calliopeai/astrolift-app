@@ -167,6 +167,33 @@ class TearDownAppInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class DeregisterAppInput:
+    """Input for ``DeregisterAppWorkflow`` (#392).
+
+    Hard-deregister of a RegisteredApp: tears down every per-app
+    cloud resource (k8s namespace, managed services, registry repo,
+    IRSA role, source webhook, deploy tokens, materialized secrets)
+    before soft-deleting the platform rows. ``delete_data`` +
+    ``force_destroy`` propagate to the child
+    ``DeprovisionManagedServiceWorkflow`` per the SDK's four-corner
+    safety matrix — danger-zone fires with both True so persistent
+    state is irreversibly removed.
+
+    Idempotent on resume: the workflow id is
+    ``DeregisterAppWorkflow-<app-guid>`` so re-firing the mutation
+    joins the existing run rather than starting a parallel teardown.
+    The workflow reports each step's outcome on
+    ``WorkflowResult.data["teardown"][<resource>]`` so an operator
+    can inspect what's still live before a retry.
+    """
+
+    registered_app_id: int
+    actor: Actor
+    delete_data: bool = True
+    force_destroy: bool = True
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class BringClusterIntoManagementInput:
     """Input for ``BringClusterIntoManagementWorkflow`` (#316).
 
