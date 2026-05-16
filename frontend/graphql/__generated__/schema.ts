@@ -638,6 +638,18 @@ export type AstroliftIdentityProviderMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftInstallSourceWebhookPayload = {
+  hookId: Scalars['String']['output'];
+  receiverUrl: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftInstallSourceWebhookPayloadMutationResult = {
+  data?: Maybe<AstroliftInstallSourceWebhookPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftInvitation = {
   acceptedAt?: Maybe<Scalars['DateTime']['output']>;
   createdAt: Scalars['DateTime']['output'];
@@ -887,6 +899,30 @@ export type AstroliftProviderPlugin = {
   version: Scalars['String']['output'];
 };
 
+export type AstroliftPushCiSecretsPayload = {
+  repo: Scalars['String']['output'];
+  rotatedTokenLast4: Scalars['String']['output'];
+  secretNames: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftPushCiSecretsPayloadMutationResult = {
+  data?: Maybe<AstroliftPushCiSecretsPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftPushCiWorkflowPayload = {
+  commitSha?: Maybe<Scalars['String']['output']>;
+  prUrl?: Maybe<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftPushCiWorkflowPayloadMutationResult = {
+  data?: Maybe<AstroliftPushCiWorkflowPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftQuota = {
   currentUsage: Scalars['Float']['output'];
   hardLimit: Scalars['Float']['output'];
@@ -936,6 +972,7 @@ export type AstroliftRegisteredApp = {
   sourceKind: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
+  sourceWebhookInstalledAt?: Maybe<Scalars['DateTime']['output']>;
   subdomain: Scalars['String']['output'];
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
@@ -1690,6 +1727,10 @@ export type InstallScmWebhookInput = {
   targetUrl: InputMaybe<Scalars['String']['input']>;
 };
 
+export type InstallSourceWebhookInput = {
+  appSlug: Scalars['String']['input'];
+};
+
 export type LibraryMkdirResult = {
   directory?: Maybe<SharedDirectoryType>;
   ok: Scalars['Boolean']['output'];
@@ -1841,6 +1882,7 @@ export type Mutation = {
   generateSshDeployKey: AstroliftSshDeployKeyCreatedMutationResult;
   grantRole: AstroliftRoleBindingMutationResult;
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
+  installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
   /** Create a new directory in the library. */
@@ -1895,6 +1937,8 @@ export type Mutation = {
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
   provisionManagedService: AstroliftManagedServiceMutationResult;
+  pushAstroliftCiSecretsToRepo: AstroliftPushCiSecretsPayloadMutationResult;
+  pushAstroliftCiWorkflowToRepo: AstroliftPushCiWorkflowPayloadMutationResult;
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
   pushManifestToRepo: ManifestpushpayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
@@ -2230,6 +2274,11 @@ export type MutationGrantTeamAccessToAppArgs = {
 };
 
 
+export type MutationInstallAstroliftSourceWebhookArgs = {
+  input: InstallSourceWebhookInput;
+};
+
+
 export type MutationInstallClusterPrereqsArgs = {
   input: InstallClusterPrereqsInputType;
 };
@@ -2404,6 +2453,16 @@ export type MutationProfileRequestPwdChangeArgs = {
 
 export type MutationProvisionManagedServiceArgs = {
   input: ProvisionManagedServiceInput;
+};
+
+
+export type MutationPushAstroliftCiSecretsToRepoArgs = {
+  input: PushCiSecretsToRepoInput;
+};
+
+
+export type MutationPushAstroliftCiWorkflowToRepoArgs = {
+  input: PushCiWorkflowToRepoInput;
 };
 
 
@@ -2933,12 +2992,20 @@ export type ProvisionManagedServiceInput = {
   variant: InputMaybe<Scalars['String']['input']>;
 };
 
+export type PushCiSecretsToRepoInput = {
+  appSlug: Scalars['String']['input'];
+};
+
 export type PushCiWorkflowInput = {
   appId: Scalars['GUID']['input'];
   branch: InputMaybe<Scalars['String']['input']>;
   commitMessage: InputMaybe<Scalars['String']['input']>;
   connectionId: Scalars['GUID']['input'];
   filePath: InputMaybe<Scalars['String']['input']>;
+};
+
+export type PushCiWorkflowToRepoInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 export type PushManifestToRepoInput = {

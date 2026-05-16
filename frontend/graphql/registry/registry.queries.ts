@@ -35,6 +35,7 @@ const APP_FIELDS = `
   lastSyncedHash
   manifestSyncState
   lastResyncAt
+  sourceWebhookInstalledAt
   createdAt
   updatedAt
   deletedAt

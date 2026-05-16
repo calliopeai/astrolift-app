@@ -2117,6 +2117,222 @@ class LifecycleMutation:
             ),
         )
 
+    # ----------------------------------------------------------------
+    # #385 — one-click source-webhook install
+    # ----------------------------------------------------------------
+    #
+    # Registers (or refreshes) the push-event webhook on the app's
+    # configured source repo. ``app.update`` is the gate — this is a
+    # repo-config-touching action, not a deploy. The service layer
+    # picks the same connection the manifest sync / workflow dispatch
+    # paths use so a single identity drives every SCM call for an app.
+
+    @strawberry.field
+    @mutation_audit(action="app.ci.install_webhook")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def install_astrolift_source_webhook(
+        self,
+        info: Info,
+        input: InstallSourceWebhookInput,
+    ) -> MutationResultType[InstallSourceWebhookPayload]:
+        """Install (or refresh) the source-host push-event webhook for
+        ``app_slug`` pointing at the platform's receiver URL.
+
+        The receiver URL shape is
+        ``{PLATFORM_API_URL}/api/webhooks/github/{app.guid}/`` — keyed
+        on the app's GUID so deliveries route without grepping the
+        payload. The HMAC secret is rotated on every call (created or
+        refreshed) and persisted on the picked SourceConnection's
+        ``webhook_secret_*`` columns.
+
+        Status codes:
+        * ``created`` — a brand-new hook landed on the host.
+        * ``refreshed`` — same URL already registered (or the App's
+          own webhook covers this repo); we rotated the secret and
+          advanced the ``installed_at`` marker.
+        """
+        from astrolift_scm.services.webhooks import (
+            install_astrolift_source_webhook as install_webhook_service,
+        )
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        try:
+            result = install_webhook_service(app)
+        except NotImplementedError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+
+        if result.status == "no_connection":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "no source connection available",
+            )
+        if result.status == "fetch_failed":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "webhook install failed",
+            )
+
+        return gql_success(
+            InstallSourceWebhookPayload(
+                status=result.status,
+                hook_id=result.hook_id,
+                receiver_url=result.receiver_url,
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # CI secrets push (#383): seal + PUT the five ``ASTROLIFT_*``
+    # GitHub Actions secrets onto the app's source repo, rotating the
+    # deploy token as part of the round-trip.
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.ci.push_secrets")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def push_astrolift_ci_secrets_to_repo(
+        self,
+        info: Info,
+        input: PushCiSecretsToRepoInput,
+    ) -> MutationResultType[PushCiSecretsPayload]:
+        """Push the five CI secrets to the app's source repo (#383).
+
+        Auth is the viewer's *personal* GitHub OAuth connection (per
+        #395): we want the secret writes attributed to the human who
+        clicked the button on GitHub's audit log, not to a shared
+        org-level PAT. The mutation rotates the deploy token as part
+        of the push — there's no way to recover the existing plaintext
+        from the hash, so a rotation is the only way to deliver a
+        sealable value. Live CI keeps working through the rotation
+        grace window (the previous hash stays valid for 1h by default).
+        """
+        from django.conf import settings
+
+        from astrolift_scm.services.secrets import (
+            PushSecretsError,
+            push_astrolift_ci_secrets,
+        )
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        platform_api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+
+        try:
+            result = push_astrolift_ci_secrets(
+                app,
+                viewer_user=viewer,
+                platform_api_url=platform_api_url,
+            )
+        except NotImplementedError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        except PushSecretsError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message)
+
+        if not result.ok:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error_message or "couldn't push CI secrets",
+            )
+
+        return gql_success(
+            PushCiSecretsPayload(
+                secret_names=list(result.secret_names),
+                rotated_token_last_4=result.new_token_last_4,
+                repo=app.source_repo,
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # CI workflow push (#384): render the canonical
+    # ``.github/workflows/astrolift-ci.yml`` for the app and commit
+    # it to the deploy branch. Pairs with the secrets push (#383) so
+    # an operator can go from "fresh repo" to "platform-driven deploy"
+    # without copy-pasting the reference YAML by hand.
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.ci.push_workflow")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def push_astrolift_ci_workflow_to_repo(
+        self,
+        info: Info,
+        input: PushCiWorkflowToRepoInput,
+    ) -> MutationResultType[PushCiWorkflowPayload]:
+        """Render + reconcile the Astrolift CI workflow file onto the
+        app's deploy branch (#384).
+
+        Idempotent on no-op: when the file already matches the rendered
+        template byte-for-byte the resolver returns ``status="in_sync"``
+        and no commit lands. Protected deploy branches fall through to
+        a side-branch + PR flow (``status="pr_opened"``) so the change
+        respects the repo's review path.
+        """
+        from astrolift_scm.services.workflow_sync import (
+            WorkflowSyncError,
+            sync_workflow_file_to_repo,
+        )
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+
+        try:
+            result = sync_workflow_file_to_repo(app, viewer_user=viewer)
+        except NotImplementedError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        except WorkflowSyncError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message)
+
+        if result.status == "fetch_failed":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error or "couldn't sync CI workflow to repo",
+            )
+
+        return gql_success(
+            PushCiWorkflowPayload(
+                status=result.status,
+                commit_sha=result.commit_sha or None,
+                pr_url=result.pr_url or None,
+            ),
+        )
+
 
 # ---------------------------------------------------------------------------
 # #388 input / payload types — defined at module scope so Strawberry
@@ -2153,3 +2369,124 @@ class _WorkloadOpPayload:
     new_revision: int | None
     desired_replicas: int | None
     ready_replicas: int | None
+
+
+# ---------------------------------------------------------------------------
+# #383 input / payload types — push CI secrets to repo. Kept at module
+# scope so Strawberry picks them up; appended at the tail so sibling
+# agents touching this file don't collide on the same line range.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class PushCiSecretsToRepoInput:
+    """Push the five Astrolift CI secrets to ``app_slug``'s source repo.
+
+    Slug rather than guid so the FE button can call the mutation
+    without a separate lookup; matches the contract on every other
+    CI-side mutation (#384, #387)."""
+
+    app_slug: str
+
+
+@strawberry.type(name="AstroliftPushCiSecretsPayload")
+class PushCiSecretsPayload:
+    """Read-back for a successful CI-secrets push (#383).
+
+    ``secret_names`` is the canonical list of names PUT (rendered
+    verbatim in the success toast so the operator knows what just
+    landed on the repo). ``rotated_token_last_4`` is the last four
+    chars of the freshly-minted deploy-token plaintext — the only
+    piece of the new token that ever surfaces to the browser; the
+    full plaintext is sealed and handed to GitHub. ``repo`` is the
+    ``owner/name`` of the target repo, for the toast's repo-label."""
+
+    secret_names: list[str]
+    rotated_token_last_4: str
+    repo: str
+
+
+# ---------------------------------------------------------------------------
+# #385 input / payload types — install source-host push-event webhook.
+# Kept at the tail so sibling agents touching this file land on
+# adjacent line ranges instead of overlapping ones.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class InstallSourceWebhookInput:
+    """Install or refresh the push-event webhook on ``app_slug``'s
+    source repo. Slug rather than guid so the FE button calls the
+    mutation without an extra lookup — same shape every other CI-side
+    mutation uses."""
+
+    app_slug: str
+
+
+@strawberry.type(name="AstroliftInstallSourceWebhookPayload")
+class InstallSourceWebhookPayload:
+    """Read-back for a successful webhook install / refresh (#385).
+
+    ``status`` is one of:
+    * ``created`` — the host registered a brand-new hook.
+    * ``refreshed`` — a hook with the same URL already existed (or the
+      GitHub App's own webhook covers this repo); we rotated the
+      shared HMAC secret and advanced the ``installed_at`` timestamp
+      so the operator's click is observable in the UI.
+
+    ``hook_id`` is the host-side identifier (numeric on GitHub,
+    stored as string for GitLab / Bitbucket forward-compat). Empty
+    for GitHub-App-install connections where the App's own webhook
+    routes deliveries.
+
+    ``receiver_url`` is the canonical platform URL the host POSTs
+    deliveries to — surfaced in the toast so the operator can paste
+    it elsewhere if a manual install is ever needed."""
+
+    status: str
+    hook_id: str
+    receiver_url: str
+
+
+# ---------------------------------------------------------------------------
+# #384 input / payload types — push CI workflow file to repo. Kept at
+# module scope so Strawberry picks them up; appended at the tail so
+# sibling agents touching this file don't collide on the same line
+# range.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class PushCiWorkflowToRepoInput:
+    """Push the rendered Astrolift CI workflow to ``app_slug``'s repo.
+
+    Slug rather than guid so the FE button can call the mutation
+    without a separate lookup — matches the contract on the other
+    CI-side mutations (#383, #387)."""
+
+    app_slug: str
+
+
+@strawberry.type(name="AstroliftPushCiWorkflowPayload")
+class PushCiWorkflowPayload:
+    """Read-back for a successful CI-workflow sync (#384).
+
+    ``status`` discriminates how the change landed:
+
+    * ``created``   — file was missing on the deploy branch; we wrote
+                       it. ``commit_sha`` is the commit SHA.
+    * ``updated``   — file existed and diverged; we overwrote it.
+                       ``commit_sha`` is the new commit SHA.
+    * ``in_sync``   — file already matched the rendered template; we
+                       did nothing. Both ``commit_sha`` and ``pr_url``
+                       are null.
+    * ``pr_opened`` — the deploy branch is protected; we landed the
+                       file on a side branch and opened a PR back into
+                       the deploy branch. ``pr_url`` is the PR URL.
+
+    ``commit_sha`` is null on ``in_sync`` and ``pr_opened`` paths;
+    ``pr_url`` is null on ``created`` / ``updated`` / ``in_sync``."""
+
+    status: str
+    commit_sha: str | None
+    pr_url: str | None

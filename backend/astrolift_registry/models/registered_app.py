@@ -134,6 +134,16 @@ class RegisteredApp(NamedBaseCoreModel):
     # "Last resynced 5 minutes ago" without grepping audit logs.
     last_resync_at = models.DateTimeField(null=True, blank=True)
 
+    # Source-host webhook state (#385). Populated by
+    # ``installAstroliftSourceWebhook`` so the Settings page can show
+    # whether the push-event hook is wired up. ``source_webhook_id``
+    # is the host-side identifier (GitHub returns a numeric id; we
+    # store as string so GitLab / Bitbucket slot in alongside).
+    # ``source_webhook_installed_at`` advances on each successful
+    # install / refresh; the FE renders it as a relative-time chip.
+    source_webhook_id = models.CharField(max_length=128, blank=True, default="")
+    source_webhook_installed_at = models.DateTimeField(null=True, blank=True)
+
     default_tenant_cluster = models.ForeignKey(
         "astrolift_clusters.TenantCluster",
         related_name="registered_apps",

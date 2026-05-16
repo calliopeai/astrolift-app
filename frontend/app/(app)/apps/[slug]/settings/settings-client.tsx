@@ -200,6 +200,7 @@ export function SettingsClient({ slug }: { slug: string }) {
                   appSlug={a.slug}
                   ecrRepoUri={a.ecrRepoUri}
                   ecrPushRoleArn={a.ecrPushRoleArn}
+                  sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
                 />
               </React.Fragment>
             );

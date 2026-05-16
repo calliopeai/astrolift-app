@@ -203,7 +203,8 @@ def _dispatch_github_workflow(
                     error_code="WORKFLOW_FILE_MISSING",
                     error_message=(
                         f"GitHub couldn't find {workflow_path!r} on the default branch. "
-                        "Sync your CI workflow to the repo first, then retry."
+                        "Click 'Sync workflow file' on the app's CI setup section "
+                        "(or run pushAstroliftCiWorkflowToRepo), then retry."
                     ),
                 )
             return WorkflowDispatchResult(

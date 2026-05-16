@@ -1,18 +1,24 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   CheckIcon,
   ChevronDownIcon,
   CopyIcon,
   ExternalLinkIcon,
+  FileCheck2Icon,
   KeyIcon,
+  Loader2Icon,
   TerminalIcon,
+  UploadCloudIcon,
+  WebhookIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { Can } from "@/components/Can";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,6 +27,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  INSTALL_SOURCE_WEBHOOK,
+  PUSH_CI_SECRETS_TO_REPO,
+  PUSH_CI_WORKFLOW_TO_REPO,
+} from "@/graphql/lifecycle/lifecycle.mutations";
 import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 
 /**
@@ -40,6 +51,10 @@ interface Props {
   appSlug: string;
   ecrRepoUri: string;
   ecrPushRoleArn: string;
+  /** ISO timestamp of the last successful webhook install / refresh
+   *  (#385). `null` until the operator clicks "Install webhook" for
+   *  the first time. */
+  sourceWebhookInstalledAt: string | null;
 }
 
 interface PlatformUrlResp {
@@ -58,7 +73,12 @@ interface SecretRow {
   externalLabel?: string;
 }
 
-export function CiSetupSection({ appSlug, ecrRepoUri, ecrPushRoleArn }: Props) {
+export function CiSetupSection({
+  appSlug,
+  ecrRepoUri,
+  ecrPushRoleArn,
+  sourceWebhookInstalledAt,
+}: Props) {
   const { data, loading } = useQuery<PlatformUrlResp>(GET_PLATFORM_API_URL, {
     fetchPolicy: "cache-first",
   });
@@ -157,7 +177,91 @@ export function CiSetupSection({ appSlug, ecrRepoUri, ecrPushRoleArn }: Props) {
           </div>
         </div>
       </details>
+
+      <Can permission="app.update">
+        <PushAndRotateAction appSlug={appSlug} />
+        <SyncWorkflowFileAction appSlug={appSlug} />
+        <InstallSourceWebhookAction
+          appSlug={appSlug}
+          sourceWebhookInstalledAt={sourceWebhookInstalledAt}
+        />
+      </Can>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Push & rotate (#383)
+//
+// One-click round-trip that seals each of the five `ASTROLIFT_*` values
+// with the repo's libsodium public key and PUTs them as GitHub Actions
+// secrets via the viewer's personal GitHub OAuth connection. The deploy
+// token is rotated as part of the call — there's no other way to land a
+// sealable plaintext for the `ASTROLIFT_DEPLOY_TOKEN` slot. The previous
+// hash stays valid through the model's grace window (1h default) so in-
+// flight CI keeps working until it picks up the new secret.
+// ---------------------------------------------------------------------
+
+interface PushCiSecretsResp {
+  pushAstroliftCiSecretsToRepo: {
+    ok: boolean;
+    errors: Array<{ code: string; message: string; field?: string | null }>;
+    data: {
+      secretNames: string[];
+      rotatedTokenLast4: string;
+      repo: string;
+    } | null;
+  };
+}
+
+function PushAndRotateAction({ appSlug }: { appSlug: string }) {
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [push, { loading }] = useMutation<PushCiSecretsResp>(PUSH_CI_SECRETS_TO_REPO);
+
+  async function handleConfirm() {
+    const { data } = await push({ variables: { input: { appSlug } } });
+    const payload = data?.pushAstroliftCiSecretsToRepo;
+    if (!payload?.ok || !payload.data) {
+      throw new Error(payload?.errors?.[0]?.message ?? "Couldn't push CI secrets.");
+    }
+    const { secretNames, rotatedTokenLast4, repo } = payload.data;
+    toast.success(
+      `Pushed ${secretNames.length} secrets to ${repo} — new token's last 4: ${rotatedTokenLast4}`,
+    );
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">Push & rotate</p>
+        <p className="text-muted-foreground text-xs">
+          Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the
+          deploy token as part of the round-trip.
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant="default"
+        onClick={() => setConfirmOpen(true)}
+        disabled={loading}
+        className="gap-1.5"
+      >
+        {loading ? (
+          <Loader2Icon className="size-3.5 animate-spin" />
+        ) : (
+          <UploadCloudIcon className="size-3.5" />
+        )}
+        Push &amp; rotate
+      </Button>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Push CI secrets to the repo?"
+        description="This rotates the deploy token. The old token will stop working immediately."
+        confirmLabel="Push & rotate"
+        onConfirm={handleConfirm}
+      />
+    </div>
   );
 }
 
@@ -324,4 +428,224 @@ jobs:
             -H "Content-Type: application/json" \\
             -d "{\\"appSlug\\":\\"$APP_SLUG\\",\\"image\\":\\"$IMAGE\\",\\"commitSha\\":\\"\${{ github.sha }}\\"}"
 `;
+}
+
+// ---------------------------------------------------------------------
+// Sync workflow file (#384)
+//
+// Renders the canonical ``astrolift-ci.yml`` for the app and commits it
+// into ``.github/workflows/`` on the deploy branch. Idempotent: a
+// re-click on an in-sync repo returns ``in_sync`` and is a no-op. When
+// the deploy branch is protected, the platform lands the file on a side
+// branch and opens a PR; the toast then links to that PR rather than to
+// a commit. Pairs with "Push & rotate" above so an operator can stand
+// up a fresh repo end-to-end without leaving this section.
+// ---------------------------------------------------------------------
+
+interface PushCiWorkflowResp {
+  pushAstroliftCiWorkflowToRepo: {
+    ok: boolean;
+    errors: Array<{ code: string; message: string; field?: string | null }>;
+    data: {
+      status: string;
+      commitSha: string | null;
+      prUrl: string | null;
+    } | null;
+  };
+}
+
+function SyncWorkflowFileAction({ appSlug }: { appSlug: string }) {
+  const [sync, { loading }] = useMutation<PushCiWorkflowResp>(PUSH_CI_WORKFLOW_TO_REPO);
+
+  async function handleClick() {
+    try {
+      const { data } = await sync({ variables: { input: { appSlug } } });
+      const payload = data?.pushAstroliftCiWorkflowToRepo;
+      if (!payload?.ok || !payload.data) {
+        toast.error(payload?.errors?.[0]?.message ?? "Couldn't sync the workflow file.");
+        return;
+      }
+      const { status, commitSha, prUrl } = payload.data;
+      if (status === "in_sync") {
+        toast.success("Already up to date.");
+        return;
+      }
+      if (status === "pr_opened") {
+        if (prUrl) {
+          toast.success(
+            <span>
+              Branch is protected — opened a PR.{" "}
+              <Link href={prUrl} target="_blank" rel="noreferrer" className="underline">
+                View PR
+              </Link>
+            </span>,
+          );
+        } else {
+          toast.success("Branch is protected — opened a PR.");
+        }
+        return;
+      }
+      const verb = status === "created" ? "Created" : "Updated";
+      const shortSha = (commitSha ?? "").slice(0, 7);
+      toast.success(
+        shortSha
+          ? `${verb} astrolift-ci.yml (commit ${shortSha}).`
+          : `${verb} astrolift-ci.yml.`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't sync the workflow file.");
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">Sync workflow file</p>
+        <p className="text-muted-foreground text-xs">
+          Commits the rendered <span className="font-mono">.github/workflows/astrolift-ci.yml</span>{" "}
+          to the deploy branch. Idempotent — re-clicks on an in-sync repo are a no-op.
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={loading}
+        className="gap-1.5"
+      >
+        {loading ? (
+          <Loader2Icon className="size-3.5 animate-spin" />
+        ) : (
+          <FileCheck2Icon className="size-3.5" />
+        )}
+        Sync workflow file
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Install source-host push webhook (#385)
+//
+// Registers (or refreshes) the source-host push-event webhook on the
+// app's repo so the platform receives `push` and `pull_request`
+// deliveries. The mutation rotates a shared HMAC secret on every
+// click — a re-click on an already-installed hook returns
+// ``status=refreshed`` and is otherwise a no-op on the host side
+// (GitHub keeps the URL unique). Chip in the header surfaces the
+// current state: green "installed · 5m ago" when the app row carries
+// an `installedAt`, amber "not installed" otherwise.
+// ---------------------------------------------------------------------
+
+interface InstallSourceWebhookResp {
+  installAstroliftSourceWebhook: {
+    ok: boolean;
+    errors: Array<{ code: string; message: string; field?: string | null }>;
+    data: {
+      status: string;
+      hookId: string;
+      receiverUrl: string;
+    } | null;
+  };
+}
+
+function InstallSourceWebhookAction({
+  appSlug,
+  sourceWebhookInstalledAt,
+}: {
+  appSlug: string;
+  sourceWebhookInstalledAt: string | null;
+}) {
+  const [install, { loading }] = useMutation<InstallSourceWebhookResp>(INSTALL_SOURCE_WEBHOOK, {
+    // Re-read the app so the chip + timestamp converge after install.
+    refetchQueries: ["GetApp"],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleClick() {
+    try {
+      const { data } = await install({ variables: { input: { appSlug } } });
+      const payload = data?.installAstroliftSourceWebhook;
+      if (!payload?.ok || !payload.data) {
+        toast.error(payload?.errors?.[0]?.message ?? "Couldn't install the source webhook.");
+        return;
+      }
+      const { status, receiverUrl } = payload.data;
+      const verb = status === "created" ? "Installed" : "Refreshed";
+      toast.success(
+        receiverUrl
+          ? `${verb} push webhook → ${receiverUrl}`
+          : `${verb} push webhook.`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't install the source webhook.");
+    }
+  }
+
+  const installed = Boolean(sourceWebhookInstalledAt);
+  const relative = sourceWebhookInstalledAt
+    ? formatRelativeWebhookInstall(sourceWebhookInstalledAt)
+    : null;
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium">Source webhook</p>
+          {installed ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+              <CheckIcon className="size-3" />
+              installed · {relative}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              not installed
+            </span>
+          )}
+        </div>
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          Registers the push-event webhook on the source repo pointing at the platform&rsquo;s
+          receiver URL. Re-click to rotate the HMAC secret without spawning a duplicate hook.
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={loading}
+        className="gap-1.5"
+      >
+        {loading ? (
+          <Loader2Icon className="size-3.5 animate-spin" />
+        ) : (
+          <WebhookIcon className="size-3.5" />
+        )}
+        {installed ? "Refresh webhook" : "Install webhook"}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Compact relative-time formatter for the webhook-install chip.
+ *
+ * The Settings page already uses ``useFormatters`` for resync state,
+ * but threading that hook through every action component crosses the
+ * "props in, JSX out" boundary the section component aims for. A
+ * local helper keeps this fragment self-contained.
+ */
+function formatRelativeWebhookInstall(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(diff)) return "just now";
+  const seconds = Math.max(0, Math.floor(diff / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
 }
