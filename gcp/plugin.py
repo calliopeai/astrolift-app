@@ -28,6 +28,7 @@ from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
+from gcp.managed.bigtable import BigtableDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
@@ -56,6 +57,7 @@ PLUGIN = ProviderPlugin(
         ("postgres", "cloudsql"): CloudSQLPostgresDriver,
         ("mysql", "cloudsql"): CloudSQLMySQLDriver,
         ("redis", "memorystore"): MemorystoreRedisDriver,
+        ("kv_store", "bigtable"): BigtableDriver,
     },
     config_schema={
         "type": "object",
