@@ -23,7 +23,6 @@ Pending (separate tickets, follow-on managed services):
 """
 
 from _sdk.base import ProviderPlugin
-
 from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
@@ -37,7 +36,6 @@ from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
 from gcp.tls_managed import GCPManagedCertDriver
-
 
 PLUGIN = ProviderPlugin(
     id="gcp",
