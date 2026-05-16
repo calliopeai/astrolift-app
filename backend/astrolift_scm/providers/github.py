@@ -388,6 +388,75 @@ def install_github_webhook(
     return InstallWebhookResult(hook_id=str(hook_id), webhook_url=target_url)
 
 
+def delete_github_webhook(
+    connection,
+    *,
+    repo_full_name: str,
+    hook_id: str,
+) -> None:
+    """DELETE /repos/{owner}/{repo}/hooks/{hook_id}.
+
+    Idempotent: 404 (hook already gone) is treated as success — the
+    deregister flow's only concern is that the hook is no longer live,
+    not that this particular call performed the delete.
+
+    GitHub-App-install connections raise ``UNSUPPORTED`` — those
+    connections never install per-repo hooks in the first place, so
+    there's nothing to delete. The deregister activity treats that
+    case as a clean no-op.
+    """
+    if connection.kind == "github_app_install":
+        raise GithubProviderError(
+            "UNSUPPORTED",
+            "github_app_install never installs per-repo hooks; nothing to delete",
+        )
+    if not hook_id:
+        raise GithubProviderError(
+            "VALIDATION",
+            "hook_id is required to delete a webhook",
+        )
+
+    token = _token(connection)
+    base = _api_base(connection)
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    safe_hook = urllib.parse.quote(str(hook_id), safe="")
+    url = f"{base}/repos/{safe_repo}/hooks/{safe_hook}"
+
+    req = urllib.request.Request(
+        url,
+        method="DELETE",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        urllib.request.urlopen(req, timeout=15)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            # Hook already gone — the desired end state. Don't fail.
+            return
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError(
+            "API_ERROR",
+            f"GitHub returned {exc.code}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+
 def _github_contents_url(base: str, repo_full_name: str, path: str) -> str:
     safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
     safe_path = "/".join(urllib.parse.quote(p, safe="") for p in path.split("/"))

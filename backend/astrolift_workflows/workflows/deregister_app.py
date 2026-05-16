@@ -1,0 +1,435 @@
+"""DeregisterAppWorkflow (#392) — danger-zone hard deregister.
+
+Tears down every per-app resource class in strict dependency order
+and ONLY soft-deletes the platform rows once every prior step has
+either succeeded or returned an explicit "nothing to do" status. Re-
+firing the mutation joins the existing run via a deterministic
+workflow id (``DeregisterAppWorkflow-<app-guid>``), so a partial
+failure can be resumed without manual rescue.
+
+Resource teardown order (each step records its result on
+``WorkflowResult.data["teardown"][<resource>]``):
+
+  1. ``deployments_cancelled`` — drain in-flight deploys by clearing
+     the app's runtime via ``delete_app_namespaces`` (the namespace
+     delete cascades Deployments / ReplicaSets / Pods on every
+     cluster the app is bound to). Done first so subsequent steps
+     don't race with a workflow rolling new pods.
+  2. ``managed_services`` — fan out ``deprovision_managed_service``
+     for every active ``ManagedService`` row with
+     ``delete_data=True, force_destroy=True`` (the danger-zone four-
+     corner). Driver-level errors propagate so we can mark the
+     resource as still-live on partial-failure resume.
+  3. ``namespaces`` — re-run ``delete_app_namespaces`` after the
+     managed-service deprovision to catch anything the deprovision
+     of a stateful service re-emitted (Helm-managed PVCs etc.).
+     Idempotent — already-gone namespaces are a clean no-op.
+  4. ``registry_repo`` — ``deprovision_app_registry_repo`` archives
+     the app's image repo and clears the platform's stored URI.
+  5. ``identity_role`` — ``deprovision_app_identity_role`` deletes
+     the IRSA / WI / FI role bound to the app's ServiceAccount.
+  6. ``materialized_secrets`` — fan out ``delete_secret_from_cluster``
+     for every (cluster, env, bundle) ref the app holds, then call
+     ``revoke_app_secret_bundle_refs`` to soft-delete the binding
+     rows so the operator's bundle refs are revoked.
+  7. ``source_webhook`` — ``delete_app_source_webhook`` removes the
+     push-event webhook on the source repo. Soft-fails on hosts
+     that never installed one (GitHub-App, no-repo, no-connection).
+  8. ``deploy_tokens`` — ``revoke_app_deploy_tokens`` soft-deletes
+     active tokens so CI / cron pointed at the app fails loudly.
+  9. ``platform_rows`` — ``soft_delete_app_records`` ONLY after every
+     prior step succeeded or was explicitly skipped.
+
+Partial failure semantics: each step is wrapped in a try/except so
+one failure doesn't strand the rest of the teardown. The workflow
+result's ``ok`` flag is True iff every step succeeded;
+``still_live_resources`` lists the resource keys that failed so the
+operator can re-fire the mutation. Soft-delete of the platform rows
+is gated on a clean prior pass — if any prior step failed, the row
+survives and a retry can converge.
+"""
+
+from __future__ import annotations
+
+from datetime import timedelta
+from typing import Any
+
+from temporalio import workflow
+from temporalio.common import RetryPolicy
+
+from astrolift_workflows.inputs import DeregisterAppInput, WorkflowResult
+
+with workflow.unsafe.imports_passed_through():
+    from astrolift_workflows.activities import (
+        delete_app_namespaces,
+        delete_app_source_webhook,
+        delete_secret_from_cluster,
+        deprovision_app_identity_role,
+        deprovision_app_registry_repo,
+        deprovision_managed_service,
+        list_app_managed_service_ids,
+        list_app_secret_targets,
+        mark_app_deregistered,
+        mark_app_tearing_down,
+        revoke_app_deploy_tokens,
+        revoke_app_secret_bundle_refs,
+        soft_delete_app_records,
+    )
+
+_QUICK_TIMEOUT = timedelta(minutes=2)
+_NAMESPACE_TIMEOUT = timedelta(minutes=10)
+_DEPROVISION_TIMEOUT = timedelta(minutes=30)
+
+_STANDARD_RETRY = RetryPolicy(
+    initial_interval=timedelta(seconds=2),
+    maximum_interval=timedelta(seconds=15),
+    maximum_attempts=3,
+)
+_CLEANUP_RETRY = RetryPolicy(
+    initial_interval=timedelta(seconds=5),
+    maximum_interval=timedelta(seconds=60),
+    maximum_attempts=3,
+)
+
+
+def _step_result(*, ok: bool, detail: str, data: Any = None) -> dict[str, Any]:
+    """Standard per-step result shape recorded on ``WorkflowResult.data``."""
+    return {"ok": ok, "detail": detail, "data": data}
+
+
+@workflow.defn(name="DeregisterAppWorkflow")
+class DeregisterAppWorkflow:
+    @workflow.run
+    async def run(self, input: DeregisterAppInput) -> WorkflowResult:
+        app_id = input.registered_app_id
+        delete_data = bool(input.delete_data)
+        force_destroy = bool(input.force_destroy)
+
+        # Provisioning-status flip is observable in the UI immediately
+        # — re-runs against the same workflow id no-op (Temporal de-
+        # dupes), so this is safe to re-execute as a step header.
+        await workflow.execute_activity(
+            mark_app_tearing_down,
+            app_id,
+            start_to_close_timeout=_QUICK_TIMEOUT,
+            retry_policy=_STANDARD_RETRY,
+        )
+
+        teardown: dict[str, dict[str, Any]] = {}
+        still_live: list[str] = []
+
+        # 1. Drain in-flight deployments — namespace delete cascades
+        #    the runtime resources Deployments/ReplicaSets/Pods so
+        #    nothing new comes up while subsequent steps run.
+        try:
+            namespaces_deleted = await workflow.execute_activity(
+                delete_app_namespaces,
+                app_id,
+                start_to_close_timeout=_NAMESPACE_TIMEOUT,
+                retry_policy=_CLEANUP_RETRY,
+            )
+            teardown["deployments_cancelled"] = _step_result(
+                ok=True,
+                detail=f"deleted {len(namespaces_deleted)} namespace(s)",
+                data=namespaces_deleted,
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["deployments_cancelled"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("deployments_cancelled")
+
+        # 2. Managed-service deprovision — fan out one activity per
+        #    active ManagedService row. Failures collect per-id so a
+        #    single stuck service doesn't strand the rest of the pass.
+        ms_results: list[dict[str, Any]] = []
+        ms_failed = False
+        try:
+            ms_ids = await workflow.execute_activity(
+                list_app_managed_service_ids,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+        except Exception as exc:  # noqa: BLE001
+            ms_ids = []
+            ms_failed = True
+            ms_results.append({"ok": False, "message": str(exc)})
+
+        for ms_id in ms_ids:
+            try:
+                res = await workflow.execute_activity(
+                    deprovision_managed_service,
+                    args=[ms_id, delete_data, force_destroy],
+                    start_to_close_timeout=_DEPROVISION_TIMEOUT,
+                    retry_policy=_CLEANUP_RETRY,
+                )
+                ms_results.append(
+                    {
+                        "ok": bool(res.get("ok")),
+                        "managed_service_id": ms_id,
+                        "message": str(res.get("message", "")),
+                    },
+                )
+                if not res.get("ok"):
+                    ms_failed = True
+            except Exception as exc:  # noqa: BLE001
+                ms_results.append(
+                    {
+                        "ok": False,
+                        "managed_service_id": ms_id,
+                        "message": str(exc),
+                    },
+                )
+                ms_failed = True
+
+        teardown["managed_services"] = _step_result(
+            ok=not ms_failed,
+            detail=(
+                f"{sum(1 for r in ms_results if r.get('ok'))}/" f"{len(ms_results)} deprovision result(s) ok"
+            ),
+            data=ms_results,
+        )
+        if ms_failed:
+            still_live.append("managed_services")
+
+        # 3. Second namespace pass — captures anything the managed-
+        #    service deprovision re-emitted (Helm cleanup hooks etc.).
+        #    Idempotent.
+        try:
+            namespaces_deleted_2 = await workflow.execute_activity(
+                delete_app_namespaces,
+                app_id,
+                start_to_close_timeout=_NAMESPACE_TIMEOUT,
+                retry_policy=_CLEANUP_RETRY,
+            )
+            teardown["namespaces"] = _step_result(
+                ok=True,
+                detail=f"second pass: {len(namespaces_deleted_2)} namespace(s)",
+                data=namespaces_deleted_2,
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["namespaces"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("namespaces")
+
+        # 4. Registry repo archive + URI clear.
+        try:
+            repo_summary = await workflow.execute_activity(
+                deprovision_app_registry_repo,
+                args=[app_id, True],
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_CLEANUP_RETRY,
+            )
+            teardown["registry_repo"] = _step_result(
+                ok=True,
+                detail=f"archived repo {repo_summary.get('repo', '')!r}",
+                data=repo_summary,
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["registry_repo"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("registry_repo")
+
+        # 5. Identity role delete.
+        try:
+            id_summary = await workflow.execute_activity(
+                deprovision_app_identity_role,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_CLEANUP_RETRY,
+            )
+            teardown["identity_role"] = _step_result(
+                ok=True,
+                detail=f"deleted identity role {id_summary.get('role', '')!r}",
+                data=id_summary,
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["identity_role"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("identity_role")
+
+        # 6. Materialized cluster secrets — drop the per-cluster
+        #    Secret then soft-delete the AppSecretBundleRef bindings.
+        secret_results: list[dict[str, Any]] = []
+        secret_failed = False
+        try:
+            targets = await workflow.execute_activity(
+                list_app_secret_targets,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+        except Exception as exc:  # noqa: BLE001
+            targets = []
+            secret_failed = True
+            secret_results.append({"ok": False, "message": str(exc)})
+
+        for target in targets:
+            if target.get("tenant_cluster_id") is None:
+                # No cluster bound — nothing to drop on the cluster,
+                # the ref soft-delete pass picks it up.
+                secret_results.append(
+                    {
+                        "ok": True,
+                        "bundle_slug": target.get("bundle_slug", ""),
+                        "detail": "no cluster bound; skipped cluster-side delete",
+                    },
+                )
+                continue
+            try:
+                summary = await workflow.execute_activity(
+                    delete_secret_from_cluster,
+                    target,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_CLEANUP_RETRY,
+                )
+                errs = list(summary.get("errors", []) or [])
+                secret_results.append(
+                    {
+                        "ok": not errs,
+                        "bundle_slug": target.get("bundle_slug", ""),
+                        "cluster_slug": summary.get("cluster_slug", ""),
+                        "errors": errs,
+                    },
+                )
+                if errs:
+                    secret_failed = True
+            except Exception as exc:  # noqa: BLE001
+                secret_results.append(
+                    {
+                        "ok": False,
+                        "bundle_slug": target.get("bundle_slug", ""),
+                        "message": str(exc),
+                    },
+                )
+                secret_failed = True
+
+        if not secret_failed:
+            # Only revoke the bindings when every cluster-side delete
+            # converged; otherwise a retry needs the refs to know
+            # which (cluster, env, bundle) rows to re-target.
+            try:
+                revoked = await workflow.execute_activity(
+                    revoke_app_secret_bundle_refs,
+                    app_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+                teardown["materialized_secrets"] = _step_result(
+                    ok=True,
+                    detail=(
+                        f"{len(secret_results)} cluster-side delete(s) ok; "
+                        f"{revoked} bundle ref(s) soft-deleted"
+                    ),
+                    data={"per_target": secret_results, "refs_revoked": revoked},
+                )
+            except Exception as exc:  # noqa: BLE001
+                teardown["materialized_secrets"] = _step_result(
+                    ok=False,
+                    detail=f"ref soft-delete failed: {exc}",
+                    data={"per_target": secret_results},
+                )
+                still_live.append("materialized_secrets")
+        else:
+            teardown["materialized_secrets"] = _step_result(
+                ok=False,
+                detail="cluster-side secret delete had failures; refs kept for retry",
+                data={"per_target": secret_results},
+            )
+            still_live.append("materialized_secrets")
+
+        # 7. Source-host push-event webhook.
+        try:
+            wh_summary = await workflow.execute_activity(
+                delete_app_source_webhook,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_CLEANUP_RETRY,
+            )
+            teardown["source_webhook"] = _step_result(
+                ok=True,
+                detail=str(wh_summary.get("detail", "")),
+                data=wh_summary,
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["source_webhook"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("source_webhook")
+
+        # 8. Revoke deploy tokens — CI / cron pointed at the app
+        #    fails loudly rather than silently.
+        try:
+            tokens_revoked = await workflow.execute_activity(
+                revoke_app_deploy_tokens,
+                app_id,
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+            teardown["deploy_tokens"] = _step_result(
+                ok=True,
+                detail=f"revoked {tokens_revoked} deploy token(s)",
+                data={"revoked": tokens_revoked},
+            )
+        except Exception as exc:  # noqa: BLE001
+            teardown["deploy_tokens"] = _step_result(
+                ok=False,
+                detail=str(exc),
+            )
+            still_live.append("deploy_tokens")
+
+        # 9. Platform rows soft-delete — gated on a clean prior pass.
+        if not still_live:
+            try:
+                summary = await workflow.execute_activity(
+                    soft_delete_app_records,
+                    app_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+                teardown["platform_rows"] = _step_result(
+                    ok=True,
+                    detail=f"soft-delete summary={summary}",
+                    data=summary,
+                )
+                await workflow.execute_activity(
+                    mark_app_deregistered,
+                    app_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001
+                teardown["platform_rows"] = _step_result(
+                    ok=False,
+                    detail=str(exc),
+                )
+                still_live.append("platform_rows")
+        else:
+            teardown["platform_rows"] = _step_result(
+                ok=False,
+                detail=("skipped: prior steps still live — soft-delete is gated " "on a clean teardown pass"),
+            )
+
+        ok = not still_live
+        message_parts = [
+            f"{sum(1 for k, v in teardown.items() if v['ok'])}/" f"{len(teardown)} step(s) ok",
+        ]
+        if still_live:
+            message_parts.append(f"still_live={still_live}")
+        return WorkflowResult(
+            ok=ok,
+            message=" | ".join(message_parts),
+            data={
+                "teardown": teardown,
+                "still_live_resources": still_live,
+            },
+        )

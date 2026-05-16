@@ -119,6 +119,7 @@ def mutation_audit(
     *,
     action: str,
     target: Callable[..., tuple[str, Any] | None] | None = None,
+    extras: Callable[[Any], dict[str, Any] | None] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Standard wrapper for every GraphQL mutation.
 
@@ -126,6 +127,14 @@ def mutation_audit(
     (e.g. ``"app.deploy"``). ``target`` is an optional resolver-arg
     function that returns ``(kind, id)`` for the affected object so the
     audit row can carry it.
+
+    ``extras`` is an optional post-call hook: a callable that receives
+    the resolver's ``MutationResult`` and returns a ``dict`` of
+    additional fields to attach to the ``AuditEntry.extra`` payload.
+    Useful when the issue's audit-trail requirement names specific
+    counts or identifiers that aren't part of the standard envelope —
+    e.g. #389's force-redeploy wants ``deployments_cancelled`` and
+    ``k8s_objects_deleted`` on the audit row.
     """
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -167,6 +176,20 @@ def mutation_audit(
                         error_message = first.message
                         decision = "DENY" if first.code is ErrorCode.PERMISSION_DENIED else "ALLOW"
 
+            # Resolvers may return either the bare ``MutationResult``
+            # dataclass or the Strawberry ``MutationResultType`` —
+            # duck-type on ``.ok`` so the extras hook handles both.
+            extra_payload: dict[str, Any] | None = None
+            if extras is not None and result is not None and hasattr(result, "ok"):
+                try:
+                    extra_payload = extras(result)
+                except Exception:  # noqa: BLE001 — audit must never raise
+                    log.warning(
+                        "mutation %s: extras() raised; dropping extras payload",
+                        action,
+                        exc_info=True,
+                    )
+
             entry = AuditEntry(
                 actor_user_id=tenant.actor_user_id if tenant else None,
                 organization_id=tenant.organization_id if tenant else None,
@@ -178,6 +201,7 @@ def mutation_audit(
                 permissions=tuple(p.value for p in permissions if isinstance(p, Permission)),
                 error_code=error_code,
                 error_message=error_message,
+                extra=extra_payload,
             )
             emit_audit(entry)
             return result

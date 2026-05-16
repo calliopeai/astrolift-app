@@ -21,6 +21,10 @@ class ScheduledJobRun(BaseCoreModel):
         FAILED = "failed"
         SUPERSEDED = "superseded"
 
+    class TriggerKind(models.TextChoices):
+        SCHEDULED = "scheduled"
+        MANUAL = "manual"
+
     workload = models.ForeignKey(
         "astrolift_registry.Workload",
         related_name="scheduled_runs",
@@ -32,7 +36,20 @@ class ScheduledJobRun(BaseCoreModel):
         on_delete=models.CASCADE,
     )
     k8s_job_name = models.CharField(max_length=255, blank=True, default="")
+    namespace = models.CharField(max_length=255, blank=True, default="")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.RUNNING)
+    trigger_kind = models.CharField(
+        max_length=16,
+        choices=TriggerKind.choices,
+        default=TriggerKind.SCHEDULED,
+    )
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="triggered_scheduled_job_runs",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     duration_seconds = models.IntegerField(null=True, blank=True)

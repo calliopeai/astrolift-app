@@ -590,6 +590,17 @@ export type AstroliftDeploymentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftDeregisterAppPayload = {
+  stillLiveResources: Array<Scalars['String']['output']>;
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftDeregisterAppPayloadMutationResult = {
+  data?: Maybe<AstroliftDeregisterAppPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftDisconnectUserSourceProviderPayload = {
   disconnectedId?: Maybe<Scalars['GUID']['output']>;
   providerConfigId: Scalars['GUID']['output'];
@@ -615,6 +626,20 @@ export type AstroliftEvent = {
 export type AstroliftEventPage = {
   items: Array<AstroliftEvent>;
   nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftForceRedeployPayload = {
+  deploymentsCancelled: Scalars['Int']['output'];
+  dispatchMessage?: Maybe<Scalars['String']['output']>;
+  k8sObjectsDeleted: Scalars['Int']['output'];
+  runUrl?: Maybe<Scalars['String']['output']>;
+  workflowDispatched: Scalars['Boolean']['output'];
+};
+
+export type AstroliftForceRedeployPayloadMutationResult = {
+  data?: Maybe<AstroliftForceRedeployPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftIdentityProvider = {
@@ -1048,6 +1073,18 @@ export type AstroliftRoleBindingMutationResult = {
 
 export type AstroliftRoleMutationResult = {
   data?: Maybe<AstroliftRole>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRunJobOncePayload = {
+  logsUrl?: Maybe<Scalars['String']['output']>;
+  namespace: Scalars['String']['output'];
+  runName: Scalars['String']['output'];
+};
+
+export type AstroliftRunJobOncePayloadMutationResult = {
+  data?: Maybe<AstroliftRunJobOncePayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -1611,6 +1648,11 @@ export type DeprovisionManagedServiceInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DeregisterAppInput = {
+  appSlug: Scalars['String']['input'];
+  confirmName: Scalars['String']['input'];
+};
+
 export type DetachSecretBundleInput = {
   attachmentId: Scalars['GUID']['input'];
 };
@@ -1680,6 +1722,12 @@ export type FileUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
   publicUrl?: Maybe<Scalars['String']['output']>;
+};
+
+export type ForceRedeployInput = {
+  appSlug: Scalars['String']['input'];
+  confirmSlug: Scalars['String']['input'];
+  environmentName: InputMaybe<Scalars['String']['input']>;
 };
 
 export type GenerateSshDeployKeyInput = {
@@ -1873,10 +1921,12 @@ export type Mutation = {
   /** Delete a workflow definition by slug (staff only). */
   deleteWorkflowDefinition: MutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
+  deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
+  forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
   /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
   generateRocketChatToken: Scalars['String']['output'];
   generateSshDeployKey: AstroliftSshDeployKeyCreatedMutationResult;
@@ -1964,6 +2014,7 @@ export type Mutation = {
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
+  runAstroliftJobOnce: AstroliftRunJobOncePayloadMutationResult;
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -2239,6 +2290,11 @@ export type MutationDeprovisionManagedServiceArgs = {
 };
 
 
+export type MutationDeregisterAstroliftAppArgs = {
+  input: DeregisterAppInput;
+};
+
+
 export type MutationDetachSecretBundleArgs = {
   input: DetachSecretBundleInput;
 };
@@ -2256,6 +2312,11 @@ export type MutationFileUploadArgs = {
   metadata?: InputMaybe<Scalars['JSON']['input']>;
   mimetype: Scalars['String']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationForceAstroliftRedeployArgs = {
+  input: ForceRedeployInput;
 };
 
 
@@ -2588,6 +2649,11 @@ export type MutationRotateSecretBundleArgs = {
 
 export type MutationRotateWebhookSecretArgs = {
   input: RotateWebhookSecretInput;
+};
+
+
+export type MutationRunAstroliftJobOnceArgs = {
+  input: RunJobOnceInput;
 };
 
 
@@ -3558,6 +3624,12 @@ export type RotateSecretBundleInput = {
 
 export type RotateWebhookSecretInput = {
   connectionId: Scalars['GUID']['input'];
+};
+
+export type RunJobOnceInput = {
+  appSlug: Scalars['String']['input'];
+  environmentName: Scalars['String']['input'];
+  jobSlug: Scalars['String']['input'];
 };
 
 export type ScaleWorkloadInput = {

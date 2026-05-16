@@ -2333,6 +2333,353 @@ class LifecycleMutation:
             ),
         )
 
+    # ----------------------------------------------------------------
+    # Danger-zone hard deregister (#392)
+    # ----------------------------------------------------------------
+    #
+    # Fires ``DeregisterAppWorkflow`` (#392) with a deterministic
+    # workflow id (``DeregisterAppWorkflow-<app-guid>``) so re-firing
+    # the mutation joins the existing run rather than starting a
+    # parallel teardown — partial failures are resumable. The
+    # ``confirm_name`` field is a muscle-memory guard: the operator
+    # must type the app's name verbatim to enable the destructive
+    # click in the FE modal.
+
+    @strawberry.field
+    @mutation_audit(action="app.deregister")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def deregister_astrolift_app(
+        self,
+        info: Info,
+        input: DeregisterAppInput,
+    ) -> MutationResultType[DeregisterAppPayload]:
+        """Hard-deregister an app and tear down every per-app cloud
+        resource (#392).
+
+        Validates the typed-confirmation guard (``confirm_name`` must
+        equal the app's ``name``) before kicking the workflow off.
+        Returns the workflow id immediately; the workflow does the
+        per-resource teardown async and reports each step's outcome
+        on its result envelope.
+
+        Re-firing the same mutation joins the existing workflow run
+        via Temporal de-dup on the workflow id — operators retry on
+        partial failure by clicking Deregister again."""
+        # NOTE: ``start_workflow`` is imported at module scope so the
+        # ``temporal_recorder`` fixture's monkeypatch on
+        # ``astrolift_lifecycle.schema.mutations.start_workflow``
+        # actually intercepts the call. Local re-imports would
+        # silently bypass the recorder.
+        from astrolift_workflows.inputs import (
+            Actor as _Actor,
+        )
+        from astrolift_workflows.inputs import (
+            DeregisterAppInput as _DeregisterInput,
+        )
+
+        slug = (input.app_slug or "").strip()
+        if not slug:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "app_slug is required",
+                field="appSlug",
+            )
+
+        app = (
+            RegisteredApp.objects.filter(slug=slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {slug!r} not found",
+                field="appSlug",
+            )
+
+        confirm = (input.confirm_name or "").strip()
+        if confirm != app.name:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "confirm_name must match the app's name exactly",
+                field="confirmName",
+            )
+
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) if request else None
+        actor = _Actor(
+            kind="user",
+            user_id=getattr(user, "pk", None) if user is not None else None,
+            display=str(
+                getattr(user, "email", "") or getattr(user, "username", ""),
+            ),
+        )
+
+        workflow_id = f"DeregisterAppWorkflow-{app.guid}"
+        # Deterministic workflow id makes re-firing the mutation
+        # converge on the existing run; Temporal de-dups by id.
+        start_workflow(
+            "DeregisterAppWorkflow",
+            args=[
+                _DeregisterInput(
+                    registered_app_id=app.pk,
+                    actor=actor,
+                    delete_data=True,
+                    force_destroy=True,
+                ),
+            ],
+            workflow_id=workflow_id,
+        )
+
+        return gql_success(
+            DeregisterAppPayload(
+                workflow_id=workflow_id,
+                still_live_resources=[],
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # Force redeploy recovery (#389)
+    # ----------------------------------------------------------------
+    #
+    # Recovery path for wedged apps: cancel in-flight Deployment rows,
+    # delete the per-workload k8s objects (Deployment / Service /
+    # Ingress / CronJob plus bare-slug fallbacks), then re-dispatch
+    # the deploy CI workflow. ``app.deploy`` + ``app.update`` are both
+    # required (intentionally restrictive — this drops live traffic).
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.force_redeploy",
+        extras=lambda result: (
+            {
+                "deployments_cancelled": result.data.deployments_cancelled,
+                "k8s_objects_deleted": result.data.k8s_objects_deleted,
+                "workflow_dispatched": result.data.workflow_dispatched,
+            }
+            if getattr(result, "ok", False) and getattr(result, "data", None) is not None
+            else None
+        ),
+    )
+    @require_permission(Permission.APP_DEPLOY, Permission.APP_UPDATE)
+    @tenant_scoped()
+    def force_astrolift_redeploy(
+        self,
+        info: Info,
+        input: ForceRedeployInput,
+    ) -> MutationResultType[ForceRedeployPayload]:
+        """Recover a wedged app by cancelling in-flight deploys,
+        deleting orphan k8s objects, and re-firing the CI workflow.
+
+        ``confirm_slug`` must equal the app's slug — muscle-memory
+        guard so a stray click on a destructive button doesn't tear
+        live traffic on the wrong app.
+
+        ``environment_name`` scopes the recovery to one environment;
+        omitting it widens the action to every env on the app (the
+        normal case when a rename or namespace migration left objects
+        across every env).
+
+        The CI re-dispatch flows through the standard pipeline; envs
+        that gate on approval still go through the approver flow.
+        Dispatch failures don't roll back the cancellation + delete
+        steps — those are surfaced in the payload so the operator
+        sees what actually changed.
+        """
+        from astrolift_workflows.activities.force_redeploy import (
+            _cancel_in_flight_deploys_sync,
+            _delete_app_k8s_objects_sync,
+            _redispatch_ci_workflow_sync,
+        )
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        # Muscle-memory guard. We compare after the lookup so the
+        # error never leaks whether an app slug exists.
+        if (input.confirm_slug or "").strip() != app.slug:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "confirm_slug must match the app's slug",
+                field="confirmSlug",
+            )
+
+        environment_id: int | None = None
+        if input.environment_name:
+            env = (
+                AppEnvironment.objects.filter(
+                    registered_app=app,
+                    name=input.environment_name,
+                    deleted_at__isnull=True,
+                )
+                .only("pk")
+                .first()
+            )
+            if env is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"environment {input.environment_name!r} not found on app {app.slug!r}",
+                    field="environmentName",
+                )
+            environment_id = env.pk
+
+        cancelled = _cancel_in_flight_deploys_sync(app.pk, environment_id)
+        delete_summary = _delete_app_k8s_objects_sync(app.pk, environment_id)
+        dispatch = _redispatch_ci_workflow_sync(app.pk)
+
+        return gql_success(
+            ForceRedeployPayload(
+                deployments_cancelled=cancelled,
+                k8s_objects_deleted=int(delete_summary["deleted"]),
+                workflow_dispatched=bool(dispatch["dispatched"]),
+                run_url=dispatch["run_url"] or None,
+                dispatch_message=dispatch["message"] or None,
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # Run scheduled job once (#390): spawn an ad-hoc k8s Job from a
+    # manifest-declared CronJob without touching the schedule. Direct
+    # apply through the cluster driver — no Temporal workflow. Gated on
+    # ``app.deploy`` since the action lands a workload on a tenant
+    # cluster.
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.job.run_once")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def run_astrolift_job_once(
+        self,
+        info: Info,
+        input: RunJobOnceInput,
+    ) -> MutationResultType[RunJobOncePayload]:
+        """Render a single Job from a CronJob's jobTemplate and apply it.
+
+        The job inherits the cronjob's pod spec verbatim (image, env,
+        resource asks) but uses a fresh name ``<job_slug>-manual-<8hex>``
+        and ``backoffLimit: 0`` so the manual one-shot is observably
+        single-attempt. Recorded as a ``ScheduledJobRun`` with
+        ``trigger_kind="manual"`` so the existing jobs surface lists
+        the manual run alongside controller-issued runs.
+        """
+        from astrolift_lifecycle.services.job_runner import (
+            JobRunError,
+            run_job_once,
+        )
+
+        if not (input.job_slug or "").strip():
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "job_slug is required",
+                field="jobSlug",
+            )
+        if not (input.environment_name or "").strip():
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "environment_name is required",
+                field="environmentName",
+            )
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        actor = _actor_from_request(info)
+
+        try:
+            result = run_job_once(
+                app,
+                input.environment_name,
+                input.job_slug,
+                actor_user_id=actor.user_id,
+                actor_display=actor.display,
+            )
+        except JobRunError as exc:
+            return gql_failure(exc.code, exc.message)
+
+        if not result.ok:
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                result.error or "couldn't apply job manifest",
+            )
+
+        return gql_success(
+            RunJobOncePayload(
+                run_name=result.run_name,
+                namespace=result.namespace,
+                logs_url=result.logs_url,
+            ),
+        )
+
+
+# ---------------------------------------------------------------------------
+# #389 input / payload types — force-redeploy recovery. Defined at
+# module scope so Strawberry picks them up; appended at the tail so
+# sibling agents touching this file land on adjacent line ranges
+# instead of overlapping ones.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class ForceRedeployInput:
+    """Input for the force-redeploy recovery mutation (#389).
+
+    ``app_slug`` resolves the RegisteredApp; ``environment_name``
+    scopes the recovery to one env (None → every env on the app).
+    ``confirm_slug`` must equal ``app_slug`` — muscle-memory guard
+    against accidental destructive clicks. The FE confirmation modal
+    binds the typed-slug field to this argument."""
+
+    app_slug: str
+    environment_name: str | None = None
+    confirm_slug: str
+
+
+@strawberry.type(name="AstroliftForceRedeployPayload")
+class ForceRedeployPayload:
+    """Read-back for a force-redeploy attempt (#389).
+
+    ``deployments_cancelled`` is the count of ``Deployment`` rows
+    transitioned out of an in-flight status (PENDING_APPROVAL /
+    PENDING / DEPLOYING / REDEPLOYING) into FAILED.
+
+    ``k8s_objects_deleted`` is the count of stub manifests the cluster
+    driver accepted on the delete pass. The driver treats not-found
+    as ok per the SDK contract — this is the count of stubs that did
+    not surface an error, not necessarily the count of objects that
+    actually existed.
+
+    ``workflow_dispatched`` is True when the CI workflow-dispatch call
+    succeeded. ``run_url`` is the host's runs-page URL when present;
+    ``dispatch_message`` carries the failure message when False so
+    the FE toast surfaces the partial-success shape (cancellation +
+    delete counts are still applied)."""
+
+    deployments_cancelled: int
+    k8s_objects_deleted: int
+    workflow_dispatched: bool
+    run_url: str | None
+    dispatch_message: str | None
+
 
 # ---------------------------------------------------------------------------
 # #388 input / payload types — defined at module scope so Strawberry
@@ -2490,3 +2837,89 @@ class PushCiWorkflowPayload:
     status: str
     commit_sha: str | None
     pr_url: str | None
+
+
+# ---------------------------------------------------------------------------
+# #390 input / payload types — run-scheduled-job-once. Kept at the
+# tail so sibling agents touching this file land on adjacent line
+# ranges instead of overlapping ones.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class RunJobOnceInput:
+    """Input for the manual one-shot run of a manifest-declared CronJob
+    (#390).
+
+    ``app_slug`` resolves the RegisteredApp; ``environment_name`` picks
+    the target env (which carries the tenant cluster the Job lands on);
+    ``job_slug`` is the cronjob workload's slug from
+    ``astrolift.toml`` — slug rather than guid so the FE button calls
+    the mutation without an extra lookup."""
+
+    app_slug: str
+    environment_name: str
+    job_slug: str
+
+
+@strawberry.type(name="AstroliftRunJobOncePayload")
+class RunJobOncePayload:
+    """Read-back for a successful manual job-run dispatch (#390).
+
+    ``run_name`` is the freshly-applied k8s Job name
+    (``<job_slug>-manual-<8hex>``); operators paste it verbatim into
+    ``kubectl logs job/<name>`` when diagnosing outside the UI.
+    ``namespace`` is the per-app namespace the Job landed in.
+    ``logs_url`` points at the existing scheduled-job-runs surface
+    where the run materializes once the cluster reports it."""
+
+    run_name: str
+    namespace: str
+    logs_url: str | None
+
+
+# ---------------------------------------------------------------------------
+# #392 input / payload types — danger-zone hard deregister. Defined at
+# module scope so Strawberry picks them up; appended at the tail so
+# sibling agents touching this file land on adjacent line ranges
+# instead of overlapping ones.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class DeregisterAppInput:
+    """Input for the hard-deregister + full teardown mutation (#392).
+
+    ``app_slug`` resolves the RegisteredApp; ``confirm_name`` must
+    equal the app's ``name`` verbatim — a muscle-memory guard against
+    accidental destructive clicks. The FE confirmation modal binds
+    the typed-name field to this argument so the destructive button
+    stays disabled until the operator types the exact name.
+
+    Hard-deregister always fires with the danger-zone four-corner:
+    ``delete_data=True`` + ``force_destroy=True`` on the child
+    managed-service deprovisions. Operators who want a recoverable
+    delete use the soft-delete mutation on the overview tab instead."""
+
+    app_slug: str
+    confirm_name: str
+
+
+@strawberry.type(name="AstroliftDeregisterAppPayload")
+class DeregisterAppPayload:
+    """Read-back for a deregister kickoff or resume (#392).
+
+    ``workflow_id`` is the deterministic Temporal id
+    (``DeregisterAppWorkflow-<app-guid>``) the mutation fired. Re-
+    firing the mutation joins the existing run via Temporal de-dup
+    on this id so partial-failure resume is a one-click retry.
+
+    ``still_live_resources`` is empty on the initial kickoff (the
+    workflow runs async, so the mutation returns before any
+    teardown step has completed). The list is populated when an
+    operator polls the workflow result on a resume path — the
+    workflow's ``WorkflowResult.data["still_live_resources"]``
+    carries the resource keys that failed on the prior pass."""
+
+    workflow_id: str
+    still_live_resources: list[str]
