@@ -84,8 +84,9 @@ const TABS: TabSpec[] = [
   },
   {
     key: "settings",
-    href: (s) => `/apps/${s}/config`,
+    href: (s) => `/apps/${s}/settings`,
     match: (p, s) =>
+      p.startsWith(`/apps/${s}/settings`) ||
       p.startsWith(`/apps/${s}/config`) ||
       p.startsWith(`/apps/${s}/manifest`) ||
       p.startsWith(`/apps/${s}/webhooks`) ||
