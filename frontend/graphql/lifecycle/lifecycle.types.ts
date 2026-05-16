@@ -15,8 +15,11 @@
  */
 
 import type {
+  AstroliftAppCertificate as GeneratedAppCertificate,
+  AstroliftAppDnsRecord as GeneratedAppDnsRecord,
   AstroliftAppEnvironment as GeneratedAppEnvironment,
   AstroliftAppHealthSummary as GeneratedAppHealthSummary,
+  AstroliftAppIdentityBinding as GeneratedAppIdentityBinding,
   AstroliftAppLogLine as GeneratedAppLogLine,
   AstroliftAppPod as GeneratedAppPod,
   AstroliftCommandRun as GeneratedCommandRun,
@@ -40,32 +43,20 @@ export type DeploymentStatus =
   | "superseded"
   | "rolled_back";
 
-export type TriggerKind =
-  | "push"
-  | "manual"
-  | "ci"
-  | "scheduled"
-  | "rollback"
-  | "promotion";
+export type TriggerKind = "push" | "manual" | "ci" | "scheduled" | "rollback" | "promotion";
 
 export type PreviewStatus = "building" | "running" | "failed" | "torn_down";
 
 export type AstroliftAppEnvironment = GeneratedAppEnvironment;
 
-export type AstroliftDeployment = Omit<
-  GeneratedDeployment,
-  "status" | "triggerKind"
-> & {
+export type AstroliftDeployment = Omit<GeneratedDeployment, "status" | "triggerKind"> & {
   status: DeploymentStatus;
   triggerKind: TriggerKind;
 };
 
 export type AstroliftDeploymentLogEntry = GeneratedDeploymentLogEntry;
 
-export type AstroliftPreviewEnvironment = Omit<
-  GeneratedPreviewEnvironment,
-  "status"
-> & {
+export type AstroliftPreviewEnvironment = Omit<GeneratedPreviewEnvironment, "status"> & {
   status: PreviewStatus;
 };
 
@@ -78,16 +69,9 @@ export type AstroliftAppHealthSummary = Omit<
   latestDeploymentStatus: DeploymentStatus | null;
 };
 
-export type ScheduledJobRunStatus =
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "superseded";
+export type ScheduledJobRunStatus = "running" | "succeeded" | "failed" | "superseded";
 
-export type AstroliftScheduledJobRun = Omit<
-  GeneratedScheduledJobRun,
-  "status"
-> & {
+export type AstroliftScheduledJobRun = Omit<GeneratedScheduledJobRun, "status"> & {
   status: ScheduledJobRunStatus;
 };
 
@@ -120,4 +104,29 @@ export type AstroliftAppPod = GeneratedAppPod;
 
 export type AstroliftAppLogLine = Omit<GeneratedAppLogLine, "stream"> & {
   stream: LogStreamKind;
+};
+
+// #377 — observability cards (DNS / TLS / Workload identity).
+//
+// The narrow string-union types below mirror the SDK enums in
+// `astrolift-providers/_sdk/{dns,tls,identity}.py` so switch-style
+// renderers (status dots, chip colours) typecheck against valid
+// values. The schema carries them as plain `String!` fields.
+
+export type DnsPropagationStatus = "propagated" | "pending" | "unknown";
+
+export type CertificateRenewalStatus = "auto" | "manual" | "failed" | "unknown";
+
+export type IdentityBindingKind = "irsa" | "workload_identity" | "federated" | "unknown";
+
+export type AstroliftAppDnsRecord = Omit<GeneratedAppDnsRecord, "propagationStatus"> & {
+  propagationStatus: DnsPropagationStatus;
+};
+
+export type AstroliftAppCertificate = Omit<GeneratedAppCertificate, "renewalStatus"> & {
+  renewalStatus: CertificateRenewalStatus;
+};
+
+export type AstroliftAppIdentityBinding = Omit<GeneratedAppIdentityBinding, "kind"> & {
+  kind: IdentityBindingKind;
 };

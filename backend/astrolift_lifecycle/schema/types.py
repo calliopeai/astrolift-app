@@ -443,3 +443,73 @@ class AppLogLineType:
     timestamp: dt.datetime
     message: str
     stream: str
+
+
+# ---------------------------------------------------------------------------
+# #377 — observability cards (DNS / TLS / Workload identity)
+# ---------------------------------------------------------------------------
+#
+# These types mirror the SDK dataclasses
+# (``_sdk.dns.DnsRecord``, ``_sdk.tls.CertificateInfo``,
+# ``_sdk.identity.IdentityBinding``) — see ``astrolift-providers/_sdk/``.
+# The strawberry layer auto-converts snake_case → camelCase so the FE
+# sees ``propagationStatus`` etc. ``not_after`` is a string (ISO-8601)
+# rather than a datetime so the schema doesn't depend on the cloud
+# returning timezone-aware values.
+
+
+@strawberry.type(name="AstroliftAppDnsRecord")
+class AppDnsRecordType:
+    name: str
+    type: str
+    value: str
+    ttl: int
+    propagation_status: str
+
+
+@strawberry.type(name="AstroliftAppCertificate")
+class AppCertificateType:
+    id: str
+    hostname: str
+    issuer: str
+    not_after: str
+    days_until_expiry: int
+    renewal_status: str
+
+
+@strawberry.type(name="AstroliftAppIdentityBinding")
+class AppIdentityBindingType:
+    kind: str
+    role_arn_or_principal: str
+    trust_policy_summary: str
+    last_used_at: str | None
+
+
+def dns_record_to_type(r) -> AppDnsRecordType:
+    return AppDnsRecordType(
+        name=r.name,
+        type=r.type,
+        value=r.value,
+        ttl=r.ttl,
+        propagation_status=r.propagation_status,
+    )
+
+
+def certificate_info_to_type(c) -> AppCertificateType:
+    return AppCertificateType(
+        id=c.id,
+        hostname=c.hostname,
+        issuer=c.issuer,
+        not_after=c.not_after,
+        days_until_expiry=c.days_until_expiry,
+        renewal_status=c.renewal_status,
+    )
+
+
+def identity_binding_to_type(b) -> AppIdentityBindingType:
+    return AppIdentityBindingType(
+        kind=b.kind,
+        role_arn_or_principal=b.role_arn_or_principal,
+        trust_policy_summary=b.trust_policy_summary,
+        last_used_at=b.last_used_at,
+    )

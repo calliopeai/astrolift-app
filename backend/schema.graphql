@@ -132,6 +132,23 @@ type AstroliftApiTokenPlaintextMutationResult {
   data: AstroliftApiTokenPlaintext
 }
 
+type AstroliftAppCertificate {
+  id: String!
+  hostname: String!
+  issuer: String!
+  notAfter: String!
+  daysUntilExpiry: Int!
+  renewalStatus: String!
+}
+
+type AstroliftAppDnsRecord {
+  name: String!
+  type: String!
+  value: String!
+  ttl: Int!
+  propagationStatus: String!
+}
+
 type AstroliftAppDomain {
   id: GUID!
   hostname: String!
@@ -195,6 +212,13 @@ type AstroliftAppHealthSummary {
   latestImageTag: String!
   lastDeployedAt: DateTime
   hasRecentFailure: Boolean!
+}
+
+type AstroliftAppIdentityBinding {
+  kind: String!
+  roleArnOrPrincipal: String!
+  trustPolicySummary: String!
+  lastUsedAt: String
 }
 
 type AstroliftAppLogLine {
@@ -2092,6 +2116,9 @@ type Query {
   astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
+  astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): [AstroliftAppDnsRecord!]!
+  astroliftAppCertificates(appSlug: String!, environmentName: String = null): [AstroliftAppCertificate!]!
+  astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBinding
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
