@@ -23,7 +23,6 @@ Pending (separate tickets, follow-on managed services):
 """
 
 from _sdk.base import ProviderPlugin
-
 from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
@@ -35,10 +34,10 @@ from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
+from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
 from gcp.tls_managed import GCPManagedCertDriver
-
 
 PLUGIN = ProviderPlugin(
     id="gcp",
@@ -60,6 +59,7 @@ PLUGIN = ProviderPlugin(
         ("redis", "memorystore"): MemorystoreRedisDriver,
         ("kv_store", "bigtable"): BigtableDriver,
         ("search", "gcp_elastic_cloud"): GCPElasticCloudStubDriver,
+        ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
     },
     config_schema={
         "type": "object",
