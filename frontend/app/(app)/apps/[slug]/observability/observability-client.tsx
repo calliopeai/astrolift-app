@@ -18,6 +18,7 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import {
   DnsRecordsCard,
+  GoldenSignalsPanel,
   TlsCertificatesCard,
   WorkloadIdentityCard,
 } from "@/components/observability";
@@ -324,6 +325,9 @@ export function ObservabilityClient({ slug }: { slug: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── #380 SRE golden signals + status-code breakdown ───────────── */}
+      <GoldenSignalsPanel appSlug={a.slug} />
 
       {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}
       <DnsRecordsCard appSlug={a.slug} />

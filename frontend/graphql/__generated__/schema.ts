@@ -229,6 +229,14 @@ export type AstroliftAppEnvironmentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAppGoldenSignal = {
+  name: GoldenSignalKind;
+  promql: Scalars['String']['output'];
+  rangeSeconds: Scalars['Int']['output'];
+  samples: Array<AstroliftTimeSeriesPoint>;
+  unit: Scalars['String']['output'];
+};
+
 export type AstroliftAppHealthSummary = {
   appName: Scalars['String']['output'];
   appSlug: Scalars['String']['output'];
@@ -441,6 +449,17 @@ export type AstroliftCommandRun = {
   workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftConnectUserSourceProviderPayload = {
+  authorizationUrl: Scalars['String']['output'];
+  providerConfigId: Scalars['GUID']['output'];
+};
+
+export type AstroliftConnectUserSourceProviderPayloadMutationResult = {
+  data?: Maybe<AstroliftConnectUserSourceProviderPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftContainer = {
   args: Array<Scalars['String']['output']>;
   buildContext: Scalars['String']['output'];
@@ -548,6 +567,17 @@ export type AstroliftDeploymentMetrics = {
 
 export type AstroliftDeploymentMutationResult = {
   data?: Maybe<AstroliftDeployment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftDisconnectUserSourceProviderPayload = {
+  disconnectedId?: Maybe<Scalars['GUID']['output']>;
+  providerConfigId: Scalars['GUID']['output'];
+};
+
+export type AstroliftDisconnectUserSourceProviderPayloadMutationResult = {
+  data?: Maybe<AstroliftDisconnectUserSourceProviderPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -677,6 +707,17 @@ export type AstroliftMember = {
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
   user: AstroliftUser;
+};
+
+export type AstroliftMyConnectedAccount = {
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  isConnected: Scalars['Boolean']['output'];
+  lastUsedAt?: Maybe<Scalars['String']['output']>;
+  linkedAccountLogin?: Maybe<Scalars['String']['output']>;
+  providerConfigId: Scalars['GUID']['output'];
+  providerKind: Scalars['String']['output'];
+  providerLabel: Scalars['String']['output'];
+  reauthRequired: Scalars['Boolean']['output'];
 };
 
 export type AstroliftMyProfile = {
@@ -1088,6 +1129,18 @@ export type AstroliftSshDeployKeyMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftStatusCodeBreakdown = {
+  promql: Scalars['String']['output'];
+  rangeSeconds: Scalars['Int']['output'];
+  series: Array<AstroliftStatusCodeSeries>;
+};
+
+export type AstroliftStatusCodeSeries = {
+  codeClass: Scalars['String']['output'];
+  samples: Array<AstroliftTimeSeriesPoint>;
+  topCodes: Array<Scalars['String']['output']>;
+};
+
 export type AstroliftTeam = {
   createdAt: Scalars['DateTime']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1120,6 +1173,7 @@ export type AstroliftTenantCluster = {
   organizationSlug?: Maybe<Scalars['String']['output']>;
   providerPluginSlug: Scalars['String']['output'];
   region: Scalars['String']['output'];
+  secretsBackendProvisionedAt?: Maybe<Scalars['DateTime']['output']>;
   slug: Scalars['String']['output'];
 };
 
@@ -1127,6 +1181,11 @@ export type AstroliftTenantClusterMutationResult = {
   data?: Maybe<AstroliftTenantCluster>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftTimeSeriesPoint = {
+  ts: Scalars['DateTime']['output'];
+  value: Scalars['Float']['output'];
 };
 
 export type AstroliftUser = {
@@ -1286,6 +1345,10 @@ export type ConnectSourceInput = {
   oauthRedirectUri: InputMaybe<Scalars['String']['input']>;
   repoVisibilityScopes: InputMaybe<Array<Scalars['String']['input']>>;
   secretPlaintext: Scalars['String']['input'];
+};
+
+export type ConnectUserSourceProviderInput = {
+  providerConfigId: Scalars['GUID']['input'];
 };
 
 export type CreateAlertRuleInput = {
@@ -1473,6 +1536,11 @@ export type DisconnectSourceInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DisconnectUserSourceProviderInput = {
+  confirmAccountLogin: Scalars['String']['input'];
+  providerConfigId: Scalars['GUID']['input'];
+};
+
 export type EmployeeAvatarType = {
   publicPermanentUrl?: Maybe<Scalars['String']['output']>;
 };
@@ -1535,6 +1603,14 @@ export type GenerateSshDeployKeyInput = {
   appSlug: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
 };
+
+export type GoldenSignalKind =
+  | 'ERRORS'
+  | 'LATENCY_P50'
+  | 'LATENCY_P90'
+  | 'LATENCY_P99'
+  | 'SATURATION_CPU'
+  | 'TRAFFIC';
 
 export type GrantRoleInput = {
   roleId: Scalars['GUID']['input'];
@@ -1663,6 +1739,8 @@ export type Mutation = {
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
+  astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
+  astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
@@ -1880,6 +1958,16 @@ export type MutationApproveDeploymentByTokenArgs = {
 
 export type MutationArchiveAppRegistryRepoArgs = {
   input: ArchiveAppRegistryRepoInput;
+};
+
+
+export type MutationAstroliftConnectUserSourceProviderArgs = {
+  input: ConnectUserSourceProviderInput;
+};
+
+
+export type MutationAstroliftDisconnectUserSourceProviderArgs = {
+  input: DisconnectUserSourceProviderInput;
 };
 
 
@@ -2773,12 +2861,14 @@ export type Query = {
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
   astroliftAppDnsRecords: Array<AstroliftAppDnsRecord>;
   astroliftAppDomains: Array<AstroliftAppDomain>;
+  astroliftAppGoldenSignals: Array<AstroliftAppGoldenSignal>;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
+  astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
   astroliftApps: Array<AstroliftRegisteredApp>;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
@@ -2804,6 +2894,7 @@ export type Query = {
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
+  astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
@@ -2899,6 +2990,13 @@ export type QueryAstroliftAppDomainsArgs = {
 };
 
 
+export type QueryAstroliftAppGoldenSignalsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryAstroliftAppIdentityBindingArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -2926,6 +3024,13 @@ export type QueryAstroliftAppSecretBundleAttachmentsArgs = {
 export type QueryAstroliftAppSecretsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppStatusCodeBreakdownArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
 };
 
 

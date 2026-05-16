@@ -25,6 +25,7 @@ import astrolift_billing.schema as AstroliftBillingSchema  # noqa: E402
 import astrolift_clusters.schema as AstroliftClustersSchema  # noqa: E402
 import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
 import astrolift_lifecycle.schema as AstroliftLifecycleSchema  # noqa: E402
+import astrolift_observability.schema as AstroliftObservabilitySchema  # noqa: E402
 import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
 import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 import astrolift_scm.schema as AstroliftScmSchema  # noqa: E402
@@ -42,6 +43,7 @@ _query_bases = [
     AstroliftBillingSchema.BillingQuery,
     AstroliftScmSchema.ScmQuery,
     AstroliftServicesSchema.ServicesQuery,
+    AstroliftObservabilitySchema.GoldenSignalsQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,

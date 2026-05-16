@@ -338,6 +338,7 @@ INSTALLED_APPS = [
     "astrolift_lifecycle",
     "astrolift_services",
     "astrolift_operations",
+    "astrolift_observability",
     "astrolift_billing",
     "astrolift_scm",
     # End of Astrolift

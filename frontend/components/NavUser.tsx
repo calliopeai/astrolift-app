@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
+import { ConnectedAccountsSection } from "@/components/ConnectedAccountsSection";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -213,6 +214,7 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
             {profileLoading && !profile && (
               <p className="text-muted-foreground text-sm">Loading…</p>
             )}
+            <ConnectedAccountsSection />
           </div>
         </SheetContent>
       </Sheet>
