@@ -9,6 +9,8 @@ deployment site.
 
 from __future__ import annotations
 
+import base64
+import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -38,11 +40,19 @@ from k8s_native.management import (
     run_bring_into_management,
 )
 from k8s_native.observability import (
+    ClusterAuthError,
     LivePodBackend,
     LogBackend,
     PodBackend,
     default_log_backend,
 )
+
+# AKS admin kubeconfig TTL. The blob carries a long-lived client
+# certificate, but we re-fetch every ~50 min so a key-rotation event
+# on the Azure side propagates without the operator restarting the
+# control plane. 50 min is comfortably under the 60-min Azure AAD
+# token refresh window and matches what kubelogin defaults to.
+_AKS_KUBECONFIG_TTL_SECONDS = 50 * 60
 
 
 class _NotFound(Exception):
@@ -55,6 +65,14 @@ class AKSConfig:
     resource_group: str
     cluster_name: str
     container_service_client: Any | None = None
+    use_federated_token: bool = False
+    """Reserved for the Path B (federated-credential AAD token exchange)
+    slice; today the driver always routes ``exec_plugin`` auth through
+    ``list_cluster_admin_credentials`` regardless of this flag. The
+    follow-on slice will wire the DefaultAzureCredential → AAD →
+    kubelogin equivalent so private-cluster operators who've disabled
+    admin credentials can still surface live pod state.
+    """
 
 
 class AKSClusterDriver(ClusterDriver):
@@ -66,6 +84,7 @@ class AKSClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         self._config = config
         if config.container_service_client is not None:
@@ -84,18 +103,26 @@ class AKSClusterDriver(ClusterDriver):
         self._k8s_cache: dict[str, Any] = {}
         # Pluggable runtime-observability backends (#299). The listing
         # + log-streaming path is cloud-neutral as soon as the
-        # ClusterAuth blob is in hand; AKS federated-credential
-        # exec_plugin token mint lives in #311 follow-up.
+        # ClusterAuth blob is in hand; the AKS-specific exec_plugin
+        # token mint (#311) materializes ``exec_plugin`` rows into
+        # ``kubeconfig`` before delegating.
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
         # Bring-into-management (#316). Inherits k8s_native's body
-        # via the management backend; AKS federated-credential
-        # exec_plugin token mint is irrelevant for the kubeconfig +
-        # service-account auth paths that route through
-        # ``build_api_client``.
+        # via the management backend; ``exec_plugin`` rows are
+        # materialized to ``kubeconfig`` before being routed through
+        # the shared probe / preflight path so capability probes work
+        # over the AKS-native auth dance.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
         )
+        # exec_plugin → kubeconfig token cache (#311). Keyed by
+        # (resource_group, cluster_name) so a single driver can serve
+        # multiple TenantCluster rows that resolve to different AKS
+        # managed clusters. ``clock`` is injected so tests can advance
+        # past the TTL without sleeping.
+        self._clock: Callable[[], float] = clock or time.monotonic
+        self._kubeconfig_cache: dict[tuple[str, str], tuple[float, str]] = {}
 
     def apply_manifests(
         self,
@@ -310,11 +337,17 @@ class AKSClusterDriver(ClusterDriver):
         namespace: str,
         app_slug: str,
     ) -> list[PodInfo]:
-        """Listing path is shared with k8s_native — the AKS-specific
-        bit (federated-credential exec_plugin token mint) lives in
-        #311 follow-up."""
+        """List pods on the AKS cluster.
+
+        Materializes ``exec_plugin`` auth into a kubeconfig blob
+        (admin credentials fetched via
+        ``managed_clusters.list_cluster_admin_credentials``) before
+        delegating to the shared k8s_native pod backend.
+        ``kubeconfig`` / ``service_account_token`` pass through
+        unchanged.
+        """
         return self._pod_backend.list_pods(
-            auth=auth,
+            auth=self._resolve_aks_auth(auth),
             namespace=namespace,
             app_slug=app_slug,
         )
@@ -329,9 +362,9 @@ class AKSClusterDriver(ClusterDriver):
         tail_lines: int,
         follow: bool,
     ) -> AsyncIterator[PodLogLine]:
-        """See ``list_pods`` — same shared k8s_native path."""
+        """See ``list_pods`` — same resolve-then-delegate pattern."""
         return self._log_backend.stream(
-            auth=auth,
+            auth=self._resolve_aks_auth(auth),
             namespace=namespace,
             pod_name=pod_name,
             container=container,
@@ -342,7 +375,10 @@ class AKSClusterDriver(ClusterDriver):
     # ---- bring-into-management (#316) -----------------------------
 
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
-        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+        return probe_cluster_capabilities(
+            backend=self._management_backend,
+            cluster=self._resolve_aks_auth_context(cluster),
+        )
 
     def bring_into_management(
         self,
@@ -352,7 +388,7 @@ class AKSClusterDriver(ClusterDriver):
     ) -> ManagementReport:
         return run_bring_into_management(
             backend=self._management_backend,
-            cluster=cluster,
+            cluster=self._resolve_aks_auth_context(cluster),
             run_preflight=run_preflight,
         )
 
@@ -570,6 +606,143 @@ class AKSClusterDriver(ClusterDriver):
         # production wiring fetches kubeconfig via
         # list_cluster_admin_credentials and parses cluster-data.
         return f"https://{endpoint}", ""
+
+    # ---- exec_plugin token materialization (#311) -----------------
+    #
+    # The shared k8s_native ``build_api_client`` accepts ``kubeconfig``
+    # + ``service_account_token`` but rejects ``exec_plugin`` — AKS
+    # token minting is the cloud driver's job. We resolve the row by
+    # calling ``managed_clusters.list_cluster_admin_credentials``,
+    # which returns a kubeconfig blob already wired to the AKS
+    # control plane (cluster client cert + private key + CA), and
+    # rewrite the auth so the shared backend sees plain ``kubeconfig``.
+    #
+    # Path B (federated-credential AAD-token exchange via kubelogin)
+    # is reserved for a follow-on slice — see ``AKSConfig.use_federated_token``.
+    # The acceptance criterion just needs live pods, which Path A
+    # satisfies for the common case.
+    #
+    # Two helpers because ClusterContext (for bring/probe) and
+    # ClusterAuth (for list_pods/stream_logs) are different frozen
+    # dataclasses — ``dataclasses.replace`` is type-specific. The
+    # kubeconfig fetch + TTL cache is shared via ``_admin_kubeconfig``.
+
+    def _admin_kubeconfig(
+        self,
+        *,
+        resource_group: str,
+        cluster_name: str,
+    ) -> str:
+        """Fetch (and cache) the admin kubeconfig blob for an AKS
+        managed cluster.
+
+        Cached for ``_AKS_KUBECONFIG_TTL_SECONDS`` per
+        (resource_group, cluster_name). Raises ``ClusterAuthError``
+        on any SDK failure with the mapped error wrapped as cause —
+        the resolver-side log shows both the cluster slug and the
+        underlying Azure error.
+        """
+        key = (resource_group, cluster_name)
+        now = self._clock()
+        cached = self._kubeconfig_cache.get(key)
+        if cached is not None:
+            expires_at, blob = cached
+            if expires_at > now:
+                return blob
+
+        try:
+            result = self._aks.managed_clusters.list_cluster_admin_credentials(
+                resource_group_name=resource_group,
+                resource_name=cluster_name,
+            )
+        except Exception as exc:
+            mapped = map_api_error(exc)
+            raise ClusterAuthError(
+                f"AKS {resource_group}/{cluster_name}: "
+                f"list_cluster_admin_credentials failed: {mapped}",
+            ) from exc
+
+        kubeconfigs = getattr(result, "kubeconfigs", None) or []
+        if not kubeconfigs:
+            raise ClusterAuthError(
+                f"AKS {resource_group}/{cluster_name}: "
+                "list_cluster_admin_credentials returned no kubeconfigs",
+            )
+        raw = getattr(kubeconfigs[0], "value", None)
+        if raw is None:
+            raise ClusterAuthError(
+                f"AKS {resource_group}/{cluster_name}: "
+                "list_cluster_admin_credentials kubeconfig.value is empty",
+            )
+        # Azure returns ``value`` as bytes (the kubeconfig YAML) on
+        # the real SDK; some fakes return str directly. Some operator
+        # tooling also base64-encodes the blob — be tolerant of both.
+        if isinstance(raw, bytes):
+            try:
+                blob = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                try:
+                    blob = base64.b64decode(raw).decode("utf-8")
+                except Exception as exc:
+                    raise ClusterAuthError(
+                        f"AKS {resource_group}/{cluster_name}: "
+                        "kubeconfig blob is neither UTF-8 nor base64-UTF-8",
+                    ) from exc
+        else:
+            blob = str(raw)
+
+        self._kubeconfig_cache[key] = (
+            now + _AKS_KUBECONFIG_TTL_SECONDS,
+            blob,
+        )
+        return blob
+
+    def _resolve_aks_auth(self, auth: ClusterAuth) -> ClusterAuth:
+        if auth.auth_method != "exec_plugin":
+            return auth
+        import dataclasses
+
+        cfg = auth.auth_config or {}
+        resource_group = cfg.get("resource_group") or self._config.resource_group
+        cluster_name = cfg.get("cluster_name") or self._config.cluster_name
+        blob = self._admin_kubeconfig(
+            resource_group=resource_group,
+            cluster_name=cluster_name,
+        )
+        new_cfg: dict[str, Any] = {"kubeconfig": blob}
+        context = cfg.get("context")
+        if context:
+            new_cfg["context"] = context
+        return dataclasses.replace(
+            auth,
+            auth_method="kubeconfig",
+            auth_config=new_cfg,
+        )
+
+    def _resolve_aks_auth_context(
+        self,
+        cluster: ClusterContext,
+    ) -> ClusterContext:
+        if cluster.auth_method != "exec_plugin":
+            return cluster
+        import dataclasses
+
+        cfg = cluster.auth_config or {}
+        resource_group = cfg.get("resource_group") or self._config.resource_group
+        cluster_name = cfg.get("cluster_name") or self._config.cluster_name
+        blob = self._admin_kubeconfig(
+            resource_group=resource_group,
+            cluster_name=cluster_name,
+        )
+        new_cfg: dict[str, Any] = {"kubeconfig": blob}
+        context = cfg.get("context")
+        if context:
+            new_cfg["context"] = context
+        return dataclasses.replace(
+            cluster,
+            auth_method="kubeconfig",
+            auth_config=new_cfg,
+        )
 
 
 def _build_k8s_client(*, endpoint: str, ca_data: str) -> Any:
