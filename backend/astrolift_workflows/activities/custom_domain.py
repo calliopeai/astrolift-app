@@ -334,64 +334,159 @@ def _issue_cert_sync(custom_domain_id: int) -> dict[str, Any]:
     ``CustomDomain.certificate_id`` so the UI can show "cert active"
     + the ingress renderer can wire it to the workload's listener.
 
-    Strategy picks itself by driver: AWS clusters use
-    ``acm_dns_validated`` (DNS-01 happens via Route53 once we already
-    own the records), GCP uses ``gcp_managed_cert``, Azure uses
-    ``azure_managed_cert``, k8s_native uses ``letsencrypt`` (cert-
-    manager + LE / HTTP-01). The driver impl owns the strategy
-    default; the activity only passes the hostname.
+    Strategy picks itself by zone-management mode:
+      ``is_platform_managed_zone=True``: the platform owns the zone
+        (subdomain delegated to astrolift OR managed-domain row), so
+        DNS-01 validation can write challenge records via the
+        DnsDriver. Strategy is the driver's preferred DNS-validated
+        path — ``acm_dns_validated`` on AWS, ``gcp_managed_cert`` on
+        GCP, ``azure_managed_cert`` on Azure, ``letsencrypt`` (DNS-01)
+        on k8s_native.
+
+      ``is_platform_managed_zone=False``: operator owns the zone
+        (Cloudflare / self-hosted / wherever). Platform can't write
+        challenge records, so cert issuance must work over the
+        already-propagated CNAME — HTTP-01 on k8s_native (cert-manager
+        does the http-01 dance over port-80), ``letsencrypt`` http-01
+        on the managed clouds. AWS clusters fall back to operator-
+        supplied cert (``provided``) since ACM can't HTTP-01 — the UI
+        surfaces a callout pointing the operator at the BYO-cert flow.
+
+    The driver impl owns the strategy default; the activity passes
+    the right key based on zone mode so the driver doesn't have to
+    re-derive it.
     """
     from astrolift_lifecycle.models import CustomDomain
 
     d = CustomDomain.all_objects.select_related("registered_app").get(
         pk=custom_domain_id,
     )
-    if d.certificate_id:
+    if d.certificate_state == CustomDomain.CertificateState.BYO:
+        # Operator opted into BYO via uploadCustomDomainCertificate —
+        # don't auto-issue or overwrite. Renderer reads the uploaded
+        # PEM directly.
         return {
             "ok": True,
             "certificate_id": d.certificate_id,
+            "state": d.certificate_state,
+            "message": "BYO certificate — auto-issuance skipped",
+        }
+    if d.certificate_id and d.certificate_state == CustomDomain.CertificateState.ACTIVE:
+        return {
+            "ok": True,
+            "certificate_id": d.certificate_id,
+            "state": d.certificate_state,
             "message": "certificate already issued",
         }
-    cluster = getattr(d.registered_app, "default_tenant_cluster", None)
-    if cluster is None:
+
+    def _persist_fail(message: str) -> dict[str, Any]:
+        d.certificate_state = CustomDomain.CertificateState.FAILED
+        d.last_certificate_error = message[:512]
+        d.save(
+            update_fields=[
+                "certificate_state",
+                "last_certificate_error",
+                "updated_at",
+                "version",
+            ],
+        )
         return {
             "ok": False,
             "certificate_id": "",
-            "message": "app has no default_tenant_cluster — no TLS driver to call",
+            "state": d.certificate_state,
+            "message": message,
         }
+
+    cluster = getattr(d.registered_app, "default_tenant_cluster", None)
+    if cluster is None:
+        return _persist_fail("app has no default_tenant_cluster — no TLS driver to call")
     try:
         from core.cluster_observability import _driver_for_capability  # type: ignore[attr-defined]
 
         tls_driver = _driver_for_capability(cluster, "tls")
     except Exception as exc:  # noqa: BLE001
-        return {
-            "ok": False,
-            "certificate_id": "",
-            "message": f"tls driver unresolvable: {exc}",
-        }
+        return _persist_fail(f"tls driver unresolvable: {exc}")
+
+    strategy = _pick_tls_strategy(
+        plugin_slug=getattr(getattr(cluster, "provider_plugin", None), "slug", "") or "",
+        is_platform_managed_zone=bool(d.is_platform_managed_zone),
+    )
+    # Flip to ISSUING so the UI shows a spinner while the driver call
+    # is in flight. Clear last_certificate_error from any prior fail.
+    d.certificate_state = CustomDomain.CertificateState.ISSUING
+    d.last_certificate_error = ""
+    d.save(
+        update_fields=[
+            "certificate_state",
+            "last_certificate_error",
+            "updated_at",
+            "version",
+        ],
+    )
+
     try:
-        cert = tls_driver.ensure_certificate(d.hostname)
+        cert = tls_driver.ensure_certificate(d.hostname, strategy=strategy)
+    except TypeError:
+        try:
+            cert = tls_driver.ensure_certificate(d.hostname)
+        except Exception as exc:  # noqa: BLE001
+            return _persist_fail(f"ensure_certificate (no-strategy fallback): {exc}")
     except Exception as exc:  # noqa: BLE001
-        return {
-            "ok": False,
-            "certificate_id": "",
-            "message": f"ensure_certificate: {exc}",
-        }
+        return _persist_fail(f"ensure_certificate strategy={strategy!r}: {exc}")
     cert_id = getattr(cert, "id", "") or ""
-    if cert_id:
-        d.certificate_id = cert_id
-        d.save(
-            update_fields=[
-                "certificate_id",
-                "updated_at",
-                "version",
-            ],
+    if not cert_id:
+        return _persist_fail(
+            f"driver returned no certificate id (strategy={strategy!r})",
         )
+    d.certificate_id = cert_id
+    d.certificate_state = CustomDomain.CertificateState.ACTIVE
+    d.last_certificate_error = ""
+    d.save(
+        update_fields=[
+            "certificate_id",
+            "certificate_state",
+            "last_certificate_error",
+            "updated_at",
+            "version",
+        ],
+    )
     return {
-        "ok": bool(cert_id),
+        "ok": True,
         "certificate_id": cert_id,
-        "message": f"certificate id={cert_id}",
+        "state": d.certificate_state,
+        "message": f"certificate id={cert_id} (strategy={strategy})",
     }
+
+
+def _pick_tls_strategy(
+    *,
+    plugin_slug: str,
+    is_platform_managed_zone: bool,
+) -> str:
+    """Map (cloud, zone-mode) → ``TlsDriver`` strategy key.
+
+    Platform-managed zones use the DNS-validated path because we can
+    write challenge records ourselves. Externally-managed zones fall
+    back to HTTP-01 (where supported) — the operator already CNAMEd
+    the hostname to the cluster ingress so port-80 is reachable.
+
+    AWS HTTP-01 isn't covered by ACM, so externally-managed AWS
+    domains land on ``provided`` (operator imports a cert into ACM)
+    — the renderer's TLS block reads the cert id verbatim.
+    """
+    cloud = plugin_slug.lower()
+    if is_platform_managed_zone:
+        if cloud == "aws":
+            return "acm_dns_validated"
+        if cloud == "gcp":
+            return "gcp_managed_cert"
+        if cloud == "azure":
+            return "azure_managed_cert"
+        return "letsencrypt"  # k8s_native via cert-manager DNS-01
+    # External-zone path
+    if cloud == "aws":
+        return "provided"
+    return "letsencrypt_http01"
 
 
 @activity.defn(name="astrolift.custom_domain.issue_certificate")

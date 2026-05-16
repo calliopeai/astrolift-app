@@ -35,6 +35,13 @@ from astrolift_workflows.activities.app_teardown import (
     revoke_app_deploy_tokens,
     soft_delete_app_records,
 )
+from astrolift_workflows.activities.capability_deprovision import (
+    deprovision_app_certificate,
+    deprovision_app_dns_record,
+    deprovision_app_identity_role,
+    deprovision_app_ingress,
+    deprovision_app_registry_repo,
+)
 from astrolift_workflows.activities.cluster_management import (
     apply_platform_rbac,
     ensure_cluster_drained,
@@ -80,16 +87,30 @@ from astrolift_workflows.activities.scheduled import (
     reconcile_cluster_capabilities,
     reheal_webhook_subscriptions,
 )
+from astrolift_workflows.activities.secret_rotation import (
+    bounce_workloads_consuming_bundle,
+    delete_secret_from_cluster,
+    list_active_secret_bundle_targets,
+    list_bundles_due_for_refresh,
+    refresh_secret_bundle_in_cluster,
+)
 
 __all__ = [
     "apply_manifests",
     "apply_platform_rbac",
     "apply_to_target_cluster",
+    "bounce_workloads_consuming_bundle",
     "capture_platform_cost_snapshot",
     "create_promotion_deployment",
     "create_rollback_deployment",
     "delete_app_namespaces",
     "delete_preview_namespace",
+    "delete_secret_from_cluster",
+    "deprovision_app_certificate",
+    "deprovision_app_dns_record",
+    "deprovision_app_identity_role",
+    "deprovision_app_ingress",
+    "deprovision_app_registry_repo",
     "deprovision_managed_service",
     "detect_drift",
     "dispatch_cron_deploys",
@@ -101,7 +122,9 @@ __all__ = [
     "health_check",
     "install_cluster_prereqs",
     "issue_custom_domain_certificate",
+    "list_active_secret_bundle_targets",
     "list_app_managed_service_ids",
+    "list_bundles_due_for_refresh",
     "mark_app_deregistered",
     "mark_app_provisioning",
     "mark_app_ready",
@@ -126,6 +149,7 @@ __all__ = [
     "provision_registry_repo",
     "prune_audit_log",
     "reconcile_cluster_capabilities",
+    "refresh_secret_bundle_in_cluster",
     "reheal_webhook_subscriptions",
     "remove_platform_rbac",
     "render_manifests",

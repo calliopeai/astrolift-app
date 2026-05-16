@@ -18,6 +18,7 @@ class AppEnvironmentType:
     name: str
     url: str
     deploys_paused: bool
+    ingress_paused: bool
     required_approvals: int
     registered_app_slug: str
     cluster_slug: str | None
@@ -82,6 +83,7 @@ def app_env_to_type(env) -> AppEnvironmentType:
         name=env.name,
         url=env.url or "",
         deploys_paused=env.deploys_paused,
+        ingress_paused=env.ingress_paused,
         required_approvals=env.required_approvals,
         registered_app_slug=env.registered_app.slug,
         cluster_slug=env.tenant_cluster.slug if env.tenant_cluster_id else None,
@@ -274,6 +276,21 @@ class AppDomainType:
     is_platform_managed_zone: bool
     last_validation_error: str
 
+    # ---- cert lifecycle (#397 unhappy-path surface) ----------------
+    # cert_state above is the DNS validation status. The fields below
+    # are the certificate's own state — separate axis so the UI can
+    # render "DNS validated but cert issuance failed" distinctly.
+
+    certificate_state: str
+    """not_requested | issuing | active | failed | byo. Mirrors
+    ``CustomDomain.CertificateState``. Surfaces post-validation cert
+    progression so the UI can render a spinner while ACME / cloud-cert
+    is provisioning and an actionable error + BYO upload affordance
+    when issuance fails."""
+
+    last_certificate_error: str
+    byo_certificate_uploaded_at: dt.datetime | None
+
 
 def app_domain_to_type(d) -> AppDomainType:
     return AppDomainType(
@@ -302,6 +319,9 @@ def app_domain_to_type(d) -> AppDomainType:
         ],
         is_platform_managed_zone=bool(d.is_platform_managed_zone),
         last_validation_error=d.last_validation_error or "",
+        certificate_state=d.certificate_state or "not_requested",
+        last_certificate_error=d.last_certificate_error or "",
+        byo_certificate_uploaded_at=d.byo_certificate_uploaded_at,
     )
 
 

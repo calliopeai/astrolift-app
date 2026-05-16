@@ -36,6 +36,11 @@ from astrolift_workflows.workflows.scheduled import (
     ReconcileClusterCapabilitiesWorkflow,
     RehealWebhookSubscriptionsWorkflow,
 )
+from astrolift_workflows.workflows.secret_rotation import (
+    DeleteSecretBundleFromClustersWorkflow,
+    RotateSecretBundleWorkflow,
+    SecretBundleScheduledRefreshWorkflow,
+)
 from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
 from astrolift_workflows.workflows.validate_custom_domain import (
@@ -47,6 +52,7 @@ __all__ = [
     "CapturePlatformCostSnapshotWorkflow",
     "CronDeployTickWorkflow",
     "DecommissionClusterWorkflow",
+    "DeleteSecretBundleFromClustersWorkflow",
     "DeployAppWorkflow",
     "DeprovisionManagedServiceWorkflow",
     "DriftDetectionWorkflow",
@@ -60,6 +66,8 @@ __all__ = [
     "ReconcileClusterCapabilitiesWorkflow",
     "RehealWebhookSubscriptionsWorkflow",
     "RollbackDeploymentWorkflow",
+    "RotateSecretBundleWorkflow",
+    "SecretBundleScheduledRefreshWorkflow",
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
     "ValidateCustomDomainWorkflow",

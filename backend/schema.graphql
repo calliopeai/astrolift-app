@@ -56,6 +56,11 @@ type AppsecretwritepayloadMutationResult {
   data: Appsecretwritepayload
 }
 
+input ArchiveAppRegistryRepoInput {
+  appId: GUID!
+  archive: Boolean! = true
+}
+
 type AstroliftActiveSession {
   id: String!
   expiresAt: DateTime!
@@ -142,6 +147,9 @@ type AstroliftAppDomain {
   requiredDnsRecords: [AstroliftAppDomainRequiredRecord!]!
   isPlatformManagedZone: Boolean!
   lastValidationError: String!
+  certificateState: String!
+  lastCertificateError: String!
+  byoCertificateUploadedAt: DateTime
 }
 
 type AstroliftAppDomainMutationResult {
@@ -165,6 +173,7 @@ type AstroliftAppEnvironment {
   name: String!
   url: String!
   deploysPaused: Boolean!
+  ingressPaused: Boolean!
   requiredApprovals: Int!
   registeredAppSlug: String!
   clusterSlug: String
@@ -286,6 +295,18 @@ type AstroliftBudget {
   period: String!
   currentSpendCents: Int!
   alertsAtPct: [Int!]!
+}
+
+type AstroliftCapabilityDeprovisionPayload {
+  appId: GUID
+  clusterSlug: String!
+  detail: String!
+}
+
+type AstroliftCapabilityDeprovisionPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftCapabilityDeprovisionPayload
 }
 
 type AstroliftClusterBootstrapComponent {
@@ -947,6 +968,12 @@ type AstroliftSecretBundle {
   createdAt: DateTime!
 }
 
+type AstroliftSecretBundleMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftSecretBundle
+}
+
 type AstroliftSourceConnection {
   id: GUID!
   kind: String!
@@ -1329,6 +1356,21 @@ input DecommissionClusterInputType {
 
 input DeleteAlertRuleInput {
   id: GUID!
+}
+
+input DeleteAppDnsRecordInput {
+  appId: GUID!
+  hostname: String!
+  recordType: String! = "CNAME"
+}
+
+input DeleteAppIdentityRoleInput {
+  appId: GUID!
+}
+
+input DeleteAppIngressInput {
+  appId: GUID!
+  hostname: String = null
 }
 
 input DeleteAppSecretInput {
@@ -1763,14 +1805,22 @@ type Mutation {
   redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
+  pauseAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
+  resumeAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   tearDownPreview(input: TearDownPreviewInputGql!): AstroliftDeploymentMutationResult!
   migrateAppToCluster(input: MigrateAppInputGql!): AstroliftAppEnvironmentMutationResult!
   addAppDomain(input: AddAppDomainInput!): AstroliftAppDomainMutationResult!
   removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!
   recheckDomainValidation(input: RecheckDomainValidationInput!): AstroliftAppDomainMutationResult!
+  uploadCustomDomainCertificate(input: UploadCustomDomainCertificateInput!): AstroliftAppDomainMutationResult!
   createDeployToken(input: CreateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
   rotateDeployToken(input: RotateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
   revokeDeployToken(input: RevokeDeployTokenInput!): DeploytokenrevokedpayloadMutationResult!
+  deleteAppDnsRecord(input: DeleteAppDnsRecordInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
+  revokeAppCertificate(input: RevokeAppCertificateInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
+  deleteAppIdentityRole(input: DeleteAppIdentityRoleInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
+  archiveAppRegistryRepo(input: ArchiveAppRegistryRepoInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
+  deleteAppIngress(input: DeleteAppIngressInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -1784,6 +1834,7 @@ type Mutation {
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
   attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
   detachSecretBundle(input: DetachSecretBundleInput!): AttachmentremovedpayloadMutationResult!
+  rotateSecretBundle(input: RotateSecretBundleInput!): AstroliftSecretBundleMutationResult!
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
@@ -2135,6 +2186,10 @@ input RevokeApiTokenInput {
   id: GUID!
 }
 
+input RevokeAppCertificateInput {
+  customDomainId: GUID!
+}
+
 input RevokeDeployTokenInput {
   id: GUID!
 }
@@ -2148,6 +2203,10 @@ input RevokeRoleBindingInput {
 }
 
 input RotateDeployTokenInput {
+  id: GUID!
+}
+
+input RotateSecretBundleInput {
   id: GUID!
 }
 
@@ -2393,6 +2452,12 @@ input UpdateWebhookSubscriptionInput {
   url: String = null
   events: [String!] = null
   isActive: Boolean = null
+}
+
+input UploadCustomDomainCertificateInput {
+  id: GUID!
+  certificatePem: String!
+  privateKeyPem: String!
 }
 
 enum UploadLocation {

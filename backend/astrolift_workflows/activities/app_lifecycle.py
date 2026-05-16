@@ -353,6 +353,21 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         environment_name=env.name,
         env_from_secret_refs=env_from,
     )
+
+    # Fold in CustomDomain Ingress + TLS Secret resources (#397). Each
+    # validated + active/byo domain gets its own Ingress so per-host
+    # TLS strategy choices stay isolated — auto-issued ACM lives on the
+    # cluster's cert-manager / cloud cert manager, BYO PEM ships
+    # inline as a kubernetes.io/tls Secret.
+    ingress_resources = await sync_to_async(
+        _render_app_ingresses_and_tls,
+    )(d.pk, namespace, manifest)
+    if ingress_resources:
+        resources = sorted(
+            [*resources, *ingress_resources],
+            key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
+        )
+
     log.info(
         "render_manifests produced %d resource(s) with envFrom=%s",
         len(resources),
@@ -360,6 +375,176 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         extra={"deployment_id": deployment_id},
     )
     return {"resources": resources, "env_from_secret_refs": env_from}
+
+
+def _render_app_ingresses_and_tls(
+    deployment_id: int,
+    namespace: str,
+    manifest,
+) -> list[dict[str, Any]]:
+    """Emit one ``Ingress`` per active CustomDomain + a TLS ``Secret``
+    for every BYO cert. Skips domains in non-serving states
+    (validating, failed, not_requested) — we never want traffic
+    routed at a hostname whose cert isn't usable yet.
+
+    For ACTIVE-state domains on platform-managed zones the cert lives
+    in the cloud's cert manager (ACM, Google-managed cert, Azure cert)
+    and is referenced by annotation/spec at the cluster's ingress
+    controller; we leave the Ingress' ``tls.secretName`` pointing at
+    the conventional ``<app>-<host>-tls`` name and let the controller
+    populate it via cert-manager when present. For ACTIVE on external
+    zones we annotate with ``cert-manager.io/cluster-issuer`` so the
+    cluster's cert-manager does the HTTP-01 dance on first apply. For
+    BYO we emit the TLS Secret inline from the operator-supplied PEM.
+    """
+    import base64
+
+    from astrolift_lifecycle.models import CustomDomain, Deployment
+
+    d = Deployment.all_objects.select_related(
+        "registered_app",
+        "app_environment",
+    ).get(pk=deployment_id)
+
+    # Find the public-facing workload + its port. If the app has no
+    # deployment workload with an exposed port we can't route to it,
+    # so no ingress.
+    primary_workload = next(
+        (w for w in manifest.workloads if w.kind == "deployment"),
+        None,
+    )
+    if primary_workload is None or not primary_workload.containers:
+        return []
+    primary_container = next(
+        (c for c in primary_workload.containers if c.is_primary),
+        primary_workload.containers[0],
+    )
+    if primary_container.port <= 0:
+        return []
+    backend_port = int(primary_container.port)
+    backend_service = primary_workload.name
+
+    # Operator pause is per-environment, evaluated once per render and
+    # reflected on every Ingress this deploy emits. We keep emitting
+    # the Ingress (don't skip it) so operators see the paused state
+    # via ``kubectl get ingress -L astrolift.dev/ingress-state``
+    # instead of a 404, and so the controller serves a clear 503 with
+    # an Astrolift-branded message instead of the app.
+    ingress_paused = bool(getattr(d.app_environment, "ingress_paused", False))
+    ingress_state_label = "paused" if ingress_paused else "live"
+
+    out: list[dict[str, Any]] = []
+    domains = CustomDomain.objects.filter(
+        registered_app=d.registered_app,
+        deleted_at__isnull=True,
+        is_active=True,
+        validation_status=CustomDomain.ValidationStatus.VALIDATED,
+    )
+    for cd in domains:
+        state = cd.certificate_state
+        if state not in (
+            CustomDomain.CertificateState.ACTIVE,
+            CustomDomain.CertificateState.BYO,
+        ):
+            continue
+        host_slug = cd.hostname.replace(".", "-")
+        secret_name = f"{d.registered_app.slug}-{host_slug}-tls"
+        ingress_name = f"{d.registered_app.slug}-{host_slug}"
+        annotations: dict[str, str] = {}
+        if ingress_paused:
+            # nginx-ingress-controller honors server-snippet to inject
+            # raw nginx config into the per-host server block; a bare
+            # 503 short-circuits before reaching the upstream service.
+            # The TLS Secret + handshake stay intact so the cert isn't
+            # invalidated and resuming is a no-op render away.
+            annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
+                'return 503 "Astrolift: app is paused";'
+            )
+
+        if state == CustomDomain.CertificateState.BYO:
+            # Split the stored bundle into cert chain + private key on
+            # the LAST ``END CERTIFICATE`` marker. The upload mutation
+            # validated both halves are PEM-looking; the renderer
+            # ships them as a ``kubernetes.io/tls`` Secret.
+            bundle = cd.byo_certificate_pem or ""
+            end_marker = "-----END CERTIFICATE-----"
+            idx = bundle.rfind(end_marker)
+            if idx == -1:
+                # Stored bundle is corrupted — skip rather than emit a
+                # broken secret. The cert-state UI shows BYO + the
+                # next recheck will surface the issue.
+                continue
+            chain = bundle[: idx + len(end_marker)].strip() + "\n"
+            key = bundle[idx + len(end_marker) :].lstrip()
+            out.append(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Secret",
+                    "type": "kubernetes.io/tls",
+                    "metadata": {
+                        "name": secret_name,
+                        "namespace": namespace,
+                        "labels": {
+                            "astrolift.dev/app": d.registered_app.slug,
+                            "astrolift.dev/custom-domain": cd.hostname,
+                            "astrolift.dev/cert-source": "byo",
+                        },
+                    },
+                    "data": {
+                        "tls.crt": base64.b64encode(chain.encode("utf-8")).decode("ascii"),
+                        "tls.key": base64.b64encode(key.encode("utf-8")).decode("ascii"),
+                    },
+                }
+            )
+        elif state == CustomDomain.CertificateState.ACTIVE:
+            if not cd.is_platform_managed_zone:
+                # External zone, auto-issued: nudge cert-manager to
+                # solve HTTP-01 on the first apply. (No-op if the
+                # cluster's cert-manager already owns the Secret.)
+                annotations["cert-manager.io/cluster-issuer"] = "letsencrypt-prod"
+
+        out.append(
+            {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": {
+                    "name": ingress_name,
+                    "namespace": namespace,
+                    "annotations": annotations,
+                    "labels": {
+                        "astrolift.dev/app": d.registered_app.slug,
+                        "astrolift.dev/custom-domain": cd.hostname,
+                        "astrolift.dev/cert-source": (
+                            "byo" if state == CustomDomain.CertificateState.BYO else "auto"
+                        ),
+                        "astrolift.dev/ingress-state": ingress_state_label,
+                    },
+                },
+                "spec": {
+                    "tls": [{"hosts": [cd.hostname], "secretName": secret_name}],
+                    "rules": [
+                        {
+                            "host": cd.hostname,
+                            "http": {
+                                "paths": [
+                                    {
+                                        "path": "/",
+                                        "pathType": "Prefix",
+                                        "backend": {
+                                            "service": {
+                                                "name": backend_service,
+                                                "port": {"number": backend_port},
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            }
+        )
+    return out
 
 
 def _bindings_secret_name(app_slug: str) -> str:

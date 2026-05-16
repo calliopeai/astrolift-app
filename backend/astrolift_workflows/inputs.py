@@ -230,6 +230,34 @@ class MigrateAppInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class RotateSecretBundleInput:
+    """Rotate one SecretBundle across every cluster/app/env that has
+    an active ``AppSecretBundleRef`` to it (#365). The workflow re-
+    fetches values from the SecretsBackend, applies them as the
+    materialized k8s Secret, then bounces every workload that
+    envFroms the bundle so the new values take effect immediately."""
+
+    secret_bundle_id: int
+    actor: Actor
+    bounce_workloads: bool = True
+    """Set False on the scheduled refresh path — restarting every
+    workload bound to a rotated bundle on an hourly cadence would be
+    too disruptive. Workloads pick up the new values on next deploy
+    or pod restart. ``rotateSecretBundle`` (operator-fired) leaves
+    this True so the rotation actually takes effect."""
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class DeleteSecretBundleFromClustersInput:
+    """Fan-out cleanup of the k8s Secret the bundle was materialized
+    into on every cluster it ever reached. Fired on bundle soft-
+    delete (#365)."""
+
+    secret_bundle_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""

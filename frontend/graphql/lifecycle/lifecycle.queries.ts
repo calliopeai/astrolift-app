@@ -7,6 +7,7 @@ export const LIST_ENVIRONMENTS = gql`
       name
       url
       deploysPaused
+      ingressPaused
       requiredApprovals
       registeredAppSlug
       clusterSlug
@@ -17,16 +18,8 @@ export const LIST_ENVIRONMENTS = gql`
 `;
 
 export const LIST_DEPLOYMENTS = gql`
-  query ListDeployments(
-    $appSlug: String
-    $environmentName: String
-    $limit: Int
-  ) {
-    astroliftDeployments(
-      appSlug: $appSlug
-      environmentName: $environmentName
-      limit: $limit
-    ) {
+  query ListDeployments($appSlug: String, $environmentName: String, $limit: Int) {
+    astroliftDeployments(appSlug: $appSlug, environmentName: $environmentName, limit: $limit) {
       id
       registeredAppSlug
       environmentName
@@ -112,16 +105,8 @@ export const GET_DEPLOYMENT_METRICS = gql`
 `;
 
 export const LIST_SCHEDULED_JOB_RUNS = gql`
-  query ListScheduledJobRuns(
-    $appSlug: String
-    $environmentName: String
-    $limit: Int
-  ) {
-    astroliftScheduledJobRuns(
-      appSlug: $appSlug
-      environmentName: $environmentName
-      limit: $limit
-    ) {
+  query ListScheduledJobRuns($appSlug: String, $environmentName: String, $limit: Int) {
+    astroliftScheduledJobRuns(appSlug: $appSlug, environmentName: $environmentName, limit: $limit) {
       id
       registeredAppSlug
       environmentName
@@ -185,6 +170,9 @@ export const LIST_APP_DOMAINS = gql`
       expectedCnameTarget
       isPlatformManagedZone
       lastValidationError
+      certificateState
+      lastCertificateError
+      byoCertificateUploadedAt
       requiredDnsRecords {
         kind
         name

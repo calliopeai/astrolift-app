@@ -38,6 +38,56 @@ class SecretBundle(NamedBaseCoreModel):
             ),
         ]
 
+    def soft_delete(self, *, by=None) -> None:
+        """Override to fan out cleanup of the materialized k8s Secret
+        on every cluster this bundle was applied to (#365).
+
+        Soft-delete on the bundle doesn't cascade to
+        ``AppSecretBundleRef`` rows (FK is PROTECT for hard-delete;
+        soft-delete bypasses on_delete entirely), so the workflow's
+        target-list activity still finds every active ref and can
+        emit a delete for each materialized k8s Secret.
+
+        Best-effort enqueue: any failure to start the workflow is
+        logged but doesn't block the delete. Operators can re-fire
+        rotate/delete via the GraphQL mutation if cleanup is
+        incomplete — better than blocking the soft-delete on a
+        flaky Temporal connection.
+        """
+        import logging
+
+        target_bundle_pk = self.pk
+        super().soft_delete(by=by)
+        try:
+            from astrolift_workflows.client import start_workflow
+            from astrolift_workflows.inputs import (
+                Actor,
+                DeleteSecretBundleFromClustersInput,
+            )
+
+            start_workflow(
+                "DeleteSecretBundleFromClustersWorkflow",
+                args=[
+                    DeleteSecretBundleFromClustersInput(
+                        secret_bundle_id=target_bundle_pk,
+                        actor=Actor(
+                            kind="system",
+                            user_id=getattr(by, "pk", None) if by else None,
+                            display="bundle-soft-delete-hook",
+                        ),
+                    ),
+                ],
+                workflow_id=(f"DeleteSecretBundleFromClustersWorkflow-" f"{self.guid}"),
+            )
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).warning(
+                "DeleteSecretBundleFromClustersWorkflow enqueue failed "
+                "for bundle %s — Secret will linger in cluster(s) until "
+                "the next scheduled refresh skips this deleted bundle",
+                self.guid,
+                exc_info=True,
+            )
+
 
 class AppSecretBundleRef(BaseCoreModel):
     registered_app = models.ForeignKey(

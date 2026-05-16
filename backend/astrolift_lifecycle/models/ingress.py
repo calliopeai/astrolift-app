@@ -149,6 +149,47 @@ class CustomDomain(BaseCoreModel):
         ),
     )
 
+    # ---- cert lifecycle (#397 PR 5 + self-serve unhappy path) -----
+
+    class CertificateState(models.TextChoices):
+        NOT_REQUESTED = "not_requested"
+        ISSUING = "issuing"
+        ACTIVE = "active"
+        FAILED = "failed"
+        BYO = "byo"
+
+    certificate_state = models.CharField(
+        max_length=16,
+        choices=CertificateState.choices,
+        default=CertificateState.NOT_REQUESTED,
+        help_text=(
+            "not_requested: validation hasn't completed yet. "
+            "issuing: ensure_certificate fired; provider still "
+            "provisioning. "
+            "active: cert is usable by the renderer. "
+            "failed: cert issuance failed — operator action needed "
+            "(BYO cert, switch validation method, etc.). "
+            "byo: operator uploaded a cert via "
+            "``uploadCustomDomainCertificate``, bypassing auto-issuance."
+        ),
+    )
+    last_certificate_error = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+    )
+    byo_certificate_pem = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "Operator-uploaded certificate chain (PEM) for the BYO "
+            "path — used when the platform can't auto-issue (AWS "
+            "with externally-managed DNS, LE rate-limited zones, "
+            "custom CA). Write-only via GraphQL; never echoed back."
+        ),
+    )
+    byo_certificate_uploaded_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
