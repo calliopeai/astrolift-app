@@ -26,6 +26,7 @@ logged via the structured JSON logger and dropped.
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -52,6 +53,78 @@ class EventEnvelope:
 
 
 EventWriter = Callable[[EventEnvelope], None]
+
+
+# Supply-chain gate payload shape (#313). Emitted as the ``payload``
+# dict of a ``deploy.supply_chain.blocked`` Event by the
+# PromoteDeploymentWorkflow when the policy resolved off
+# ``RegisteredApp.security_policy_resolved`` short-circuits a promote.
+#
+# Defined here (alongside ``EventEnvelope``) so the workflow code and
+# any future writers reference the same shape. Use ``as_payload()`` to
+# obtain the JSON-serialisable dict that goes into the envelope's
+# ``payload`` slot — datetimes serialise as ISO-8601 UTC strings so
+# downstream consumers (webhook fan-out, activity feed) can render
+# them without per-consumer parsing.
+_SUPPLY_CHAIN_BLOCK_REASONS = frozenset(
+    {
+        "critical_cves",
+        "missing_signature",
+        "high_cve_threshold_exceeded",
+    }
+)
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class SupplyChainBlockedPayload:
+    """Frozen record of a supply-chain gate decision against a promote.
+
+    All identifiers are external-stable (slug / GUID / image digest),
+    never integer PKs — the payload is part of the public event
+    contract and feeds outbound webhooks.
+
+    ``cve_summary`` is None when the block path didn't run a scan
+    (e.g. a missing-signature block can fire before scanning); when
+    present it carries severity-bucketed counts as
+    ``{"critical": N, "high": N, "medium": N, "low": N}``.
+    """
+
+    app_slug: str
+    deployment_guid: str
+    image_digest: str
+    reason: str
+    cve_summary: dict[str, int] | None
+    signature_required: bool
+    blocked_at: dt.datetime
+
+    def __post_init__(self) -> None:
+        if self.reason not in _SUPPLY_CHAIN_BLOCK_REASONS:
+            raise ValueError(
+                f"SupplyChainBlockedPayload.reason must be one of "
+                f"{sorted(_SUPPLY_CHAIN_BLOCK_REASONS)!r}; got {self.reason!r}"
+            )
+
+    def as_payload(self) -> dict[str, Any]:
+        """Return the JSON-serialisable dict for ``Event.emit(payload=...)``.
+
+        Datetimes go out as ISO-8601 UTC strings ('Z' suffix when the
+        input is timezone-aware UTC) so webhook consumers don't need
+        Python-side parsers.
+        """
+        blocked_at_iso = self.blocked_at.isoformat()
+        if self.blocked_at.tzinfo is not None and self.blocked_at.utcoffset() == dt.timedelta(0):
+            # Normalise the UTC offset to the canonical 'Z' suffix for
+            # interop with consumers that don't accept '+00:00'.
+            blocked_at_iso = blocked_at_iso.replace("+00:00", "Z")
+        return {
+            "app_slug": self.app_slug,
+            "deployment_guid": self.deployment_guid,
+            "image_digest": self.image_digest,
+            "reason": self.reason,
+            "cve_summary": dict(self.cve_summary) if self.cve_summary is not None else None,
+            "signature_required": bool(self.signature_required),
+            "blocked_at": blocked_at_iso,
+        }
 
 
 def _log_event(envelope: EventEnvelope) -> None:

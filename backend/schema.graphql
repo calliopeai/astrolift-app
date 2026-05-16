@@ -113,6 +113,24 @@ type AstroliftAlertRuleMutationResult {
   data: AstroliftAlertRule
 }
 
+input AstroliftAnonymizeUserInput {
+  userGid: GUID!
+}
+
+type AstroliftAnonymizeUserPayload {
+  anonymizedUserId: GUID!
+  wasSelf: Boolean!
+  requiresLogout: Boolean!
+  lifecycle: String!
+  anonymizedAt: DateTime!
+}
+
+type AstroliftAnonymizeUserPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAnonymizeUserPayload
+}
+
 type AstroliftApiToken {
   id: GUID!
   name: String!
@@ -1008,6 +1026,7 @@ type AstroliftRegisteredApp {
   deletedAt: DateTime
   lastResyncAt: DateTime
   sourceWebhookInstalledAt: DateTime
+  securityPolicy: AstroliftSecurityPolicy!
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1164,6 +1183,12 @@ type AstroliftSecretBundleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftSecretBundle
+}
+
+type AstroliftSecurityPolicy {
+  blockOnCriticalCves: Boolean!
+  blockOnMissingSignature: Boolean!
+  blockOnHighCveThreshold: Int
 }
 
 type AstroliftSourceConnection {
@@ -2068,6 +2093,7 @@ type Mutation {
   revokeTeamAccessFromApp(input: RevokeTeamAccessInput!): SoftdeletepayloadMutationResult!
   resyncAstroliftManifestFromRepo(input: ResyncManifestFromRepoInput!): ResyncManifestPayloadMutationResult!
   assignAstroliftAppToProject(input: AssignAppToProjectInput!): AstroliftRegisteredAppMutationResult!
+  updateAstroliftSecurityPolicy(input: UpdateSecurityPolicyInput!): AstroliftRegisteredAppMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -2161,6 +2187,7 @@ type Mutation {
 
   """Delete a workflow definition by slug (staff only)."""
   deleteWorkflowDefinition(slug: String!): MutationResult!
+  astroliftAnonymizeUser(input: AstroliftAnonymizeUserInput!): AstroliftAnonymizeUserPayloadMutationResult!
   astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
   astroliftDisconnectUserSourceProvider(input: DisconnectUserSourceProviderInput!): AstroliftDisconnectUserSourceProviderPayloadMutationResult!
 }
@@ -2807,6 +2834,13 @@ input UpdateRoleInput {
   name: String = null
   permissions: [String!] = null
   description: String = null
+}
+
+input UpdateSecurityPolicyInput {
+  appSlug: String!
+  blockOnCriticalCves: Boolean!
+  blockOnMissingSignature: Boolean!
+  blockOnHighCveThreshold: Int
 }
 
 input UpdateSourceConnectionInput {
