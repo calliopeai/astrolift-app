@@ -31,7 +31,6 @@ from gcp.cluster_gke import (
 )
 from k8s_native.observability import ClusterAuthError
 
-
 # ---- fake GCP surface --------------------------------------------
 
 
