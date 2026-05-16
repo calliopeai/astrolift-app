@@ -242,3 +242,45 @@ export const LIST_APP_PODS = gql`
     }
   }
 `;
+
+// #377 — operator-facing observability cards on the app detail page.
+// Each query backs one card; the resolvers degrade to empty / null
+// when the cluster's plugin doesn't implement the read method, so
+// the FE empty state covers both "not configured" + "not yet
+// supported on this cloud" with the same UX.
+
+export const LIST_APP_DNS_RECORDS = gql`
+  query ListAppDnsRecords($appSlug: String!, $environmentName: String) {
+    astroliftAppDnsRecords(appSlug: $appSlug, environmentName: $environmentName) {
+      name
+      type
+      value
+      ttl
+      propagationStatus
+    }
+  }
+`;
+
+export const LIST_APP_CERTIFICATES = gql`
+  query ListAppCertificates($appSlug: String!, $environmentName: String) {
+    astroliftAppCertificates(appSlug: $appSlug, environmentName: $environmentName) {
+      id
+      hostname
+      issuer
+      notAfter
+      daysUntilExpiry
+      renewalStatus
+    }
+  }
+`;
+
+export const GET_APP_IDENTITY_BINDING = gql`
+  query GetAppIdentityBinding($appSlug: String!, $environmentName: String) {
+    astroliftAppIdentityBinding(appSlug: $appSlug, environmentName: $environmentName) {
+      kind
+      roleArnOrPrincipal
+      trustPolicySummary
+      lastUsedAt
+    }
+  }
+`;

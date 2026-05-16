@@ -42,6 +42,12 @@ from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_ingress,
     deprovision_app_registry_repo,
 )
+from astrolift_workflows.activities.cluster_decommission_cleanup import (
+    cleanup_cluster_acm_certs,
+    cleanup_cluster_dns_records,
+    cleanup_cluster_ecr_repos,
+    cleanup_cluster_irsa_roles,
+)
 from astrolift_workflows.activities.cluster_management import (
     apply_platform_rbac,
     ensure_cluster_drained,
@@ -101,6 +107,10 @@ __all__ = [
     "apply_to_target_cluster",
     "bounce_workloads_consuming_bundle",
     "capture_platform_cost_snapshot",
+    "cleanup_cluster_acm_certs",
+    "cleanup_cluster_dns_records",
+    "cleanup_cluster_ecr_repos",
+    "cleanup_cluster_irsa_roles",
     "create_promotion_deployment",
     "create_rollback_deployment",
     "delete_app_namespaces",

@@ -19,9 +19,12 @@ from astrolift_lifecycle.models import (
     ScheduledJobRun,
 )
 from astrolift_lifecycle.schema.types import (
+    AppCertificateType,
+    AppDnsRecordType,
     AppDomainType,
     AppEnvironmentType,
     AppHealthSummaryType,
+    AppIdentityBindingType,
     AppPodType,
     CommandRunType,
     DeploymentLogEntryType,
@@ -32,10 +35,13 @@ from astrolift_lifecycle.schema.types import (
     ScheduledJobRunType,
     app_domain_to_type,
     app_env_to_type,
+    certificate_info_to_type,
     command_run_to_type,
     deploy_token_to_type,
     deployment_log_to_type,
     deployment_to_type,
+    dns_record_to_type,
+    identity_binding_to_type,
     pod_info_to_type,
     preview_to_type,
     scheduled_job_run_to_type,
@@ -362,3 +368,135 @@ class LifecycleQuery:
             .order_by("-created_at")[:100]
         )
         return [deploy_token_to_type(t) for t in qs]
+
+    # ---- #377 observability cards (DNS / TLS / Workload identity) ----
+    #
+    # The three resolvers below back the operator-facing cards on the
+    # app detail page. Each one resolves the app + cluster (same shape
+    # as ``astrolift_app_pods`` above), then dispatches to the cluster's
+    # provider plugin via ``driver_for_capability``. Drivers that don't
+    # implement the read method (the SDK default raises
+    # ``NotImplementedError``) degrade to an empty list / null —
+    # the FE renders that as the "not yet supported on this cloud"
+    # empty state with a deep-link to set things up. Per the workspace
+    # convention queries don't return MutationResult envelopes, so
+    # NotImplementedError + driver-side errors are swallowed in the
+    # resolver rather than translated to ``gql_failure``.
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_dns_records(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+    ) -> list[AppDnsRecordType]:
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
+        if cluster is None:
+            return []
+        try:
+            driver = driver_for_capability(cluster, "dns")
+        except AppDeployError:
+            return []
+        try:
+            records = driver.list_records_for_app(app_slug)
+        except NotImplementedError:
+            return []
+        except Exception:  # noqa: BLE001 — driver-side errors degrade
+            return []
+        return [dns_record_to_type(r) for r in records]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_certificates(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+    ) -> list[AppCertificateType]:
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
+        if cluster is None:
+            return []
+        try:
+            driver = driver_for_capability(cluster, "tls")
+        except AppDeployError:
+            return []
+        try:
+            certs = driver.list_certificates(filter_hostname=app_slug)
+        except NotImplementedError:
+            return []
+        except Exception:  # noqa: BLE001 — driver-side errors degrade
+            return []
+        return [certificate_info_to_type(c) for c in certs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_identity_binding(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+    ) -> AppIdentityBindingType | None:
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        cluster = _resolve_app_cluster(app_slug=app_slug, environment_name=environment_name)
+        if cluster is None:
+            return None
+        try:
+            driver = driver_for_capability(cluster, "identity")
+        except AppDeployError:
+            return None
+        try:
+            binding = driver.describe_identity(app_slug)
+        except NotImplementedError:
+            return None
+        except Exception:  # noqa: BLE001 — driver-side errors degrade
+            return None
+        if binding is None:
+            return None
+        return identity_binding_to_type(binding)
+
+
+def _resolve_app_cluster(*, app_slug: str, environment_name: str | None):
+    """Return the TenantCluster the observability cards should query.
+
+    Mirrors the resolution shape of ``astrolift_app_pods``:
+      1. If ``environment_name`` is given, prefer that env's cluster.
+      2. Else fall back to the app's ``default_tenant_cluster``.
+      3. Inactive cluster rows are skipped — same UX outcome as no
+         cluster wired (empty card with a deep-link).
+
+    Lives at module scope so the three observability resolvers stay
+    short + the app/cluster lookup is testable without a strawberry
+    Info object."""
+    app = (
+        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        .filter(slug=app_slug, deleted_at__isnull=True)
+        .first()
+    )
+    if app is None:
+        return None
+    cluster = None
+    if environment_name:
+        env = (
+            AppEnvironment.objects.select_related("tenant_cluster")
+            .filter(
+                registered_app=app,
+                name=environment_name,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+    if cluster is None:
+        cluster = app.default_tenant_cluster
+    if cluster is None or not getattr(cluster, "is_active", True):
+        return None
+    return cluster

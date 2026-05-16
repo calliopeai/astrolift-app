@@ -81,6 +81,11 @@ export type AppsecretwritepayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ArchiveAppRegistryRepoInput = {
+  appId: Scalars['GUID']['input'];
+  archive: Scalars['Boolean']['input'];
+};
+
 export type AstroliftActiveSession = {
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   expiresAt: Scalars['DateTime']['output'];
@@ -152,6 +157,23 @@ export type AstroliftApiTokenPlaintextMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAppCertificate = {
+  daysUntilExpiry: Scalars['Int']['output'];
+  hostname: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  issuer: Scalars['String']['output'];
+  notAfter: Scalars['String']['output'];
+  renewalStatus: Scalars['String']['output'];
+};
+
+export type AstroliftAppDnsRecord = {
+  name: Scalars['String']['output'];
+  propagationStatus: Scalars['String']['output'];
+  ttl: Scalars['Int']['output'];
+  type: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
 export type AstroliftAppDomain = {
   byoCertificateUploadedAt?: Maybe<Scalars['DateTime']['output']>;
   certState: Scalars['String']['output'];
@@ -215,6 +237,13 @@ export type AstroliftAppHealthSummary = {
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   latestDeploymentStatus?: Maybe<Scalars['String']['output']>;
   latestImageTag: Scalars['String']['output'];
+};
+
+export type AstroliftAppIdentityBinding = {
+  kind: Scalars['String']['output'];
+  lastUsedAt?: Maybe<Scalars['String']['output']>;
+  roleArnOrPrincipal: Scalars['String']['output'];
+  trustPolicySummary: Scalars['String']['output'];
 };
 
 export type AstroliftAppLogLine = {
@@ -315,6 +344,18 @@ export type AstroliftBudget = {
   period: Scalars['String']['output'];
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
+};
+
+export type AstroliftCapabilityDeprovisionPayload = {
+  appId?: Maybe<Scalars['GUID']['output']>;
+  clusterSlug: Scalars['String']['output'];
+  detail: Scalars['String']['output'];
+};
+
+export type AstroliftCapabilityDeprovisionPayloadMutationResult = {
+  data?: Maybe<AstroliftCapabilityDeprovisionPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftClusterBootstrapComponent = {
@@ -976,6 +1017,12 @@ export type AstroliftSecretBundle = {
   teamSlug?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftSecretBundleMutationResult = {
+  data?: Maybe<AstroliftSecretBundle>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftSourceConnection = {
   accountLogin: Scalars['String']['output'];
   apiBaseUrl: Scalars['String']['output'];
@@ -1354,6 +1401,21 @@ export type DeleteAlertRuleInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DeleteAppDnsRecordInput = {
+  appId: Scalars['GUID']['input'];
+  hostname: Scalars['String']['input'];
+  recordType: Scalars['String']['input'];
+};
+
+export type DeleteAppIdentityRoleInput = {
+  appId: Scalars['GUID']['input'];
+};
+
+export type DeleteAppIngressInput = {
+  appId: Scalars['GUID']['input'];
+  hostname: InputMaybe<Scalars['String']['input']>;
+};
+
 export type DeleteAppSecretInput = {
   appSlug: Scalars['String']['input'];
   key: Scalars['String']['input'];
@@ -1600,6 +1662,7 @@ export type Mutation = {
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
+  archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
@@ -1625,6 +1688,9 @@ export type Mutation = {
   /** Delete an object by its global ID (soft-delete via delete_check). */
   delete: Scalars['Boolean']['output'];
   deleteAlertRule: AlertruledeletedpayloadMutationResult;
+  deleteAppDnsRecord: AstroliftCapabilityDeprovisionPayloadMutationResult;
+  deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
+  deleteAppIngress: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppSecret: AppsecretwritepayloadMutationResult;
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
@@ -1706,11 +1772,13 @@ export type Mutation = {
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
+  revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
+  rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -1807,6 +1875,11 @@ export type MutationApproveDeploymentArgs = {
 
 export type MutationApproveDeploymentByTokenArgs = {
   input: ApproveByTokenInput;
+};
+
+
+export type MutationArchiveAppRegistryRepoArgs = {
+  input: ArchiveAppRegistryRepoInput;
 };
 
 
@@ -1927,6 +2000,21 @@ export type MutationDeleteArgs = {
 
 export type MutationDeleteAlertRuleArgs = {
   input: DeleteAlertRuleInput;
+};
+
+
+export type MutationDeleteAppDnsRecordArgs = {
+  input: DeleteAppDnsRecordInput;
+};
+
+
+export type MutationDeleteAppIdentityRoleArgs = {
+  input: DeleteAppIdentityRoleInput;
+};
+
+
+export type MutationDeleteAppIngressArgs = {
+  input: DeleteAppIngressInput;
 };
 
 
@@ -2227,6 +2315,11 @@ export type MutationRevokeApiTokenArgs = {
 };
 
 
+export type MutationRevokeAppCertificateArgs = {
+  input: RevokeAppCertificateInput;
+};
+
+
 export type MutationRevokeDeployTokenArgs = {
   input: RevokeDeployTokenInput;
 };
@@ -2249,6 +2342,11 @@ export type MutationRollbackDeploymentArgs = {
 
 export type MutationRotateDeployTokenArgs = {
   input: RotateDeployTokenInput;
+};
+
+
+export type MutationRotateSecretBundleArgs = {
+  input: RotateSecretBundleInput;
 };
 
 
@@ -2670,10 +2768,13 @@ export type Query = {
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApp?: Maybe<AstroliftRegisteredApp>;
+  astroliftAppCertificates: Array<AstroliftAppCertificate>;
   astroliftAppCountForCluster: Scalars['Int']['output'];
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
+  astroliftAppDnsRecords: Array<AstroliftAppDnsRecord>;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
+  astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
@@ -2771,6 +2872,12 @@ export type QueryAstroliftAppArgs = {
 };
 
 
+export type QueryAstroliftAppCertificatesArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftAppCountForClusterArgs = {
   clusterId: Scalars['GUID']['input'];
 };
@@ -2781,8 +2888,20 @@ export type QueryAstroliftAppDeployTokensArgs = {
 };
 
 
+export type QueryAstroliftAppDnsRecordsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftAppDomainsArgs = {
   appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppIdentityBindingArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3104,6 +3223,10 @@ export type RevokeApiTokenInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type RevokeAppCertificateInput = {
+  customDomainId: Scalars['GUID']['input'];
+};
+
 export type RevokeDeployTokenInput = {
   id: Scalars['GUID']['input'];
 };
@@ -3117,6 +3240,10 @@ export type RevokeRoleBindingInput = {
 };
 
 export type RotateDeployTokenInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type RotateSecretBundleInput = {
   id: Scalars['GUID']['input'];
 };
 

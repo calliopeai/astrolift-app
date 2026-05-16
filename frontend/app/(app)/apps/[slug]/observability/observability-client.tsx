@@ -16,17 +16,16 @@ import Link from "next/link";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import {
+  DnsRecordsCard,
+  TlsCertificatesCard,
+  WorkloadIdentityCard,
+} from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -38,10 +37,7 @@ import {
 } from "@/components/ui/table";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import { ON_APP_LOG } from "@/graphql/lifecycle/lifecycle.subscriptions";
-import type {
-  AstroliftAppLogLine,
-  AstroliftAppPod,
-} from "@/graphql/lifecycle/lifecycle.types";
+import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
@@ -143,7 +139,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   // is undefined / unchanged — useEffect deps below depend on it.
   const podRows: AstroliftAppPod[] = React.useMemo(
     () => pods.data?.astroliftAppPods ?? [],
-    [pods.data],
+    [pods.data]
   );
 
   const appEvents = React.useMemo(() => {
@@ -197,9 +193,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       setLogBuffer((prev) => {
         const next = [...prev, formatLogLine(line)];
         // Cap memory so an hours-long tail doesn't grow unbounded.
-        return next.length > LOG_BUFFER_LIMIT
-          ? next.slice(-LOG_BUFFER_LIMIT)
-          : next;
+        return next.length > LOG_BUFFER_LIMIT ? next.slice(-LOG_BUFFER_LIMIT) : next;
       });
     },
   });
@@ -256,8 +250,8 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             <BoxIcon className="size-4" /> Pods
           </CardTitle>
           <CardDescription>
-            Live pod state from the tenant cluster, refreshed every{" "}
-            {POD_POLL_MS / 1000}s. Click a row to tail its logs below.
+            Live pod state from the tenant cluster, refreshed every {POD_POLL_MS / 1000}s. Click a
+            row to tail its logs below.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -291,9 +285,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               </TableHeader>
               <TableBody>
                 {podRows.map((pod) => {
-                  const readyCount = pod.containerStatuses.filter(
-                    (c) => c.ready,
-                  ).length;
+                  const readyCount = pod.containerStatuses.filter((c) => c.ready).length;
                   const total = pod.containerStatuses.length;
                   const isSelected = pod.name === selectedPod;
                   return (
@@ -301,31 +293,23 @@ export function ObservabilityClient({ slug }: { slug: string }) {
                       key={pod.name}
                       onClick={() => setPickedPod(pod.name)}
                       data-selected={isSelected}
-                      className="hover:bg-muted/40 cursor-pointer data-[selected=true]:bg-muted/60"
+                      className="hover:bg-muted/40 data-[selected=true]:bg-muted/60 cursor-pointer"
                     >
-                      <TableCell className="font-mono text-xs">
-                        {pod.name}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {pod.workload || "—"}
-                      </TableCell>
+                      <TableCell className="font-mono text-xs">{pod.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{pod.workload || "—"}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center gap-2 text-xs">
                           <StatusDot status={statusToDot(pod.status)} />
                           <span>{pod.status}</span>
                           {pod.status !== pod.phase && pod.phase && (
-                            <span className="text-muted-foreground font-mono">
-                              ({pod.phase})
-                            </span>
+                            <span className="text-muted-foreground font-mono">({pod.phase})</span>
                           )}
                         </span>
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {readyCount}/{total || 0}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {pod.restarts}
-                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">{pod.restarts}</TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {formatAge(pod.age)}
                       </TableCell>
@@ -340,6 +324,11 @@ export function ObservabilityClient({ slug }: { slug: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}
+      <DnsRecordsCard appSlug={a.slug} />
+      <TlsCertificatesCard appSlug={a.slug} />
+      <WorkloadIdentityCard appSlug={a.slug} />
 
       {/* ─── log viewer ────────────────────────────────────────────────── */}
       <Card>
@@ -407,12 +396,16 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             )}
           </pre>
           <p className="text-muted-foreground mt-2 text-xs">
-            Buffer is capped at {LOG_BUFFER_LIMIT} lines. Use the CLI for
-            a true tail without the buffer cap:{" "}
+            Buffer is capped at {LOG_BUFFER_LIMIT} lines. Use the CLI for a true tail without the
+            buffer cap:{" "}
             <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
               astro logs --app={a.slug} --follow
             </code>
-            . <Link href="/downloads" className="underline">Install the CLI</Link>.
+            .{" "}
+            <Link href="/downloads" className="underline">
+              Install the CLI
+            </Link>
+            .
           </p>
         </CardContent>
       </Card>
@@ -425,8 +418,8 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               <ActivityIcon className="size-4" /> Recent platform events
             </CardTitle>
             <CardDescription>
-              App-scoped slice of the platform event stream — deploy
-              lifecycle, scaling decisions, alert transitions.
+              App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions,
+              alert transitions.
             </CardDescription>
           </div>
           <Link
