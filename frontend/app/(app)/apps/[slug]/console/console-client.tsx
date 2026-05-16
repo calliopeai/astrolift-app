@@ -10,6 +10,7 @@ import {
   TerminalIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -34,29 +35,34 @@ interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
 }
 
-const SAMPLE_COMMANDS = [
-  {
-    label: "Open an interactive shell",
-    template: (slug: string) => `astro exec --app=${slug} -- bash`,
-  },
-  {
-    label: "Run a Django management command",
-    template: (slug: string) =>
-      `astro exec --app=${slug} -- python manage.py migrate --check`,
-  },
-  {
-    label: "Tail logs from the primary workload",
-    template: (slug: string) => `astro logs --app=${slug} --follow`,
-  },
-];
-
 export function ConsoleClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.console");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const a = app.data?.astroliftApp;
 
+  const sampleCommands = [
+    {
+      key: "openShell" as const,
+      label: t("shortcuts.openShell"),
+      template: (s: string) => `astro exec --app=${s} -- bash`,
+    },
+    {
+      key: "djangoCmd" as const,
+      label: t("shortcuts.djangoCmd"),
+      template: (s: string) =>
+        `astro exec --app=${s} -- python manage.py migrate --check`,
+    },
+    {
+      key: "tailLogs" as const,
+      label: t("shortcuts.tailLogs"),
+      template: (s: string) => `astro logs --app=${s} --follow`,
+    },
+  ];
+
   if (app.loading && !a) {
     return (
-      <PageShell title="Loading…">
+      <PageShell title={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
       </PageShell>
     );
@@ -64,13 +70,13 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
   if (!a) {
     return (
-      <PageShell title="App not found">
+      <PageShell title={tCommon("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={tCommon("notFoundSlug", { slug })}
+          description={tCommon("notFoundDescription")}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -78,10 +84,10 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={`${a.name} · Console`}
+      title={t("title", { name: a.name })}
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          {a.slug} · interactive shell into the running workloads
+          {t("description", { slug: a.slug })}
         </span>
       }
     >
@@ -91,30 +97,24 @@ export function ConsoleClient({ slug }: { slug: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <TerminalIcon className="size-4" />
-            In-browser terminal
+            {t("terminal.title")}
             <Badge variant="outline" className="text-[10px] uppercase">
-              coming soon
+              {t("terminal.comingSoon")}
             </Badge>
           </CardTitle>
-          <CardDescription>
-            A web-based PTY into the primary container ships once the
-            log + exec WebSocket bridge stabilizes. Use the CLI in the
-            meantime — it runs the same backend protocol behind the
-            scenes.
-          </CardDescription>
+          <CardDescription>{t("terminal.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-muted/40 flex h-64 items-center justify-center rounded-md border border-dashed">
             <div className="text-muted-foreground flex flex-col items-center gap-2 text-center">
               <TerminalIcon className="size-8" />
-              <p className="text-sm">In-browser terminal lands soon</p>
+              <p className="text-sm">{t("terminal.lands")}</p>
               <p className="max-w-md text-xs">
-                Until then, the{" "}
-                <code className="bg-background rounded px-1 py-0.5 font-mono">
-                  astro
-                </code>{" "}
-                CLI gives you the same exec capability from your local
-                shell.
+                {t.rich("terminal.untilThen", {
+                  cli: () => (
+                    <code className="bg-background rounded px-1 py-0.5 font-mono">astro</code>
+                  ),
+                })}
               </p>
             </div>
           </div>
@@ -122,13 +122,13 @@ export function ConsoleClient({ slug }: { slug: string }) {
             <Button asChild>
               <Link href="/downloads">
                 <DownloadIcon className="size-4" />
-                Install the CLI
+                {t("terminal.install")}
               </Link>
             </Button>
             <Button asChild variant="outline">
               <Link href={`/apps/${a.slug}/tokens`}>
                 <ExternalLinkIcon className="size-4" />
-                Manage deploy tokens
+                {t("terminal.manageTokens")}
               </Link>
             </Button>
           </div>
@@ -137,20 +137,19 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">CLI shortcuts</CardTitle>
+          <CardTitle className="text-base">{t("shortcuts.title")}</CardTitle>
           <CardDescription>
-            Common commands you&apos;d run against this app. Each one
-            authenticates with your local{" "}
-            <code className="bg-muted rounded px-1 py-0.5 font-mono">
-              astro login
-            </code>{" "}
-            session.
+            {t.rich("shortcuts.description", {
+              login: () => (
+                <code className="bg-muted rounded px-1 py-0.5 font-mono">astro login</code>
+              ),
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {SAMPLE_COMMANDS.map((s) => (
+          {sampleCommands.map((s) => (
             <CopyableCommand
-              key={s.label}
+              key={s.key}
               label={s.label}
               command={s.template(a.slug)}
             />
@@ -160,21 +159,24 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">What lands when</CardTitle>
+          <CardTitle className="text-base">{t("lands.title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <Item
             done
-            label="CLI exec via astro exec"
-            note="Available today on every connected cluster."
+            label={t("lands.execLabel")}
+            note={t("lands.execNote")}
+            shippedLabel={t("lands.shipped")}
           />
           <Item
-            label="WebSocket log + exec bridge"
-            note="Wires the runtime PTY into a GraphQL subscription so the in-browser terminal can attach."
+            label={t("lands.bridgeLabel")}
+            note={t("lands.bridgeNote")}
+            shippedLabel={t("lands.shipped")}
           />
           <Item
-            label="Web terminal"
-            note="The actual xterm.js + PTY surface that renders on this page."
+            label={t("lands.webLabel")}
+            note={t("lands.webNote")}
+            shippedLabel={t("lands.shipped")}
           />
         </CardContent>
       </Card>
@@ -205,6 +207,7 @@ function CopyableCommand({
 }
 
 function CopyButton({ value }: { value: string }) {
+  const t = useTranslations("apps.console");
   const [copied, setCopied] = React.useState(false);
   return (
     <Button
@@ -212,15 +215,15 @@ function CopyButton({ value }: { value: string }) {
       variant="ghost"
       size="icon"
       className="size-7 shrink-0"
-      aria-label="Copy command"
+      aria-label={t("copy")}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
           setCopied(true);
-          toast.success("Copied to clipboard");
+          toast.success(t("copied"));
           setTimeout(() => setCopied(false), 1200);
         } catch {
-          toast.error("Couldn't copy — clipboard access blocked");
+          toast.error(t("copyFailed"));
         }
       }}
     >
@@ -237,10 +240,12 @@ function Item({
   done,
   label,
   note,
+  shippedLabel,
 }: {
   done?: boolean;
   label: string;
   note: string;
+  shippedLabel: string;
 }) {
   return (
     <div className="flex items-start gap-3">
@@ -255,7 +260,7 @@ function Item({
               variant="secondary"
               className="ml-2 bg-emerald-500/15 text-emerald-700 text-xs dark:text-emerald-300"
             >
-              shipped
+              {shippedLabel}
             </Badge>
           )}
         </div>

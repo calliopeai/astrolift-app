@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -84,8 +85,7 @@ interface EnvsResp {
 
 interface LinkSection {
   key: string;
-  title: string;
-  description: string;
+  i18nKey: string;
   href: (slug: string) => string;
   icon: typeof KeyIcon;
 }
@@ -95,71 +95,57 @@ interface LinkSection {
 const LINK_SECTIONS: LinkSection[] = [
   {
     key: "deploy-strategy",
-    title: "Deploy strategy",
-    description:
-      "Edit the manifest TOML — image build, environments, triggers, approvals, and rollout strategy.",
+    i18nKey: "deployStrategy",
     href: (s) => `/apps/${s}/config`,
     icon: FileCodeIcon,
   },
   {
     key: "deploy-tokens",
-    title: "Deploy tokens",
-    description:
-      "Long-lived bearer tokens that let external CI hand off deployments without an interactive session.",
+    i18nKey: "deployTokens",
     href: (s) => `/apps/${s}/tokens`,
     icon: KeyIcon,
   },
   {
     key: "secrets",
-    title: "Secrets + env",
-    description:
-      "Per-environment encrypted secrets and plaintext env vars mounted into workloads at deploy time.",
+    i18nKey: "secrets",
     href: (s) => `/apps/${s}/secrets`,
     icon: LockIcon,
   },
   {
     key: "managed-services",
-    title: "Managed services",
-    description:
-      "Provisioned dependencies — Postgres, Redis, object storage — attached and routed via Astrolift.",
+    i18nKey: "managedServices",
     href: (s) => `/apps/${s}/managed-services`,
     icon: PlugIcon,
   },
   {
     key: "domains",
-    title: "Custom domains",
-    description:
-      "Map your own hostnames to environments. Validation, ACME-issued certs, and BYO certificate upload.",
+    i18nKey: "domains",
     href: (s) => `/apps/${s}/domains`,
     icon: GlobeIcon,
   },
   {
     key: "webhooks",
-    title: "Webhooks",
-    description:
-      "Outbound deployment, build, and lifecycle events delivered to your endpoints with HMAC signatures.",
+    i18nKey: "webhooks",
     href: (s) => `/apps/${s}/webhooks`,
     icon: WebhookIcon,
   },
   {
     key: "members",
-    title: "Team members",
-    description:
-      "App-scoped role bindings layered on top of org and team grants. Manage who can deploy, rotate, or destroy.",
+    i18nKey: "members",
     href: (s) => `/apps/${s}/members`,
     icon: UsersIcon,
   },
   {
     key: "observability",
-    title: "Observability",
-    description:
-      "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default.",
+    i18nKey: "observability",
     href: (s) => `/apps/${s}/observability`,
     icon: LineChartIcon,
   },
 ];
 
 export function SettingsClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.settings");
   const app = useQuery<AppResp>(GET_APP, {
     variables: { slug },
     fetchPolicy: "cache-and-network",
@@ -167,7 +153,7 @@ export function SettingsClient({ slug }: { slug: string }) {
 
   if (app.loading && !app.data) {
     return (
-      <PageShell title="Settings" description="Loading…">
+      <PageShell title={t("title")} description={t("loading")}>
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
       </PageShell>
@@ -177,13 +163,13 @@ export function SettingsClient({ slug }: { slug: string }) {
   const a = app.data?.astroliftApp;
   if (!a) {
     return (
-      <PageShell title="App not found">
+      <PageShell title={tCommon("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={tCommon("notFoundSlug", { slug })}
+          description={tCommon("notFoundDescription")}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -194,13 +180,16 @@ export function SettingsClient({ slug }: { slug: string }) {
       title={
         <span className="flex items-center gap-3">
           <SettingsIcon className="text-muted-foreground size-5" />
-          <span>Settings</span>
+          <span>{t("title")}</span>
         </span>
       }
       description={
         <span>
-          Operational controls and configuration for{" "}
-          <span className="text-foreground font-mono text-xs">{a.slug}</span>.
+          {t.rich("description", {
+            slug: () => (
+              <span className="text-foreground font-mono text-xs">{a.slug}</span>
+            ),
+          })}
         </span>
       }
     >
@@ -302,6 +291,7 @@ function ResyncSourceSection({
   appSlug: string;
   lastResyncAt: string | null;
 }) {
+  const t = useTranslations("apps.settings.resync");
   const fmt = useFormatters();
   const [resync, { loading }] = useMutation<ResyncResp>(RESYNC_MANIFEST_FROM_REPO, {
     refetchQueries: [{ query: GET_APP, variables: { slug: appSlug } }],
@@ -341,12 +331,8 @@ function ResyncSourceSection({
     <section className="rounded-lg border p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Resync from source</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Re-read <span className="font-mono">astrolift.toml</span> from the deploy branch and
-            apply env, workload, schedule, and managed-service changes. Non-destructive on local
-            staged drafts.
-          </p>
+          <h2 className="text-base font-semibold">{t("title")}</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
         </div>
         <Can permission="app.update">
           <Button size="sm" variant="outline" onClick={handleResync} disabled={loading}>
@@ -355,18 +341,18 @@ function ResyncSourceSection({
             ) : (
               <RefreshCwIcon className="size-3.5" />
             )}
-            {loading ? "Resyncing…" : "Resync from source"}
+            {loading ? t("syncing") : t("button")}
           </Button>
         </Can>
       </div>
       <p className="text-muted-foreground text-[11px]">
         {lastResyncAt ? (
           <>
-            Last resynced{" "}
+            {t("last")}{" "}
             <span className="text-foreground">{fmt.formatRelativeTime(lastResyncAt)}</span>.
           </>
         ) : (
-          "Never resynced from source."
+          t("never")
         )}
       </p>
     </section>
@@ -389,6 +375,7 @@ interface ResumeIngressResp {
  * where you still want pods running for in-flight DB writes).
  */
 function IngressControlsSection({ appSlug }: { appSlug: string }) {
+  const t = useTranslations("apps.settings.ingress");
   const { data, loading } = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
@@ -398,10 +385,8 @@ function IngressControlsSection({ appSlug }: { appSlug: string }) {
   return (
     <section className="rounded-lg border p-5">
       <div className="mb-4">
-        <h2 className="text-base font-semibold">Ingress</h2>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Pause edge routing without stopping the workloads behind it.
-        </p>
+        <h2 className="text-base font-semibold">{t("title")}</h2>
+        <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
       </div>
 
       {loading && envs.length === 0 ? (
@@ -411,7 +396,7 @@ function IngressControlsSection({ appSlug }: { appSlug: string }) {
         </div>
       ) : envs.length === 0 ? (
         <p className="text-muted-foreground text-xs italic">
-          No environments yet — sync the manifest to populate this section.
+          {t("emptyEnvs")}
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -425,6 +410,7 @@ function IngressControlsSection({ appSlug }: { appSlug: string }) {
 }
 
 function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: string }) {
+  const t = useTranslations("apps.settings.ingress");
   const refetch = [{ query: LIST_ENVIRONMENTS, variables: { appSlug } }];
   const [pause, { loading: pausing }] = useMutation<PauseIngressResp>(PAUSE_APP_INGRESS, {
     refetchQueries: refetch,
@@ -466,7 +452,7 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
             className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
           >
             <PauseIcon className="size-3" />
-            Paused
+            {t("paused")}
           </Badge>
         ) : (
           <Badge
@@ -474,7 +460,7 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
             className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
           >
             <PlayIcon className="size-3" />
-            Live
+            {t("live")}
           </Badge>
         )}
       </div>
@@ -492,7 +478,7 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
           ) : (
             <PauseIcon className="size-3.5" />
           )}
-          {paused ? "Resume" : "Pause"}
+          {paused ? t("resume") : t("pause")}
         </Button>
       </Can>
     </div>
@@ -502,6 +488,7 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
 // ─── link card ────────────────────────────────────────────────────────────────
 
 function SettingsLinkCard({ section, slug }: { section: LinkSection; slug: string }) {
+  const t = useTranslations("apps.settings.links");
   const Icon = section.icon;
   return (
     <Link href={section.href(slug)} className="group block">
@@ -511,8 +498,10 @@ function SettingsLinkCard({ section, slug }: { section: LinkSection; slug: strin
             <Icon className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{section.title}</p>
-            <p className="text-muted-foreground mt-0.5 text-xs">{section.description}</p>
+            <p className="text-sm font-semibold">{t(`${section.i18nKey}.title`)}</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {t(`${section.i18nKey}.description`)}
+            </p>
           </div>
           <ChevronRightIcon className="text-muted-foreground group-hover:text-foreground size-5 shrink-0 transition-colors" />
         </CardContent>
@@ -548,6 +537,7 @@ interface ForceRedeployResp {
  * app's slug exactly.
  */
 function ForceRedeploySection({ appSlug }: { appSlug: string }) {
+  const t = useTranslations("apps.settings.forceRedeploy");
   const [open, setOpen] = React.useState(false);
   const [typed, setTyped] = React.useState("");
   const [forceRedeploy, { loading }] = useMutation<ForceRedeployResp>(FORCE_REDEPLOY);
@@ -610,12 +600,8 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
           <FlameIcon className="size-5" />
         </div>
         <div className="flex-1">
-          <CardTitle className="text-base">Force redeploy</CardTitle>
-          <CardDescription className="mt-1">
-            Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload
-            Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the
-            rollout window opens.
-          </CardDescription>
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription className="mt-1">{t("description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -627,14 +613,11 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
               ) : (
                 <FlameIcon className="size-4" />
               )}
-              Force redeploy
+              {t("button")}
             </Button>
           </Can>
         </Can>
-        <p className="text-muted-foreground mt-2 text-[11px]">
-          Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a
-          rename or a deploy row that won't reconcile.
-        </p>
+        <p className="text-muted-foreground mt-2 text-[11px]">{t("hint")}</p>
       </CardContent>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
@@ -642,18 +625,19 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <FlameIcon className="text-destructive size-4" />
-              Force redeploy {appSlug}?
+              {t("confirmTitle", { slug: appSlug })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This cancels any pending deploys, deletes the app's running Kubernetes objects
-              (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live
-              traffic drops briefly while the rollout window opens. Environments with required
-              approvals still go through the approver flow.
+              {t("confirmDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid gap-2 py-2">
             <Label htmlFor="force-redeploy-confirm" className="text-xs">
-              Type <span className="text-foreground font-mono text-xs">{appSlug}</span> to confirm:
+              {t.rich("typeToConfirm", {
+                slug: () => (
+                  <span className="text-foreground font-mono text-xs">{appSlug}</span>
+                ),
+              })}
             </Label>
             <Input
               id="force-redeploy-confirm"
@@ -666,12 +650,9 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={loading}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
-                // We hand-roll the click handler so the modal stays
-                // open on backend rejection — AlertDialogAction's
-                // default behavior closes regardless of return value.
                 e.preventDefault();
                 void handleConfirm();
               }}
@@ -679,7 +660,7 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
               className="bg-destructive hover:bg-destructive/90 text-white"
             >
               {loading ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              Force redeploy
+              {t("button")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -750,6 +731,7 @@ interface DeregisterResp {
 }
 
 function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string }) {
+  const t = useTranslations("apps.settings.dangerZone");
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [confirm, setConfirm] = React.useState("");
@@ -817,25 +799,22 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
           </div>
           <div className="flex-1">
             <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-              Danger zone
+              {t("title")}
             </CardTitle>
-            <CardDescription className="mt-1">
-              Hard deregister this app and tear down every attached resource — workloads,
-              environments, secrets, domains, managed services. Irreversible.
-            </CardDescription>
+            <CardDescription className="mt-1">{t("description")}</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <Can permission="app.delete">
             <Button variant="destructive" onClick={() => setOpen(true)}>
               <Trash2Icon className="size-4" />
-              Deregister app
+              {t("button")}
             </Button>
           </Can>
           {stillLive.length > 0 ? (
             <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
               <p className="text-amber-700 dark:text-amber-400">
-                Last attempt left {stillLive.length} resource class(es) live:
+                {t("stillLive", { count: stillLive.length })}
               </p>
               <ul className="text-foreground mt-1 list-disc pl-5 font-mono text-[11px]">
                 {stillLive.map((r) => (
@@ -850,15 +829,12 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
                   onClick={() => setOpen(true)}
                   disabled={loading}
                 >
-                  Retry deregister
+                  {t("retry")}
                 </Button>
               </Can>
             </div>
           ) : (
-            <p className="text-muted-foreground mt-2 text-[11px]">
-              For a recoverable delete, use <span className="font-mono">Delete</span> on the
-              overview tab (soft delete, 30-day recovery window).
-            </p>
+            <p className="text-muted-foreground mt-2 text-[11px]">{t("softHint")}</p>
           )}
         </CardContent>
       </Card>
@@ -868,14 +844,11 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="text-destructive size-5" />
-              Deregister {appName}?
+              {t("confirmTitle", { name: appName })}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm">
-                <p>
-                  This destroys the following resource classes for this app. The action is
-                  irreversible.
-                </p>
+                <p>{t("confirmIntro")}</p>
                 <ul className="bg-muted/40 space-y-2 rounded-md border p-3 text-xs">
                   {TEARDOWN_RESOURCE_LABELS.map((r) => (
                     <li key={r.key} className="flex flex-col gap-0.5">
@@ -886,7 +859,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
                 </ul>
                 <div className="space-y-1.5">
                   <Label htmlFor="deregister-confirm" className="text-xs">
-                    To confirm, type the app&apos;s name:{" "}
+                    {t("typeToConfirm")}{" "}
                     <span className="font-mono">{appName}</span>
                   </Label>
                   <Input
@@ -903,7 +876,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={loading}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
@@ -917,7 +890,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
               ) : (
                 <Trash2Icon className="size-4" />
               )}
-              {loading ? "Deregistering…" : "Deregister app"}
+              {loading ? t("deregistering") : t("button")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -960,6 +933,7 @@ interface RunJobOnceResp {
  * page where the run materializes once the cluster picks it up.
  */
 function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
+  const t = useTranslations("apps.settings.runJob");
   const router = useRouter();
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug },
@@ -1027,7 +1001,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
         toast.success(message, {
           duration: 8000,
           action: {
-            label: "View runs",
+            label: t("viewRuns"),
             onClick: () => router.push(logsUrl),
           },
         });
@@ -1046,22 +1020,19 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
           <TimerIcon className="size-5" />
         </div>
         <div className="flex-1">
-          <CardTitle className="text-base">Run scheduled job once</CardTitle>
-          <CardDescription className="mt-1">
-            Dispatch a one-shot run of a manifest-declared cron job without changing its schedule.
-            Recurring runs continue on their own.
-          </CardDescription>
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription className="mt-1">{t("description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <div className="grid gap-1.5">
             <Label htmlFor="run-job-job-slug" className="text-xs">
-              Job
+              {t("job")}
             </Label>
             <Select value={jobSlug} onValueChange={setJobSlugOverride}>
               <SelectTrigger id="run-job-job-slug" className="w-full">
-                <SelectValue placeholder="Select a job" />
+                <SelectValue placeholder={t("selectJob")} />
               </SelectTrigger>
               <SelectContent>
                 {cronJobs.map((w) => (
@@ -1077,11 +1048,11 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="run-job-env" className="text-xs">
-              Environment
+              {t("environment")}
             </Label>
             <Select value={envName} onValueChange={setEnvNameOverride}>
               <SelectTrigger id="run-job-env" className="w-full">
-                <SelectValue placeholder="Select an environment" />
+                <SelectValue placeholder={t("selectEnv")} />
               </SelectTrigger>
               <SelectContent>
                 {environments.map((e) => (
@@ -1103,15 +1074,14 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
               ) : (
                 <PlayCircleIcon className="size-4" />
               )}
-              Run now
+              {t("run")}
             </Button>
           </Can>
         </div>
         <p className="text-muted-foreground mt-3 text-[11px]">
-          The job inherits the cronjob&apos;s pod spec verbatim. Manual runs are recorded alongside
-          scheduled runs on the{" "}
+          {t("footer")}{" "}
           <Link href={`/apps/${appSlug}/jobs`} className="underline">
-            jobs page
+            {t("jobsPage")}
           </Link>
           .
         </p>

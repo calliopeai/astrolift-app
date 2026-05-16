@@ -7,6 +7,7 @@ import {
   PauseIcon,
   PlayIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -45,6 +46,7 @@ interface Resp {
 }
 
 export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
+  const t = useTranslations("lists.environments");
   const { can } = useMyPermissions();
   const variables = { appSlug: appSlug ?? null };
   const { data, loading } = useQuery<Resp>(LIST_ENVIRONMENTS, {
@@ -81,11 +83,9 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
 
   return (
     <PageShell
-      title="Environments"
+      title={t("title")}
       description={
-        appSlug
-          ? `Deploy targets for ${appSlug}. Pause an environment to halt CI/push triggers and require explicit operator action to resume.`
-          : "Deploy targets across your apps. Pause an environment to halt CI/push triggers and require explicit operator action to resume."
+        appSlug ? t("descriptionForApp", { slug: appSlug }) : t("description")
       }
     >
       <Card>
@@ -99,22 +99,22 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
             <div className="p-6">
               <EmptyState
                 icon={<CloudIcon className="size-5" />}
-                title="No environments yet"
-                description="Register an app and bind it to a cluster to create your first environment."
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
                 actionHref="/apps"
-                actionLabel="Open apps"
+                actionLabel={t("openApps")}
               />
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>App / Env</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Cluster</TableHead>
-                  <TableHead>Approvals</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("columns.appEnv")}</TableHead>
+                  <TableHead>{t("columns.url")}</TableHead>
+                  <TableHead>{t("columns.cluster")}</TableHead>
+                  <TableHead>{t("columns.approvals")}</TableHead>
+                  <TableHead>{t("columns.status")}</TableHead>
+                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -123,7 +123,9 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
                     <TableCell>
                       <div className="font-medium">{e.registeredAppSlug}</div>
                       <div className="text-muted-foreground text-xs">
-                        env <span className="font-mono">{e.name}</span>
+                        {t.rich("envName", {
+                          name: () => <span className="font-mono">{e.name}</span>,
+                        })}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -149,11 +151,11 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
                     <TableCell>
                       {e.deploysPaused ? (
                         <Badge variant="destructive" className="gap-1">
-                          <PauseIcon className="size-3" /> paused
+                          <PauseIcon className="size-3" /> {t("paused")}
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="gap-1">
-                          <PlayIcon className="size-3" /> active
+                          <PlayIcon className="size-3" /> {t("active")}
                         </Badge>
                       )}
                     </TableCell>
@@ -175,7 +177,7 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
                                 );
                               }}
                             >
-                              <PlayIcon className="size-3" /> Resume
+                              <PlayIcon className="size-3" /> {t("resume")}
                             </Button>
                           </Can>
                         ) : (
@@ -186,7 +188,7 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
                               disabled={busy}
                               onClick={() => setPauseTarget(e)}
                             >
-                              <PauseIcon className="size-3" /> Pause
+                              <PauseIcon className="size-3" /> {t("pause")}
                             </Button>
                           </Can>
                         ))}
@@ -206,11 +208,14 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
         }}
         title={
           pauseTarget
-            ? `Pause ${pauseTarget.registeredAppSlug}/${pauseTarget.name}?`
-            : "Pause environment?"
+            ? t("confirmPause.title", {
+                app: pauseTarget.registeredAppSlug,
+                env: pauseTarget.name,
+              })
+            : t("confirmPause.fallbackTitle")
         }
-        description="CI pushes and source-driven triggers are rejected with a 423 until you explicitly resume. In-flight deployments continue to completion. Operator-initiated deployments from the UI are still allowed."
-        confirmLabel="Pause environment"
+        description={t("confirmPause.description")}
+        confirmLabel={t("confirmPause.confirm")}
         destructive
         onConfirm={async () => {
           if (!pauseTarget) return;

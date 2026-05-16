@@ -8,6 +8,7 @@ import {
   RefreshCwIcon,
   SaveIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -73,12 +74,12 @@ interface RenderedResp {
 
 const SYNC_BADGE: Record<
   ManifestSyncState,
-  { label: string; tone: "default" | "secondary" | "destructive" | "outline" }
+  { key: string; tone: "default" | "secondary" | "destructive" | "outline" }
 > = {
-  in_sync: { label: "In sync", tone: "secondary" },
-  db_ahead: { label: "Unsaved drafts in DB", tone: "outline" },
-  repo_ahead: { label: "Repo ahead", tone: "outline" },
-  diverged: { label: "Diverged", tone: "destructive" },
+  in_sync: { key: "inSync", tone: "secondary" },
+  db_ahead: { key: "dbAhead", tone: "outline" },
+  repo_ahead: { key: "repoAhead", tone: "outline" },
+  diverged: { key: "diverged", tone: "destructive" },
 };
 
 // Section keys map to the leading [section] header in astrolift.toml.
@@ -87,11 +88,11 @@ const SYNC_BADGE: Record<
 // always written as [[workloads.web]] / [services.postgres] / etc.,
 // scanning for "[<key>" catches both the bare section and the inline
 // array-of-tables forms.
-const PILL_SECTIONS: Array<{ key: string; label: string; headers: string[] }> = [
-  { key: "workloads", label: "Workloads", headers: ["[workloads", "[[workloads"] },
-  { key: "services", label: "Managed services", headers: ["[services", "[[services"] },
-  { key: "env", label: "Env vars", headers: ["[env", "[[env"] },
-  { key: "volumes", label: "Volumes", headers: ["[volumes", "[[volumes"] },
+const PILL_SECTIONS: Array<{ key: string; headers: string[] }> = [
+  { key: "workloads", headers: ["[workloads", "[[workloads"] },
+  { key: "services", headers: ["[services", "[[services"] },
+  { key: "env", headers: ["[env", "[[env"] },
+  { key: "volumes", headers: ["[volumes", "[[volumes"] },
 ];
 
 function PillToggleGroup({
@@ -101,6 +102,7 @@ function PillToggleGroup({
   onSelect: (key: string) => void;
   active: string | null;
 }) {
+  const t = useTranslations("apps.config.pills");
   return (
     <div className="flex flex-wrap gap-1.5">
       {PILL_SECTIONS.map((p) => {
@@ -116,7 +118,7 @@ function PillToggleGroup({
                 : "border-input hover:bg-accent hover:text-accent-foreground"
             }`}
           >
-            {p.label}
+            {t(p.key)}
           </button>
         );
       })}
@@ -139,6 +141,7 @@ function ConflictResolverModal({
   onAcceptTheirs: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("apps.config.conflict");
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6"
@@ -148,18 +151,15 @@ function ConflictResolverModal({
     >
       <div className="bg-background w-full max-w-4xl rounded-lg border p-6 shadow-2xl">
         <h2 id="conflict-title" className="text-lg font-semibold">
-          The manifest changed under your edit
+          {t("title")}
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          The server&apos;s copy was updated at{" "}
-          <span className="font-mono">{new Date(serverUpdatedAt).toLocaleString()}</span>.
-          Keep your edit (force-overwrite their changes) or discard your draft
-          and load theirs.
+          {t("description", { at: new Date(serverUpdatedAt).toLocaleString() })}
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">
-              Your draft
+              {t("yourDraft")}
             </div>
             <pre className="bg-muted max-h-[50vh] overflow-auto rounded p-3 font-mono text-[11px] leading-relaxed">
               {ours}
@@ -167,7 +167,7 @@ function ConflictResolverModal({
           </div>
           <div>
             <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">
-              Server copy
+              {t("serverCopy")}
             </div>
             <pre className="bg-muted max-h-[50vh] overflow-auto rounded p-3 font-mono text-[11px] leading-relaxed">
               {theirs}
@@ -176,13 +176,13 @@ function ConflictResolverModal({
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button variant="outline" onClick={onAcceptTheirs}>
-            Discard mine, load theirs
+            {t("loadTheirs")}
           </Button>
           <Button variant="destructive" onClick={onForceOverwrite}>
-            Force-overwrite with mine
+            {t("forceOverwrite")}
           </Button>
         </div>
       </div>
@@ -192,6 +192,9 @@ function ConflictResolverModal({
 
 export function ConfigEditorClient({ slug }: { slug: string }) {
   const fmt = useFormatters();
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.config");
+  const tSync = useTranslations("apps.config.syncStates");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const a = app.data?.astroliftApp ?? null;
 
@@ -291,6 +294,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
     }
   }
 
+
   async function handleSync() {
     if (!a) return;
     const { data } = await syncManifest({ variables: { input: { id: a.id } } });
@@ -343,7 +347,9 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       charOffset += lines[i].length + 1;
     }
     if (foundLine === -1) {
-      toast.message(`No ${section.label.toLowerCase()} section in this manifest yet.`);
+      const tPills = (k: string) =>
+        ({ workloads: "workloads", services: "managed services", env: "env vars", volumes: "volumes" })[k] ?? k;
+      toast.message(t("pills.noSection", { section: tPills(section.key) }));
       return;
     }
     setActivePill(key);
@@ -378,7 +384,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
   if (app.loading && !a) {
     return (
-      <PageShell title="Config" description="Loading…">
+      <PageShell title={t("loadingTitle")} description={t("loading")}>
         <Skeleton className="h-96 w-full" />
       </PageShell>
     );
@@ -387,14 +393,14 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
   if (!a) {
     return (
       <PageShell
-        title="App not found"
-        description="The app doesn't exist or you don't have permission to view it."
+        title={tCommon("notFound")}
+        description={tCommon("notFoundPermission")}
       >
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
+          title={tCommon("notFoundSlug", { slug })}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -407,13 +413,13 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={`${a.name} · config`}
+      title={t("title", { name: a.name })}
       description={
         <span className="flex flex-wrap items-center gap-2">
           <span>{a.manifestPath} on {a.deployBranch}</span>
-          <Badge variant={syncBadge.tone}>{syncBadge.label}</Badge>
+          <Badge variant={syncBadge.tone}>{tSync(syncBadge.key)}</Badge>
           <span className="text-muted-foreground text-xs">
-            updated {fmt.formatRelativeTime(a.updatedAt)}
+            {t("updated", { at: fmt.formatRelativeTime(a.updatedAt) })}
           </span>
         </span>
       }
@@ -425,11 +431,11 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
             disabled={busy}
           >
             <RefreshCwIcon className="size-4" />
-            Sync from repo
+            {t("syncFromRepo")}
           </Button>
           <Button onClick={handleSave} disabled={busy || !isDirty}>
             <SaveIcon className="size-4" />
-            {updateState.loading ? "Saving…" : "Save draft"}
+            {updateState.loading ? t("saving") : t("saveDraft")}
           </Button>
           <Button
             variant="outline"
@@ -437,7 +443,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
             disabled={busy || a.manifestSyncState === "in_sync"}
           >
             <GitPullRequestIcon className="size-4" />
-            Push to repo
+            {t("pushToRepo")}
           </Button>
         </>
       }
@@ -448,19 +454,15 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
             <div className="flex items-center gap-2">
               <AlertTriangleIcon className="text-destructive size-4" />
               <span>
-                The manifest was updated on the server{" "}
-                <span className="font-medium">
-                  {fmt.formatRelativeTime(conflict.serverUpdatedAt)}
-                </span>
-                . Your edit is based on an older copy.
+                {t("conflict.banner", { at: fmt.formatRelativeTime(conflict.serverUpdatedAt) })}
               </span>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={dismissConflictKeepMine}>
-                Keep mine
+                {t("conflict.keepMine")}
               </Button>
               <Button size="sm" variant="outline" onClick={adoptTheirs}>
-                Load theirs
+                {t("conflict.loadTheirsShort")}
               </Button>
             </div>
           </CardContent>
@@ -469,9 +471,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PillToggleGroup onSelect={scrollToSection} active={activePill} />
-        <p className="text-muted-foreground text-xs">
-          Jump to a section in the editor.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("pills.jumpHint")}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -481,13 +481,11 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
               <span className="font-mono">{a.manifestPath}</span>
               {isDirty && (
                 <Badge variant="outline" className="ml-2 text-[10px]">
-                  unsaved
+                  {t("editor.unsaved")}
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              Source TOML. Save stages the change in the platform; Push to repo opens a PR.
-            </CardDescription>
+            <CardDescription>{t("editor.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -504,17 +502,15 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Rendered preview</CardTitle>
-            <CardDescription>
-              Kubernetes resources the platform would apply for this manifest. Re-renders on the saved draft, not the in-flight edit.
-            </CardDescription>
+            <CardTitle className="text-base">{t("rendered.title")}</CardTitle>
+            <CardDescription>{t("rendered.description")}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {rendered.loading && !rendered.data ? (
               <Skeleton className="m-6 h-96" />
             ) : renderedResult?.error ? (
               <div className="text-destructive p-6 text-sm">
-                <p className="font-medium">Render failed</p>
+                <p className="font-medium">{t("rendered.renderFailed")}</p>
                 <p className="mt-1">{renderedResult.error}</p>
                 {renderedResult.errorPath && (
                   <p className="text-muted-foreground mt-2 font-mono text-xs">
@@ -532,7 +528,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
               </pre>
             ) : (
               <div className="text-muted-foreground p-6 text-sm">
-                No rendered output yet.
+                {t("rendered.noOutput")}
               </div>
             )}
           </CardContent>
@@ -543,14 +539,14 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
         <Card className="border-dashed">
           <CardContent className="flex items-center justify-between gap-3 p-4 text-sm">
             <span className="text-muted-foreground">
-              Source repo:{" "}
-              <span className="font-mono">{a.sourceRepo}</span> on branch{" "}
+              {t("sourceRepo")}{" "}
+              <span className="font-mono">{a.sourceRepo}</span> {t("onBranch")}{" "}
               <span className="font-mono">{a.deployBranch}</span>
             </span>
             <Button asChild variant="ghost" size="sm">
               <a href={a.sourceUrl} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-3.5" />
-                Open repo
+                {t("openRepo")}
               </a>
             </Button>
           </CardContent>
@@ -571,9 +567,9 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
       <ConfirmDialog
         open={confirmSync}
         onOpenChange={setConfirmSync}
-        title="Sync from repo?"
-        description="Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge."
-        confirmLabel="Sync from repo"
+        title={t("confirmSync.title")}
+        description={t("confirmSync.description")}
+        confirmLabel={t("confirmSync.confirm")}
         destructive
         onConfirm={handleSync}
       />

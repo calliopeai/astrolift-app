@@ -8,6 +8,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -92,6 +93,7 @@ const SOURCE_TONE: Record<string, "secondary" | "outline" | "default"> = {
 };
 
 export function SecretsClient({ slug }: { slug: string }) {
+  const t = useTranslations("apps.secrets");
   const [envName, setEnvName] = React.useState<string>(ALL_ENVS);
   const [setOpen, setSetOpen] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
@@ -172,20 +174,20 @@ export function SecretsClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title="Secrets"
-      description={`App-level [env] literals + attached bundles + managed-service envelopes for ${slug}. Set/delete writes to the staged manifest; push to repo to land.`}
+      title={t("title")}
+      description={t("description", { slug })}
       actions={
         <>
           <Can permission="app.deploy">
             <Button variant="outline" onClick={() => setBulkOpen(true)}>
               <UploadIcon className="size-4" />
-              Bulk import
+              {t("bulkImport")}
             </Button>
           </Can>
           <Can permission="app.deploy">
             <Button onClick={() => setSetOpen(true)}>
               <PlusIcon className="size-4" />
-              New secret
+              {t("newSecret")}
             </Button>
           </Can>
         </>
@@ -193,14 +195,14 @@ export function SecretsClient({ slug }: { slug: string }) {
     >
       <div className="flex flex-wrap items-center gap-2">
         <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          Environment
+          {t("environment")}
         </Label>
         <Select value={envName} onValueChange={setEnvName}>
           <SelectTrigger className="w-56">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL_ENVS}>All environments</SelectItem>
+            <SelectItem value={ALL_ENVS}>{t("allEnvironments")}</SelectItem>
             {envList.map((e) => (
               <SelectItem key={e.id} value={e.name}>
                 {e.name}
@@ -209,7 +211,7 @@ export function SecretsClient({ slug }: { slug: string }) {
           </SelectContent>
         </Select>
         <span className="text-muted-foreground text-xs">
-          {list.length} key{list.length === 1 ? "" : "s"}
+          {t("keysCount", { count: list.length })}
         </span>
       </div>
 
@@ -225,18 +227,18 @@ export function SecretsClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<KeyIcon className="size-5" />}
-                title="No secrets yet"
-                description="Add literals via 'New secret', or attach a Secret Bundle. Managed services contribute their connection envelope automatically."
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
               />
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Env</TableHead>
-                  <TableHead>Last edited</TableHead>
+                  <TableHead>{t("columns.key")}</TableHead>
+                  <TableHead>{t("columns.source")}</TableHead>
+                  <TableHead>{t("columns.env")}</TableHead>
+                  <TableHead>{t("columns.lastEdited")}</TableHead>
                   <TableHead className="w-12 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -317,9 +319,13 @@ export function SecretsClient({ slug }: { slug: string }) {
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete ${deleteTarget.key}?` : "Delete secret?"}
-        description="Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed."
-        confirmLabel="Delete secret"
+        title={
+          deleteTarget
+            ? t("delete.title", { key: deleteTarget.key })
+            : t("delete.fallbackTitle")
+        }
+        description={t("delete.description")}
+        confirmLabel={t("delete.confirm")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await handleDelete(deleteTarget);
@@ -363,6 +369,8 @@ function SetSecretSheet({
   onSubmit: (key: string, value: string) => Promise<boolean>;
   busy: boolean;
 }) {
+  const t = useTranslations("apps.secrets.setSheet");
+  const tCommon = useTranslations("apps.common");
   const [key, setKey] = React.useState("");
   const [value, setValue] = React.useState("");
 
@@ -377,12 +385,8 @@ function SetSecretSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>New secret</SheetTitle>
-          <SheetDescription>
-            Sets one literal in the app&apos;s [env] table. Plaintext is never
-            returned by the API; only this submit ships the value to the
-            backend.
-          </SheetDescription>
+          <SheetTitle>{t("title")}</SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -393,7 +397,7 @@ function SetSecretSheet({
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="secret-key">Key</Label>
+            <Label htmlFor="secret-key">{t("keyLabel")}</Label>
             <Input
               id="secret-key"
               value={key}
@@ -406,7 +410,7 @@ function SetSecretSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="secret-value">Value</Label>
+            <Label htmlFor="secret-value">{t("valueLabel")}</Label>
             <Input
               id="secret-value"
               value={value}
@@ -416,17 +420,14 @@ function SetSecretSheet({
               spellCheck={false}
               className="font-mono"
             />
-            <p className="text-muted-foreground text-xs">
-              Stored in <code>manifest_raw_staged</code>. Use Push to repo on
-              the Config page to commit the change.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("valueHint")}</p>
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !key || !value}>
-              {busy ? "Saving…" : "Save secret"}
+              {busy ? t("submitting") : t("submit")}
             </Button>
           </SheetFooter>
         </form>
@@ -446,6 +447,8 @@ function BulkImportSheet({
   onSubmit: (dotenvText: string) => Promise<boolean>;
   busy: boolean;
 }) {
+  const t = useTranslations("apps.secrets.bulkSheet");
+  const tCommon = useTranslations("apps.common");
   const [text, setText] = React.useState("");
 
   React.useEffect(() => {
@@ -465,12 +468,8 @@ function BulkImportSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>Bulk import from .env</SheetTitle>
-          <SheetDescription>
-            Paste a <code>.env</code> file. Each <code>KEY=value</code> line
-            gets staged into the app&apos;s [env] table. Existing keys are
-            overwritten.
-          </SheetDescription>
+          <SheetTitle>{t("title")}</SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -491,7 +490,7 @@ function BulkImportSheet({
           {previewKeys.length > 0 && (
             <div className="rounded border bg-muted/30 p-3 text-xs">
               <p className="text-muted-foreground mb-2">
-                Will set {previewKeys.length} key{previewKeys.length === 1 ? "" : "s"}:
+                {t("willSet", { count: previewKeys.length })}
               </p>
               <div className="flex flex-wrap gap-1">
                 {previewKeys.slice(0, 20).map((k) => (
@@ -509,10 +508,10 @@ function BulkImportSheet({
           )}
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !text.trim()}>
-              {busy ? "Importing…" : "Import"}
+              {busy ? t("submitting") : t("submit")}
             </Button>
           </SheetFooter>
         </form>

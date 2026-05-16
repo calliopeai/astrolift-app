@@ -17,6 +17,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -109,14 +110,15 @@ const CERT_TONE: Record<string, "ok" | "warn" | "error" | "pending"> = {
   failed: "error",
 };
 
-const CERT_LABEL: Record<string, string> = {
-  pending: "Awaiting DNS",
-  validating: "Validating…",
-  validated: "Validated",
-  failed: "Failed",
+const CERT_LABEL_KEYS: Record<string, string> = {
+  pending: "awaiting",
+  validating: "validating",
+  validated: "validated",
+  failed: "failed",
 };
 
 export function AppDomainsClient({ slug }: { slug: string }) {
+  const t = useTranslations("apps.domains");
   const [open, setOpen] = React.useState(false);
   const variables = { appSlug: slug };
   const domains = useQuery<Resp>(LIST_APP_DOMAINS, {
@@ -237,20 +239,20 @@ export function AppDomainsClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title="Custom domains"
-      description={`Hostnames bound to ${slug}. Add a domain, copy the validation TXT record into your DNS provider, then click Recheck once it propagates.`}
+      title={t("title")}
+      description={t("description", { slug })}
       actions={
         <>
           <Button asChild size="sm" variant="outline">
             <Link href={DOC_LINKS.customDomains}>
               <BookOpenIcon className="size-4" />
-              Learn more
+              {t("learnMore")}
             </Link>
           </Button>
           <Can permission="app.deploy">
             <Button onClick={() => setOpen(true)}>
               <PlusIcon className="size-4" />
-              Add domain
+              {t("addDomain")}
             </Button>
           </Can>
         </>
@@ -283,8 +285,8 @@ export function AppDomainsClient({ slug }: { slug: string }) {
             <CardContent className="p-6">
               <EmptyState
                 icon={<GlobeIcon className="size-5" />}
-                title="No custom domains yet"
-                description="Add a hostname like checkout.acme.com to point at this app's primary public workload. Removing a domain later detaches it from ingress — the platform stops routing traffic for that hostname and the cert is freed."
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
               />
             </CardContent>
           </Card>
@@ -333,9 +335,13 @@ export function AppDomainsClient({ slug }: { slug: string }) {
         onOpenChange={(next) => {
           if (!next) setRemoveTarget(null);
         }}
-        title={removeTarget ? `Remove ${removeTarget.hostname}?` : "Remove domain?"}
-        description="Soft-deletes the app↔hostname binding. The cert is freed and the hostname becomes available to re-add to another app. The DNS record at your provider is unaffected."
-        confirmLabel="Remove domain"
+        title={
+          removeTarget
+            ? t("remove.title", { hostname: removeTarget.hostname })
+            : t("remove.fallbackTitle")
+        }
+        description={t("remove.description")}
+        confirmLabel={t("remove.confirm")}
         destructive
         onConfirm={async () => {
           if (removeTarget) await handleRemove(removeTarget);
@@ -371,6 +377,8 @@ function AddDomainSheet({
   onSubmit: (hostname: string, validationMethod: string) => Promise<boolean>;
   busy: boolean;
 }) {
+  const t = useTranslations("apps.domains");
+  const tCommon = useTranslations("apps.common");
   const [hostname, setHostname] = React.useState("");
   const [validationMethod, setValidationMethod] = React.useState("");
 
@@ -385,11 +393,8 @@ function AddDomainSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Add custom domain</SheetTitle>
-          <SheetDescription>
-            The platform issues a cert via Let&apos;s Encrypt once the DNS validation record is in
-            place.
-          </SheetDescription>
+          <SheetTitle>{t("addSheet.title")}</SheetTitle>
+          <SheetDescription>{t("addSheet.description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -400,7 +405,7 @@ function AddDomainSheet({
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="d-hostname">Hostname</Label>
+            <Label htmlFor="d-hostname">{t("addSheet.hostname")}</Label>
             <Input
               id="d-hostname"
               value={hostname}
@@ -413,7 +418,7 @@ function AddDomainSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="d-method">Validation method (optional)</Label>
+            <Label htmlFor="d-method">{t("addSheet.validationMethod")}</Label>
             <Input
               id="d-method"
               value={validationMethod}
@@ -423,15 +428,15 @@ function AddDomainSheet({
               className="font-mono"
             />
             <p className="text-muted-foreground text-xs">
-              Defaults to the platform&apos;s preferred method when blank.
+              {t("addSheet.validationHint")}
             </p>
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !hostname.trim()}>
-              {busy ? "Adding…" : "Add domain"}
+              {busy ? t("addSheet.submitting") : t("addSheet.submit")}
             </Button>
           </SheetFooter>
         </form>
@@ -460,8 +465,10 @@ function DomainHandshakeCard({
   onRemove: () => void;
   onUploadCert: () => void;
 }) {
+  const t = useTranslations("apps.domains.cert");
   const tone = CERT_TONE[domain.certState] ?? "pending";
-  const label = CERT_LABEL[domain.certState] ?? domain.certState;
+  const labelKey = CERT_LABEL_KEYS[domain.certState];
+  const label = labelKey ? t(labelKey) : domain.certState;
   const records = domain.requiredDnsRecords ?? [];
   const allPropagated = records.length > 0 && records.every((r) => r.propagated);
 
@@ -474,18 +481,18 @@ function DomainHandshakeCard({
           <Badge variant="secondary">{label}</Badge>
           {domain.isPlatformManagedZone && (
             <Badge variant="outline" className="text-[10px]">
-              Platform-managed zone
+              {t("platformZone")}
             </Badge>
           )}
           <span className="text-muted-foreground ml-auto text-xs">
             {domain.lastCheckedAt
-              ? `Last checked ${new Date(domain.lastCheckedAt).toLocaleString()}`
-              : "Not checked yet"}
+              ? t("lastChecked", { at: new Date(domain.lastCheckedAt).toLocaleString() })
+              : t("notChecked")}
           </span>
           <Can permission="app.deploy">
             <Button size="sm" variant="ghost" onClick={onRecheck} disabled={busy}>
               <RefreshCwIcon className="size-3.5" />
-              Recheck
+              {t("recheck")}
             </Button>
             <Button
               variant="ghost"
@@ -495,14 +502,14 @@ function DomainHandshakeCard({
               disabled={busy}
             >
               <Trash2Icon className="size-4" />
-              <span className="sr-only">Remove</span>
+              <span className="sr-only">{t("remove")}</span>
             </Button>
           </Can>
         </div>
 
         {domain.lastValidationError && (
           <div className="border-destructive/30 bg-destructive/5 rounded-md border p-2 text-xs">
-            <span className="text-destructive font-medium">Validation error:</span>{" "}
+            <span className="text-destructive font-medium">{t("validationError")}</span>{" "}
             <span className="text-muted-foreground">{domain.lastValidationError}</span>
           </div>
         )}
@@ -513,20 +520,20 @@ function DomainHandshakeCard({
           <div className="space-y-2">
             <div className="text-muted-foreground text-xs">
               {domain.isPlatformManagedZone
-                ? "Platform-managed records — astrolift owns the zone and creates these via the DNS driver. No operator action needed; the recheck below is a probe."
+                ? t("platformManagedHelp")
                 : domain.certState === "validated"
-                  ? "These records are live in your DNS. Cert active."
-                  : "Add these records to your authoritative DNS, then click Recheck. The platform queries your zone's nameservers directly so propagation typically takes < 5 min."}
+                  ? t("liveHelp")
+                  : t("needsHelp")}
             </div>
             <div className="border-border rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-6"></TableHead>
-                    <TableHead className="w-16">Type</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead className="w-16">TTL</TableHead>
+                    <TableHead className="w-16">{t("dnsColumns.type")}</TableHead>
+                    <TableHead>{t("dnsColumns.name")}</TableHead>
+                    <TableHead>{t("dnsColumns.value")}</TableHead>
+                    <TableHead className="w-16">{t("dnsColumns.ttl")}</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -558,17 +565,11 @@ function DomainHandshakeCard({
               </Table>
             </div>
             {allPropagated && domain.certState !== "validated" && (
-              <p className="text-muted-foreground text-xs">
-                All records propagated. Validation should flip to{" "}
-                <code className="font-mono">validated</code> on the next workflow tick (or click
-                Recheck to force one).
-              </p>
+              <p className="text-muted-foreground text-xs">{t("allPropagated")}</p>
             )}
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            Handshake not generated yet — re-add the domain to refresh its required records.
-          </p>
+          <p className="text-muted-foreground text-sm">{t("noHandshake")}</p>
         )}
       </CardContent>
     </Card>
@@ -592,6 +593,7 @@ function CertStateBlock({
   busy: boolean;
   onUploadCert: () => void;
 }) {
+  const t = useTranslations("apps.domains.cert");
   const state = domain.certificateState || "not_requested";
   // not_requested with un-validated DNS: don't render — the DNS card
   // already tells the story. Once DNS validates, the worker fires
@@ -603,13 +605,9 @@ function CertStateBlock({
     return (
       <div className="text-muted-foreground flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
         <Loader2Icon className="size-3.5 animate-spin text-amber-600" />
-        <span className="font-medium text-amber-700 dark:text-amber-400">
-          Certificate provisioning…
-        </span>
+        <span className="font-medium text-amber-700 dark:text-amber-400">{t("issuing")}</span>
         <span>
-          {domain.isPlatformManagedZone
-            ? "DNS-01 challenge in progress with the cloud cert manager."
-            : "HTTP-01 challenge running against your CNAME target."}
+          {domain.isPlatformManagedZone ? t("issuingPlatform") : t("issuingExternal")}
         </span>
       </div>
     );
@@ -618,12 +616,9 @@ function CertStateBlock({
     return (
       <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs">
         <ShieldCheckIcon className="size-3.5 text-emerald-600" />
-        <span className="font-medium text-emerald-700 dark:text-emerald-400">
-          Certificate active
-        </span>
+        <span className="font-medium text-emerald-700 dark:text-emerald-400">{t("active")}</span>
         <span className="text-muted-foreground">
-          Serving HTTPS for {domain.hostname}. The renderer picks the cert up automatically on the
-          next deploy.
+          {t("activeDesc", { hostname: domain.hostname })}
         </span>
       </div>
     );
@@ -634,24 +629,21 @@ function CertStateBlock({
         <CheckCircle2Icon className="size-3.5 shrink-0 text-sky-600" />
         <div className="flex-1 space-y-1">
           <div>
-            <span className="font-medium text-sky-700 dark:text-sky-400">
-              Using uploaded certificate
-            </span>
+            <span className="font-medium text-sky-700 dark:text-sky-400">{t("byo")}</span>
             {domain.byoCertificateUploadedAt && (
               <span className="text-muted-foreground ml-2">
-                Uploaded {new Date(domain.byoCertificateUploadedAt).toLocaleString()}
+                {t("byoUploaded", {
+                  at: new Date(domain.byoCertificateUploadedAt).toLocaleString(),
+                })}
               </span>
             )}
           </div>
-          <p className="text-muted-foreground">
-            The platform won&apos;t auto-rotate this cert. Re-upload before its expiry to avoid a
-            service interruption.
-          </p>
+          <p className="text-muted-foreground">{t("byoNote")}</p>
         </div>
         <Can permission="app.deploy">
           <Button size="sm" variant="ghost" onClick={onUploadCert} disabled={busy}>
             <UploadIcon className="size-3.5" />
-            Replace
+            {t("replace")}
           </Button>
         </Can>
       </div>
@@ -662,33 +654,26 @@ function CertStateBlock({
       <div className="border-destructive/30 bg-destructive/5 flex items-start gap-2 rounded-md border p-2 text-xs">
         <AlertTriangleIcon className="text-destructive size-3.5 shrink-0" />
         <div className="flex-1 space-y-1">
-          <div className="text-destructive font-medium">Certificate issuance failed</div>
+          <div className="text-destructive font-medium">{t("failedTitle")}</div>
           {domain.lastCertificateError && (
             <p className="text-muted-foreground font-mono break-all">
               {domain.lastCertificateError}
             </p>
           )}
-          <p className="text-muted-foreground">
-            Common causes: external DNS zone on AWS (ACM can&apos;t HTTP-01), Let&apos;s Encrypt
-            rate limit on the apex, or the CNAME isn&apos;t reachable on port 80. Upload your own
-            certificate to bypass auto-issuance, or fix the upstream cause and click Recheck.
-          </p>
+          <p className="text-muted-foreground">{t("failedHelp")}</p>
         </div>
         <Can permission="app.deploy">
           <Button size="sm" variant="default" onClick={onUploadCert} disabled={busy}>
             <UploadIcon className="size-3.5" />
-            Upload cert
+            {t("uploadCert")}
           </Button>
         </Can>
       </div>
     );
   }
-  // not_requested but DNS validated: should be transient — show a
-  // gentle hint that the worker hasn't picked it up yet.
   return (
     <div className="text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-      DNS validated. Certificate issuance queued — should start within a minute. If it doesn&apos;t,
-      click Recheck to retrigger.
+      {t("queued")}
     </div>
   );
 }
@@ -711,6 +696,8 @@ function UploadCertSheet({
   onSubmit: (certificatePem: string, privateKeyPem: string) => Promise<boolean>;
   busy: boolean;
 }) {
+  const t = useTranslations("apps.domains.upload");
+  const tCommon = useTranslations("apps.common");
   const [cert, setCert] = React.useState("");
   const [key, setKey] = React.useState("");
 
@@ -730,13 +717,9 @@ function UploadCertSheet({
       <SheetContent className="flex flex-col sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>
-            {domain ? `Upload certificate for ${domain.hostname}` : "Upload certificate"}
+            {domain ? t("title", { hostname: domain.hostname }) : t("fallbackTitle")}
           </SheetTitle>
-          <SheetDescription>
-            Paste the full PEM-encoded certificate chain (leaf + any intermediates) and the matching
-            private key. The platform stores the bundle and projects it as a Kubernetes TLS Secret
-            on the runtime cluster on the next deploy. Replaces any in-flight auto-issuance.
-          </SheetDescription>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -747,7 +730,7 @@ function UploadCertSheet({
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="cert-pem">Certificate chain (PEM)</Label>
+            <Label htmlFor="cert-pem">{t("certLabel")}</Label>
             <Textarea
               id="cert-pem"
               value={cert}
@@ -760,13 +743,11 @@ function UploadCertSheet({
               className="h-40 font-mono text-xs"
             />
             {!certOk && cert.length > 0 && (
-              <p className="text-destructive text-xs">
-                Doesn&apos;t look like a PEM CERTIFICATE block.
-              </p>
+              <p className="text-destructive text-xs">{t("certInvalid")}</p>
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="cert-key">Private key (PEM)</Label>
+            <Label htmlFor="cert-key">{t("keyLabel")}</Label>
             <Textarea
               id="cert-key"
               value={key}
@@ -777,21 +758,16 @@ function UploadCertSheet({
               className="h-32 font-mono text-xs"
             />
             {!keyOk && key.length > 0 && (
-              <p className="text-destructive text-xs">
-                Doesn&apos;t look like a PEM-encoded private key.
-              </p>
+              <p className="text-destructive text-xs">{t("keyInvalid")}</p>
             )}
           </div>
-          <p className="text-muted-foreground text-xs">
-            The platform won&apos;t auto-rotate this cert. Track its expiry yourself; re-upload
-            before it lapses to avoid a service interruption.
-          </p>
+          <p className="text-muted-foreground text-xs">{t("noRotate")}</p>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={!ready}>
-              {busy ? "Uploading…" : "Upload certificate"}
+              {busy ? t("submitting") : t("submit")}
             </Button>
           </SheetFooter>
         </form>
@@ -821,6 +797,8 @@ function IngressStatusCard({
   busy: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("apps.domains.ingress");
+  const tCert = useTranslations("apps.domains.cert");
   const paused = env.ingressPaused;
   const tone = paused ? "warn" : "ok";
   const managedHost = (() => {
@@ -838,14 +816,14 @@ function IngressStatusCard({
         <div className="flex flex-wrap items-baseline gap-3">
           <StatusDot status={tone} />
           <span className="text-sm font-semibold capitalize">{env.name}</span>
-          <span className="text-muted-foreground text-xs">ingress</span>
+          <span className="text-muted-foreground text-xs">{t("label")}</span>
           {paused ? (
             <Badge
               variant="outline"
               className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
             >
               <PauseIcon className="size-3" />
-              Paused
+              {t("paused")}
             </Badge>
           ) : (
             <Badge
@@ -853,7 +831,7 @@ function IngressStatusCard({
               className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
             >
               <PlayIcon className="size-3" />
-              Live
+              {t("live")}
             </Badge>
           )}
           <Can permission="app.deploy">
@@ -871,36 +849,32 @@ function IngressStatusCard({
               ) : (
                 <PauseIcon className="size-3.5" />
               )}
-              {paused ? "Resume ingress" : "Pause ingress"}
+              {paused ? t("resume") : t("pause")}
             </Button>
           </Can>
         </div>
 
-        <p className="text-muted-foreground text-xs">
-          When paused, the app&apos;s ingresses return HTTP 503 to all callers. Use this for planned
-          maintenance windows — the workload keeps running so you can still ship deploys and observe
-          metrics. Resume restores routing.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("description")}</p>
 
         <div className="border-border bg-muted/30 space-y-1.5 rounded-md border p-3 text-xs">
-          <div className="text-muted-foreground">Bound hostnames</div>
+          <div className="text-muted-foreground">{t("bound")}</div>
           {managedHost && (
             <div className="flex items-center gap-2">
               <code className="font-mono break-all">{managedHost}</code>
               <Badge variant="outline" className="text-[10px]">
-                Managed
+                {tCert("managed")}
               </Badge>
             </div>
           )}
           {customHosts.length === 0
             ? !managedHost && (
-                <p className="text-muted-foreground italic">No hostnames bound yet.</p>
+                <p className="text-muted-foreground italic">{t("noneBound")}</p>
               )
             : customHosts.map((h) => (
                 <div key={h} className="flex items-center gap-2">
                   <code className="font-mono break-all">{h}</code>
                   <Badge variant="outline" className="text-[10px]">
-                    Custom
+                    {tCert("custom")}
                   </Badge>
                 </div>
               ))}
@@ -911,10 +885,9 @@ function IngressStatusCard({
             <AlertTriangleIcon className="size-3.5 shrink-0 text-amber-600" />
             <span className="text-muted-foreground">
               <span className="font-medium text-amber-700 dark:text-amber-400">
-                Maintenance mode active.
+                {t("maintenance")}
               </span>{" "}
-              Every bound hostname is returning 503. Health probes that hit ingress will fail;
-              in-cluster probes are unaffected.
+              {t("maintenanceDesc")}
             </span>
           </div>
         )}

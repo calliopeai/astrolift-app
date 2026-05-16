@@ -11,6 +11,7 @@ import {
   ShieldCheckIcon,
   ShieldOffIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -127,6 +128,8 @@ function asObject(payload: unknown): Record<string, unknown> | null {
 }
 
 export function AppSecurityClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.security");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   // Org-wide events query — we filter client-side by registeredAppId
   // until astroliftEvents grows an appSlug arg per #313.
@@ -158,7 +161,7 @@ export function AppSecurityClient({ slug }: { slug: string }) {
 
   if (app.loading && !a) {
     return (
-      <PageShell title="Security" description="Loading…">
+      <PageShell title={t("loadingTitle")} description={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
       </PageShell>
     );
@@ -167,14 +170,14 @@ export function AppSecurityClient({ slug }: { slug: string }) {
   if (!a) {
     return (
       <PageShell
-        title="App not found"
-        description="The app doesn't exist or you don't have permission to view it."
+        title={tCommon("notFound")}
+        description={tCommon("notFoundPermission")}
       >
         <EmptyState
           icon={<ShieldCheckIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
+          title={tCommon("notFoundSlug", { slug })}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -182,8 +185,8 @@ export function AppSecurityClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={`${a.name} · Security`}
-      description="Supply-chain status for the latest build: image signing, vulnerability scan, SBOM, and the deploy-gating policy that decides when a build is safe to roll out."
+      title={t("title", { name: a.name })}
+      description={t("description")}
     >
       <AppTabs slug={a.slug} active="security" />
 
@@ -192,24 +195,8 @@ export function AppSecurityClient({ slug }: { slug: string }) {
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
             <AlertTriangleIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
             <div className="flex-1">
-              <CardTitle className="text-sm">Backend wiring pending</CardTitle>
-              <CardDescription>
-                The supply-chain workflows (image_signing, image_scan,
-                sbom_multiarch) already emit events, but the per-app event
-                filter and the <code className="bg-muted rounded px-1 font-mono">RegisteredApp.securityPolicy</code>{" "}
-                fields aren&apos;t on main yet. The panels below read
-                whatever org-wide events match this app and the policy
-                toggles are disabled — tracked under{" "}
-                <a
-                  href="https://github.com/calliopeai/astrolift-app/issues/313"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline"
-                >
-                  #313
-                </a>
-                .
-              </CardDescription>
+              <CardTitle className="text-sm">{t("backendPending.title")}</CardTitle>
+              <CardDescription>{t("backendPending.description")}</CardDescription>
             </div>
           </CardHeader>
         </Card>
@@ -224,6 +211,7 @@ export function AppSecurityClient({ slug }: { slug: string }) {
 }
 
 function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading: boolean }) {
+  const t = useTranslations("apps.security.signing");
   const payload = (event && asObject(event.payload)) as SigningPayload | null;
   const hasEvent = event !== null && payload !== null;
 
@@ -233,44 +221,37 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
         <div className="flex items-start gap-3">
           <ShieldCheckIcon className="mt-0.5 size-4 text-emerald-700 dark:text-emerald-300" />
           <div>
-            <CardTitle className="text-sm">Image signing</CardTitle>
-            <CardDescription>
-              Cosign-keyless signature on the latest published image. Verifiable
-              via the Sigstore transparency log.
-            </CardDescription>
+            <CardTitle className="text-sm">{t("title")}</CardTitle>
+            <CardDescription>{t("description")}</CardDescription>
           </div>
         </div>
         {hasEvent ? (
           <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-            Signed
+            {t("signed")}
           </Badge>
         ) : (
-          <Badge variant="outline">No data</Badge>
+          <Badge variant="outline">{t("noData")}</Badge>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
           <Skeleton className="h-16 w-full" />
         ) : !hasEvent ? (
-          <p className="text-muted-foreground text-sm">
-            No <code className="bg-muted rounded px-1 font-mono">image.signed</code>{" "}
-            event for this app yet. The next CI run that publishes an image
-            will emit one.
-          </p>
+          <p className="text-muted-foreground text-sm">{t("noEvent")}</p>
         ) : (
           <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-            <Field label="Image tag" mono value={payload.image_tag || "—"} />
+            <Field label={t("imageTag")} mono value={payload.image_tag || "—"} />
             <Field
-              label="Signed at"
+              label={t("signedAt")}
               value={formatTime(payload.signed_at ?? event?.occurredAt ?? null)}
             />
             <Field
-              label="Signer identity"
+              label={t("signerIdentity")}
               mono
               value={payload.signer_identity || "—"}
             />
             <Field
-              label="Image digest"
+              label={t("imageDigest")}
               mono
               value={
                 payload.image_digest ? (
@@ -283,7 +264,7 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
             {payload.rekor_entry_url && (
               <div className="sm:col-span-2">
                 <dt className="text-muted-foreground text-xs uppercase tracking-wide">
-                  Rekor transparency log
+                  {t("rekor")}
                 </dt>
                 <dd className="mt-0.5">
                   <a
@@ -293,8 +274,8 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
                     className="inline-flex items-center gap-1 text-sm hover:underline"
                   >
                     {payload.rekor_log_index
-                      ? `Entry #${payload.rekor_log_index}`
-                      : "Verify entry"}
+                      ? t("rekorEntry", { index: payload.rekor_log_index })
+                      : t("rekorVerify")}
                     <ExternalLinkIcon className="size-3" />
                   </a>
                 </dd>
@@ -308,6 +289,8 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
 }
 
 function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: boolean }) {
+  const t = useTranslations("apps.security.sbom");
+  const tSig = useTranslations("apps.security.signing");
   const payload = (event && asObject(event.payload)) as SbomPayload | null;
   const hasEvent = event !== null && payload !== null;
 
@@ -317,42 +300,35 @@ function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: b
         <div className="flex items-start gap-3">
           <FileBoxIcon className="text-muted-foreground mt-0.5 size-4" />
           <div>
-            <CardTitle className="text-sm">SBOM</CardTitle>
-            <CardDescription>
-              Software Bill of Materials for the latest image. Lists every
-              package the runtime container includes.
-            </CardDescription>
+            <CardTitle className="text-sm">{t("title")}</CardTitle>
+            <CardDescription>{t("description")}</CardDescription>
           </div>
         </div>
         {hasEvent && payload.component_count != null ? (
-          <Badge variant="secondary">{payload.component_count} components</Badge>
+          <Badge variant="secondary">{t("components", { count: payload.component_count })}</Badge>
         ) : (
-          <Badge variant="outline">No data</Badge>
+          <Badge variant="outline">{tSig("noData")}</Badge>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
           <Skeleton className="h-16 w-full" />
         ) : !hasEvent ? (
-          <p className="text-muted-foreground text-sm">
-            No <code className="bg-muted rounded px-1 font-mono">sbom.generated</code>{" "}
-            event for this app yet. The sbom_multiarch workflow runs on the
-            next image push.
-          </p>
+          <p className="text-muted-foreground text-sm">{t("noEvent")}</p>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <dl className="grid flex-1 grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
               <Field
-                label="Format"
+                label={t("format")}
                 mono
                 value={payload.format || "—"}
               />
               <Field
-                label="Generated at"
+                label={t("generatedAt")}
                 value={formatTime(payload.generated_at ?? event?.occurredAt ?? null)}
               />
               <Field
-                label="Image digest"
+                label={tSig("imageDigest")}
                 mono
                 value={
                   payload.image_digest ? (
@@ -367,7 +343,7 @@ function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: b
               <Button asChild size="sm" variant="outline">
                 <a href={payload.artifact_url} target="_blank" rel="noreferrer">
                   <DownloadIcon className="size-3.5" />
-                  Download SBOM
+                  {t("download")}
                 </a>
               </Button>
             )}
@@ -379,6 +355,8 @@ function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: b
 }
 
 function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: boolean }) {
+  const t = useTranslations("apps.security.scan");
+  const tSig = useTranslations("apps.security.signing");
   const payload = (event && asObject(event.payload)) as ScanPayload | null;
   const hasEvent = event !== null && payload !== null;
   const counts = payload?.counts ?? { critical: 0, high: 0, medium: 0, low: 0 };
@@ -402,22 +380,19 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
         <div className="flex items-start gap-3">
           <ScanLineIcon className="text-muted-foreground mt-0.5 size-4" />
           <div>
-            <CardTitle className="text-sm">Vulnerability scan</CardTitle>
-            <CardDescription>
-              Findings from the image_scan workflow on the latest published
-              image. CVE list with suggested upgrade paths.
-            </CardDescription>
+            <CardTitle className="text-sm">{t("title")}</CardTitle>
+            <CardDescription>{t("description")}</CardDescription>
           </div>
         </div>
         {hasEvent ? (
           <div className="flex flex-wrap gap-1.5">
-            <SeverityCount label="Critical" value={counts.critical} tone="critical" />
-            <SeverityCount label="High" value={counts.high} tone="high" />
-            <SeverityCount label="Medium" value={counts.medium} tone="medium" />
-            <SeverityCount label="Low" value={counts.low} tone="low" />
+            <SeverityCount label={t("critical")} value={counts.critical} tone="critical" />
+            <SeverityCount label={t("high")} value={counts.high} tone="high" />
+            <SeverityCount label={t("medium")} value={counts.medium} tone="medium" />
+            <SeverityCount label={t("low")} value={counts.low} tone="low" />
           </div>
         ) : (
-          <Badge variant="outline">No data</Badge>
+          <Badge variant="outline">{tSig("noData")}</Badge>
         )}
       </CardHeader>
       <CardContent className="space-y-3 p-0">
@@ -427,27 +402,22 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
             <Skeleton className="h-12 w-full" />
           </div>
         ) : !hasEvent ? (
-          <p className="text-muted-foreground p-6 text-sm">
-            No <code className="bg-muted rounded px-1 font-mono">image.scanned</code>{" "}
-            event for this app yet. The image_scan workflow runs on the next
-            image push.
-          </p>
+          <p className="text-muted-foreground p-6 text-sm">{t("noEvent")}</p>
         ) : sortedFindings.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm">
             <CheckCircle2Icon className="size-4 text-emerald-700 dark:text-emerald-300" />
             <span className="text-muted-foreground">
-              No vulnerabilities reported. Last scanned{" "}
-              {formatTime(payload.scanned_at ?? event?.occurredAt ?? null)}.
+              {t("noVulns", { at: formatTime(payload.scanned_at ?? event?.occurredAt ?? null) })}
             </span>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>CVE</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Package</TableHead>
-                <TableHead>Fix available</TableHead>
+                <TableHead>{t("columns.cve")}</TableHead>
+                <TableHead>{t("columns.severity")}</TableHead>
+                <TableHead>{t("columns.package")}</TableHead>
+                <TableHead>{t("columns.fix")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -477,10 +447,10 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
                   <TableCell className="font-mono text-xs">
                     {f.fixed_in_version ? (
                       <span className="text-emerald-700 dark:text-emerald-300">
-                        upgrade → {f.fixed_in_version}
+                        {t("upgrade", { version: f.fixed_in_version })}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground">no fix yet</span>
+                      <span className="text-muted-foreground">{t("noFix")}</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -513,6 +483,7 @@ function SeverityCount({
 }
 
 function PolicyCard({ backendReady }: { backendReady: boolean }) {
+  const t = useTranslations("apps.security.policy");
   const [policy, setPolicy] = React.useState(DEFAULT_POLICY);
   const [dirty, setDirty] = React.useState(false);
 
@@ -534,25 +505,21 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
       <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
         <ShieldOffIcon className="text-muted-foreground mt-0.5 size-4" />
         <div className="flex-1">
-          <CardTitle className="text-sm">Deploy-gating policy</CardTitle>
-          <CardDescription>
-            What the promote-deploy workflow refuses to roll out. Rules
-            evaluate at the moment of promotion against the latest scan + the
-            signature on the image digest.
-          </CardDescription>
+          <CardTitle className="text-sm">{t("title")}</CardTitle>
+          <CardDescription>{t("description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
         <ToggleRow
-          label="Block deploys on critical CVEs"
-          description="Refuses to roll out an image whose latest scan reports any critical-severity vulnerability."
+          label={t("blockCves")}
+          description={t("blockCvesDesc")}
           checked={policy.blockOnCriticalCves}
           disabled={!backendReady}
           onChange={(v) => update("blockOnCriticalCves", v)}
         />
         <ToggleRow
-          label="Block deploys on missing signature"
-          description="Refuses to roll out an image that doesn't have a corresponding image.signed event. Sigstore-keyless via cosign on the CI side."
+          label={t("blockSig")}
+          description={t("blockSigDesc")}
           checked={policy.blockOnMissingSignature}
           disabled={!backendReady}
           onChange={(v) => update("blockOnMissingSignature", v)}
@@ -561,12 +528,8 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">High-severity CVE threshold</p>
-              <p className="text-muted-foreground text-xs">
-                Set a count above which deploys get blocked. Leave empty to
-                allow any number of high-severity findings (criticals still
-                gated above).
-              </p>
+              <p className="text-sm font-medium">{t("highThreshold")}</p>
+              <p className="text-muted-foreground text-xs">{t("highThresholdDesc")}</p>
             </div>
             <select
               className="border-input bg-background rounded-md border px-2 py-1 text-sm disabled:opacity-50"
@@ -579,7 +542,7 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
                 )
               }
             >
-              <option value="">No threshold</option>
+              <option value="">{t("noThreshold")}</option>
               <option value="1">≥ 1 high</option>
               <option value="3">≥ 3 high</option>
               <option value="5">≥ 5 high</option>
@@ -591,10 +554,10 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
         <Can permission="app.update">
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" disabled={!dirty || !backendReady} onClick={reset}>
-              Reset
+              {t("reset")}
             </Button>
             <Button disabled={!dirty || !backendReady}>
-              {backendReady ? "Save policy" : "Backend wiring pending"}
+              {backendReady ? t("save") : t("pending")}
             </Button>
           </div>
         </Can>

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { ShieldIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -45,6 +46,8 @@ interface RolesResp {
 }
 
 export function AppMembersClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.members");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const bindings = useQuery<BindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
@@ -85,7 +88,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
 
   if (app.loading && !a) {
     return (
-      <PageShell title="Members" description="Loading…">
+      <PageShell title={t("loadingTitle")} description={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
       </PageShell>
     );
@@ -94,14 +97,14 @@ export function AppMembersClient({ slug }: { slug: string }) {
   if (!a) {
     return (
       <PageShell
-        title="App not found"
-        description="The app doesn't exist or you don't have permission to view it."
+        title={tCommon("notFound")}
+        description={tCommon("notFoundPermission")}
       >
         <EmptyState
           icon={<UsersIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
+          title={tCommon("notFoundSlug", { slug })}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -109,13 +112,13 @@ export function AppMembersClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title="App members"
-      description={`Role bindings scoped to ${a.slug}. Org and team-level grants apply automatically and aren't shown here — manage them on /members.`}
+      title={t("title")}
+      description={t("description", { slug: a.slug })}
     >
       <Card>
         <CardContent className="p-4">
           <p className="text-muted-foreground text-xs uppercase tracking-wide">
-            App-scoped roles available
+            {t("availableRoles")}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {appRoles.map((r) => (
@@ -125,7 +128,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
             ))}
             {appRoles.length === 0 && (
               <span className="text-muted-foreground text-xs">
-                No app-scoped roles defined.
+                {t("noRolesDefined")}
               </span>
             )}
           </div>
@@ -143,20 +146,20 @@ export function AppMembersClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<ShieldIcon className="size-5" />}
-                title="No app-scoped role bindings"
-                description="Grant a user an app-level role from the org-wide /members page (Grant role → APP scope → this app)."
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
                 actionHref="/members"
-                actionLabel="Open members"
+                actionLabel={t("openMembers")}
               />
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Granted</TableHead>
-                  <TableHead>Expires</TableHead>
+                  <TableHead>{t("columns.user")}</TableHead>
+                  <TableHead>{t("columns.role")}</TableHead>
+                  <TableHead>{t("columns.granted")}</TableHead>
+                  <TableHead>{t("columns.expires")}</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -173,7 +176,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
                         </>
                       ) : (
                         <span className="font-mono text-xs">
-                          group: {rb.groupExternalId}
+                          {t("groupPrefix")} {rb.groupExternalId}
                         </span>
                       )}
                     </TableCell>
@@ -186,7 +189,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
                       {new Date(rb.grantedAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {rb.expiresAt ? new Date(rb.expiresAt).toLocaleDateString() : "never"}
+                      {rb.expiresAt ? new Date(rb.expiresAt).toLocaleDateString() : t("never")}
                     </TableCell>
                     <TableCell className="text-right">
                       <Can permission="org.manage_members">
@@ -198,7 +201,7 @@ export function AppMembersClient({ slug }: { slug: string }) {
                           disabled={revoking}
                         >
                           <Trash2Icon className="size-4" />
-                          <span className="sr-only">Revoke</span>
+                          <span className="sr-only">{t("revoke")}</span>
                         </Button>
                       </Can>
                     </TableCell>
@@ -217,13 +220,14 @@ export function AppMembersClient({ slug }: { slug: string }) {
         }}
         title={
           revokeTarget
-            ? `Revoke ${revokeTarget.role.slug} from ${
-                revokeTarget.user?.username ?? revokeTarget.groupExternalId
-              }?`
-            : "Revoke role?"
+            ? t("revokeConfirm.title", {
+                role: revokeTarget.role.slug,
+                target: revokeTarget.user?.username ?? revokeTarget.groupExternalId,
+              })
+            : t("revokeConfirm.fallbackTitle")
         }
-        description="Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions."
-        confirmLabel="Revoke role"
+        description={t("revokeConfirm.description")}
+        confirmLabel={t("revokeConfirm.confirm")}
         destructive
         onConfirm={async () => {
           if (revokeTarget) await handleRevoke(revokeTarget);

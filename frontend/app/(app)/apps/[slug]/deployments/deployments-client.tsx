@@ -9,6 +9,7 @@ import {
   GitCommitIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -74,22 +75,22 @@ const statusToDot: Record<
 
 type StatusBucket = "all" | "succeeded" | "failed" | "in_flight" | "other";
 
-const STATUS_BUCKET_OPTIONS: { value: StatusBucket; label: string }[] = [
-  { value: "all", label: "Any status" },
-  { value: "succeeded", label: "Succeeded" },
-  { value: "failed", label: "Failed" },
-  { value: "in_flight", label: "In flight" },
-  { value: "other", label: "Rolled back / superseded" },
+const STATUS_BUCKET_KEYS: { value: StatusBucket; key: string }[] = [
+  { value: "all", key: "all" },
+  { value: "succeeded", key: "succeeded" },
+  { value: "failed", key: "failed" },
+  { value: "in_flight", key: "inFlight" },
+  { value: "other", key: "other" },
 ];
 
-const TRIGGER_OPTIONS: { value: TriggerKind | "all"; label: string }[] = [
-  { value: "all", label: "Any trigger" },
-  { value: "push", label: "push" },
-  { value: "manual", label: "manual" },
-  { value: "ci", label: "ci" },
-  { value: "scheduled", label: "scheduled" },
-  { value: "rollback", label: "rollback" },
-  { value: "promotion", label: "promotion" },
+const TRIGGER_KEYS: { value: TriggerKind | "all"; key: string }[] = [
+  { value: "all", key: "all" },
+  { value: "push", key: "push" },
+  { value: "manual", key: "manual" },
+  { value: "ci", key: "ci" },
+  { value: "scheduled", key: "scheduled" },
+  { value: "rollback", key: "rollback" },
+  { value: "promotion", key: "promotion" },
 ];
 
 const IN_FLIGHT: ReadonlySet<DeploymentStatus> = new Set([
@@ -129,6 +130,8 @@ function githubCommitUrl(repo: string, sha: string): string {
 }
 
 export function AppDeploymentsClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.deployments");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
     variables: { appSlug: slug, limit: 100 },
@@ -178,7 +181,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
   if (app.loading && !a) {
     return (
-      <PageShell title="Loading…">
+      <PageShell title={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
       </PageShell>
     );
@@ -186,13 +189,13 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
   if (!a) {
     return (
-      <PageShell title="App not found">
+      <PageShell title={tCommon("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={tCommon("notFoundSlug", { slug })}
+          description={tCommon("notFoundDescription")}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -200,10 +203,10 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={`${a.name} · Deployments`}
+      title={t("title", { name: a.name })}
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          {a.slug} · full historical deploy log with filters
+          {t("description", { slug: a.slug })}
         </span>
       }
     >
@@ -212,7 +215,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       {/* ─── filter bar ────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Search commit, tag, branch, workload…"
+          placeholder={t("filters.search")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"
@@ -225,9 +228,9 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STATUS_BUCKET_OPTIONS.map((o) => (
+            {STATUS_BUCKET_KEYS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(`statusBuckets.${o.key}`)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -240,19 +243,19 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TRIGGER_OPTIONS.map((o) => (
+            {TRIGGER_KEYS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(`triggers.${o.key}`)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={envFilter} onValueChange={setEnvFilter}>
           <SelectTrigger className="w-40">
-            <SelectValue placeholder="Any env" />
+            <SelectValue placeholder={t("filters.anyEnv")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Any env</SelectItem>
+            <SelectItem value="all">{t("filters.anyEnv")}</SelectItem>
             {envList.map((e) => (
               <SelectItem key={e.id} value={e.name}>
                 {e.name}
@@ -261,7 +264,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
           </SelectContent>
         </Select>
         <span className="text-muted-foreground ml-auto text-xs">
-          {filtered.length} of {allDeployments.length}
+          {t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
         </span>
       </div>
 
@@ -277,15 +280,15 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<BoxIcon className="size-5" />}
-                title="No deployments match your filters"
+                title={t("emptyTitle")}
                 description={
                   allDeployments.length === 0
-                    ? "This app hasn't been deployed yet."
-                    : "Loosen the filters or clear the search to see more results."
+                    ? t("emptyNever")
+                    : t("emptyTryAgain")
                 }
                 actionHref={`/apps/${a.slug}/environments`}
                 actionLabel={
-                  allDeployments.length === 0 ? "Start a deployment" : undefined
+                  allDeployments.length === 0 ? t("emptyStart") : undefined
                 }
               />
             </div>
@@ -294,13 +297,13 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-6"></TableHead>
-                  <TableHead>When</TableHead>
-                  <TableHead>Env</TableHead>
-                  <TableHead>Image / commit</TableHead>
-                  <TableHead>Trigger</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>CI</TableHead>
+                  <TableHead>{t("table.when")}</TableHead>
+                  <TableHead>{t("table.env")}</TableHead>
+                  <TableHead>{t("table.imageCommit")}</TableHead>
+                  <TableHead>{t("table.trigger")}</TableHead>
+                  <TableHead>{t("table.status")}</TableHead>
+                  <TableHead>{t("table.duration")}</TableHead>
+                  <TableHead>{t("table.ci")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -370,7 +373,10 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       </Badge>
                       {d.approvalsRequired > 0 && (
                         <div className="text-muted-foreground mt-1 text-xs">
-                          {d.approvalsReceived}/{d.approvalsRequired} approvals
+                          {t("approvalsCount", {
+                            received: d.approvalsReceived,
+                            required: d.approvalsRequired,
+                          })}
                         </div>
                       )}
                     </TableCell>
@@ -405,14 +411,12 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       </Card>
 
       <p className="text-muted-foreground text-center text-xs">
-        Showing the latest {allDeployments.length} deployments. Older
-        rollouts are accessible via the API — pagination ships once the
-        list grows past a single window.{" "}
+        {t("footer", { count: allDeployments.length })}{" "}
         <Link
           href={`/apps/${a.slug}/environments`}
           className="hover:text-foreground underline"
         >
-          Roll a new deployment
+          {t("rollNew")}
         </Link>
         .
       </p>

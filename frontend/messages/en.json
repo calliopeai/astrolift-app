@@ -164,6 +164,810 @@
       "security": "Security",
       "members": "Members",
       "settings": "Settings"
+    },
+    "common": {
+      "loading": "Loading…",
+      "notFound": "App not found",
+      "notFoundSlug": "No app with slug {slug}",
+      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
+      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
+      "backToApps": "Back to apps",
+      "cancel": "Cancel"
+    },
+    "detail": {
+      "actions": {
+        "open": "Open",
+        "deploy": "Deploy",
+        "config": "Config",
+        "source": "Source",
+        "delete": "Delete"
+      },
+      "provisioning": {
+        "failed": "Provisioning failed"
+      },
+      "topology": {
+        "title": "Topology",
+        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
+        "emptyTitle": "No topology yet",
+        "emptyDescription": "Topology fills in once workloads are registered for this app."
+      },
+      "delete": {
+        "title": "Delete {slug}?",
+        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
+        "confirm": "Delete app"
+      }
+    },
+    "deployments": {
+      "title": "{name} · Deployments",
+      "description": "{slug} · full historical deploy log with filters",
+      "filters": {
+        "search": "Search commit, tag, branch, workload…",
+        "anyEnv": "Any env",
+        "counts": "{filtered} of {total}"
+      },
+      "table": {
+        "when": "When",
+        "env": "Env",
+        "imageCommit": "Image / commit",
+        "trigger": "Trigger",
+        "status": "Status",
+        "duration": "Duration",
+        "ci": "CI"
+      },
+      "emptyTitle": "No deployments match your filters",
+      "emptyNever": "This app hasn't been deployed yet.",
+      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
+      "emptyStart": "Start a deployment",
+      "approvalsCount": "{received}/{required} approvals",
+      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
+      "rollNew": "Roll a new deployment",
+      "statusBuckets": {
+        "all": "Any status",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "inFlight": "In flight",
+        "other": "Rolled back / superseded"
+      },
+      "triggers": {
+        "all": "Any trigger",
+        "push": "push",
+        "manual": "manual",
+        "ci": "ci",
+        "scheduled": "scheduled",
+        "rollback": "rollback",
+        "promotion": "promotion"
+      }
+    },
+    "observability": {
+      "title": "{name} · Observability",
+      "description": "{slug} · pod state and log stream from the runtime cluster",
+      "pods": {
+        "title": "Pods",
+        "description": "Live pod state from the tenant cluster, refreshed every {seconds}s. Click a row to tail its logs below.",
+        "emptyTitle": "No pods running for this app",
+        "emptyDescription": "Once a deployment has rolled out and the cluster reports pods, they appear here. If you expected pods, check the deployment log.",
+        "emptyAction": "View deployment history",
+        "columns": {
+          "pod": "Pod",
+          "workload": "Workload",
+          "status": "Status",
+          "ready": "Ready",
+          "restarts": "Restarts",
+          "age": "Age",
+          "node": "Node"
+        }
+      },
+      "logs": {
+        "title": "Live logs",
+        "streaming": "Streaming",
+        "fromCluster": "from the runtime cluster.",
+        "selectPrompt": "Select a pod above to tail its log stream.",
+        "clear": "Clear",
+        "pause": "Pause",
+        "stream": "Stream",
+        "waiting": "Waiting for the first line…",
+        "pressStream": "Press \"Stream\" to start tailing.",
+        "pickPod": "Pick a pod above first.",
+        "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
+        "installCli": "Install the CLI"
+      },
+      "events": {
+        "title": "Recent platform events",
+        "description": "App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions, alert transitions.",
+        "all": "All events",
+        "emptyTitle": "No events for this app yet",
+        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire."
+      }
+    },
+    "console": {
+      "title": "{name} · Console",
+      "description": "{slug} · interactive shell into the running workloads",
+      "terminal": {
+        "title": "In-browser terminal",
+        "comingSoon": "coming soon",
+        "description": "A web-based PTY into the primary container ships once the log + exec WebSocket bridge stabilizes. Use the CLI in the meantime — it runs the same backend protocol behind the scenes.",
+        "lands": "In-browser terminal lands soon",
+        "untilThen": "Until then, the {cli} CLI gives you the same exec capability from your local shell.",
+        "install": "Install the CLI",
+        "manageTokens": "Manage deploy tokens"
+      },
+      "shortcuts": {
+        "title": "CLI shortcuts",
+        "description": "Common commands you'd run against this app. Each one authenticates with your local {login} session.",
+        "openShell": "Open an interactive shell",
+        "djangoCmd": "Run a Django management command",
+        "tailLogs": "Tail logs from the primary workload"
+      },
+      "lands": {
+        "title": "What lands when",
+        "execLabel": "CLI exec via astro exec",
+        "execNote": "Available today on every connected cluster.",
+        "bridgeLabel": "WebSocket log + exec bridge",
+        "bridgeNote": "Wires the runtime PTY into a GraphQL subscription so the in-browser terminal can attach.",
+        "webLabel": "Web terminal",
+        "webNote": "The actual xterm.js + PTY surface that renders on this page.",
+        "shipped": "shipped"
+      },
+      "copy": "Copy command",
+      "copied": "Copied to clipboard",
+      "copyFailed": "Couldn't copy — clipboard access blocked"
+    },
+    "previews": {
+      "title": "{name} · Previews",
+      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "disabled": {
+        "title": "Previews are disabled for this app",
+        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+      },
+      "stale": {
+        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
+        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+      },
+      "emptyTitle": "No preview environments yet",
+      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR.",
+      "openRepo": "Open repo",
+      "enablePreviews": "Enable previews",
+      "columns": {
+        "prBranch": "PR / branch",
+        "hostname": "Hostname",
+        "lastDeploy": "Last deploy",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "staleBadge": "stale",
+      "tearDown": "Tear down",
+      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
+      "confirmTitle": "Tear down preview for PR #{pr}?",
+      "confirmFallback": "Tear down preview?",
+      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released."
+    },
+    "domains": {
+      "title": "Custom domains",
+      "description": "Hostnames bound to {slug}. Add a domain, copy the validation TXT record into your DNS provider, then click Recheck once it propagates.",
+      "learnMore": "Learn more",
+      "addDomain": "Add domain",
+      "emptyTitle": "No custom domains yet",
+      "emptyDescription": "Add a hostname like checkout.acme.com to point at this app's primary public workload. Removing a domain later detaches it from ingress — the platform stops routing traffic for that hostname and the cert is freed.",
+      "addSheet": {
+        "title": "Add custom domain",
+        "description": "The platform issues a cert via Let's Encrypt once the DNS validation record is in place.",
+        "hostname": "Hostname",
+        "validationMethod": "Validation method (optional)",
+        "validationHint": "Defaults to the platform's preferred method when blank.",
+        "submit": "Add domain",
+        "submitting": "Adding…"
+      },
+      "remove": {
+        "title": "Remove {hostname}?",
+        "fallbackTitle": "Remove domain?",
+        "description": "Soft-deletes the app↔hostname binding. The cert is freed and the hostname becomes available to re-add to another app. The DNS record at your provider is unaffected.",
+        "confirm": "Remove domain"
+      },
+      "cert": {
+        "awaiting": "Awaiting DNS",
+        "validating": "Validating…",
+        "validated": "Validated",
+        "failed": "Failed",
+        "platformZone": "Platform-managed zone",
+        "managed": "Managed",
+        "custom": "Custom",
+        "lastChecked": "Last checked {at}",
+        "notChecked": "Not checked yet",
+        "recheck": "Recheck",
+        "remove": "Remove",
+        "validationError": "Validation error:",
+        "platformManagedHelp": "Platform-managed records — astrolift owns the zone and creates these via the DNS driver. No operator action needed; the recheck below is a probe.",
+        "liveHelp": "These records are live in your DNS. Cert active.",
+        "needsHelp": "Add these records to your authoritative DNS, then click Recheck. The platform queries your zone's nameservers directly so propagation typically takes < 5 min.",
+        "allPropagated": "All records propagated. Validation should flip to validated on the next workflow tick (or click Recheck to force one).",
+        "noHandshake": "Handshake not generated yet — re-add the domain to refresh its required records.",
+        "issuing": "Certificate provisioning…",
+        "issuingPlatform": "DNS-01 challenge in progress with the cloud cert manager.",
+        "issuingExternal": "HTTP-01 challenge running against your CNAME target.",
+        "active": "Certificate active",
+        "activeDesc": "Serving HTTPS for {hostname}. The renderer picks the cert up automatically on the next deploy.",
+        "byo": "Using uploaded certificate",
+        "byoUploaded": "Uploaded {at}",
+        "byoNote": "The platform won't auto-rotate this cert. Re-upload before its expiry to avoid a service interruption.",
+        "replace": "Replace",
+        "failedTitle": "Certificate issuance failed",
+        "failedHelp": "Common causes: external DNS zone on AWS (ACM can't HTTP-01), Let's Encrypt rate limit on the apex, or the CNAME isn't reachable on port 80. Upload your own certificate to bypass auto-issuance, or fix the upstream cause and click Recheck.",
+        "uploadCert": "Upload cert",
+        "queued": "DNS validated. Certificate issuance queued — should start within a minute. If it doesn't, click Recheck to retrigger.",
+        "dnsColumns": {
+          "type": "Type",
+          "name": "Name",
+          "value": "Value",
+          "ttl": "TTL"
+        }
+      },
+      "upload": {
+        "title": "Upload certificate for {hostname}",
+        "fallbackTitle": "Upload certificate",
+        "description": "Paste the full PEM-encoded certificate chain (leaf + any intermediates) and the matching private key. The platform stores the bundle and projects it as a Kubernetes TLS Secret on the runtime cluster on the next deploy. Replaces any in-flight auto-issuance.",
+        "certLabel": "Certificate chain (PEM)",
+        "keyLabel": "Private key (PEM)",
+        "certInvalid": "Doesn't look like a PEM CERTIFICATE block.",
+        "keyInvalid": "Doesn't look like a PEM-encoded private key.",
+        "noRotate": "The platform won't auto-rotate this cert. Track its expiry yourself; re-upload before it lapses to avoid a service interruption.",
+        "submit": "Upload certificate",
+        "submitting": "Uploading…"
+      },
+      "ingress": {
+        "label": "ingress",
+        "paused": "Paused",
+        "live": "Live",
+        "resume": "Resume ingress",
+        "pause": "Pause ingress",
+        "description": "When paused, the app's ingresses return HTTP 503 to all callers. Use this for planned maintenance windows — the workload keeps running so you can still ship deploys and observe metrics. Resume restores routing.",
+        "bound": "Bound hostnames",
+        "noneBound": "No hostnames bound yet.",
+        "maintenance": "Maintenance mode active.",
+        "maintenanceDesc": "Every bound hostname is returning 503. Health probes that hit ingress will fail; in-cluster probes are unaffected."
+      }
+    },
+    "secrets": {
+      "title": "Secrets",
+      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
+      "bulkImport": "Bulk import",
+      "newSecret": "New secret",
+      "environment": "Environment",
+      "allEnvironments": "All environments",
+      "keysCount": "{count, plural, one {# key} other {# keys}}",
+      "emptyTitle": "No secrets yet",
+      "emptyDescription": "Add literals via 'New secret', or attach a Secret Bundle. Managed services contribute their connection envelope automatically.",
+      "columns": {
+        "key": "Key",
+        "source": "Source",
+        "env": "Env",
+        "lastEdited": "Last edited"
+      },
+      "delete": {
+        "title": "Delete {key}?",
+        "fallbackTitle": "Delete secret?",
+        "description": "Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed.",
+        "confirm": "Delete secret"
+      },
+      "setSheet": {
+        "title": "New secret",
+        "description": "Sets one literal in the app's [env] table. Plaintext is never returned by the API; only this submit ships the value to the backend.",
+        "keyLabel": "Key",
+        "valueLabel": "Value",
+        "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
+        "submit": "Save secret",
+        "submitting": "Saving…"
+      },
+      "bulkSheet": {
+        "title": "Bulk import from .env",
+        "description": "Paste a .env file. Each KEY=value line gets staged into the app's [env] table. Existing keys are overwritten.",
+        "willSet": "Will set {count, plural, one {# key} other {# keys}}:",
+        "submit": "Import",
+        "submitting": "Importing…"
+      }
+    },
+    "security": {
+      "title": "{name} · Security",
+      "description": "Supply-chain status for the latest build: image signing, vulnerability scan, SBOM, and the deploy-gating policy that decides when a build is safe to roll out.",
+      "loadingTitle": "Security",
+      "backendPending": {
+        "title": "Backend wiring pending",
+        "description": "The supply-chain workflows (image_signing, image_scan, sbom_multiarch) already emit events, but the per-app event filter and the RegisteredApp.securityPolicy fields aren't on main yet. The panels below read whatever org-wide events match this app and the policy toggles are disabled — tracked under #313."
+      },
+      "signing": {
+        "title": "Image signing",
+        "description": "Cosign-keyless signature on the latest published image. Verifiable via the Sigstore transparency log.",
+        "signed": "Signed",
+        "noData": "No data",
+        "noEvent": "No image.signed event for this app yet. The next CI run that publishes an image will emit one.",
+        "imageTag": "Image tag",
+        "signedAt": "Signed at",
+        "signerIdentity": "Signer identity",
+        "imageDigest": "Image digest",
+        "rekor": "Rekor transparency log",
+        "rekorEntry": "Entry #{index}",
+        "rekorVerify": "Verify entry"
+      },
+      "sbom": {
+        "title": "SBOM",
+        "description": "Software Bill of Materials for the latest image. Lists every package the runtime container includes.",
+        "components": "{count} components",
+        "noEvent": "No sbom.generated event for this app yet. The sbom_multiarch workflow runs on the next image push.",
+        "format": "Format",
+        "generatedAt": "Generated at",
+        "download": "Download SBOM"
+      },
+      "scan": {
+        "title": "Vulnerability scan",
+        "description": "Findings from the image_scan workflow on the latest published image. CVE list with suggested upgrade paths.",
+        "noEvent": "No image.scanned event for this app yet. The image_scan workflow runs on the next image push.",
+        "noVulns": "No vulnerabilities reported. Last scanned {at}.",
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "columns": {
+          "cve": "CVE",
+          "severity": "Severity",
+          "package": "Package",
+          "fix": "Fix available"
+        },
+        "upgrade": "upgrade → {version}",
+        "noFix": "no fix yet"
+      },
+      "policy": {
+        "title": "Deploy-gating policy",
+        "description": "What the promote-deploy workflow refuses to roll out. Rules evaluate at the moment of promotion against the latest scan + the signature on the image digest.",
+        "blockCves": "Block deploys on critical CVEs",
+        "blockCvesDesc": "Refuses to roll out an image whose latest scan reports any critical-severity vulnerability.",
+        "blockSig": "Block deploys on missing signature",
+        "blockSigDesc": "Refuses to roll out an image that doesn't have a corresponding image.signed event. Sigstore-keyless via cosign on the CI side.",
+        "highThreshold": "High-severity CVE threshold",
+        "highThresholdDesc": "Set a count above which deploys get blocked. Leave empty to allow any number of high-severity findings (criticals still gated above).",
+        "noThreshold": "No threshold",
+        "reset": "Reset",
+        "save": "Save policy",
+        "pending": "Backend wiring pending"
+      }
+    },
+    "members": {
+      "title": "App members",
+      "description": "Role bindings scoped to {slug}. Org and team-level grants apply automatically and aren't shown here — manage them on /members.",
+      "loadingTitle": "Members",
+      "availableRoles": "App-scoped roles available",
+      "noRolesDefined": "No app-scoped roles defined.",
+      "emptyTitle": "No app-scoped role bindings",
+      "emptyDescription": "Grant a user an app-level role from the org-wide /members page (Grant role → APP scope → this app).",
+      "openMembers": "Open members",
+      "columns": {
+        "user": "User",
+        "role": "Role",
+        "granted": "Granted",
+        "expires": "Expires"
+      },
+      "groupPrefix": "group:",
+      "never": "never",
+      "revoke": "Revoke",
+      "revokeConfirm": {
+        "title": "Revoke {role} from {target}?",
+        "fallbackTitle": "Revoke role?",
+        "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
+        "confirm": "Revoke role"
+      }
+    },
+    "config": {
+      "title": "{name} · config",
+      "loadingTitle": "Config",
+      "loading": "Loading…",
+      "updated": "updated {at}",
+      "syncFromRepo": "Sync from repo",
+      "saveDraft": "Save draft",
+      "saving": "Saving…",
+      "pushToRepo": "Push to repo",
+      "syncStates": {
+        "inSync": "In sync",
+        "dbAhead": "Unsaved drafts in DB",
+        "repoAhead": "Repo ahead",
+        "diverged": "Diverged"
+      },
+      "conflict": {
+        "title": "The manifest changed under your edit",
+        "description": "The server's copy was updated at {at}. Keep your edit (force-overwrite their changes) or discard your draft and load theirs.",
+        "yourDraft": "Your draft",
+        "serverCopy": "Server copy",
+        "cancel": "Cancel",
+        "loadTheirs": "Discard mine, load theirs",
+        "forceOverwrite": "Force-overwrite with mine",
+        "banner": "The manifest was updated on the server {at}. Your edit is based on an older copy.",
+        "keepMine": "Keep mine",
+        "loadTheirsShort": "Load theirs"
+      },
+      "pills": {
+        "workloads": "Workloads",
+        "services": "Managed services",
+        "env": "Env vars",
+        "volumes": "Volumes",
+        "jumpHint": "Jump to a section in the editor.",
+        "noSection": "No {section} section in this manifest yet."
+      },
+      "editor": {
+        "unsaved": "unsaved",
+        "description": "Source TOML. Save stages the change in the platform; Push to repo opens a PR."
+      },
+      "rendered": {
+        "title": "Rendered preview",
+        "description": "Kubernetes resources the platform would apply for this manifest. Re-renders on the saved draft, not the in-flight edit.",
+        "renderFailed": "Render failed",
+        "noOutput": "No rendered output yet."
+      },
+      "sourceRepo": "Source repo:",
+      "onBranch": "on branch",
+      "openRepo": "Open repo",
+      "confirmSync": {
+        "title": "Sync from repo?",
+        "description": "Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge.",
+        "confirm": "Sync from repo"
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "loading": "Loading…",
+      "description": "Operational controls and configuration for <slug></slug>.",
+      "resync": {
+        "title": "Resync from source",
+        "description": "Re-read astrolift.toml from the deploy branch and apply env, workload, schedule, and managed-service changes. Non-destructive on local staged drafts.",
+        "button": "Resync from source",
+        "syncing": "Resyncing…",
+        "last": "Last resynced",
+        "never": "Never resynced from source."
+      },
+      "ingress": {
+        "title": "Ingress",
+        "description": "Pause edge routing without stopping the workloads behind it.",
+        "emptyEnvs": "No environments yet — sync the manifest to populate this section.",
+        "paused": "Paused",
+        "live": "Live",
+        "resume": "Resume",
+        "pause": "Pause"
+      },
+      "links": {
+        "deployStrategy": {
+          "title": "Deploy strategy",
+          "description": "Edit the manifest TOML — image build, environments, triggers, approvals, and rollout strategy."
+        },
+        "deployTokens": {
+          "title": "Deploy tokens",
+          "description": "Long-lived bearer tokens that let external CI hand off deployments without an interactive session."
+        },
+        "secrets": {
+          "title": "Secrets + env",
+          "description": "Per-environment encrypted secrets and plaintext env vars mounted into workloads at deploy time."
+        },
+        "managedServices": {
+          "title": "Managed services",
+          "description": "Provisioned dependencies — Postgres, Redis, object storage — attached and routed via Astrolift."
+        },
+        "domains": {
+          "title": "Custom domains",
+          "description": "Map your own hostnames to environments. Validation, ACME-issued certs, and BYO certificate upload."
+        },
+        "webhooks": {
+          "title": "Webhooks",
+          "description": "Outbound deployment, build, and lifecycle events delivered to your endpoints with HMAC signatures."
+        },
+        "members": {
+          "title": "Team members",
+          "description": "App-scoped role bindings layered on top of org and team grants. Manage who can deploy, rotate, or destroy."
+        },
+        "observability": {
+          "title": "Observability",
+          "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
+        }
+      },
+      "forceRedeploy": {
+        "title": "Force redeploy",
+        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
+        "button": "Force redeploy",
+        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
+        "confirmTitle": "Force redeploy {slug}?",
+        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
+        "typeToConfirm": "Type <slug></slug> to confirm:",
+        "cancel": "Cancel"
+      },
+      "dangerZone": {
+        "title": "Danger zone",
+        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
+        "button": "Deregister app",
+        "stillLive": "Last attempt left {count} resource class(es) live:",
+        "retry": "Retry deregister",
+        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
+        "confirmTitle": "Deregister {name}?",
+        "confirmIntro": "This destroys the following resource classes for this app. The action is irreversible.",
+        "typeToConfirm": "To confirm, type the app's name:",
+        "deregistering": "Deregistering…",
+        "cancel": "Cancel"
+      },
+      "runJob": {
+        "title": "Run scheduled job once",
+        "description": "Dispatch a one-shot run of a manifest-declared cron job without changing its schedule. Recurring runs continue on their own.",
+        "job": "Job",
+        "selectJob": "Select a job",
+        "environment": "Environment",
+        "selectEnv": "Select an environment",
+        "run": "Run now",
+        "footer": "The job inherits the cronjob's pod spec verbatim. Manual runs are recorded alongside scheduled runs on the",
+        "jobsPage": "jobs page",
+        "viewRuns": "View runs"
+      }
+    }
+  },
+  "lists": {
+    "deployments": {
+      "title": "Deployments",
+      "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
+      "start": "Start deployment",
+      "filterApp": "Filter by app slug…",
+      "counts": "{filtered} of {total}",
+      "emptyTitle": "No deployments yet",
+      "emptyDescription": "Register an app and roll a deployment from /apps/[slug]/deploy. Deployments land here as soon as the workflow starts.",
+      "openApps": "Open apps",
+      "approvalsCount": "{received}/{required} approvals",
+      "columns": {
+        "appEnv": "App / Env",
+        "image": "Image",
+        "trigger": "Trigger",
+        "status": "Status",
+        "duration": "Duration",
+        "started": "Started"
+      },
+      "actions": {
+        "label": "Actions",
+        "approve": "Approve",
+        "abort": "Abort",
+        "rollback": "Rollback",
+        "redeploy": "Redeploy"
+      },
+      "statusOptions": {
+        "all": "All statuses",
+        "pending_approval": "Pending approval",
+        "pending": "Pending",
+        "deploying": "Deploying",
+        "redeploying": "Redeploying",
+        "running": "Running",
+        "failed": "Failed",
+        "rolled_back": "Rolled back",
+        "superseded": "Superseded"
+      },
+      "envWorkload": "env {env} · workload {workload}",
+      "envOnly": "env {env}",
+      "confirm": {
+        "approveTitle": "Approve deploy of {tag}?",
+        "approveDescription": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately.",
+        "approveConfirm": "Approve",
+        "abortTitle": "Abort in-flight deploy of {app}/{env}?",
+        "abortDescription": "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
+        "abortConfirm": "Abort deploy",
+        "rollbackTitle": "Rollback {app}/{env} to the previous revision?",
+        "rollbackDescription": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
+        "rollbackConfirm": "Rollback",
+        "redeployTitle": "Redeploy {tag} to {app}/{env}?",
+        "redeployDescription": "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
+        "redeployConfirm": "Redeploy"
+      },
+      "startSheet": {
+        "title": "Start deployment",
+        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
+        "appLabel": "App",
+        "appPlaceholder": "Choose an app",
+        "envLabel": "Environment",
+        "envPlaceholder": "Choose an environment",
+        "tagLabel": "Image tag",
+        "tagPlaceholder": "v1.4.2 or sha-abc123",
+        "digestLabel": "Image digest (optional)",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
+        "triggerLabel": "Trigger",
+        "approvalsSuffix": "{count} approval(s)",
+        "paused": "paused",
+        "cancel": "Cancel",
+        "submit": "Start deployment",
+        "submitting": "Starting…"
+      }
+    },
+    "deploymentDetail": {
+      "title": "{app} → {env}",
+      "subtitle": "Deployment {id}",
+      "loadingTitle": "Deployment",
+      "loading": "Loading…",
+      "notFoundTitle": "Deployment not found",
+      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
+      "returnLink": "Try returning to the",
+      "deploymentsList": "deployments list",
+      "approve": "Approve",
+      "abort": "Abort",
+      "rollback": "Rollback",
+      "redeploy": "Redeploy",
+      "approvalsCount": "{received}/{required} approvals",
+      "fields": {
+        "imageTag": "Image tag",
+        "imageDigest": "Image digest",
+        "clusterRevision": "Cluster revision",
+        "workload": "Workload",
+        "created": "Created",
+        "started": "Started",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "duration": "Duration",
+        "commit": "Commit",
+        "branch": "Branch",
+        "ciActor": "CI actor",
+        "ciProvider": "CI provider",
+        "ciRun": "CI run"
+      },
+      "lifecycle": "Lifecycle log",
+      "noLog": "No log entries yet.",
+      "manifests": "Rendered manifests",
+      "renderFailed": "Render failed",
+      "noManifests": "No manifests rendered yet.",
+      "events": "Recent events",
+      "noEvents": "No platform events for this app yet.",
+      "confirmAbort": {
+        "title": "Abort deploy of {app}/{env}?",
+        "description": "Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed.",
+        "confirm": "Abort deploy"
+      },
+      "confirmRollback": {
+        "title": "Rollback {app}/{env}?",
+        "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
+        "confirm": "Rollback"
+      }
+    },
+    "environments": {
+      "title": "Environments",
+      "description": "Deploy targets across your apps. Pause an environment to halt CI/push triggers and require explicit operator action to resume.",
+      "descriptionForApp": "Deploy targets for {slug}. Pause an environment to halt CI/push triggers and require explicit operator action to resume.",
+      "columns": {
+        "appEnv": "App / Env",
+        "url": "URL",
+        "cluster": "Cluster",
+        "approvals": "Approvals",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "emptyTitle": "No environments yet",
+      "emptyDescription": "Register an app and bind it to a cluster to create your first environment.",
+      "openApps": "Open apps",
+      "paused": "paused",
+      "active": "active",
+      "resume": "Resume",
+      "pause": "Pause",
+      "envName": "env <name></name>",
+      "confirmPause": {
+        "title": "Pause {app}/{env}?",
+        "fallbackTitle": "Pause environment?",
+        "description": "CI pushes and source-driven triggers are rejected with a 423 until you explicitly resume. In-flight deployments continue to completion. Operator-initiated deployments from the UI are still allowed.",
+        "confirm": "Pause environment"
+      }
+    },
+    "previews": {
+      "title": "Preview environments",
+      "description": "Per-PR ephemeral deploys. Hostnames follow pr-<n>-<app>.pr.<org>.<base-zone>; tear-down on PR close.",
+      "columns": {
+        "app": "App",
+        "pr": "PR",
+        "branch": "Branch",
+        "hostname": "Hostname",
+        "lastDeploy": "Last deploy",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "emptyTitle": "No preview environments",
+      "emptyDescription": "Open a pull request against an app with preview_enabled=true to spin one up.",
+      "openApps": "Open apps",
+      "tearDown": "Tear down",
+      "confirmTitle": "Tear down preview for PR #{pr}?",
+      "confirmFallback": "Tear down preview?",
+      "confirmDescription": "Namespace {namespace} is deleted and the hostname {hostname} is released. The preview re-spins automatically on the next push to {branch}.",
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released."
+    },
+    "approval": {
+      "title": "Approve deployment",
+      "loading": "Loading…",
+      "notFoundTitle": "Deployment not found",
+      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
+      "expired": "The approval link may have expired, or the deployment was deleted. Return to the",
+      "deploymentsList": "deployments list",
+      "fields": {
+        "imageTag": "Image tag",
+        "imageDigest": "Image digest",
+        "clusterRevision": "Cluster revision",
+        "workload": "Workload",
+        "created": "Created",
+        "started": "Started"
+      },
+      "approvalsCount": "{received} / {required} approvals",
+      "awaiting": "Awaiting approval",
+      "awaitingDesc": "{remaining} more approval(s) required before this deployment proceeds. Self-approval is rejected by the backend.",
+      "approve": "Approve",
+      "missingPermission": "You don't have app.approve_deploy; ask an org admin to approve.",
+      "viewDetail": "View full detail",
+      "viewDetailShort": "View detail",
+      "alreadyApproved": "Already approved",
+      "alreadyApprovedDesc": "The deployment moved past the approval gate. Status: {status}.",
+      "failed": "Deployment failed",
+      "failedDesc": "Approval no longer applies. Inspect the lifecycle log on the detail page.",
+      "noAction": "No approval action available in current state {status}.",
+      "confirm": {
+        "title": "Approve deploy of {tag}?",
+        "description": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately and traffic shifts according to the configured strategy. Self-approval on a deploy you triggered is rejected by the backend.",
+        "confirm": "Approve deployment"
+      }
+    },
+    "alerts": {
+      "title": "Alerts",
+      "description": "Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events surface in the bottom panel.",
+      "newRule": "New rule",
+      "stats": {
+        "rules": "Rules",
+        "active": "{count} active",
+        "unresolved": "Unresolved",
+        "inWindow": "in current window",
+        "total": "Total events",
+        "latest": "latest 100"
+      },
+      "rules": {
+        "title": "Rules",
+        "description": "Predicates fire events when matching telemetry crosses a threshold.",
+        "emptyTitle": "No alert rules yet",
+        "emptyDescription": "Create a rule to start surfacing platform events as alerts.",
+        "columns": {
+          "name": "Name",
+          "target": "Target",
+          "severity": "Severity",
+          "created": "Created"
+        }
+      },
+      "events": {
+        "title": "Recent events",
+        "description": "Firing instances from the rules above. Acknowledge to silence while the underlying issue is being worked.",
+        "emptyTitle": "No events yet",
+        "emptyDescription": "Events appear here when an active rule's predicate matches incoming telemetry.",
+        "columns": {
+          "summary": "Summary",
+          "severity": "Severity",
+          "fired": "Fired",
+          "state": "State"
+        },
+        "resolved": "resolved",
+        "acknowledged": "acknowledged",
+        "firing": "firing",
+        "ack": "Ack"
+      },
+      "delete": {
+        "title": "Delete rule \"{name}\"?",
+        "fallbackTitle": "Delete rule?",
+        "description": "Soft-deletes the rule. Events that already fired stay in the log and remain reachable from the event panel — only future evaluations stop. Re-create the rule with the same target to resume coverage.",
+        "confirm": "Delete rule"
+      },
+      "create": {
+        "title": "New alert rule",
+        "description": "Predicate matches against the platform event stream. Notify channels describe where firing events go (Slack, email, webhook).",
+        "nameLabel": "Name",
+        "namePlaceholder": "failed-deploy",
+        "targetLabel": "Target",
+        "severityLabel": "Severity",
+        "targetIdLabel": "Target ID",
+        "targetIdGlobal": "(blank for global)",
+        "targetIdPlaceholder": "app slug, env name, or workload slug",
+        "targetIdGlobalHint": "Global rules ignore targetId — backend rejects non-empty values.",
+        "targetIdHint": "App slug for app target; env name for env target; etc.",
+        "predicateLabel": "Predicate (JSON)",
+        "channelsLabel": "Notify channels (JSON)",
+        "cancel": "Cancel",
+        "submit": "Create rule",
+        "submitting": "Creating…"
+      }
     }
   },
   "settingsIndex": {

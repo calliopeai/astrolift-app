@@ -11,6 +11,7 @@ import {
   StopCircleIcon,
   UndoIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -97,19 +98,20 @@ const IN_FLIGHT: DeploymentStatus[] = [
   "redeploying",
 ];
 
-const STATUS_OPTIONS: { value: DeploymentStatus | "all"; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "pending_approval", label: "Pending approval" },
-  { value: "pending", label: "Pending" },
-  { value: "deploying", label: "Deploying" },
-  { value: "redeploying", label: "Redeploying" },
-  { value: "running", label: "Running" },
-  { value: "failed", label: "Failed" },
-  { value: "rolled_back", label: "Rolled back" },
-  { value: "superseded", label: "Superseded" },
+const STATUS_VALUES: (DeploymentStatus | "all")[] = [
+  "all",
+  "pending_approval",
+  "pending",
+  "deploying",
+  "redeploying",
+  "running",
+  "failed",
+  "rolled_back",
+  "superseded",
 ];
 
 export function DeploymentsClient() {
+  const t = useTranslations("lists.deployments");
   const [openCreate, setOpenCreate] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<DeploymentStatus | "all">("all");
   const [appFilter, setAppFilter] = React.useState("");
@@ -215,54 +217,61 @@ export function DeploymentsClient() {
     }
   > = {
     approve: {
-      title: (d) => `Approve deploy of ${d.imageTag}?`,
+      title: (d) => t("confirm.approveTitle", { tag: d.imageTag }),
       description: (d) =>
-        `Unblocks the rollout to ${d.registeredAppSlug}/${d.environmentName}. The workflow resumes immediately.`,
-      confirmLabel: "Approve",
+        t("confirm.approveDescription", {
+          app: d.registeredAppSlug,
+          env: d.environmentName,
+        }),
+      confirmLabel: t("confirm.approveConfirm"),
       destructive: false,
     },
     abort: {
       title: (d) =>
-        `Abort in-flight deploy of ${d.registeredAppSlug}/${d.environmentName}?`,
-      description: () =>
-        "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
-      confirmLabel: "Abort deploy",
+        t("confirm.abortTitle", { app: d.registeredAppSlug, env: d.environmentName }),
+      description: () => t("confirm.abortDescription"),
+      confirmLabel: t("confirm.abortConfirm"),
       destructive: true,
     },
     rollback: {
       title: (d) =>
-        `Rollback ${d.registeredAppSlug}/${d.environmentName} to the previous revision?`,
-      description: () =>
-        "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-      confirmLabel: "Rollback",
+        t("confirm.rollbackTitle", {
+          app: d.registeredAppSlug,
+          env: d.environmentName,
+        }),
+      description: () => t("confirm.rollbackDescription"),
+      confirmLabel: t("confirm.rollbackConfirm"),
       destructive: false,
     },
     redeploy: {
       title: (d) =>
-        `Redeploy ${d.imageTag} to ${d.registeredAppSlug}/${d.environmentName}?`,
-      description: () =>
-        "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
-      confirmLabel: "Redeploy",
+        t("confirm.redeployTitle", {
+          tag: d.imageTag,
+          app: d.registeredAppSlug,
+          env: d.environmentName,
+        }),
+      description: () => t("confirm.redeployDescription"),
+      confirmLabel: t("confirm.redeployConfirm"),
       destructive: false,
     },
   };
 
   return (
     <PageShell
-      title="Deployments"
-      description="Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs."
+      title={t("title")}
+      description={t("description")}
       actions={
         <Can permission="app.deploy">
           <Button onClick={() => setOpenCreate(true)}>
             <PlusIcon className="size-4" />
-            Start deployment
+            {t("start")}
           </Button>
         </Can>
       }
     >
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Filter by app slug…"
+          placeholder={t("filterApp")}
           value={appFilter}
           onChange={(e) => setAppFilter(e.target.value)}
           className="max-w-xs"
@@ -275,15 +284,15 @@ export function DeploymentsClient() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+            {STATUS_VALUES.map((v) => (
+              <SelectItem key={v} value={v}>
+                {t(`statusOptions.${v}`)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <span className="text-muted-foreground text-xs">
-          {list.length} of {allDeployments.length}
+          {t("counts", { filtered: list.length, total: allDeployments.length })}
         </span>
       </div>
 
@@ -298,10 +307,10 @@ export function DeploymentsClient() {
             <div className="p-6">
               <EmptyState
                 icon={<BoxIcon className="size-5" />}
-                title="No deployments yet"
-                description="Register an app and roll a deployment from /apps/[slug]/deploy. Deployments land here as soon as the workflow starts."
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
                 actionHref="/apps"
-                actionLabel="Open apps"
+                actionLabel={t("openApps")}
               />
             </div>
           ) : (
@@ -309,12 +318,12 @@ export function DeploymentsClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead>App / Env</TableHead>
-                  <TableHead>Image</TableHead>
-                  <TableHead>Trigger</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Started</TableHead>
+                  <TableHead>{t("columns.appEnv")}</TableHead>
+                  <TableHead>{t("columns.image")}</TableHead>
+                  <TableHead>{t("columns.trigger")}</TableHead>
+                  <TableHead>{t("columns.status")}</TableHead>
+                  <TableHead>{t("columns.duration")}</TableHead>
+                  <TableHead>{t("columns.started")}</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -354,7 +363,10 @@ export function DeploymentsClient() {
                       </Badge>
                       {d.approvalsRequired > 0 && (
                         <div className="text-muted-foreground mt-1 text-xs">
-                          {d.approvalsReceived}/{d.approvalsRequired} approvals
+                          {t("approvalsCount", {
+                            received: d.approvalsReceived,
+                            required: d.approvalsRequired,
+                          })}
                         </div>
                       )}
                     </TableCell>
@@ -380,7 +392,7 @@ export function DeploymentsClient() {
                               disabled={busy}
                             >
                               <MoreHorizontalIcon className="size-4" />
-                              <span className="sr-only">Actions</span>
+                              <span className="sr-only">{t("actions.label")}</span>
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -389,7 +401,7 @@ export function DeploymentsClient() {
                                 onClick={() => setPendingAction({ kind: "approve", deployment: d })}
                               >
                                 <CheckIcon className="size-4" />
-                                Approve
+                                {t("actions.approve")}
                               </DropdownMenuItem>
                             )}
                             {IN_FLIGHT.includes(d.status) && canDeploy && (
@@ -398,7 +410,7 @@ export function DeploymentsClient() {
                                 variant="destructive"
                               >
                                 <StopCircleIcon className="size-4" />
-                                Abort
+                                {t("actions.abort")}
                               </DropdownMenuItem>
                             )}
                             {d.status === "running" && canRollback && (
@@ -406,7 +418,7 @@ export function DeploymentsClient() {
                                 onClick={() => setPendingAction({ kind: "rollback", deployment: d })}
                               >
                                 <UndoIcon className="size-4" />
-                                Rollback
+                                {t("actions.rollback")}
                               </DropdownMenuItem>
                             )}
                             {(d.status === "running" ||
@@ -420,7 +432,7 @@ export function DeploymentsClient() {
                                   }
                                 >
                                   <RotateCcwIcon className="size-4" />
-                                  Redeploy
+                                  {t("actions.redeploy")}
                                 </DropdownMenuItem>
                               )}
                           </DropdownMenuContent>
