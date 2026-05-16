@@ -43,14 +43,18 @@ import { REVOKE_INVITATION, REVOKE_ROLE_BINDING } from "@/graphql/identity/ident
 import {
   LIST_INVITATIONS,
   LIST_MEMBERS,
+  LIST_PROJECTS,
   LIST_ROLE_BINDINGS,
   LIST_ROLES,
+  LIST_TEAMS,
 } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftInvitation,
   AstroliftMember,
+  AstroliftProject,
   AstroliftRole,
   AstroliftRoleBinding,
+  AstroliftTeam,
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
@@ -89,6 +93,12 @@ export function MembersClient() {
   const bindings = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
   const invitations = useQuery<InvitationsResp>(LIST_INVITATIONS);
+  // Loaded so the Scope column can resolve `(scopeKind=TEAM, scopeId=N)`
+  // into a human-readable team / project name instead of the bare
+  // "TEAM" badge that previously made it ambiguous whether the column
+  // showed a role or a scope.
+  const teams = useQuery<{ astroliftTeams: AstroliftTeam[] }>(LIST_TEAMS);
+  const projects = useQuery<{ astroliftProjects: AstroliftProject[] }>(LIST_PROJECTS);
 
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
@@ -155,6 +165,28 @@ export function MembersClient() {
 
   const memberList = members.data?.astroliftMembers ?? [];
   const bindingList = bindings.data?.astroliftRoleBindings ?? [];
+  const teamList = teams.data?.astroliftTeams ?? [];
+  const projectList = projects.data?.astroliftProjects ?? [];
+
+  // Lookup tables for the Scope column. Pre-existing scopes were
+  // rendered as a bare badge ("TEAM" / "PROJECT") that operators
+  // read as a role name; surface the actual team / project name
+  // alongside.
+  const teamById = new Map(teamList.map((t) => [t.id, t]));
+  const projectById = new Map(projectList.map((p) => [p.id, p]));
+  function scopeLabel(m: AstroliftMember): string {
+    if (m.scopeKind === "TEAM") {
+      return teamById.get(m.scopeId)?.slug ?? "—";
+    }
+    if (m.scopeKind === "PROJECT") {
+      const p = projectById.get(m.scopeId);
+      return p ? `${p.team.slug}/${p.slug}` : "—";
+    }
+    if (m.scopeKind === "ORG") {
+      return "organization";
+    }
+    return "—";
+  }
 
   // Group bindings by user for the role-binding tab.
   const bindingsByUser = new Map<string, AstroliftRoleBinding[]>();
@@ -227,9 +259,14 @@ export function MembersClient() {
                         <div className="text-muted-foreground text-xs">{m.user.email}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
-                          {m.scopeKind}
-                        </Badge>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
+                            {m.scopeKind}
+                          </Badge>
+                          <span className="text-muted-foreground font-mono text-[10px]">
+                            {scopeLabel(m)}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

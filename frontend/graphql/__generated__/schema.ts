@@ -327,6 +327,25 @@ export type AstroliftAppSummary = {
   status: Scalars['String']['output'];
 };
 
+export type AstroliftAppTeamAccess = {
+  accessLevel: Scalars['String']['output'];
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  isHome: Scalars['Boolean']['output'];
+  teamId: Scalars['GUID']['output'];
+  teamName: Scalars['String']['output'];
+  teamSlug: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAppTeamAccessMutationResult = {
+  data?: Maybe<AstroliftAppTeamAccess>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAuditEvent = {
   action: Scalars['String']['output'];
   actorDisplay: Scalars['String']['output'];
@@ -892,6 +911,7 @@ export type AstroliftRegisteredApp = {
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   k8sNamespace: Scalars['String']['output'];
+  lastResyncAt?: Maybe<Scalars['DateTime']['output']>;
   lastSyncedHash: Scalars['String']['output'];
   logRetentionDays: Scalars['Int']['output'];
   manifestHash: Scalars['String']['output'];
@@ -1619,6 +1639,12 @@ export type GrantRoleInput = {
   userId: Scalars['String']['input'];
 };
 
+export type GrantTeamAccessInput = {
+  accessLevel: Scalars['String']['input'];
+  appId: Scalars['GUID']['input'];
+  teamId: Scalars['GUID']['input'];
+};
+
 export type GroupOperationInput = {
   groupId: Scalars['ID']['input'];
   operation: Scalars['String']['input'];
@@ -1728,6 +1754,11 @@ export type MigrateAppInputGql = {
   targetClusterId: Scalars['GUID']['input'];
 };
 
+export type MoveAppToTeamInput = {
+  appId: Scalars['GUID']['input'];
+  targetTeamId: Scalars['GUID']['input'];
+};
+
 export type Mutation = {
   abortDeployment: AstroliftDeploymentMutationResult;
   acceptInvitation: AstroliftInvitationMutationResult;
@@ -1783,6 +1814,7 @@ export type Mutation = {
   generateRocketChatToken: Scalars['String']['output'];
   generateSshDeployKey: AstroliftSshDeployKeyCreatedMutationResult;
   grantRole: AstroliftRoleBindingMutationResult;
+  grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
   /** Create a new directory in the library. */
@@ -1807,6 +1839,7 @@ export type Mutation = {
   /** Create or update a Metabase chart via MetabaseChartSerializer. */
   metabaseChart: MutationResult;
   migrateAppToCluster: AstroliftAppEnvironmentMutationResult;
+  moveAppToTeam: AstroliftRegisteredAppMutationResult;
   /** Create or update a notification via NotificationSerializer. */
   notification: MutationResult;
   /** Mark a notification as read. */
@@ -1849,11 +1882,13 @@ export type Mutation = {
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
+  resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
+  revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
@@ -2161,6 +2196,11 @@ export type MutationGrantRoleArgs = {
 };
 
 
+export type MutationGrantTeamAccessToAppArgs = {
+  input: GrantTeamAccessInput;
+};
+
+
 export type MutationInstallClusterPrereqsArgs = {
   input: InstallClusterPrereqsInputType;
 };
@@ -2230,6 +2270,11 @@ export type MutationMetabaseChartArgs = {
 
 export type MutationMigrateAppToClusterArgs = {
   input: MigrateAppInputGql;
+};
+
+
+export type MutationMoveAppToTeamArgs = {
+  input: MoveAppToTeamInput;
 };
 
 
@@ -2398,6 +2443,11 @@ export type MutationResumeEnvironmentArgs = {
 };
 
 
+export type MutationResyncAstroliftManifestFromRepoArgs = {
+  input: ResyncManifestFromRepoInput;
+};
+
+
 export type MutationRevokeApiTokenArgs = {
   input: RevokeApiTokenInput;
 };
@@ -2420,6 +2470,11 @@ export type MutationRevokeInvitationArgs = {
 
 export type MutationRevokeRoleBindingArgs = {
   input: RevokeRoleBindingInput;
+};
+
+
+export type MutationRevokeTeamAccessFromAppArgs = {
+  input: RevokeTeamAccessInput;
 };
 
 
@@ -2869,6 +2924,7 @@ export type Query = {
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
   astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
+  astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
   astroliftApps: Array<AstroliftRegisteredApp>;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
@@ -3031,6 +3087,11 @@ export type QueryAstroliftAppStatusCodeBreakdownArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryAstroliftAppTeamAccessesArgs = {
+  appSlug: Scalars['String']['input'];
 };
 
 
@@ -3324,6 +3385,28 @@ export type RemoveOrganizationAllowlistDomainInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type ResyncManifestFromRepoInput = {
+  appSlug: Scalars['String']['input'];
+};
+
+export type ResyncManifestPayload = {
+  envKeysChanged: Scalars['Int']['output'];
+  managedServicesAdded: Array<Scalars['String']['output']>;
+  managedServicesRemoved: Array<Scalars['String']['output']>;
+  schedulesChanged: Scalars['Int']['output'];
+  summary: Scalars['String']['output'];
+  syncState: Scalars['String']['output'];
+  workloadsAdded: Array<Scalars['String']['output']>;
+  workloadsChanged: Array<Scalars['String']['output']>;
+  workloadsRemoved: Array<Scalars['String']['output']>;
+};
+
+export type ResyncManifestPayloadMutationResult = {
+  data?: Maybe<ResyncManifestPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type RevokeApiTokenInput = {
   id: Scalars['GUID']['input'];
 };
@@ -3342,6 +3425,11 @@ export type RevokeInvitationInput = {
 
 export type RevokeRoleBindingInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type RevokeTeamAccessInput = {
+  appId: Scalars['GUID']['input'];
+  teamId: Scalars['GUID']['input'];
 };
 
 export type RotateDeployTokenInput = {

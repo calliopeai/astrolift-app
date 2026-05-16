@@ -302,6 +302,25 @@ type AstroliftAppSummary {
   status: String!
 }
 
+type AstroliftAppTeamAccess {
+  id: GUID!
+  appId: GUID!
+  appSlug: String!
+  teamId: GUID!
+  teamSlug: String!
+  teamName: String!
+  accessLevel: String!
+  isHome: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftAppTeamAccessMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppTeamAccess
+}
+
 type AstroliftAuditEvent {
   id: GUID!
   organizationId: String
@@ -893,6 +912,7 @@ type AstroliftRegisteredApp {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+  lastResyncAt: DateTime
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1605,6 +1625,12 @@ input GrantRoleInput {
   scopeGuid: GUID!
 }
 
+input GrantTeamAccessInput {
+  appId: GUID!
+  teamId: GUID!
+  accessLevel: String!
+}
+
 input GroupOperationInput {
   userIds: [ID!]!
   groupId: ID!
@@ -1717,6 +1743,11 @@ input MigrateAppInputGql {
   appEnvironmentId: GUID!
   targetClusterId: GUID!
   drainSource: Boolean! = true
+}
+
+input MoveAppToTeamInput {
+  appId: GUID!
+  targetTeamId: GUID!
 }
 
 type Mutation {
@@ -1874,6 +1905,10 @@ type Mutation {
   updateManifest(input: UpdateManifestInput!): ManifeststagepayloadMutationResult!
   syncManifestFromRepo(input: SyncManifestFromRepoInput!): ManifeststagepayloadMutationResult!
   pushManifestToRepo(input: PushManifestToRepoInput!): ManifestpushpayloadMutationResult!
+  moveAppToTeam(input: MoveAppToTeamInput!): AstroliftRegisteredAppMutationResult!
+  grantTeamAccessToApp(input: GrantTeamAccessInput!): AstroliftAppTeamAccessMutationResult!
+  revokeTeamAccessFromApp(input: RevokeTeamAccessInput!): SoftdeletepayloadMutationResult!
+  resyncAstroliftManifestFromRepo(input: ResyncManifestFromRepoInput!): ResyncManifestPayloadMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -2179,6 +2214,7 @@ type Query {
   astroliftApps: [AstroliftRegisteredApp!]!
   astroliftMyApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
+  astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
@@ -2291,6 +2327,28 @@ input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
 }
 
+input ResyncManifestFromRepoInput {
+  appSlug: String!
+}
+
+type ResyncManifestPayload {
+  syncState: String!
+  summary: String!
+  workloadsAdded: [String!]!
+  workloadsRemoved: [String!]!
+  workloadsChanged: [String!]!
+  managedServicesAdded: [String!]!
+  managedServicesRemoved: [String!]!
+  envKeysChanged: Int!
+  schedulesChanged: Int!
+}
+
+type ResyncManifestPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ResyncManifestPayload
+}
+
 input RevokeApiTokenInput {
   id: GUID!
 }
@@ -2309,6 +2367,11 @@ input RevokeInvitationInput {
 
 input RevokeRoleBindingInput {
   id: GUID!
+}
+
+input RevokeTeamAccessInput {
+  appId: GUID!
+  teamId: GUID!
 }
 
 input RotateDeployTokenInput {
