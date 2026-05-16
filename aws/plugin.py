@@ -34,6 +34,7 @@ from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
+from aws.managed.vector_opensearch import OpenSearchVectorDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
 from aws.tls_acm import ACMDriver
@@ -61,6 +62,7 @@ PLUGIN = ProviderPlugin(
         ("postgres", "rds"): RDSPostgresDriver,
         ("mysql", "rds_mysql"): RDSMySQLDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
+        ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,
     },
     config_schema={
         "type": "object",
