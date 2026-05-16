@@ -461,6 +461,24 @@ def _viewer_can_access_project(*, project, viewer) -> bool:
 
 
 @strawberry.input
+class UpdateSecurityPolicyInput:
+    """Update the supply-chain / scanner policy for an app (#313).
+
+    Every knob is required on the wire: the form on
+    ``/apps/[slug]/security`` always submits the full effective
+    policy. ``block_on_high_cve_threshold`` is the one nullable knob —
+    None clears the count-based gate; a non-null integer must be at
+    least 1 (a threshold of 0 would block every image and is almost
+    certainly an input error).
+    """
+
+    app_slug: str
+    block_on_critical_cves: bool
+    block_on_missing_signature: bool
+    block_on_high_cve_threshold: int | None
+
+
+@strawberry.input
 class ResyncManifestFromRepoInput:
     """Re-fetch ``astrolift.toml`` from the deploy branch and
     reconcile workloads / env / managed services / schedules.
@@ -1431,4 +1449,51 @@ class RegistryMutation:
         # never dangle under a different team's branch.
         app.team = project.team
         app.save(update_fields=["project", "team", "updated_at", "version"])
+        return gql_success(app_to_type(app))
+
+    @strawberry.field
+    @mutation_audit(action="app.security_policy.update")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def update_astrolift_security_policy(
+        self,
+        info: Info,
+        input: UpdateSecurityPolicyInput,
+    ) -> MutationResultType[RegisteredAppType]:
+        """Persist the supply-chain / scanner policy for an app (#313).
+
+        The PromoteDeploymentWorkflow reads
+        ``app.security_policy_resolved`` at deploy-gate time and short-
+        circuits the promote when any active knob would block (emitting
+        a ``SupplyChainBlockedPayload`` event). This mutation is the
+        only sanctioned writer of that JSON blob — it goes through the
+        standard tenant / permission / audit envelope so the audit log
+        captures who tightened or loosened the gate.
+
+        Threshold semantics: ``block_on_high_cve_threshold`` of None
+        clears the count-based gate entirely; a non-null integer must
+        be >= 1. A threshold of 0 would block every image and is
+        almost certainly an input error — refuse with VALIDATION.
+        """
+        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        if input.block_on_high_cve_threshold is not None and input.block_on_high_cve_threshold < 1:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "blockOnHighCveThreshold must be at least 1 (use null to clear the threshold)",
+                field="blockOnHighCveThreshold",
+            )
+
+        app.security_policy = {
+            "block_on_critical_cves": bool(input.block_on_critical_cves),
+            "block_on_missing_signature": bool(input.block_on_missing_signature),
+            "block_on_high_cve_threshold": (
+                int(input.block_on_high_cve_threshold)
+                if input.block_on_high_cve_threshold is not None
+                else None
+            ),
+        }
+        app.save(update_fields=["security_policy", "updated_at", "version"])
         return gql_success(app_to_type(app))

@@ -138,6 +138,24 @@ export type AstroliftAlertRuleMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAnonymizeUserInput = {
+  userGid: Scalars['GUID']['input'];
+};
+
+export type AstroliftAnonymizeUserPayload = {
+  anonymizedAt: Scalars['DateTime']['output'];
+  anonymizedUserId: Scalars['GUID']['output'];
+  lifecycle: Scalars['String']['output'];
+  requiresLogout: Scalars['Boolean']['output'];
+  wasSelf: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAnonymizeUserPayloadMutationResult = {
+  data?: Maybe<AstroliftAnonymizeUserPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftApiToken = {
   createdAt: Scalars['DateTime']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1022,6 +1040,7 @@ export type AstroliftRegisteredApp = {
   rawManifestStaged: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
   requiresApproval: Scalars['Boolean']['output'];
+  securityPolicy: AstroliftSecurityPolicy;
   slug: Scalars['String']['output'];
   sourceKind: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
@@ -1189,6 +1208,12 @@ export type AstroliftSecretBundleMutationResult = {
   data?: Maybe<AstroliftSecretBundle>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSecurityPolicy = {
+  blockOnCriticalCves: Scalars['Boolean']['output'];
+  blockOnHighCveThreshold?: Maybe<Scalars['Int']['output']>;
+  blockOnMissingSignature: Scalars['Boolean']['output'];
 };
 
 export type AstroliftSourceConnection = {
@@ -1934,6 +1959,7 @@ export type Mutation = {
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
   assignAstroliftAppToProject: AstroliftRegisteredAppMutationResult;
+  astroliftAnonymizeUser: AstroliftAnonymizeUserPayloadMutationResult;
   astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
@@ -2100,6 +2126,7 @@ export type Mutation = {
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
+  updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
   updateManagedDomain: AstroliftManagedDomainMutationResult;
   updateManagedService: AstroliftManagedServiceMutationResult;
@@ -2172,6 +2199,11 @@ export type MutationArchiveAppRegistryRepoArgs = {
 
 export type MutationAssignAstroliftAppToProjectArgs = {
   input: AssignAppToProjectInput;
+};
+
+
+export type MutationAstroliftAnonymizeUserArgs = {
+  input: AstroliftAnonymizeUserInput;
 };
 
 
@@ -2865,6 +2897,11 @@ export type MutationUpdateAlertRuleArgs = {
 
 export type MutationUpdateAppArgs = {
   input: UpdateAppInput;
+};
+
+
+export type MutationUpdateAstroliftSecurityPolicyArgs = {
+  input: UpdateSecurityPolicyInput;
 };
 
 
@@ -3948,6 +3985,13 @@ export type UpdateRoleInput = {
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   permissions: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type UpdateSecurityPolicyInput = {
+  appSlug: Scalars['String']['input'];
+  blockOnCriticalCves: Scalars['Boolean']['input'];
+  blockOnHighCveThreshold: InputMaybe<Scalars['Int']['input']>;
+  blockOnMissingSignature: Scalars['Boolean']['input'];
 };
 
 export type UpdateSourceConnectionInput = {

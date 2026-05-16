@@ -159,6 +159,14 @@ class RegisteredApp(NamedBaseCoreModel):
         on_delete=models.SET_NULL,
     )
 
+    # Supply-chain / scanner policy consulted at promote time by the
+    # PromoteDeploymentWorkflow (#313). Persisted as a sparse JSON blob
+    # so we can add keys without per-toggle migrations; the
+    # ``security_policy_resolved`` property fills in the platform
+    # defaults for any unset key so callers never need to know which
+    # keys are populated. Empty dict means "use defaults everywhere".
+    security_policy = models.JSONField(default=dict, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -186,6 +194,29 @@ class RegisteredApp(NamedBaseCoreModel):
         ProvisioningStatus.READY: {ProvisioningStatus.PROVISIONING, ProvisioningStatus.FAILED},
         ProvisioningStatus.FAILED: {ProvisioningStatus.PROVISIONING},
     }
+
+    @property
+    def security_policy_resolved(self) -> dict:
+        """Return the supply-chain policy with platform defaults filled in.
+
+        Defaults are deliberately strict: critical CVEs and missing
+        cosign signatures block by default. ``block_on_high_cve_threshold``
+        is nullable — None means "no count-based block on high-severity
+        CVEs". A non-null integer N means "block when the high-CVE count
+        on the candidate image is >= N".
+
+        Callers (notably PromoteDeploymentWorkflow's supply-chain gate)
+        should always read through this property rather than the raw
+        JSON field so that a partial policy persists the operator's
+        explicit choices without losing the platform defaults for the
+        unspecified knobs.
+        """
+        policy = self.security_policy or {}
+        return {
+            "block_on_critical_cves": policy.get("block_on_critical_cves", True),
+            "block_on_missing_signature": policy.get("block_on_missing_signature", True),
+            "block_on_high_cve_threshold": policy.get("block_on_high_cve_threshold"),
+        }
 
     def transition_provisioning(self, new_status: RegisteredApp.ProvisioningStatus) -> None:
         current = RegisteredApp.ProvisioningStatus(self.provisioning_status)

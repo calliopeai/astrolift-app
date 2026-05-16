@@ -11,6 +11,25 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftSecurityPolicy")
+class SecurityPolicyType:
+    """Resolved supply-chain policy for an app (#313).
+
+    Mirrors ``RegisteredApp.security_policy_resolved`` — every field
+    is present even when the underlying ``security_policy`` JSON blob
+    is empty, because callers always want the *effective* gate
+    settings (platform defaults filled in for unspecified knobs).
+
+    ``block_on_high_cve_threshold`` is nullable: None means "no
+    count-based block on high-severity CVEs"; a non-null integer N
+    means "block when the high-CVE count is >= N".
+    """
+
+    block_on_critical_cves: bool
+    block_on_missing_signature: bool
+    block_on_high_cve_threshold: int | None
+
+
 @strawberry.type(name="AstroliftRegisteredApp")
 class RegisteredAppType:
     id: GUID
@@ -91,6 +110,12 @@ class RegisteredAppType:
     # page; FE renders it as a green "installed · 5m ago" chip vs
     # an amber "not installed" chip.
     source_webhook_installed_at: dt.datetime | None
+
+    # Supply-chain policy (#313). Always populated — the resolver
+    # reads ``security_policy_resolved`` so platform defaults are
+    # surfaced for any unspecified knob. The supply-chain Settings
+    # card (#307) reads this directly to seed the form.
+    security_policy: SecurityPolicyType
 
 
 @strawberry.type(name="AstroliftAppTeamAccess")
@@ -237,6 +262,17 @@ def app_to_type(app) -> RegisteredAppType:
         deleted_at=app.deleted_at,
         last_resync_at=app.last_resync_at,
         source_webhook_installed_at=app.source_webhook_installed_at,
+        security_policy=_security_policy_to_type(app),
+    )
+
+
+def _security_policy_to_type(app) -> SecurityPolicyType:
+    resolved = app.security_policy_resolved
+    threshold = resolved["block_on_high_cve_threshold"]
+    return SecurityPolicyType(
+        block_on_critical_cves=bool(resolved["block_on_critical_cves"]),
+        block_on_missing_signature=bool(resolved["block_on_missing_signature"]),
+        block_on_high_cve_threshold=int(threshold) if threshold is not None else None,
     )
 
 
