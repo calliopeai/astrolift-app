@@ -29,6 +29,7 @@ from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
+from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
@@ -58,6 +59,7 @@ PLUGIN = ProviderPlugin(
         ("object_store", "s3"): S3Driver,
         ("queue", "sqs"): SQSDriver,
         ("postgres", "rds"): RDSPostgresDriver,
+        ("mysql", "rds_mysql"): RDSMySQLDriver,
         ("redis", "elasticache"): ElastiCacheRedisDriver,
     },
     config_schema={

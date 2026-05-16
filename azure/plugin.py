@@ -32,6 +32,7 @@ from azure.cluster_aks import AKSClusterDriver
 from azure.dns_azuredns import AzureDNSDriver
 from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
+from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import BlobStorageDriver
 from azure.managed.queue_servicebus import ServiceBusDriver
 from azure.registry_acr import ACRDriver
@@ -54,6 +55,7 @@ PLUGIN = ProviderPlugin(
     managed_service_drivers={
         ("object_store", "blob"): BlobStorageDriver,
         ("queue", "servicebus"): ServiceBusDriver,
+        ("mysql", "azure_mysql_flex"): AzureMySQLFlexibleDriver,
     },
     config_schema={
         "type": "object",
