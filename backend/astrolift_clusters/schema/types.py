@@ -9,6 +9,23 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftClusterBootstrapRun")
+class ClusterBootstrapRunType:
+    """One ``astro cluster bootstrap`` invocation against the cluster
+    (#319). Recorded by the CLI via ``recordClusterBootstrapRun``."""
+
+    id: GUID
+    status: str  # "succeeded" | "failed"
+    chart_version: str
+    installed_releases: JSON
+    cli_version: str
+    host_info: JSON
+    error_message: str
+    started_at: dt.datetime
+    ended_at: dt.datetime
+    triggered_by_username: str | None
+
+
 @strawberry.type(name="AstroliftTenantCluster")
 class TenantClusterType:
     id: GUID
@@ -28,6 +45,52 @@ class TenantClusterType:
     last_management_error: str
     managed_at: dt.datetime | None
     secrets_backend_provisioned_at: dt.datetime | None
+
+    @strawberry.field
+    def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
+        """Most recent ``astro cluster bootstrap`` invocation for this
+        cluster, or ``None`` if the CLI has never reported one. Used
+        by the cluster detail page's "Last bootstrap" card (#319)."""
+        # Local import to keep this module free of model imports at
+        # parse time — the rest of the module is pure type wiring.
+        from astrolift_clusters.models import (
+            ClusterBootstrapRun,
+            TenantCluster,
+        )
+
+        cluster = TenantCluster.objects.filter(guid=str(self.id)).first()
+        if cluster is None:
+            return None
+        run = (
+            ClusterBootstrapRun.objects.filter(tenant_cluster=cluster)
+            .select_related("triggered_by")
+            .order_by("-ended_at")
+            .first()
+        )
+        if run is None:
+            return None
+        return bootstrap_run_to_type(run)
+
+    @strawberry.field
+    def bootstrap_runs(self, limit: int = 10) -> list[ClusterBootstrapRunType]:
+        """History of bootstrap runs against this cluster, newest first
+        (#319). Bounded to ``limit`` rows (default 10, max 100) so the
+        cluster detail card stays predictable."""
+        from astrolift_clusters.models import (
+            ClusterBootstrapRun,
+            TenantCluster,
+        )
+
+        capped = max(1, min(int(limit or 10), 100))
+        cluster = TenantCluster.objects.filter(guid=str(self.id)).first()
+        if cluster is None:
+            return []
+        qs = (
+            ClusterBootstrapRun.objects.filter(tenant_cluster=cluster)
+            .select_related("triggered_by")
+            .order_by("-ended_at")[:capped]
+        )
+        return [bootstrap_run_to_type(r) for r in qs]
 
 
 @strawberry.type(name="AstroliftManagedDomain")
@@ -82,6 +145,21 @@ def domain_to_type(domain) -> ManagedDomainType:
         default_for=domain.default_for,
         is_wildcard_managed=domain.is_wildcard_managed,
         created_at=domain.created_at,
+    )
+
+
+def bootstrap_run_to_type(run) -> ClusterBootstrapRunType:
+    return ClusterBootstrapRunType(
+        id=GUID(str(run.guid)),
+        status=run.status,
+        chart_version=run.chart_version or "",
+        installed_releases=run.installed_releases or [],
+        cli_version=run.cli_version or "",
+        host_info=run.host_info or {},
+        error_message=run.error_message or "",
+        started_at=run.started_at,
+        ended_at=run.ended_at,
+        triggered_by_username=(run.triggered_by.username if run.triggered_by_id else None),
     )
 
 
@@ -260,3 +338,30 @@ class ClusterWorkflowRunType:
     """Empty when the workflow is still RUNNING."""
 
     run_id: str
+
+
+# ---- Cluster workload health (#362) -------------------------------
+
+
+@strawberry.type(name="AstroliftClusterWorkloadHealth")
+class ClusterWorkloadHealthType:
+    """Per-Deployment health row for the Status tab's Workload health
+    card (#362). One row per Deployment in the operator-facing
+    namespace set; the card sorts by readiness deficit (most-broken
+    first) and surfaces restarts as a triage signal."""
+
+    namespace: str
+    workload_name: str
+    desired_replicas: int
+    ready_replicas: int
+    restart_count_24h: int
+    """Sum of container restart counts across pods owned by this
+    Deployment whose last termination fell inside the trailing 24h
+    window. Clients without termination-timestamp data contribute
+    their full running counter (best-effort)."""
+
+    last_image_deployed_at: str
+    """RFC3339 timestamp of the Deployment's last completed rollout
+    (Progressing condition with reason NewReplicaSetAvailable).
+    Empty string when the Deployment has never rolled or when the
+    condition isn't populated by the apiserver."""

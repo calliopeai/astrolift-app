@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db.models import Q
 from strawberry.types import Info
 
+from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
@@ -330,3 +331,84 @@ class RegistryQuery:
             error_line=None,
             error_column=None,
         )
+
+    @strawberry.field
+    @tenant_scoped()
+    def assignable_astrolift_projects(self, info: Info) -> list[ProjectType]:
+        """Projects in the current tenant org the viewer can assign
+        apps to (#391).
+
+        Self-service: no ``@require_permission`` gate — the viewer's
+        own bindings are the gate, same shape as ``astrolift_my_apps``.
+        Returns projects reachable by an active RoleBinding at ORG /
+        TEAM / PROJECT scope. APP-scope bindings don't surface
+        projects: a user with app-only access on one app shouldn't be
+        offered the underlying project as an assignment target for
+        OTHER apps.
+
+        Superusers see every active project in the tenant.
+        """
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from astrolift_identity.models import Project, RoleBinding
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.organization_id is None:
+            return []
+
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        viewer = (
+            User.objects.filter(pk=tenant.actor_user_id).first() if tenant.actor_user_id is not None else None
+        )
+
+        base_qs = Project.objects.select_related("organization", "team").filter(
+            organization_id=tenant.organization_id,
+            deleted_at__isnull=True,
+        )
+
+        if (
+            viewer is not None
+            and getattr(viewer, "is_superuser", False)
+            and getattr(viewer, "is_active", True)
+        ):
+            return [project_to_type(p) for p in base_qs.order_by("name")[:500]]
+
+        if viewer is None:
+            return []
+
+        now = timezone.now()
+        bindings = list(
+            RoleBinding.objects.filter(
+                user_id=viewer.pk,
+                deleted_at__isnull=True,
+            ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+        )
+        if not bindings:
+            return []
+
+        org_ids: set[int] = set()
+        team_ids: set[int] = set()
+        project_ids: set[int] = set()
+        for b in bindings:
+            if b.scope_kind == RoleBinding.ScopeKind.ORG:
+                org_ids.add(b.scope_id)
+            elif b.scope_kind == RoleBinding.ScopeKind.TEAM:
+                team_ids.add(b.scope_id)
+            elif b.scope_kind == RoleBinding.ScopeKind.PROJECT:
+                project_ids.add(b.scope_id)
+
+        scope_filter = Q()
+        if org_ids:
+            scope_filter |= Q(organization_id__in=org_ids)
+        if team_ids:
+            scope_filter |= Q(team_id__in=team_ids)
+        if project_ids:
+            scope_filter |= Q(pk__in=project_ids)
+        if not scope_filter.children:
+            return []
+
+        qs = base_qs.filter(scope_filter).order_by("team__name", "name")[:500]
+        return [project_to_type(p) for p in qs]

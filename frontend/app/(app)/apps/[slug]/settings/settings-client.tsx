@@ -70,6 +70,7 @@ import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/regist
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AppTabs } from "../components/app-tabs";
+import { AssignProjectCard } from "../components/assign-project-card";
 import { CiSetupSection } from "../components/ci-setup-section";
 import { ControlsSection } from "../components/controls-section";
 import { TeamsCard } from "../components/teams-card";
@@ -210,6 +211,13 @@ export function SettingsClient({ slug }: { slug: string }) {
       <ResyncSourceSection appSlug={a.slug} lastResyncAt={a.lastResyncAt ?? null} />
 
       <IngressControlsSection appSlug={a.slug} />
+
+      <AssignProjectCard
+        appSlug={a.slug}
+        currentProjectId={a.projectId ?? null}
+        currentProjectName={a.projectName}
+        currentTeamName={a.teamName}
+      />
 
       <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />
 

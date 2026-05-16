@@ -105,6 +105,63 @@ export const LIST_CLUSTERS = gql`
       lifecycle
       lastManagementError
       managedAt
+      lastBootstrapRun {
+        id
+        status
+        chartVersion
+        installedReleases
+        cliVersion
+        errorMessage
+        startedAt
+        endedAt
+        triggeredByUsername
+      }
+    }
+  }
+`;
+
+// Bootstrap-run history for a single cluster (#319). The 'View
+// history' disclosure on the Last bootstrap card fans this query
+// out when expanded; we don't pull the full history on the cluster
+// list to keep that query light.
+export const CLUSTER_BOOTSTRAP_RUNS = gql`
+  query ClusterBootstrapRuns($limit: Int) {
+    astroliftClusters {
+      id
+      slug
+      bootstrapRuns(limit: $limit) {
+        id
+        status
+        chartVersion
+        installedReleases
+        cliVersion
+        errorMessage
+        startedAt
+        endedAt
+        triggeredByUsername
+      }
+    }
+  }
+`;
+
+// CLI report-back of an ``astro cluster bootstrap`` outcome (#319).
+// Operator-side surfaces don't fire this — the CLI does. Exposed
+// from the queries module so the type generation picks it up and
+// makes the mutation discoverable from the typed client.
+export const RECORD_CLUSTER_BOOTSTRAP_RUN = gql`
+  mutation RecordClusterBootstrapRun(
+    $input: RecordClusterBootstrapRunInput!
+  ) {
+    recordClusterBootstrapRun(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+      }
     }
   }
 `;
@@ -322,6 +379,22 @@ export const LIST_PROVIDER_PLUGINS = gql`
       version
       capabilitiesManifest
       isEnabled
+    }
+  }
+`;
+
+// Per-Deployment workload health rollup for the Status tab (#362).
+// Drives the Workload health card — desired vs ready replicas, 24h
+// restart counts, last completed rollout timestamp.
+export const CLUSTER_WORKLOAD_HEALTH = gql`
+  query ClusterWorkloadHealth($clusterId: GUID!) {
+    astroliftClusterWorkloadHealth(clusterId: $clusterId) {
+      namespace
+      workloadName
+      desiredReplicas
+      readyReplicas
+      restartCount24h
+      lastImageDeployedAt
     }
   }
 `;

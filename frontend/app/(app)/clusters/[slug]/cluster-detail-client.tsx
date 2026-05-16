@@ -4,14 +4,18 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
+  ChevronDownIcon,
   CloudIcon,
   GlobeIcon,
   LayersIcon,
   Loader2Icon,
   PlayIcon,
   RefreshCcwIcon,
+  RocketIcon,
   ShieldIcon,
   Trash2Icon,
+  UserIcon,
+  XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -21,6 +25,8 @@ import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import { useFormatters } from "@/lib/i18n/formatters";
+import { cn } from "@/lib/utils";
 import { ClusterTabs } from "./components/cluster-tabs";
 import {
   AlertDialog,
@@ -54,6 +60,7 @@ import {
   BRING_CLUSTER_INTO_MANAGEMENT,
   CLUSTER_APP_COUNT,
   CLUSTER_BOOTSTRAP_PLAN,
+  CLUSTER_BOOTSTRAP_RUNS,
   DECOMMISSION_CLUSTER,
   INSTALL_CLUSTER_PREREQS,
   LIST_CLUSTERS,
@@ -503,6 +510,8 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
         </div>
       )}
 
+      <LastBootstrapCard slug={cluster.slug} run={cluster.lastBootstrapRun ?? null} />
+
       <BootstrapPlanCard clusterId={cluster.id} />
 
       <AlertDialog open={decommissionOpen} onOpenChange={setDecommissionOpen}>
@@ -936,5 +945,274 @@ function AppsBoundCard({ clusterId }: { clusterId: string }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Last bootstrap card (#319) ─────────────────────────────────────
+// Surfaces the outcome of the most recent ``astro cluster bootstrap``
+// run, fed by recordClusterBootstrapRun (called by the CLI). Status
+// pill + relative timestamp + chart version + installed-release
+// count + triggering operator. Inline 'View history' disclosure fans
+// out CLUSTER_BOOTSTRAP_RUNS for the per-cluster history list.
+//
+// Lives on the overview tab — kept away from the sibling Status tab
+// (#362) so this card and the workload-health card don't fight for
+// the same screen real estate.
+
+interface BootstrapRun {
+  id: string;
+  status: string;
+  chartVersion: string;
+  installedReleases: unknown;
+  cliVersion: string;
+  errorMessage: string;
+  startedAt: string;
+  endedAt: string;
+  triggeredByUsername?: string | null;
+}
+
+interface BootstrapRunsResp {
+  astroliftClusters: { id: string; slug: string; bootstrapRuns: BootstrapRun[] }[];
+}
+
+function bootstrapReleaseCount(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | null }) {
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const fmt = useFormatters();
+
+  // The CLI command operators can paste into a terminal — same string
+  // used by the missing-prereq warning above; kept inline so this card
+  // renders standalone when the cluster has zero bootstrap runs yet.
+  const cliHint = `astro cluster bootstrap --cluster-slug ${slug}`;
+
+  if (!run) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <RocketIcon className="size-4" />
+            Last bootstrap
+          </CardTitle>
+          <CardDescription>
+            No bootstrap runs reported for this cluster yet. Run{" "}
+            <code className="font-mono text-xs">{cliHint}</code> from the
+            CLI to install platform prerequisites; the outcome will land
+            here automatically.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const succeeded = run.status === "succeeded";
+  const releaseCount = bootstrapReleaseCount(run.installedReleases);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <RocketIcon className="size-4" />
+          Last bootstrap
+        </CardTitle>
+        <CardDescription>
+          Most recent <code className="font-mono text-xs">astro cluster bootstrap</code>{" "}
+          run reported by the CLI. Re-runs append; the row never
+          mutates after the CLI submits it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {succeeded ? (
+            <Badge variant="default" className="gap-1">
+              <CheckCircleIcon className="size-3" />
+              Succeeded
+            </Badge>
+          ) : (
+            <Badge variant="destructive" className="gap-1">
+              <XCircleIcon className="size-3" />
+              Failed
+            </Badge>
+          )}
+          <span
+            className="text-muted-foreground text-xs"
+            title={fmt.formatDateTime(run.endedAt)}
+          >
+            {fmt.formatRelativeTime(run.endedAt)}
+          </span>
+          {run.cliVersion && (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              {run.cliVersion}
+            </Badge>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+          <Field
+            label="Chart version"
+            mono
+            value={run.chartVersion || "—"}
+          />
+          <Field
+            label="Installed releases"
+            value={
+              <span>
+                <span className="font-semibold">{releaseCount}</span>{" "}
+                <span className="text-muted-foreground text-xs">
+                  release{releaseCount === 1 ? "" : "s"}
+                </span>
+              </span>
+            }
+          />
+          <Field
+            label="Triggered by"
+            value={
+              <span className="inline-flex items-center gap-1.5">
+                <UserIcon className="size-3.5" />
+                <span>{run.triggeredByUsername || "unknown"}</span>
+              </span>
+            }
+          />
+          <Field
+            label="Started"
+            value={fmt.formatDateTime(run.startedAt)}
+          />
+        </div>
+
+        {!succeeded && run.errorMessage && (
+          <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
+            <p className="text-destructive text-xs font-medium">
+              Error reported by the CLI
+            </p>
+            <pre className="text-destructive mt-1 whitespace-pre-wrap text-xs">
+              {run.errorMessage}
+            </pre>
+          </div>
+        )}
+
+        {releaseCount > 0 && Array.isArray(run.installedReleases) && (
+          <details className="rounded-md border">
+            <summary className="text-muted-foreground cursor-pointer px-3 py-2 text-xs">
+              View installed releases
+            </summary>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Release</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(run.installedReleases as Array<Record<string, unknown>>).map(
+                  (r, i) => (
+                    <TableRow key={`${r.name ?? "release"}-${i}`}>
+                      <TableCell className="font-mono text-xs">
+                        {String(r.name ?? "—")}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {String(r.version ?? "—")}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {String(r.status ?? "")}
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
+              </TableBody>
+            </Table>
+          </details>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((v) => !v)}
+          aria-expanded={historyOpen}
+          className="text-primary hover:text-primary inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+        >
+          <ChevronDownIcon
+            className={cn(
+              "size-3 transition-transform",
+              historyOpen && "rotate-180",
+            )}
+          />
+          {historyOpen ? "Hide history" : "View history"}
+        </button>
+
+        {historyOpen && <BootstrapHistoryList slug={slug} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BootstrapHistoryList({ slug }: { slug: string }) {
+  // Fan out only when the operator opens the disclosure — no point
+  // pulling N runs on every cluster detail page load when most
+  // operators never look past the headline.
+  const { data, loading } = useQuery<BootstrapRunsResp>(CLUSTER_BOOTSTRAP_RUNS, {
+    variables: { limit: 10 },
+  });
+  const fmt = useFormatters();
+  const cluster = data?.astroliftClusters.find((c) => c.slug === slug);
+  const runs = cluster?.bootstrapRuns ?? [];
+
+  if (loading) {
+    return <Skeleton className="h-16 w-full" />;
+  }
+  if (runs.length === 0) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        No prior bootstrap runs.
+      </p>
+    );
+  }
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Status</TableHead>
+          <TableHead>When</TableHead>
+          <TableHead>Chart</TableHead>
+          <TableHead>Releases</TableHead>
+          <TableHead>Operator</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {runs.map((r) => (
+          <TableRow key={r.id}>
+            <TableCell>
+              {r.status === "succeeded" ? (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircleIcon className="size-3" />
+                  Succeeded
+                </Badge>
+              ) : (
+                <Badge variant="destructive" className="gap-1">
+                  <XCircleIcon className="size-3" />
+                  Failed
+                </Badge>
+              )}
+            </TableCell>
+            <TableCell
+              className="text-xs"
+              title={fmt.formatDateTime(r.endedAt)}
+            >
+              {fmt.formatRelativeTime(r.endedAt)}
+            </TableCell>
+            <TableCell className="font-mono text-xs">
+              {r.chartVersion || "—"}
+            </TableCell>
+            <TableCell className="text-xs">
+              {bootstrapReleaseCount(r.installedReleases)}
+            </TableCell>
+            <TableCell className="text-xs">
+              {r.triggeredByUsername || "unknown"}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

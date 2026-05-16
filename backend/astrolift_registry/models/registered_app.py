@@ -47,10 +47,17 @@ class RegisteredApp(NamedBaseCoreModel):
         related_name="registered_apps",
         on_delete=models.CASCADE,
     )
+    # Nullable so the operator can unassign an app from its project
+    # (and so the nav-tree code can render "Unassigned" buckets at the
+    # team / org levels — #391). When the project itself is hard-deleted
+    # we clear the FK rather than cascading the destruction; soft-deletes
+    # leave the FK in place because the project row stays in the table.
     project = models.ForeignKey(
         "astrolift_identity.Project",
         related_name="registered_apps",
-        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
     )
 
     source_kind = models.CharField(max_length=32, choices=SourceKind.choices, default=SourceKind.GITHUB)

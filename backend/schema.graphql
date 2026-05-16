@@ -61,6 +61,11 @@ input ArchiveAppRegistryRepoInput {
   archive: Boolean! = true
 }
 
+input AssignAppToProjectInput {
+  appSlug: String!
+  projectGuid: GUID = null
+}
+
 type AstroliftActiveSession {
   id: String!
   expiresAt: DateTime!
@@ -388,6 +393,19 @@ type AstroliftClusterBootstrapPlan {
   components: [AstroliftClusterBootstrapComponent!]!
 }
 
+type AstroliftClusterBootstrapRun {
+  id: GUID!
+  status: String!
+  chartVersion: String!
+  installedReleases: JSON!
+  cliVersion: String!
+  hostInfo: JSON!
+  errorMessage: String!
+  startedAt: DateTime!
+  endedAt: DateTime!
+  triggeredByUsername: String
+}
+
 type AstroliftClusterEvent {
   namespace: String!
   name: String!
@@ -428,6 +446,15 @@ type AstroliftClusterWorkflowRun {
   startedAt: String!
   closedAt: String!
   runId: String!
+}
+
+type AstroliftClusterWorkloadHealth {
+  namespace: String!
+  workloadName: String!
+  desiredReplicas: Int!
+  readyReplicas: Int!
+  restartCount24h: Int!
+  lastImageDeployedAt: String!
 }
 
 type AstroliftCommandRun {
@@ -941,6 +968,10 @@ type AstroliftRegisteredApp {
   organizationSlug: String!
   teamSlug: String!
   projectSlug: String!
+  projectId: GUID
+  projectName: String!
+  teamId: GUID
+  teamName: String!
   sourceKind: String!
   sourceRepo: String!
   sourceUrl: String!
@@ -1246,6 +1277,8 @@ type AstroliftTenantCluster {
   lastManagementError: String!
   managedAt: DateTime
   secretsBackendProvisionedAt: DateTime
+  lastBootstrapRun: AstroliftClusterBootstrapRun
+  bootstrapRuns(limit: Int! = 10): [AstroliftClusterBootstrapRun!]!
 }
 
 type AstroliftTenantClusterMutationResult {
@@ -1397,6 +1430,16 @@ input BootstrapOptionOverride {
   componentKey: String!
   optionKey: String!
   value: String!
+}
+
+type Bootstraprunrecordedpayload {
+  id: GUID!
+}
+
+type BootstraprunrecordedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Bootstraprunrecordedpayload
 }
 
 input BringClusterIntoManagementInputType {
@@ -2024,6 +2067,7 @@ type Mutation {
   grantTeamAccessToApp(input: GrantTeamAccessInput!): AstroliftAppTeamAccessMutationResult!
   revokeTeamAccessFromApp(input: RevokeTeamAccessInput!): SoftdeletepayloadMutationResult!
   resyncAstroliftManifestFromRepo(input: ResyncManifestFromRepoInput!): ResyncManifestPayloadMutationResult!
+  assignAstroliftAppToProject(input: AssignAppToProjectInput!): AstroliftRegisteredAppMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -2041,6 +2085,7 @@ type Mutation {
   refreshClusterManagement(input: RefreshClusterManagementInputType!): AstroliftTenantClusterMutationResult!
   decommissionCluster(input: DecommissionClusterInputType!): AstroliftTenantClusterMutationResult!
   installClusterPrereqs(input: InstallClusterPrereqsInputType!): AstroliftTenantClusterMutationResult!
+  recordClusterBootstrapRun(input: RecordClusterBootstrapRunInput!): BootstraprunrecordedpayloadMutationResult!
   unregisterTenantCluster(input: UnregisterTenantClusterInput!): SoftdeletepayloadMutationResult!
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
@@ -2352,6 +2397,7 @@ type Query {
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
+  assignableAstroliftProjects: [AstroliftProject!]!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
   astroliftDeployment(id: String!): AstroliftDeployment
@@ -2376,6 +2422,7 @@ type Query {
   astroliftAppCountForCluster(clusterId: GUID!): Int!
   astroliftClusterHealth(clusterId: GUID!, eventLimit: Int! = 50): AstroliftClusterHealth
   astroliftClusterBootstrapPlan(clusterId: GUID!): AstroliftClusterBootstrapPlan
+  astroliftClusterWorkloadHealth(clusterId: GUID!): [AstroliftClusterWorkloadHealth!]!
   astroliftQuotas: [AstroliftQuota!]!
   astroliftBudgets: [AstroliftBudget!]!
   astroliftCostSnapshots(days: Int! = 30, limit: Int! = 200): [AstroliftCostSnapshot!]!
@@ -2406,6 +2453,18 @@ type Query {
 
 input RecheckDomainValidationInput {
   id: GUID!
+}
+
+input RecordClusterBootstrapRunInput {
+  clusterSlug: String!
+  status: String!
+  chartVersion: String!
+  installedReleases: JSON!
+  cliVersion: String!
+  hostInfo: JSON!
+  errorMessage: String = null
+  startedAt: DateTime!
+  endedAt: DateTime!
 }
 
 input RefreshClusterManagementInputType {

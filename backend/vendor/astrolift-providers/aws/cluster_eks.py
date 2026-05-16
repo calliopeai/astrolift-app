@@ -861,6 +861,25 @@ class EKSClusterDriver(ClusterDriver):
             limit=limit,
         )
 
+    def list_workload_health(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+    ):
+        from _sdk._kube_health import (
+            default_namespaces,
+            workload_health_from_client,
+        )
+
+        try:
+            client = self._k8s(cluster.slug)
+        except Exception:  # noqa: BLE001
+            return []
+        return workload_health_from_client(
+            client, namespaces=default_namespaces(namespaces),
+        )
+
     # ---- internals ------------------------------------------------
 
     def _k8s(self, cluster: str) -> Any:

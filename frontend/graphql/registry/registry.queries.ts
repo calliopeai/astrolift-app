@@ -7,7 +7,11 @@ const APP_FIELDS = `
   description
   organizationSlug
   teamSlug
+  teamId
+  teamName
   projectSlug
+  projectId
+  projectName
   sourceKind
   sourceRepo
   sourceUrl
@@ -153,6 +157,27 @@ export const LIST_CONTAINERS = gql`
 export const GET_PLATFORM_API_URL = gql`
   query GetPlatformApiUrl {
     astroliftPlatformApiUrl
+  }
+`;
+
+/**
+ * Projects in the current tenant org the viewer can assign apps to (#391).
+ * Self-service: gated by the viewer's RoleBindings (ORG / TEAM /
+ * PROJECT scope). Powers the project picker on the Settings
+ * "Assign project" card; the FE groups the result by team.
+ */
+export const LIST_ASSIGNABLE_PROJECTS = gql`
+  query ListAssignableAstroliftProjects {
+    assignableAstroliftProjects {
+      id
+      slug
+      name
+      team {
+        id
+        slug
+        name
+      }
+    }
   }
 `;
 

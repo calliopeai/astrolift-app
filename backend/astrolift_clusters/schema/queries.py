@@ -14,6 +14,7 @@ from astrolift_clusters.schema.types import (
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
     ClusterWorkflowRunType,
+    ClusterWorkloadHealthType,
     ManagedDomainType,
     PodPhaseSummaryType,
     ProviderPluginType,
@@ -314,3 +315,55 @@ class ClustersQuery:
             # the cluster anyway, just without an install checklist.
             components = []
         return bootstrap_plan_to_type(cluster, components)
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_workload_health(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> list[ClusterWorkloadHealthType]:
+        """Per-Deployment health rollup for the Status tab (#362).
+
+        The pod-phase card answers "is anything red"; this resolver
+        answers "which workload is red" — desired vs ready replicas,
+        restart counts in the trailing 24h, last completed rollout
+        timestamp. Driver-resolution or driver-call failure yields an
+        empty list (no creds / unreachable / plugin missing); the UI
+        renders an empty-state card rather than erroring out the
+        whole tab. Soft-deleted / missing clusters also yield an
+        empty list (defense in depth — the caller's permission gate
+        already protects access, but mirroring the cluster_health
+        contract keeps the resolver layer symmetric).
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cluster_workload_health_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+            )
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return []
+        try:
+            rows = cluster_workload_health_dispatch(cluster=cluster)
+        except ClusterManagementError:
+            return []
+        return [
+            ClusterWorkloadHealthType(
+                namespace=row["namespace"],
+                workload_name=row["name"],
+                desired_replicas=int(row["desired_replicas"]),
+                ready_replicas=int(row["ready_replicas"]),
+                restart_count_24h=int(row["restart_count_24h"]),
+                last_image_deployed_at=row["last_image_deployed_at"],
+            )
+            for row in rows
+        ]

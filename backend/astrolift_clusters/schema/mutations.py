@@ -12,6 +12,7 @@ kick a Temporal workflow that talks to the real cluster.
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 
 import strawberry
@@ -19,6 +20,7 @@ from django.db import transaction
 from strawberry.types import Info
 
 from astrolift_clusters.models import (
+    ClusterBootstrapRun,
     ManagedDomain,
     ProviderPlugin,
     ProviderPluginConfig,
@@ -42,6 +44,7 @@ from astrolift_workflows.inputs import (
     InstallClusterPrereqsInput,
 )
 from core.decorators import tenant_scoped
+from core.events import Event
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -237,6 +240,40 @@ class DecommissionClusterInputType:
 class RefreshClusterManagementInputType:
     cluster_id: GUID
     force_preflight: bool = False
+
+
+@strawberry.input
+class RecordClusterBootstrapRunInput:
+    """CLI-submitted bootstrap outcome (#319).
+
+    The CLI calls this after ``astro cluster bootstrap`` settles
+    (success or failure). ``cluster_slug`` keys the row to the right
+    cluster — the CLI knows the slug it was invoked against and never
+    holds an integer PK. ``status`` is the post-run summary
+    (``succeeded`` or ``failed``); ``installed_releases`` is a free-
+    form list of ``{name, version}`` (and optional ``status``) entries
+    captured from the helm transcript. ``host_info`` is a free-form
+    JSON blob — OS, arch, kubectl/helm versions — kept for
+    debuggability without forcing the CLI version that wrote it to be
+    in lock-step with the control plane."""
+
+    cluster_slug: str
+    status: str
+    chart_version: str
+    installed_releases: JSON
+    cli_version: str
+    host_info: JSON
+    error_message: str | None = None
+    started_at: dt.datetime
+    ended_at: dt.datetime
+
+
+@strawberry.type
+class _BootstrapRunRecordedPayload:
+    """Minimal return shape — the CLI only needs the id back so it can
+    reference the run in subsequent log lines / future re-uploads."""
+
+    id: GUID
 
 
 @strawberry.input
@@ -519,6 +556,137 @@ class ClustersMutation:
             workflow_id=f"InstallClusterPrereqsWorkflow-{cluster.guid}",
         )
         return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(action="cluster.record_bootstrap_run")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def record_cluster_bootstrap_run(
+        self, info: Info, input: RecordClusterBootstrapRunInput
+    ) -> MutationResultType[_BootstrapRunRecordedPayload]:
+        """Record an ``astro cluster bootstrap`` outcome (#319).
+
+        The CLI fires this after the helm install/upgrade pass settles,
+        so the control plane has a durable record of how each cluster
+        was last brought up. Two surfaces consume the result:
+
+        * the ``ClusterBootstrapRun`` row drives the "Last bootstrap"
+          card on ``/clusters/[slug]`` (and the per-cluster history list);
+        * the ``cluster.bootstrap_run`` event emitted in the same
+          transaction feeds ``astroliftEvents`` queries + the webhook
+          fan-out for the audit trail.
+
+        Permission gate is ``cluster.manage`` — the operator who can
+        bring a cluster into management is the same actor whose CLI is
+        reporting bootstrap outcomes. Failure to record must not fail
+        the CLI's bootstrap path, so the CLI catches errors from this
+        mutation and prints a warning rather than exiting non-zero —
+        but the gate stays strict on the control-plane side so a
+        random un-privileged session can't seed false history.
+        """
+        status = (input.status or "").strip().lower()
+        if status not in {
+            ClusterBootstrapRun.Status.SUCCEEDED.value,
+            ClusterBootstrapRun.Status.FAILED.value,
+        }:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "status must be 'succeeded' or 'failed'",
+                field="status",
+            )
+
+        if not input.cluster_slug:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "clusterSlug is required",
+                field="clusterSlug",
+            )
+
+        # installed_releases comes off the wire as scalar JSON; the
+        # model column is a JSONField(default=list), so anything but a
+        # list is a schema-level lie we should refuse rather than
+        # coerce.
+        releases = input.installed_releases
+        if releases is None:
+            releases = []
+        if not isinstance(releases, list):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "installedReleases must be a JSON array",
+                field="installedReleases",
+            )
+
+        host_info = input.host_info
+        if host_info is None:
+            host_info = {}
+        if not isinstance(host_info, dict):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "hostInfo must be a JSON object",
+                field="hostInfo",
+            )
+
+        if input.ended_at < input.started_at:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "endedAt must be at or after startedAt",
+                field="endedAt",
+            )
+
+        cluster = TenantCluster.objects.filter(
+            slug=input.cluster_slug,
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"cluster {input.cluster_slug!r} not found",
+                field="clusterSlug",
+            )
+
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) if request else None
+        triggered_by = user if (user is not None and getattr(user, "is_authenticated", False)) else None
+
+        with transaction.atomic():
+            run = ClusterBootstrapRun.objects.create(
+                tenant_cluster=cluster,
+                triggered_by=triggered_by,
+                status=status,
+                chart_version=input.chart_version or "",
+                installed_releases=releases,
+                cli_version=input.cli_version or "",
+                host_info=host_info,
+                error_message=input.error_message or "",
+                started_at=input.started_at,
+                ended_at=input.ended_at,
+            )
+
+            # Emit the audit event in the same txn so a successful
+            # mutation always has its event row, and a rolled-back
+            # mutation never leaves a phantom event behind. The
+            # ``astroliftEvents`` query, the webhook fan-out, and the
+            # in-app activity feed all key off this row.
+            Event.emit(
+                event_type="cluster.bootstrap_run",
+                payload={
+                    "cluster_slug": cluster.slug,
+                    "cluster_id": str(cluster.guid),
+                    "status": run.status,
+                    "chart_version": run.chart_version,
+                    "installed_releases": run.installed_releases,
+                    "cli_version": run.cli_version,
+                    "host_info": run.host_info,
+                    "error_message": run.error_message,
+                    "started_at": run.started_at.isoformat(),
+                    "ended_at": run.ended_at.isoformat(),
+                },
+                resource_kind="TenantCluster",
+                resource_id=str(cluster.guid),
+                actor_user_id=triggered_by.pk if triggered_by else None,
+            )
+
+        return gql_success(_BootstrapRunRecordedPayload(id=GUID(str(run.guid))))
 
     @strawberry.field
     @mutation_audit(action="cluster.unregister")

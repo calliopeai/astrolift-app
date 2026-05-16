@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { AlertTriangleIcon, CheckIcon, XIcon } from "lucide-react";
+import { AlertTriangleIcon, CheckIcon, RocketIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   CLUSTER_HEALTH,
   CLUSTER_LIFECYCLE_AUDIT,
+  CLUSTER_WORKLOAD_HEALTH,
   LIST_CLUSTERS,
   RECENT_CLUSTER_WORKFLOWS,
 } from "@/graphql/clusters/clusters.queries";
@@ -88,6 +89,8 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
       <ClusterTabs slug={slug} active="status" />
 
       <LiveHealthCard clusterId={cluster.id} />
+
+      <WorkloadHealthCard clusterId={cluster.id} />
 
       <RecentWorkflowsCard clusterId={cluster.id} />
 
@@ -433,6 +436,158 @@ function RecentWorkflowsCard({ clusterId }: { clusterId: string }) {
               );
             })}
           </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Workload health card (#362 slice 3) ─────────────────────────────
+// Backed by ``astroliftClusterWorkloadHealth`` — per-Deployment view
+// of desired vs ready replicas + 24h restart counts + last rollout.
+// The pod-phase card above answers "is anything red"; this answers
+// "which workload is red" and lets the operator triage without
+// clicking through to ``kubectl`` / a dashboard.
+
+interface WorkloadHealthRow {
+  namespace: string;
+  workloadName: string;
+  desiredReplicas: number;
+  readyReplicas: number;
+  restartCount24h: number;
+  lastImageDeployedAt: string;
+}
+
+interface WorkloadHealthResp {
+  astroliftClusterWorkloadHealth: WorkloadHealthRow[];
+}
+
+function WorkloadHealthCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<WorkloadHealthResp>(
+    CLUSTER_WORKLOAD_HEALTH,
+    {
+      variables: { clusterId },
+      pollInterval: 30000,
+    },
+  );
+  const rows = data?.astroliftClusterWorkloadHealth ?? [];
+
+  // Sort by readiness deficit, descending — most-broken first. The
+  // backend already sorts by (namespace, name), but the operator
+  // cares about "what's not healthy" before "what's named first".
+  const sorted = [...rows].sort((a, b) => {
+    const deficitA = a.desiredReplicas - a.readyReplicas;
+    const deficitB = b.desiredReplicas - b.readyReplicas;
+    if (deficitA !== deficitB) return deficitB - deficitA;
+    if (a.namespace !== b.namespace) {
+      return a.namespace.localeCompare(b.namespace);
+    }
+    return a.workloadName.localeCompare(b.workloadName);
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Workload health</CardTitle>
+        <CardDescription>
+          Per-Deployment readiness + 24h restart counts across the
+          platform&apos;s managed namespaces. Sorted most-broken
+          first; polls every 30s.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading && rows.length === 0 ? (
+          <Skeleton className="h-24 w-full" />
+        ) : rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No workload data available — the driver couldn&apos;t
+            reach the apiserver, or no Deployments are running in
+            the platform&apos;s managed namespaces yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground text-xs uppercase tracking-wide">
+                <tr className="border-border border-b">
+                  <th className="py-2 pr-3 text-left font-medium">
+                    Workload
+                  </th>
+                  <th className="py-2 pr-3 text-left font-medium">
+                    Namespace
+                  </th>
+                  <th className="py-2 pr-3 text-right font-medium">
+                    Ready / desired
+                  </th>
+                  <th className="py-2 pr-3 text-right font-medium">
+                    Restarts 24h
+                  </th>
+                  <th className="py-2 pr-0 text-right font-medium">
+                    Last deploy
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((row) => {
+                  const deficit =
+                    row.desiredReplicas - row.readyReplicas;
+                  const readyTone =
+                    deficit === 0
+                      ? "text-emerald-600"
+                      : deficit === row.desiredReplicas
+                        ? "text-destructive"
+                        : "text-amber-600";
+                  const restartsTone =
+                    row.restartCount24h === 0
+                      ? "text-muted-foreground"
+                      : row.restartCount24h < 5
+                        ? "text-amber-600"
+                        : "text-destructive";
+                  return (
+                    <tr
+                      key={`${row.namespace}-${row.workloadName}`}
+                      className="border-border/50 border-b last:border-b-0"
+                    >
+                      <td className="py-2 pr-3">
+                        <code className="font-mono text-xs">
+                          {row.workloadName}
+                        </code>
+                      </td>
+                      <td className="text-muted-foreground py-2 pr-3 font-mono text-xs">
+                        {row.namespace}
+                      </td>
+                      <td
+                        className={
+                          "py-2 pr-3 text-right tabular-nums " + readyTone
+                        }
+                      >
+                        {row.readyReplicas} / {row.desiredReplicas}
+                      </td>
+                      <td
+                        className={
+                          "py-2 pr-3 text-right tabular-nums " +
+                          restartsTone
+                        }
+                      >
+                        {row.restartCount24h}
+                      </td>
+                      <td className="text-muted-foreground py-2 pr-0 text-right text-xs">
+                        {row.lastImageDeployedAt ? (
+                          <span className="inline-flex items-center gap-1">
+                            <RocketIcon className="size-3" />
+                            {new Date(
+                              row.lastImageDeployedAt,
+                            ).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="opacity-60">never</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </CardContent>
     </Card>
