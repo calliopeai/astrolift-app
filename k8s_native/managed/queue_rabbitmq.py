@@ -21,12 +21,12 @@ from _sdk.managed_service import (
     ProvisionSpec,
     ServiceHandle,
     ServiceStatus,
-    SnapshotHandle,
     UpdateResult,
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "queue"
 
@@ -80,33 +80,42 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = self._namespace_for(spec=spec)
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         manifest = self._render_cluster_crd(spec=spec, name=cluster_name)
         if self._config.cluster_driver is None:
             return ProvisionResult(
                 ok=True,
-                handle=f"{KIND}/{cluster_name}",
+                handle=handle,
                 message="RabbitmqCluster CRD rendered",
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
-            self._namespace_for(spec=spec),
+            namespace,
             [manifest],
         )
         if not result.ok:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message="apply_manifests failed",
                 errors=result.errors,
             )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{cluster_name}",
+            handle=handle,
             message=f"RabbitMQ cluster {cluster_name} provisioned",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message="operator reconciles via re-applied CRD",
         )
 
@@ -118,19 +127,59 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data, force_destroy
+        if self._config.cluster_driver is None:
+            return DeprovisionResult(
+                ok=True,
+                handle=spec.handle,
+                message="no cluster_driver — manifest deletion skipped",
+            )
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        stub = {
+            "apiVersion": "rabbitmq.com/v1beta1",
+            "kind": "RabbitmqCluster",
+            "metadata": {
+                "name": parsed.name,
+                "namespace": parsed.namespace,
+            },
+        }
+        result = self._config.cluster_driver.delete_manifests(
+            parsed.cluster_id,
+            parsed.namespace,
+            [stub],
+        )
+        if result.errors:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(result.errors),
+                errors=result.errors,
+            )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message="delete via RabbitmqCluster CRD removal",
+            ok=True,
+            handle=spec.handle,
+            message=f"RabbitmqCluster {parsed.name} deleted",
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message="status delegated to operator reconciliation",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
+        name = _unpack_handle(handle.handle).name
         return Binding(
             env_vars={
                 "RABBITMQ_HOST": ValueRef(literal=name),
@@ -166,15 +215,20 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self):
-        return BindingSchema(env_vars={
-            "RABBITMQ_HOST": "Service hostname",
-            "RABBITMQ_PORT": "AMQP port (5672)",
-            "RABBITMQ_USER": "Default user (from Secret)",
-            "RABBITMQ_PASSWORD": "Default password (from Secret)",
-        })
+        return BindingSchema(
+            env_vars={
+                "RABBITMQ_HOST": "Service hostname",
+                "RABBITMQ_PORT": "AMQP port (5672)",
+                "RABBITMQ_USER": "Default user (from Secret)",
+                "RABBITMQ_PASSWORD": "Default password (from Secret)",
+            }
+        )
 
     def _render_cluster_crd(
-        self, *, spec: ProvisionSpec, name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        name: str,
     ) -> dict[str, Any]:
         size_spec = SIZE_TO_SPEC.get(spec.size, SIZE_TO_SPEC["small"])
         return {
@@ -196,9 +250,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
                     "storage": size_spec["storage_size"],
                 },
                 "rabbitmq": {
-                    "additionalConfig": (
-                        "cluster_partition_handling = pause_minority"
-                    ),
+                    "additionalConfig": ("cluster_partition_handling = pause_minority"),
                 },
             },
         }
