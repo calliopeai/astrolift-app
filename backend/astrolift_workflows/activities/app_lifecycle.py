@@ -237,7 +237,11 @@ async def provision_managed_services_initial(
 
 def _pre_flight_sync(deployment_id: int) -> None:
     from astrolift_lifecycle.models import Deployment
-    from core.app_deploy import AppDeployError, cluster_for_deployment
+    from core.app_deploy import (
+        AppDeployError,
+        cluster_for_deployment,
+        render_resources_for_deployment,
+    )
 
     d = Deployment.all_objects.select_related("registered_app__organization", "app_environment").get(
         pk=deployment_id,
@@ -256,6 +260,13 @@ def _pre_flight_sync(deployment_id: int) -> None:
         raise AppDeployError(
             f"cluster {cluster.slug!r} is in lifecycle {cluster.lifecycle!r}, not managed — "
             "bring it into management before deploying",
+        )
+    # Catch the empty-[[workloads]] case here so operators see a clear
+    # pre-deploy error rather than an opaque apply failure later (#359).
+    resources = render_resources_for_deployment(d)
+    if not resources:
+        raise AppDeployError(
+            "manifest renders to zero Kubernetes resources — declare at least one workload in [[workloads]]",
         )
 
 
@@ -838,7 +849,7 @@ def _wait_dns_sync(deployment_id: int, timeout_seconds: int) -> int:
 
 
 @activity.defn(name="astrolift.deploy.wait_dns")
-async def wait_dns(deployment_id: int, timeout_seconds: int = 120) -> int:
+async def wait_dns(deployment_id: int, timeout_seconds: int = 300) -> int:
     """Wait for the app's hostnames to resolve via DNS.
 
     Covers the managed-domain hostname + every CustomDomain bound to
@@ -846,6 +857,9 @@ async def wait_dns(deployment_id: int, timeout_seconds: int = 120) -> int:
     stdlib ``socket.gethostbyname`` against the local resolver — same
     view a browser hitting the load balancer will get. Loop polls
     every 5s up to ``timeout_seconds``.
+
+    Default raised to 300s because Route53 propagation + new managed-
+    domain setup commonly exceeds 2 min on first deploy (#359).
     """
     from asgiref.sync import sync_to_async
 
