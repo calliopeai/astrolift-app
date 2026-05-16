@@ -28,6 +28,12 @@ RUN pip install --no-cache-dir whitenoise
 # regenerated here, so install it explicitly.
 RUN pip install --no-cache-dir pynacl
 
+# pytest-asyncio: declared in Pipfile dev-packages; some images were
+# built before the lock caught up, so install it explicitly. Required
+# for any test with `async def` bodies (pubsub, observability, etc.) —
+# pytest.ini sets ``asyncio_mode = auto`` so the plugin must be loaded.
+RUN pip install --no-cache-dir pytest-asyncio
+
 COPY . .
 
 # Provider plugins (astrolift-providers, vendored under backend/vendor) ship

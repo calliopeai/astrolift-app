@@ -86,6 +86,18 @@ EXEMPT: dict[str, str] = {
         "self-service: returns apps the caller can reach via their own RoleBindings"
         " (any scope from app up to org). Permission visibility IS the gate."
     ),
+    "RegistryQuery.astrolift_platform_api_url": (
+        "platform-level value (the install's PLATFORM_API_URL) surfaced to the "
+        "Settings / CI-setup page so the operator can paste it into "
+        "``ASTROLIFT_API_URL`` on their CI side. Not tenant-scoped because the "
+        "API origin is the same regardless of tenant; the resolver still rejects "
+        "anonymous callers so the origin doesn't leak to unauthenticated probes."
+    ),
+    "RegistryQuery.assignable_astrolift_projects": (
+        "self-service: returns projects the caller can assign apps to via their "
+        "own RoleBindings (#391), same shape as astrolift_my_apps. Permission "
+        "visibility from the caller's bindings IS the gate."
+    ),
     "OperationsMutation.mark_notification_read": "self-service: marks the caller's own notification",
     "OperationsMutation.mark_all_notifications_read": "self-service: marks all the caller's notifications",
     # Token-based public approval (#125, spec 06 §4.6). The single-use
