@@ -2228,8 +2228,12 @@ class LifecycleMutation:
         org-level PAT. The mutation rotates the deploy token as part
         of the push — there's no way to recover the existing plaintext
         from the hash, so a rotation is the only way to deliver a
-        sealable value. Live CI keeps working through the rotation
-        grace window (the previous hash stays valid for 1h by default).
+        sealable value. The rotation is *immediate* (no grace window):
+        the operator clicked an explicit ``Push & rotate`` affordance
+        and was warned in the confirm dialog, so the old hash is
+        revoked in the same transaction as the new plaintext lands in
+        GitHub. In-flight CI runs holding the previous token will
+        need to be re-kicked.
         """
         from django.conf import settings
 
