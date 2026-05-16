@@ -29,7 +29,7 @@ def pod_phase_summary_from_client(
     for ns in namespaces:
         try:
             pods = k8s_client.list_namespaced_pod(namespace=ns)
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         counts: dict[str, int] = {}
         for item in getattr(pods, "items", []) or []:
@@ -62,7 +62,7 @@ def events_from_client(
     for ns in namespaces:
         try:
             resp = k8s_client.list_namespaced_event(namespace=ns)
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         for raw in getattr(resp, "items", []) or []:
             ev_type = getattr(raw, "type", "") or ""
@@ -131,19 +131,19 @@ def workload_health_from_client(
     import datetime as _dt
 
     if now_iso is None:
-        now_dt = _dt.datetime.now(_dt.timezone.utc)
+        now_dt = _dt.datetime.now(_dt.UTC)
     else:
         try:
             now_dt = _dt.datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
         except ValueError:
-            now_dt = _dt.datetime.now(_dt.timezone.utc)
+            now_dt = _dt.datetime.now(_dt.UTC)
     window_start = now_dt - _dt.timedelta(hours=24)
 
     out: list[WorkloadHealth] = []
     for ns in namespaces:
         try:
             deployments = k8s_client.list_namespaced_deployment(namespace=ns)
-        except Exception:  # noqa: BLE001 — missing ns / RBAC
+        except Exception:
             continue
         for dep in getattr(deployments, "items", []) or []:
             meta = getattr(dep, "metadata", None)
@@ -217,9 +217,9 @@ def _restart_count_for_deployment(
         # Older client signatures may not accept label_selector kwarg.
         try:
             pods = k8s_client.list_namespaced_pod(namespace=namespace)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return 0
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0
 
     total = 0
@@ -259,7 +259,7 @@ def _restart_count_for_deployment(
                 total += restart_count
                 continue
             if finished_dt.tzinfo is None:
-                finished_dt = finished_dt.replace(tzinfo=_dt.timezone.utc)
+                finished_dt = finished_dt.replace(tzinfo=_dt.UTC)
             if finished_dt >= window_start:
                 total += restart_count
     return total
