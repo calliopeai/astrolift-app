@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import base64
 import time
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 from _sdk.cluster import (
     ApplyResult,
@@ -191,7 +193,7 @@ class EKSClusterDriver(ClusterDriver):
                     name=name,
                 )
                 deleted.append(ref)
-            except _NotFound:
+            except _NotFoundError:
                 not_found.append(ref)
             except Exception as exc:
                 errors.append(f"{ref}: {exc}")
@@ -211,7 +213,7 @@ class EKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         try:
             ns = client.get_namespace(name=name)
-        except _NotFound:
+        except _NotFoundError:
             return None
         except Exception as exc:
             raise RuntimeError(f"get_namespace {name}: {exc}") from exc
@@ -263,7 +265,7 @@ class EKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         try:
             client.delete(kind="Namespace", namespace=None, name=name)
-        except _NotFound:
+        except _NotFoundError:
             return
         except Exception as exc:
             raise RuntimeError(f"delete_namespace {name}: {exc}") from exc
@@ -298,7 +300,7 @@ class EKSClusterDriver(ClusterDriver):
                 namespace=namespace,
                 name=name,
             )
-        except _NotFound as exc:
+        except _NotFoundError as exc:
             raise NotFoundError(
                 f"{kind}/{name} in namespace {namespace}",
             ) from exc
@@ -408,7 +410,7 @@ class EKSClusterDriver(ClusterDriver):
                 container=container,
                 command=command,
             )
-        except _NotFound as exc:
+        except _NotFoundError as exc:
             raise NotFoundError(
                 f"pod {pod} in namespace {namespace}",
             ) from exc
@@ -841,7 +843,7 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return pod_phase_summary_from_client(
             client, namespaces=default_namespaces(namespaces),
@@ -859,7 +861,7 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return events_from_client(
             client,
@@ -881,7 +883,7 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return workload_health_from_client(
             client, namespaces=default_namespaces(namespaces),
@@ -938,7 +940,7 @@ class EKSClusterDriver(ClusterDriver):
 # ---- Internal client + exception types -----------------------------
 
 
-class _NotFound(Exception):
+class _NotFoundError(Exception):
     """Raised by the k8s client wrapper when a resource doesn't exist."""
 
 
