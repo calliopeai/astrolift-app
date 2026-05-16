@@ -31,6 +31,8 @@ class ManagedService(BaseCoreModel):
         VECTOR_INDEX = "vector_index"
         TIME_SERIES = "time_series"
         DOCUMENT_DB = "document_db"
+        EMAIL = "email"
+        MODEL_ENDPOINT = "model_endpoint"
 
     class Status(models.TextChoices):
         PENDING = "pending"

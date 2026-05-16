@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class SecretsBackend(Protocol):
@@ -20,3 +20,18 @@ class SecretsBackend(Protocol):
     def delete(self, path: str) -> None: ...
 
     def list(self, prefix: str) -> list[str]: ...
+
+    # TODO(#379): Implement on concrete drivers that need out-of-band setup
+    # (CSI driver Helm install for GCP Secret Manager + Azure Key Vault,
+    # KMS key creation for AWS Secrets Manager scoped per-cluster, Vault
+    # auth-backend + policy setup for HashiCorp Vault). AWS Secrets
+    # Manager and the kubernetes_secrets backend need no init and should
+    # leave the default NotImplementedError in place -- the
+    # provision_secrets_backend activity catches that and records a
+    # ``skipped`` result without failing the workflow.
+    def ensure_initialized(self) -> dict[str, Any]:
+        """One-time bootstrap: CSI driver install, KMS key creation,
+        Vault token setup. Idempotent. Default raises
+        NotImplementedError so AWS Secrets Manager (which needs no
+        init) degrades cleanly."""
+        raise NotImplementedError("ensure_initialized not required for this backend")

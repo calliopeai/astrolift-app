@@ -27,6 +27,7 @@ class TenantClusterType:
     lifecycle: str
     last_management_error: str
     managed_at: dt.datetime | None
+    secrets_backend_provisioned_at: dt.datetime | None
 
 
 @strawberry.type(name="AstroliftManagedDomain")
@@ -68,6 +69,7 @@ def cluster_to_type(cluster) -> TenantClusterType:
         lifecycle=cluster.lifecycle,
         last_management_error=cluster.last_management_error or "",
         managed_at=cluster.managed_at,
+        secrets_backend_provisioned_at=cluster.secrets_backend_provisioned_at,
     )
 
 

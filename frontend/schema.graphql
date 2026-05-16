@@ -1096,6 +1096,7 @@ type AstroliftTenantCluster {
   lifecycle: String!
   lastManagementError: String!
   managedAt: DateTime
+  secretsBackendProvisionedAt: DateTime
 }
 
 type AstroliftTenantClusterMutationResult {

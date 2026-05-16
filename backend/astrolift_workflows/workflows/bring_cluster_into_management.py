@@ -45,6 +45,7 @@ with workflow.unsafe.imports_passed_through():
         mark_managed,
         mark_managing,
         probe_capabilities,
+        provision_secrets_backend,
         run_preflight_job,
         verify_reachability,
     )
@@ -71,6 +72,16 @@ _MARK_ERROR_RETRY = RetryPolicy(maximum_attempts=1)
 _STANDARD_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=2),
     maximum_interval=timedelta(seconds=15),
+    maximum_attempts=3,
+)
+
+# SecretsBackend bootstrap (CSI driver install / KMS key create / Vault
+# auth setup) can take a few minutes on first run; give it room before
+# Temporal cancels. Three retries to weather transient cloud-API blips.
+_SECRETS_BACKEND_TIMEOUT = timedelta(minutes=5)
+_SECRETS_BACKEND_RETRY = RetryPolicy(
+    initial_interval=timedelta(seconds=5),
+    maximum_interval=timedelta(seconds=30),
     maximum_attempts=3,
 )
 
@@ -115,6 +126,22 @@ class BringClusterIntoManagementWorkflow:
             )
         except Exception as exc:  # noqa: BLE001
             return await self._fail(cluster_id, f"verify_reachability: {exc}")
+
+        # Provision the secrets backend before any platform RBAC apply
+        # so the cert-manager / external-secrets workloads we install in
+        # later activities can already reach a working SecretsBackend.
+        # ``install_cluster_prereqs`` runs in its own upstream workflow;
+        # here we're bridging the gap between prereqs install and the
+        # platform RBAC bundle.
+        try:
+            await workflow.execute_activity(
+                provision_secrets_backend,
+                cluster_id,
+                start_to_close_timeout=_SECRETS_BACKEND_TIMEOUT,
+                retry_policy=_SECRETS_BACKEND_RETRY,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return await self._fail(cluster_id, f"provision_secrets_backend: {exc}")
 
         try:
             await workflow.execute_activity(

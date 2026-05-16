@@ -86,6 +86,70 @@ async def apply_platform_rbac(cluster_id: int) -> list[str]:
     return await sync_to_async(_apply_platform_rbac_sync)(cluster_id)
 
 
+def _provision_secrets_backend_sync(cluster_id: int) -> dict[str, Any]:
+    """Idempotent — re-runs are safe.
+
+    Resolves the cluster's SecretsBackend via ``driver_for_capability``
+    and calls ``ensure_initialized()`` which performs the one-time
+    bootstrap (CSI driver install / KMS key creation / Vault auth
+    setup, depending on driver). Backends that don't need init raise
+    ``NotImplementedError`` from the default protocol stub — we catch
+    that and return ``skipped=True`` so the workflow proceeds without
+    failure.
+    """
+    from django.utils import timezone
+
+    from astrolift_clusters.models import TenantCluster
+    from core.app_deploy import AppDeployError, driver_for_capability
+
+    cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    try:
+        driver = driver_for_capability(cluster, "secrets")
+    except AppDeployError as exc:
+        # Plugin doesn't register a secrets driver at all — surface as a
+        # skipped step so the workflow continues; the operator can wire
+        # one in later without re-running cluster bring.
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": f"no secrets driver registered for cluster {cluster.slug}: {exc}",
+        }
+
+    try:
+        result = driver.ensure_initialized()
+    except NotImplementedError as exc:
+        # Default protocol behavior — backend needs no out-of-band
+        # bootstrap (e.g. AWS Secrets Manager with cluster-default KMS).
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": f"backend does not require initialization: {exc}",
+        }
+
+    cluster.secrets_backend_provisioned_at = timezone.now()
+    cluster.save(
+        update_fields=[
+            "secrets_backend_provisioned_at",
+            "updated_at",
+            "version",
+        ]
+    )
+    payload: dict[str, Any] = {"ok": True, "skipped": False}
+    if isinstance(result, dict):
+        payload["result"] = result
+    return payload
+
+
+@activity.defn(name="astrolift.cluster.provision_secrets_backend")
+async def provision_secrets_backend(cluster_id: int) -> dict[str, Any]:
+    """Idempotent — re-runs are safe. Calls
+    SecretsBackend.ensure_initialized()."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_provision_secrets_backend_sync)(cluster_id)
+
+
 def _probe_capabilities_sync(cluster_id: int) -> dict:
     from django.utils import timezone
 

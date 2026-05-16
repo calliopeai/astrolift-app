@@ -103,6 +103,13 @@ class TenantCluster(NamedBaseCoreModel):
     )
     last_management_error = models.TextField(blank=True, default="")
     managed_at = models.DateTimeField(null=True, blank=True)
+    # Stamped by the ``provision_secrets_backend`` activity in the
+    # bring-into-management workflow (#379) once the SecretsBackend
+    # driver's one-time bootstrap (CSI install / KMS key / Vault auth)
+    # has succeeded. Null while the backend hasn't been initialized or
+    # when the driver reports it doesn't need initialization (the
+    # activity records a ``skipped`` result without writing this).
+    secrets_backend_provisioned_at = models.DateTimeField(null=True, blank=True)
 
     delivery_mode = models.CharField(
         max_length=32,
