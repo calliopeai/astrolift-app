@@ -30,6 +30,7 @@ from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.dynamodb import DynamoDBDriver
+from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
 from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
@@ -68,6 +69,7 @@ PLUGIN = ProviderPlugin(
         ("vector_index", "opensearch_vector"): OpenSearchVectorDriver,
         ("search", "opensearch"): OpenSearchSearchDriver,
         ("time_series", "timestream"): TimestreamDriver,
+        ("email", "ses"): AmazonSESDriver,
     },
     config_schema={
         "type": "object",
