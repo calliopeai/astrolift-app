@@ -54,6 +54,8 @@ class FakePublisher:
 @dataclass
 class FakeSubscriber:
     subscriptions: set[str] = field(default_factory=set)
+    seeks: list[dict[str, Any]] = field(default_factory=list)
+    delete_raises: dict[str, Exception] = field(default_factory=dict)
 
     def subscription_path(self, project: str, sub: str) -> str:
         return f"projects/{project}/subscriptions/{sub}"
@@ -67,9 +69,17 @@ class FakeSubscriber:
 
     def delete_subscription(self, *, request: dict[str, Any]) -> None:
         sub_id = request["subscription"].rsplit("/", 1)[-1]
+        if sub_id in self.delete_raises:
+            raise self.delete_raises[sub_id]
         if sub_id not in self.subscriptions:
             raise _NotFound(sub_id)
         self.subscriptions.discard(sub_id)
+
+    def seek(self, *, request: dict[str, Any]) -> None:
+        sub_id = request["subscription"].rsplit("/", 1)[-1]
+        if sub_id not in self.subscriptions:
+            raise _NotFound(sub_id)
+        self.seeks.append(request)
 
 
 @pytest.fixture
@@ -200,3 +210,84 @@ def test_topic_id_canonicalization(driver: PubSubDriver) -> None:
     # Pub/Sub allows alphanumeric + - + _
     for c in topic:
         assert c.isalnum() or c in "-_"
+
+
+# ---- four-corner deprovision matrix --------------------------------
+
+
+def test_deprovision_default_drains_subscription(
+    driver: PubSubDriver,
+    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+) -> None:
+    """delete_data=False (default) seeks the subscription forward
+    to drain in-flight messages before deleting."""
+    res = driver.provision(_spec())
+    deprov = driver.deprovision(DeprovisionSpec(handle=res.handle))
+    assert deprov.ok
+    assert len(fake_sub.seeks) == 1
+    # Both topic + subscription deleted regardless of delete_data
+    assert fake_pub.topics == set()
+    assert fake_sub.subscriptions == set()
+    assert "drained=yes" in deprov.message
+
+
+def test_deprovision_delete_data_skips_drain(
+    driver: PubSubDriver,
+    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+) -> None:
+    res = driver.provision(_spec())
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=res.handle), delete_data=True,
+    )
+    assert deprov.ok
+    assert fake_sub.seeks == []
+    assert "drained=no" in deprov.message
+
+
+def test_deprovision_refuses_active_subscribers(
+    driver: PubSubDriver, fake_sub: FakeSubscriber,
+) -> None:
+    """FAILED_PRECONDITION on delete_subscription (active pull
+    consumers) errors out cleanly when force_destroy=False."""
+    res = driver.provision(_spec())
+    sub_id = next(iter(fake_sub.subscriptions))
+    fake_sub.delete_raises[sub_id] = RuntimeError(
+        "FAILED_PRECONDITION: active subscribers attached",
+    )
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=res.handle), delete_data=True,
+    )
+    assert not deprov.ok
+    assert "force_destroy=True" in deprov.message
+
+
+def test_deprovision_force_destroy_bypasses_active_subscribers(
+    driver: PubSubDriver,
+    fake_pub: FakePublisher, fake_sub: FakeSubscriber,
+) -> None:
+    res = driver.provision(_spec())
+    sub_id = next(iter(fake_sub.subscriptions))
+    fake_sub.delete_raises[sub_id] = RuntimeError(
+        "FAILED_PRECONDITION: active subscribers attached",
+    )
+
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle=res.handle),
+        delete_data=True, force_destroy=True,
+    )
+    assert deprov.ok
+    # Topic still gets deleted even when subscription delete is
+    # bypassed
+    assert fake_pub.topics == set()
+    assert "force_destroy" in deprov.message
+
+
+def test_deprovision_already_gone_is_idempotent(
+    driver: PubSubDriver,
+) -> None:
+    deprov = driver.deprovision(
+        DeprovisionSpec(handle="queue/never"),
+    )
+    assert deprov.ok
+    assert "already gone" in deprov.message
