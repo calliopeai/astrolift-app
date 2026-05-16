@@ -15,6 +15,8 @@ const APP_FIELDS = `
   defaultBranch
   manifestHash
   registryRepoUri
+  ecrRepoUri
+  ecrPushRoleArn
   k8sNamespace
   subdomain
   isActive
@@ -144,6 +146,12 @@ export const LIST_CONTAINERS = gql`
       healthcheckPort
       workloadSlug
     }
+  }
+`;
+
+export const GET_PLATFORM_API_URL = gql`
+  query GetPlatformApiUrl {
+    astroliftPlatformApiUrl
   }
 `;
 

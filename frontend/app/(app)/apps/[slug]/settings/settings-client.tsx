@@ -41,6 +41,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AppTabs } from "../components/app-tabs";
+import { CiSetupSection } from "../components/ci-setup-section";
 import { ControlsSection } from "../components/controls-section";
 import { TeamsCard } from "../components/teams-card";
 
@@ -184,9 +185,27 @@ export function SettingsClient({ slug }: { slug: string }) {
       <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />
 
       <div className="flex flex-col gap-3">
-        {LINK_SECTIONS.map((s) => (
-          <SettingsLinkCard key={s.key} section={s} slug={a.slug} />
-        ))}
+        {LINK_SECTIONS.map((s) => {
+          const card = <SettingsLinkCard key={s.key} section={s} slug={a.slug} />;
+          // CI-setup section slots between Deploy strategy and Deploy
+          // tokens (#382). Hidden when the app has no source repo —
+          // there's nothing to wire up to until registration captures
+          // one. Sibling-friendly: appending a fragment under the
+          // deploy-strategy row, no surrounding reformatting.
+          if (s.key === "deploy-strategy" && a.sourceRepo) {
+            return (
+              <React.Fragment key="deploy-strategy-with-ci">
+                {card}
+                <CiSetupSection
+                  appSlug={a.slug}
+                  ecrRepoUri={a.ecrRepoUri}
+                  ecrPushRoleArn={a.ecrPushRoleArn}
+                />
+              </React.Fragment>
+            );
+          }
+          return card;
+        })}
       </div>
 
       <DangerZoneCard />

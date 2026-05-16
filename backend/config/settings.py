@@ -81,6 +81,12 @@ DEFAULT_USER_TEST = env_str(
 # The default user to execute automatic system operations. i.e. scheduled tasks, automatic signatures...
 # The default set of permissions available for the system user(s). For instance, the permission to sign documents.
 FRONTEND_URL = env_str("FRONTEND_URL", "http://localhost:3000")
+# Public base URL the platform's REST API answers at — surfaced to
+# operators on the Settings page (#382) as the value to wire into
+# ``ASTROLIFT_API_URL`` on the CI side so the deploy webhook hits the
+# right install. Falls back to FRONTEND_URL for local dev where the
+# Next.js proxy fronts the Django API at the same origin.
+PLATFORM_API_URL = env_str("PLATFORM_API_URL", FRONTEND_URL)
 API_SYSTEM_USER = env_str("API_SYSTEM_USER", "system")
 API_SYSTEM_PERMISSION_GROUP = env_str("API_SYSTEM_PERMISSION_GROUP", "astrolift_automatic_system_operations")
 

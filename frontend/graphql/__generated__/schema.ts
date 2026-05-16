@@ -908,6 +908,8 @@ export type AstroliftRegisteredApp = {
   deployBranch: Scalars['String']['output'];
   deployTokenLast4: Scalars['String']['output'];
   description: Scalars['String']['output'];
+  ecrPushRoleArn: Scalars['String']['output'];
+  ecrRepoUri: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   k8sNamespace: Scalars['String']['output'];
@@ -1208,6 +1210,17 @@ export type AstroliftTimeSeriesPoint = {
   value: Scalars['Float']['output'];
 };
 
+export type AstroliftTriggerDeployWorkflowPayload = {
+  dispatchedBranch: Scalars['String']['output'];
+  runUrl: Scalars['String']['output'];
+};
+
+export type AstroliftTriggerDeployWorkflowPayloadMutationResult = {
+  data?: Maybe<AstroliftTriggerDeployWorkflowPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftUser = {
   email: Scalars['String']['output'];
   id: Scalars['String']['output'];
@@ -1281,6 +1294,19 @@ export type AstroliftWorkload = {
   slug: Scalars['String']['output'];
   storageClass: Scalars['String']['output'];
   storageSize: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadOpPayload = {
+  desiredReplicas?: Maybe<Scalars['Int']['output']>;
+  newRevision?: Maybe<Scalars['Int']['output']>;
+  readyReplicas?: Maybe<Scalars['Int']['output']>;
+  workloadId: Scalars['GUID']['output'];
+};
+
+export type AstroliftWorkloadOpPayloadMutationResult = {
+  data?: Maybe<AstroliftWorkloadOpPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AttachSecretBundleInput = {
@@ -1880,6 +1906,7 @@ export type Mutation = {
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
+  restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
@@ -1893,6 +1920,7 @@ export type Mutation = {
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
+  scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
@@ -1923,6 +1951,7 @@ export type Mutation = {
   transferApp: AstroliftRegisteredAppMutationResult;
   /** Transition a workflow instance to a new state. */
   transitionWorkflow: MutationResult;
+  triggerAstroliftDeployWorkflow: AstroliftTriggerDeployWorkflowPayloadMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
@@ -2433,6 +2462,11 @@ export type MutationRemoveOrganizationAllowlistDomainArgs = {
 };
 
 
+export type MutationRestartAstroliftWorkloadArgs = {
+  input: RestartWorkloadInput;
+};
+
+
 export type MutationResumeAppIngressArgs = {
   input: EnvironmentByIdInput;
 };
@@ -2495,6 +2529,11 @@ export type MutationRotateSecretBundleArgs = {
 
 export type MutationRotateWebhookSecretArgs = {
   input: RotateWebhookSecretInput;
+};
+
+
+export type MutationScaleAstroliftWorkloadArgs = {
+  input: ScaleWorkloadInput;
 };
 
 
@@ -2621,6 +2660,11 @@ export type MutationTransitionWorkflowArgs = {
   instanceId: Scalars['ID']['input'];
   note?: Scalars['String']['input'];
   toState: Scalars['String']['input'];
+};
+
+
+export type MutationTriggerAstroliftDeployWorkflowArgs = {
+  input: TriggerDeployWorkflowInput;
 };
 
 
@@ -2958,6 +3002,7 @@ export type Query = {
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
+  astroliftPlatformApiUrl: Scalars['String']['output'];
   astroliftPolicies: Array<AstroliftPolicy>;
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftProjects: Array<AstroliftProject>;
@@ -3385,6 +3430,10 @@ export type RemoveOrganizationAllowlistDomainInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type RestartWorkloadInput = {
+  workloadId: Scalars['GUID']['input'];
+};
+
 export type ResyncManifestFromRepoInput = {
   appSlug: Scalars['String']['input'];
 };
@@ -3442,6 +3491,11 @@ export type RotateSecretBundleInput = {
 
 export type RotateWebhookSecretInput = {
   connectionId: Scalars['GUID']['input'];
+};
+
+export type ScaleWorkloadInput = {
+  replicas: Scalars['Int']['input'];
+  workloadId: Scalars['GUID']['input'];
 };
 
 export type SetActiveIdentityProviderInput = {
@@ -3573,6 +3627,11 @@ export type TransitionLogEntry = {
   timestamp: Scalars['DateTime']['output'];
   toState: Scalars['String']['output'];
   username?: Maybe<Scalars['String']['output']>;
+};
+
+export type TriggerDeployWorkflowInput = {
+  appSlug: Scalars['String']['input'];
+  branch: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UnregisterTenantClusterInput = {

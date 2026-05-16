@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.conf import settings
 from django.db.models import Q
 from strawberry.types import Info
 
@@ -26,6 +27,22 @@ from core.tenancy import get_current_tenant
 
 @strawberry.type
 class RegistryQuery:
+    @strawberry.field
+    def astrolift_platform_api_url(self, info: Info) -> str:
+        """Public base URL the platform's REST API answers at.
+
+        Surfaced to the Settings page CI-setup section (#382) so the
+        operator can paste it verbatim into ``ASTROLIFT_API_URL`` on
+        their CI side. Platform-level value — not tenant-scoped — but
+        still gated to authenticated callers so we don't leak the
+        install's API origin to anonymous probes.
+        """
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not getattr(viewer, "is_authenticated", False):
+            raise PermissionError("astrolift_platform_api_url requires an authenticated viewer")
+        return (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()

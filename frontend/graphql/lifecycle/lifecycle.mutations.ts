@@ -314,3 +314,75 @@ export const RESUME_APP_INGRESS = gql`
     }
   }
 `;
+
+// --- Rebuild & deploy via CI workflow dispatch (#387) -------------
+//
+// Fires the source host's workflow-dispatch endpoint for the app's
+// astrolift-ci.yml workflow on the configured deploy branch. The
+// payload's runUrl points at the workflow's runs page (GitHub's
+// dispatch endpoint returns 204 with no run id) — the toast links
+// to it so the operator can watch the new run come up.
+
+export const TRIGGER_DEPLOY_WORKFLOW = gql`
+  mutation TriggerDeployWorkflow($input: TriggerDeployWorkflowInput!) {
+    triggerAstroliftDeployWorkflow(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        runUrl
+        dispatchedBranch
+      }
+    }
+  }
+`;
+
+// --- Live workload ops (#388) -------------------------------------
+//
+// Direct-to-cluster operational actions on a Workload's Deployment.
+// Both are gated on `app.deploy` server-side; the FE additionally
+// gates the buttons with <Can permission="app.deploy">. The
+// `WORKLOAD_OP_FIELDS` are deliberately small — the read-back is
+// best-effort; the FE refetches the workload list to converge the
+// displayed counters.
+
+const WORKLOAD_OP_FIELDS = `
+  workloadId
+  newRevision
+  desiredReplicas
+  readyReplicas
+`;
+
+export const RESTART_WORKLOAD = gql`
+  mutation RestartAstroliftWorkload($input: RestartWorkloadInput!) {
+    restartAstroliftWorkload(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${WORKLOAD_OP_FIELDS}
+      }
+    }
+  }
+`;
+
+export const SCALE_WORKLOAD = gql`
+  mutation ScaleAstroliftWorkload($input: ScaleWorkloadInput!) {
+    scaleAstroliftWorkload(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${WORKLOAD_OP_FIELDS}
+      }
+    }
+  }
+`;

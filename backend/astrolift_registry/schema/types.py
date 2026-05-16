@@ -35,6 +35,15 @@ class RegisteredAppType:
     manifest_sync_state: str
 
     registry_repo_uri: str
+    # ECR-side coordinates surfaced for the Settings page's CI-setup
+    # section (#382). ``ecr_repo_uri`` mirrors ``registry_repo_uri``;
+    # the alias is the value an operator pastes into the
+    # ``ASTROLIFT_ECR_URI`` GitHub Actions secret. ``ecr_push_role_arn``
+    # is the IRSA-bound IAM role the workflow assumes via OIDC and is
+    # populated by the cluster-bootstrap path (#309). Stays empty
+    # until provisioning lands the role ARN.
+    ecr_repo_uri: str
+    ecr_push_role_arn: str
     k8s_namespace: str
     subdomain: str
     is_active: bool
@@ -182,6 +191,8 @@ def app_to_type(app) -> RegisteredAppType:
         last_synced_hash=app.last_synced_hash or "",
         manifest_sync_state=sync_state.value,
         registry_repo_uri=app.registry_repo_uri,
+        ecr_repo_uri=app.registry_repo_uri,
+        ecr_push_role_arn=app.push_role_ref or "",
         k8s_namespace=app.k8s_namespace,
         subdomain=app.subdomain,
         is_active=app.is_active,
