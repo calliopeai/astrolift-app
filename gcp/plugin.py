@@ -34,6 +34,7 @@ from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
+from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
 from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
@@ -60,6 +61,7 @@ PLUGIN = ProviderPlugin(
         ("kv_store", "bigtable"): BigtableDriver,
         ("search", "gcp_elastic_cloud"): GCPElasticCloudStubDriver,
         ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
+        ("time_series", "gcp_managed_prometheus"): GCPManagedPrometheusDriver,
     },
     config_schema={
         "type": "object",
