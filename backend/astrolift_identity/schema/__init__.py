@@ -1,3 +1,4 @@
+from astrolift_identity.anonymize import IdentityAnonymizeUserMutation
 from astrolift_identity.connected_accounts import (
     MyConnectedAccountsMutation,
     MyConnectedAccountsQuery,
@@ -23,7 +24,11 @@ class IdentityQuery(_BaseIdentityQuery, MyConnectedAccountsQuery):
     pass
 
 
-class IdentityMutation(_BaseIdentityMutation, MyConnectedAccountsMutation):
+class IdentityMutation(
+    _BaseIdentityMutation,
+    MyConnectedAccountsMutation,
+    IdentityAnonymizeUserMutation,
+):
     pass
 
 
