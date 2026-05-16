@@ -30,7 +30,7 @@ from _sdk.cluster import (
     WorkloadStatus,
 )
 from aws._errors import NotFoundError
-from aws.cluster_eks import EKSClusterDriver, EKSConfig, _NotFound
+from aws.cluster_eks import EKSClusterDriver, EKSConfig, _NotFoundError
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ def test_apply_propagates_dry_run(
 def test_delete_classifies_not_found_separately(
     driver: EKSClusterDriver, fake_k8s_client,
 ) -> None:
-    fake_k8s_client.delete.side_effect = [None, _NotFound()]
+    fake_k8s_client.delete.side_effect = [None, _NotFoundError()]
     result = driver.delete_manifests(
         "aws-prod", "ns",
         [
@@ -211,7 +211,7 @@ def test_get_namespace_returns_state(
 def test_get_namespace_missing_returns_none(
     driver: EKSClusterDriver, fake_k8s_client,
 ) -> None:
-    fake_k8s_client.get_namespace.side_effect = _NotFound()
+    fake_k8s_client.get_namespace.side_effect = _NotFoundError()
     assert driver.get_namespace("aws-prod", "missing") is None
 
 
@@ -239,7 +239,7 @@ def test_delete_namespace_no_wait(
 def test_delete_namespace_idempotent_on_missing(
     driver: EKSClusterDriver, fake_k8s_client,
 ) -> None:
-    fake_k8s_client.delete.side_effect = _NotFound()
+    fake_k8s_client.delete.side_effect = _NotFoundError()
     # Should NOT raise
     driver.delete_namespace("aws-prod", "missing", wait=False)
 
@@ -271,7 +271,7 @@ def test_get_workload_status_projection(
 def test_get_workload_status_not_found(
     driver: EKSClusterDriver, fake_k8s_client,
 ) -> None:
-    fake_k8s_client.get.side_effect = _NotFound()
+    fake_k8s_client.get.side_effect = _NotFoundError()
     with pytest.raises(NotFoundError):
         driver.get_workload_status(
             "aws-prod", "ns", "Deployment", "missing",
@@ -338,7 +338,7 @@ def test_poll_rollout_invokes_on_tick(
 def test_poll_rollout_workload_not_found(
     driver: EKSClusterDriver, fake_k8s_client,
 ) -> None:
-    fake_k8s_client.get.side_effect = _NotFound()
+    fake_k8s_client.get.side_effect = _NotFoundError()
     result = driver.poll_rollout(
         "aws-prod", "ns", "Deployment", "missing", timeout=5,
     )
