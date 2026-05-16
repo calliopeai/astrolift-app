@@ -41,6 +41,7 @@ from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
 from azure.managed.cosmos import AzureCosmosDriver
+from azure.managed.email_acs import AzureCommunicationEmailDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
     AzureBlobStorageDriver,
@@ -80,6 +81,7 @@ PLUGIN = ProviderPlugin(
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
         ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
+        ("email", "azure_acs"): AzureCommunicationEmailDriver,
     },
     config_schema={
         "type": "object",

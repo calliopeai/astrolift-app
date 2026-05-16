@@ -28,6 +28,7 @@ from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
 from gcp.managed.bigtable import BigtableDriver
+from gcp.managed.email_thirdparty import GCPEmailStubDriver
 from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
@@ -60,6 +61,7 @@ PLUGIN = ProviderPlugin(
         ("kv_store", "bigtable"): BigtableDriver,
         ("search", "gcp_elastic_cloud"): GCPElasticCloudStubDriver,
         ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
+        ("email", "gcp_thirdparty"): GCPEmailStubDriver,
     },
     config_schema={
         "type": "object",
