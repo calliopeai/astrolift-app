@@ -18,8 +18,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from _sdk.identity import WorkloadIdentityDriver
-
+from _sdk.identity import IdentityBinding, WorkloadIdentityDriver
 from aws._errors import NotFoundError, map_client_error
 
 
@@ -87,7 +86,7 @@ class IRSADriver(WorkloadIdentityDriver):
         except self._iam.exceptions.EntityAlreadyExistsException:
             # Idempotent — return the existing ARN
             return self._role_arn(name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
         # Attach inline policy from the permissions list.
@@ -101,7 +100,7 @@ class IRSADriver(WorkloadIdentityDriver):
                         "Statement": permissions,
                     }),
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise map_client_error(exc) from exc
 
         return response["Role"]["Arn"]
@@ -115,7 +114,7 @@ class IRSADriver(WorkloadIdentityDriver):
             )
         except self._iam.exceptions.NoSuchEntityException as exc:
             raise NotFoundError(f"role {role} or policy {policy} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     def delete_identity_role(self, role: str) -> None:
@@ -141,8 +140,57 @@ class IRSADriver(WorkloadIdentityDriver):
             self._iam.delete_role(RoleName=role)
         except self._iam.exceptions.NoSuchEntityException as exc:
             raise NotFoundError(f"role {role} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
+
+    # ---- observability reads (#377) -------------------------------
+
+    def describe_identity(self, app_slug: str) -> IdentityBinding | None:
+        """Return the IRSA binding for an app, or ``None`` when no role
+        named ``astrolift-<app_slug>`` exists.
+
+        The role-name convention follows the workspace pattern
+        (``astrolift-<slug>`` from ``create_identity_role`` callers in
+        the lifecycle deploy code). ``last_used_at`` comes from
+        ``RoleLastUsed`` on ``GetRole`` — IAM populates that lazily, so
+        a freshly-created role reports None until the first STS exchange.
+
+        ``trust_policy_summary`` is a 1-line abstract built from the
+        OIDC subject conditions in the trust policy: ``"OIDC trust:
+        system:serviceaccount:<ns>:<sa>"`` for a single subject, or
+        ``"OIDC trust: <N> service account(s)"`` for multi-subject roles.
+        Operators who need the full policy click through to IAM."""
+        role_name = f"astrolift-{app_slug}"
+        try:
+            response = self._iam.get_role(RoleName=role_name)
+        except self._iam.exceptions.NoSuchEntityException:
+            return None
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+        role = response["Role"]
+        trust_doc = role.get("AssumeRolePolicyDocument") or {}
+        if isinstance(trust_doc, str):
+            from urllib.parse import unquote
+            trust_doc = json.loads(unquote(trust_doc))
+
+        last_used = (role.get("RoleLastUsed") or {}).get("LastUsedDate")
+        last_used_iso: str | None
+        if last_used is None:
+            last_used_iso = None
+        elif hasattr(last_used, "isoformat"):
+            last_used_iso = last_used.isoformat()
+        else:
+            last_used_iso = str(last_used)
+
+        return IdentityBinding(
+            kind="irsa",
+            role_arn_or_principal=role["Arn"],
+            trust_policy_summary=_summarize_trust(
+                trust_doc, self._config.cluster_oidc_issuer,
+            ),
+            last_used_at=last_used_iso,
+        )
 
     # ---- internals ------------------------------------------------
 
@@ -187,7 +235,7 @@ class IRSADriver(WorkloadIdentityDriver):
             response = self._iam.get_role(RoleName=role_name)
         except self._iam.exceptions.NoSuchEntityException as exc:
             raise NotFoundError(f"role {role_name} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
         trust_doc = response["Role"]["AssumeRolePolicyDocument"]
@@ -219,5 +267,34 @@ class IRSADriver(WorkloadIdentityDriver):
                 RoleName=role_name,
                 PolicyDocument=json.dumps(trust_doc),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
+
+
+def _summarize_trust(trust_doc: dict[str, Any], oidc_issuer: str) -> str:
+    """Build the operator-facing 1-line trust summary for a binding.
+
+    The trust doc is the IAM ``AssumeRolePolicyDocument`` shape; we
+    look at the OIDC ``:sub`` condition under ``StringEquals`` and
+    reduce to either ``"OIDC trust: <subject>"`` for a single binding
+    or ``"OIDC trust: N service account(s)"`` for many. Anything else
+    falls back to ``"trust policy: <N> statement(s)"`` which is still
+    enough info for the operator to know there's something to inspect."""
+    sub_key = f"{oidc_issuer}:sub"
+    statements = trust_doc.get("Statement") or []
+    subjects: list[str] = []
+    for stmt in statements:
+        cond = stmt.get("Condition") or {}
+        eq = cond.get("StringEquals") or {}
+        value = eq.get(sub_key)
+        if isinstance(value, list):
+            subjects.extend(str(v) for v in value)
+        elif isinstance(value, str):
+            subjects.append(value)
+    if len(subjects) == 1:
+        return f"OIDC trust: {subjects[0]}"
+    if len(subjects) > 1:
+        return f"OIDC trust: {len(subjects)} service account(s)"
+    if statements:
+        return f"trust policy: {len(statements)} statement(s)"
+    return "trust policy: empty"
