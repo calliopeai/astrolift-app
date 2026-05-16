@@ -924,9 +924,16 @@ class Profile(RequiresApproveMixin, Tracking):
         profile.switch_group = None
         profile.save()
 
-        match self.document_option:
-            case Profile.DocumentOptions.PUBLISHED if self.draft is not None:
-                self.draft.anonymize(profile.nickname)
+        # Reverse one-to-one access raises RelatedObjectDoesNotExist
+        # instead of returning None — wrap so published profiles with
+        # no draft don't NPE during anonymization (#312).
+        if self.document_option == Profile.DocumentOptions.PUBLISHED:
+            try:
+                draft = self.draft
+            except Profile.DoesNotExist:
+                draft = None
+            if draft is not None:
+                draft.anonymize(profile.nickname)
 
     @classmethod
     @transaction.atomic
