@@ -40,6 +40,7 @@ from azure.dns_azuredns import AzureDNSDriver
 from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
+from azure.managed.cosmos import AzureCosmosDriver
 from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
 from azure.managed.object_store_blob import (
     AzureBlobStorageDriver,
@@ -74,6 +75,7 @@ PLUGIN = ProviderPlugin(
         ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
         ("object_store", "azure_blob"): AzureBlobStorageDriver,
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("kv_store", "cosmos"): AzureCosmosDriver,
     },
     config_schema={
         "type": "object",
