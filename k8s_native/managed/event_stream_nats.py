@@ -26,7 +26,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "event_stream"
 
@@ -53,33 +54,42 @@ class NATSDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = self._namespace_for(spec=spec)
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         manifest = self._render_statefulset(spec=spec, name=cluster_name)
         if self._config.cluster_driver is None:
             return ProvisionResult(
                 ok=True,
-                handle=f"{KIND}/{cluster_name}",
+                handle=handle,
                 message="NATS manifests rendered",
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
-            self._namespace_for(spec=spec),
+            namespace,
             [manifest],
         )
         if not result.ok:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message="apply_manifests failed",
                 errors=result.errors,
             )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{cluster_name}",
+            handle=handle,
             message=f"NATS cluster {cluster_name} provisioned",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message="re-apply manifest to scale / reconfigure",
         )
 
@@ -91,19 +101,59 @@ class NATSDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data, force_destroy
+        if self._config.cluster_driver is None:
+            return DeprovisionResult(
+                ok=True,
+                handle=spec.handle,
+                message="no cluster_driver — manifest deletion skipped",
+            )
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        stub = {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {
+                "name": parsed.name,
+                "namespace": parsed.namespace,
+            },
+        }
+        result = self._config.cluster_driver.delete_manifests(
+            parsed.cluster_id,
+            parsed.namespace,
+            [stub],
+        )
+        if result.errors:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(result.errors),
+                errors=result.errors,
+            )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message="delete via StatefulSet removal",
+            ok=True,
+            handle=spec.handle,
+            message=f"NATS StatefulSet {parsed.name} deleted",
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message="status via StatefulSet readyReplicas",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
+        name = _unpack_handle(handle.handle).name
         return Binding(
             env_vars={
                 "EVENT_STREAM_BROKERS": ValueRef(
@@ -137,13 +187,18 @@ class NATSDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self):
-        return BindingSchema(env_vars={
-            "EVENT_STREAM_BROKERS": "NATS URL (nats://host:port)",
-            "EVENT_STREAM_TLS": "TLS enabled (true/false)",
-        })
+        return BindingSchema(
+            env_vars={
+                "EVENT_STREAM_BROKERS": "NATS URL (nats://host:port)",
+                "EVENT_STREAM_TLS": "TLS enabled (true/false)",
+            }
+        )
 
     def _render_statefulset(
-        self, *, spec: ProvisionSpec, name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        name: str,
     ) -> dict[str, Any]:
         replicas = SIZE_TO_REPLICAS.get(spec.size, 1)
         ns = self._namespace_for(spec=spec)
@@ -168,25 +223,26 @@ class NATSDriver(ManagedServiceDriver):
                         "labels": {"app": "nats", "name": name},
                     },
                     "spec": {
-                        "containers": [{
-                            "name": "nats",
-                            "image": "nats:2.10-alpine",
-                            "args": [
-                                "--cluster_name", name,
-                                "--cluster", "nats://0.0.0.0:6222",
-                                "--http_port", "8222",
-                                *(
-                                    ["--jetstream"]
-                                    if self._config.enable_jetstream
-                                    else []
-                                ),
-                            ],
-                            "ports": [
-                                {"containerPort": 4222, "name": "client"},
-                                {"containerPort": 6222, "name": "cluster"},
-                                {"containerPort": 8222, "name": "monitor"},
-                            ],
-                        }],
+                        "containers": [
+                            {
+                                "name": "nats",
+                                "image": "nats:2.10-alpine",
+                                "args": [
+                                    "--cluster_name",
+                                    name,
+                                    "--cluster",
+                                    "nats://0.0.0.0:6222",
+                                    "--http_port",
+                                    "8222",
+                                    *(["--jetstream"] if self._config.enable_jetstream else []),
+                                ],
+                                "ports": [
+                                    {"containerPort": 4222, "name": "client"},
+                                    {"containerPort": 6222, "name": "cluster"},
+                                    {"containerPort": 8222, "name": "monitor"},
+                                ],
+                            }
+                        ],
                     },
                 },
             },

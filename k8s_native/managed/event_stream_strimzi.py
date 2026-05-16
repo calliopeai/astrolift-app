@@ -22,12 +22,12 @@ from _sdk.managed_service import (
     ProvisionSpec,
     ServiceHandle,
     ServiceStatus,
-    SnapshotHandle,
     UpdateResult,
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "event_stream"
 
@@ -85,33 +85,42 @@ class StrimziKafkaDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = self._namespace_for(spec=spec)
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         manifests = self._render_manifests(spec=spec, name=cluster_name)
         if self._config.cluster_driver is None:
             return ProvisionResult(
                 ok=True,
-                handle=f"{KIND}/{cluster_name}",
+                handle=handle,
                 message="Strimzi Kafka CRDs rendered",
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
-            self._namespace_for(spec=spec),
+            namespace,
             manifests,
         )
         if not result.ok:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message="apply_manifests failed",
                 errors=result.errors,
             )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{cluster_name}",
+            handle=handle,
             message=f"Kafka cluster {cluster_name} provisioned",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message="Strimzi reconciles topology updates via re-applied CRD",
         )
 
@@ -123,20 +132,93 @@ class StrimziKafkaDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data, force_destroy
+        if self._config.cluster_driver is None:
+            return DeprovisionResult(
+                ok=True,
+                handle=spec.handle,
+                message="no cluster_driver — manifest deletion skipped",
+            )
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        # Delete the four resources provision emitted: the Kafka CR
+        # (which the operator cascades into the underlying
+        # StatefulSets), both KafkaNodePool CRs (controllers +
+        # brokers), and the KafkaUser. The operator finalizer also
+        # cascades pod-disruption-budgets and Services.
+        stubs = [
+            {
+                "apiVersion": "kafka.strimzi.io/v1beta2",
+                "kind": "Kafka",
+                "metadata": {
+                    "name": parsed.name,
+                    "namespace": parsed.namespace,
+                },
+            },
+            {
+                "apiVersion": "kafka.strimzi.io/v1beta2",
+                "kind": "KafkaNodePool",
+                "metadata": {
+                    "name": "controllers",
+                    "namespace": parsed.namespace,
+                },
+            },
+            {
+                "apiVersion": "kafka.strimzi.io/v1beta2",
+                "kind": "KafkaNodePool",
+                "metadata": {
+                    "name": "brokers",
+                    "namespace": parsed.namespace,
+                },
+            },
+            {
+                "apiVersion": "kafka.strimzi.io/v1beta2",
+                "kind": "KafkaUser",
+                "metadata": {
+                    "name": f"{parsed.name}-app-user",
+                    "namespace": parsed.namespace,
+                },
+            },
+        ]
+        result = self._config.cluster_driver.delete_manifests(
+            parsed.cluster_id,
+            parsed.namespace,
+            stubs,
+        )
+        if result.errors:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(result.errors),
+                errors=result.errors,
+            )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message="delete via Kafka CRD removal",
+            ok=True,
+            handle=spec.handle,
+            message=f"Kafka cluster {parsed.name} deleted",
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message="status delegated to Strimzi reconciliation",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
-        bootstrap = f"{name}-kafka-bootstrap.{self._fallback_ns(name=name)}.svc:9092"
+        parsed = _unpack_handle(handle.handle)
+        name = parsed.name
+        ns = parsed.namespace or self._fallback_ns(name=name)
+        bootstrap = f"{name}-kafka-bootstrap.{ns}.svc:9092"
         return Binding(
             env_vars={
                 "EVENT_STREAM_BROKERS": ValueRef(literal=bootstrap),
@@ -157,8 +239,7 @@ class StrimziKafkaDriver(ManagedServiceDriver):
 
     def snapshot(self, handle):
         raise NotImplementedError(
-            "Kafka snapshot via MirrorMaker2 / cluster mirroring; "
-            "out of scope for this driver",
+            "Kafka snapshot via MirrorMaker2 / cluster mirroring; " "out of scope for this driver",
         )
 
     def restore(self, snapshot, target):
@@ -173,15 +254,20 @@ class StrimziKafkaDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self):
-        return BindingSchema(env_vars={
-            "EVENT_STREAM_BROKERS": "Bootstrap server (host:port)",
-            "EVENT_STREAM_USERNAME": "SASL username (from Secret)",
-            "EVENT_STREAM_PASSWORD": "SASL password (from Secret)",
-            "EVENT_STREAM_TLS": "TLS enabled (true/false)",
-        })
+        return BindingSchema(
+            env_vars={
+                "EVENT_STREAM_BROKERS": "Bootstrap server (host:port)",
+                "EVENT_STREAM_USERNAME": "SASL username (from Secret)",
+                "EVENT_STREAM_PASSWORD": "SASL password (from Secret)",
+                "EVENT_STREAM_TLS": "TLS enabled (true/false)",
+            }
+        )
 
     def _render_manifests(
-        self, *, spec: ProvisionSpec, name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        name: str,
     ) -> list[dict[str, Any]]:
         size_spec = SIZE_TO_SPEC.get(spec.size, SIZE_TO_SPEC["small"])
         ns = self._namespace_for(spec=spec)
@@ -218,13 +304,16 @@ class StrimziKafkaDriver(ManagedServiceDriver):
                         ],
                         "config": {
                             "default.replication.factor": min(
-                                size_spec["kafka_replicas"], 3,
+                                size_spec["kafka_replicas"],
+                                3,
                             ),
                             "min.insync.replicas": min(
-                                size_spec["kafka_replicas"], 2,
+                                size_spec["kafka_replicas"],
+                                2,
                             ),
                             "offsets.topic.replication.factor": min(
-                                size_spec["kafka_replicas"], 3,
+                                size_spec["kafka_replicas"],
+                                3,
                             ),
                         },
                     },
@@ -286,16 +375,21 @@ class StrimziKafkaDriver(ManagedServiceDriver):
                     "authentication": {"type": "scram-sha-512"},
                     "authorization": {
                         "type": "simple",
-                        "acls": [{
-                            "resource": {
-                                "type": "topic",
-                                "name": "*",
-                                "patternType": "literal",
-                            },
-                            "operations": [
-                                "Read", "Write", "Describe", "Create",
-                            ],
-                        }],
+                        "acls": [
+                            {
+                                "resource": {
+                                    "type": "topic",
+                                    "name": "*",
+                                    "patternType": "literal",
+                                },
+                                "operations": [
+                                    "Read",
+                                    "Write",
+                                    "Describe",
+                                    "Create",
+                                ],
+                            }
+                        ],
                     },
                 },
             },
