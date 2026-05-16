@@ -64,10 +64,19 @@ def test_start_deployment_persists_ci_metadata(
     assert d.ci_provider == "github_actions"
 
 
-def test_manual_deployment_leaves_ci_metadata_empty(org, app, env, fake_info, permission_resolver):
+def test_manual_deployment_leaves_ci_metadata_empty(
+    org, app, env, fake_info, permission_resolver, settings
+):
     """The fields are optional. A UI deploy that doesn't set them
     persists empty strings — DEFINITELY not nulls or 'N/A' — so
     queries don't have to coalesce."""
+    # Disable Temporal — this test is about DB persistence, not
+    # workflow enqueueing. Without this the resolver tries to dial
+    # ``temporal-server`` and fails when the suite is run in
+    # isolation (the sibling test in this module that explicitly
+    # toggles the kill switch wasn't masking the bug — order
+    # dependency would have hit any order eventually).
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
     permission_resolver.grant(Permission.APP_DEPLOY)
     from core.tenancy import TenantContext, tenant_context
 

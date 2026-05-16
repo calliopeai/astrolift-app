@@ -51,6 +51,46 @@ from core.request_context import generate_ulid, set_request_id  # noqa: E402
 from core.tenancy import TenantContext  # noqa: E402
 from core.tenancy import tenant_context as _tenant_ctx  # noqa: E402
 
+# ---------------------------------------------------------------------------
+# TRUNCATE CASCADE for transaction=True tests.
+#
+# pytest-django's @pytest.mark.django_db(transaction=True) flushes the DB
+# between tests via django.core.management.commands.flush, which on
+# Postgres emits ``TRUNCATE <table>`` without CASCADE. Astrolift's schema
+# has FK references between every business table (organization → app →
+# environment → deployment, etc.), so the naked TRUNCATE fails with
+# ``cannot truncate a table referenced in a foreign key constraint``.
+#
+# Django's own TransactionTestCase passes ``allow_cascade=True`` only
+# when ``available_apps`` is set — pytest-django's marker doesn't set
+# either, so we patch the Postgres operations' ``sql_flush`` to default
+# ``allow_cascade=True``. This matches what real test runs need (full
+# wipe + reload) and is scoped to the test session only.
+# ---------------------------------------------------------------------------
+from django.db.backends.base.operations import BaseDatabaseOperations  # noqa: E402
+from django.db.backends.postgresql.operations import (  # noqa: E402
+    DatabaseOperations as PostgresDatabaseOperations,
+)
+
+_original_sql_flush_base = BaseDatabaseOperations.sql_flush
+_original_sql_flush_pg = PostgresDatabaseOperations.sql_flush
+
+
+def _sql_flush_with_cascade_base(self, style, tables, *, reset_sequences=False, allow_cascade=False):
+    return _original_sql_flush_base(
+        self, style, tables, reset_sequences=reset_sequences, allow_cascade=True
+    )
+
+
+def _sql_flush_with_cascade_pg(self, style, tables, *, reset_sequences=False, allow_cascade=False):
+    return _original_sql_flush_pg(
+        self, style, tables, reset_sequences=reset_sequences, allow_cascade=True
+    )
+
+
+BaseDatabaseOperations.sql_flush = _sql_flush_with_cascade_base
+PostgresDatabaseOperations.sql_flush = _sql_flush_with_cascade_pg
+
 
 @pytest.fixture(autouse=True)
 def _reset_request_id():
