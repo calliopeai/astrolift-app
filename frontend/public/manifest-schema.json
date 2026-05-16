@@ -1,0 +1,165 @@
+{
+  "_comment": "TODO(#356 follow-on): generate this from astrolift_manifest source-of-truth on the backend (e.g. a `make manifest-schema` task that dumps the dataclasses + per-field doc strings). Hand-curated placeholder content lives below.",
+  "version": "0.1.0-placeholder",
+  "sections": [
+    {
+      "key": "meta",
+      "title": "[meta]",
+      "summary": "Static identification: app slug, manifest version, owner team. Read once at registration; not used at runtime.",
+      "required": true,
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Human-readable app name."
+        },
+        {
+          "name": "slug",
+          "type": "string",
+          "required": true,
+          "description": "URL-safe identifier, unique within the project."
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": false,
+          "description": "Optional manifest schema version pin."
+        }
+      ]
+    },
+    {
+      "key": "deploy",
+      "title": "[deploy]",
+      "summary": "Deployment topology — target cluster, replica count, rollout strategy, resource requests/limits.",
+      "required": true,
+      "fields": [
+        {
+          "name": "cluster",
+          "type": "string",
+          "required": false,
+          "description": "Tenant cluster slug; defaults to the project's default cluster binding."
+        },
+        {
+          "name": "replicas",
+          "type": "integer",
+          "required": false,
+          "description": "Desired replica count; defaults to 1."
+        },
+        {
+          "name": "strategy",
+          "type": "string",
+          "required": false,
+          "description": "Rollout strategy — rolling | recreate. Default: rolling."
+        }
+      ]
+    },
+    {
+      "key": "env",
+      "title": "[env]",
+      "summary": "Per-environment overrides (dev / staging / prod). Each environment gets its own [env.<name>] subsection with merged settings.",
+      "required": false,
+      "fields": []
+    },
+    {
+      "key": "workloads",
+      "title": "[[workloads]]",
+      "summary": "Containers, ports, healthchecks, command/args. Repeating section — multiple workloads per app are allowed.",
+      "required": true,
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Workload identifier, unique within the app."
+        },
+        {
+          "name": "image",
+          "type": "string",
+          "required": true,
+          "description": "Container image reference (registry + tag or digest)."
+        },
+        {
+          "name": "ports",
+          "type": "list<integer>",
+          "required": false,
+          "description": "Container ports exposed to the cluster network."
+        }
+      ]
+    },
+    {
+      "key": "managed_services",
+      "title": "[[managed_services]]",
+      "summary": "Provider-managed dependencies (Postgres, Redis, object storage, etc). Each binding is provisioned and its connection details injected into the workload env.",
+      "required": false,
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string",
+          "required": true,
+          "description": "Service kind — postgres | redis | object_storage | kafka | …"
+        },
+        {
+          "name": "binding",
+          "type": "string",
+          "required": true,
+          "description": "Env-var prefix used when injecting connection settings."
+        }
+      ]
+    },
+    {
+      "key": "ingress",
+      "title": "[ingress]",
+      "summary": "Public exposure — hostnames, paths, TLS, the IngressDriver routes traffic via the cluster's ingress class.",
+      "required": false,
+      "fields": [
+        {
+          "name": "host",
+          "type": "string",
+          "required": false,
+          "description": "Custom hostname. Wildcard certs from the managed domain are reused when available."
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": false,
+          "description": "Path prefix. Defaults to /."
+        }
+      ]
+    },
+    {
+      "key": "ci",
+      "title": "[ci]",
+      "summary": "Continuous integration knobs — source provider, branch filters, build commands, preview-env policy.",
+      "required": false,
+      "fields": [
+        {
+          "name": "provider",
+          "type": "string",
+          "required": false,
+          "description": "SCM provider slug (github, gitlab, …)."
+        },
+        {
+          "name": "branch",
+          "type": "string",
+          "required": false,
+          "description": "Default branch tracked for production deploys."
+        }
+      ]
+    },
+    {
+      "key": "domain",
+      "title": "[domain]",
+      "summary": "DNS records to reconcile via the DnsDriver. Tied to a ManagedDomain on the org so wildcard certs and zone delegation are reused.",
+      "required": false,
+      "fields": [
+        {
+          "name": "zone",
+          "type": "string",
+          "required": false,
+          "description": "Managed-domain zone (e.g. apps.example.com)."
+        }
+      ]
+    }
+  ]
+}

@@ -3,9 +3,11 @@
 import {
   ActivityIcon,
   BarChart3Icon,
+  BookOpenIcon,
   BoxIcon,
   CalendarClockIcon,
   ChevronRightIcon,
+  FileTextIcon,
   GitPullRequestIcon,
   CloudIcon,
   CoinsIcon,
@@ -17,6 +19,8 @@ import {
   HomeIcon,
   KeyIcon,
   LayersIcon,
+  LifeBuoyIcon,
+  PlugIcon,
   RocketIcon,
   ScrollTextIcon,
   Settings2Icon,
@@ -224,6 +228,18 @@ const sections: NavSection[] = [
   {
     label: "Resources",
     items: [
+      { label: "Docs", href: "/resources/docs", icon: <BookOpenIcon /> },
+      {
+        label: "Manifest reference",
+        href: "/resources/manifest",
+        icon: <FileTextIcon />,
+      },
+      {
+        label: "Driver reference",
+        href: "/resources/drivers",
+        icon: <PlugIcon />,
+      },
+      { label: "Get help", href: "/resources/help", icon: <LifeBuoyIcon /> },
       { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
     ],
   },
