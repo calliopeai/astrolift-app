@@ -1,0 +1,102 @@
+"""Thin adapter over ``astrolift_operations.prometheus_client`` for the
+golden-signals surface (#380).
+
+The operations module already ships a battle-tested Prometheus
+transport (urllib + TTL cache + 4xx/5xx mapping). Re-using it keeps a
+single client surface; this adapter just normalises the row shape the
+observability resolver wants:
+
+* ``query_range_series`` — given a PromQL expression + window, return
+  one ``(label_value, [(ts, value), ...])`` series per matrix row.
+  For unlabelled aggregates the series carries the empty string as
+  its key.
+* ``resolve_prometheus_endpoint`` — find the endpoint for an app's
+  cluster the same way the operations resolver does (the operator
+  sets it on ``TenantCluster.provider_config['prometheus_endpoint']``).
+
+The error contract matches the upstream client: callers can catch
+``astrolift_operations.prometheus_client.PrometheusError`` and degrade
+to the "metrics not yet flowing" empty state.
+"""
+
+from __future__ import annotations
+
+from astrolift_operations import prometheus_client
+
+
+def resolve_prometheus_endpoint(
+    *,
+    app,
+    environment_name: str | None,
+) -> str | None:
+    """Look up the Prometheus endpoint for ``app`` (and optionally a
+    specific environment).
+
+    Returns the endpoint URL or ``None`` if:
+
+    * the app has no environments
+    * the named environment doesn't exist (when ``environment_name`` is given)
+    * the env's cluster has no ``prometheus_endpoint`` in
+      ``provider_config``
+
+    The convention mirrors the existing operations resolver: the
+    operator sets ``prometheus_endpoint`` on the
+    ``TenantCluster.provider_config`` JSON via the cluster registration
+    UI. No fallback to a platform-wide endpoint — Prometheus is
+    cluster-local.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+
+    qs = AppEnvironment.objects.filter(
+        registered_app=app,
+        deleted_at__isnull=True,
+    ).select_related("tenant_cluster")
+    if environment_name:
+        qs = qs.filter(name=environment_name)
+    env = qs.order_by("name").first()
+    if env is None or env.tenant_cluster_id is None:
+        return None
+    cfg = env.tenant_cluster.provider_config or {}
+    endpoint = (cfg.get("prometheus_endpoint") or "").strip()
+    return endpoint or None
+
+
+def query_range_series(
+    *,
+    endpoint: str,
+    promql: str,
+    start_unix: int,
+    end_unix: int,
+    step_seconds: int,
+    label_key: str | None = None,
+) -> list[tuple[str, list[tuple[float, float]]]]:
+    """Run ``query_range`` and return a list of
+    ``(series_label, [(ts, value), ...])`` tuples.
+
+    ``label_key`` names the PromQL label whose value distinguishes
+    rows in the matrix (e.g. ``"code"`` for the status-code breakdown).
+    When ``label_key`` is ``None`` (the aggregate-everything case) the
+    series carries the empty string and we expect exactly one row.
+
+    Raises :class:`prometheus_client.PrometheusError` on transport or
+    PromQL failure — callers are expected to swallow that and surface
+    the "metrics not yet flowing" empty state.
+    """
+    rows = prometheus_client.query_range(
+        endpoint=endpoint,
+        query=promql,
+        start_unix=start_unix,
+        end_unix=end_unix,
+        step_seconds=step_seconds,
+    )
+    out: list[tuple[str, list[tuple[float, float]]]] = []
+    for row in rows:
+        if label_key is None:
+            key = ""
+        else:
+            key = row.metric_labels.get(label_key, "")
+        # ``row.values`` is a tuple of (ts_unix_seconds, value) pairs;
+        # the upstream parser already coerced NaN strings to 0.0 so we
+        # can hand them straight to the GraphQL layer.
+        out.append((key, list(row.values)))
+    return out

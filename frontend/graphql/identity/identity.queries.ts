@@ -323,6 +323,21 @@ export const LIST_INVITATIONS = gql`
   }
 `;
 
+export const LIST_MY_CONNECTED_ACCOUNTS = gql`
+  query ListMyConnectedAccounts {
+    astroliftMyConnectedAccounts {
+      providerConfigId
+      providerKind
+      providerLabel
+      isConnected
+      linkedAccountLogin
+      reauthRequired
+      expiresAt
+      lastUsedAt
+    }
+  }
+`;
+
 // Suppress the unused import warning — fragment is referenced from
 // other domain files once they're written.
 void IDENTITY_TIMESTAMPS;

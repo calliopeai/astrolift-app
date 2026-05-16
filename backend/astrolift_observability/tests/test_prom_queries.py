@@ -1,0 +1,191 @@
+"""Pure-builder tests for ``astrolift_observability.prom_queries``.
+
+Each builder returns a ``QueryPlan`` — we assert the rendered PromQL
+matches the expected literal for representative inputs so a refactor
+that changes spacing / quoting / label ordering trips a test.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from astrolift_observability import prom_queries
+from astrolift_operations.prometheus_client import PrometheusQueryError
+
+# ----------------------------------------------------------------------
+# rate-window + step helpers
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "range_seconds,expected_window",
+    [
+        (15 * 60, "1m"),  # 15m → 1m
+        (60 * 60, "1m"),  # 1h  → 1m
+        (6 * 60 * 60, "5m"),  # 6h  → 5m
+        (24 * 60 * 60, "5m"),  # 24h → 5m
+        (7 * 86400, "15m"),  # 7d  → 15m
+        (30 * 86400, "1h"),  # 30d → 1h
+    ],
+)
+def test_pick_rate_window(range_seconds: int, expected_window: str) -> None:
+    assert prom_queries.pick_rate_window(range_seconds) == expected_window
+
+
+@pytest.mark.parametrize(
+    "range_seconds,expected_min_step",
+    [
+        (15 * 60, 15),  # tiny window clamps to floor
+        (60 * 60, 15),
+        (6 * 60 * 60, 60),  # 6h / 360 = 60s
+        (24 * 60 * 60, 240),  # 24h / 360 = 240s
+    ],
+)
+def test_pick_step_seconds(range_seconds: int, expected_min_step: int) -> None:
+    step = prom_queries.pick_step_seconds(range_seconds, max_points=360)
+    assert step == expected_min_step
+
+
+def test_pick_step_seconds_rejects_non_positive() -> None:
+    with pytest.raises(ValueError):
+        prom_queries.pick_step_seconds(0)
+
+
+# ----------------------------------------------------------------------
+# request-rate / traffic
+# ----------------------------------------------------------------------
+
+
+def test_request_rate_query_renders_expected_promql() -> None:
+    plan = prom_queries.build_request_rate_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+    )
+    assert plan.rate_window == "1m"
+    assert plan.labels == {"app": "hello-world", "environment": "prod"}
+    assert plan.promql == ('sum(rate(http_requests_total{app="hello-world",environment="prod"}[1m]))')
+
+
+def test_request_rate_query_without_environment() -> None:
+    plan = prom_queries.build_request_rate_query(
+        app_slug="hello-world",
+        environment_name=None,
+        range_seconds=60 * 60,
+    )
+    assert plan.labels == {"app": "hello-world"}
+    assert plan.promql == 'sum(rate(http_requests_total{app="hello-world"}[1m]))'
+
+
+# ----------------------------------------------------------------------
+# error-rate
+# ----------------------------------------------------------------------
+
+
+def test_error_rate_query_uses_clamp_min_and_5xx_matcher() -> None:
+    plan = prom_queries.build_error_rate_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+    )
+    assert plan.promql == (
+        'sum(rate(http_requests_total{app="hello-world",environment="prod",code=~"5.."}[1m])) '
+        '/ clamp_min(sum(rate(http_requests_total{app="hello-world",environment="prod"}[1m])), 1e-9)'
+    )
+
+
+# ----------------------------------------------------------------------
+# latency quantiles
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "quantile,expected_q_str",
+    [
+        (0.50, "0.5"),
+        (0.90, "0.9"),
+        (0.99, "0.99"),
+    ],
+)
+def test_latency_quantile_query(quantile: float, expected_q_str: str) -> None:
+    plan = prom_queries.build_latency_quantile_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+        quantile=quantile,
+    )
+    assert plan.promql == (
+        f"histogram_quantile({expected_q_str}, "
+        f"sum by (le)(rate(http_request_duration_seconds_bucket"
+        f'{{app="hello-world",environment="prod"}}[1m])))'
+    )
+
+
+def test_latency_quantile_query_rejects_out_of_range() -> None:
+    with pytest.raises(ValueError):
+        prom_queries.build_latency_quantile_query(
+            app_slug="hello-world",
+            environment_name=None,
+            range_seconds=60 * 60,
+            quantile=1.5,
+        )
+
+
+# ----------------------------------------------------------------------
+# CPU saturation
+# ----------------------------------------------------------------------
+
+
+def test_cpu_saturation_query_renders_expected_promql() -> None:
+    plan = prom_queries.build_cpu_saturation_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=6 * 60 * 60,  # 6h → 5m rate window
+    )
+    assert plan.rate_window == "5m"
+    assert plan.promql == (
+        'sum(rate(container_cpu_usage_seconds_total{app="hello-world",environment="prod"}[5m])) '
+        "/ clamp_min(sum(kube_pod_container_resource_limits"
+        '{app="hello-world",environment="prod",resource="cpu"}), 1e-9)'
+    )
+
+
+# ----------------------------------------------------------------------
+# status-code breakdown
+# ----------------------------------------------------------------------
+
+
+def test_status_code_breakdown_query_aggregates_by_code() -> None:
+    plan = prom_queries.build_status_code_breakdown_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+    )
+    assert plan.promql == (
+        "sum by (code) (rate(http_requests_total" '{app="hello-world",environment="prod"}[1m]))'
+    )
+
+
+# ----------------------------------------------------------------------
+# label-value sanitization
+# ----------------------------------------------------------------------
+
+
+def test_builder_rejects_unsafe_app_slug() -> None:
+    """A rogue caller can't smuggle a quote into the PromQL label
+    match — the sanitizer rejects anything outside the allow-list."""
+    with pytest.raises(PrometheusQueryError):
+        prom_queries.build_request_rate_query(
+            app_slug='hello"; drop table apps; --',
+            environment_name=None,
+            range_seconds=60 * 60,
+        )
+
+
+def test_builder_rejects_unsafe_environment_name() -> None:
+    with pytest.raises(PrometheusQueryError):
+        prom_queries.build_request_rate_query(
+            app_slug="hello-world",
+            environment_name='prod"',
+            range_seconds=60 * 60,
+        )

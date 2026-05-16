@@ -154,3 +154,27 @@ export interface MutationResult<T> {
   errors: MutationError[];
   data: T | null;
 }
+
+/** One row in the per-user "connected accounts" surface of the account drawer. */
+export interface AstroliftMyConnectedAccount {
+  providerConfigId: string;
+  providerKind: string;
+  providerLabel: string;
+  isConnected: boolean;
+  linkedAccountLogin: string | null;
+  reauthRequired: boolean;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+}
+
+/** Payload returned by `astroliftConnectUserSourceProvider`. */
+export interface AstroliftConnectUserSourceProviderPayload {
+  providerConfigId: string;
+  authorizationUrl: string;
+}
+
+/** Payload returned by `astroliftDisconnectUserSourceProvider`. */
+export interface AstroliftDisconnectUserSourceProviderPayload {
+  providerConfigId: string;
+  disconnectedId: string | null;
+}

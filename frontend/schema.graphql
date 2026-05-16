@@ -204,6 +204,14 @@ type AstroliftAppEnvironmentMutationResult {
   data: AstroliftAppEnvironment
 }
 
+type AstroliftAppGoldenSignal {
+  name: GoldenSignalKind!
+  rangeSeconds: Int!
+  samples: [AstroliftTimeSeriesPoint!]!
+  promql: String!
+  unit: String!
+}
+
 type AstroliftAppHealthSummary {
   appSlug: String!
   appName: String!
@@ -416,6 +424,17 @@ type AstroliftCommandRun {
   createdAt: DateTime!
 }
 
+type AstroliftConnectUserSourceProviderPayload {
+  providerConfigId: GUID!
+  authorizationUrl: String!
+}
+
+type AstroliftConnectUserSourceProviderPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftConnectUserSourceProviderPayload
+}
+
 type AstroliftContainer {
   id: GUID!
   name: String!
@@ -525,6 +544,17 @@ type AstroliftDeploymentMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftDeployment
+}
+
+type AstroliftDisconnectUserSourceProviderPayload {
+  providerConfigId: GUID!
+  disconnectedId: GUID
+}
+
+type AstroliftDisconnectUserSourceProviderPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftDisconnectUserSourceProviderPayload
 }
 
 type AstroliftEvent {
@@ -652,6 +682,17 @@ type AstroliftMember {
   lastSeenAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
+}
+
+type AstroliftMyConnectedAccount {
+  providerConfigId: GUID!
+  providerKind: String!
+  providerLabel: String!
+  isConnected: Boolean!
+  linkedAccountLogin: String
+  reauthRequired: Boolean!
+  expiresAt: String
+  lastUsedAt: String
 }
 
 type AstroliftMyProfile {
@@ -1063,6 +1104,18 @@ type AstroliftSshDeployKeyMutationResult {
   data: AstroliftSshDeployKey
 }
 
+type AstroliftStatusCodeBreakdown {
+  rangeSeconds: Int!
+  series: [AstroliftStatusCodeSeries!]!
+  promql: String!
+}
+
+type AstroliftStatusCodeSeries {
+  codeClass: String!
+  samples: [AstroliftTimeSeriesPoint!]!
+  topCodes: [String!]!
+}
+
 type AstroliftTeam {
   id: GUID!
   slug: String!
@@ -1103,6 +1156,11 @@ type AstroliftTenantClusterMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftTenantCluster
+}
+
+type AstroliftTimeSeriesPoint {
+  ts: DateTime!
+  value: Float!
 }
 
 type AstroliftUser {
@@ -1262,6 +1320,10 @@ input ConnectSourceInput {
   oauthClientId: String = null
   oauthRedirectUri: String = null
   repoVisibilityScopes: [String!] = null
+}
+
+input ConnectUserSourceProviderInput {
+  providerConfigId: GUID!
 }
 
 input CreateAlertRuleInput {
@@ -1455,6 +1517,11 @@ input DisconnectSourceInput {
   id: GUID!
 }
 
+input DisconnectUserSourceProviderInput {
+  providerConfigId: GUID!
+  confirmAccountLogin: String!
+}
+
 type EmployeeAvatarType {
   publicPermanentUrl: String
 }
@@ -1520,6 +1587,15 @@ scalar GUID
 input GenerateSshDeployKeyInput {
   name: String!
   appSlug: String = null
+}
+
+enum GoldenSignalKind {
+  TRAFFIC
+  ERRORS
+  LATENCY_P50
+  LATENCY_P90
+  LATENCY_P99
+  SATURATION_CPU
 }
 
 input GrantRoleInput {
@@ -1881,6 +1957,8 @@ type Mutation {
 
   """Delete a workflow definition by slug (staff only)."""
   deleteWorkflowDefinition(slug: String!): MutationResult!
+  astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
+  astroliftDisconnectUserSourceProvider(input: DisconnectUserSourceProviderInput!): AstroliftDisconnectUserSourceProviderPayloadMutationResult!
 }
 
 type MutationError {
@@ -2140,6 +2218,8 @@ type Query {
   astroliftSecretBundles: [AstroliftSecretBundle!]!
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
+  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null): [AstroliftAppGoldenSignal!]!
+  astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftStatusCodeBreakdown
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
@@ -2152,6 +2232,7 @@ type Query {
 
   """List workflow instances for a specific object."""
   workflowInstances(objectId: Int!, modelLabel: String = null): [WorkflowInstanceType!]!
+  astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
 }
 
 input RecheckDomainValidationInput {

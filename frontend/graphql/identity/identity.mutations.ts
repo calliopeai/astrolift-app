@@ -477,3 +477,37 @@ export const ACCEPT_INVITATION = gql`
     }
   }
 `;
+
+export const CONNECT_USER_SOURCE_PROVIDER = gql`
+  mutation ConnectUserSourceProvider($input: ConnectUserSourceProviderInput!) {
+    astroliftConnectUserSourceProvider(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        providerConfigId
+        authorizationUrl
+      }
+    }
+  }
+`;
+
+export const DISCONNECT_USER_SOURCE_PROVIDER = gql`
+  mutation DisconnectUserSourceProvider($input: DisconnectUserSourceProviderInput!) {
+    astroliftDisconnectUserSourceProvider(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        providerConfigId
+        disconnectedId
+      }
+    }
+  }
+`;

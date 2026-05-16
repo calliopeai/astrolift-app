@@ -109,6 +109,14 @@ class SourceConnection(BaseCoreModel):
     is_orphaned = models.BooleanField(default=False)
     orphaned_at = models.DateTimeField(null=True, blank=True)
     orphaned_reason = models.CharField(max_length=255, blank=True, default="")
+    # Softer signal than ``is_orphaned``: the token is still
+    # technically present (or was, until very recently) but the
+    # platform observed a 401 / token-expired response and wants the
+    # user to walk back through the OAuth dance. The UI renders this
+    # as an amber "Re-authorize" chip rather than the red "Reconnect
+    # needed" state. Set by token-using call sites when they see a
+    # recoverable auth failure; cleared on a successful OAuth dance.
+    reauth_required = models.BooleanField(default=False)
 
     # Self-hosted Gitea / on-prem GitLab need a custom base URL;
     # github.com / gitlab.com are inferred from kind when blank.
