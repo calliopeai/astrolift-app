@@ -8,10 +8,15 @@ the local AWS-IAM-authenticator helper or direct STS) to get a
 short-lived bearer token. The kubernetes Python client uses
 those to talk to the cluster's API server.
 
-Token refresh: tokens expire every ~14 minutes. The driver
-re-fetches on each operation rather than caching long-term;
-high-frequency callers should reuse a single driver instance
-which keeps the boto3 client warm.
+Token refresh: tokens expire ~15 minutes after signing. The
+apply-manifests path mints fresh on every operation (high
+amortized cost is fine for low-frequency lifecycle activities);
+the runtime-observability path (``list_pods`` / ``stream_logs``,
+#299) mints lazily and caches per (cluster_name, region) for
+~13 minutes so back-to-back resolver calls don't pay the STS
+round trip each time. Cache is in-process on the driver
+instance — long-lived workers benefit; short CLI invocations
+get a single mint anyway.
 
 This module is the platform's authoritative way to apply
 manifests, manage namespaces, and observe rollouts. Other
@@ -75,6 +80,38 @@ class EKSConfig:
     """How long to ask STS to make the token valid for. EKS caps
     at 14 minutes; we ask for 60s + re-fetch per operation."""
 
+    exec_plugin_token_ttl_seconds: int = 13 * 60
+    """How long the observability-path token cache holds a minted
+    bearer before re-signing. The STS-presigned URL is valid for
+    15 min by EKS protocol; 13 min gives a 2 min safety margin
+    against clock skew + cluster-side acceptance windows."""
+
+
+@dataclass
+class _TokenCacheEntry:
+    """One cached bearer token with its absolute expiry timestamp.
+
+    ``expires_at`` is a monotonic-clock deadline so the cache is
+    immune to wall-clock jumps (DST, NTP slew, container migration).
+    """
+
+    token: str
+    expires_at: float
+
+
+@dataclass
+class _DescribeCacheEntry:
+    """Endpoint + base64-CA cached from EKS DescribeCluster.
+
+    Kept distinct from the bearer-token cache because DescribeCluster
+    output rarely rotates (it changes when the operator rotates the
+    cluster CA, which is rare and out-of-band). Cleared explicitly
+    in ``invalidate_describe_cache`` if a caller ever needs to.
+    """
+
+    endpoint: str
+    ca_data: str
+
 
 class EKSClusterDriver(ClusterDriver):
     """boto3 + kubernetes-client backed EKS driver."""
@@ -89,6 +126,8 @@ class EKSClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
+        token_minter: Callable[[str, str], str] | None = None,
+        monotonic_clock: Callable[[], float] | None = None,
     ) -> None:
         self._config = config
         if eks_client is not None:
@@ -111,19 +150,39 @@ class EKSClusterDriver(ClusterDriver):
         # as K8sNativeClusterDriver — the listing + log-streaming
         # path is cloud-neutral as soon as the ClusterAuth blob is
         # in hand; what's EKS-specific is *how* the operator's
-        # exec_plugin row gets turned into kubeconfig (#309 follow-up).
+        # exec_plugin row gets turned into kubeconfig (#309).
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
         # Bring-into-management (#316). The RBAC apply + capability
         # probe + preflight Job body is the k8s_native canonical
-        # version; EKS auth is already routed back through the
-        # kubeconfig branch of ``build_api_client`` once the row's
-        # ``auth_config`` carries a kubeconfig blob, so no EKS-side
-        # override is needed today. ``exec_plugin`` auth remains
-        # pending the #309 follow-up.
+        # version; EKS auth is routed through the synthesized
+        # ``kubeconfig`` blob the helpers below build, so the shared
+        # backend's ``build_api_client`` is the only thing the probe
+        # path needs to satisfy.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
         )
+        # Token-mint injection lets tests substitute a recording
+        # double for ``mint_eks_token`` without monkey-patching the
+        # module. Default points at the production helper.
+        self._token_minter: Callable[[str, str], str] = token_minter or (
+            lambda cluster_name, region: mint_eks_token(
+                cluster_name=cluster_name,
+                region=region,
+            )
+        )
+        # Monotonic clock is parametrized so the cache-TTL tests can
+        # drive expiry without sleeping. ``time.monotonic`` is the
+        # production source — wall-clock-jump-immune.
+        self._clock: Callable[[], float] = monotonic_clock or time.monotonic
+        # Per-(cluster_name, region) bearer-token cache for the
+        # observability path. The apply-manifests path mints
+        # per-operation via ``_eks_token`` and does NOT use this
+        # cache — it's strictly for resolver-side call hot-loops.
+        self._token_cache: dict[tuple[str, str], _TokenCacheEntry] = {}
+        # Per-cluster_name describe-cache for endpoint + CA. Cleared
+        # by ``invalidate_describe_cache`` on the rare CA rotation.
+        self._describe_cache: dict[str, _DescribeCacheEntry] = {}
 
     # ---- apply / delete -------------------------------------------
 
@@ -441,7 +500,7 @@ class EKSClusterDriver(ClusterDriver):
         ``service_account_token`` pass through unchanged.
         """
         return self._pod_backend.list_pods(
-            auth=self._materialize_eks_auth_auth(auth),
+            auth=self._resolve_eks_auth(auth),
             namespace=namespace,
             app_slug=app_slug,
         )
@@ -458,7 +517,7 @@ class EKSClusterDriver(ClusterDriver):
     ) -> AsyncIterator[PodLogLine]:
         """See ``list_pods`` — same materialize-then-delegate pattern."""
         return self._log_backend.stream(
-            auth=self._materialize_eks_auth_auth(auth),
+            auth=self._resolve_eks_auth(auth),
             namespace=namespace,
             pod_name=pod_name,
             container=container,
@@ -471,7 +530,7 @@ class EKSClusterDriver(ClusterDriver):
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
         return probe_cluster_capabilities(
             backend=self._management_backend,
-            cluster=self._materialize_eks_auth_context(cluster),
+            cluster=self._resolve_eks_auth_context(cluster),
         )
 
     def bring_into_management(
@@ -482,7 +541,7 @@ class EKSClusterDriver(ClusterDriver):
     ) -> ManagementReport:
         return run_bring_into_management(
             backend=self._management_backend,
-            cluster=self._materialize_eks_auth_context(cluster),
+            cluster=self._resolve_eks_auth_context(cluster),
             run_preflight=run_preflight,
         )
 
@@ -762,61 +821,190 @@ class EKSClusterDriver(ClusterDriver):
             ),
         ]
 
-    # ---- exec_plugin token materialization -----------------------
+    # ---- exec_plugin token materialization (#309) -----------------
     #
-    # The k8s_native backend's ``build_api_client`` knows how to handle
-    # ``kubeconfig`` + ``service_account_token`` auth but raises on
-    # ``exec_plugin`` — EKS-specific token minting is the cloud
-    # driver's job. We pre-mint the bearer token via the
-    # AWS-IAM-Authenticator protocol and rewrite the auth so the
-    # shared backend sees a plain ``service_account_token`` blob.
+    # The k8s_native backend's ``build_api_client`` handles
+    # ``kubeconfig`` + ``service_account_token`` auth natively but
+    # raises on ``exec_plugin`` — EKS-specific token minting is the
+    # cloud driver's job. We mint the bearer token via the
+    # AWS-IAM-Authenticator protocol, fetch the cluster's endpoint +
+    # CA via DescribeCluster, synthesize an in-memory kubeconfig
+    # blob, and rewrite the auth payload so the shared backend sees
+    # a plain ``kubeconfig`` row. The kubeconfig branch is the more
+    # tolerant path (carries endpoint, CA, and bearer in one YAML
+    # doc) and is what ``aws eks get-token`` users actually consume
+    # via their kubeconfig file — so the resolver path matches the
+    # operator's local kubectl path exactly.
     #
     # Two helpers because ClusterContext (for bring/probe) and
     # ClusterAuth (for list_pods/stream_logs) are different frozen
-    # dataclasses — dataclasses.replace is type-specific. The
-    # token-mint logic is shared via ``_eks_token_for``.
+    # dataclasses — dataclasses.replace is type-specific. Both
+    # converge on ``_synthesize_kubeconfig`` for the actual work.
 
-    def _eks_token_for(self, cluster_name: str | None, region: str | None) -> str:
-        """Mint an EKS bearer token. Falls back to the driver's
-        configured cluster_name / region when the row didn't carry
-        them (legacy rows registered before auto-discover landed)."""
-        name = cluster_name or self._config.cluster_name
-        rgn = region or self._config.region
+    def _resolve_eks_target(
+        self,
+        cluster_name: str | None,
+        region: str | None,
+    ) -> tuple[str, str]:
+        """Resolve the (cluster_name, region) to use for token mint +
+        describe. Falls back to the driver's configured values for
+        legacy TenantCluster rows that pre-date auto-discovery."""
+        return (
+            cluster_name or self._config.cluster_name,
+            region or self._config.region,
+        )
+
+    def _cached_token(self, cluster_name: str, region: str) -> str:
+        """Mint-or-return-cached bearer token for the (cluster, region).
+
+        Tokens are cached for ``exec_plugin_token_ttl_seconds`` (13 min
+        by default) against the monotonic clock so resolver hot-loops
+        don't re-sign on every call. Re-minted on miss / expiry."""
+        key = (cluster_name, region)
+        now = self._clock()
+        entry = self._token_cache.get(key)
+        if entry is not None and entry.expires_at > now:
+            return entry.token
         try:
-            return mint_eks_token(cluster_name=name, region=rgn)
+            token = self._token_minter(cluster_name, region)
         except Exception as exc:
             raise map_client_error(exc) from exc
+        self._token_cache[key] = _TokenCacheEntry(
+            token=token,
+            expires_at=now + float(self._config.exec_plugin_token_ttl_seconds),
+        )
+        return token
 
-    def _materialize_eks_auth_context(self, cluster: ClusterContext) -> ClusterContext:
+    def _cached_describe(self, cluster_name: str) -> _DescribeCacheEntry:
+        """Endpoint + base64-CA for the cluster, cached after first hit.
+
+        ``ClusterAuthError`` from the shared backend is what the
+        resolver layer expects on auth failure, but at this layer we
+        raise via ``map_client_error`` so the caller sees a typed
+        ``NotFoundError`` / ``ProviderError`` and can decide whether
+        to log + swallow or surface."""
+        cached = self._describe_cache.get(cluster_name)
+        if cached is not None:
+            return cached
+        try:
+            response = self._eks.describe_cluster(name=cluster_name)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        cluster_payload = response["cluster"]
+        entry = _DescribeCacheEntry(
+            endpoint=cluster_payload["endpoint"],
+            ca_data=cluster_payload["certificateAuthority"]["data"],
+        )
+        self._describe_cache[cluster_name] = entry
+        return entry
+
+    def invalidate_describe_cache(self, cluster_name: str | None = None) -> None:
+        """Drop a cached DescribeCluster entry. Operators rotating
+        the cluster CA can call this; the next observability call
+        re-fetches. Passing None clears the whole cache."""
+        if cluster_name is None:
+            self._describe_cache.clear()
+        else:
+            self._describe_cache.pop(cluster_name, None)
+
+    def _synthesize_kubeconfig(
+        self,
+        *,
+        slug: str,
+        cluster_name: str,
+        region: str,
+    ) -> dict[str, Any]:
+        """Build the auth_config blob (``{"kubeconfig": <yaml>}``)
+        a synthesized ``ClusterAuth(auth_method='kubeconfig', ...)``
+        carries through ``build_api_client``.
+
+        The YAML shape is the standard EKS kubeconfig — one cluster,
+        one user, one context — with the bearer token inlined under
+        the user's ``token`` field. We deliberately do NOT emit an
+        ``exec`` stanza pointing at ``aws eks get-token`` because the
+        platform worker container doesn't ship the AWS CLI; inlining
+        the token sidesteps that and matches what ``mint_eks_token``
+        already does for in-process consumption."""
+        import yaml
+
+        describe = self._cached_describe(cluster_name)
+        token = self._cached_token(cluster_name, region)
+        user_name = f"astrolift-{slug}"
+        kubeconfig = {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "current-context": slug,
+            "clusters": [
+                {
+                    "name": cluster_name,
+                    "cluster": {
+                        "server": describe.endpoint,
+                        # CA is delivered base64-encoded by EKS;
+                        # kubeconfig spec also expects base64 under
+                        # ``certificate-authority-data`` — pass through
+                        # unchanged.
+                        "certificate-authority-data": describe.ca_data,
+                    },
+                },
+            ],
+            "users": [
+                {
+                    "name": user_name,
+                    "user": {"token": token},
+                },
+            ],
+            "contexts": [
+                {
+                    "name": slug,
+                    "context": {
+                        "cluster": cluster_name,
+                        "user": user_name,
+                    },
+                },
+            ],
+        }
+        return {"kubeconfig": yaml.safe_dump(kubeconfig, sort_keys=False)}
+
+    def _resolve_eks_auth_context(self, cluster: ClusterContext) -> ClusterContext:
         if cluster.auth_method != "exec_plugin":
             return cluster
         import dataclasses
 
         cfg = cluster.auth_config or {}
-        token = self._eks_token_for(cfg.get("cluster_name"), cfg.get("region"))
+        cluster_name, region = self._resolve_eks_target(
+            cfg.get("cluster_name"),
+            cfg.get("region"),
+        )
+        auth_config = self._synthesize_kubeconfig(
+            slug=cluster.slug,
+            cluster_name=cluster_name,
+            region=region,
+        )
         return dataclasses.replace(
             cluster,
-            auth_method="service_account_token",
-            auth_config={
-                "token": token,
-                "ca_cert": cluster.ca_cert or cfg.get("ca_cert", ""),
-            },
+            auth_method="kubeconfig",
+            auth_config=auth_config,
         )
 
-    def _materialize_eks_auth_auth(self, auth: ClusterAuth) -> ClusterAuth:
+    def _resolve_eks_auth(self, auth: ClusterAuth) -> ClusterAuth:
         if auth.auth_method != "exec_plugin":
             return auth
         import dataclasses
 
         cfg = auth.auth_config or {}
-        token = self._eks_token_for(cfg.get("cluster_name"), cfg.get("region"))
+        cluster_name, region = self._resolve_eks_target(
+            cfg.get("cluster_name"),
+            cfg.get("region"),
+        )
+        auth_config = self._synthesize_kubeconfig(
+            slug=auth.slug,
+            cluster_name=cluster_name,
+            region=region,
+        )
         return dataclasses.replace(
             auth,
-            auth_method="service_account_token",
-            auth_config={
-                "token": token,
-                "ca_cert": auth.ca_cert or cfg.get("ca_cert", ""),
-            },
+            auth_method="kubeconfig",
+            auth_config=auth_config,
         )
 
     # ---- Cluster health (#68 slice 1) -----------------------------
@@ -879,18 +1067,13 @@ class EKSClusterDriver(ClusterDriver):
         return client
 
     def _describe_cluster(self) -> tuple[str, str]:
-        try:
-            response = self._eks.describe_cluster(
-                name=self._config.cluster_name,
-            )
-        except Exception as exc:
-            raise map_client_error(exc) from exc
-        cluster = response["cluster"]
-        endpoint = cluster["endpoint"]
-        ca_data = cluster["certificateAuthority"]["data"]
+        # Shared with the observability path's ``_cached_describe`` so
+        # both the apply-manifests boto3 flow and the synthesize-
+        # kubeconfig flow read the same canonical endpoint + CA pair.
         # ca_data is base64-encoded by EKS; the kubernetes client
         # handles the decode per its config shape.
-        return endpoint, ca_data
+        entry = self._cached_describe(self._config.cluster_name)
+        return entry.endpoint, entry.ca_data
 
     def _eks_token(self) -> str:
         """Generate a short-lived EKS bearer token via the
