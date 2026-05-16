@@ -9,6 +9,7 @@ import {
   UndoIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -113,6 +114,7 @@ const IN_FLIGHT: DeploymentStatus[] = [
 ];
 
 export function DeploymentDetailClient({ id }: { id: string }) {
+  const t = useTranslations("lists.deploymentDetail");
   const { can } = useMyPermissions();
 
   const {
@@ -205,7 +207,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
   if (dLoading && !d) {
     return (
-      <PageShell title="Deployment" description="Loading…">
+      <PageShell title={t("loadingTitle")} description={t("loading")}>
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
       </PageShell>
@@ -215,14 +217,14 @@ export function DeploymentDetailClient({ id }: { id: string }) {
   if (!d) {
     return (
       <PageShell
-        title="Deployment not found"
-        description="The deployment doesn't exist or you don't have permission to view it."
+        title={t("notFoundTitle")}
+        description={t("notFoundDescription")}
       >
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Try returning to the{" "}
+            {t("returnLink")}{" "}
             <Link href="/deployments" className="underline">
-              deployments list
+              {t("deploymentsList")}
             </Link>
             .
           </CardContent>
@@ -243,8 +245,8 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
   return (
     <PageShell
-      title={`${d.registeredAppSlug} → ${d.environmentName}`}
-      description={`Deployment ${d.id}`}
+      title={t("title", { app: d.registeredAppSlug, env: d.environmentName })}
+      description={t("subtitle", { id: d.id })}
       actions={
         <div className="flex items-center gap-2">
           {showApprove && (
@@ -259,7 +261,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                   reportResult("approveDeployment", data?.approveDeployment);
                 }}
               >
-                <CheckIcon className="size-4" /> Approve
+                <CheckIcon className="size-4" /> {t("approve")}
               </Button>
             </Can>
           )}
@@ -271,7 +273,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 disabled={busy}
                 onClick={() => setConfirmAbort(true)}
               >
-                <StopCircleIcon className="size-4" /> Abort
+                <StopCircleIcon className="size-4" /> {t("abort")}
               </Button>
             </Can>
           )}
@@ -283,7 +285,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 disabled={busy}
                 onClick={() => setConfirmRollback(true)}
               >
-                <UndoIcon className="size-4" /> Rollback
+                <UndoIcon className="size-4" /> {t("rollback")}
               </Button>
             </Can>
           )}
@@ -306,7 +308,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                   reportResult("redeployApp", data?.redeployApp);
                 }}
               >
-                <RotateCcwIcon className="size-4" /> Redeploy
+                <RotateCcwIcon className="size-4" /> {t("redeploy")}
               </Button>
             </Can>
           )}
@@ -320,7 +322,10 @@ export function DeploymentDetailClient({ id }: { id: string }) {
             <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
             {d.approvalsRequired > 0 && (
               <Badge variant="secondary">
-                {d.approvalsReceived}/{d.approvalsRequired} approvals
+                {t("approvalsCount", {
+                  received: d.approvalsReceived,
+                  required: d.approvalsRequired,
+                })}
               </Badge>
             )}
             <Badge variant="outline" className="font-mono">
@@ -329,16 +334,16 @@ export function DeploymentDetailClient({ id }: { id: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-          <Field label="Image tag" mono value={d.imageTag || "—"} />
-          <Field label="Image digest" mono value={d.imageDigest || "—"} />
-          <Field label="Cluster revision" mono value={d.clusterRevision || "—"} />
-          <Field label="Workload" mono value={d.workloadSlug || "—"} />
-          <Field label="Created" value={formatTime(d.createdAt)} />
-          <Field label="Started" value={formatTime(d.startedAt)} />
-          <Field label="Succeeded" value={formatTime(d.succeededAt)} />
-          <Field label="Failed" value={formatTime(d.failedAt)} />
+          <Field label={t("fields.imageTag")} mono value={d.imageTag || "—"} />
+          <Field label={t("fields.imageDigest")} mono value={d.imageDigest || "—"} />
+          <Field label={t("fields.clusterRevision")} mono value={d.clusterRevision || "—"} />
+          <Field label={t("fields.workload")} mono value={d.workloadSlug || "—"} />
+          <Field label={t("fields.created")} value={formatTime(d.createdAt)} />
+          <Field label={t("fields.started")} value={formatTime(d.startedAt)} />
+          <Field label={t("fields.succeeded")} value={formatTime(d.succeededAt)} />
+          <Field label={t("fields.failed")} value={formatTime(d.failedAt)} />
           <Field
-            label="Duration"
+            label={t("fields.duration")}
             value={
               <span className="inline-flex items-center gap-1">
                 <ClockIcon className="size-3" />
@@ -349,18 +354,18 @@ export function DeploymentDetailClient({ id }: { id: string }) {
           {(d.commitSha || d.branch || d.ciRunUrl) && (
             <>
               {d.commitSha && (
-                <Field label="Commit" mono value={d.commitSha.slice(0, 12)} />
+                <Field label={t("fields.commit")} mono value={d.commitSha.slice(0, 12)} />
               )}
-              {d.branch && <Field label="Branch" mono value={d.branch} />}
+              {d.branch && <Field label={t("fields.branch")} mono value={d.branch} />}
               {d.ciActorKind && (
-                <Field label="CI actor" mono value={d.ciActorKind} />
+                <Field label={t("fields.ciActor")} mono value={d.ciActorKind} />
               )}
               {d.ciProvider && (
-                <Field label="CI provider" mono value={d.ciProvider} />
+                <Field label={t("fields.ciProvider")} mono value={d.ciProvider} />
               )}
               {d.ciRunUrl && (
                 <Field
-                  label="CI run"
+                  label={t("fields.ciRun")}
                   value={
                     <a
                       href={d.ciRunUrl}
@@ -380,13 +385,13 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Lifecycle log</CardTitle>
+          <CardTitle className="text-base">{t("lifecycle")}</CardTitle>
         </CardHeader>
         <CardContent>
           {lLoading && log.length === 0 ? (
             <Skeleton className="h-24 w-full" />
           ) : log.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No log entries yet.</p>
+            <p className="text-muted-foreground text-sm">{t("noLog")}</p>
           ) : (
             <ol className="border-muted relative ml-3 space-y-4 border-l pl-4">
               {log.map((e) => (
@@ -417,14 +422,14 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Rendered manifests</CardTitle>
+          <CardTitle className="text-base">{t("manifests")}</CardTitle>
         </CardHeader>
         <CardContent>
           {manifest.loading ? (
             <Skeleton className="h-32 w-full" />
           ) : manifest.data?.astroliftRenderedManifest?.error ? (
             <div className="text-destructive text-sm">
-              <p className="font-medium">Render failed</p>
+              <p className="font-medium">{t("renderFailed")}</p>
               <p className="mt-1">{manifest.data.astroliftRenderedManifest.error}</p>
               {manifest.data.astroliftRenderedManifest.errorPath && (
                 <p className="text-muted-foreground mt-1 font-mono text-xs">
@@ -439,14 +444,14 @@ export function DeploymentDetailClient({ id }: { id: string }) {
               {JSON.stringify(manifest.data.astroliftRenderedManifest.resources, null, 2)}
             </pre>
           ) : (
-            <p className="text-muted-foreground text-sm">No manifests rendered yet.</p>
+            <p className="text-muted-foreground text-sm">{t("noManifests")}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent events</CardTitle>
+          <CardTitle className="text-base">{t("events")}</CardTitle>
         </CardHeader>
         <CardContent>
           {events.loading && !events.data ? (
@@ -459,7 +464,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
               if (filtered.length === 0) {
                 return (
                   <p className="text-muted-foreground text-sm">
-                    No platform events for this app yet.
+                    {t("noEvents")}
                   </p>
                 );
               }
@@ -485,9 +490,9 @@ export function DeploymentDetailClient({ id }: { id: string }) {
       <ConfirmDialog
         open={confirmAbort}
         onOpenChange={setConfirmAbort}
-        title={`Abort deploy of ${d.registeredAppSlug}/${d.environmentName}?`}
-        description="Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed."
-        confirmLabel="Abort deploy"
+        title={t("confirmAbort.title", { app: d.registeredAppSlug, env: d.environmentName })}
+        description={t("confirmAbort.description")}
+        confirmLabel={t("confirmAbort.confirm")}
         destructive
         onConfirm={async () => {
           const { data } = await abort({ variables: { input: { id: d.id } } });
@@ -498,9 +503,12 @@ export function DeploymentDetailClient({ id }: { id: string }) {
       <ConfirmDialog
         open={confirmRollback}
         onOpenChange={setConfirmRollback}
-        title={`Rollback ${d.registeredAppSlug}/${d.environmentName}?`}
-        description="Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded."
-        confirmLabel="Rollback"
+        title={t("confirmRollback.title", {
+          app: d.registeredAppSlug,
+          env: d.environmentName,
+        })}
+        description={t("confirmRollback.description")}
+        confirmLabel={t("confirmRollback.confirm")}
         onConfirm={async () => {
           const { data } = await rollback({ variables: { input: { id: d.id } } });
           reportResult("rollbackDeployment", data?.rollbackDeployment);

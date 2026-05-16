@@ -8,6 +8,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -99,6 +100,7 @@ const TARGETS = ["app", "env", "workload", "global"];
 const SEVERITIES = ["info", "warn", "critical"];
 
 export function AlertsClient() {
+  const t = useTranslations("lists.alerts");
   const [createOpen, setCreateOpen] = React.useState(false);
   const rules = useQuery<RulesResp>(LIST_ALERT_RULES, {
     variables: { activeOnly: false },
@@ -158,13 +160,13 @@ export function AlertsClient() {
 
   return (
     <PageShell
-      title="Alerts"
-      description="Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events surface in the bottom panel."
+      title={t("title")}
+      description={t("description")}
       actions={
         <Can permission="org.update">
           <Button onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-4" />
-            New rule
+            {t("newRule")}
           </Button>
         </Can>
       }
@@ -173,32 +175,32 @@ export function AlertsClient() {
         <Card>
           <CardContent className="p-4">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              Rules
+              {t("stats.rules")}
             </p>
             <p className="mt-1 text-2xl font-bold">{ruleList.length}</p>
             <p className="text-muted-foreground text-xs">
-              {ruleList.filter((r) => r.isActive).length} active
+              {t("stats.active", { count: ruleList.filter((r) => r.isActive).length })}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              Unresolved
+              {t("stats.unresolved")}
             </p>
             <p className="mt-1 text-2xl font-bold text-destructive">
               {unresolvedEvents.length}
             </p>
-            <p className="text-muted-foreground text-xs">in current window</p>
+            <p className="text-muted-foreground text-xs">{t("stats.inWindow")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              Total events
+              {t("stats.total")}
             </p>
             <p className="mt-1 text-2xl font-bold">{eventList.length}</p>
-            <p className="text-muted-foreground text-xs">latest 100</p>
+            <p className="text-muted-foreground text-xs">{t("stats.latest")}</p>
           </CardContent>
         </Card>
       </div>
@@ -206,10 +208,8 @@ export function AlertsClient() {
       <Card>
         <CardContent className="p-0">
           <div className="border-b p-4">
-            <h2 className="font-medium">Rules</h2>
-            <p className="text-muted-foreground text-xs">
-              Predicates fire events when matching telemetry crosses a threshold.
-            </p>
+            <h2 className="font-medium">{t("rules.title")}</h2>
+            <p className="text-muted-foreground text-xs">{t("rules.description")}</p>
           </div>
           {rules.loading && ruleList.length === 0 ? (
             <div className="space-y-2 p-6">
@@ -220,8 +220,8 @@ export function AlertsClient() {
             <div className="p-6">
               <EmptyState
                 icon={<BellIcon className="size-5" />}
-                title="No alert rules yet"
-                description="Create a rule to start surfacing platform events as alerts."
+                title={t("rules.emptyTitle")}
+                description={t("rules.emptyDescription")}
               />
             </div>
           ) : (
@@ -229,10 +229,10 @@ export function AlertsClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>{t("rules.columns.name")}</TableHead>
+                  <TableHead>{t("rules.columns.target")}</TableHead>
+                  <TableHead>{t("rules.columns.severity")}</TableHead>
+                  <TableHead>{t("rules.columns.created")}</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -288,11 +288,8 @@ export function AlertsClient() {
       <Card>
         <CardContent className="p-0">
           <div className="border-b p-4">
-            <h2 className="font-medium">Recent events</h2>
-            <p className="text-muted-foreground text-xs">
-              Firing instances from the rules above. Acknowledge to silence
-              while the underlying issue is being worked.
-            </p>
+            <h2 className="font-medium">{t("events.title")}</h2>
+            <p className="text-muted-foreground text-xs">{t("events.description")}</p>
           </div>
           {events.loading && eventList.length === 0 ? (
             <div className="space-y-2 p-6">
@@ -303,8 +300,8 @@ export function AlertsClient() {
             <div className="p-6">
               <EmptyState
                 icon={<BellIcon className="size-5" />}
-                title="No events yet"
-                description="Events appear here when an active rule's predicate matches incoming telemetry."
+                title={t("events.emptyTitle")}
+                description={t("events.emptyDescription")}
               />
             </div>
           ) : (
@@ -312,10 +309,10 @@ export function AlertsClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead>Summary</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Fired</TableHead>
-                  <TableHead>State</TableHead>
+                  <TableHead>{t("events.columns.summary")}</TableHead>
+                  <TableHead>{t("events.columns.severity")}</TableHead>
+                  <TableHead>{t("events.columns.fired")}</TableHead>
+                  <TableHead>{t("events.columns.state")}</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -338,11 +335,11 @@ export function AlertsClient() {
                     </TableCell>
                     <TableCell>
                       {e.resolvedAt ? (
-                        <Badge variant="outline">resolved</Badge>
+                        <Badge variant="outline">{t("events.resolved")}</Badge>
                       ) : e.acknowledgedAt ? (
-                        <Badge variant="secondary">acknowledged</Badge>
+                        <Badge variant="secondary">{t("events.acknowledged")}</Badge>
                       ) : (
-                        <Badge variant="destructive">firing</Badge>
+                        <Badge variant="destructive">{t("events.firing")}</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -355,7 +352,7 @@ export function AlertsClient() {
                             disabled={busy}
                           >
                             <CheckIcon className="size-3.5" />
-                            Ack
+                            {t("events.ack")}
                           </Button>
                         </Can>
                       )}
@@ -391,9 +388,13 @@ export function AlertsClient() {
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete rule "${deleteTarget.name}"?` : "Delete rule?"}
-        description="Soft-deletes the rule. Events that already fired stay in the log and remain reachable from the event panel — only future evaluations stop. Re-create the rule with the same target to resume coverage."
-        confirmLabel="Delete rule"
+        title={
+          deleteTarget
+            ? t("delete.title", { name: deleteTarget.name })
+            : t("delete.fallbackTitle")
+        }
+        description={t("delete.description")}
+        confirmLabel={t("delete.confirm")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await handleDelete(deleteTarget);
@@ -421,6 +422,7 @@ function CreateRuleSheet({
   }) => Promise<boolean>;
   busy: boolean;
 }) {
+  const t = useTranslations("lists.alerts.create");
   const [name, setName] = React.useState("");
   const [target, setTarget] = React.useState("global");
   const [targetId, setTargetId] = React.useState("");
@@ -451,11 +453,8 @@ function CreateRuleSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>New alert rule</SheetTitle>
-          <SheetDescription>
-            Predicate matches against the platform event stream. Notify channels
-            describe where firing events go (Slack, email, webhook).
-          </SheetDescription>
+          <SheetTitle>{t("title")}</SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -483,12 +482,12 @@ function CreateRuleSheet({
           className="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="ar-name">Name</Label>
+            <Label htmlFor="ar-name">{t("nameLabel")}</Label>
             <Input
               id="ar-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="failed-deploy"
+              placeholder={t("namePlaceholder")}
               autoFocus
               required
               spellCheck={false}
@@ -497,22 +496,22 @@ function CreateRuleSheet({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="ar-target">Target</Label>
+              <Label htmlFor="ar-target">{t("targetLabel")}</Label>
               <Select value={target} onValueChange={setTarget}>
                 <SelectTrigger id="ar-target">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TARGETS.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                  {TARGETS.map((tgt) => (
+                    <SelectItem key={tgt} value={tgt}>
+                      {tgt}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ar-severity">Severity</Label>
+              <Label htmlFor="ar-severity">{t("severityLabel")}</Label>
               <Select value={severity} onValueChange={setSeverity}>
                 <SelectTrigger id="ar-severity">
                   <SelectValue />
@@ -528,24 +527,22 @@ function CreateRuleSheet({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ar-target-id">Target ID</Label>
+            <Label htmlFor="ar-target-id">{t("targetIdLabel")}</Label>
             <Input
               id="ar-target-id"
               value={targetId}
               onChange={(e) => setTargetId(e.target.value)}
-              placeholder={isGlobal ? "(blank for global)" : "app slug, env name, or workload slug"}
+              placeholder={isGlobal ? t("targetIdGlobal") : t("targetIdPlaceholder")}
               disabled={isGlobal}
               spellCheck={false}
               className="font-mono"
             />
             <p className="text-muted-foreground text-xs">
-              {isGlobal
-                ? "Global rules ignore targetId — backend rejects non-empty values."
-                : "App slug for app target; env name for env target; etc."}
+              {isGlobal ? t("targetIdGlobalHint") : t("targetIdHint")}
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ar-predicate">Predicate (JSON)</Label>
+            <Label htmlFor="ar-predicate">{t("predicateLabel")}</Label>
             <Textarea
               id="ar-predicate"
               value={predicateText}
@@ -559,7 +556,7 @@ function CreateRuleSheet({
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ar-channels">Notify channels (JSON)</Label>
+            <Label htmlFor="ar-channels">{t("channelsLabel")}</Label>
             <Textarea
               id="ar-channels"
               value={channelsText}
@@ -571,10 +568,10 @@ function CreateRuleSheet({
           </div>
           <SheetFooter className="flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? "Creating…" : "Create rule"}
+              {busy ? t("submitting") : t("submit")}
             </Button>
           </SheetFooter>
         </form>

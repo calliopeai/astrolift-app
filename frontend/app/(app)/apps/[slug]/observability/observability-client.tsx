@@ -13,6 +13,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -124,6 +125,8 @@ function formatLogLine(line: AstroliftAppLogLine): string {
 }
 
 export function ObservabilityClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.observability");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const events = useQuery<EventsResp>(LIST_EVENTS, {
     variables: { limit: 200 },
@@ -211,7 +214,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
   if (app.loading && !a) {
     return (
-      <PageShell title="Loading…">
+      <PageShell title={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
       </PageShell>
     );
@@ -219,13 +222,13 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
   if (!a) {
     return (
-      <PageShell title="App not found">
+      <PageShell title={tCommon("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={tCommon("notFoundSlug", { slug })}
+          description={tCommon("notFoundDescription")}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -235,10 +238,10 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={`${a.name} · Observability`}
+      title={t("title", { name: a.name })}
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          {a.slug} · pod state and log stream from the runtime cluster
+          {t("description", { slug: a.slug })}
         </span>
       }
     >
@@ -248,11 +251,10 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <BoxIcon className="size-4" /> Pods
+            <BoxIcon className="size-4" /> {t("pods.title")}
           </CardTitle>
           <CardDescription>
-            Live pod state from the tenant cluster, refreshed every {POD_POLL_MS / 1000}s. Click a
-            row to tail its logs below.
+            {t("pods.description", { seconds: POD_POLL_MS / 1000 })}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -265,23 +267,23 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<BoxIcon className="size-5" />}
-                title="No pods running for this app"
-                description="Once a deployment has rolled out and the cluster reports pods, they appear here. If you expected pods, check the deployment log."
+                title={t("pods.emptyTitle")}
+                description={t("pods.emptyDescription")}
                 actionHref={`/apps/${a.slug}/deployments`}
-                actionLabel="View deployment history"
+                actionLabel={t("pods.emptyAction")}
               />
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Pod</TableHead>
-                  <TableHead>Workload</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ready</TableHead>
-                  <TableHead className="text-right">Restarts</TableHead>
-                  <TableHead className="text-right">Age</TableHead>
-                  <TableHead>Node</TableHead>
+                  <TableHead>{t("pods.columns.pod")}</TableHead>
+                  <TableHead>{t("pods.columns.workload")}</TableHead>
+                  <TableHead>{t("pods.columns.status")}</TableHead>
+                  <TableHead className="text-right">{t("pods.columns.ready")}</TableHead>
+                  <TableHead className="text-right">{t("pods.columns.restarts")}</TableHead>
+                  <TableHead className="text-right">{t("pods.columns.age")}</TableHead>
+                  <TableHead>{t("pods.columns.node")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -339,19 +341,19 @@ export function ObservabilityClient({ slug }: { slug: string }) {
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <TerminalIcon className="size-4" /> Live logs
+              <TerminalIcon className="size-4" /> {t("logs.title")}
             </CardTitle>
             <CardDescription>
               {selectedPod ? (
                 <>
-                  Streaming{" "}
+                  {t("logs.streaming")}{" "}
                   <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
                     {selectedPod}
                   </code>{" "}
-                  from the runtime cluster.
+                  {t("logs.fromCluster")}
                 </>
               ) : (
-                "Select a pod above to tail its log stream."
+                t("logs.selectPrompt")
               )}
             </CardDescription>
           </div>
@@ -362,7 +364,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               onClick={() => setLogBuffer([])}
               disabled={logBuffer.length === 0}
             >
-              <Trash2Icon className="size-3" /> Clear
+              <Trash2Icon className="size-3" /> {t("logs.clear")}
             </Button>
             <Button
               size="sm"
@@ -372,11 +374,11 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             >
               {streaming ? (
                 <>
-                  <PauseIcon className="size-3" /> Pause
+                  <PauseIcon className="size-3" /> {t("logs.pause")}
                 </>
               ) : (
                 <>
-                  <PlayIcon className="size-3" /> Stream
+                  <PlayIcon className="size-3" /> {t("logs.stream")}
                 </>
               )}
             </Button>
@@ -390,24 +392,23 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             {logBuffer.length === 0 ? (
               <span className="text-muted-foreground italic">
                 {streaming
-                  ? "Waiting for the first line…"
+                  ? t("logs.waiting")
                   : selectedPod
-                    ? 'Press "Stream" to start tailing.'
-                    : "Pick a pod above first."}
+                    ? t("logs.pressStream")
+                    : t("logs.pickPod")}
               </span>
             ) : (
               logBuffer.join("\n")
             )}
           </pre>
           <p className="text-muted-foreground mt-2 text-xs">
-            Buffer is capped at {LOG_BUFFER_LIMIT} lines. Use the CLI for a true tail without the
-            buffer cap:{" "}
+            {t("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
             <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
               astro logs --app={a.slug} --follow
             </code>
             .{" "}
             <Link href="/downloads" className="underline">
-              Install the CLI
+              {t("logs.installCli")}
             </Link>
             .
           </p>
@@ -419,18 +420,15 @@ export function ObservabilityClient({ slug }: { slug: string }) {
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ActivityIcon className="size-4" /> Recent platform events
+              <ActivityIcon className="size-4" /> {t("events.title")}
             </CardTitle>
-            <CardDescription>
-              App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions,
-              alert transitions.
-            </CardDescription>
+            <CardDescription>{t("events.description")}</CardDescription>
           </div>
           <Link
             href="/events"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
           >
-            All events <ExternalLinkIcon className="size-3" />
+            {t("events.all")} <ExternalLinkIcon className="size-3" />
           </Link>
         </CardHeader>
         <CardContent className="p-0">
@@ -443,8 +441,8 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<ScrollTextIcon className="size-5" />}
-                title="No events for this app yet"
-                description="Platform events appear here as deploys, scale changes, and alerts fire."
+                title={t("events.emptyTitle")}
+                description={t("events.emptyDescription")}
               />
             </div>
           ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -63,6 +64,7 @@ interface MutationResp {
 const TRIGGER_KINDS = ["manual", "ci", "scheduled", "promotion"] as const;
 
 export function StartDeploymentDialog({ open, onOpenChange }: Props) {
+  const t = useTranslations("lists.deployments.startSheet");
   const apps = useQuery<AppsResp>(LIST_APPS, { skip: !open });
   const [appSlug, setAppSlug] = React.useState("");
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
@@ -125,23 +127,18 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Start deployment</SheetTitle>
-          <SheetDescription>
-            Submits a new rollout to Temporal. If the environment requires
-            approvals, the deployment lands as <code>pending_approval</code>{" "}
-            and the workflow doesn&apos;t start until enough approvers sign
-            off.
-          </SheetDescription>
+          <SheetTitle>{t("title")}</SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={submit}
           className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="app">App</Label>
+            <Label htmlFor="app">{t("appLabel")}</Label>
             <Select value={appSlug} onValueChange={setAppSlug}>
               <SelectTrigger id="app">
-                <SelectValue placeholder="Choose an app" />
+                <SelectValue placeholder={t("appPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {appList.map((a) => (
@@ -155,14 +152,14 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="env">Environment</Label>
+            <Label htmlFor="env">{t("envLabel")}</Label>
             <Select
               value={environmentName}
               onValueChange={setEnvironmentName}
               disabled={!appSlug}
             >
               <SelectTrigger id="env">
-                <SelectValue placeholder="Choose an environment" />
+                <SelectValue placeholder={t("envPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {envList.map((e) => (
@@ -171,11 +168,11 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
                     {e.requiredApprovals > 0 && (
                       <span className="text-muted-foreground">
                         {" "}
-                        · {e.requiredApprovals} approval(s)
+                        · {t("approvalsSuffix", { count: e.requiredApprovals })}
                       </span>
                     )}
                     {e.deploysPaused && (
-                      <span className="text-amber-600"> · paused</span>
+                      <span className="text-amber-600"> · {t("paused")}</span>
                     )}
                   </SelectItem>
                 ))}
@@ -184,34 +181,31 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tag">Image tag</Label>
+            <Label htmlFor="tag">{t("tagLabel")}</Label>
             <Input
               id="tag"
               value={imageTag}
               onChange={(e) => setImageTag(e.target.value)}
-              placeholder="v1.4.2 or sha-abc123"
+              placeholder={t("tagPlaceholder")}
               className="font-mono text-xs"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="digest">Image digest (optional)</Label>
+            <Label htmlFor="digest">{t("digestLabel")}</Label>
             <Input
               id="digest"
               value={imageDigest}
               onChange={(e) => setImageDigest(e.target.value)}
-              placeholder="sha256:..."
+              placeholder={t("digestPlaceholder")}
               className="font-mono text-xs"
             />
-            <p className="text-muted-foreground text-xs">
-              When set, this digest is what the workflow renders into the
-              manifest — guaranteed-immutable target.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("digestHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="trigger">Trigger</Label>
+            <Label htmlFor="trigger">{t("triggerLabel")}</Label>
             <Select
               value={triggerKind}
               onValueChange={(v) =>
@@ -237,13 +231,13 @@ export function StartDeploymentDialog({ open, onOpenChange }: Props) {
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={loading || !appSlug || !environmentName || !imageTag}
             >
-              {loading ? "Starting…" : "Start deployment"}
+              {loading ? t("submitting") : t("submit")}
             </Button>
           </SheetFooter>
         </form>

@@ -11,6 +11,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -141,6 +142,8 @@ function appTopology(
 
 export function AppDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
+  const tCommon = useTranslations("apps.common");
+  const tDetail = useTranslations("apps.detail");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
@@ -156,7 +159,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
   if (app.loading && !app.data) {
     return (
-      <PageShell title="Loading…">
+      <PageShell title={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
       </PageShell>
@@ -166,13 +169,13 @@ export function AppDetailClient({ slug }: { slug: string }) {
   const a = app.data?.astroliftApp;
   if (!a) {
     return (
-      <PageShell title="App not found">
+      <PageShell title={tCommon("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={tCommon("notFoundSlug", { slug })}
+          description={tCommon("notFoundDescription")}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -235,34 +238,34 @@ export function AppDetailClient({ slug }: { slug: string }) {
             <Button asChild variant="outline">
               <a href={`https://${primaryHost}`} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
-                Open
+                {tDetail("actions.open")}
               </a>
             </Button>
           )}
           <Button asChild>
             <a href={`/apps/${a.slug}/environments`}>
               <RocketIcon className="size-4" />
-              Deploy
+              {tDetail("actions.deploy")}
             </a>
           </Button>
           <Button asChild variant="outline">
             <a href={`/apps/${a.slug}/config`}>
               <FileCodeIcon className="size-4" />
-              Config
+              {tDetail("actions.config")}
             </a>
           </Button>
           {a.sourceUrl && (
             <Button asChild variant="outline">
               <a href={a.sourceUrl} target="_blank" rel="noreferrer">
                 <GitBranchIcon className="size-4" />
-                Source
+                {tDetail("actions.source")}
               </a>
             </Button>
           )}
           <Can permission="app.delete">
             <Button variant="ghost" onClick={() => setConfirmOpen(true)} disabled={deleting}>
               <Trash2Icon className="size-4" />
-              Delete
+              {tDetail("actions.delete")}
             </Button>
           </Can>
         </>
@@ -272,7 +275,9 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
       {a.provisioningStatus === "failed" && a.provisioningError && (
         <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
-          <p className="text-destructive text-xs font-semibold">Provisioning failed</p>
+          <p className="text-destructive text-xs font-semibold">
+            {tDetail("provisioning.failed")}
+          </p>
           <p className="text-muted-foreground mt-1 font-mono text-xs break-all">
             {a.provisioningError}
           </p>
@@ -285,11 +290,8 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Topology</CardTitle>
-          <CardDescription>
-            Provisioned components — public ingress, services, workloads, and attached managed
-            services. Click a node to drill in.
-          </CardDescription>
+          <CardTitle>{tDetail("topology.title")}</CardTitle>
+          <CardDescription>{tDetail("topology.description")}</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {workloads.loading ? (
@@ -300,8 +302,8 @@ export function AppDetailClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<BoxIcon className="size-5" />}
-                title="No topology yet"
-                description="Topology fills in once workloads are registered for this app."
+                title={tDetail("topology.emptyTitle")}
+                description={tDetail("topology.emptyDescription")}
               />
             </div>
           ) : (
@@ -329,9 +331,9 @@ export function AppDetailClient({ slug }: { slug: string }) {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Delete ${a.slug}?`}
-        description="Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner."
-        confirmLabel="Delete app"
+        title={tDetail("delete.title", { slug: a.slug })}
+        description={tDetail("delete.description")}
+        confirmLabel={tDetail("delete.confirm")}
         destructive
         onConfirm={handleDelete}
       />

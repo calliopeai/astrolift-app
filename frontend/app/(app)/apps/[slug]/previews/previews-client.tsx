@@ -8,6 +8,7 @@ import {
   GitPullRequestIcon,
   TrashIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -75,6 +76,8 @@ function isStale(p: AstroliftPreviewEnvironment): boolean {
 }
 
 export function AppPreviewsClient({ slug }: { slug: string }) {
+  const tCommon = useTranslations("apps.common");
+  const t = useTranslations("apps.previews");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const previews = useQuery<PreviewsResp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: slug },
@@ -99,7 +102,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
 
   if (app.loading && !a) {
     return (
-      <PageShell title="Loading…">
+      <PageShell title={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
       </PageShell>
     );
@@ -107,13 +110,13 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
 
   if (!a) {
     return (
-      <PageShell title="App not found">
+      <PageShell title={tCommon("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No app with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={tCommon("notFoundSlug", { slug })}
+          description={tCommon("notFoundDescription")}
           actionHref="/apps"
-          actionLabel="Back to apps"
+          actionLabel={tCommon("backToApps")}
         />
       </PageShell>
     );
@@ -131,10 +134,10 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={`${a.name} · Previews`}
+      title={t("title", { name: a.name })}
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          {a.slug} · per-PR ephemeral environments at pr-N.{a.subdomain}
+          {t("description", { slug: a.slug, subdomain: a.subdomain })}
         </span>
       }
     >
@@ -145,12 +148,8 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
             <AlertTriangleIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
             <div className="flex-1">
-              <CardTitle className="text-sm">Previews are disabled for this app</CardTitle>
-              <CardDescription>
-                Enable per-PR previews in app settings to spin one up
-                automatically when a pull request opens. You can still see
-                historical preview rows below.
-              </CardDescription>
+              <CardTitle className="text-sm">{t("disabled.title")}</CardTitle>
+              <CardDescription>{t("disabled.description")}</CardDescription>
             </div>
           </CardHeader>
         </Card>
@@ -162,13 +161,10 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
             <CalendarClockIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
             <div className="flex-1">
               <CardTitle className="text-sm">
-                {stale.length} preview{stale.length === 1 ? "" : "s"} stale
+                {t("stale.title", { count: stale.length })}
               </CardTitle>
               <CardDescription>
-                These previews haven&apos;t been redeployed in more than{" "}
-                {STALE_DAYS} days. Either the PR is dormant or auto-teardown
-                missed it — consider tearing them down to free namespace
-                quota.
+                {t("stale.description", { days: STALE_DAYS })}
               </CardDescription>
             </div>
           </CardHeader>
@@ -186,11 +182,9 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
             <div className="p-6">
               <EmptyState
                 icon={<GitPullRequestIcon className="size-5" />}
-                title="No preview environments yet"
+                title={t("emptyTitle")}
                 description={
-                  a.previewEnabled
-                    ? "Open a pull request against this app to spin up a preview automatically."
-                    : "Enable previews in app settings to spin one up automatically on each PR."
+                  a.previewEnabled ? t("emptyEnabled") : t("emptyDisabled")
                 }
                 actionHref={
                   a.previewEnabled ? a.sourceUrl ?? undefined : `/apps/${a.slug}/config`
@@ -198,9 +192,9 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                 actionLabel={
                   a.previewEnabled
                     ? a.sourceUrl
-                      ? "Open repo"
+                      ? t("openRepo")
                       : undefined
-                    : "Enable previews"
+                    : t("enablePreviews")
                 }
               />
             </div>
@@ -209,11 +203,11 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-6"></TableHead>
-                  <TableHead>PR / branch</TableHead>
-                  <TableHead>Hostname</TableHead>
-                  <TableHead>Last deploy</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("columns.prBranch")}</TableHead>
+                  <TableHead>{t("columns.hostname")}</TableHead>
+                  <TableHead>{t("columns.lastDeploy")}</TableHead>
+                  <TableHead>{t("columns.status")}</TableHead>
+                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -259,7 +253,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                           variant="outline"
                           className="ml-2 text-[10px] uppercase"
                         >
-                          stale
+                          {t("staleBadge")}
                         </Badge>
                       )}
                     </TableCell>
@@ -277,7 +271,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                             disabled={tearState.loading}
                             onClick={() => setTearDownTarget(p)}
                           >
-                            <TrashIcon className="size-3" /> Tear down
+                            <TrashIcon className="size-3" /> {t("tearDown")}
                           </Button>
                         </Can>
                       )}
@@ -291,9 +285,11 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       </Card>
 
       <p className="text-muted-foreground text-center text-xs">
-        Preview retention is {a.previewMaxActive} active env
-        {a.previewMaxActive === 1 ? "" : "s"} per app · stale threshold{" "}
-        {STALE_DAYS}d.
+        {t("footer", {
+          count: a.previewMaxActive,
+          plural: a.previewMaxActive === 1 ? "" : "s",
+          days: STALE_DAYS,
+        })}
       </p>
 
       <ConfirmDialog
@@ -303,15 +299,19 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
         }}
         title={
           tearDownTarget
-            ? `Tear down preview for PR #${tearDownTarget.prNumber}?`
-            : "Tear down preview?"
+            ? t("confirmTitle", { pr: tearDownTarget.prNumber })
+            : t("confirmFallback")
         }
         description={
           tearDownTarget
-            ? `Namespace ${tearDownTarget.namespace} will be deleted, its ingress hostname (${tearDownTarget.hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to ${tearDownTarget.branch}.`
-            : "Namespace will be deleted and the hostname released."
+            ? t("confirmDescription", {
+                namespace: tearDownTarget.namespace,
+                hostname: tearDownTarget.hostname,
+                branch: tearDownTarget.branch,
+              })
+            : t("confirmDescriptionFallback")
         }
-        confirmLabel="Tear down"
+        confirmLabel={t("tearDown")}
         destructive
         onConfirm={async () => {
           if (tearDownTarget) await handleTearDown(tearDownTarget);

@@ -6,6 +6,7 @@ import {
   GitPullRequestIcon,
   TrashIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -59,6 +60,7 @@ function formatTime(iso: string | null | undefined): string {
 }
 
 export function PreviewsClient() {
+  const t = useTranslations("lists.previews");
   const { can } = useMyPermissions();
   const { data, loading } = useQuery<Resp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: null },
@@ -77,8 +79,8 @@ export function PreviewsClient() {
 
   return (
     <PageShell
-      title="Preview environments"
-      description="Per-PR ephemeral deploys. Hostnames follow pr-<n>-<app>.pr.<org>.<base-zone>; tear-down on PR close."
+      title={t("title")}
+      description={t("description")}
     >
       <Card>
         <CardContent className="p-0">
@@ -91,10 +93,10 @@ export function PreviewsClient() {
             <div className="p-6">
               <EmptyState
                 icon={<GitPullRequestIcon className="size-5" />}
-                title="No preview environments"
-                description="Open a pull request against an app with preview_enabled=true to spin one up."
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
                 actionHref="/apps"
-                actionLabel="Open apps"
+                actionLabel={t("openApps")}
               />
             </div>
           ) : (
@@ -102,13 +104,13 @@ export function PreviewsClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead>App</TableHead>
-                  <TableHead>PR</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Hostname</TableHead>
-                  <TableHead>Last deploy</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("columns.app")}</TableHead>
+                  <TableHead>{t("columns.pr")}</TableHead>
+                  <TableHead>{t("columns.branch")}</TableHead>
+                  <TableHead>{t("columns.hostname")}</TableHead>
+                  <TableHead>{t("columns.lastDeploy")}</TableHead>
+                  <TableHead>{t("columns.status")}</TableHead>
+                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,7 +170,7 @@ export function PreviewsClient() {
                             disabled={tearState.loading}
                             onClick={() => setTearTarget(p)}
                           >
-                            <TrashIcon className="size-3" /> Tear down
+                            <TrashIcon className="size-3" /> {t("tearDown")}
                           </Button>
                         </Can>
                       )}
@@ -188,15 +190,19 @@ export function PreviewsClient() {
         }}
         title={
           tearTarget
-            ? `Tear down preview for PR #${tearTarget.prNumber}?`
-            : "Tear down preview?"
+            ? t("confirmTitle", { pr: tearTarget.prNumber })
+            : t("confirmFallback")
         }
         description={
           tearTarget
-            ? `Namespace ${tearTarget.namespace} is deleted and the hostname ${tearTarget.hostname} is released. The preview re-spins automatically on the next push to ${tearTarget.branch}.`
-            : "Namespace will be deleted and the hostname released."
+            ? t("confirmDescription", {
+                namespace: tearTarget.namespace,
+                hostname: tearTarget.hostname,
+                branch: tearTarget.branch,
+              })
+            : t("confirmDescriptionFallback")
         }
-        confirmLabel="Tear down"
+        confirmLabel={t("tearDown")}
         destructive
         onConfirm={async () => {
           if (!tearTarget) return;
