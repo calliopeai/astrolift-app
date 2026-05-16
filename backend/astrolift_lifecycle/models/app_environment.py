@@ -36,6 +36,7 @@ class AppEnvironment(BaseCoreModel):
     url = models.URLField(blank=True, default="")
     deploy_config = models.JSONField(default=dict, blank=True)
     deploys_paused = models.BooleanField(default=False)
+    ingress_paused = models.BooleanField(default=False)
     required_approvals = models.PositiveIntegerField(default=0)
     approval_role_ids = models.JSONField(default=list, blank=True)
     abac_policy = models.ForeignKey(

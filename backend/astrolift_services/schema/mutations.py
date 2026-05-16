@@ -24,8 +24,10 @@ from astrolift_services.models import (
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
     ManagedServiceType,
+    SecretBundleType,
     attachment_to_type,
     managed_service_to_type,
+    secret_bundle_to_type,
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -73,6 +75,17 @@ class AttachSecretBundleInput:
 @strawberry.input
 class DetachSecretBundleInput:
     attachment_id: GUID
+
+
+@strawberry.input
+class RotateSecretBundleInput:
+    """Fire the ``RotateSecretBundleWorkflow`` for one bundle. The
+    workflow re-fetches values from the SecretsBackend, applies them
+    across every cluster the bundle is referenced on, then bounces
+    every Deployment that envFroms the bundle so pods pick up the
+    new values immediately (#365)."""
+
+    id: GUID
 
 
 # Managed services CRUD (#281) ---------------------------------------
@@ -400,6 +413,64 @@ class ServicesMutation:
                 deleted=True,
             )
         )
+
+    @strawberry.field
+    @mutation_audit(action="secret_bundle.rotate")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def rotate_secret_bundle(
+        self,
+        info: Info,
+        input: RotateSecretBundleInput,
+    ) -> MutationResultType[SecretBundleType]:
+        """Fire ``RotateSecretBundleWorkflow`` for one SecretBundle (#365).
+
+        Re-applies the bundle's materialized k8s Secret on every
+        cluster the bundle is referenced on (operator-fired path bounces
+        consumers; the hourly scheduled path doesn't). Idempotent — the
+        workflow id is bound to the bundle so re-firing joins the
+        existing run rather than spawning a parallel one.
+        """
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import (
+            Actor,
+        )
+        from astrolift_workflows.inputs import (
+            RotateSecretBundleInput as RotateInput,
+        )
+
+        bundle = SecretBundle.objects.filter(
+            guid=str(input.id),
+            deleted_at__isnull=True,
+        ).first()
+        if bundle is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "secret bundle not found",
+            )
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) if request else None
+        actor = (
+            Actor(
+                kind="user",
+                user_id=user.pk,
+                display=getattr(user, "username", "") or "",
+            )
+            if user is not None and getattr(user, "is_authenticated", False)
+            else Actor(kind="system", display="rotate-secret-bundle")
+        )
+        start_workflow(
+            "RotateSecretBundleWorkflow",
+            args=[
+                RotateInput(
+                    secret_bundle_id=bundle.pk,
+                    actor=actor,
+                    bounce_workloads=True,
+                ),
+            ],
+            workflow_id=f"RotateSecretBundleWorkflow-{bundle.guid}",
+        )
+        return gql_success(secret_bundle_to_type(bundle))
 
     # ---- Managed services CRUD (#281) ----------------------------
 

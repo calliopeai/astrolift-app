@@ -72,6 +72,15 @@ class ScheduleKind(StrEnum):
     trigger_mode='cron' and fires a deploy for each whose
     cron_expression matches the current minute (#296)."""
 
+    SECRET_BUNDLE_REFRESH = "secret_bundle_refresh"
+    """Every 1 hr — re-applies every actively-referenced
+    ``SecretBundle`` from the SecretsBackend to its bound clusters
+    so long-running pods don't drift behind external rotations
+    (AWS Secrets Manager scheduled rotation, Vault TTL renewal).
+    Doesn't bounce workloads — too disruptive on an hourly cadence;
+    operator-fired ``rotateSecretBundle`` is the path that
+    restarts consumers (#365)."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -190,6 +199,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.CRON_DEPLOY_TICK,
         ),
         description="Cron-triggered deploy dispatcher tick (#296)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.SECRET_BUNDLE_REFRESH,
+        workflow_name="SecretBundleScheduledRefreshWorkflow",
+        interval_seconds=60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.SECRET_BUNDLE_REFRESH,
+        ),
+        description="Re-apply active SecretBundles hourly (#365)",
     ),
 )
 

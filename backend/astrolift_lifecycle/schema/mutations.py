@@ -158,6 +158,20 @@ class RecheckDomainValidationInput:
     id: GUID
 
 
+@strawberry.input
+class UploadCustomDomainCertificateInput:
+    """BYO-cert payload — operator pastes (or pipes via CLI) the full
+    PEM chain + private key. Used when the platform can't auto-issue
+    a cert: externally-managed AWS zones (ACM can't HTTP-01), zones
+    that hit Let's Encrypt rate limits, or air-gapped / custom-CA
+    deployments. The renderer reads the stored PEM verbatim — the
+    platform never re-issues a BYO cert."""
+
+    id: GUID
+    certificate_pem: str
+    private_key_pem: str
+
+
 @strawberry.type
 class _AppDomainRemovedPayload:
     id: GUID
@@ -200,6 +214,81 @@ class DeployTokenSecretReveal:
 class _DeployTokenRevokedPayload:
     id: GUID
     revoked: bool
+
+
+# Standalone capability deprovision (#368) ---------------------------
+
+
+@strawberry.input
+class DeleteAppDnsRecordInput:
+    """Drop one DNS record on the app's bound cluster's DnsDriver.
+
+    ``hostname`` is the full FQDN (``api.acme.com``) — the activity
+    splits it into ``(name, parent zone)`` and dispatches to the
+    DnsDriver. ``recordType`` defaults to CNAME (the most common
+    record the platform writes for an app)."""
+
+    app_id: GUID
+    hostname: str
+    record_type: str = "CNAME"
+
+
+@strawberry.input
+class RevokeAppCertificateInput:
+    """Revoke the auto-issued cert tied to a CustomDomain row.
+
+    Resets ``certificate_state`` back to NOT_REQUESTED so the renderer
+    stops emitting the Ingress until the operator re-issues or BYO."""
+
+    custom_domain_id: GUID
+
+
+@strawberry.input
+class DeleteAppIdentityRoleInput:
+    """Delete the app's cloud IAM/identity role (IRSA / GKE Workload
+    Identity / AKS federated cred / projected SA). Subsequent deploys
+    re-provision the role on next ``provision_namespace``."""
+
+    app_id: GUID
+
+
+@strawberry.input
+class ArchiveAppRegistryRepoInput:
+    """Archive the app's image repo + clear the platform's stored URI.
+
+    The driver's ``archive`` flag controls soft-vs-hard delete on the
+    registry side (ECR archives by default). Clearing the URI lets a
+    future ``provision_registry_repo`` start cleanly."""
+
+    app_id: GUID
+    archive: bool = True
+
+
+@strawberry.input
+class DeleteAppIngressInput:
+    """Delete one Ingress (when ``hostname`` given) or every Ingress
+    on the app's namespace (when None).
+
+    Per-hostname soft-deletes the matching ``CustomDomain`` row — the
+    renderer drops its Ingress on the next deploy. The all-ingresses
+    path calls the IngressDriver directly."""
+
+    app_id: GUID
+    hostname: str | None = None
+
+
+@strawberry.type(name="AstroliftCapabilityDeprovisionPayload")
+class _CapabilityDeprovisionPayload:
+    """Generic envelope for capability-deprovision mutations.
+
+    Carries the cluster slug + a free-form ``detail`` string the UI
+    can render. Per-mutation extras (deleted hostnames, role name,
+    etc.) live in ``detail`` rather than typed fields — the operator-
+    facing display is the same shape across capabilities."""
+
+    app_id: GUID | None
+    cluster_slug: str
+    detail: str
 
 
 # ---------------------------------------------------------------------------
@@ -1030,6 +1119,59 @@ class LifecycleMutation:
         return gql_success(app_env_to_type(env))
 
     @strawberry.field
+    @mutation_audit(action="environment.pause_ingress")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def pause_app_ingress(
+        self, info: Info, input: EnvironmentByIdInput
+    ) -> MutationResultType[AppEnvironmentType]:
+        """Pause live traffic at the Ingress layer for an env (#378).
+
+        Independent of ``deploys_paused``: the renderer keeps emitting
+        the per-CustomDomain Ingress on every deploy, but tagged so
+        the controller serves a 503 instead of the app. Lets an
+        operator put an app in maintenance ("we'll be right back")
+        without freezing the deploy pipeline, and lets them keep
+        shipping fixes while traffic stays parked. The flag is
+        consulted by ``_render_app_ingresses_and_tls`` on the next
+        deploy render — re-deploy or wait for the next CI push for it
+        to take effect cluster-side.
+        """
+        env = (
+            AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if env is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "environment not found")
+        if not env.ingress_paused:
+            env.ingress_paused = True
+            env.save(update_fields=["ingress_paused", "updated_at", "version"])
+        return gql_success(app_env_to_type(env))
+
+    @strawberry.field
+    @mutation_audit(action="environment.resume_ingress")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def resume_app_ingress(
+        self, info: Info, input: EnvironmentByIdInput
+    ) -> MutationResultType[AppEnvironmentType]:
+        """Lift the ingress-pause flag — restores normal routing on
+        the next render. As with ``pause_app_ingress``, the change is
+        picked up by the next deploy."""
+        env = (
+            AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if env is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "environment not found")
+        if env.ingress_paused:
+            env.ingress_paused = False
+            env.save(update_fields=["ingress_paused", "updated_at", "version"])
+        return gql_success(app_env_to_type(env))
+
+    @strawberry.field
     @mutation_audit(action="preview.tear_down")
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
@@ -1332,6 +1474,74 @@ class LifecycleMutation:
         _kick_validate_custom_domain(domain)
         return gql_success(app_domain_to_type(domain))
 
+    @strawberry.field
+    @mutation_audit(action="app.domain.upload_certificate")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def upload_custom_domain_certificate(
+        self,
+        info: Info,
+        input: UploadCustomDomainCertificateInput,
+    ) -> MutationResultType[AppDomainType]:
+        """BYO-cert path for the unhappy-path UX (#397).
+
+        When auto-issuance can't reach the cert (externally-managed
+        AWS zone, LE rate-limited zone, custom CA), the operator
+        pastes their PEM chain + key here. We store both, flip
+        ``certificate_state`` to ``byo``, and the renderer picks up
+        the uploaded PEM instead of an issued cert id.
+
+        Basic shape validation only — we accept any PEM-looking
+        payload at this layer; the renderer rejects malformed chains
+        at apply time and reports back on the deployment status.
+        """
+        from datetime import datetime as _dt
+
+        domain = CustomDomain.objects.filter(
+            guid=str(input.id),
+            deleted_at__isnull=True,
+        ).first()
+        if domain is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "domain not found",
+            )
+        pem = (input.certificate_pem or "").strip()
+        key = (input.private_key_pem or "").strip()
+        if "-----BEGIN CERTIFICATE-----" not in pem:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "certificate_pem must contain at least one PEM CERTIFICATE block",
+                field="certificatePem",
+            )
+        if "PRIVATE KEY" not in key:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "private_key_pem must be a PEM-encoded private key",
+                field="privateKeyPem",
+            )
+        # Stash the PEM bundle (chain + key concatenated) onto the
+        # row. The renderer reads ``byo_certificate_pem`` and emits a
+        # platform-issued Secret/SecretSet to the runtime cluster.
+        domain.byo_certificate_pem = pem + "\n" + key
+        domain.byo_certificate_uploaded_at = _dt.now(tz=UTC)
+        domain.certificate_state = CustomDomain.CertificateState.BYO
+        domain.last_certificate_error = ""
+        # Clear any auto-issued cert id — the BYO cert supersedes it.
+        domain.certificate_id = ""
+        domain.save(
+            update_fields=[
+                "byo_certificate_pem",
+                "byo_certificate_uploaded_at",
+                "certificate_state",
+                "last_certificate_error",
+                "certificate_id",
+                "updated_at",
+                "version",
+            ],
+        )
+        return gql_success(app_domain_to_type(domain))
+
     # ---- Deploy tokens (#281) ------------------------------------
 
     @strawberry.field
@@ -1462,4 +1672,233 @@ class LifecycleMutation:
                 id=input.id,
                 revoked=True,
             )
+        )
+
+    # ---- Standalone capability deprovision (#368) ---------------
+
+    @strawberry.field
+    @mutation_audit(action="app.dns_record.delete")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def delete_app_dns_record(
+        self,
+        info: Info,
+        input: DeleteAppDnsRecordInput,
+    ) -> MutationResultType[_CapabilityDeprovisionPayload]:
+        """Drop one DNS record on the app's bound cluster's
+        ``DnsDriver`` (#368).
+
+        Useful for cleaning up a stale CNAME the renderer once
+        emitted but the operator has decommissioned, without dropping
+        the whole app's DNS scaffolding. The activity splits the
+        FQDN into ``(name, parent zone)`` itself and dispatches.
+        """
+        from astrolift_workflows.activities.capability_deprovision import (
+            CapabilityDeprovisionError,
+            _deprovision_dns_record_sync,
+        )
+
+        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        host = (input.hostname or "").strip()
+        if not host:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "hostname is required",
+                field="hostname",
+            )
+        try:
+            summary = _deprovision_dns_record_sync(
+                registered_app_id=app.pk,
+                hostname=host,
+                record_type=input.record_type or "CNAME",
+            )
+        except CapabilityDeprovisionError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        return gql_success(
+            _CapabilityDeprovisionPayload(
+                app_id=input.app_id,
+                cluster_slug=str(summary["cluster_slug"]),
+                detail=(f"deleted {summary['type']} record {summary['name']!r} in zone {summary['zone']!r}"),
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.certificate.revoke")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def revoke_app_certificate(
+        self,
+        info: Info,
+        input: RevokeAppCertificateInput,
+    ) -> MutationResultType[_CapabilityDeprovisionPayload]:
+        """Revoke the auto-issued cert for a ``CustomDomain`` and
+        reset cert state so the renderer stops emitting the Ingress
+        (#368).
+
+        The ``CustomDomain`` row is preserved — operators may want to
+        re-issue or BYO without re-adding the hostname. Clears
+        ``certificate_id``, ``byo_certificate_pem``, and flips state
+        to NOT_REQUESTED.
+        """
+        from astrolift_workflows.activities.capability_deprovision import (
+            CapabilityDeprovisionError,
+            _deprovision_certificate_sync,
+        )
+
+        domain = CustomDomain.objects.filter(
+            guid=str(input.custom_domain_id),
+            deleted_at__isnull=True,
+        ).first()
+        if domain is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "custom domain not found")
+        try:
+            summary = _deprovision_certificate_sync(custom_domain_id=domain.pk)
+        except CapabilityDeprovisionError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        cert_id = summary["certificate_id"]
+        revoked = summary["revoked"]
+        if cert_id and revoked:
+            detail = f"revoked certificate {cert_id!r}; cert state reset to not_requested"
+        elif cert_id:
+            detail = f"could not revoke certificate {cert_id!r}; cert state reset to not_requested"
+        else:
+            detail = "no auto-issued certificate to revoke; cert state reset to not_requested"
+        return gql_success(
+            _CapabilityDeprovisionPayload(
+                app_id=GUID(str(domain.registered_app.guid)),
+                cluster_slug=str(summary["cluster_slug"]),
+                detail=detail,
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.identity_role.delete")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def delete_app_identity_role(
+        self,
+        info: Info,
+        input: DeleteAppIdentityRoleInput,
+    ) -> MutationResultType[_CapabilityDeprovisionPayload]:
+        """Delete the cloud IAM/identity role bound to the app's
+        ServiceAccount via the cluster's WorkloadIdentityDriver
+        (#368).
+
+        Subsequent deploys re-provision the role through the
+        canonical onboarding path — pulling the role doesn't break
+        the app permanently."""
+        from astrolift_workflows.activities.capability_deprovision import (
+            CapabilityDeprovisionError,
+            _deprovision_identity_role_sync,
+        )
+
+        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        try:
+            summary = _deprovision_identity_role_sync(registered_app_id=app.pk)
+        except CapabilityDeprovisionError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        return gql_success(
+            _CapabilityDeprovisionPayload(
+                app_id=input.app_id,
+                cluster_slug=str(summary["cluster_slug"]),
+                detail=f"deleted identity role {summary['role']!r}",
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.registry_repo.archive")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def archive_app_registry_repo(
+        self,
+        info: Info,
+        input: ArchiveAppRegistryRepoInput,
+    ) -> MutationResultType[_CapabilityDeprovisionPayload]:
+        """Archive the app's image repo on the registry + clear the
+        platform's stored URI (#368).
+
+        Default ``archive=True`` matches the registry SDK contract
+        (ECR archives images instead of hard-deleting). Clearing the
+        URI lets ``provision_registry_repo`` re-create a fresh repo
+        on the next provision pass.
+        """
+        from astrolift_workflows.activities.capability_deprovision import (
+            CapabilityDeprovisionError,
+            _deprovision_registry_repo_sync,
+        )
+
+        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        try:
+            summary = _deprovision_registry_repo_sync(
+                registered_app_id=app.pk,
+                archive=bool(input.archive),
+            )
+        except CapabilityDeprovisionError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        verb = "archived" if summary["archived"] else "deleted"
+        return gql_success(
+            _CapabilityDeprovisionPayload(
+                app_id=input.app_id,
+                cluster_slug=str(summary["cluster_slug"]),
+                detail=f"{verb} registry repo {summary['repo']!r}; registry_repo_uri cleared",
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.ingress.delete")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def delete_app_ingress(
+        self,
+        info: Info,
+        input: DeleteAppIngressInput,
+    ) -> MutationResultType[_CapabilityDeprovisionPayload]:
+        """Delete one or every Ingress on the app's namespace (#368).
+
+        ``hostname`` given → soft-delete the matching CustomDomain;
+        the renderer drops its Ingress on the next deploy.
+        ``hostname`` None → call ``IngressDriver.delete_ingress`` for
+        every CustomDomain on the app's bound cluster, soft-deleting
+        each row as it goes. Coordinate with #378 (pause/resume) —
+        operators typically pause first, drop the ingress, then
+        decide whether to resume on a different host.
+        """
+        from astrolift_workflows.activities.capability_deprovision import (
+            CapabilityDeprovisionError,
+            _deprovision_ingress_sync,
+        )
+
+        app = RegisteredApp.objects.filter(guid=str(input.app_id), deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        host = (input.hostname or "").strip() or None
+        try:
+            summary = _deprovision_ingress_sync(
+                registered_app_id=app.pk,
+                hostname=host,
+            )
+        except CapabilityDeprovisionError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        deleted = summary["deleted_hostnames"]
+        if host:
+            detail = f"soft-deleted custom domain {host!r}; ingress drops on next deploy"
+        else:
+            detail = (
+                f"deleted {len(deleted)} ingress(es) on namespace "
+                f"{summary['namespace']!r}: {', '.join(deleted)}"
+                if deleted
+                else f"no active ingresses on namespace {summary['namespace']!r}"
+            )
+        return gql_success(
+            _CapabilityDeprovisionPayload(
+                app_id=input.app_id,
+                cluster_slug=str(summary["cluster_slug"]),
+                detail=detail,
+            ),
         )

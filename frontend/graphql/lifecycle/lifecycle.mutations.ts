@@ -14,6 +14,9 @@ const APP_DOMAIN_FIELDS = `
   expectedCnameTarget
   isPlatformManagedZone
   lastValidationError
+  certificateState
+  lastCertificateError
+  byoCertificateUploadedAt
   requiredDnsRecords {
     kind
     name
@@ -39,8 +42,14 @@ export const REMOVE_APP_DOMAIN = gql`
   mutation RemoveAppDomain($input: RemoveAppDomainInput!) {
     removeAppDomain(input: $input) {
       ok
-      errors { code message }
-      data { id deleted }
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
     }
   }
 `;
@@ -50,6 +59,18 @@ export const RECHECK_DOMAIN_VALIDATION = gql`
     recheckDomainValidation(input: $input) {
       ok
       errors { code message }
+      data { ${APP_DOMAIN_FIELDS} }
+    }
+  }
+`;
+
+export const UPLOAD_CUSTOM_DOMAIN_CERTIFICATE = gql`
+  mutation UploadCustomDomainCertificate(
+    $input: UploadCustomDomainCertificateInput!
+  ) {
+    uploadCustomDomainCertificate(input: $input) {
+      ok
+      errors { code message field }
       data { ${APP_DOMAIN_FIELDS} }
     }
   }
@@ -98,8 +119,14 @@ export const REVOKE_DEPLOY_TOKEN = gql`
   mutation RevokeDeployToken($input: RevokeDeployTokenInput!) {
     revokeDeployToken(input: $input) {
       ok
-      errors { code message }
-      data { id revoked }
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        revoked
+      }
     }
   }
 `;
@@ -220,6 +247,7 @@ const ENVIRONMENT_FIELDS = `
   name
   url
   deploysPaused
+  ingressPaused
   requiredApprovals
   registeredAppSlug
   clusterSlug
@@ -245,6 +273,36 @@ export const PAUSE_ENVIRONMENT = gql`
 export const RESUME_ENVIRONMENT = gql`
   mutation ResumeEnvironment($input: EnvironmentByIdInput!) {
     resumeEnvironment(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${ENVIRONMENT_FIELDS}
+      }
+    }
+  }
+`;
+
+export const PAUSE_APP_INGRESS = gql`
+  mutation PauseAppIngress($input: EnvironmentByIdInput!) {
+    pauseAppIngress(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${ENVIRONMENT_FIELDS}
+      }
+    }
+  }
+`;
+
+export const RESUME_APP_INGRESS = gql`
+  mutation ResumeAppIngress($input: EnvironmentByIdInput!) {
+    resumeAppIngress(input: $input) {
       ok
       errors {
         code
