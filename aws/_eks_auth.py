@@ -28,13 +28,14 @@ if TYPE_CHECKING:
     import boto3
 
 
-_PRESIGN_EXPIRES_SECONDS = 60
-"""How long the presigned URL is valid before EKS rejects the auth.
+_PRESIGN_EXPIRES_SECONDS = 900
+"""Default presigned-URL lifetime when the caller doesn't pin one.
 
-EKS's authenticator allows up to 15 minutes; 60s is short enough to keep
-old leaked tokens useless and long enough to absorb clock drift between
-the worker host and the IAM/STS service. The driver re-mints per
-operation so this isn't a refresh interval."""
+EKS's IAM authenticator caps at 15 minutes (900s); the k8s client
+doesn't auto-retry on 401, so we ask for the EKS ceiling rather than
+churning short-lived tokens mid-operation. Callers (notably the EKS
+driver) override via ``EKSConfig.sts_token_lifetime_seconds`` — see
+#359."""
 
 
 def mint_eks_token(
@@ -42,6 +43,7 @@ def mint_eks_token(
     region: str,
     *,
     session: boto3.Session | None = None,
+    expires_in_seconds: int = _PRESIGN_EXPIRES_SECONDS,
 ) -> str:
     """Return a ``k8s-aws-v1.<...>`` bearer token for ``cluster_name``.
 
@@ -49,6 +51,9 @@ def mint_eks_token(
     is provided — supports both static IAM credentials and ECS task
     role credentials transparently because botocore picks them up from
     the standard credential chain.
+
+    ``expires_in_seconds`` controls the signed STS presigned-URL
+    window; EKS's IAM authenticator caps it at 900 (15 minutes).
 
     Raises ``botocore.exceptions.NoCredentialsError`` when no creds are
     available; the activity surface translates that to a clear
@@ -80,7 +85,7 @@ def mint_eks_token(
     signed_url = signer.generate_presigned_url(
         params,
         region_name=region,
-        expires_in=_PRESIGN_EXPIRES_SECONDS,
+        expires_in=expires_in_seconds,
         operation_name="",
     )
     # base64url-encode the URL and strip trailing '=' padding (the

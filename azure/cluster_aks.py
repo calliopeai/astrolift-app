@@ -554,7 +554,7 @@ class AKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return pod_phase_summary_from_client(
             client, namespaces=default_namespaces(namespaces),
@@ -572,13 +572,32 @@ class AKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return events_from_client(
             client,
             namespaces=default_namespaces(namespaces),
             event_type=event_type,
             limit=limit,
+        )
+
+    def list_workload_health(
+        self,
+        cluster: ClusterContext,
+        *,
+        namespaces: list[str] | None = None,
+    ):
+        from _sdk._kube_health import (
+            default_namespaces,
+            workload_health_from_client,
+        )
+
+        try:
+            client = self._k8s(cluster.slug)
+        except Exception:
+            return []
+        return workload_health_from_client(
+            client, namespaces=default_namespaces(namespaces),
         )
 
     def _k8s(self, cluster: str) -> Any:
