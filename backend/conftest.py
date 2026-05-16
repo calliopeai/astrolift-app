@@ -46,11 +46,6 @@ django.setup()
 
 import pytest  # noqa: E402  (must follow the env-pop + django.setup above)
 
-from core.permissions import register_permission_resolver  # noqa: E402
-from core.request_context import generate_ulid, set_request_id  # noqa: E402
-from core.tenancy import TenantContext  # noqa: E402
-from core.tenancy import tenant_context as _tenant_ctx  # noqa: E402
-
 # ---------------------------------------------------------------------------
 # TRUNCATE CASCADE for transaction=True tests.
 #
@@ -72,20 +67,21 @@ from django.db.backends.postgresql.operations import (  # noqa: E402
     DatabaseOperations as PostgresDatabaseOperations,
 )
 
+from core.permissions import register_permission_resolver  # noqa: E402
+from core.request_context import generate_ulid, set_request_id  # noqa: E402
+from core.tenancy import TenantContext  # noqa: E402
+from core.tenancy import tenant_context as _tenant_ctx  # noqa: E402
+
 _original_sql_flush_base = BaseDatabaseOperations.sql_flush
 _original_sql_flush_pg = PostgresDatabaseOperations.sql_flush
 
 
 def _sql_flush_with_cascade_base(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-    return _original_sql_flush_base(
-        self, style, tables, reset_sequences=reset_sequences, allow_cascade=True
-    )
+    return _original_sql_flush_base(self, style, tables, reset_sequences=reset_sequences, allow_cascade=True)
 
 
 def _sql_flush_with_cascade_pg(self, style, tables, *, reset_sequences=False, allow_cascade=False):
-    return _original_sql_flush_pg(
-        self, style, tables, reset_sequences=reset_sequences, allow_cascade=True
-    )
+    return _original_sql_flush_pg(self, style, tables, reset_sequences=reset_sequences, allow_cascade=True)
 
 
 BaseDatabaseOperations.sql_flush = _sql_flush_with_cascade_base

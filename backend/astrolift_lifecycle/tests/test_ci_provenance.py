@@ -64,9 +64,7 @@ def test_start_deployment_persists_ci_metadata(
     assert d.ci_provider == "github_actions"
 
 
-def test_manual_deployment_leaves_ci_metadata_empty(
-    org, app, env, fake_info, permission_resolver, settings
-):
+def test_manual_deployment_leaves_ci_metadata_empty(org, app, env, fake_info, permission_resolver, settings):
     """The fields are optional. A UI deploy that doesn't set them
     persists empty strings — DEFINITELY not nulls or 'N/A' — so
     queries don't have to coalesce."""
