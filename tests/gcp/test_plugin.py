@@ -24,6 +24,15 @@ def test_managed_services_have_object_store_and_queue() -> None:
     assert ("queue", "pubsub") in keys
 
 
+def test_managed_services_have_full_gcp_coverage() -> None:
+    """#363 + #370: GCP slice ships postgres + mysql + redis on
+    top of object_store + queue."""
+    keys = set(PLUGIN.managed_service_drivers.keys())
+    assert ("postgres", "cloudsql") in keys
+    assert ("mysql", "cloudsql") in keys
+    assert ("redis", "memorystore") in keys
+
+
 def test_config_schema_requires_core_fields() -> None:
     required = PLUGIN.config_schema.get("required", [])
     assert "project_id" in required
