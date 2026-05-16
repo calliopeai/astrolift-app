@@ -52,6 +52,7 @@ from azure.managed.queue_servicebus import (
     ServiceBusDriver,
 )
 from azure.managed.search_aisearch import AzureAISearchFullTextDriver
+from azure.managed.vector_search import AzureAISearchVectorDriver
 from azure.registry_acr import ACRDriver
 from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
@@ -78,6 +79,7 @@ PLUGIN = ProviderPlugin(
         ("queue", "azure_servicebus"): AzureServiceBusDriver,
         ("kv_store", "cosmos"): AzureCosmosDriver,
         ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
+        ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
     },
     config_schema={
         "type": "object",
