@@ -62,6 +62,12 @@ websockets = "*"
 # Used by the manifest auto-discoverer (#119) to serialise the
 # inferred manifest dict into a TOML string for the UI / SCM PR.
 tomli-w = "*"
+# libsodium sealed-box for the GitHub Actions secrets push (#383).
+# GitHub's secret-write API requires Curve25519 sealed-box encryption
+# of each secret value under the repo's public key. pynacl wraps
+# libsodium so we don't shell out to ``openssl`` or carry our own
+# crypto.
+pynacl = "*"
 # The kubernetes python client used to live here for the runtime
 # observability surface (astroliftAppPods + onAppLog). After #299
 # it moved to astrolift-providers[k8s] / [aws] / [gcp] / [azure]

@@ -23,6 +23,11 @@ RUN pipenv requirements --dev > requirements.txt && pip install -r requirements.
 # WhiteNoiseMiddleware import work even before the lock catches up.
 RUN pip install --no-cache-dir whitenoise
 
+# pynacl: same story — declared in Pipfile (#383) for the libsodium
+# sealed-box used by the GitHub CI-secrets push, but the lock isn't
+# regenerated here, so install it explicitly.
+RUN pip install --no-cache-dir pynacl
+
 COPY . .
 
 # Provider plugins (astrolift-providers, vendored under backend/vendor) ship

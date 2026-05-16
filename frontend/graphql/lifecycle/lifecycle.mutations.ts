@@ -386,3 +386,86 @@ export const SCALE_WORKLOAD = gql`
     }
   }
 `;
+
+// --- Install source-host push webhook (#385) -----------------------
+//
+// Registers (or refreshes) the push-event webhook on the app's
+// configured source repo pointing at the platform's receiver URL.
+// Status comes back as either ``created`` (a brand-new hook landed)
+// or ``refreshed`` (same URL was already registered, or the App's
+// own webhook covers this repo; the shared HMAC secret rotates and
+// ``installedAt`` advances either way).
+
+export const INSTALL_SOURCE_WEBHOOK = gql`
+  mutation InstallAstroliftSourceWebhook($input: InstallSourceWebhookInput!) {
+    installAstroliftSourceWebhook(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        status
+        hookId
+        receiverUrl
+      }
+    }
+  }
+`;
+
+// --- Push astrolift-ci.yml to the source repo (#384) --------------
+//
+// Renders the canonical CI workflow against the app's persisted state
+// (slug, deploy branch, ECR URI, push-role ARN, platform API URL) and
+// commits it to ``.github/workflows/astrolift-ci.yml`` on the deploy
+// branch. Idempotent when the file already matches the rendered
+// template; falls back to a side-branch + PR when the deploy branch
+// is protected. Paired with ``triggerAstroliftDeployWorkflow`` (#387)
+// so the operator can go file-missing → first-deploy in two clicks.
+
+export const PUSH_CI_WORKFLOW_TO_REPO = gql`
+  mutation PushAstroliftCiWorkflowToRepo($input: PushCiWorkflowToRepoInput!) {
+    pushAstroliftCiWorkflowToRepo(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        status
+        commitSha
+        prUrl
+      }
+    }
+  }
+`;
+
+// --- Push CI secrets to repo (#383) --------------------------------
+//
+// Seals the five `ASTROLIFT_*` GitHub Actions secret values with the
+// repo's public key and PUTs them via the viewer's personal GitHub
+// OAuth connection. The deploy token is rotated as part of the round-
+// trip — the previous token stays valid through the model's grace
+// window so in-flight CI doesn't snap. Response carries the canonical
+// secret name list and the new token's last-4 (the only piece of the
+// new plaintext that ever crosses back to the browser).
+
+export const PUSH_CI_SECRETS_TO_REPO = gql`
+  mutation PushAstroliftCiSecretsToRepo($input: PushCiSecretsToRepoInput!) {
+    pushAstroliftCiSecretsToRepo(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        secretNames
+        rotatedTokenLast4
+        repo
+      }
+    }
+  }
+`;

@@ -613,6 +613,18 @@ type AstroliftIdentityProviderMutationResult {
   data: AstroliftIdentityProvider
 }
 
+type AstroliftInstallSourceWebhookPayload {
+  status: String!
+  hookId: String!
+  receiverUrl: String!
+}
+
+type AstroliftInstallSourceWebhookPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftInstallSourceWebhookPayload
+}
+
 type AstroliftInvitation {
   id: GUID!
   email: String!
@@ -862,6 +874,30 @@ type AstroliftProviderPlugin {
   isEnabled: Boolean!
 }
 
+type AstroliftPushCiSecretsPayload {
+  secretNames: [String!]!
+  rotatedTokenLast4: String!
+  repo: String!
+}
+
+type AstroliftPushCiSecretsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftPushCiSecretsPayload
+}
+
+type AstroliftPushCiWorkflowPayload {
+  status: String!
+  commitSha: String
+  prUrl: String
+}
+
+type AstroliftPushCiWorkflowPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftPushCiWorkflowPayload
+}
+
 type AstroliftQuota {
   id: GUID!
   scopeKind: String!
@@ -915,6 +951,7 @@ type AstroliftRegisteredApp {
   updatedAt: DateTime!
   deletedAt: DateTime
   lastResyncAt: DateTime
+  sourceWebhookInstalledAt: DateTime
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1676,6 +1713,10 @@ input InstallScmWebhookInput {
   secret: String = null
 }
 
+input InstallSourceWebhookInput {
+  appSlug: String!
+}
+
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
@@ -1986,6 +2027,9 @@ type Mutation {
   triggerAstroliftDeployWorkflow(input: TriggerDeployWorkflowInput!): AstroliftTriggerDeployWorkflowPayloadMutationResult!
   restartAstroliftWorkload(input: RestartWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
   scaleAstroliftWorkload(input: ScaleWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
+  installAstroliftSourceWebhook(input: InstallSourceWebhookInput!): AstroliftInstallSourceWebhookPayloadMutationResult!
+  pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
+  pushAstroliftCiWorkflowToRepo(input: PushCiWorkflowToRepoInput!): AstroliftPushCiWorkflowPayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -2181,12 +2225,20 @@ input ProvisionManagedServiceInput {
   config: JSON = null
 }
 
+input PushCiSecretsToRepoInput {
+  appSlug: String!
+}
+
 input PushCiWorkflowInput {
   appId: GUID!
   connectionId: GUID!
   branch: String = null
   commitMessage: String = null
   filePath: String = null
+}
+
+input PushCiWorkflowToRepoInput {
+  appSlug: String!
 }
 
 input PushManifestToRepoInput {

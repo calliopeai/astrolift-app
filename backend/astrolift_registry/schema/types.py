@@ -76,6 +76,12 @@ class RegisteredAppType:
     # time; surfaces on the Settings page as relative time.
     last_resync_at: dt.datetime | None
 
+    # Source-host webhook state (#385). ``installed_at`` is null
+    # until the operator clicks "Install webhook" on the Settings
+    # page; FE renders it as a green "installed · 5m ago" chip vs
+    # an amber "not installed" chip.
+    source_webhook_installed_at: dt.datetime | None
+
 
 @strawberry.type(name="AstroliftAppTeamAccess")
 class AppTeamAccessType:
@@ -215,6 +221,7 @@ def app_to_type(app) -> RegisteredAppType:
         updated_at=app.updated_at,
         deleted_at=app.deleted_at,
         last_resync_at=app.last_resync_at,
+        source_webhook_installed_at=app.source_webhook_installed_at,
     )
 
 
