@@ -291,6 +291,34 @@ class _CapabilityDeprovisionPayload:
     detail: str
 
 
+@strawberry.input
+class TriggerDeployWorkflowInput:
+    """Input for the rebuild-and-deploy workflow-dispatch mutation (#387).
+
+    ``app_slug`` resolves the RegisteredApp; ``branch`` defaults to
+    the app's ``deploy_branch`` (with a ``main`` fallback) when
+    None/empty. We accept a slug rather than a guid here for parity
+    with ``start_deployment`` — operators tend to script against
+    slugs."""
+
+    app_slug: str
+    branch: str | None = None
+
+
+@strawberry.type(name="AstroliftTriggerDeployWorkflowPayload")
+class TriggerDeployWorkflowPayload:
+    """What the FE renders on a successful workflow dispatch (#387).
+
+    ``run_url`` is the host's runs-page URL for the workflow file —
+    GitHub's dispatch endpoint doesn't return a run id, so we link
+    to the runs page and the operator watches the new run materialize
+    at the top. ``dispatched_branch`` is the branch the dispatch
+    actually targeted, after defaulting/normalizing the input."""
+
+    run_url: str
+    dispatched_branch: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -1902,3 +1930,226 @@ class LifecycleMutation:
                 detail=detail,
             ),
         )
+
+    @strawberry.field
+    @mutation_audit(action="app.ci.dispatch")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def trigger_astrolift_deploy_workflow(
+        self,
+        info: Info,
+        input: TriggerDeployWorkflowInput,
+    ) -> MutationResultType[TriggerDeployWorkflowPayload]:
+        """Rebuild + deploy by firing the source host's workflow-
+        dispatch API for the app's CI workflow (#387).
+
+        Does NOT bypass the env's approval policy: if the app gates
+        deploys on human approval (``requires_approval=True``) OR any
+        env on the app carries ``required_approvals > 0``, the
+        mutation refuses with PRECONDITION so the operator falls back
+        to the regular ``startDeployment`` + approver flow rather
+        than sneaking a build through CI dispatch.
+        """
+        from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_scm.services.workflows import (
+            WorkflowDispatchError,
+            dispatch_astrolift_ci_workflow,
+        )
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        # Approval-gate. Either app-level (requires_approval=True) or
+        # env-level (any active env with required_approvals > 0) is
+        # enough to bounce this path. The operator gets a clear hint
+        # to take the regular deploy path with approvers.
+        gates_on_approval = bool(app.requires_approval)
+        if not gates_on_approval:
+            gates_on_approval = AppEnvironment.objects.filter(
+                registered_app=app,
+                required_approvals__gt=0,
+                deleted_at__isnull=True,
+            ).exists()
+        if gates_on_approval:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                ("deploy workflow requires approval — " "use startDeployment with approver flow"),
+            )
+
+        branch_input = (input.branch or "").strip() or None
+        try:
+            result = dispatch_astrolift_ci_workflow(app, branch=branch_input)
+        except NotImplementedError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        except WorkflowDispatchError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, exc.message)
+
+        if not result.ok:
+            # WORKFLOW_FILE_MISSING gets surfaced as PRECONDITION so
+            # the FE can pivot to the #384 "Sync CI workflow" flow.
+            # Other host failures (auth, network, generic API) ride
+            # the same envelope; the message carries enough for the
+            # toast to be useful.
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error_message or "workflow dispatch failed",
+            )
+
+        dispatched_branch = (branch_input or app.deploy_branch or "main").strip() or "main"
+        return gql_success(
+            TriggerDeployWorkflowPayload(
+                run_url=result.run_url,
+                dispatched_branch=dispatched_branch,
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # Live workload ops (#388): rolling restart + scale replicas
+    # ----------------------------------------------------------------
+    #
+    # First-line incident-response actions. The mutation resolves the
+    # Workload row by GUID, dispatches through
+    # ``astrolift_lifecycle.services.k8s_ops`` (which speaks to the
+    # bound cluster's ClusterDriver), and returns the read-back
+    # revision / replica counts. ``app.deploy`` is the gate — these
+    # change live runtime state, so we don't expand the permission
+    # surface beyond what manual deploys already need.
+
+    @strawberry.field
+    @mutation_audit(action="app.workload.restart")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def restart_astrolift_workload(
+        self,
+        info: Info,
+        input: RestartWorkloadInput,
+    ) -> MutationResultType[_WorkloadOpPayload]:
+        """Trigger a rolling restart on the workload's Deployment.
+
+        Equivalent to ``kubectl rollout restart deployment/<name>``:
+        annotates the pod template with a fresh
+        ``kubectl.kubernetes.io/restartedAt`` so the Deployment
+        controller rolls a new ReplicaSet. No image change, no
+        manifest re-render — fastest way to bounce wedged pods or
+        propagate a sidecar update.
+        """
+        from astrolift_lifecycle.services.k8s_ops import (
+            K8sOpError,
+            rollout_restart_workload,
+        )
+        from astrolift_registry.models import Workload
+
+        workload = (
+            Workload.objects.filter(
+                guid=str(input.workload_id),
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if workload is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "workload not found")
+        try:
+            result = rollout_restart_workload(workload)
+        except K8sOpError as exc:
+            return gql_failure(exc.code, exc.message)
+        return gql_success(
+            _WorkloadOpPayload(
+                workload_id=input.workload_id,
+                new_revision=result.new_revision,
+                desired_replicas=None,
+                ready_replicas=None,
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.workload.scale")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def scale_astrolift_workload(
+        self,
+        info: Info,
+        input: ScaleWorkloadInput,
+    ) -> MutationResultType[_WorkloadOpPayload]:
+        """Patch the workload's Deployment ``spec.replicas``.
+
+        Bounds are clamped server-side: ``0 <= replicas <= min(20,
+        env.max_replicas)``. Out-of-range scales return
+        ``VALIDATION`` with the bounds in the message — the UI surfaces
+        the message verbatim so the operator knows the upper they're
+        hitting.
+        """
+        from astrolift_lifecycle.services.k8s_ops import (
+            K8sOpError,
+            scale_workload,
+        )
+        from astrolift_registry.models import Workload
+
+        workload = (
+            Workload.objects.filter(
+                guid=str(input.workload_id),
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if workload is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "workload not found")
+        try:
+            result = scale_workload(workload, int(input.replicas))
+        except K8sOpError as exc:
+            return gql_failure(exc.code, exc.message)
+        return gql_success(
+            _WorkloadOpPayload(
+                workload_id=input.workload_id,
+                new_revision=None,
+                desired_replicas=result.current_replicas,
+                ready_replicas=result.ready_replicas,
+            ),
+        )
+
+
+# ---------------------------------------------------------------------------
+# #388 input / payload types — defined at module scope so Strawberry
+# picks them up alongside the resolver decorators above. Kept at the
+# tail of the file so sibling agents appending input/output types
+# don't conflict.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class RestartWorkloadInput:
+    workload_id: GUID
+
+
+@strawberry.input
+class ScaleWorkloadInput:
+    workload_id: GUID
+    replicas: int
+
+
+@strawberry.type(name="AstroliftWorkloadOpPayload")
+class _WorkloadOpPayload:
+    """Read-back payload for live workload ops.
+
+    ``new_revision`` is the post-restart ``observedGeneration`` (may
+    be None when the driver doesn't surface status). ``desired_replicas``
+    + ``ready_replicas`` are the post-scale ``spec.replicas`` /
+    ``status.readyReplicas`` read-back. Fields irrelevant to the
+    specific op are left None — the UI uses the mutation it called
+    to decide which fields to render.
+    """
+
+    workload_id: GUID
+    new_revision: int | None
+    desired_replicas: int | None
+    ready_replicas: int | None

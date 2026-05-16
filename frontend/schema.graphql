@@ -891,6 +891,8 @@ type AstroliftRegisteredApp {
   lastSyncedHash: String!
   manifestSyncState: String!
   registryRepoUri: String!
+  ecrRepoUri: String!
+  ecrPushRoleArn: String!
   k8sNamespace: String!
   subdomain: String!
   isActive: Boolean!
@@ -1183,6 +1185,17 @@ type AstroliftTimeSeriesPoint {
   value: Float!
 }
 
+type AstroliftTriggerDeployWorkflowPayload {
+  runUrl: String!
+  dispatchedBranch: String!
+}
+
+type AstroliftTriggerDeployWorkflowPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftTriggerDeployWorkflowPayload
+}
+
 type AstroliftUser {
   id: String!
   username: String!
@@ -1256,6 +1269,19 @@ type AstroliftWorkload {
   storageClass: String!
   storageSize: String!
   registeredAppSlug: String!
+}
+
+type AstroliftWorkloadOpPayload {
+  workloadId: GUID!
+  newRevision: Int
+  desiredReplicas: Int
+  readyReplicas: Int
+}
+
+type AstroliftWorkloadOpPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftWorkloadOpPayload
 }
 
 input AttachSecretBundleInput {
@@ -1957,6 +1983,9 @@ type Mutation {
   deleteAppIdentityRole(input: DeleteAppIdentityRoleInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   archiveAppRegistryRepo(input: ArchiveAppRegistryRepoInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   deleteAppIngress(input: DeleteAppIngressInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
+  triggerAstroliftDeployWorkflow(input: TriggerDeployWorkflowInput!): AstroliftTriggerDeployWorkflowPayloadMutationResult!
+  restartAstroliftWorkload(input: RestartWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
+  scaleAstroliftWorkload(input: ScaleWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -2211,6 +2240,7 @@ type Query {
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
+  astroliftPlatformApiUrl: String!
   astroliftApps: [AstroliftRegisteredApp!]!
   astroliftMyApps: [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
@@ -2327,6 +2357,10 @@ input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
 }
 
+input RestartWorkloadInput {
+  workloadId: GUID!
+}
+
 input ResyncManifestFromRepoInput {
   appSlug: String!
 }
@@ -2384,6 +2418,11 @@ input RotateSecretBundleInput {
 
 input RotateWebhookSecretInput {
   connectionId: GUID!
+}
+
+input ScaleWorkloadInput {
+  workloadId: GUID!
+  replicas: Int!
 }
 
 input SetActiveIdentityProviderInput {
@@ -2495,6 +2534,11 @@ type TransitionLogEntry {
   note: String!
   timestamp: DateTime!
   username: String
+}
+
+input TriggerDeployWorkflowInput {
+  appSlug: String!
+  branch: String = null
 }
 
 scalar UUID
