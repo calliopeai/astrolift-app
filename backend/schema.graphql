@@ -49,10 +49,16 @@ input ApproveByTokenInput {
   token: String!
 }
 
+input ApproveSecretChangeInput {
+  proposalId: GUID!
+  reason: String = null
+}
+
 type Appsecretwritepayload {
   appSlug: String!
   key: String!
   rawManifestStaged: String!
+  pendingProposalId: GUID
 }
 
 type AppsecretwritepayloadMutationResult {
@@ -328,6 +334,14 @@ type AstroliftAppIdentityBinding {
   lastUsedAt: String
 }
 
+enum AstroliftAppListStatusFilter {
+  ALL
+  OK
+  DEGRADED
+  STALE
+  NEVER_DEPLOYED
+}
+
 type AstroliftAppLogLine {
   podName: String!
   container: String!
@@ -415,6 +429,15 @@ type AstroliftAppSettingsLastModified {
   webhooks: DateTime
   members: DateTime
   observability: DateTime
+}
+
+enum AstroliftAppSourceKindFilter {
+  ALL
+  GITHUB
+  GITLAB
+  BITBUCKET
+  GITEA
+  GIT_URL
 }
 
 type AstroliftAppSummary {
@@ -1598,12 +1621,19 @@ type AstroliftRegisteredApp {
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
   settingsLastModified: AstroliftAppSettingsLastModified
+  viewerPermissions: [String!]!
 }
 
 type AstroliftRegisteredAppMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRegisteredApp
+}
+
+type AstroliftRegisteredAppPage {
+  items: [AstroliftRegisteredApp!]!
+  nextCursor: String
+  totalCount: Int!
 }
 
 type AstroliftRemoteRepo {
@@ -1785,6 +1815,41 @@ type AstroliftSecretBundleMutationResult {
   data: AstroliftSecretBundle
 }
 
+type AstroliftSecretChangeApproval {
+  id: GUID!
+  approverUserId: String!
+  approverDisplayName: String!
+  decision: String!
+  decidedAt: DateTime!
+  reason: String!
+}
+
+type AstroliftSecretChangeProposal {
+  id: GUID!
+  registeredAppSlug: String!
+  environmentName: String!
+  op: String!
+  status: String!
+  proposerUserId: String!
+  proposerDisplayName: String!
+  payload: JSON!
+  payloadDiff: JSON!
+  requiredApproverCount: Int!
+  approvalsCount: Int!
+  expiresAt: DateTime!
+  decidedAt: DateTime
+  appliedAt: DateTime
+  applyError: String!
+  createdAt: DateTime!
+  approvals: [AstroliftSecretChangeApproval!]!
+}
+
+type AstroliftSecretChangeProposalMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftSecretChangeProposal
+}
+
 type AstroliftSecretEditor {
   id: String!
   username: String!
@@ -1795,6 +1860,26 @@ type AstroliftSecurityPolicy {
   blockOnCriticalCves: Boolean!
   blockOnMissingSignature: Boolean!
   blockOnHighCveThreshold: Int
+}
+
+"""
+Install identity + capabilities handshake (#479). Returned by ``astroliftServerInfo``. Callable by unauthenticated clients so multi-install mobile / CLI / SDK callers can pick the right UI and gate commands before login.
+"""
+type AstroliftServerInfo {
+  version: String!
+  apiVersion: String!
+  installId: String!
+  installSlug: String!
+  installLabel: String
+  region: String
+
+  """
+  Current server-side wall clock (UTC). Used by clients to detect clock drift.
+  """
+  serverTime: DateTime!
+  capabilities: [String!]!
+  featureFlags: [FeatureFlagInfo!]!
+  authMethods: [String!]!
 }
 
 type AstroliftSourceConnection {
@@ -2139,6 +2224,7 @@ input AttachSecretBundleInput {
 type Attachmentremovedpayload {
   attachmentId: GUID!
   deleted: Boolean!
+  pendingProposalId: GUID
 }
 
 type AttachmentremovedpayloadMutationResult {
@@ -2537,6 +2623,13 @@ input ExportAuditEventsInput {
 input ExtendPreviewTtlInputGql {
   id: GUID!
   days: Int!
+}
+
+"""Runtime feature toggle reported by ``astroliftServerInfo``."""
+type FeatureFlagInfo {
+  key: String!
+  enabled: Boolean!
+  description: String
 }
 
 type FileUploadResult {
@@ -2992,6 +3085,10 @@ type Mutation {
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
+  proposeSecretChange(input: ProposeSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  withdrawSecretChange(input: WithdrawSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
@@ -3173,6 +3270,17 @@ type ProfileType {
   signature: UploadType
 }
 
+input ProposeSecretChangeInput {
+  appSlug: String!
+  op: String!
+  environmentName: String = null
+  key: String = null
+  value: String = null
+  bundleSlug: String = null
+  prefix: String = null
+  attachmentId: GUID = null
+}
+
 type Providerpluginconfigpayload {
   pluginSlug: String!
   organizationScoped: Boolean!
@@ -3230,6 +3338,11 @@ type Query {
 
   """Query mutation audit logs. Admin only."""
   auditLogs(operation: String = null, userId: String = null, limit: Int! = 50): [AuditLogEntry!]!
+
+  """
+  Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in.
+  """
+  astroliftServerInfo: AstroliftServerInfo!
   organization(id: ID!): OrganizationType
   organizations(query: String = null): [OrganizationType!]!
   members: [OrganizationMemberType!]!
@@ -3271,9 +3384,12 @@ type Query {
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftPlatformApiUrl: String!
-  astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
-  astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
+  astroliftApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
+  astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
+  astroliftMyApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
+  astroliftMyAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
   astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
+  astroliftAppPermissions(appSlug: String!): [String!]!
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
@@ -3327,6 +3443,8 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
+  astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
+  astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
@@ -3412,6 +3530,11 @@ input RegisterTenantClusterInput {
 input RejectByTokenInput {
   token: String!
   reason: String = null
+}
+
+input RejectSecretChangeInput {
+  proposalId: GUID!
+  reason: String!
 }
 
 input RemoveAppDomainInput {
@@ -3853,6 +3976,10 @@ type WebhookSecretRevealMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: WebhookSecretReveal
+}
+
+input WithdrawSecretChangeInput {
+  proposalId: GUID!
 }
 
 type WorkflowDefinitionType {

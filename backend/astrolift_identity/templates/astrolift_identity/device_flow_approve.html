@@ -1,0 +1,76 @@
+{% load i18n %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Authorize device — Astrolift</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: #0b1623; color: #f3f6fb; margin: 0; padding: 2rem; }
+    .card { max-width: 28rem; margin: 4rem auto; background: #142235;
+            border-radius: 12px; padding: 2rem; border: 1px solid #1f3550; }
+    h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+    p.lead { color: #c0d1ea; margin: 0 0 1.5rem; }
+    .meta { background: #0f1c2c; padding: 1rem; border-radius: 8px;
+            font-size: 0.875rem; color: #c0d1ea; margin-bottom: 1.5rem; }
+    .meta dt { color: #7e98bd; }
+    .meta dd { margin: 0 0 0.5rem; word-break: break-word; }
+    .actions { display: flex; gap: 0.5rem; }
+    button { flex: 1; padding: 0.75rem 1rem; border: 0; border-radius: 8px;
+             font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+    button.primary { background: #2cb1bc; color: #07182a; }
+    button.secondary { background: transparent; color: #c0d1ea;
+                       border: 1px solid #2c4866; }
+    .error { background: #4a1f24; color: #ffd0d0; padding: 0.75rem 1rem;
+             border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; }
+    select { width: 100%; padding: 0.5rem; margin: 0.25rem 0 1rem;
+             background: #0f1c2c; color: #f3f6fb; border: 1px solid #2c4866;
+             border-radius: 6px; }
+    label { font-size: 0.875rem; color: #7e98bd; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Authorize this device?</h1>
+    <p class="lead">A device is requesting access to your Astrolift account.</p>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <dl class="meta">
+      <dt>{% trans "Client" %}</dt>
+      <dd>{{ session.client_label|default:session.client_kind }}</dd>
+      <dt>{% trans "Kind" %}</dt>
+      <dd>{{ session.client_kind }}</dd>
+      {% if session.user_agent %}
+        <dt>{% trans "User agent" %}</dt>
+        <dd>{{ session.user_agent }}</dd>
+      {% endif %}
+      {% if session.client_ip %}
+        <dt>{% trans "Originating IP" %}</dt>
+        <dd>{{ session.client_ip }}</dd>
+      {% endif %}
+    </dl>
+
+    <form method="post">
+      {% csrf_token %}
+      {% if multi_org_options %}
+        <label for="organization_id">{% trans "Authorize for organization" %}</label>
+        <select name="organization_id" id="organization_id" required>
+          <option value="">— {% trans "Choose…" %} —</option>
+          {% for org in multi_org_options %}
+            <option value="{{ org.id }}">{{ org.name }}</option>
+          {% endfor %}
+        </select>
+      {% endif %}
+      <div class="actions">
+        <button type="submit" name="action" value="approve" class="primary">
+          {% trans "Approve" %}
+        </button>
+        <button type="submit" name="action" value="deny" class="secondary">
+          {% trans "Deny" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

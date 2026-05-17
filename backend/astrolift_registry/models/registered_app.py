@@ -150,6 +150,23 @@ class RegisteredApp(NamedBaseCoreModel):
     )
     minimum_approvals = models.PositiveIntegerField(default=1)
 
+    # Secret-change approval policy (#488). Parallel to the deployment
+    # approval gear above. When ``requires_secret_approval=True``, the
+    # secret-write mutations (``setAppSecret`` / ``deleteAppSecret`` /
+    # ``attachSecretBundle`` / ``detachSecretBundle``) stop applying
+    # directly and instead create a ``SecretChangeProposal`` that needs
+    # ``secret_minimum_approvals`` approvers before the underlying op
+    # fires.  Empty ``secret_approver_users`` with the flag on means
+    # "any user holding the secret-approve permission on the app's
+    # org can approve" — the permission gate covers that case.
+    requires_secret_approval = models.BooleanField(default=False)
+    secret_approver_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="secret_approver_for_apps",
+        blank=True,
+    )
+    secret_minimum_approvals = models.PositiveIntegerField(default=1)
+
     # Latest preview screenshot URL for this app, written by the
     # platform's screenshotter service (spec 09 §4.21). Stays empty
     # until the service captures and uploads its first frame; the UI
@@ -208,6 +225,16 @@ class RegisteredApp(NamedBaseCoreModel):
         indexes = [
             models.Index(fields=["organization", "is_active"], name="app_org_active_idx"),
             models.Index(fields=["project"], name="app_project_idx"),
+            # Apps-list filters (#481). The list query pages by
+            # ``(-created_at, -guid)`` over a row set already narrowed
+            # by team / project / provisioning_status, so these are the
+            # supporting indexes for the filter axes the FE exposes.
+            # All three include the soft-delete predicate columns
+            # (``deleted_at`` for the team/project pair) so the partial
+            # filter inside ``_apply_apps_list_filters`` stays index-only.
+            models.Index(fields=["team", "deleted_at"], name="app_team_deleted_idx"),
+            models.Index(fields=["project", "deleted_at"], name="app_project_deleted_idx"),
+            models.Index(fields=["provisioning_status"], name="app_provisioning_status_idx"),
         ]
 
     _PROVISIONING_TRANSITIONS = {

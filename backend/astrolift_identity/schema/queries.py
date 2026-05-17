@@ -724,59 +724,18 @@ class IdentityQuery:
         Django superusers get every permission slug, mirroring the
         bypass in ``astrolift_identity.permission_resolver.resolve``
         — the bootstrap admin path doesn't need explicit role bindings.
-        """
-        from django.contrib.auth import get_user_model
 
-        from core.permissions import Permission
+        Routes through ``permission_resolver.resolve_effective_permissions``
+        so the read-side and the gate share the same scope-traversal
+        logic (#478) — fix-once-apply-everywhere.
+        """
+        from astrolift_identity.permission_resolver import resolve_effective_permissions
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
-
-        if (
-            get_user_model()
-            .objects.filter(pk=tenant.actor_user_id, is_superuser=True, is_active=True)
-            .exists()
-        ):
-            return sorted(p.value for p in Permission)
-
-        # Walk the user's RoleBindings in the current org and union
-        # the permission slugs each role grants. Mirrors the logic in
-        # astrolift_identity.permission_resolver.resolve(), but returns
-        # the full set instead of checking a single permission.
-        from django.utils import timezone
-
-        now = timezone.now()
-        candidate_scopes: list[tuple[str, int]] = []
-        if tenant.project_id is not None:
-            candidate_scopes.append(("PROJECT", tenant.project_id))
-        if tenant.team_id is not None:
-            candidate_scopes.append(("TEAM", tenant.team_id))
-        if tenant.organization_id is not None:
-            candidate_scopes.append(("ORG", tenant.organization_id))
-        if not candidate_scopes:
-            return []
-
-        scope_kinds = {k for k, _ in candidate_scopes}
-        scope_ids_by_kind: dict[str, set[int]] = {}
-        for k, sid in candidate_scopes:
-            scope_ids_by_kind.setdefault(k, set()).add(sid)
-
-        bindings = RoleBinding.objects.select_related("role").filter(
-            user_id=tenant.actor_user_id, scope_kind__in=scope_kinds
-        )
-        effective: set[str] = set()
-        for binding in bindings:
-            if binding.expires_at is not None and binding.expires_at <= now:
-                continue
-            ids = scope_ids_by_kind.get(binding.scope_kind, set())
-            if binding.scope_id not in ids:
-                continue
-            for slug in binding.role.permissions or ():
-                effective.add(slug)
-
-        return sorted(effective)
+        return sorted(resolve_effective_permissions(tenant))
 
     @strawberry.field
     @tenant_scoped()

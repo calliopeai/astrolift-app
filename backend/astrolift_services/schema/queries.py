@@ -14,6 +14,7 @@ from astrolift_services.models import (
     AppSecretBundleRef,
     ManagedService,
     SecretBundle,
+    SecretChangeProposal,
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
@@ -23,9 +24,11 @@ from astrolift_services.schema.types import (
     ManagedServiceQueueDepthType,
     ManagedServiceType,
     SecretBundleType,
+    SecretChangeProposalType,
     attachment_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
+    secret_change_proposal_to_type,
     secret_editor_from_user,
 )
 from core.decorators import tenant_scoped
@@ -411,3 +414,61 @@ class ServicesQuery:
             in_flight=int(in_flight) if isinstance(in_flight, (int, float)) else 0,
             sampled_at=sampled_at,
         )
+
+    # ---- Secret-change proposals (#488) ------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_secret_change_proposals(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        status: str | None = None,
+    ) -> list[SecretChangeProposalType]:
+        """List secret-change proposals for the calling tenant (#488).
+
+        Filtered by app slug + lifecycle status when provided.  Default
+        view (no filters) returns every proposal across every app the
+        caller can read; the global ``/approvals`` page consumes this
+        to render the mixed queue alongside deployment approvals.
+        """
+        qs = (
+            SecretChangeProposal.objects.select_related(
+                "registered_app",
+                "app_environment",
+                "proposer",
+            )
+            .filter(deleted_at__isnull=True)
+            .order_by("-created_at")
+        )
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        if status:
+            valid = {s.value for s in SecretChangeProposal.Status}
+            if status in valid:
+                qs = qs.filter(status=status)
+        # Hard cap so a runaway tenant can't page-of-everything us.
+        return [secret_change_proposal_to_type(p) for p in qs[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_secret_change_proposal(
+        self,
+        info: Info,
+        id: GUID,
+    ) -> SecretChangeProposalType | None:
+        """Single proposal detail for the proposal-detail page."""
+        proposal = (
+            SecretChangeProposal.objects.select_related(
+                "registered_app",
+                "app_environment",
+                "proposer",
+            )
+            .filter(guid=str(id), deleted_at__isnull=True)
+            .first()
+        )
+        if proposal is None:
+            return None
+        return secret_change_proposal_to_type(proposal)
