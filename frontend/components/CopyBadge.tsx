@@ -72,16 +72,16 @@ export function CopyBadge({
         onClick={handleCopy}
         title={title ?? `Copy ${value}`}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-0.5",
-          "text-sm font-mono hover:bg-muted/60 transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "bg-background inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5",
+          "hover:bg-muted/60 font-mono text-sm transition-colors",
+          "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
         )}
       >
         <span className="truncate">{label ?? value}</span>
         {copied ? (
           <CheckIcon className="size-3 text-emerald-600 dark:text-emerald-400" aria-hidden />
         ) : (
-          <CopyIcon className="size-3 text-muted-foreground" aria-hidden />
+          <CopyIcon className="text-muted-foreground size-3" aria-hidden />
         )}
       </button>
       {openHref && (
@@ -89,7 +89,7 @@ export function CopyBadge({
           asChild
           variant="ghost"
           size="icon"
-          className="size-6 text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground size-6"
         >
           <a
             href={openHref}
