@@ -265,13 +265,9 @@ def _resolve_window(
     if window == CostWindow.H24:
         return _ResolvedWindow(start=today, end=today, label="24h")
     if window == CostWindow.D7:
-        return _ResolvedWindow(
-            start=today - dt.timedelta(days=6), end=today, label="7d"
-        )
+        return _ResolvedWindow(start=today - dt.timedelta(days=6), end=today, label="7d")
     if window == CostWindow.D30:
-        return _ResolvedWindow(
-            start=today - dt.timedelta(days=29), end=today, label="30d"
-        )
+        return _ResolvedWindow(start=today - dt.timedelta(days=29), end=today, label="30d")
     if window == CostWindow.MTD:
         return _ResolvedWindow(start=today.replace(day=1), end=today, label="mtd")
     # Defensive fallback — Strawberry enforces enum membership.
@@ -314,9 +310,7 @@ def _flag_anomalies(
     flags = [False] * len(totals)
     if len(totals) < 4:
         return flags
-    deltas = [
-        totals[i][1] - totals[i - 1][1] for i in range(1, len(totals))
-    ]
+    deltas = [totals[i][1] - totals[i - 1][1] for i in range(1, len(totals))]
     try:
         mean_d = statistics.fmean(deltas)
         sd_d = statistics.pstdev(deltas)
@@ -333,9 +327,7 @@ def _flag_anomalies(
 # ---- forecast -------------------------------------------------------
 
 
-def _linear_regression_slope_intercept(
-    xs: Sequence[float], ys: Sequence[float]
-) -> tuple[float, float]:
+def _linear_regression_slope_intercept(xs: Sequence[float], ys: Sequence[float]) -> tuple[float, float]:
     """Least-squares slope + intercept. Returns (slope, intercept)."""
     n = len(xs)
     if n < 2:
@@ -406,9 +398,7 @@ def _project_month_end(
         mean = statistics.fmean(ys) if ys else 0
         sd = statistics.pstdev(ys) if len(ys) > 1 else 0
         rel_var = (sd / mean) if mean > 0 else math.inf
-        confidence = (
-            ForecastConfidence.HIGH if rel_var < 0.6 else ForecastConfidence.MEDIUM
-        )
+        confidence = ForecastConfidence.HIGH if rel_var < 0.6 else ForecastConfidence.MEDIUM
     return (max(0, projected), confidence)
 
 
@@ -524,9 +514,7 @@ class BillingQuery:
         previous_month_cents = int(prev_qs["total"] or 0)
 
         if previous_month_cents > 0:
-            delta_pct = (
-                (mtd_cents - previous_month_cents) / previous_month_cents * 100.0
-            )
+            delta_pct = (mtd_cents - previous_month_cents) / previous_month_cents * 100.0
         else:
             delta_pct = 0.0
 
@@ -567,9 +555,7 @@ class BillingQuery:
             qs = qs.filter(registered_app__slug=registered_app_slug)
 
         currency = "USD"
-        attributed: dict[
-            tuple[int, str], dict
-        ] = {}  # (binding_id, by) → aggregate row
+        attributed: dict[tuple[int, str], dict] = {}  # (binding_id, by) → aggregate row
         unattributed = 0
         total = 0
         for c in qs:
@@ -602,9 +588,7 @@ class BillingQuery:
             svc = getattr(binding, "managed_service", None) if binding else None
             app = r["app"]
             return CostBindingRowType(
-                managed_service_binding_id=(
-                    str(binding.guid) if binding else None
-                ),
+                managed_service_binding_id=(str(binding.guid) if binding else None),
                 managed_service_id=(str(svc.guid) if svc else None),
                 managed_service_name=(svc.name if svc else None),
                 managed_service_kind=(svc.kind if svc else None),
