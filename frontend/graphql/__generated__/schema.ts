@@ -329,17 +329,22 @@ export type AstroliftAppSecret = {
   isMasked: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
   lastEditedAt?: Maybe<Scalars['DateTime']['output']>;
+  lastEditedBy?: Maybe<AstroliftSecretEditor>;
   managedServiceKind: Scalars['String']['output'];
   source: Scalars['String']['output'];
 };
 
 export type AstroliftAppSecretBundleAttachment = {
+  attachedAt?: Maybe<Scalars['DateTime']['output']>;
   bundleName: Scalars['String']['output'];
   bundleSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  keyCount: Scalars['Int']['output'];
+  mergeOrder: Scalars['Int']['output'];
   prefix: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
+  teamSlug?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftAppSecretBundleAttachmentMutationResult = {
@@ -379,6 +384,8 @@ export type AstroliftAuditEvent = {
   actorDisplay: Scalars['String']['output'];
   actorId: Scalars['String']['output'];
   actorKind: Scalars['String']['output'];
+  after?: Maybe<Scalars['JSON']['output']>;
+  before?: Maybe<Scalars['JSON']['output']>;
   data: Scalars['JSON']['output'];
   decision: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -388,6 +395,33 @@ export type AstroliftAuditEvent = {
   targetId: Scalars['String']['output'];
   targetKind: Scalars['String']['output'];
   targetSlug: Scalars['String']['output'];
+};
+
+export type AstroliftAuditEventPage = {
+  items: Array<AstroliftAuditEvent>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftAuditExport = {
+  byteCount: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  downloadUrl: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  format: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  rowCount: Scalars['Int']['output'];
+  sha256: Scalars['String']['output'];
+};
+
+export type AstroliftAuditExportMutationResult = {
+  data?: Maybe<AstroliftAuditExport>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAuditRetention = {
+  days: Scalars['Int']['output'];
 };
 
 export type AstroliftBudget = {
@@ -998,17 +1032,34 @@ export type AstroliftPolicyMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftPreviewAggregateResources = {
+  cpuCores: Scalars['Float']['output'];
+  memoryBytes: Scalars['Float']['output'];
+  podCount: Scalars['Int']['output'];
+};
+
 export type AstroliftPreviewEnvironment = {
+  aggregateResources: AstroliftPreviewAggregateResources;
   branch: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
+  estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   namespace: Scalars['String']['output'];
   prNumber: Scalars['Int']['output'];
+  prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
+  sourceUrl: Scalars['String']['output'];
   status: Scalars['String']['output'];
   tornDownAt?: Maybe<Scalars['DateTime']['output']>;
+  ttlUntil: Scalars['DateTime']['output'];
+};
+
+export type AstroliftPreviewEnvironmentMutationResult = {
+  data?: Maybe<AstroliftPreviewEnvironment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftProject = {
@@ -1161,6 +1212,20 @@ export type AstroliftRenderedManifest = {
   resources: Scalars['JSON']['output'];
 };
 
+export type AstroliftRevealedSecret = {
+  environmentName: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  revealedAt: Scalars['DateTime']['output'];
+  secretId: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftRevealedSecretMutationResult = {
+  data?: Maybe<AstroliftRevealedSecret>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftRole = {
   description: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -1276,6 +1341,12 @@ export type AstroliftSecretBundleMutationResult = {
   data?: Maybe<AstroliftSecretBundle>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSecretEditor = {
+  displayName: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  username: Scalars['String']['output'];
 };
 
 export type AstroliftSecurityPolicy = {
@@ -1898,6 +1969,20 @@ export type EnvironmentByIdInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type ExportAuditEventsInput = {
+  action: InputMaybe<Scalars['String']['input']>;
+  actorId: InputMaybe<Scalars['String']['input']>;
+  createdAtGte: InputMaybe<Scalars['DateTime']['input']>;
+  createdAtLte: InputMaybe<Scalars['DateTime']['input']>;
+  decision: InputMaybe<Scalars['String']['input']>;
+  format: Scalars['String']['input'];
+};
+
+export type ExtendPreviewTtlInputGql = {
+  days: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+};
+
 export type FileUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
@@ -2111,6 +2196,8 @@ export type Mutation = {
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
+  exportAuditEvents: AstroliftAuditExportMutationResult;
+  extendPreviewTtl: AstroliftPreviewEnvironmentMutationResult;
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
   forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
@@ -2192,6 +2279,7 @@ export type Mutation = {
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
+  revealAppSecret: AstroliftRevealedSecretMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
@@ -2505,6 +2593,16 @@ export type MutationDisconnectSourceArgs = {
 };
 
 
+export type MutationExportAuditEventsArgs = {
+  input: ExportAuditEventsInput;
+};
+
+
+export type MutationExtendPreviewTtlArgs = {
+  input: ExtendPreviewTtlInputGql;
+};
+
+
 export type MutationFileUploadArgs = {
   description?: InputMaybe<Scalars['String']['input']>;
   fileUploadGid?: InputMaybe<Scalars['ID']['input']>;
@@ -2804,6 +2902,11 @@ export type MutationResumeEnvironmentArgs = {
 
 export type MutationResyncAstroliftManifestFromRepoArgs = {
   input: ResyncManifestFromRepoInput;
+};
+
+
+export type MutationRevealAppSecretArgs = {
+  input: RevealAppSecretInput;
 };
 
 
@@ -3320,6 +3423,8 @@ export type Query = {
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
   astroliftApps: Array<AstroliftRegisteredApp>;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
+  astroliftAuditEventsPage: AstroliftAuditEventPage;
+  astroliftAuditRetention: AstroliftAuditRetention;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftClusterBootstrapPlan?: Maybe<AstroliftClusterBootstrapPlan>;
@@ -3498,7 +3603,22 @@ export type QueryAstroliftAppTeamAccessesArgs = {
 
 export type QueryAstroliftAuditEventsArgs = {
   action?: InputMaybe<Scalars['String']['input']>;
+  actorId?: InputMaybe<Scalars['String']['input']>;
+  createdAtGte?: InputMaybe<Scalars['DateTime']['input']>;
+  createdAtLte?: InputMaybe<Scalars['DateTime']['input']>;
   decision?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftAuditEventsPageArgs = {
+  action?: InputMaybe<Scalars['String']['input']>;
+  actorId?: InputMaybe<Scalars['String']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+  createdAtGte?: InputMaybe<Scalars['DateTime']['input']>;
+  createdAtLte?: InputMaybe<Scalars['DateTime']['input']>;
+  decision?: InputMaybe<Scalars['String']['input']>;
+  includeTotal?: Scalars['Boolean']['input'];
   limit?: Scalars['Int']['input'];
 };
 
@@ -3859,6 +3979,11 @@ export type ResyncManifestPayloadMutationResult = {
   data?: Maybe<ResyncManifestPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type RevealAppSecretInput = {
+  appSlug: Scalars['String']['input'];
+  secretId: Scalars['String']['input'];
 };
 
 export type RevokeApiTokenInput = {
