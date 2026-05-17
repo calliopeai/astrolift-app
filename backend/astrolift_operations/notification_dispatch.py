@@ -1,36 +1,57 @@
 """
-Notification dispatch — bridge between ``Event.emit`` and per-cloud
-push drivers (#476, #499, #490).
+Notification dispatch -- bridge between :meth:`core.events.Event.emit`
+and the canonical per-cloud ``NotificationDriver`` SDK (#476, #499,
+#490, #519).
 
-This module is the *only* writer for the push-fan-out pipeline. The
-shape:
+Pipeline:
 
-1. ``register_event_subscriber(dispatch_event)`` — installed at
-   :class:`astrolift_operations.apps.AstroliftOperationsConfig.ready`,
+1. ``register_event_subscriber(dispatch_event)`` -- installed at
+   :class:`astrolift_operations.apps.AstroliftOperationsConfig.ready`
    so every successful ``Event.emit`` is considered for fan-out
    after the persistent ``Event`` row has been written.
 2. ``dispatch_event`` looks the envelope's ``event_type`` up in
-   :data:`NOTIFICATION_TEMPLATES`. Unknown types are dropped silently
-   (the in-app activity feed already covers them).
-3. The template resolves a *recipient list* (users to notify), a
-   *title*, a *body*, and an *action_url*.
+   :data:`NOTIFICATION_TEMPLATES`. Unknown types are dropped
+   silently (the in-app activity feed covers them already).
+3. The template resolves a recipient list (users to notify), a
+   title, body, and an action_url.
 4. The dispatcher walks each recipient's live device registrations,
-   honours :class:`NotificationPreference`, and calls
-   ``driver.send(...)`` for every surviving device.
-5. Each send attempt — success, retry, drop, stale — is written to
-   the audit stream so a post-mortem can answer "did Alice get
-   pushed about the secret reveal at 14:02?"
+   honours :class:`NotificationPreference`, resolves the right
+   per-cloud :class:`NotificationDriver` instance for the
+   recipient's organization, and calls
+   ``driver.send(target=PushTarget(...), payload=NotificationPayload(...))``.
+5. Each send attempt -- success, transient failure, invalid-token,
+   skipped -- is written to the audit stream so a post-mortem can
+   answer "did Alice get pushed about the secret reveal at 14:02?"
 
-The :class:`NotificationDriver` Protocol below is a local shim until
-``vendor/astrolift-providers/_sdk/notification.py`` lands (#490).
-Once the SDK is vendored, this module re-exports the Protocol from
-the SDK and the local definition is removed.
+#519 reconciliation: the local ``NotificationDriver`` Protocol that
+shipped with #476/#499 has been removed; this module now consumes
+the canonical Protocol from
+``vendor/astrolift-providers/_sdk/notification.py``. The
+in-memory fallback driver that lived here moved to
+``tests/fixtures/notification_driver.py`` and is **test-only** --
+the production driver resolver does not know about it. Tests
+install it via :func:`set_driver_override_for_tests`.
 
-The default driver is an in-memory recorder. Tests register a fake;
-production wires the per-cloud driver from the install's
-``NotificationProfile`` (also pending #490). The recorder shape
-lets the dispatcher start no-op-safe on day one of the deploy
-without requiring NotificationProfile rows in every install.
+Driver resolution:
+
+* Production: per-recipient driver lookup keyed on the recipient's
+  organization. The active ``NotificationProfile`` row's
+  ``driver`` slug (``aws_sns`` / ``gcp_fcm`` / ``azure_anh`` /
+  ``otlp_webhook`` / ``multiplexer``) and ``config`` blob are
+  threaded into a per-slug factory in
+  :func:`_build_driver_from_profile`. Same pattern the cost
+  estimator uses -- the notification driver's per-instance config
+  shape does not match the ``_config_for`` cluster-config shape
+  that ``driver_for_capability`` builds, so going through that
+  helper would mis-instantiate.
+* Test override: :func:`set_driver_override_for_tests` installs a
+  module-scope driver that short-circuits resolution. The
+  ``tests/fixtures/notification_driver.py`` shim is the standard
+  test stub.
+* No profile + no override: the dispatcher logs ``status=no_driver``
+  to the audit row and drops the send. Installs that have not yet
+  configured a NotificationProfile silently no-op rather than
+  emitting through some non-prod fallback.
 """
 
 from __future__ import annotations
@@ -39,8 +60,16 @@ import dataclasses
 import datetime as dt
 import logging
 from collections.abc import Iterable
-from typing import Literal, Protocol
+from typing import Any
 
+from _sdk.notification import (
+    DevicePlatform,
+    NotificationDriver,
+    NotificationPayload,
+    ProviderHealth,
+    PushTarget,
+    SendResult,
+)
 from django.db import transaction
 
 from core.events import EventEnvelope
@@ -49,114 +78,315 @@ from core.mutations import AuditEntry, emit_audit
 log = logging.getLogger("astrolift_operations.notification_dispatch")
 
 
-# ---- driver Protocol -----------------------------------------------
+# ---- public re-exports ---------------------------------------------
+#
+# Callers downstream of #476 imported ``NotificationPayload`` from
+# this module. After #519 the canonical type lives in the SDK; we
+# re-export so existing imports keep working without forcing every
+# consumer to update their import path in one go.
+
+__all__ = [
+    "NOTIFICATION_TEMPLATES",
+    "NotificationDriver",
+    "NotificationPayload",
+    "NotificationTemplate",
+    "SendResult",
+    "_build_driver_from_profile",
+    "default_driver_slug_for_registration",
+    "dispatch_event",
+    "emit_session_created_event",
+    "iter_template_event_types",
+    "register_geo_resolver",
+    "resolve_driver_for_recipient",
+    "set_driver_override_for_tests",
+    "unset_driver_override_for_tests",
+]
 
 
-@dataclasses.dataclass(slots=True, frozen=True)
-class NotificationPayload:
-    """One push payload the driver fans out.
+# ---- test-only driver override -------------------------------------
+#
+# Tests use the SDK-shaped in-memory driver fixture in
+# ``tests/fixtures/notification_driver.py``. Installing the override
+# replaces every per-recipient driver lookup with this instance so
+# tests don't need to set up a NotificationProfile row per fixture.
 
-    All strings are bounded so a runaway template doesn't oversize
-    an APNs / FCM packet (both cap around 4 KiB total). The
-    dispatcher truncates before constructing this dataclass so the
-    driver never sees an over-size payload.
+_TEST_DRIVER_OVERRIDE: NotificationDriver | None = None
+
+
+def set_driver_override_for_tests(driver: NotificationDriver) -> None:
+    """Install a test-only driver that intercepts every send.
+
+    The override applies for every recipient -- the
+    NotificationProfile-keyed per-org lookup is short-circuited.
+    Tests that exercise the per-org resolver should clear the
+    override first (see :func:`unset_driver_override_for_tests`).
     """
-
-    event_type: str
-    title: str
-    body: str
-    action_url: str
-    data: dict[str, str]
+    global _TEST_DRIVER_OVERRIDE
+    _TEST_DRIVER_OVERRIDE = driver
 
 
-@dataclasses.dataclass(slots=True, frozen=True)
-class SendResult:
-    """Outcome of a single ``driver.send(...)`` call.
+def unset_driver_override_for_tests() -> None:
+    """Clear any test-only driver override. Idempotent."""
+    global _TEST_DRIVER_OVERRIDE
+    _TEST_DRIVER_OVERRIDE = None
 
-    ``status`` is one of:
 
-    * ``"delivered"`` — provider accepted; downstream delivery is
-      best-effort but the platform's responsibility ends here.
-    * ``"retry"`` — transient failure (5xx, rate-limit). The
-      dispatcher logs but does not retry inline; the operator-tunable
-      retry workflow handles backoff.
-    * ``"stale"`` — provider says the token is dead
-      (FCM ``unregistered`` / APNs ``Unregistered``). The dispatcher
-      soft-deletes the row.
-    * ``"dropped"`` — refused for a non-recoverable reason (bad
-      project key, malformed token). Logged + audited; the device
-      row is marked stale.
+def _get_test_driver_override() -> NotificationDriver | None:
+    return _TEST_DRIVER_OVERRIDE
+
+
+# ---- driver resolution ---------------------------------------------
+
+
+def resolve_driver_for_recipient(
+    *,
+    user_id: int,
+    organization_id: int | None,
+) -> NotificationDriver | None:
+    """Resolve the right :class:`NotificationDriver` for a recipient.
+
+    Resolution order:
+
+    1. Test override (see :func:`set_driver_override_for_tests`).
+    2. Active ``NotificationProfile`` for the recipient's
+       ``organization_id``.
+    3. ``None`` -- caller treats the recipient as "no driver
+       configured" and audits ``status=no_driver``.
+
+    The user_id parameter is reserved for future personalisation
+    (e.g. an operator-installed per-user driver override); today
+    the resolution is org-scoped.
     """
+    override = _get_test_driver_override()
+    if override is not None:
+        return override
 
-    status: Literal["delivered", "retry", "stale", "dropped"]
-    detail: str = ""
+    if organization_id is None:
+        return None
+
+    try:
+        from astrolift_operations.models import NotificationProfile
+    except Exception:  # noqa: BLE001 -- model import is best-effort
+        return None
+
+    profile = (
+        NotificationProfile.objects.filter(
+            organization_id=organization_id,
+            is_active=True,
+        )
+        .order_by("-updated_at")
+        .first()
+    )
+    if profile is None:
+        return None
+
+    try:
+        return _build_driver_from_profile(
+            driver_slug=profile.driver,
+            config=profile.config or {},
+        )
+    except Exception:  # noqa: BLE001 -- driver build errors must not break emit
+        log.warning(
+            "notification driver build failed",
+            exc_info=True,
+            extra={
+                "organization_id": organization_id,
+                "driver_slug": profile.driver,
+            },
+        )
+        return None
 
 
-class NotificationDriver(Protocol):
-    """Driver Protocol — provider-agnostic push delivery.
+def _resolve_secret(secret_ref: Any) -> str:
+    """Resolve a secret reference to its plaintext value.
 
-    Mirrors the shape #490 will land in
-    ``vendor/astrolift-providers/_sdk/notification.py``. Keeping the
-    Protocol local in this module means the dispatcher works
-    standalone today and only re-exports from the SDK once the
-    vendor module is available.
+    The operator stores ``*_secret_ref`` keys in the profile blob
+    pointing at the install's secrets backend (e.g. AWS Secrets
+    Manager / GCP Secret Manager). This helper is the dispatcher
+    side of the indirection.
+
+    Today the dispatcher does not have a backend-agnostic secrets
+    resolver wired in (#490 ships the policy validator + the
+    per-cloud drivers; the secret-ref lookup is a separate
+    cross-cutting story). We return an empty string so the caller
+    falls back to the plain-text value the operator may have
+    stashed alongside the ref. When the secrets-resolver lands,
+    this is the single place to wire it.
+
+    Empty / non-string refs collapse to an empty result.
     """
-
-    name: str
-
-    def send(self, *, device_token: str, platform: str, payload: NotificationPayload) -> SendResult:
-        """Send one push to one device. MUST NOT raise on transient
-        failure — return ``SendResult(status="retry")`` instead.
-        Raising is reserved for misconfiguration (e.g. missing creds)
-        that should surface in operator logs."""
-        ...
+    if not isinstance(secret_ref, str) or not secret_ref:
+        return ""
+    return ""
 
 
-# ---- in-memory default driver --------------------------------------
+def _build_driver_from_profile(
+    *,
+    driver_slug: str,
+    config: dict[str, Any],
+) -> NotificationDriver:
+    """Per-slug factory.
 
-
-class MemoryNotificationDriver:
-    """In-process driver used in tests and as a no-op default.
-
-    Records every send into ``self.sent`` so tests can introspect the
-    fan-out without mocking transport. ``name="memory"`` lines up
-    with the ``DeviceRegistration.driver`` slug so a test fixture can
-    register a device and have its sends actually flow.
+    Each per-cloud driver ships its own ``*Config`` dataclass; the
+    factory translates the operator-stored JSON blob into the right
+    config and constructs the driver. Imports are lazy so a backend
+    image that doesn't ship a given cloud SDK can still load this
+    module -- the missing import bubbles up as a build failure that
+    :func:`resolve_driver_for_recipient` catches + audits.
     """
+    if driver_slug == "aws_sns":
+        from aws.notification_sns import (
+            SNSNotificationConfig,
+            SNSNotificationDriver,
+        )
 
-    name = "memory"
+        platform_apps_raw = config.get("platform_applications") or {}
+        # Operator-stored config is a string-keyed dict; SDK expects
+        # ``DevicePlatform`` keys. Translate explicitly so an
+        # unrecognised platform surfaces as a build error rather
+        # than a silent miss at send time.
+        platform_apps = {DevicePlatform(platform): str(arn) for platform, arn in platform_apps_raw.items()}
+        return SNSNotificationDriver(
+            config=SNSNotificationConfig(
+                region=str(config.get("region", "")),
+                platform_applications=platform_apps,
+                default_ttl_seconds=int(config.get("default_ttl_seconds", 86400)),
+                sms_sender_id=str(config.get("sms_sender_id", "")),
+            ),
+        )
 
-    def __init__(self) -> None:
-        self.sent: list[tuple[str, str, NotificationPayload]] = []
-        # Tokens the test wants to simulate as stale.
-        self.force_stale: set[str] = set()
-        self.force_drop: set[str] = set()
-        self.force_retry: set[str] = set()
+    if driver_slug == "gcp_fcm":
+        from gcp.notification_fcm import FCMConfig, FCMNotificationDriver
 
-    def send(self, *, device_token: str, platform: str, payload: NotificationPayload) -> SendResult:
-        self.sent.append((device_token, platform, payload))
-        if device_token in self.force_stale:
-            return SendResult(status="stale", detail="forced-stale (test)")
-        if device_token in self.force_drop:
-            return SendResult(status="dropped", detail="forced-drop (test)")
-        if device_token in self.force_retry:
-            return SendResult(status="retry", detail="forced-retry (test)")
-        return SendResult(status="delivered")
+        # ``credentials_secret_ref`` in the profile blob is the
+        # operator-stored secret pointer. The dispatcher resolves
+        # it through the secrets backend before constructing the
+        # driver; the resolved token lands in ``access_token``.
+        access_token = _resolve_secret(config.get("credentials_secret_ref", "")) or str(
+            config.get("access_token", "")
+        )
+        return FCMNotificationDriver(
+            config=FCMConfig(
+                project_id=str(config.get("project_id", "")),
+                access_token=access_token,
+                timeout_seconds=int(config.get("timeout_seconds", 10)),
+            ),
+        )
+
+    if driver_slug == "azure_anh":
+        from azure.notification_anh import (
+            AzureNotificationHubsConfig,
+            AzureNotificationHubsDriver,
+        )
+
+        shared_access_key = _resolve_secret(config.get("shared_access_key_secret_ref", "")) or str(
+            config.get("shared_access_key", "")
+        )
+        return AzureNotificationHubsDriver(
+            config=AzureNotificationHubsConfig(
+                namespace=str(config.get("namespace", "")),
+                hub_name=str(config.get("hub_name", "")),
+                shared_access_key_name=str(config.get("shared_access_key_name", "")),
+                shared_access_key=shared_access_key,
+                api_version=str(config.get("api_version", "2020-06")),
+                timeout_seconds=int(config.get("timeout_seconds", 10)),
+            ),
+        )
+
+    if driver_slug == "otlp_webhook":
+        from k8s_native.notification_otlp import (
+            WebhookSMTPConfig,
+            WebhookSMTPNotificationDriver,
+        )
+
+        # ``channels`` from the profile is informational metadata
+        # (used by the policy layer to surface which channels the
+        # operator wired); the driver itself picks behavior off the
+        # populated URL / SMTP fields. We pass it through anyway
+        # via extra_headers metadata so debug logs show it.
+        channels = config.get("channels") or ()
+        return WebhookSMTPNotificationDriver(
+            config=WebhookSMTPConfig(
+                default_webhook_url=str(config.get("default_webhook_url", "")),
+                default_webhook_bearer=_resolve_secret(config.get("default_webhook_bearer_secret_ref", ""))
+                or str(config.get("default_webhook_bearer", "")),
+                push_webhook_url=str(config.get("push_webhook_url", "")),
+                smtp_host=str(config.get("smtp_host", "")),
+                smtp_port=int(config.get("smtp_port", 587)),
+                smtp_username=str(config.get("smtp_username", "")),
+                smtp_password=_resolve_secret(config.get("smtp_password_secret_ref", ""))
+                or str(config.get("smtp_password", "")),
+                smtp_from=str(config.get("smtp_from", "")),
+                smtp_use_tls=bool(config.get("smtp_use_tls", True)),
+                timeout_seconds=int(config.get("timeout_seconds", 10)),
+                extra_headers={"x-astrolift-channels": ",".join(map(str, channels))} if channels else {},
+            ),
+        )
+
+    if driver_slug == "multiplexer":
+        from _sdk.notification import MultiplexerNotificationDriver
+
+        primary_spec = config.get("primary") or {}
+        secondaries_spec = config.get("secondaries") or []
+        primary = _build_driver_from_profile(
+            driver_slug=str(primary_spec.get("driver", "")),
+            config=dict(primary_spec.get("config") or {}),
+        )
+        secondaries = [
+            _build_driver_from_profile(
+                driver_slug=str(child.get("driver", "")),
+                config=dict(child.get("config") or {}),
+            )
+            for child in secondaries_spec
+        ]
+        return MultiplexerNotificationDriver(
+            primary=primary,
+            secondaries=secondaries,
+        )
+
+    raise ValueError(
+        f"unknown notification driver slug: {driver_slug!r}; "
+        "known: aws_sns, gcp_fcm, azure_anh, otlp_webhook, multiplexer",
+    )
 
 
-_driver: NotificationDriver = MemoryNotificationDriver()
+def default_driver_slug_for_registration(
+    *,
+    organization_id: int | None,
+) -> str:
+    """Return the driver slug to stamp on a freshly-registered
+    :class:`DeviceRegistration`.
 
+    Used by ``mutations.register_mobile_device`` so the row tracks
+    which driver minted the token. When a test override is active
+    we stamp ``"memory"`` so the test fixture's send path matches.
+    When no profile is configured we stamp ``"unconfigured"`` --
+    the dispatcher later refuses to send through a row whose
+    driver slug doesn't match the install's active driver, but
+    the row is still useful audit-side (operator can see what got
+    enrolled before they wired a profile).
+    """
+    override = _get_test_driver_override()
+    if override is not None:
+        return getattr(override, "name", "memory")
 
-def register_driver(driver: NotificationDriver) -> None:
-    """Swap the active driver. Tests use this to install a fake;
-    production wiring (#490) replaces it with a SNS / FCM / ANH
-    driver constructed from the install's ``NotificationProfile``."""
-    global _driver
-    _driver = driver
+    if organization_id is None:
+        return "unconfigured"
 
+    try:
+        from astrolift_operations.models import NotificationProfile
+    except Exception:  # noqa: BLE001
+        return "unconfigured"
 
-def get_driver() -> NotificationDriver:
-    return _driver
+    profile = (
+        NotificationProfile.objects.filter(
+            organization_id=organization_id,
+            is_active=True,
+        )
+        .only("driver")
+        .first()
+    )
+    return str(profile.driver) if profile else "unconfigured"
 
 
 # ---- templates -----------------------------------------------------
@@ -193,7 +423,7 @@ def _truncate(value: str, limit: int) -> str:
 
 def _coerce_id_list(raw: object) -> list[int]:
     """Coerce a payload list to ``list[int]`` of user ids. Bad input
-    drops to empty rather than raising — a push fan-out should never
+    drops to empty rather than raising -- a push fan-out should never
     fail because the payload schema drifted."""
     if not isinstance(raw, (list, tuple)):
         return []
@@ -217,7 +447,7 @@ def _org_admin_user_ids(*, organization_id: int) -> list[int]:
     """
     try:
         from astrolift_identity.models import Member
-    except Exception:  # noqa: BLE001 — import is best-effort
+    except Exception:  # noqa: BLE001 -- import is best-effort
         return []
     return list(
         Member.objects.filter(
@@ -286,7 +516,7 @@ def _template_secret_revealed(envelope: EventEnvelope) -> NotificationTemplate |
 def _template_alert_fired(envelope: EventEnvelope) -> NotificationTemplate | None:
     if envelope.organization_id is None:
         return None
-    # Org-wide alert fan-out — every member of the org with at least
+    # Org-wide alert fan-out -- every member of the org with at least
     # one active membership is a candidate. Per-user preference still
     # gates the actual send.
     member_ids = _org_admin_user_ids(organization_id=envelope.organization_id)
@@ -377,7 +607,7 @@ def _template_app_deregister_pending(envelope: EventEnvelope) -> NotificationTem
 
 
 def _template_session_created(envelope: EventEnvelope) -> NotificationTemplate | None:
-    """Per #499 — push 'new sign-in' alert to user's OTHER devices.
+    """Per #499 -- push 'new sign-in' alert to user's OTHER devices.
 
     The new session's own device (when bound via
     ``DeviceRegistration.enrolled_session``) is excluded by the
@@ -461,7 +691,7 @@ def _excluded_device_ids_for(envelope: EventEnvelope) -> set[int]:
     """Devices the dispatcher must NOT push to for this envelope.
 
     For ``auth.session.created`` (per #499) the just-issued
-    session's own device is excluded — we want to alert the user's
+    session's own device is excluded -- we want to alert the user's
     *other* devices, not echo back to the one they're holding.
     """
     if envelope.event_type != "auth.session.created":
@@ -472,7 +702,7 @@ def _excluded_device_ids_for(envelope: EventEnvelope) -> set[int]:
         return set()
     try:
         from astrolift_operations.models import DeviceRegistration
-    except Exception:  # noqa: BLE001 — model import is best-effort
+    except Exception:  # noqa: BLE001 -- model import is best-effort
         return set()
     return set(
         DeviceRegistration.all_objects.filter(enrolled_session_id=session_pk).values_list("pk", flat=True)
@@ -480,7 +710,7 @@ def _excluded_device_ids_for(envelope: EventEnvelope) -> set[int]:
 
 
 def dispatch_event(envelope: EventEnvelope) -> None:
-    """Subscriber entry point — translate an envelope to push fan-out.
+    """Subscriber entry point -- translate an envelope to push fan-out.
 
     Registered at ``apps.ready`` so every successful ``Event.emit``
     flows through here after the persistent ``Event`` row write.
@@ -490,7 +720,7 @@ def dispatch_event(envelope: EventEnvelope) -> None:
         return
     try:
         template = template_fn(envelope)
-    except Exception:  # noqa: BLE001 — template failures must never raise
+    except Exception:  # noqa: BLE001 -- template failures must never raise
         log.warning(
             "notification template raised; dropping envelope",
             exc_info=True,
@@ -502,12 +732,35 @@ def dispatch_event(envelope: EventEnvelope) -> None:
     _dispatch_template(envelope=envelope, template=template)
 
 
+def _platform_for_device_row(device: Any) -> DevicePlatform:
+    """Translate the DB row's platform string to the SDK enum.
+
+    The DB carries ``ios`` / ``android`` / ``web_push``; the SDK
+    enum's ``WEB`` member is the web-push equivalent. Unknown
+    values raise -- the dispatcher catches and audits as ``error``.
+    """
+    raw = (device.platform or "").lower()
+    if raw == "web_push":
+        return DevicePlatform.WEB
+    return DevicePlatform(raw)
+
+
 def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplate) -> None:
-    from astrolift_operations.models import DeviceRegistration
+    from astrolift_operations.models import DeviceRegistration, is_enabled
 
     effective_kind = _effective_event_kind(envelope)
     excluded_device_ids = _excluded_device_ids_for(envelope)
-    driver = get_driver()
+
+    # Resolve the driver once per envelope -- the recipients in a
+    # single fan-out share the same org (the template always pulls
+    # from one org's admin list / triggerer set), so per-recipient
+    # resolution would just duplicate the lookup. Override branch
+    # short-circuits identically.
+    driver = resolve_driver_for_recipient(
+        user_id=template.recipient_user_ids[0] if template.recipient_user_ids else 0,
+        organization_id=envelope.organization_id,
+    )
+
     seen: set[int] = set()
 
     for user_id in template.recipient_user_ids:
@@ -515,10 +768,8 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
             continue
         seen.add(user_id)
 
-        # Per-user preference gate — default tables in
+        # Per-user preference gate -- default tables in
         # NotificationPreference cover the canonical events.
-        from astrolift_operations.models import is_enabled
-
         if not is_enabled(user_id=user_id, channel="push", event_kind=effective_kind):
             _audit_dispatch(
                 envelope=envelope,
@@ -527,6 +778,7 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
                 token_last_4="",
                 status="opt_out",
                 detail=f"preference={effective_kind}=off",
+                driver_name=getattr(driver, "name", "") if driver else "",
             )
             continue
 
@@ -544,6 +796,22 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
                 token_last_4="",
                 status="no_device",
                 detail=f"event={envelope.event_type}",
+                driver_name=getattr(driver, "name", "") if driver else "",
+            )
+            continue
+
+        if driver is None:
+            # No active NotificationProfile and no test override --
+            # audit once per recipient so the operator can see which
+            # users would have been pushed had a driver been wired.
+            _audit_dispatch(
+                envelope=envelope,
+                user_id=user_id,
+                device_id=None,
+                token_last_4="",
+                status="no_driver",
+                detail=(f"event={envelope.event_type}; organization_id={envelope.organization_id}"),
+                driver_name="",
             )
             continue
 
@@ -556,16 +824,23 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
                     token_last_4=device.device_token[-4:],
                     status="excluded",
                     detail="enrolled_session_self",
+                    driver_name=getattr(driver, "name", ""),
                 )
                 continue
             payload = NotificationPayload(
-                event_type=envelope.event_type,
                 title=template.title,
                 body=template.body,
-                action_url=template.action_url,
                 data=_build_data_payload(template=template, envelope=envelope),
+                action_url=template.action_url,
+                category=envelope.event_type,
             )
-            _send_one(device=device, payload=payload, driver=driver, envelope=envelope, user_id=user_id)
+            _send_one(
+                device=device,
+                payload=payload,
+                driver=driver,
+                envelope=envelope,
+                user_id=user_id,
+            )
 
 
 def _build_data_payload(*, template: NotificationTemplate, envelope: EventEnvelope) -> dict[str, str]:
@@ -591,24 +866,52 @@ def _build_data_payload(*, template: NotificationTemplate, envelope: EventEnvelo
     return data
 
 
+# Map SDK SendStatus literals to the dispatcher's audit decision +
+# downstream policy. ``invalid_token`` is the only status that
+# soft-deletes the device row; ``failed`` + ``rate_limited`` are
+# audit-only (retry orchestration lives in a separate workflow).
+_ALLOW_STATUSES = frozenset({"delivered", "queued"})
+
+
 def _send_one(
     *,
-    device,
+    device: Any,
     payload: NotificationPayload,
     driver: NotificationDriver,
     envelope: EventEnvelope,
     user_id: int,
 ) -> None:
     try:
-        result = driver.send(
-            device_token=device.device_token,
-            platform=device.platform,
-            payload=payload,
+        platform = _platform_for_device_row(device)
+    except ValueError as exc:
+        log.warning(
+            "device row has unknown platform; skipping",
+            extra={"device_id": device.pk, "platform": device.platform},
         )
-    except Exception as exc:  # noqa: BLE001 — driver crash never breaks emit
+        _audit_dispatch(
+            envelope=envelope,
+            user_id=user_id,
+            device_id=device.pk,
+            token_last_4=device.device_token[-4:],
+            status="error",
+            detail=f"unknown platform {device.platform!r}: {exc}",
+            driver_name=getattr(driver, "name", ""),
+        )
+        return
+
+    target = PushTarget(
+        registration_id=device.device_token,
+        platform=platform,
+    )
+    try:
+        result = driver.send(target=target, payload=payload)
+    except Exception as exc:  # noqa: BLE001 -- driver crash never breaks emit
         log.exception(
             "notification driver crashed",
-            extra={"event_type": envelope.event_type, "driver": getattr(driver, "name", "")},
+            extra={
+                "event_type": envelope.event_type,
+                "driver": getattr(driver, "name", ""),
+            },
         )
         _audit_dispatch(
             envelope=envelope,
@@ -617,10 +920,14 @@ def _send_one(
             token_last_4=device.device_token[-4:],
             status="error",
             detail=str(exc)[:200],
+            driver_name=getattr(driver, "name", ""),
         )
         return
 
-    if result.status == "stale" or result.status == "dropped":
+    if result.status == "invalid_token":
+        # Stale provider token: the dispatcher MUST mark the device
+        # revoked so future fan-outs skip it. The SDK Protocol
+        # contract says this status is never retriable.
         with transaction.atomic():
             device.mark_stale()
 
@@ -630,7 +937,8 @@ def _send_one(
         device_id=device.pk,
         token_last_4=device.device_token[-4:],
         status=result.status,
-        detail=result.detail,
+        detail=result.error or result.provider_message_id,
+        driver_name=getattr(driver, "name", ""),
     )
 
 
@@ -642,15 +950,18 @@ def _audit_dispatch(
     token_last_4: str,
     status: str,
     detail: str,
+    driver_name: str,
 ) -> None:
     """Write one audit row per fan-out decision.
 
-    Decision = ``ALLOW`` when a delivery attempt landed; ``DENY``
-    when the dispatcher skipped (opt-out / excluded / stale). Either
-    way the audit row carries enough provenance to reconstruct who
-    got pushed (or why they didn't) months later.
+    Decision = ``ALLOW`` when the driver reported success
+    (delivered / queued); ``DENY`` when the dispatcher skipped
+    (opt-out / excluded / no_device / no_driver) or the driver
+    rejected (failed / unsupported / rate_limited / invalid_token).
+    Either way the row carries enough provenance to reconstruct
+    who got pushed (or why they didn't) months later.
     """
-    decision = "ALLOW" if status in ("delivered", "retry") else "DENY"
+    decision = "ALLOW" if status in _ALLOW_STATUSES else "DENY"
     emit_audit(
         AuditEntry(
             actor_user_id=envelope.actor_user_id,
@@ -667,6 +978,7 @@ def _audit_dispatch(
                 "token_last_4": token_last_4,
                 "status": status,
                 "detail": detail,
+                "driver": driver_name,
             },
         )
     )
@@ -691,7 +1003,7 @@ def emit_session_created_event(
     when a brand-new :class:`AstroliftSession` row is created (#499 §A).
 
     Decouples the identity app from the dispatcher so identity
-    doesn't need to know about NotificationDriver — it just emits
+    doesn't need to know about NotificationDriver -- it just emits
     the event and the subscriber takes care of the fan-out.
     """
     from core.events import Event
@@ -716,7 +1028,7 @@ def emit_session_created_event(
             actor_user_id=int(user_id),
             organization_id=organization_id,
         )
-    except Exception:  # noqa: BLE001 — session-create must never break on event emit
+    except Exception:  # noqa: BLE001 -- session-create must never break on event emit
         log.warning(
             "auth.session.created emit failed",
             exc_info=True,
@@ -739,7 +1051,7 @@ def _geo_from_ip(ip_address: str | None) -> str:
         return ""
     try:
         return resolver(ip_address) or ""
-    except Exception:  # noqa: BLE001 — resolver errors must never block emit
+    except Exception:  # noqa: BLE001 -- resolver errors must never block emit
         log.warning("geo_resolver raised", exc_info=True)
         return ""
 
@@ -748,7 +1060,7 @@ _geo_resolver = None
 
 
 def register_geo_resolver(resolver) -> None:
-    """Install a maxmind-style IP→string resolver. Optional."""
+    """Install a maxmind-style IP-to-string resolver. Optional."""
     global _geo_resolver
     _geo_resolver = resolver
 
@@ -758,3 +1070,35 @@ def iter_template_event_types() -> Iterable[str]:
     handles. Exposed so the preference catalog can render the list
     in /settings/notifications without duplicating the constant."""
     return tuple(NOTIFICATION_TEMPLATES.keys())
+
+
+# ---- healthcheck passthrough ---------------------------------------
+
+
+def driver_health_for_organization(*, organization_id: int | None) -> ProviderHealth | None:
+    """Run the driver healthcheck for an organization's active
+    profile (operator UI surface).
+
+    Returns ``None`` when no driver is configured + no override is
+    active -- the UI should render an "unconfigured" state instead
+    of an error.
+    """
+    driver = resolve_driver_for_recipient(
+        user_id=0,
+        organization_id=organization_id,
+    )
+    if driver is None:
+        return None
+    try:
+        return driver.healthcheck()
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "notification driver healthcheck raised",
+            exc_info=True,
+            extra={"organization_id": organization_id},
+        )
+        return ProviderHealth(
+            ok=False,
+            message=f"healthcheck raised: {exc}",
+            checked_at=dt.datetime.now(dt.UTC).isoformat(),
+        )
