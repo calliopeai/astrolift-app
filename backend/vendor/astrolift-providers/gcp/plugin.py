@@ -31,6 +31,7 @@ from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
+from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
 from gcp.tls_managed import GCPManagedCertDriver
@@ -47,6 +48,7 @@ PLUGIN = ProviderPlugin(
         "tls": GCPManagedCertDriver,
         "cluster": GKEClusterDriver,
         "ingress": GCPIngressDriver,
+        "notification": FCMNotificationDriver,
     },
     managed_service_drivers={
         ("object_store", "gcs"): GCSDriver,

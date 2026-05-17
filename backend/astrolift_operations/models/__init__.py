@@ -13,6 +13,8 @@ from astrolift_operations.models.notification_preference import (
     default_enabled,
     is_enabled,
 )
+from astrolift_operations.models.notification_delivery import NotificationDelivery
+from astrolift_operations.models.notification_profile import NotificationProfile
 from astrolift_operations.models.webhook_delivery import WebhookDelivery
 from astrolift_operations.models.webhook_subscription import WebhookSubscription
 from astrolift_operations.models.workflow_run import WorkflowRun
@@ -31,6 +33,8 @@ __all__ = [
     "Notification",
     "NotificationChannel",
     "NotificationPreference",
+    "NotificationDelivery",
+    "NotificationProfile",
     "WebhookDelivery",
     "WebhookSubscription",
     "WorkflowRun",

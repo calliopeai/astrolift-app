@@ -536,6 +536,30 @@ class OperationsQuery:
         return out
 
     @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_devices(
+        self,
+        info: Info,
+    ) -> list[DeviceRegistrationType]:
+        """List the caller's registered push devices (#490).
+
+        Auth via tenant binding: caller sees only their own
+        DeviceRegistration rows, never another user's tokens.
+        Order: most recently used first so the surface is useful
+        for "which device did I last log in on" debugging."""
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+        qs = (
+            DeviceRegistration.objects.filter(
+                user_id=tenant.actor_user_id,
+                deleted_at__isnull=True,
+            )
+            .order_by("-last_used_at", "-created_at")
+        )
+        return [device_registration_to_type(d) for d in qs]
+
+    @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_alert_rules(
