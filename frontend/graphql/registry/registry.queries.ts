@@ -101,6 +101,16 @@ export const GET_APP = gql`
         environmentName
         lastChecked
       }
+      settingsLastModified {
+        deployStrategy
+        deployTokens
+        secrets
+        managedServices
+        domains
+        webhooks
+        members
+        observability
+      }
     }
   }
 `;
