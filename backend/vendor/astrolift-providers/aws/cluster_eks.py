@@ -38,6 +38,7 @@ from _sdk.cluster import (
     ClusterDriver,
     DeleteResult,
     ExecResult,
+    InteractiveExecSession,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -50,6 +51,10 @@ from _sdk.cluster import (
 )
 from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
+from k8s_native.interactive_exec import (
+    InteractiveExecBackend,
+    default_interactive_exec_backend,
+)
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -94,6 +99,7 @@ class EKSClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
+        exec_backend: InteractiveExecBackend | None = None,
     ) -> None:
         self._config = config
         if eks_client is not None:
@@ -128,6 +134,12 @@ class EKSClusterDriver(ClusterDriver):
         # pending the #309 follow-up.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
+        )
+        # Interactive exec backend (#423) — same materialize-then-delegate
+        # auth dance as the log/pod backends; lives behind a separate
+        # constructor kwarg so tests inject a recording session.
+        self._exec_backend: InteractiveExecBackend = (
+            exec_backend if exec_backend is not None else default_interactive_exec_backend()
         )
 
     # ---- apply / delete -------------------------------------------
@@ -469,6 +481,26 @@ class EKSClusterDriver(ClusterDriver):
             container=container,
             tail_lines=tail_lines,
             follow=follow,
+        )
+
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> InteractiveExecSession:
+        """See ``list_pods`` — same materialize-then-delegate pattern."""
+        return self._exec_backend.open(
+            auth=self._materialize_eks_auth_auth(auth),
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
         )
 
     # ---- bring-into-management (#316) -----------------------------
