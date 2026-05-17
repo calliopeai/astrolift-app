@@ -302,6 +302,8 @@ export const LIST_ACTIVE_SESSIONS = gql`
       id
       expiresAt
       isCurrent
+      clientKind
+      label
       createdAt
       lastSeenAt
       ipAddress
@@ -462,3 +464,18 @@ export const LIST_MY_CONNECTED_ACCOUNTS = gql`
 // Suppress the unused import warning — fragment is referenced from
 // other domain files once they're written.
 void IDENTITY_TIMESTAMPS;
+
+// #487 — step-up auth. The nav indicator polls this query so the
+// "Admin elevated for N more minutes" badge stays accurate without
+// requiring the user to refresh the page.
+export const GET_ELEVATION_STATUS = gql`
+  query GetElevationStatus {
+    astroliftElevationStatus {
+      elevated
+      elevatedUntil
+      secondsRemaining
+      method
+      requiredFor
+    }
+  }
+`;

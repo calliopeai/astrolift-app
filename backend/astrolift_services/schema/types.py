@@ -227,6 +227,132 @@ class ManagedServiceTestEmailResultType:
     to confirm which provider received the call."""
 
 
+@strawberry.type(name="AstroliftSecretChangeApproval")
+class SecretChangeApprovalType:
+    """One approver's vote on a secret-change proposal (#488)."""
+
+    id: GUID
+    approver_user_id: str
+    approver_display_name: str
+    decision: str
+    """``approved`` or ``rejected``."""
+
+    decided_at: dt.datetime
+    reason: str = ""
+
+
+@strawberry.type(name="AstroliftSecretChangeProposal")
+class SecretChangeProposalType:
+    """A pending / decided secret-change proposal (#488).
+
+    Returned by the propose / approve / reject / withdraw mutations
+    and the queue queries.  The diff blob is pre-rendered at propose
+    time so the proposal-detail page can render without re-reading
+    + re-diffing.  Plaintext values are NEVER baked into the diff —
+    the operator reveals them via the explicit ``revealAppSecret``
+    mutation which carries its own audit trail (#424).
+    """
+
+    id: GUID
+    registered_app_slug: str
+    environment_name: str
+    """Empty string for app-wide literal writes that don't bind to a
+    specific environment row."""
+
+    op: str
+    """One of ``set | delete | attach_bundle | detach_bundle``."""
+
+    status: str
+    """One of ``pending | approved | rejected | applied | expired | withdrawn``."""
+
+    proposer_user_id: str
+    """Stringified Django user pk; empty when the proposer row was
+    deleted after the proposal was created."""
+
+    proposer_display_name: str
+
+    payload: JSON
+    """The proposed change.  Shape varies by op; the FE reads
+    ``payload_diff`` for the render-friendly summary."""
+
+    payload_diff: JSON
+    """Pre-rendered before/after for the proposal-detail page."""
+
+    required_approver_count: int
+    approvals_count: int
+    """Distinct approvers who voted approved (rejections are not
+    counted here; one rejection moves the proposal to ``rejected``)."""
+
+    expires_at: dt.datetime
+    decided_at: dt.datetime | None = None
+    applied_at: dt.datetime | None = None
+    apply_error: str = ""
+
+    created_at: dt.datetime
+    approvals: list[SecretChangeApprovalType]
+
+
+def secret_change_approval_to_type(approval) -> SecretChangeApprovalType:
+    approver = approval.approver
+    if approver is None:
+        display = ""
+        user_id = ""
+    else:
+        display = (
+            approver.get_full_name()
+            if hasattr(approver, "get_full_name") and approver.get_full_name()
+            else (approver.username or approver.email or "")
+        )
+        user_id = str(approver.pk)
+    return SecretChangeApprovalType(
+        id=GUID(str(approval.guid)),
+        approver_user_id=user_id,
+        approver_display_name=display,
+        decision=approval.decision,
+        decided_at=approval.decided_at,
+        reason=approval.reason or "",
+    )
+
+
+def secret_change_proposal_to_type(proposal) -> SecretChangeProposalType:
+    proposer = proposal.proposer
+    if proposer is None:
+        proposer_display = ""
+        proposer_id = ""
+    else:
+        proposer_display = (
+            proposer.get_full_name()
+            if hasattr(proposer, "get_full_name") and proposer.get_full_name()
+            else (proposer.username or proposer.email or "")
+        )
+        proposer_id = str(proposer.pk)
+
+    approvals = list(
+        proposal.approvals.filter(deleted_at__isnull=True).select_related("approver").order_by("decided_at")
+    )
+    approved_count = sum(1 for a in approvals if a.decision == "approved")
+
+    return SecretChangeProposalType(
+        id=GUID(str(proposal.guid)),
+        registered_app_slug=proposal.registered_app.slug,
+        environment_name=proposal.environment_name or "",
+        op=proposal.op,
+        status=proposal.status,
+        proposer_user_id=proposer_id,
+        proposer_display_name=proposer_display,
+        payload=proposal.payload or {},
+        payload_diff=proposal.payload_diff or {},
+        required_approver_count=int(proposal.required_approver_count or 0),
+        approvals_count=approved_count,
+        expires_at=proposal.expires_at,
+        decided_at=proposal.decided_at,
+        applied_at=proposal.applied_at,
+        apply_error=proposal.apply_error or "",
+        created_at=proposal.created_at,
+        approvals=[secret_change_approval_to_type(a) for a in approvals],
+    )
+
+
 @strawberry.type(name="AstroliftRevealedSecret")
 class RevealedSecretType:
     """Plaintext payload returned by `revealAppSecret` (#424).

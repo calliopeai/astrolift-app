@@ -35,6 +35,7 @@ from astrolift_identity.schema.types import (
     ActiveSessionType,
     ApiTokenType,
     ApproverUserType,
+    ElevationStatusType,
     IdentityProviderType,
     InvitationType,
     MemberType,
@@ -51,6 +52,7 @@ from astrolift_identity.schema.types import (
     SearchableUserType,
     TeamType,
     _resolve_display_name,
+    active_session_to_type,
     api_token_to_type,
     app_to_summary,
     approver_user_to_type,
@@ -723,59 +725,18 @@ class IdentityQuery:
         Django superusers get every permission slug, mirroring the
         bypass in ``astrolift_identity.permission_resolver.resolve``
         — the bootstrap admin path doesn't need explicit role bindings.
-        """
-        from django.contrib.auth import get_user_model
 
-        from core.permissions import Permission
+        Routes through ``permission_resolver.resolve_effective_permissions``
+        so the read-side and the gate share the same scope-traversal
+        logic (#478) — fix-once-apply-everywhere.
+        """
+        from astrolift_identity.permission_resolver import resolve_effective_permissions
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
-
-        if (
-            get_user_model()
-            .objects.filter(pk=tenant.actor_user_id, is_superuser=True, is_active=True)
-            .exists()
-        ):
-            return sorted(p.value for p in Permission)
-
-        # Walk the user's RoleBindings in the current org and union
-        # the permission slugs each role grants. Mirrors the logic in
-        # astrolift_identity.permission_resolver.resolve(), but returns
-        # the full set instead of checking a single permission.
-        from django.utils import timezone
-
-        now = timezone.now()
-        candidate_scopes: list[tuple[str, int]] = []
-        if tenant.project_id is not None:
-            candidate_scopes.append(("PROJECT", tenant.project_id))
-        if tenant.team_id is not None:
-            candidate_scopes.append(("TEAM", tenant.team_id))
-        if tenant.organization_id is not None:
-            candidate_scopes.append(("ORG", tenant.organization_id))
-        if not candidate_scopes:
-            return []
-
-        scope_kinds = {k for k, _ in candidate_scopes}
-        scope_ids_by_kind: dict[str, set[int]] = {}
-        for k, sid in candidate_scopes:
-            scope_ids_by_kind.setdefault(k, set()).add(sid)
-
-        bindings = RoleBinding.objects.select_related("role").filter(
-            user_id=tenant.actor_user_id, scope_kind__in=scope_kinds
-        )
-        effective: set[str] = set()
-        for binding in bindings:
-            if binding.expires_at is not None and binding.expires_at <= now:
-                continue
-            ids = scope_ids_by_kind.get(binding.scope_kind, set())
-            if binding.scope_id not in ids:
-                continue
-            for slug in binding.role.permissions or ():
-                effective.add(slug)
-
-        return sorted(effective)
+        return sorted(resolve_effective_permissions(tenant))
 
     @strawberry.field
     @tenant_scoped()
@@ -800,26 +761,44 @@ class IdentityQuery:
         return identity_provider_to_type(idp, is_active=True)
 
     @strawberry.field
-    @tenant_scoped()
     def astrolift_active_sessions(self, info: Info) -> list[ActiveSessionType]:
-        """The signed-in viewer's own active sessions.
+        """The signed-in viewer's own AstroliftSession rows.
 
-        Walks ``django_session`` decoding each row's session_data to
-        find the ones bound to this user. Self-only — every authed
-        user can list their own sessions; no permission gate.
+        Self-only — every authed user can list their own sessions;
+        no permission gate. Exempt from ``@tenant_scoped`` because a
+        session is bound to a user, not an org (see
+        ``test_tenancy_guardrail.py`` EXEMPT list).
 
-        v1 surfaces what django_session natively tracks: session_key
-        (suffix), expire_date, is_current. IP / UA / created_at /
-        last_seen_at land once a SessionMetadata model + middleware
-        track them per-request (#289 follow-up).
+        Rows come from ``AstroliftSession`` (the sidecar) populated
+        by ``SessionTrackingMiddleware``; not from ``django_session``
+        directly. That gives us ``client_kind`` + ``last_seen_at`` +
+        a stable GUID for the per-row revoke path.
         """
-        from django.contrib.sessions.models import Session
-        from django.utils import timezone
+        from astrolift_identity.models import AstroliftSession
+        from astrolift_identity.sessions import record_session
 
         request = getattr(info.context, "request", None)
         viewer = getattr(request, "user", None) if request else None
         if viewer is None or not viewer.is_authenticated:
             return []
+
+        # Defensive: if the middleware hasn't had a chance to write
+        # the row for the current request yet (e.g. a brand-new login
+        # session being listed before the response cycle completes),
+        # touch it now so the caller doesn't see an empty list.
+        record_session(request)
+
+        current_key = getattr(getattr(request, "session", None), "session_key", None) or ""
+        qs = AstroliftSession.objects.filter(user=viewer).order_by("-last_seen_at", "-created_at")
+        return [
+            active_session_to_type(row, is_current=(bool(current_key) and row.session_key == current_key))
+            for row in qs
+        ]
+        from astrolift_identity.session_elevation import (
+            SESSION_KEY_ELEVATED_UNTIL,
+            SESSION_KEY_ELEVATION_METHOD,
+            _parse_iso,
+        )
 
         current_key = getattr(getattr(request, "session", None), "session_key", None)
         viewer_pk = str(viewer.pk)
@@ -833,6 +812,14 @@ class IdentityQuery:
                 continue
             if str(data.get("_auth_user_id", "")) != viewer_pk:
                 continue
+            elevated_until = _parse_iso(data.get(SESSION_KEY_ELEVATED_UNTIL))
+            # Lapsed elevations aren't surfaced as "elevated" — the
+            # client should treat them as None so the indicator goes
+            # away the moment the timer runs out without waiting for
+            # a deelevate mutation.
+            if elevated_until is not None and elevated_until <= now:
+                elevated_until = None
+            method = data.get(SESSION_KEY_ELEVATION_METHOD) if elevated_until else None
             # Return only the last 8 chars of the session key as a
             # display-safe identifier. The full key never leaves the
             # cookie jar; logout_all_sessions doesn't need it.
@@ -845,9 +832,50 @@ class IdentityQuery:
                     last_seen_at=None,
                     ip_address=None,
                     user_agent=None,
+                    elevated_until=elevated_until,
+                    elevation_method=method if isinstance(method, str) else None,
                 )
             )
         return out
+
+    @strawberry.field
+    def astrolift_elevation_status(self, info: Info) -> ElevationStatusType:
+        """Snapshot of the current session's step-up elevation (#487).
+
+        Self-only — every authed user sees their own session's
+        elevation, no permission gate. Unauthenticated callers get a
+        deny-shaped envelope (``elevated=False``, ``required_for=[]``)
+        rather than an exception so the FE can render the indicator
+        in a logged-out shell without a try/catch.
+        """
+        from astrolift_identity.session_elevation import get_status
+        from astrolift_identity.step_up import list_gated_resolvers
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated or session is None:
+            return ElevationStatusType(
+                elevated=False,
+                elevated_until=None,
+                seconds_remaining=0,
+                method=None,
+                required_for=[],
+            )
+
+        status = get_status(session)
+        # ``list_gated_resolvers`` walks the live schema so the FE's
+        # ``required_for`` reflects exactly what the backend gates —
+        # operators that bolt new sensitive mutations on a fork get
+        # them announced automatically once they decorate.
+        gated = [p.resolver.split(".", 1)[-1] for p in list_gated_resolvers()]
+        return ElevationStatusType(
+            elevated=status.elevated,
+            elevated_until=status.elevated_until,
+            seconds_remaining=status.seconds_remaining,
+            method=status.method,
+            required_for=gated,
+        )
 
 
 def _active_idp_pk() -> int | None:

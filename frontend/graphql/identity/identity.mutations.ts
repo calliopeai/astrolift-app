@@ -174,6 +174,40 @@ export const LOGOUT_ALL_SESSIONS = gql`
   }
 `;
 
+export const REVOKE_ASTROLIFT_SESSION = gql`
+  mutation RevokeAstroliftSession($input: RevokeAstroliftSessionInput!) {
+    revokeAstroliftSession(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        revoked
+      }
+    }
+  }
+`;
+
+export const HEARTBEAT_SESSION = gql`
+  mutation HeartbeatSession {
+    heartbeatSession {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        lastSeenAt
+      }
+    }
+  }
+`;
+
 export const CREATE_POLICY = gql`
   mutation CreatePolicy($input: CreatePolicyInput!) {
     createPolicy(input: $input) {
@@ -581,6 +615,69 @@ export const DISCONNECT_USER_SOURCE_PROVIDER = gql`
       data {
         providerConfigId
         disconnectedId
+      }
+    }
+  }
+`;
+
+// #487 — step-up auth. Elevate the session for a configurable
+// short window (default 15 minutes, server-clamped) so sensitive
+// mutations gated by ``@requires_elevation`` can run.
+export const ELEVATE_ADMIN_SESSION = gql`
+  mutation ElevateAdminSession($input: ElevateAdminSessionInput!) {
+    elevateAdminSession(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        elevatedUntil
+        secondsRemaining
+        method
+      }
+    }
+  }
+`;
+
+export const DEELEVATE_ADMIN_SESSION = gql`
+  mutation DeelevateAdminSession {
+    deelevateAdminSession {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        previouslyElevated
+      }
+    }
+  }
+`;
+
+// #494 — mobile install enrollment QR. Operator clicks "Pair new
+// device" → this mutation mints a pre-approved device-flow session
+// and returns the QR (rendered server-side as SVG to avoid a
+// frontend QR-encoder dependency) + the payload mobile scanners
+// decode. Single-use; rate-limited per operator.
+export const GENERATE_INSTALL_ENROLLMENT_QR = gql`
+  mutation GenerateInstallEnrollmentQr($input: GenerateInstallEnrollmentQrInput!) {
+    generateInstallEnrollmentQr(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        qrPayload
+        qrSvg
+        verificationUri
+        sessionId
+        sessionGuid
+        expiresAt
       }
     }
   }

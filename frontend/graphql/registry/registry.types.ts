@@ -6,8 +6,10 @@ import type {
   AstroliftAppConfigDrift as GeneratedAppConfigDrift,
   AstroliftAppDeploymentSummary as GeneratedAppDeploymentSummary,
   AstroliftAppHealthPulse as GeneratedAppHealthPulse,
+  AstroliftAppListStatusFilter as GeneratedAppListStatusFilter,
   AstroliftAppReprovisionState as GeneratedAppReprovisionState,
   AstroliftAppSettingsLastModified as GeneratedAppSettingsLastModified,
+  AstroliftAppSourceKindFilter as GeneratedAppSourceKindFilter,
   AstroliftAppTeamAccess as GeneratedAppTeamAccess,
   AstroliftContainer as GeneratedContainer,
   AstroliftRegisteredApp as GeneratedRegisteredApp,
@@ -150,4 +152,26 @@ export type AppTeamAccessLevel = "viewer" | "deployer" | "owner";
 
 export type AstroliftAppTeamAccess = Omit<GeneratedAppTeamAccess, "accessLevel"> & {
   accessLevel: AppTeamAccessLevel;
+};
+
+/**
+ * Apps-list filter axes (#481). Re-export with the GraphQL-generated
+ * shape — Strawberry uppercases enum members on the wire, so these
+ * match the codegen output exactly.
+ */
+export type AppListStatusFilter = GeneratedAppListStatusFilter;
+export type AppSourceKindFilter = GeneratedAppSourceKindFilter;
+
+/**
+ * Cursor-paginated apps-list slice surfaced by ``LIST_APPS_PAGE`` (#481).
+ * ``items`` carries the typed registered apps; ``nextCursor`` is the
+ * opaque cursor to feed back through ``fetchMore`` to request the
+ * next page (null when the caller has reached the end of the
+ * filtered result). ``totalCount`` is the filter-aware total — useful
+ * for "Showing N of M" copy on the page header.
+ */
+export type AstroliftRegisteredAppPage = {
+  items: AstroliftRegisteredApp[];
+  nextCursor: string | null;
+  totalCount: number;
 };

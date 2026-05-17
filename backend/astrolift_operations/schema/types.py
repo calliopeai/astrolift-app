@@ -433,6 +433,62 @@ def audit_export_to_type(e, *, download_url: str) -> AuditExportType:
     )
 
 
+@strawberry.type(name="AstroliftAppLogExport")
+class AppLogExportType:
+    """Result of an ``exportAstroliftAppLogs`` mutation (#483).
+
+    Carries the pre-signed download URL plus enough metadata
+    (line count, byte count, sha256) for the UI to surface
+    verification + progress. ``truncated`` flags when the line
+    cap was hit before the upstream stream ended — the operator
+    should narrow the time range / level / regex filter and retry."""
+
+    id: GUID
+    format: str
+    """``csv`` | ``ndjson`` | ``txt``."""
+
+    status: str
+    """``ready`` | ``expired`` | ``failed`` — mirrors the row's
+    ``status`` field. ``failed`` rows carry ``error_message``."""
+
+    row_count: int
+    """Number of log lines included in the export."""
+
+    byte_count: int
+    sha256: str
+    truncated: bool
+    """True when the line cap was hit before the source stream ended.
+    Surface a 'narrow the filter and retry' hint in the UI when set."""
+
+    download_url: str
+    """Token-gated URL the client GETs to retrieve the bytes. Single
+    use is logged on first read; subsequent reads inside the TTL
+    window are still allowed so the operator can recover from a
+    fumbled save."""
+
+    expires_at: dt.datetime
+    created_at: dt.datetime
+    error_message: str
+    """Captured failure detail when status == ``failed``. Empty
+    string on success."""
+
+
+def app_log_export_to_type(e, *, download_url: str) -> AppLogExportType:
+    return AppLogExportType(
+        id=GUID(str(e.guid)),
+        format=e.format,
+        status=e.status,
+        row_count=int(e.row_count or 0),
+        byte_count=int(e.byte_count or 0),
+        sha256=e.sha256 or "",
+        truncated=bool((e.filters_snapshot or {}).get("truncated", False)),
+        download_url=download_url,
+        expires_at=e.expires_at,
+        created_at=e.created_at,
+        error_message=e.error_message or "",
+    )
+
+
 def workflow_run_to_type(w) -> WorkflowRunType:
     return WorkflowRunType(
         id=GUID(str(w.guid)),

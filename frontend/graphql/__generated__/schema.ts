@@ -97,11 +97,13 @@ export type AssignAppToProjectInput = {
 };
 
 export type AstroliftActiveSession = {
+  clientKind: Scalars['String']['output'];
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  expiresAt: Scalars['DateTime']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
   ipAddress?: Maybe<Scalars['String']['output']>;
   isCurrent: Scalars['Boolean']['output'];
+  label: Scalars['String']['output'];
   lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
   userAgent?: Maybe<Scalars['String']['output']>;
 };
@@ -983,23 +985,6 @@ export type AstroliftDeregisterPreviewSourceWebhook = {
   repo: Scalars['String']['output'];
 };
 
-export type AstroliftDeviceRegistration = {
-  createdAt: Scalars['DateTime']['output'];
-  driverName: Scalars['String']['output'];
-  id: Scalars['GUID']['output'];
-  label: Scalars['String']['output'];
-  lastUsedAt?: Maybe<Scalars['DateTime']['output']>;
-  platform: Scalars['String']['output'];
-  registrationId: Scalars['String']['output'];
-  userId: Scalars['String']['output'];
-};
-
-export type AstroliftDeviceRegistrationMutationResult = {
-  data?: Maybe<AstroliftDeviceRegistration>;
-  errors: Array<MutationError>;
-  ok: Scalars['Boolean']['output'];
-};
-
 export type AstroliftDisconnectUserSourceProviderPayload = {
   disconnectedId?: Maybe<Scalars['GUID']['output']>;
   providerConfigId: Scalars['GUID']['output'];
@@ -1107,6 +1092,17 @@ export type AstroliftFormSubmission = {
 
 export type AstroliftFormSubmissionMutationResult = {
   data?: Maybe<AstroliftFormSubmission>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftHeartbeatSessionPayload = {
+  id: Scalars['GUID']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftHeartbeatSessionPayloadMutationResult = {
+  data?: Maybe<AstroliftHeartbeatSessionPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -1658,6 +1654,17 @@ export type AstroliftRevealedSecret = {
 
 export type AstroliftRevealedSecretMutationResult = {
   data?: Maybe<AstroliftRevealedSecret>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRevokeAstroliftSessionPayload = {
+  id: Scalars['GUID']['output'];
+  revoked: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRevokeAstroliftSessionPayloadMutationResult = {
+  data?: Maybe<AstroliftRevokeAstroliftSessionPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -2799,6 +2806,7 @@ export type Mutation = {
   generateSshDeployKey: AstroliftSshDeployKeyCreatedMutationResult;
   grantRole: AstroliftRoleBindingMutationResult;
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
+  heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
@@ -2867,7 +2875,6 @@ export type Mutation = {
   redeployApp: AstroliftDeploymentMutationResult;
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
-  registerAstroliftDevice: AstroliftDeviceRegistrationMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
@@ -2883,6 +2890,7 @@ export type Mutation = {
   revealManagedServiceConnection: AstroliftManagedServiceConnectionMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
+  revokeAstroliftSession: AstroliftRevokeAstroliftSessionPayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
@@ -2930,7 +2938,6 @@ export type Mutation = {
   transitionWorkflow: MutationResult;
   triggerAstroliftDeployWorkflow: AstroliftTriggerDeployWorkflowPayloadMutationResult;
   unmuteAlertRule: AstroliftAlertRuleMutationResult;
-  unregisterAstroliftDevice: SoftdeletepayloadMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
@@ -3534,11 +3541,6 @@ export type MutationRegisterAppArgs = {
 };
 
 
-export type MutationRegisterAstroliftDeviceArgs = {
-  input: RegisterAstroliftDeviceInput;
-};
-
-
 export type MutationRegisterTenantClusterArgs = {
   input: RegisterTenantClusterInput;
 };
@@ -3611,6 +3613,11 @@ export type MutationRevokeApiTokenArgs = {
 
 export type MutationRevokeAppCertificateArgs = {
   input: RevokeAppCertificateInput;
+};
+
+
+export type MutationRevokeAstroliftSessionArgs = {
+  input: RevokeAstroliftSessionInput;
 };
 
 
@@ -3826,11 +3833,6 @@ export type MutationTriggerAstroliftDeployWorkflowArgs = {
 
 export type MutationUnmuteAlertRuleArgs = {
   input: UnmuteAlertRuleInput;
-};
-
-
-export type MutationUnregisterAstroliftDeviceArgs = {
-  input: UnregisterAstroliftDeviceInput;
 };
 
 
@@ -4209,7 +4211,6 @@ export type Query = {
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
-  astroliftMyDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
@@ -4839,13 +4840,6 @@ export type RegisterAppInput = {
   triggerMode: InputMaybe<Scalars['String']['input']>;
 };
 
-export type RegisterAstroliftDeviceInput = {
-  kind: Scalars['String']['input'];
-  label: InputMaybe<Scalars['String']['input']>;
-  platformData: InputMaybe<Scalars['JSON']['input']>;
-  token: Scalars['String']['input'];
-};
-
 export type RegisterTenantClusterInput = {
   authConfig: InputMaybe<Scalars['JSON']['input']>;
   authMethod: Scalars['String']['input'];
@@ -4924,6 +4918,11 @@ export type RevokeApiTokenInput = {
 
 export type RevokeAppCertificateInput = {
   customDomainId: Scalars['GUID']['input'];
+};
+
+export type RevokeAstroliftSessionInput = {
+  reason: InputMaybe<Scalars['String']['input']>;
+  sessionId: Scalars['GUID']['input'];
 };
 
 export type RevokeDeployTokenInput = {
@@ -5117,10 +5116,6 @@ export type TriggerDeployWorkflowInput = {
 
 export type UnmuteAlertRuleInput = {
   ruleId: Scalars['GUID']['input'];
-};
-
-export type UnregisterAstroliftDeviceInput = {
-  deviceId: Scalars['GUID']['input'];
 };
 
 export type UnregisterTenantClusterInput = {

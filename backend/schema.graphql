@@ -73,8 +73,10 @@ input AssignAppToProjectInput {
 
 type AstroliftActiveSession {
   id: String!
-  expiresAt: DateTime!
+  expiresAt: DateTime
   isCurrent: Boolean!
+  clientKind: String!
+  label: String!
   createdAt: DateTime
   lastSeenAt: DateTime
   ipAddress: String
@@ -1087,6 +1089,17 @@ type AstroliftFormSubmissionMutationResult {
   data: AstroliftFormSubmission
 }
 
+type AstroliftHeartbeatSessionPayload {
+  id: GUID!
+  lastSeenAt: DateTime
+}
+
+type AstroliftHeartbeatSessionPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftHeartbeatSessionPayload
+}
+
 type AstroliftIdentityProvider {
   id: GUID!
   organizationSlug: String!
@@ -1636,6 +1649,17 @@ type AstroliftRevealedSecretMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftRevealedSecret
+}
+
+type AstroliftRevokeAstroliftSessionPayload {
+  id: GUID!
+  revoked: Boolean!
+}
+
+type AstroliftRevokeAstroliftSessionPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRevokeAstroliftSessionPayload
 }
 
 type AstroliftRole {
@@ -2866,6 +2890,8 @@ type Mutation {
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
   markOnboardingComplete(input: MarkOnboardingCompleteInput!): AstroliftMarkOnboardingCompletePayloadMutationResult!
   logoutAllSessions(input: LogoutAllSessionsInput!): AstroliftLogoutAllSessionsPayloadMutationResult!
+  revokeAstroliftSession(input: RevokeAstroliftSessionInput!): AstroliftRevokeAstroliftSessionPayloadMutationResult!
+  heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
@@ -3459,6 +3485,11 @@ input RevokeApiTokenInput {
 
 input RevokeAppCertificateInput {
   customDomainId: GUID!
+}
+
+input RevokeAstroliftSessionInput {
+  sessionId: GUID!
+  reason: String = null
 }
 
 input RevokeDeployTokenInput {

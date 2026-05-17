@@ -20,7 +20,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
-import { LogViewer, TerminalEmulator } from "@/components/observability";
+import { AppLogExportDialog, LogViewer, TerminalEmulator } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,6 +131,10 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
   const [streaming, setStreaming] = React.useState(false);
   const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
+  // App-log export modal — same affordance as the observability tab,
+  // operators on the console page also want to ship a bundle to a
+  // vendor without bouncing tabs. (#483)
+  const [exportOpen, setExportOpen] = React.useState(false);
 
   // Operator opts into the WS exec connection — keeps an idle
   // console tab from holding a kubelet exec socket open just
@@ -284,6 +288,15 @@ export function ConsoleClient({ slug }: { slug: string }) {
               disabled={logBuffer.length === 0}
             >
               <Trash2Icon className="size-3" /> {tObs("logs.clear")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setExportOpen(true)}
+              disabled={!selectedPod}
+              title={tObs("logs.exportTitle")}
+            >
+              <DownloadIcon className="size-3" /> {tObs("logs.export")}
             </Button>
             <Button
               size="sm"
@@ -451,6 +464,15 @@ export function ConsoleClient({ slug }: { slug: string }) {
           />
         </CardContent>
       </Card>
+
+      {/* #483 app-log export modal — vendor handoff + compliance. */}
+      <AppLogExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        appSlug={a.slug}
+        podName={selectedPod}
+        container={selectedContainer}
+      />
     </PageShell>
   );
 }

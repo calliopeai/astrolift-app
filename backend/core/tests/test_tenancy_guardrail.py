@@ -57,9 +57,48 @@ EXEMPT: dict[str, str] = {
     "IdentityMutation.update_my_profile": (
         "self-service: callers can edit their own profile fields when the IdP doesn't lock them"
     ),
+    "IdentityMutation.generate_install_enrollment_qr": (
+        "#494 self-service: any authed user can enroll their own mobile device — the "
+        "operator's web session IS the proof, same pattern as update_my_profile. The "
+        "permission check is implicit (authenticated user), not org-scoped; per-user "
+        "rate limit (ENROLLMENT_MAX_ACTIVE_PER_USER) caps abuse. The resulting "
+        "session inherits the operator's active org when one is set, so the redeemed "
+        "token is tenant-scoped at issue time even though the mutation isn't."
+    ),
     "IdentityMutation.logout_all_sessions": (
         "self-service: revokes the caller's own sessions; tenant context "
         "is irrelevant — a session is bound to a user, not an org"
+    ),
+    "IdentityMutation.revoke_astrolift_session": (
+        "self-service OR cross-tenant org-admin: callers can revoke their "
+        "own sessions regardless of active org (you can sign out a stale "
+        "phone before re-entering a tenant context). Org-admin revoke "
+        "uses the active tenant for the org-membership check inline; the "
+        "decorator can't gate it because the permitted path branches on "
+        "is-owner-vs-is-org-admin at resolver entry."
+    ),
+    "IdentityMutation.heartbeat_session": (
+        "self-service: a session is bound to a user, not an org; the "
+        "ping is the caller asserting their own liveness"
+    ),
+    "IdentityMutation.elevate_admin_session": (
+        "#487 step-up auth: elevates the caller's own session timer; "
+        "tenant context is irrelevant — elevation is session-scoped, "
+        "not org-scoped. The credential verifier IS the gate; "
+        "@require_permission would need a special 'can elevate' "
+        "permission that every authed user trivially has."
+    ),
+    "IdentityMutation.deelevate_admin_session": (
+        "#487 step-up auth: the 'log me out of admin' counterpart to "
+        "elevate_admin_session — self-service, tenant-orthogonal, no "
+        "permission gate (every authed user can drop their own "
+        "elevation)."
+    ),
+    "IdentityQuery.astrolift_elevation_status": (
+        "#487 step-up auth: returns the caller's own session elevation "
+        "snapshot. Self-service, tenant-orthogonal — drives the nav "
+        "indicator that has to render before any tenant context is "
+        "picked (e.g. on the org switcher itself)."
     ),
     "IdentityMutation.set_active_organization": (
         "the act of selecting a tenant context cannot itself be tenant-scoped"
@@ -85,6 +124,18 @@ EXEMPT: dict[str, str] = {
     "RegistryQuery.astrolift_my_apps": (
         "self-service: returns apps the caller can reach via their own RoleBindings"
         " (any scope from app up to org). Permission visibility IS the gate."
+    ),
+    "RegistryQuery.astrolift_my_apps_page": (
+        "self-service: cursor-paginated companion to astrolift_my_apps (#481)."
+        " Same rationale — the viewer's RoleBindings are the gate; filter args"
+        " (search/status/team/project) compose on top of that scope filter."
+    ),
+    "RegistryQuery.astrolift_app_permissions": (
+        "self-service: returns the caller's own effective permission slugs on "
+        "one app, computed via the same RoleBinding scope traversal the "
+        "@require_permission decorator uses (#478). No data leaks past what "
+        "the caller already has — the resolver hides apps in other tenants "
+        "and returns [] when there is no binding."
     ),
     "RegistryQuery.astrolift_platform_api_url": (
         "platform-level value (the install's PLATFORM_API_URL) surfaced to the "

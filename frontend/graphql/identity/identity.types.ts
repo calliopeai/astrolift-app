@@ -17,6 +17,8 @@ import type {
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
   AstroliftApproverUser as GeneratedApproverUser,
   AstroliftAppSummary as GeneratedAppSummary,
+  AstroliftEnrollmentQrPayload as GeneratedEnrollmentQrPayload,
+  AstroliftHeartbeatSessionPayload as GeneratedHeartbeatSessionPayload,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
   AstroliftInvitation as GeneratedInvitation,
   AstroliftLogoutAllSessionsPayload as GeneratedLogoutAllSessionsPayload,
@@ -26,6 +28,7 @@ import type {
   AstroliftOrganizationAllowlistedDomain as GeneratedOrganizationAllowlistedDomain,
   AstroliftPolicy as GeneratedPolicy,
   AstroliftProject as GeneratedProject,
+  AstroliftRevokeAstroliftSessionPayload as GeneratedRevokeAstroliftSessionPayload,
   AstroliftRole as GeneratedRole,
   AstroliftRoleBinding as GeneratedRoleBinding,
   AstroliftSearchableUser as GeneratedSearchableUser,
@@ -147,9 +150,29 @@ export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
 
 export type AstroliftOrganizationAllowlistedDomain = GeneratedOrganizationAllowlistedDomain;
 
-export type AstroliftActiveSession = GeneratedActiveSession;
+/**
+ * Issuance kind of a session row. Mirrors
+ * ``astrolift_identity.models.ClientKind`` on the backend. Stored
+ * as the lowercase string on the wire; the FE narrows it here so
+ * switch / badge rendering stays exhaustive when a new kind lands.
+ */
+export type AstroliftClientKind = "web" | "cli" | "mobile" | "browser_extension" | "api_token";
+
+export type AstroliftActiveSession = Omit<GeneratedActiveSession, "clientKind"> & {
+  clientKind: AstroliftClientKind;
+};
 
 export type AstroliftLogoutAllSessionsPayload = GeneratedLogoutAllSessionsPayload;
+
+// #494 — mobile install enrollment QR payload (returned by
+// ``generateInstallEnrollmentQr``). All scalars are non-null per
+// the backend ``EnrollmentQrPayloadType`` — including ``qrSvg``,
+// which is the server-rendered SVG markup the frontend embeds
+// directly.
+export type AstroliftEnrollmentQrPayload = GeneratedEnrollmentQrPayload;
+export type AstroliftRevokeAstroliftSessionPayload = GeneratedRevokeAstroliftSessionPayload;
+
+export type AstroliftHeartbeatSessionPayload = GeneratedHeartbeatSessionPayload;
 
 export type MutationError = GeneratedMutationError;
 
@@ -204,4 +227,36 @@ export interface AstroliftBulkAssignTeamMemberRolesPayload {
   assignedCount: number;
   alreadyAssignedCount: number;
   failedCount: number;
+}
+
+// ---- #487 step-up auth ------------------------------------------------
+
+export type AstroliftElevationMethod =
+  | "password"
+  | "otp"
+  | "webauthn"
+  | "magic_link";
+
+export interface ElevateAdminSessionInput {
+  method: AstroliftElevationMethod;
+  credential: string;
+  ttlSeconds?: number;
+}
+
+export interface AstroliftElevatePayload {
+  elevatedUntil: string;
+  secondsRemaining: number;
+  method: AstroliftElevationMethod;
+}
+
+export interface AstroliftDeelevatePayload {
+  previouslyElevated: boolean;
+}
+
+export interface AstroliftElevationStatus {
+  elevated: boolean;
+  elevatedUntil: string | null;
+  secondsRemaining: number;
+  method: AstroliftElevationMethod | null;
+  requiredFor: string[];
 }

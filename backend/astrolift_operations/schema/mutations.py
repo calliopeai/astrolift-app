@@ -35,6 +35,7 @@ from astrolift_operations.notification_dispatch import (
 from astrolift_operations.schema.types import (
     AlertEventType,
     AlertRuleType,
+    AppLogExportType,
     AuditExportType,
     DeviceRegistrationType,
     NotificationType,
@@ -42,6 +43,7 @@ from astrolift_operations.schema.types import (
     WebhookTestResultType,
     alert_event_to_type,
     alert_rule_to_type,
+    app_log_export_to_type,
     audit_export_to_type,
     device_registration_to_type,
     notification_to_type,
@@ -238,6 +240,58 @@ class ExportAuditEventsInput:
     action: str | None = None
     decision: str | None = None
     actor_id: str | None = None
+
+
+@strawberry.input
+class ExportAppLogsInput:
+    """Filter snapshot for the app-log export (#483).
+
+    The mutation streams runtime container log lines from the
+    cluster's log backend, applies the level + regex filters in
+    process, and writes the bytes to a token-gated download URL.
+    Cap on line count enforced via ``APP_LOG_EXPORT_MAX_LINES``
+    Constance flag — out-of-bound exports return ``truncated=true``
+    so the operator can narrow filters and retry.
+
+    Mobile-friendly: every field except ``app_slug`` + ``format`` is
+    optional, so a mobile client can fire a one-shot 'last hour, raw
+    text' export with two fields."""
+
+    app_slug: str
+    format: str
+    """``CSV`` | ``NDJSON`` | ``TXT``. Case-insensitive."""
+
+    environment_name: str | None = None
+    """Scope to a single env's cluster. When null, the resolver picks
+    the app's default cluster."""
+
+    workload_slug: str | None = None
+    """Reserved for future per-workload streaming via the log
+    backend. Recorded on the export row for the audit trail; current
+    serializer ignores it because the cluster driver streams at the
+    pod granularity."""
+
+    pod_name: str | None = None
+    """Single-pod scope. When null, the mutation refuses — the
+    cluster driver's ``stream_logs`` requires a pod name; multi-pod
+    aggregation is a future enhancement (#483 follow-up)."""
+
+    container: str | None = None
+    """Single container within ``pod_name``. When null, the cluster
+    driver picks the default container."""
+
+    since: dt.datetime | None = None
+    until: dt.datetime | None = None
+    """ISO timestamps bounding the requested window. Both optional;
+    the cluster driver applies its own ``tail_lines`` cap regardless."""
+
+    level: str | None = None
+    """Case-insensitive substring match against the log message.
+    ``"ERROR"`` matches lines containing ``error`` or ``ERROR``."""
+
+    regex: str | None = None
+    """Python regex over the message. Invalid patterns return
+    VALIDATION failure with ``field='regex'``."""
 
 
 @strawberry.type
@@ -1196,6 +1250,283 @@ class OperationsMutation:
         )
         return gql_success(audit_export_to_type(export, download_url=download_url))
 
+    @strawberry.field
+    @mutation_audit(action="app.log_export")
+    @require_permission(Permission.APP_LOG_EXPORT)
+    @tenant_scoped()
+    def export_astrolift_app_logs(
+        self, info: Info, input: ExportAppLogsInput
+    ) -> MutationResultType[AppLogExportType]:
+        """Stream the matching app-log slice into a token-gated
+        download (#483). Same artifact + single-use token shape as
+        ``exportAuditEvents``; pulls runtime container logs through
+        the cluster ``ClusterDriver`` (the same path the ``onAppLog``
+        subscription uses) so what the operator sees on screen is
+        what lands in the file."""
+        import re
+
+        from constance import config as constance_config
+        from django.utils import timezone
+
+        from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_operations import app_log_export as app_log_helpers
+        from astrolift_operations.models import AppLogExport
+        from astrolift_registry.models import RegisteredApp
+        from core.cluster_observability import (
+            ClusterObservabilityError,
+            namespace_for_app,
+        )
+
+        fmt = (input.format or "").strip().lower()
+        if fmt not in {"csv", "ndjson", "txt"}:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "format must be CSV, NDJSON, or TXT",
+                field="format",
+            )
+
+        if not (input.app_slug or "").strip():
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "appSlug is required",
+                field="appSlug",
+            )
+
+        if not (input.pod_name or "").strip():
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "podName is required",
+                field="podName",
+            )
+
+        if input.regex:
+            try:
+                re.compile(input.regex)
+            except re.error as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"invalid regex: {exc}",
+                    field="regex",
+                )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        app = (
+            RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+            .filter(
+                slug=input.app_slug,
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        # Environment lookup: when the operator pinned a name, that
+        # env's cluster wins; otherwise we fall back to the app's
+        # default cluster (matches the subscription's resolution
+        # contract). An unknown env name fails loudly so a typo
+        # doesn't silently land logs from the wrong cluster.
+        cluster = None
+        if input.environment_name:
+            env = (
+                AppEnvironment.objects.select_related("tenant_cluster")
+                .filter(
+                    registered_app=app,
+                    name=input.environment_name,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if env is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"environment {input.environment_name!r} not found on app {app.slug!r}",
+                    field="environmentName",
+                )
+            cluster = env.tenant_cluster
+        if cluster is None:
+            cluster = app.default_tenant_cluster
+        if cluster is None or not getattr(cluster, "is_active", True):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"app {app.slug!r} has no active cluster wired",
+            )
+
+        namespace = namespace_for_app(app)
+
+        max_lines = max(
+            1,
+            int(getattr(constance_config, "APP_LOG_EXPORT_MAX_LINES", 100000)),
+        )
+
+        # Pull from the cluster driver with ``follow=False`` so the
+        # generator terminates at the current tail. ``tail_lines``
+        # is capped at the configured max so the driver doesn't ship
+        # us more than the export will ever serialize.
+        try:
+            line_source = _materialize_app_log_lines(
+                cluster=cluster,
+                namespace=namespace,
+                pod_name=input.pod_name,
+                container=input.container,
+                tail_lines=max_lines,
+                since=input.since,
+                until=input.until,
+            )
+        except ClusterObservabilityError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"cluster log backend unavailable: {exc}",
+            )
+
+        from core.fields.uuid_v7 import uuid7
+
+        export_guid = uuid7()
+
+        try:
+            artifact = app_log_helpers.write_artifact(
+                line_source,
+                format=fmt,
+                guid=str(export_guid),
+                max_lines=max_lines,
+                level=input.level,
+                regex=input.regex,
+            )
+        except ValueError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="format")
+
+        plaintext_token, token_hash = app_log_helpers.mint_token()
+        ttl_seconds = max(
+            60,
+            int(getattr(constance_config, "APP_LOG_EXPORT_DOWNLOAD_TTL_SECONDS", 3600)),
+        )
+        expires_at = timezone.now() + dt.timedelta(seconds=ttl_seconds)
+
+        actor_user_id = tenant.actor_user_id if tenant else None
+        from django.contrib.auth import get_user_model
+
+        requested_by = None
+        if actor_user_id is not None:
+            requested_by = get_user_model().objects.filter(pk=actor_user_id).first()
+
+        export = AppLogExport.objects.create(
+            guid=export_guid,
+            organization=org,
+            registered_app=app,
+            environment_name=input.environment_name or "",
+            pod_name=input.pod_name or "",
+            workload_name=input.workload_slug or "",
+            container=input.container or "",
+            requested_by=requested_by,
+            format=fmt,
+            status=AppLogExport.Status.READY,
+            row_count=artifact.row_count,
+            byte_count=artifact.byte_count,
+            sha256=artifact.sha256,
+            relative_path=artifact.relative_path,
+            token_hash=token_hash,
+            filters_snapshot={
+                "since": (input.since.isoformat() if input.since else ""),
+                "until": (input.until.isoformat() if input.until else ""),
+                "level": input.level or "",
+                "regex": input.regex or "",
+                "container": input.container or "",
+                "workload_slug": input.workload_slug or "",
+                "truncated": artifact.truncated,
+            },
+            expires_at=expires_at,
+        )
+        assert export.token_hash == app_log_helpers.hash_token(plaintext_token)
+
+        download_url = _build_app_log_export_url(
+            info=info,
+            guid=str(export.guid),
+            token=plaintext_token,
+        )
+        return gql_success(app_log_export_to_type(export, download_url=download_url))
+
+
+def _materialize_app_log_lines(
+    *,
+    cluster,
+    namespace: str,
+    pod_name: str | None,
+    container: str | None,
+    tail_lines: int,
+    since: dt.datetime | None,
+    until: dt.datetime | None,
+):
+    """Drain the cluster driver's async log generator into a list
+    bounded by ``tail_lines``.
+
+    The export resolver is a synchronous mutation but the driver
+    returns an :class:`AsyncIterator` of ``PodLogLine`` instances.
+    We collect with a fresh event loop and clamp to ``tail_lines``
+    so a chatty pod can't blow the resolver's memory budget. The
+    ``since`` / ``until`` filter runs in-process — the cluster
+    driver's k8s ``--since-time=`` path is per-plugin and out of
+    scope for the first cut.
+    """
+    import asyncio
+
+    from core.cluster_observability import stream_app_logs
+
+    async def _drain():
+        collected: list = []
+        # Ask for one more than the configured cap so the serializer
+        # can honestly distinguish "cap hit" from "stream ended at
+        # exactly the cap". The serializer drops the spare in either
+        # case — only the truncation flag depends on it.
+        gen = stream_app_logs(
+            cluster=cluster,
+            namespace=namespace,
+            pod_name=pod_name or "",
+            container=container,
+            tail_lines=tail_lines + 1,
+            follow=False,
+        )
+        try:
+            async for line in gen:
+                ts = getattr(line, "timestamp", None)
+                if since is not None and ts is not None and ts < since:
+                    continue
+                if until is not None and ts is not None and ts > until:
+                    continue
+                collected.append(line)
+                if len(collected) >= tail_lines + 1:
+                    # +1 over the cap lets the serializer detect
+                    # truncation honestly.
+                    break
+        finally:
+            try:
+                await gen.aclose()
+            except Exception:  # noqa: BLE001
+                pass
+        return collected
+
+    try:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(_drain())
+        finally:
+            loop.close()
+    except RuntimeError:
+        # An outer event loop is already running (rare for a sync
+        # resolver; protects against pytest-asyncio harness misuse).
+        return asyncio.run(_drain())
+
 
 def _build_audit_export_url(*, info: Info, guid: str, token: str) -> str:
     """Build the absolute download URL for an audit export. Uses the
@@ -1207,6 +1538,29 @@ def _build_audit_export_url(*, info: Info, guid: str, token: str) -> str:
     base_url_setting = getattr(settings, "DJANGO_BASE_URL", None) or getattr(settings, "BASE_URL", "app/")
     base_url = (base_url_setting or "app/").lstrip("/")
     relative = f"/{base_url}audit_exports/{guid}/{token}/"
+
+    request = getattr(info.context, "request", None) if info and info.context else None
+    if request is not None:
+        try:
+            return request.build_absolute_uri(relative)
+        except Exception:  # noqa: BLE001 — never let URL building break the mutation
+            pass
+
+    platform_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+    if platform_url:
+        return platform_url + relative
+    return relative
+
+
+def _build_app_log_export_url(*, info: Info, guid: str, token: str) -> str:
+    """Build the absolute download URL for an app-log export (#483).
+    Same shape as the audit-export URL builder but mounted under
+    ``/app/app_log_exports/`` per :mod:`astrolift_operations.urls`."""
+    from django.conf import settings
+
+    base_url_setting = getattr(settings, "DJANGO_BASE_URL", None) or getattr(settings, "BASE_URL", "app/")
+    base_url = (base_url_setting or "app/").lstrip("/")
+    relative = f"/{base_url}app_log_exports/{guid}/{token}/"
 
     request = getattr(info.context, "request", None) if info and info.context else None
     if request is not None:

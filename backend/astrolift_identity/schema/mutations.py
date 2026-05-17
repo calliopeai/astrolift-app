@@ -16,6 +16,8 @@ collide with the legacy ``organization`` app's GraphQL surface.
 
 from __future__ import annotations
 
+import datetime as dt
+
 import strawberry
 from strawberry.types import Info
 
@@ -45,6 +47,7 @@ from astrolift_identity.models import (
 )
 from astrolift_identity.schema.types import (
     ApiTokenPlaintextType,
+    EnrollmentQrPayloadType,
     IdentityProviderType,
     InvitationCreatedType,
     InvitationType,
@@ -67,8 +70,9 @@ from astrolift_identity.schema.types import (
     role_to_type,
     team_to_type,
 )
+from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode, mutation_audit
+from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -242,6 +246,24 @@ class RevokeApiTokenInput:
 
 
 @strawberry.input
+class GenerateInstallEnrollmentQrInput:
+    """Input for ``generateInstallEnrollmentQr`` (#494).
+
+    ``label`` is the human-friendly name surfaced on the enrolled
+    device's listing ("Sarah's iPhone"). Operator-facing only; mobile
+    sends its own User-Agent at redeem time, which overrides this on
+    the resulting session row.
+
+    ``ttl_seconds`` is clamped server-side to
+    ``ENROLLMENT_TTL_MIN..ENROLLMENT_TTL_MAX``; ``None`` resolves to
+    the default (5 min per the issue spec).
+    """
+
+    label: str | None = None
+    ttl_seconds: int | None = None
+
+
+@strawberry.input
 class CreatePolicyInput:
     name: str
     slug: str
@@ -303,6 +325,46 @@ class LogoutAllSessionsInput:
 
 
 @strawberry.input
+class RevokeAstroliftSessionInput:
+    """Revoke a single session by its GUID (#480).
+
+    ``reason`` is an optional free-form note (truncated to 48 chars)
+    appended to the canonical ``RevocationReason`` tag on the
+    audit row — operators use it for "lost device", "fired
+    employee", etc. Required arg is ``session_id`` only.
+    """
+
+    session_id: GUID
+    reason: str | None = None
+
+
+@strawberry.type(name="AstroliftRevokeAstroliftSessionPayload")
+class _RevokeAstroliftSessionPayload:
+    id: GUID
+    revoked: bool
+
+
+@strawberry.type(name="AstroliftHeartbeatSessionPayload")
+class _HeartbeatSessionPayload:
+    id: GUID
+    last_seen_at: dt.datetime | None
+class ElevateAdminSessionInput:
+    """Step-up auth input (#487, spec 27 §4.1).
+
+    ``method`` is one of ``password | otp | webauthn | magic_link``.
+    ``credential`` is the raw value the operator presented (password
+    string, OTP code, WebAuthn assertion serialized as JSON, magic-
+    link token). Per-call ``ttl_seconds`` is clamped server-side at
+    ``STEP_UP_AUTH_MAX_TTL_SECONDS``; omit to use the operator-
+    configurable default.
+    """
+
+    method: str
+    credential: str
+    ttl_seconds: int | None = None
+
+
+@strawberry.input
 class MarkOnboardingCompleteInput:
     """Flip the active org's ``onboarding_completed_at`` to now.
 
@@ -326,6 +388,34 @@ class _MarkOnboardingCompletePayload:
 class _LogoutAllSessionsPayload:
     revoked_count: int
     kept_current: bool
+
+
+@strawberry.type(name="AstroliftElevatePayload")
+class _ElevatePayload:
+    """Result of a successful elevateAdminSession call.
+
+    ``elevated_until`` is the absolute UTC timestamp at which the
+    elevation lapses; the FE renders ``seconds_remaining`` as a
+    countdown next to the "Admin elevated" nav indicator.
+    ``method`` echoes back which credential was accepted so the FE
+    can show "elevated via WebAuthn" on the session info popover.
+    """
+
+    elevated_until: dt.datetime
+    seconds_remaining: int
+    method: str
+
+
+@strawberry.type(name="AstroliftDeelevatePayload")
+class _DeelevatePayload:
+    """Result of deelevateAdminSession — the session is now un-elevated.
+
+    Carries ``previously_elevated`` so the audit row + UI can
+    distinguish "operator clicked log-me-out-of-admin while elevated"
+    from "operator clicked it while already un-elevated" (a no-op).
+    """
+
+    previously_elevated: bool
 
 
 @strawberry.type
@@ -559,6 +649,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.grant")
+    @requires_elevation(action_label="role_binding.grant")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def grant_role(self, info: Info, input: GrantRoleInput) -> MutationResultType[RoleBindingType]:
@@ -618,6 +709,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.revoke")
+    @requires_elevation(action_label="role_binding.revoke")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def revoke_role_binding(
@@ -643,6 +735,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_revoke")
+    @requires_elevation(action_label="role_binding.bulk_revoke")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def bulk_revoke_astrolift_role_bindings(
@@ -753,6 +846,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_assign_team")
+    @requires_elevation(action_label="role_binding.bulk_assign_team")
     @require_permission(Permission.TEAM_MANAGE_MEMBERS)
     @tenant_scoped()
     def bulk_assign_astrolift_team_member_roles(
@@ -1414,6 +1508,95 @@ class IdentityMutation:
         token.save(update_fields=["is_revoked", "updated_at", "version"])
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
+    # ---- Install enrollment QR (#494) --------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="auth.enrollment.generated")
+    def generate_install_enrollment_qr(
+        self, info: Info, input: GenerateInstallEnrollmentQrInput
+    ) -> MutationResultType[EnrollmentQrPayloadType]:
+        # Self-service: any authed user can enroll their own mobile
+        # device. The operator's web session IS the proof — same
+        # pattern as ``update_my_profile``. EXEMPT in
+        # ``test_tenancy_guardrail`` for the same reason.
+        actor = _actor()
+        if actor is None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "authentication required")
+
+        # Bind the enrollment to the operator's active tenant when
+        # one is set; the redeemed access token inherits the same
+        # organization. Tenants without an active org (e.g. a fresh
+        # operator who hasn't picked one yet) get a null binding —
+        # the resulting API token is unscoped, same as the existing
+        # api_token.create path when no org is picked.
+        tenant = get_current_tenant()
+        org = None
+        if tenant and tenant.organization_id:
+            org = Organization.objects.filter(pk=tenant.organization_id).first()
+
+        from astrolift_identity import device_flow as df
+
+        result = df.create_enrollment(
+            user=actor,
+            organization=org,
+            label=input.label or "",
+            ttl_seconds=input.ttl_seconds,
+        )
+        if isinstance(result, str):
+            if result == "rate_limited":
+                return gql_failure(
+                    ErrorCode.RATE_LIMITED.value,
+                    f"too many active enrollments (max {df.ENROLLMENT_MAX_ACTIVE_PER_USER});"
+                    " wait for one to expire or use it first",
+                )
+            if result == "no_organization":
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "no active organization — pick one before pairing a mobile device",
+                )
+            return gql_failure(ErrorCode.PRECONDITION.value, f"enrollment failed: {result}")
+
+        # ---- build the QR payload + render the SVG -------------------
+        import base64
+        import json
+
+        from django.conf import settings as dj_settings
+
+        from astrolift_identity import _qr
+
+        install_url = (dj_settings.APP_BASE_URL or "").rstrip("/") or "http://localhost:3000"
+        install_label = org.name if org else (dj_settings.APP_BASE_URL or "Astrolift")
+        payload_dict = {
+            "v": 1,
+            "install_url": install_url,
+            "install_label": install_label,
+            "enrollment_token": result.token_plaintext,
+            "expires_at": result.expires_at.isoformat(),
+            "session_id": result.session_id,
+        }
+        payload_json = json.dumps(payload_dict, separators=(",", ":"))
+        qr_payload = base64.urlsafe_b64encode(payload_json.encode("utf-8")).decode("ascii")
+
+        # The QR encodes the deep-link URL (per the issue task
+        # context); the encoded JSON travels as a query param so
+        # mobile scanners that pop a browser still hand off the
+        # full payload. Falls back to plain ``install_url`` for
+        # operators typing manually.
+        deep_link = f"astrolift://enroll?payload={qr_payload}"
+        qr = _qr.encode_text(deep_link, _qr.Ecc.M)
+        qr_svg = _qr.to_svg(qr)
+
+        return gql_success(
+            EnrollmentQrPayloadType(
+                qr_payload=qr_payload,
+                qr_svg=qr_svg,
+                verification_uri=install_url,
+                session_id=result.session_id,
+                session_guid=GUID(result.session_guid),
+                expires_at=result.expires_at,
+            )
+        )
+
     # ---- ABAC Policy -------------------------------------------------
 
     @strawberry.field
@@ -1516,6 +1699,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.create")
+    @requires_elevation(action_label="identity_provider.create")
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def create_identity_provider(
@@ -1583,6 +1767,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.update")
+    @requires_elevation(action_label="identity_provider.update")
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def update_identity_provider(
@@ -1613,6 +1798,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.set_active")
+    @requires_elevation(action_label="identity_provider.set_active")
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def set_active_identity_provider(
@@ -1782,14 +1968,19 @@ class IdentityMutation:
     def logout_all_sessions(
         self, info: Info, input: LogoutAllSessionsInput
     ) -> MutationResultType[_LogoutAllSessionsPayload]:
-        """Revoke every active django_session row bound to the
-        signed-in viewer. Defaults to keeping the current session
-        active so the caller doesn't immediately bounce to /login.
+        """Revoke every active session bound to the signed-in viewer.
+
+        Soft-revokes the matching ``AstroliftSession`` sidecars AND
+        deletes the underlying ``django_session`` rows so the cookies
+        fail auth on the next request. Defaults to keeping the
+        current session active so the caller doesn't immediately
+        bounce to /login.
 
         Self-only — every authenticated user can sign themselves
         out of their other devices; no permission gate.
         """
-        from django.contrib.sessions.models import Session
+        from astrolift_identity.models import AstroliftSession, RevocationReason
+        from astrolift_identity.sessions import revoke_session
 
         request = getattr(info.context, "request", None)
         viewer = getattr(request, "user", None) if request else None
@@ -1797,28 +1988,276 @@ class IdentityMutation:
             return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
 
         current_key = getattr(getattr(request, "session", None), "session_key", None)
-        viewer_pk = str(viewer.pk)
-        keys_to_delete: list[str] = []
-        for s in Session.objects.iterator():
-            try:
-                data = s.get_decoded()
-            except Exception:
+        kept_current = False
+        revoked_count = 0
+        qs = AstroliftSession.objects.filter(user=viewer)
+        for row in qs:
+            if input.keep_current and current_key and row.session_key == current_key:
+                kept_current = True
                 continue
-            if str(data.get("_auth_user_id", "")) != viewer_pk:
-                continue
-            if input.keep_current and s.session_key == current_key:
-                continue
-            keys_to_delete.append(s.session_key)
-
-        if keys_to_delete:
-            Session.objects.filter(session_key__in=keys_to_delete).delete()
+            revoke_session(row=row, actor_user_id=viewer.pk, reason=RevocationReason.LOGOUT)
+            revoked_count += 1
 
         return gql_success(
             _LogoutAllSessionsPayload(
-                revoked_count=len(keys_to_delete),
-                kept_current=bool(input.keep_current and current_key is not None),
+                revoked_count=revoked_count,
+                kept_current=bool(kept_current),
             )
         )
+
+    @strawberry.field
+    @mutation_audit(
+        action="session.revoke",
+        target=lambda self, info, input: ("astrolift_session", str(input.session_id)),
+    )
+    def revoke_astrolift_session(
+        self, info: Info, input: RevokeAstroliftSessionInput
+    ) -> MutationResultType[_RevokeAstroliftSessionPayload]:
+        """Revoke a single AstroliftSession by GUID.
+
+        Permission gate:
+
+        * Caller owns the session → allowed.
+        * Caller belongs to the active org AND holds ``ORG_MANAGE_MEMBERS``
+          AND the target session belongs to a user in that org → allowed.
+        * Otherwise denied.
+
+        Refuses to revoke the caller's *own current* session — that
+        path is ``logoutAllSessions`` with ``keep_current=False`` or
+        a plain ``/logout``. Revoking your own current request
+        would race the response that's holding the cookie.
+
+        Idempotent: revoking an already-revoked row returns
+        ``ok: true`` with ``revoked=False``.
+        """
+        from astrolift_identity.models import AstroliftSession, Member, RevocationReason
+        from astrolift_identity.sessions import revoke_session
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        row = AstroliftSession.all_objects.filter(guid=str(input.session_id)).first()
+        if row is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "session not found")
+
+        is_owner = row.user_id == viewer.pk
+        is_org_admin = False
+        if not is_owner:
+            tenant = get_current_tenant()
+            org_id = tenant.organization_id if tenant else None
+            if org_id is not None:
+                # The active-org check: caller must be a Member of the
+                # active org AND hold ORG_MANAGE_MEMBERS AND the target
+                # session must belong to a user in that same org. Member
+                # rows are (scope_kind, scope_id) — the ORG-scoped row
+                # is the one we want for cross-tenant gating.
+                target_in_org = Member.objects.filter(
+                    user_id=row.user_id,
+                    scope_kind=Member.ScopeKind.ORG.value,
+                    scope_id=org_id,
+                    deleted_at__isnull=True,
+                ).exists()
+                caller_in_org = Member.objects.filter(
+                    user_id=viewer.pk,
+                    scope_kind=Member.ScopeKind.ORG.value,
+                    scope_id=org_id,
+                    deleted_at__isnull=True,
+                ).exists()
+                if target_in_org and caller_in_org:
+                    from core.permissions import check_permission as _check
+
+                    try:
+                        _check(Permission.ORG_MANAGE_MEMBERS)
+                        is_org_admin = True
+                    except Exception:  # noqa: BLE001 — gate is best-effort
+                        is_org_admin = False
+
+        if not (is_owner or is_org_admin):
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "cannot revoke this session")
+
+        if is_owner:
+            current_key = getattr(getattr(request, "session", None), "session_key", None)
+            if current_key and row.session_key == current_key:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "cannot revoke the current session via this mutation; use logout",
+                )
+
+        already_revoked = row.revoked_at is not None or row.deleted_at is not None
+        reason = (input.reason or "").strip()
+        revoke_session(
+            row=row,
+            actor_user_id=viewer.pk,
+            reason=(RevocationReason.ADMIN_REVOKE if is_org_admin else RevocationReason.USER_REVOKE),
+        )
+        if reason and not already_revoked:
+            # Operator-supplied reason — stash it as a free-form note
+            # so the audit row can carry it without expanding the
+            # vocabulary of RevocationReason tags.
+            row.revocation_reason = (row.revocation_reason + ":" + reason[:48])[:64]
+            row.save(update_fields=["revocation_reason", "updated_at", "version"])
+
+        return gql_success(
+            _RevokeAstroliftSessionPayload(
+                id=GUID(str(row.guid)),
+                revoked=not already_revoked,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="session.heartbeat")
+    def heartbeat_session(self, info: Info) -> MutationResultType[_HeartbeatSessionPayload]:
+        """Refresh the current session's ``last_seen_at`` immediately.
+
+        Bypasses the middleware's per-minute write throttle — the
+        client is explicitly asserting liveness, so we honor the
+        ping. Used by CLIs on periodic ticks and the mobile app on
+        foreground events.
+
+        Self-only — no permission gate. Returns the updated
+        ``last_seen_at`` so the caller can confirm the write took.
+        """
+        from astrolift_identity.models import AstroliftSession
+        from astrolift_identity.sessions import record_session, touch_last_seen
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        # record_session() find-or-creates the row; touch_last_seen
+        # then bypasses the throttle.
+        row = record_session(request)
+        if row is None:
+            current_key = getattr(getattr(request, "session", None), "session_key", None)
+            if current_key:
+                row = AstroliftSession.objects.filter(session_key=current_key, user=viewer).first()
+        if row is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "no active session to heartbeat")
+        touch_last_seen(row)
+        return gql_success(
+            _HeartbeatSessionPayload(
+                id=GUID(str(row.guid)),
+                last_seen_at=row.last_seen_at,
+            )
+        )
+
+    # ---- Step-up auth (#487, spec 27 §4.1) ---------------------------
+    #
+    # ``elevateAdminSession`` flips a server-side timer on the current
+    # session so sensitive mutations (secret writes, role grants,
+    # force-redeploys, app deregistration) can run. The decorator
+    # ``@requires_elevation`` on those mutations re-checks the timer
+    # on every call; lapsed → deny envelope → FE re-prompts.
+    #
+    # Self-only — every authed user can elevate their own session;
+    # no permission gate. The credential verifier (default: password
+    # against the Django User row, swappable via
+    # ``register_credential_verifier``) is what gates access. A
+    # session with no underlying user (token-auth path) cannot
+    # elevate and gets the same VALIDATION envelope as wrong creds.
+
+    @strawberry.field
+    @mutation_audit(action="auth.elevate_admin")
+    def elevate_admin_session(
+        self, info: Info, input: ElevateAdminSessionInput
+    ) -> MutationResultType[_ElevatePayload]:
+        from astrolift_identity.session_elevation import (
+            KNOWN_METHODS,
+            elevate,
+            verify_credential,
+        )
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        if session is None:
+            # Token-authed callers (API tokens) don't carry a session
+            # bag; step-up is browser-session only by design. They
+            # surface a typed error so the FE can hide the modal for
+            # those callers.
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "step-up auth requires a browser session",
+            )
+
+        method = (input.method or "").strip().lower()
+        if method not in KNOWN_METHODS:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown method {input.method!r}",
+                field="method",
+            )
+        if not input.credential:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "credential is required",
+                field="credential",
+            )
+        if not verify_credential(viewer, method, input.credential):
+            # Audit the failed attempt so security review can spot
+            # brute-force probes; bare-bones AuditEntry beats relying
+            # on @mutation_audit's success/failure split because we
+            # want a distinct ``auth.elevate_admin.failed`` row.
+            tenant = get_current_tenant()
+            try:
+                emit_audit(
+                    AuditEntry(
+                        actor_user_id=tenant.actor_user_id if tenant else viewer.pk,
+                        organization_id=tenant.organization_id if tenant else None,
+                        action="auth.elevate_admin.failed",
+                        decision="DENY",
+                        target_kind="user",
+                        target_id=viewer.pk,
+                        duration_ms=0,
+                        permissions=(),
+                        error_code=ErrorCode.PERMISSION_DENIED.value,
+                        error_message="invalid credential for step-up",
+                        extra={"method": method},
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                import logging as _log
+
+                _log.getLogger(__name__).exception("elevate_admin_session: failed-attempt audit emit raised")
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "invalid credential",
+                field="credential",
+            )
+
+        status = elevate(session, method=method, ttl_seconds=input.ttl_seconds)
+        return gql_success(
+            _ElevatePayload(
+                elevated_until=status.elevated_until,  # type: ignore[arg-type]
+                seconds_remaining=status.seconds_remaining,
+                method=method,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="auth.deelevate_admin")
+    def deelevate_admin_session(self, info: Info) -> MutationResultType[_DeelevatePayload]:
+        from astrolift_identity.session_elevation import deelevate, get_status
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        if session is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "step-up auth requires a browser session",
+            )
+
+        was_elevated = get_status(session).elevated
+        deelevate(session)
+        return gql_success(_DeelevatePayload(previously_elevated=was_elevated))
 
 
 def _validate_idp_config(input) -> MutationResultType | None:

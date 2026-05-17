@@ -45,6 +45,7 @@ export type AstroliftPermission =
   | "secret.read"
   | "secret.write"
   | "secret.list"
+  | "secret.approve"
   // Managed services
   | "managed_service.create"
   | "managed_service.update"
@@ -81,10 +82,7 @@ export type PermissionCheck =
   | { anyOf: AstroliftPermission[] }
   | { allOf: AstroliftPermission[] };
 
-export function permissionMatches(
-  granted: ReadonlySet<string>,
-  check: PermissionCheck,
-): boolean {
+export function permissionMatches(granted: ReadonlySet<string>, check: PermissionCheck): boolean {
   if (typeof check === "string") return granted.has(check);
   if ("anyOf" in check) return check.anyOf.some((p) => granted.has(p));
   if ("allOf" in check) return check.allOf.every((p) => granted.has(p));

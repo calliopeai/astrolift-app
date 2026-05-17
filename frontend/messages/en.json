@@ -143,7 +143,9 @@
     "backCta": "Back",
     "nextCta": "Next",
     "finishCta": "Finish setup",
-    "a11y": { "steps": "Onboarding progress" },
+    "a11y": {
+      "steps": "Onboarding progress"
+    },
     "toast": {
       "success": "Onboarding complete — you're all set.",
       "skipFailed": "Couldn't save your skip. Try again.",
@@ -284,6 +286,33 @@
     },
     "breadcrumb": {
       "root": "Settings"
+    },
+    "security": {
+      "devices": {
+        "title": "Mobile devices",
+        "description": "Pair the Astrolift mobile app to this install by scanning a QR code — no URL typing on the phone.",
+        "buttonPair": "Pair new device",
+        "dialogTitle": "Pair a mobile device",
+        "dialogDescription": "Generate a one-time QR code, then scan it with the Astrolift mobile app to enrol this install.",
+        "labelLabel": "Device label (optional)",
+        "labelPlaceholder": "Sarah's iPhone",
+        "labelHelp": "Shown next to the issued credential so you can tell devices apart later.",
+        "buttonCancel": "Cancel",
+        "buttonGenerate": "Generate QR",
+        "buttonGenerating": "Generating…",
+        "buttonRegenerate": "New QR",
+        "buttonDone": "Done",
+        "buttonCopyPayload": "Copy payload",
+        "qrAriaLabel": "Install enrollment QR code",
+        "expiresIn": "Expires in {time}",
+        "expiredLabel": "QR expired — generate a new one",
+        "sessionIdLabel": "Session ID",
+        "verificationUriLabel": "Verification URL",
+        "verificationUriHelp": "If the QR doesn't scan, type this URL on your device.",
+        "toastGenerateFailed": "Couldn't generate QR — try again.",
+        "toastUriCopied": "Verification URL copied",
+        "toastPayloadCopied": "Payload copied"
+      }
     }
   },
   "hooks": {
@@ -391,6 +420,41 @@
       "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
       "backToApps": "Back to apps",
       "cancel": "Cancel"
+    },
+    "deployStrategy": {
+      "eyebrow": "Deploy strategy",
+      "edit": "Edit",
+      "previewEnvironments": "Preview environments",
+      "previewEnvironmentsHelp": "Spin up an ephemeral environment per pull request.",
+      "sheetTitle": "Edit deploy strategy",
+      "sheetDescription": "Changes apply to the next deploy. In-flight rollouts complete on the previous strategy.",
+      "triggerModeLabel": "Trigger mode",
+      "cronExpressionLabel": "Cron expression",
+      "cronExpressionHelp": "Five fields (minute hour day month weekday). The backend rejects malformed expressions.",
+      "deployBranchLabel": "Deploy branch",
+      "deployBranchHelp": "Default branch from the repo is <branch></branch>.",
+      "cancel": "Cancel",
+      "save": "Save strategy",
+      "toastSaved": "Deploy strategy updated.",
+      "toastFailed": "Update failed.",
+      "modes": {
+        "auto_on_push": {
+          "label": "Auto on push",
+          "hint": "Any push to the deploy branch fans out a deploy."
+        },
+        "manual": {
+          "label": "Manual only",
+          "hint": "Deploys only when triggered from the UI or CLI."
+        },
+        "external_ci": {
+          "label": "External CI",
+          "hint": "Your CI calls Astrolift with a deploy token. No webhook."
+        },
+        "cron": {
+          "label": "Cron schedule",
+          "hint": "Deploys run on a recurring schedule defined by the cron expression."
+        }
+      }
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1183,9 +1247,9 @@
         "toastNoResponse": "No response from backend."
       },
       "links": {
-        "deployStrategy": {
-          "title": "Deploy strategy",
-          "description": "Edit the manifest TOML — image build, environments, triggers, approvals, and rollout strategy."
+        "manifestEditor": {
+          "title": "Edit manifest TOML",
+          "description": "Open the full astrolift.toml editor — image build, environments, triggers, approvals, and rollout strategy."
         },
         "deployTokens": {
           "title": "Deploy tokens",
@@ -2355,5 +2419,63 @@
     "sourceColumn": "Source",
     "grantRoleRowLabel": "Grant role to {name}",
     "grantRoleRowTooltip": "Grant role to {name}"
+  },
+  "securitySessions": {
+    "title": "Active sessions",
+    "description": "Browser, CLI, and mobile sessions currently signed in as you. Revoke a single one to drop just that device.",
+    "signOutEverywhere": "Sign out everywhere",
+    "signingOut": "Signing out…",
+    "loadError": "Couldn't load sessions",
+    "noSessions": "No active sessions found.",
+    "columns": {
+      "kind": "Kind",
+      "label": "Label",
+      "status": "Status",
+      "lastSeen": "Last seen",
+      "expires": "Expires",
+      "actions": "Actions"
+    },
+    "status": {
+      "current": "this device",
+      "other": "other device"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Mobile",
+      "browser_extension": "Extension",
+      "api_token": "API token"
+    },
+    "actions": {
+      "revoke": "Revoke"
+    },
+    "confirmRevoke": {
+      "title": "Revoke this session?",
+      "description": "The session will need to sign in again. Tokens bound to it stop working immediately.",
+      "confirm": "Revoke"
+    },
+    "confirmSignOutAll": {
+      "title": "Sign out of {count} other session{count, plural, one {} other {s}}?",
+      "description": "Your current session in this tab stays signed in. Every other browser tab, mobile app, and CLI you've authenticated will need to log in again.",
+      "confirm": "Sign out everywhere else"
+    },
+    "toasts": {
+      "noOthers": "No other sessions to sign out.",
+      "signedOut": "Signed out of {count} session(s).",
+      "signOutFailed": "Sign-out failed",
+      "revoked": "Session revoked.",
+      "alreadyRevoked": "Session was already revoked.",
+      "revokeFailed": "Revoke failed"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "just now",
+      "sAgo": "{n}s ago",
+      "mAgo": "{n}m ago",
+      "hAgo": "{n}h ago",
+      "dAgo": "{n}d ago",
+      "moAgo": "{n}mo ago",
+      "yAgo": "{n}y ago"
+    }
   }
 }
