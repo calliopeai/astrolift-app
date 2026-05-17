@@ -221,3 +221,227 @@ def list_workflows_for_cluster(
         )
         return []
     return _list_for_cluster_async(cluster_guid, limit)
+
+
+# ---------------------------------------------------------------------------
+# Generic instance viewer helpers (#437)
+# ---------------------------------------------------------------------------
+#
+# Powers the in-app workflow viewer surface so operators can debug async
+# task issues without leaving for the Temporal UI. Three reads + three
+# writes:
+#
+#   list_workflow_instances() — list by workflow type / status with limit
+#   describe_workflow_instance() — single instance summary
+#   workflow_history() — pre-shaped activity feed for the UI
+#
+#   cancel_workflow() — graceful cancel (cooperative signal)
+#   terminate_workflow() — hard terminate (already above)
+#   signal_workflow() — generic signal send (already above)
+
+
+@async_to_sync
+async def _list_instances_async(
+    workflow_type: str | None,
+    status: str | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    client = await _get_client_async()
+    parts: list[str] = []
+    if workflow_type:
+        # Quote-escape per Temporal's visibility query language.
+        safe = workflow_type.replace('"', '\\"')
+        parts.append(f'WorkflowType="{safe}"')
+    if status:
+        safe = status.replace('"', '\\"')
+        parts.append(f'ExecutionStatus="{safe}"')
+    query = " AND ".join(parts) if parts else ""
+    rows: list[dict[str, Any]] = []
+    try:
+        async for run in client.list_workflows(query=query):
+            duration_seconds: float | None = None
+            if run.start_time and run.close_time:
+                duration_seconds = (run.close_time - run.start_time).total_seconds()
+            rows.append(
+                {
+                    "workflow_id": run.id,
+                    "workflow_type": run.workflow_type,
+                    "status": run.status.name if run.status else "UNKNOWN",
+                    "started_at": run.start_time.isoformat() if run.start_time else "",
+                    "closed_at": run.close_time.isoformat() if run.close_time else "",
+                    "run_id": run.run_id or "",
+                    "duration_seconds": duration_seconds,
+                    "task_queue": getattr(run, "task_queue", "") or "",
+                },
+            )
+            if len(rows) >= limit:
+                break
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("temporal list_workflows failed: %s", exc)
+        return []
+    return rows
+
+
+def list_workflow_instances(
+    *,
+    workflow_type: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """List recent Temporal instances, optionally filtered.
+
+    Returns ``[]`` when Temporal is disabled or the visibility query
+    fails — keeps the UI render path identical for "no temporal" vs.
+    "no runs"."""
+    if not _temporal_enabled():
+        return []
+    return _list_instances_async(workflow_type, status, max(1, min(limit, 200)))
+
+
+@async_to_sync
+async def _describe_instance_async(workflow_id: str) -> dict[str, Any] | None:
+    client = await _get_client_async()
+    try:
+        handle = client.get_workflow_handle(workflow_id)
+        desc = await handle.describe()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("temporal describe failed for %s: %s", workflow_id, exc)
+        return None
+    duration_seconds: float | None = None
+    if desc.start_time and desc.close_time:
+        duration_seconds = (desc.close_time - desc.start_time).total_seconds()
+    return {
+        "workflow_id": desc.id,
+        "workflow_type": desc.workflow_type,
+        "status": desc.status.name if desc.status else "UNKNOWN",
+        "started_at": desc.start_time.isoformat() if desc.start_time else "",
+        "closed_at": desc.close_time.isoformat() if desc.close_time else "",
+        "run_id": desc.run_id or "",
+        "duration_seconds": duration_seconds,
+        "task_queue": getattr(desc, "task_queue", "") or "",
+    }
+
+
+def describe_workflow_instance(workflow_id: str) -> dict[str, Any] | None:
+    """Single-instance summary for the drill-down sheet (#437)."""
+    if not _temporal_enabled():
+        return None
+    return _describe_instance_async(workflow_id)
+
+
+@async_to_sync
+async def _fetch_history_async(workflow_id: str, limit: int) -> list[dict[str, Any]]:
+    client = await _get_client_async()
+    rows: list[dict[str, Any]] = []
+    try:
+        handle = client.get_workflow_handle(workflow_id)
+        async for event in handle.fetch_history_events():
+            row = _shape_history_event(event)
+            if row is not None:
+                rows.append(row)
+            if len(rows) >= limit:
+                break
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("temporal history fetch failed for %s: %s", workflow_id, exc)
+        return []
+    return rows
+
+
+def _shape_history_event(event: Any) -> dict[str, Any] | None:
+    """Pre-shape one Temporal HistoryEvent into the UI's row format.
+
+    The Temporal protobuf is dense and inconsistent across event kinds;
+    the viewer only needs a few fields — type label, timestamp, retry
+    count, decision, and a compact payload preview. This shaper picks
+    those out and lets the rest sit in raw form for ``payload`` so a
+    power user can still see everything via the JSON viewer.
+    """
+    try:
+        # event_type is an enum like EVENT_TYPE_ACTIVITY_TASK_STARTED.
+        event_type_raw = getattr(event, "event_type", None)
+        event_type = event_type_raw.name if hasattr(event_type_raw, "name") else str(event_type_raw or "")
+        ts = getattr(event, "event_time", None)
+        timestamp_iso = ts.ToDatetime().isoformat() if ts and hasattr(ts, "ToDatetime") else ""
+
+        retry_count = 0
+        decision = ""
+        payload_preview: dict[str, Any] = {}
+
+        for attr_name in [
+            "activity_task_scheduled_event_attributes",
+            "activity_task_started_event_attributes",
+            "activity_task_completed_event_attributes",
+            "activity_task_failed_event_attributes",
+            "activity_task_timed_out_event_attributes",
+            "workflow_execution_started_event_attributes",
+            "workflow_execution_completed_event_attributes",
+            "workflow_execution_failed_event_attributes",
+            "workflow_task_completed_event_attributes",
+            "timer_started_event_attributes",
+            "timer_fired_event_attributes",
+        ]:
+            attrs = getattr(event, attr_name, None)
+            if attrs is None:
+                continue
+            if hasattr(attrs, "attempt"):
+                retry_count = max(retry_count, int(getattr(attrs, "attempt", 0) or 0))
+            if hasattr(attrs, "activity_type") and getattr(attrs, "activity_type", None):
+                payload_preview["activity_type"] = getattr(attrs.activity_type, "name", "")
+            if hasattr(attrs, "activity_id") and getattr(attrs, "activity_id", ""):
+                payload_preview["activity_id"] = attrs.activity_id
+            if hasattr(attrs, "failure") and getattr(attrs, "failure", None):
+                payload_preview["failure"] = getattr(attrs.failure, "message", "") or ""
+                decision = "failed"
+            if "COMPLETED" in event_type:
+                decision = decision or "completed"
+            if "TIMED_OUT" in event_type:
+                decision = decision or "timed_out"
+            if "CANCELED" in event_type or "CANCELLED" in event_type:
+                decision = decision or "cancelled"
+            break
+
+        return {
+            "event_type": event_type,
+            "timestamp": timestamp_iso,
+            "payload": payload_preview,
+            "retry_count": retry_count,
+            "decision": decision,
+        }
+    except Exception:  # noqa: BLE001
+        logger.exception("history-event shape failed")
+        return None
+
+
+def workflow_history(workflow_id: str, *, limit: int = 200) -> list[dict[str, Any]]:
+    """Pre-shaped activity feed for the workflow viewer (#437).
+
+    Each row maps one Temporal HistoryEvent to a compact UI dict:
+    ``{event_type, timestamp, payload, retry_count, decision}``. The
+    drill-down panel groups rows by activity and collapses them. Limit
+    defaults to 200 — large enough for typical deploys, small enough
+    to cap memory."""
+    if not _temporal_enabled():
+        return []
+    return _fetch_history_async(workflow_id, max(1, min(limit, 500)))
+
+
+@async_to_sync
+async def _cancel_async(workflow_id: str) -> None:
+    client = await _get_client_async()
+    handle = client.get_workflow_handle(workflow_id)
+    await handle.cancel()
+
+
+def cancel_workflow(workflow_id: str) -> bool:
+    """Cooperative cancel — sends Temporal's CancelRequested signal so
+    the workflow can run cleanup before exiting. Returns False when
+    Temporal is disabled or the handle is missing."""
+    if not _temporal_enabled():
+        logger.info("temporal disabled; would-have-cancelled %s", workflow_id)
+        return False
+    try:
+        _cancel_async(workflow_id)
+        return True
+    except Exception:
+        logger.exception("temporal cancel failed: id=%s", workflow_id)
+        return False

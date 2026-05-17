@@ -1738,6 +1738,36 @@ export type AstroliftWebhookTestResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftWorkflowHistoryEvent = {
+  decision: Scalars['String']['output'];
+  eventType: Scalars['String']['output'];
+  payload: Scalars['JSON']['output'];
+  retryCount: Scalars['Int']['output'];
+  timestamp: Scalars['String']['output'];
+};
+
+export type AstroliftWorkflowInstance = {
+  closedAt: Scalars['String']['output'];
+  durationSeconds?: Maybe<Scalars['Float']['output']>;
+  runId: Scalars['String']['output'];
+  startedAt: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  taskQueue: Scalars['String']['output'];
+  triggeredBy: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
+  workflowType: Scalars['String']['output'];
+};
+
+export type AstroliftWorkflowInstanceDetail = {
+  history: Array<AstroliftWorkflowHistoryEvent>;
+  instance: AstroliftWorkflowInstance;
+};
+
+export type AstroliftWorkflowInstancePage = {
+  items: Array<AstroliftWorkflowInstance>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftWorkflowRun = {
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   failure: Scalars['JSON']['output'];
@@ -2363,6 +2393,7 @@ export type Mutation = {
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
   bulkRejectDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
+  cancelWorkflowInstance: MutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -2505,6 +2536,7 @@ export type Mutation = {
   signRequestSign: Scalars['Boolean']['output'];
   /** Request a sign from a user. The user must have SIGNREQUEST_CHANGE_SIGN permission. */
   signRequestUser: Scalars['Boolean']['output'];
+  signalWorkflowInstance: MutationResult;
   softDeleteApp: SoftdeletepayloadMutationResult;
   softDeleteIdentityProvider: SoftdeletepayloadMutationResult;
   softDeleteManagedDomain: SoftdeletepayloadMutationResult;
@@ -2521,6 +2553,7 @@ export type Mutation = {
   syncManifestFromRepo: ManifeststagepayloadMutationResult;
   tearDownApp: SoftdeletepayloadMutationResult;
   tearDownPreview: AstroliftDeploymentMutationResult;
+  terminateWorkflowInstance: MutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
@@ -2649,6 +2682,11 @@ export type MutationBulkRejectDeploymentsArgs = {
 
 export type MutationCancelAstroliftDeregisterArgs = {
   input: CancelDeregisterInput;
+};
+
+
+export type MutationCancelWorkflowInstanceArgs = {
+  workflowId: Scalars['String']['input'];
 };
 
 
@@ -3236,6 +3274,13 @@ export type MutationSignRequestUserArgs = {
 };
 
 
+export type MutationSignalWorkflowInstanceArgs = {
+  payload?: InputMaybe<Scalars['JSON']['input']>;
+  signalName: Scalars['String']['input'];
+  workflowId: Scalars['String']['input'];
+};
+
+
 export type MutationSoftDeleteAppArgs = {
   input: SoftDeleteAppInput;
 };
@@ -3305,6 +3350,12 @@ export type MutationTearDownAppArgs = {
 
 export type MutationTearDownPreviewArgs = {
   input: TearDownPreviewInputGql;
+};
+
+
+export type MutationTerminateWorkflowInstanceArgs = {
+  reason: Scalars['String']['input'];
+  workflowId: Scalars['String']['input'];
 };
 
 
@@ -3721,6 +3772,9 @@ export type Query = {
   astroliftTeams: Array<AstroliftTeam>;
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
+  astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
+  astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
+  astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
@@ -4055,6 +4109,24 @@ export type QueryAstroliftWebhookDeliveriesArgs = {
 
 export type QueryAstroliftWebhookSubscriptionsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftWorkflowInstanceArgs = {
+  workflowId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkflowInstanceDetailArgs = {
+  workflowId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkflowInstancesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+  workflowType?: InputMaybe<Scalars['String']['input']>;
 };
 
 

@@ -1,7 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Loader2Icon, PlusIcon, TrashIcon, WrenchIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  Loader2Icon,
+  PlusIcon,
+  TrashIcon,
+  WrenchIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Separator } from "@/components/ui/separator";
@@ -11,10 +20,13 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { useWorkflows, useDeleteWorkflow } from "@/graphql/workflows/workflows.hooks";
 import type { WorkflowDefinition } from "@/graphql/workflows/workflows.types";
 
+import { WorkflowInstancesPanel } from "./instances-panel";
+
 export default function WorkflowsPage() {
   const { workflows, loading, error } = useWorkflows();
   const [deleteWorkflow] = useDeleteWorkflow();
   const confirm = useConfirm();
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   const handleDelete = async (wf: WorkflowDefinition) => {
     const ok = await confirm({
@@ -76,40 +88,64 @@ export default function WorkflowsPage() {
       )}
 
       <div className="grid gap-4">
-        {workflows.map((wf) => (
-          <div key={wf.slug} className="flex items-center justify-between rounded-lg border p-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{wf.name}</span>
-                <Badge variant={wf.isEnabled ? "default" : "secondary"}>
-                  {wf.isEnabled ? "Active" : "Disabled"}
-                </Badge>
-                <span className="text-muted-foreground text-xs">{wf.modelLabel}</span>
+        {workflows.map((wf) => {
+          const isExpanded = expandedSlug === wf.slug;
+          return (
+            <div key={wf.slug} className="flex flex-col gap-3 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{wf.name}</span>
+                    <Badge variant={wf.isEnabled ? "default" : "secondary"}>
+                      {wf.isEnabled ? "Active" : "Disabled"}
+                    </Badge>
+                    <span className="text-muted-foreground text-xs">{wf.modelLabel}</span>
+                  </div>
+                  <span className="text-muted-foreground text-sm">
+                    {wf.description || "No description"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-muted-foreground text-sm">
+                    {wf.activeInstanceCount} active / {wf.instanceCount} total
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setExpandedSlug(isExpanded ? null : wf.slug)}
+                  >
+                    <ActivityIcon className="mr-1 h-3 w-3" />
+                    Instances
+                    {isExpanded ? (
+                      <ChevronUpIcon className="ml-1 h-3 w-3" />
+                    ) : (
+                      <ChevronDownIcon className="ml-1 h-3 w-3" />
+                    )}
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/workflows/${wf.slug}/builder`}>
+                      <WrenchIcon className="mr-1 h-3 w-3" /> Builder
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(wf)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <TrashIcon className="mr-1 h-3 w-3" /> Delete
+                  </Button>
+                </div>
               </div>
-              <span className="text-muted-foreground text-sm">
-                {wf.description || "No description"}
-              </span>
+
+              {isExpanded && (
+                <div className="border-t pt-3">
+                  <WorkflowInstancesPanel workflowType={wf.name} />
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-muted-foreground text-sm">
-                {wf.activeInstanceCount} active / {wf.instanceCount} total
-              </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/workflows/${wf.slug}/builder`}>
-                  <WrenchIcon className="mr-1 h-3 w-3" /> Builder
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDelete(wf)}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <TrashIcon className="mr-1 h-3 w-3" /> Delete
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
