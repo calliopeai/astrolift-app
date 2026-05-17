@@ -186,6 +186,18 @@ type AstroliftAppCertificate {
   renewalStatus: String!
 }
 
+type AstroliftAppDeploymentSummary {
+  id: GUID!
+  status: String!
+  startedAt: DateTime
+  endedAt: DateTime
+  createdAt: DateTime!
+  environmentName: String!
+  triggeredBy: String!
+  imageTag: String!
+  commitSha: String!
+}
+
 type AstroliftAppDnsRecord {
   name: String!
   type: String!
@@ -255,6 +267,19 @@ type AstroliftAppGoldenSignal {
   samples: [AstroliftTimeSeriesPoint!]!
   promql: String!
   unit: String!
+}
+
+type AstroliftAppHealthPulse {
+  status: AstroliftAppHealthPulseStatus!
+  ageSeconds: Int
+  message: String!
+}
+
+enum AstroliftAppHealthPulseStatus {
+  OK
+  DEGRADED
+  STALE
+  NEVER
 }
 
 type AstroliftAppHealthSummary {
@@ -1163,6 +1188,9 @@ type AstroliftRegisteredApp {
   lastResyncAt: DateTime
   sourceWebhookInstalledAt: DateTime
   securityPolicy: AstroliftSecurityPolicy!
+  latestDeployment: AstroliftAppDeploymentSummary
+  lastDeployedAt: DateTime
+  healthPulse: AstroliftAppHealthPulse
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -2640,8 +2668,8 @@ type Query {
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftPlatformApiUrl: String!
-  astroliftApps: [AstroliftRegisteredApp!]!
-  astroliftMyApps: [AstroliftRegisteredApp!]!
+  astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
+  astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!): AstroliftRegisteredApp
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!

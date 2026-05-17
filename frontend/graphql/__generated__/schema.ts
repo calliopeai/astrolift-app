@@ -211,6 +211,18 @@ export type AstroliftAppCertificate = {
   renewalStatus: Scalars['String']['output'];
 };
 
+export type AstroliftAppDeploymentSummary = {
+  commitSha: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  triggeredBy: Scalars['String']['output'];
+};
+
 export type AstroliftAppDnsRecord = {
   name: Scalars['String']['output'];
   propagationStatus: Scalars['String']['output'];
@@ -281,6 +293,18 @@ export type AstroliftAppGoldenSignal = {
   samples: Array<AstroliftTimeSeriesPoint>;
   unit: Scalars['String']['output'];
 };
+
+export type AstroliftAppHealthPulse = {
+  ageSeconds?: Maybe<Scalars['Int']['output']>;
+  message: Scalars['String']['output'];
+  status: AstroliftAppHealthPulseStatus;
+};
+
+export type AstroliftAppHealthPulseStatus =
+  | 'DEGRADED'
+  | 'NEVER'
+  | 'OK'
+  | 'STALE';
 
 export type AstroliftAppHealthSummary = {
   appName: Scalars['String']['output'];
@@ -1152,11 +1176,14 @@ export type AstroliftRegisteredApp = {
   description: Scalars['String']['output'];
   ecrPushRoleArn: Scalars['String']['output'];
   ecrRepoUri: Scalars['String']['output'];
+  healthPulse?: Maybe<AstroliftAppHealthPulse>;
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   k8sNamespace: Scalars['String']['output'];
+  lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   lastResyncAt?: Maybe<Scalars['DateTime']['output']>;
   lastSyncedHash: Scalars['String']['output'];
+  latestDeployment?: Maybe<AstroliftAppDeploymentSummary>;
   logRetentionDays: Scalars['Int']['output'];
   manifestHash: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
@@ -3619,6 +3646,11 @@ export type QueryAstroliftAppTeamAccessesArgs = {
 };
 
 
+export type QueryAstroliftAppsArgs = {
+  includeFreshness?: Scalars['Boolean']['input'];
+};
+
+
 export type QueryAstroliftAuditEventsArgs = {
   action?: InputMaybe<Scalars['String']['input']>;
   actorId?: InputMaybe<Scalars['String']['input']>;
@@ -3754,6 +3786,11 @@ export type QueryAstroliftInvitationsArgs = {
 export type QueryAstroliftManagedServicesArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMyAppsArgs = {
+  includeFreshness?: Scalars['Boolean']['input'];
 };
 
 
