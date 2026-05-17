@@ -78,15 +78,15 @@ class FormSubmission(BaseCoreModel):
         indexes = [
             models.Index(
                 fields=["form", "-submitted_at"],
-                name="form_submission_form_recent_idx",
+                name="fsub_form_recent_idx",
             ),
             models.Index(
                 fields=["form", "status", "-submitted_at"],
-                name="form_submission_form_status_idx",
+                name="fsub_form_status_idx",
             ),
             models.Index(
                 fields=["organization", "-submitted_at"],
-                name="form_submission_org_recent_idx",
+                name="fsub_org_recent_idx",
             ),
         ]
 
