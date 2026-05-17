@@ -427,6 +427,25 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftBulkDeploymentResultData {
+  results: [AstroliftBulkDeploymentResultItem!]!
+  succeededCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkDeploymentResultDataMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkDeploymentResultData
+}
+
+type AstroliftBulkDeploymentResultItem {
+  deploymentId: GUID!
+  ok: Boolean!
+  errors: [MutationError!]!
+  deployment: AstroliftDeployment
+}
+
 type AstroliftCapabilityDeprovisionPayload {
   appId: GUID
   clusterSlug: String!
@@ -664,6 +683,9 @@ type AstroliftDeployment {
   clusterRevision: String!
   approvalsRequired: Int!
   approvalsReceived: Int!
+  requiredApproverCount: Int!
+  approvedBy: [AstroliftDeploymentApprover!]!
+  awaitingApprovers: [AstroliftDeploymentApprover!]!
   startedAt: DateTime
   succeededAt: DateTime
   failedAt: DateTime
@@ -692,6 +714,14 @@ type AstroliftDeploymentApprovalHistoryEntry {
   actorDisplay: String!
   occurredAt: DateTime!
   reason: String!
+}
+
+type AstroliftDeploymentApprover {
+  userId: String!
+  displayName: String!
+  email: String!
+  approvedAt: DateTime
+  mailtoUrl: String!
 }
 
 type AstroliftDeploymentLifecycleEvent {
@@ -1659,9 +1689,19 @@ input BringClusterIntoManagementInputType {
   clusterId: GUID!
 }
 
+input BulkApproveDeploymentsInput {
+  deploymentIds: [GUID!]!
+  reason: String = null
+}
+
 input BulkImportAppSecretsInput {
   appSlug: String!
   dotenvText: String!
+}
+
+input BulkRejectDeploymentsInput {
+  deploymentIds: [GUID!]!
+  reason: String!
 }
 
 type Bulkimportpayload {
@@ -2338,6 +2378,8 @@ type Mutation {
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rejectDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
+  bulkApproveDeployments(input: BulkApproveDeploymentsInput!): AstroliftBulkDeploymentResultDataMutationResult!
+  bulkRejectDeployments(input: BulkRejectDeploymentsInput!): AstroliftBulkDeploymentResultDataMutationResult!
   approveDeploymentByToken(input: ApproveByTokenInput!): AstroliftDeploymentMutationResult!
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!

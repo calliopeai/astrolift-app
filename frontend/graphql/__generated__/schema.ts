@@ -452,6 +452,25 @@ export type AstroliftBudget = {
   scopeKind: Scalars['String']['output'];
 };
 
+export type AstroliftBulkDeploymentResultData = {
+  failedCount: Scalars['Int']['output'];
+  results: Array<AstroliftBulkDeploymentResultItem>;
+  succeededCount: Scalars['Int']['output'];
+};
+
+export type AstroliftBulkDeploymentResultDataMutationResult = {
+  data?: Maybe<AstroliftBulkDeploymentResultData>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBulkDeploymentResultItem = {
+  deployment?: Maybe<AstroliftDeployment>;
+  deploymentId: Scalars['GUID']['output'];
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftCapabilityDeprovisionPayload = {
   appId?: Maybe<Scalars['GUID']['output']>;
   clusterSlug: Scalars['String']['output'];
@@ -681,6 +700,8 @@ export type AstroliftDeployment = {
   abortedReason: Scalars['String']['output'];
   approvalsReceived: Scalars['Int']['output'];
   approvalsRequired: Scalars['Int']['output'];
+  approvedBy: Array<AstroliftDeploymentApprover>;
+  awaitingApprovers: Array<AstroliftDeploymentApprover>;
   branch: Scalars['String']['output'];
   ciActorKind: Scalars['String']['output'];
   ciProvider: Scalars['String']['output'];
@@ -699,6 +720,7 @@ export type AstroliftDeployment = {
   imageTag: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   repoUrl: Scalars['String']['output'];
+  requiredApproverCount: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
@@ -717,6 +739,14 @@ export type AstroliftDeploymentApprovalHistoryEntry = {
   id: Scalars['GUID']['output'];
   occurredAt: Scalars['DateTime']['output'];
   reason: Scalars['String']['output'];
+};
+
+export type AstroliftDeploymentApprover = {
+  approvedAt?: Maybe<Scalars['DateTime']['output']>;
+  displayName: Scalars['String']['output'];
+  email: Scalars['String']['output'];
+  mailtoUrl: Scalars['String']['output'];
+  userId: Scalars['String']['output'];
 };
 
 export type AstroliftDeploymentLifecycleEvent = {
@@ -1689,9 +1719,19 @@ export type BringClusterIntoManagementInputType = {
   clusterId: Scalars['GUID']['input'];
 };
 
+export type BulkApproveDeploymentsInput = {
+  deploymentIds: Array<Scalars['GUID']['input']>;
+  reason: InputMaybe<Scalars['String']['input']>;
+};
+
 export type BulkImportAppSecretsInput = {
   appSlug: Scalars['String']['input'];
   dotenvText: Scalars['String']['input'];
+};
+
+export type BulkRejectDeploymentsInput = {
+  deploymentIds: Array<Scalars['GUID']['input']>;
+  reason: Scalars['String']['input'];
 };
 
 export type Bulkimportpayload = {
@@ -2178,7 +2218,9 @@ export type Mutation = {
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
+  bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
+  bulkRejectDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -2445,8 +2487,18 @@ export type MutationBringClusterIntoManagementArgs = {
 };
 
 
+export type MutationBulkApproveDeploymentsArgs = {
+  input: BulkApproveDeploymentsInput;
+};
+
+
 export type MutationBulkImportAppSecretsArgs = {
   input: BulkImportAppSecretsInput;
+};
+
+
+export type MutationBulkRejectDeploymentsArgs = {
+  input: BulkRejectDeploymentsInput;
 };
 
 
