@@ -7,8 +7,14 @@
 
 import type {
   AstroliftBudget as GeneratedBudget,
+  AstroliftCostAttribution as GeneratedCostAttribution,
+  AstroliftCostBindingRow as GeneratedCostBindingRow,
+  AstroliftCostForecast as GeneratedCostForecast,
   AstroliftCostSnapshot as GeneratedCostSnapshot,
+  AstroliftCostTrendPoint as GeneratedCostTrendPoint,
   AstroliftQuota as GeneratedQuota,
+  CostWindow as GeneratedCostWindow,
+  ForecastConfidence as GeneratedForecastConfidence,
 } from "@/graphql/__generated__/schema";
 
 export type AstroliftGuid = string;
@@ -54,4 +60,25 @@ export type AstroliftCostSnapshot = Omit<
 > & {
   by: CostKind;
   source: CostSource;
+};
+
+export type CostWindow = GeneratedCostWindow;
+export type ForecastConfidence = GeneratedForecastConfidence;
+
+export type AstroliftCostTrendPoint = GeneratedCostTrendPoint;
+
+export type AstroliftCostForecast = GeneratedCostForecast;
+
+export type AstroliftCostBindingRow = Omit<
+  GeneratedCostBindingRow,
+  "by"
+> & {
+  by: CostKind;
+};
+
+export type AstroliftCostAttribution = Omit<
+  GeneratedCostAttribution,
+  "attributedRows"
+> & {
+  attributedRows: AstroliftCostBindingRow[];
 };
