@@ -65,11 +65,14 @@ interface ManagedService {
   kind: string;
   variant: string;
   status: string;
+  statusError: string;
   config: Record<string, unknown>;
   environmentName: string;
   registeredAppSlug: string;
   createdAt: string;
   updatedAt: string;
+  lastActionAt: string | null;
+  lastActionKind: string;
 }
 
 interface Resp {
