@@ -3,6 +3,7 @@
 import { useMutation } from "@apollo/client/react";
 import {
   CheckIcon,
+  ClockIcon,
   CopyIcon,
   ExternalLinkIcon,
   GlobeIcon,
@@ -22,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { SET_APP_SUBDOMAIN } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
+import type { ProvisioningStatus } from "@/graphql/registry/registry.types";
 
 import { UrlHealthBadge } from "./url-health-badge";
 
@@ -35,6 +37,11 @@ interface Props {
   subdomain: string;
   /** First public workload slug — used to render the primary host. */
   primaryWorkloadSlug: string | null;
+  /**
+   * Provisioning status of the parent app. Used to render the pending
+   * URL placeholder (#407 B) when the host isn't routable yet.
+   */
+  provisioningStatus: ProvisioningStatus;
 }
 
 // Primary URL probe is gated on a deployed public workload — the
@@ -44,6 +51,45 @@ interface Props {
 
 interface SetSubdomainResp {
   setAppSubdomain: MutationResult<{ id: string; slug: string; subdomain: string }>;
+}
+
+/**
+ * Pending-state badge that replaces UrlHealthBadge while the URL
+ * isn't routable yet (#407 B). Two shapes:
+ *
+ *  * `isProvisioning` — backend is still bringing the app up. Amber
+ *    chip + spinning indicator + "~2 min" hint operators have come
+ *    to expect for a fresh app.
+ *  * Otherwise (ready but no public workload) — neutral chip with
+ *    "first deploy will publish it" copy. The card historically just
+ *    hid the URL row here; surfacing this badge instead removes the
+ *    "why is there nothing?" confusion.
+ */
+function PendingUrlBadge({
+  isProvisioning,
+  hasWorkload,
+}: {
+  isProvisioning: boolean;
+  hasWorkload: boolean;
+}) {
+  if (isProvisioning) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300">
+        <Loader2Icon className="size-3 animate-spin" />
+        <span>Provisioning · ~2 min</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+      <ClockIcon className="size-3" />
+      <span>
+        {hasWorkload
+          ? "URL not yet routable"
+          : "URL not yet assigned — first deploy will publish it"}
+      </span>
+    </span>
+  );
 }
 
 // Full hostname pattern: 1..n DNS labels separated by dots. Each
@@ -63,7 +109,13 @@ const SUBDOMAIN_PATTERN =
  * button. When no public workload exists we still render the
  * subdomain so operators can rename it before deploying.
  */
-export function UrlCard({ appId, appSlug, subdomain, primaryWorkloadSlug }: Props) {
+export function UrlCard({
+  appId,
+  appSlug,
+  subdomain,
+  primaryWorkloadSlug,
+  provisioningStatus,
+}: Props) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(subdomain);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
@@ -89,9 +141,15 @@ export function UrlCard({ appId, appSlug, subdomain, primaryWorkloadSlug }: Prop
     awaitRefetchQueries: true,
   });
 
-  const fullHost = primaryWorkloadSlug
-    ? `${primaryWorkloadSlug}.${subdomain}`
-    : subdomain;
+  const fullHost = primaryWorkloadSlug ? `${primaryWorkloadSlug}.${subdomain}` : subdomain;
+
+  // Routable === backend says provisioning is ready AND there's a
+  // public workload to receive traffic. Anything else means the host
+  // is either still being brought up or has nothing serving on it yet,
+  // and the URL probe would always read as down. Surface a friendlier
+  // "provisioning · ~2 min" badge instead. (#407 B)
+  const isRoutable = provisioningStatus === "ready" && !!primaryWorkloadSlug;
+  const isProvisioning = provisioningStatus === "pending" || provisioningStatus === "provisioning";
 
   const isDirty = draft.trim() !== subdomain;
   const isValid = SUBDOMAIN_PATTERN.test(draft.trim());
@@ -156,9 +214,11 @@ export function UrlCard({ appId, appSlug, subdomain, primaryWorkloadSlug }: Prop
             {fullHost}
             <ExternalLinkIcon className="size-3.5" />
           </a>
-          {primaryWorkloadSlug ? (
+          {isRoutable ? (
             <UrlHealthBadge appSlug={appSlug} url={`https://${fullHost}/`} />
-          ) : null}
+          ) : (
+            <PendingUrlBadge isProvisioning={isProvisioning} hasWorkload={!!primaryWorkloadSlug} />
+          )}
           <Button
             type="button"
             size="sm"
@@ -235,14 +295,13 @@ export function UrlCard({ appId, appSlug, subdomain, primaryWorkloadSlug }: Prop
               </div>
               {!isValid && draft.length > 0 ? (
                 <p className="text-destructive text-xs">
-                  Lowercase DNS host: letters, digits, hyphens, and dots. Each label must start
-                  and end with a letter or digit.
+                  Lowercase DNS host: letters, digits, hyphens, and dots. Each label must start and
+                  end with a letter or digit.
                 </p>
               ) : (
                 <p className="text-muted-foreground text-xs">
-                  Press <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Enter</kbd>{" "}
-                  to save or{" "}
-                  <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Esc</kbd> to
+                  Press <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Enter</kbd> to
+                  save or <kbd className="bg-muted rounded px-1 font-mono text-[10px]">Esc</kbd> to
                   cancel.
                 </p>
               )}

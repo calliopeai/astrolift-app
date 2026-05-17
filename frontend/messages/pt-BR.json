@@ -509,6 +509,59 @@
           "rechecking": "Verificando novamente…"
         }
       }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "Provisionamento falhou",
+          "pending": "Provisionamento ainda não iniciou",
+          "provisioning": "Provisionamento em andamento",
+          "ready_missing_registry": "Coordenadas do registry de contêiner estão faltando",
+          "unknown": "O provisionamento precisa de atenção"
+        },
+        "description": {
+          "failed": "Tente novamente para reconstruir o repo do registry e o namespace.",
+          "pending": "Inicie para colocar o app online.",
+          "provisioning": "Aguarde — só reexecute se ficar travado.",
+          "ready_missing_registry": "Reprovisione para reconstruir o repo ECR e o papel de push; até então os deploys não fazem nada.",
+          "unknown": "Reprovisione para recuperar."
+        },
+        "elapsed": "iniciado há {minutes}min",
+        "cta": "Reprovisionar",
+        "confirm": {
+          "title": "Reprovisionar {slug}?",
+          "description": "Cancela os deploys em andamento, exclui os objetos k8s por workload e re-dispara o workflow de CI de deploy. As aprovações existentes são reexecutadas.",
+          "confirm": "Sim, reprovisionar"
+        },
+        "toast": {
+          "dispatched": "Reprovisionamento despachado — o workflow de deploy está rodando novamente.",
+          "partial": "Recuperação parcial: a limpeza rodou mas o dispatch do deploy falhou ({message})."
+        },
+        "error": {
+          "noResponse": "Reprovisionamento falhou: sem resposta do backend.",
+          "generic": "Reprovisionamento falhou."
+        }
+      },
+      "configDrift": {
+        "headline": "Drift de configuração detectado",
+        "description": "O último deploy do ambiente {env} não corresponde ao manifesto atual.",
+        "descriptionNoEnv": "O último deploy não corresponde ao manifesto atual.",
+        "cta": "Sincronizar da origem",
+        "field": {
+          "manifest_hash": "Hash do manifesto mudou desde o último deploy",
+          "image_tag": "Tag da imagem diverge do snapshot",
+          "repo_unsynced": "Repo de origem está à frente da plataforma — ressincronize para puxar",
+          "unknown": "{field} mudou"
+        },
+        "toast": {
+          "synced": "Sincronizado da origem.",
+          "failed": "Falha ao sincronizar da origem."
+        }
+      },
+      "latestDeploy": {
+        "empty": "Nenhum deploy ainda — dispare um pelo CLI ou faça push no branch de deploy.",
+        "ariaLabel": "Último deploy: {status}, {when}"
+      }
     }
   },
   "settingsIndex": {

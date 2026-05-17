@@ -19,6 +19,12 @@ const APP_FIELDS = `
   defaultBranch
   manifestHash
   registryRepoUri
+  reprovision {
+    needsReprovision
+    state
+    reason
+    elapsedSeconds
+  }
   ecrRepoUri
   ecrPushRoleArn
   k8sNamespace
@@ -86,9 +92,15 @@ export const LIST_APPS = gql`
 `;
 
 export const GET_APP = gql`
-  query GetApp($slug: String!) {
-    astroliftApp(slug: $slug) {
+  query GetApp($slug: String!, $includeDrift: Boolean = false) {
+    astroliftApp(slug: $slug, includeDrift: $includeDrift) {
       ${APP_FIELDS}
+      configDrift {
+        hasDrift
+        fields
+        environmentName
+        lastChecked
+      }
     }
   }
 `;

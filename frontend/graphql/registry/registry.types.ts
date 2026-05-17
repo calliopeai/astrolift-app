@@ -3,8 +3,10 @@
  */
 
 import type {
+  AstroliftAppConfigDrift as GeneratedAppConfigDrift,
   AstroliftAppDeploymentSummary as GeneratedAppDeploymentSummary,
   AstroliftAppHealthPulse as GeneratedAppHealthPulse,
+  AstroliftAppReprovisionState as GeneratedAppReprovisionState,
   AstroliftAppTeamAccess as GeneratedAppTeamAccess,
   AstroliftContainer as GeneratedContainer,
   AstroliftRegisteredApp as GeneratedRegisteredApp,
@@ -57,6 +59,39 @@ export type AstroliftAppDeploymentSummary = Omit<GeneratedAppDeploymentSummary, 
   status: LatestDeploymentStatus;
 };
 
+/**
+ * Reprovision-callout state surfaced on the app overview (#407 A).
+ *
+ * ``state`` narrows the wire string to the known states:
+ * - ``pending`` / ``provisioning`` / ``failed`` — mirrors the
+ *   ``ProvisioningStatus`` triplet that warrants a callout.
+ * - ``ready_missing_registry`` — synthetic state for the ready-but-no-
+ *   registry-repo-uri recovery gap.
+ * - ``""`` — no callout applies (the ready + healthy case).
+ *
+ * Unknown future states fall through to ``string`` so an FE older than
+ * the backend doesn't crash on a new code; it renders the raw reason
+ * the resolver computed.
+ */
+export type ReprovisionStateKey =
+  | ""
+  | "pending"
+  | "provisioning"
+  | "failed"
+  | "ready_missing_registry";
+
+export type AstroliftAppReprovisionState = Omit<GeneratedAppReprovisionState, "state"> & {
+  state: ReprovisionStateKey | string;
+};
+
+/**
+ * Config-drift rollup surfaced on the app overview (#407 C). Always
+ * carries a ``hasDrift`` boolean + a list of field-paths that diverged
+ * (``manifest_hash`` / ``image_tag`` / ``repo_unsynced``). FE renders
+ * one bullet per entry with copy from i18n.
+ */
+export type AstroliftAppConfigDrift = GeneratedAppConfigDrift;
+
 export type AstroliftRegisteredApp = Omit<
   GeneratedRegisteredApp,
   | "sourceKind"
@@ -65,6 +100,8 @@ export type AstroliftRegisteredApp = Omit<
   | "manifestSyncState"
   | "healthPulse"
   | "latestDeployment"
+  | "reprovision"
+  | "configDrift"
 > & {
   sourceKind: SourceKind;
   provisioningStatus: ProvisioningStatus;
@@ -72,6 +109,8 @@ export type AstroliftRegisteredApp = Omit<
   manifestSyncState: ManifestSyncState;
   healthPulse: AstroliftAppHealthPulse | null;
   latestDeployment: AstroliftAppDeploymentSummary | null;
+  reprovision: AstroliftAppReprovisionState;
+  configDrift: AstroliftAppConfigDrift | null;
 };
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {

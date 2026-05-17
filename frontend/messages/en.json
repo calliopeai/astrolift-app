@@ -372,6 +372,57 @@
           "recheck": "Click to re-run probe",
           "rechecking": "Re-running probe…"
         }
+      },
+      "reprovision": {
+        "headline": {
+          "failed": "Provisioning failed",
+          "pending": "Provisioning hasn't started",
+          "provisioning": "Provisioning in progress",
+          "ready_missing_registry": "Container registry coordinates are missing",
+          "unknown": "Provisioning needs attention"
+        },
+        "description": {
+          "failed": "Retry to rebuild the registry repo and namespace.",
+          "pending": "Kick it off to bring the app online.",
+          "provisioning": "Sit tight — re-run only if it stalls.",
+          "ready_missing_registry": "Reprovision to rebuild the ECR repo and push role; deploys will silently no-op until then.",
+          "unknown": "Reprovision to recover."
+        },
+        "elapsed": "started {minutes}m ago",
+        "cta": "Reprovision",
+        "confirm": {
+          "title": "Reprovision {slug}?",
+          "description": "Cancels in-flight deploys, deletes the per-workload k8s objects, and re-fires the deploy CI workflow. Existing approvals re-run.",
+          "confirm": "Yes, reprovision"
+        },
+        "toast": {
+          "dispatched": "Reprovision dispatched — deploy workflow is rerunning.",
+          "partial": "Partial recovery: cleanup ran but the deploy dispatch failed ({message})."
+        },
+        "error": {
+          "noResponse": "Reprovision failed: no response from backend.",
+          "generic": "Reprovision failed."
+        }
+      },
+      "configDrift": {
+        "headline": "Config drift detected",
+        "description": "The {env} environment's last deploy doesn't match the current manifest.",
+        "descriptionNoEnv": "The last deploy doesn't match the current manifest.",
+        "cta": "Sync from source",
+        "field": {
+          "manifest_hash": "Manifest hash changed since last deploy",
+          "image_tag": "Image tag diverged from snapshot",
+          "repo_unsynced": "Source repo is ahead of the platform — resync to pick it up",
+          "unknown": "{field} changed"
+        },
+        "toast": {
+          "synced": "Synced from source.",
+          "failed": "Sync from source failed."
+        }
+      },
+      "latestDeploy": {
+        "empty": "No deploys yet — trigger one from the CLI or push to the deploy branch.",
+        "ariaLabel": "Latest deployment: {status}, {when}"
       }
     },
     "wizard": {
