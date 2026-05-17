@@ -100,3 +100,52 @@ export const GET_MANAGED_SERVICE_QUEUE_DEPTH = gql`
     }
   }
 `;
+
+// #488 Secret-change approval workflow ---------------------------------
+
+const SECRET_CHANGE_PROPOSAL_FIELDS = gql`
+  fragment SecretChangeProposalFields on AstroliftSecretChangeProposal {
+    id
+    registeredAppSlug
+    environmentName
+    op
+    status
+    proposerUserId
+    proposerDisplayName
+    payload
+    payloadDiff
+    requiredApproverCount
+    approvalsCount
+    expiresAt
+    decidedAt
+    appliedAt
+    applyError
+    createdAt
+    approvals {
+      id
+      approverUserId
+      approverDisplayName
+      decision
+      decidedAt
+      reason
+    }
+  }
+`;
+
+export const LIST_SECRET_CHANGE_PROPOSALS = gql`
+  ${SECRET_CHANGE_PROPOSAL_FIELDS}
+  query ListSecretChangeProposals($appSlug: String, $status: String) {
+    astroliftSecretChangeProposals(appSlug: $appSlug, status: $status) {
+      ...SecretChangeProposalFields
+    }
+  }
+`;
+
+export const GET_SECRET_CHANGE_PROPOSAL = gql`
+  ${SECRET_CHANGE_PROPOSAL_FIELDS}
+  query GetSecretChangeProposal($id: GUID!) {
+    astroliftSecretChangeProposal(id: $id) {
+      ...SecretChangeProposalFields
+    }
+  }
+`;

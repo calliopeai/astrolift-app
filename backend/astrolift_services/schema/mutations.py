@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import strawberry
+from django.db import transaction
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -22,6 +25,8 @@ from astrolift_services.models import (
     AppSecretBundleRef,
     ManagedService,
     SecretBundle,
+    SecretChangeApproval,
+    SecretChangeProposal,
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
@@ -31,10 +36,14 @@ from astrolift_services.schema.types import (
     ManagedServiceType,
     RevealedSecretType,
     SecretBundleType,
+    SecretChangeProposalType,
     attachment_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
+    secret_change_proposal_to_type,
 )
+from astrolift_services.secret_change_apply import apply_proposal
+from astrolift_services.secret_change_diff import build_diff
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
@@ -100,6 +109,66 @@ class RevealAppSecretInput:
 
     app_slug: str
     secret_id: str
+
+
+@strawberry.input
+class ProposeSecretChangeInput:
+    """Explicit proposal creation (#488).
+
+    Same surface as ``setAppSecret`` / ``deleteAppSecret`` /
+    ``attachSecretBundle`` / ``detachSecretBundle`` rolled into one
+    discriminated input.  Callers can use this even when the app does
+    NOT have ``requires_secret_approval=True`` — opt-in workflow for
+    teams that want the review trail without flipping the gate.
+
+    When the app DOES have the gate on, the legacy mutations proxy
+    through this same path automatically; the discriminated payload
+    here is the canonical shape.
+    """
+
+    app_slug: str
+    op: str
+    """``set | delete | attach_bundle | detach_bundle``."""
+
+    environment_name: str | None = None
+    """Required for attach/detach; optional for literal set/delete
+    (which are app-wide writes against ``manifest_raw_staged``).  The
+    env name is still captured on the row for display purposes when
+    provided."""
+
+    key: str | None = None
+    """Required for set / delete."""
+
+    value: str | None = None
+    """Required for set."""
+
+    bundle_slug: str | None = None
+    """Required for attach_bundle."""
+
+    prefix: str | None = None
+    """Optional for attach_bundle."""
+
+    attachment_id: GUID | None = None
+    """Required for detach_bundle."""
+
+
+@strawberry.input
+class ApproveSecretChangeInput:
+    proposal_id: GUID
+    reason: str | None = None
+
+
+@strawberry.input
+class RejectSecretChangeInput:
+    proposal_id: GUID
+    reason: str
+    """Required (non-empty) — every rejection leaves an explanation
+    on the audit trail."""
+
+
+@strawberry.input
+class WithdrawSecretChangeInput:
+    proposal_id: GUID
 
 
 @strawberry.input
@@ -210,6 +279,10 @@ class _AppSecretWritePayload:
     app_slug: str
     key: str
     raw_manifest_staged: str
+    pending_proposal_id: GUID | None = None
+    """Set when ``requires_secret_approval=True`` on the app — the
+    underlying write didn't apply; the caller polls the proposal id
+    for approval state.  When None the write applied immediately."""
 
 
 @strawberry.type
@@ -223,6 +296,9 @@ class _BulkImportPayload:
 class _AttachmentRemovedPayload:
     attachment_id: GUID
     deleted: bool
+    pending_proposal_id: GUID | None = None
+    """Set when the app requires secret approval — the detach didn't
+    apply; the caller polls the proposal id for approval state."""
 
 
 # ---------------------------------------------------------------------
@@ -230,6 +306,109 @@ class _AttachmentRemovedPayload:
 
 
 _ENV_NAME_HINT = "must start with a letter or underscore and use only [A-Z0-9_] (POSIX env-var rules)"
+
+# Default TTL for secret-change proposals (#488).  Pulled from
+# Constance at create time; the constant here is the fallback used in
+# tests and during early-boot when Constance isn't yet readable.
+_DEFAULT_PROPOSAL_TTL_SECONDS = 7 * 24 * 3600
+
+
+def _proposal_ttl_seconds() -> int:
+    """Read SECRET_PROPOSAL_TTL_SECONDS from Constance with a safe
+    fallback.  Imports lazily so the module load order doesn't pull
+    Constance before settings are wired."""
+    try:
+        from constance import config as constance_config
+
+        return int(getattr(constance_config, "SECRET_PROPOSAL_TTL_SECONDS", _DEFAULT_PROPOSAL_TTL_SECONDS))
+    except Exception:  # noqa: BLE001 — DB not ready / Constance off
+        return _DEFAULT_PROPOSAL_TTL_SECONDS
+
+
+def _self_approve_secrets_allowed() -> bool:
+    """Read ALLOW_SELF_APPROVE_SECRETS from Constance with a safe
+    fallback to False (the safe default)."""
+    try:
+        from constance import config as constance_config
+
+        return bool(getattr(constance_config, "ALLOW_SELF_APPROVE_SECRETS", False))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _is_eligible_secret_approver(app: RegisteredApp, *, user_id: int) -> bool:
+    """Does ``user_id`` satisfy the app-level secret-approver eligibility?
+
+    Mirrors ``_is_eligible_approver`` in astrolift_lifecycle.  When
+    ``requires_secret_approval`` is off no per-app constraint applies;
+    when on the user must be in ``secret_approver_users``.  An empty
+    set with the flag on means "any holder of the
+    ``secret.approve`` permission" — the permission gate covers that
+    case.
+    """
+    if not app.requires_secret_approval:
+        return True
+    if not app.secret_approver_users.exists():
+        # No explicit set → permission gate is the sole arbiter.
+        return True
+    return app.secret_approver_users.filter(pk=user_id).exists()
+
+
+def _proposal_target_from_input(*args, **kwargs):
+    """``@mutation_audit`` target hook — extract the proposal id from
+    the input so the audit row carries the affected entity."""
+    inp = kwargs.get("input")
+    if inp is None and len(args) >= 3:
+        inp = args[2]
+    pid = getattr(inp, "proposal_id", None) if inp is not None else None
+    if pid is None:
+        return None
+    return "SecretChangeProposal", str(pid)
+
+
+def _maybe_create_proposal_for_write(
+    *,
+    app: RegisteredApp,
+    op: str,
+    payload: dict,
+    environment_name: str = "",
+    info: Info,
+) -> SecretChangeProposal | None:
+    """If the app requires secret approval, build + persist a proposal
+    row and return it.  Otherwise return None so the caller proceeds
+    with the direct write.  Caller is responsible for surfacing the
+    proposal id back in its MutationResult envelope.
+    """
+    if not app.requires_secret_approval:
+        return None
+    actor = _actor_user(info)
+    env = None
+    if environment_name:
+        env = AppEnvironment.objects.filter(
+            registered_app=app,
+            name=environment_name,
+            deleted_at__isnull=True,
+        ).first()
+    diff = build_diff(
+        app=app,
+        op=op,
+        payload=payload,
+        environment_name=environment_name,
+    )
+    proposal = SecretChangeProposal.objects.create(
+        registered_app=app,
+        app_environment=env,
+        environment_name=environment_name or "",
+        proposer=actor,
+        op=op,
+        payload=payload,
+        payload_diff=diff,
+        required_approver_count=max(int(app.secret_minimum_approvals or 1), 1),
+        expires_at=timezone.now() + timedelta(seconds=_proposal_ttl_seconds()),
+        created_by=actor,
+        updated_by=actor,
+    )
+    return proposal
 
 
 def _validate_env_key(key: str) -> str | None:
@@ -321,6 +500,26 @@ class ServicesMutation:
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # #488: when the app requires secret approval the mutation
+        # creates a proposal instead of applying.  Returning the
+        # proposal id in the same envelope shape (with empty raw
+        # manifest staged) keeps the caller code stable — they switch
+        # on ``pendingProposalId`` to decide which flow they're in.
+        proposal = _maybe_create_proposal_for_write(
+            app=app,
+            op=SecretChangeProposal.Op.SET.value,
+            payload={"key": input.key, "value": input.value},
+            info=info,
+        )
+        if proposal is not None:
+            return gql_success(
+                _AppSecretWritePayload(
+                    app_slug=app.slug,
+                    key=input.key,
+                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    pending_proposal_id=GUID(str(proposal.guid)),
+                )
+            )
         source = app.manifest_raw_staged or app.manifest_raw or ""
         new_text = set_app_env_keys(source, {input.key: input.value})
         try:
@@ -352,13 +551,32 @@ class ServicesMutation:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         source = app.manifest_raw_staged or app.manifest_raw or ""
-        new_text, removed = delete_app_env_key(source, input.key)
+        # Validate the key exists BEFORE creating a proposal — no point
+        # gating a delete-of-nothing through review.
+        _, removed = delete_app_env_key(source, input.key)
         if not removed:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 f"key {input.key!r} not present in [env]",
                 field="key",
             )
+        # #488: gate on approval policy after the existence check.
+        proposal = _maybe_create_proposal_for_write(
+            app=app,
+            op=SecretChangeProposal.Op.DELETE.value,
+            payload={"key": input.key},
+            info=info,
+        )
+        if proposal is not None:
+            return gql_success(
+                _AppSecretWritePayload(
+                    app_slug=app.slug,
+                    key=input.key,
+                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    pending_proposal_id=GUID(str(proposal.guid)),
+                )
+            )
+        new_text, _ = delete_app_env_key(source, input.key)
         try:
             staged = _stage_manifest(app, new_text, actor=_actor_user(info))
         except ManifestError as exc:
@@ -579,6 +797,34 @@ class ServicesMutation:
                 ErrorCode.PERMISSION_DENIED.value,
                 "bundle and app belong to different organizations",
             )
+        # #488: gate on secret-approval policy.
+        if app.requires_secret_approval:
+            proposal = _maybe_create_proposal_for_write(
+                app=app,
+                op=SecretChangeProposal.Op.ATTACH_BUNDLE.value,
+                payload={
+                    "bundle_slug": input.bundle_slug,
+                    "prefix": input.prefix or "",
+                },
+                environment_name=env.name,
+                info=info,
+            )
+            # Surface the proposal id by reusing the attachment payload
+            # shape: id is the proposal guid so the FE can route on it.
+            return gql_success(
+                AppSecretBundleAttachmentType(
+                    id=GUID(str(proposal.guid)),
+                    bundle_slug=bundle.slug,
+                    bundle_name=bundle.name,
+                    environment_name=env.name,
+                    prefix=input.prefix or "",
+                    registered_app_slug=app.slug,
+                    team_slug=(bundle.team.slug if bundle.team_id else None),
+                    key_count=len(bundle.last_known_keys or []),
+                    merge_order=0,
+                    attached_at=None,
+                )
+            )
         actor = _actor_user(info)
         existing = AppSecretBundleRef.objects.filter(
             registered_app=app,
@@ -641,11 +887,35 @@ class ServicesMutation:
         info: Info,
         input: DetachSecretBundleInput,
     ) -> MutationResultType[_AttachmentRemovedPayload]:
-        ref = AppSecretBundleRef.objects.filter(guid=str(input.attachment_id)).first()
+        ref = (
+            AppSecretBundleRef.objects.select_related(
+                "registered_app",
+                "app_environment",
+            )
+            .filter(guid=str(input.attachment_id))
+            .first()
+        )
         if ref is None or ref.deleted_at is not None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "attachment not found",
+            )
+        # #488: gate on secret-approval policy.
+        app = ref.registered_app
+        if app.requires_secret_approval:
+            proposal = _maybe_create_proposal_for_write(
+                app=app,
+                op=SecretChangeProposal.Op.DETACH_BUNDLE.value,
+                payload={"attachment_id": str(ref.guid)},
+                environment_name=ref.app_environment.name,
+                info=info,
+            )
+            return gql_success(
+                _AttachmentRemovedPayload(
+                    attachment_id=input.attachment_id,
+                    deleted=False,
+                    pending_proposal_id=GUID(str(proposal.guid)),
+                )
             )
         ref.soft_delete()
         return gql_success(
@@ -1201,6 +1471,361 @@ class ServicesMutation:
                 transport=transport,
             )
         )
+
+    # ---- Secret-change proposals (#488) ------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.secret.proposal.create")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def propose_secret_change(
+        self,
+        info: Info,
+        input: ProposeSecretChangeInput,
+    ) -> MutationResultType[SecretChangeProposalType]:
+        """Explicit proposal creation (#488).
+
+        Works regardless of whether the app has
+        ``requires_secret_approval`` on — teams can opt in to the
+        review trail without flipping the gate.  When the gate IS on,
+        the legacy mutations (``setAppSecret`` etc.) proxy to the same
+        underlying logic; this is just the canonical surface.
+        """
+        valid_ops = {o.value for o in SecretChangeProposal.Op}
+        if input.op not in valid_ops:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"op must be one of {sorted(valid_ops)}",
+                field="op",
+            )
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "app not found",
+                field="appSlug",
+            )
+
+        # Per-op validation + payload assembly.  We refuse to mint a
+        # proposal that we know would fail on apply (missing key,
+        # missing bundle, …) so the queue stays clean.
+        env_name = input.environment_name or ""
+        if input.op == SecretChangeProposal.Op.SET.value:
+            if not input.key:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "key is required for op=set",
+                    field="key",
+                )
+            msg = _validate_env_key(input.key)
+            if msg:
+                return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
+            if input.value is None:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "value is required for op=set",
+                    field="value",
+                )
+            payload: dict = {"key": input.key, "value": input.value}
+        elif input.op == SecretChangeProposal.Op.DELETE.value:
+            if not input.key:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "key is required for op=delete",
+                    field="key",
+                )
+            payload = {"key": input.key}
+        elif input.op == SecretChangeProposal.Op.ATTACH_BUNDLE.value:
+            if not input.bundle_slug:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "bundleSlug is required for op=attach_bundle",
+                    field="bundleSlug",
+                )
+            if not env_name:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "environmentName is required for op=attach_bundle",
+                    field="environmentName",
+                )
+            bundle = SecretBundle.objects.filter(
+                slug=input.bundle_slug,
+                deleted_at__isnull=True,
+            ).first()
+            if bundle is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"bundle {input.bundle_slug!r} not found",
+                    field="bundleSlug",
+                )
+            if bundle.organization_id != app.organization_id:
+                return gql_failure(
+                    ErrorCode.PERMISSION_DENIED.value,
+                    "bundle and app belong to different organizations",
+                )
+            payload = {
+                "bundle_slug": input.bundle_slug,
+                "prefix": input.prefix or "",
+            }
+        elif input.op == SecretChangeProposal.Op.DETACH_BUNDLE.value:
+            if input.attachment_id is None:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "attachmentId is required for op=detach_bundle",
+                    field="attachmentId",
+                )
+            ref = (
+                AppSecretBundleRef.objects.select_related("app_environment")
+                .filter(guid=str(input.attachment_id), deleted_at__isnull=True)
+                .first()
+            )
+            if ref is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "attachment not found",
+                    field="attachmentId",
+                )
+            payload = {"attachment_id": str(ref.guid)}
+            env_name = env_name or ref.app_environment.name
+        else:  # pragma: no cover — guarded above
+            return gql_failure(ErrorCode.VALIDATION.value, "unknown op", field="op")
+
+        actor = _actor_user(info)
+        env_row = None
+        if env_name:
+            env_row = AppEnvironment.objects.filter(
+                registered_app=app,
+                name=env_name,
+                deleted_at__isnull=True,
+            ).first()
+        diff = build_diff(
+            app=app,
+            op=input.op,
+            payload=payload,
+            environment_name=env_name,
+        )
+        proposal = SecretChangeProposal.objects.create(
+            registered_app=app,
+            app_environment=env_row,
+            environment_name=env_name or "",
+            proposer=actor,
+            op=input.op,
+            payload=payload,
+            payload_diff=diff,
+            required_approver_count=max(int(app.secret_minimum_approvals or 1), 1),
+            expires_at=timezone.now() + timedelta(seconds=_proposal_ttl_seconds()),
+            created_by=actor,
+            updated_by=actor,
+        )
+        return gql_success(secret_change_proposal_to_type(proposal))
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.secret.proposal.approve",
+        target=_proposal_target_from_input,
+    )
+    @require_permission(Permission.SECRET_APPROVE)
+    @tenant_scoped()
+    def approve_secret_change(
+        self,
+        info: Info,
+        input: ApproveSecretChangeInput,
+    ) -> MutationResultType[SecretChangeProposalType]:
+        proposal = (
+            SecretChangeProposal.objects.select_related("registered_app")
+            .filter(guid=str(input.proposal_id), deleted_at__isnull=True)
+            .first()
+        )
+        if proposal is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "proposal not found")
+        if proposal.status != SecretChangeProposal.Status.PENDING.value:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"proposal is in status {proposal.status}, expected pending",
+            )
+        # TTL gate — refuse to approve an expired proposal even if
+        # the sweeper hasn't transitioned it yet (race window).
+        if proposal.expires_at <= timezone.now():
+            with transaction.atomic():
+                proposal.transition_to(SecretChangeProposal.Status.EXPIRED)
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "proposal has expired",
+            )
+
+        actor = _actor_user(info)
+        if actor is None:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "authenticated user required to approve",
+            )
+        # Self-approval gate (#488 + mirror of ALLOW_SELF_APPROVE_DEPLOYS).
+        if proposal.proposer_id == actor.pk and not _self_approve_secrets_allowed():
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cannot approve your own proposal — another approver required",
+            )
+        if not _is_eligible_secret_approver(proposal.registered_app, user_id=actor.pk):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "you are not in this app's secret-approver set",
+            )
+
+        with transaction.atomic():
+            # Re-vote is disallowed by the unique constraint; treat a
+            # duplicate as a no-op (idempotent approve).
+            existing = SecretChangeApproval.objects.filter(
+                proposal=proposal,
+                approver=actor,
+                deleted_at__isnull=True,
+            ).first()
+            if existing is None:
+                SecretChangeApproval.objects.create(
+                    proposal=proposal,
+                    approver=actor,
+                    decision=SecretChangeApproval.Decision.APPROVED.value,
+                    reason=(input.reason or "").strip(),
+                    created_by=actor,
+                    updated_by=actor,
+                )
+            approved_count = SecretChangeApproval.objects.filter(
+                proposal=proposal,
+                decision=SecretChangeApproval.Decision.APPROVED.value,
+                deleted_at__isnull=True,
+            ).count()
+            if approved_count >= int(proposal.required_approver_count or 1):
+                proposal.transition_to(SecretChangeProposal.Status.APPROVED)
+                result = apply_proposal(proposal, actor=actor)
+                if result.ok:
+                    proposal.transition_to(SecretChangeProposal.Status.APPLIED)
+                else:
+                    proposal.apply_error = result.error
+                    proposal.save(
+                        update_fields=[
+                            "apply_error",
+                            "updated_at",
+                            "version",
+                        ]
+                    )
+
+        proposal.refresh_from_db()
+        return gql_success(secret_change_proposal_to_type(proposal))
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.secret.proposal.reject",
+        target=_proposal_target_from_input,
+    )
+    @require_permission(Permission.SECRET_APPROVE)
+    @tenant_scoped()
+    def reject_secret_change(
+        self,
+        info: Info,
+        input: RejectSecretChangeInput,
+    ) -> MutationResultType[SecretChangeProposalType]:
+        reason = (input.reason or "").strip()
+        if not reason:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "reason is required",
+                field="reason",
+            )
+        proposal = (
+            SecretChangeProposal.objects.select_related("registered_app")
+            .filter(guid=str(input.proposal_id), deleted_at__isnull=True)
+            .first()
+        )
+        if proposal is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "proposal not found")
+        if proposal.status != SecretChangeProposal.Status.PENDING.value:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"proposal is in status {proposal.status}, expected pending",
+            )
+        actor = _actor_user(info)
+        if actor is None:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "authenticated user required to reject",
+            )
+        # Proposer rejecting their own proposal would be equivalent to
+        # withdrawal — redirect to that path for clarity in the audit
+        # trail.
+        if proposal.proposer_id == actor.pk:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "use withdrawSecretChange to retract your own proposal",
+            )
+        if not _is_eligible_secret_approver(proposal.registered_app, user_id=actor.pk):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "you are not in this app's secret-approver set",
+            )
+
+        with transaction.atomic():
+            existing = SecretChangeApproval.objects.filter(
+                proposal=proposal,
+                approver=actor,
+                deleted_at__isnull=True,
+            ).first()
+            if existing is None:
+                SecretChangeApproval.objects.create(
+                    proposal=proposal,
+                    approver=actor,
+                    decision=SecretChangeApproval.Decision.REJECTED.value,
+                    reason=reason,
+                    created_by=actor,
+                    updated_by=actor,
+                )
+            # ANY rejection moves the proposal to rejected — one nay
+            # kills the proposal, mirroring the deploy quorum policy.
+            proposal.transition_to(SecretChangeProposal.Status.REJECTED)
+
+        proposal.refresh_from_db()
+        return gql_success(secret_change_proposal_to_type(proposal))
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.secret.proposal.withdraw",
+        target=_proposal_target_from_input,
+    )
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def withdraw_secret_change(
+        self,
+        info: Info,
+        input: WithdrawSecretChangeInput,
+    ) -> MutationResultType[SecretChangeProposalType]:
+        """Proposer-only retraction (#488).  Distinct from rejection so
+        the audit trail records the difference between 'proposer
+        changed their mind' and 'approver said no'."""
+        proposal = (
+            SecretChangeProposal.objects.select_related("registered_app")
+            .filter(guid=str(input.proposal_id), deleted_at__isnull=True)
+            .first()
+        )
+        if proposal is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "proposal not found")
+        if proposal.status != SecretChangeProposal.Status.PENDING.value:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"proposal is in status {proposal.status}, expected pending",
+            )
+        actor = _actor_user(info)
+        if actor is None:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "authenticated user required to withdraw",
+            )
+        if proposal.proposer_id != actor.pk:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "only the proposer can withdraw a proposal",
+            )
+        with transaction.atomic():
+            proposal.transition_to(SecretChangeProposal.Status.WITHDRAWN)
+        proposal.refresh_from_db()
+        return gql_success(secret_change_proposal_to_type(proposal))
 
 
 # Envelope keys that are stable configuration (region, prefix, name)

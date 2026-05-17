@@ -7,6 +7,8 @@ from astrolift_services.models import (
     ManagedService,
     ManagedServiceBinding,
     SecretBundle,
+    SecretChangeApproval,
+    SecretChangeProposal,
 )
 
 
@@ -36,3 +38,16 @@ class SecretBundleAdmin(_AllObjectsAdmin):
 @admin.register(AppSecretBundleRef)
 class AppSecretBundleRefAdmin(_AllObjectsAdmin):
     list_display = ("registered_app", "app_environment", "secret_bundle", "prefix")
+
+
+@admin.register(SecretChangeProposal)
+class SecretChangeProposalAdmin(_AllObjectsAdmin):
+    list_display = ("registered_app", "environment_name", "op", "status", "proposer", "expires_at")
+    list_filter = ("status", "op")
+    search_fields = ("registered_app__slug", "environment_name")
+
+
+@admin.register(SecretChangeApproval)
+class SecretChangeApprovalAdmin(_AllObjectsAdmin):
+    list_display = ("proposal", "approver", "decision", "decided_at")
+    list_filter = ("decision",)
