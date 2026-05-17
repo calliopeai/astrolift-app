@@ -1687,6 +1687,8 @@ export type AstroliftSecretBundle = {
   backendRef: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   id: Scalars['GUID']['output'];
+  keyCount: Scalars['Int']['output'];
+  lastKnownKeysAt?: Maybe<Scalars['DateTime']['output']>;
   name: Scalars['String']['output'];
   organizationSlug: Scalars['String']['output'];
   slug: Scalars['String']['output'];

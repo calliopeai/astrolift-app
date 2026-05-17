@@ -45,6 +45,8 @@ export const LIST_SECRET_BUNDLES = gql`
       name
       backendRef
       createdAt
+      keyCount
+      lastKnownKeysAt
     }
   }
 `;

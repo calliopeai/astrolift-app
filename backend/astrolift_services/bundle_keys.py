@@ -88,8 +88,7 @@ def refresh_bundle_known_keys(
         # Driver predates #441's protocol bump.  Treat as
         # NotImplementedError so the cache survives.
         log.warning(
-            "secrets backend %s has no list_keys -- keeping prior "
-            "snapshot for bundle %s",
+            "secrets backend %s has no list_keys -- keeping prior " "snapshot for bundle %s",
             type(secrets_backend).__name__,
             bundle.guid,
         )
@@ -98,8 +97,7 @@ def refresh_bundle_known_keys(
         keys = list_keys(bundle.backend_ref)
     except NotImplementedError:
         log.info(
-            "secrets backend %s.list_keys not implemented for "
-            "bundle %s; keeping prior snapshot",
+            "secrets backend %s.list_keys not implemented for " "bundle %s; keeping prior snapshot",
             type(secrets_backend).__name__,
             bundle.guid,
         )
@@ -134,6 +132,13 @@ def maybe_refresh_bundle_known_keys(bundle) -> list[str]:
             exc,
         )
         return list(bundle.last_known_keys or [])
+    except Exception as exc:  # noqa: BLE001 — resolver bug must not 500 the list page
+        log.warning(
+            "lazy refresh for bundle %s: backend resolution failed: %s " "-- keeping prior snapshot",
+            bundle.guid,
+            exc,
+        )
+        return list(bundle.last_known_keys or [])
     try:
         return refresh_bundle_known_keys(
             bundle,
@@ -141,8 +146,7 @@ def maybe_refresh_bundle_known_keys(bundle) -> list[str]:
         )
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "lazy refresh for bundle %s failed: %s -- keeping prior "
-            "snapshot",
+            "lazy refresh for bundle %s failed: %s -- keeping prior " "snapshot",
             bundle.guid,
             exc,
         )
@@ -176,6 +180,13 @@ def force_refresh_bundle_known_keys(bundle) -> list[str]:
             exc,
         )
         return list(bundle.last_known_keys or [])
+    except Exception as exc:  # noqa: BLE001 — resolver bug must not fail attach
+        log.warning(
+            "eager refresh for bundle %s: backend resolution failed: %s " "-- keeping prior snapshot",
+            bundle.guid,
+            exc,
+        )
+        return list(bundle.last_known_keys or [])
     try:
         return refresh_bundle_known_keys(
             bundle,
@@ -183,8 +194,7 @@ def force_refresh_bundle_known_keys(bundle) -> list[str]:
         )
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "eager refresh for bundle %s failed: %s -- keeping prior "
-            "snapshot",
+            "eager refresh for bundle %s failed: %s -- keeping prior " "snapshot",
             bundle.guid,
             exc,
         )
