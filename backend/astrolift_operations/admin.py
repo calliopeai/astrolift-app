@@ -6,6 +6,7 @@ from astrolift_operations.models import (
     AuditEvent,
     Event,
     Notification,
+    WebhookDelivery,
     WebhookSubscription,
     WorkflowRun,
     WorkloadIdentityRole,
@@ -69,8 +70,45 @@ class AuditEventAdmin(_ReadOnlyAdmin):
 
 @admin.register(WebhookSubscription)
 class WebhookSubscriptionAdmin(admin.ModelAdmin):
-    list_display = ("url", "organization", "is_active", "failure_count", "last_delivery_at")
-    list_filter = ("is_active",)
+    list_display = (
+        "url",
+        "organization",
+        "is_active",
+        "format",
+        "failure_count",
+        "last_delivery_at",
+        "secret_rotated_at",
+    )
+    list_filter = ("is_active", "format")
+
+
+@admin.register(WebhookDelivery)
+class WebhookDeliveryAdmin(admin.ModelAdmin):
+    list_display = (
+        "subscription",
+        "event_type",
+        "status_code",
+        "success",
+        "is_test",
+        "delivered_at",
+    )
+    list_filter = ("success", "is_test")
+    search_fields = ("event_type", "delivery_id")
+    readonly_fields = (
+        "guid",
+        "subscription",
+        "event_type",
+        "retry_attempt",
+        "status_code",
+        "latency_ms",
+        "success",
+        "is_test",
+        "request_payload_excerpt",
+        "response_body_excerpt",
+        "error",
+        "delivery_id",
+        "delivered_at",
+    )
 
 
 @admin.register(WorkflowRun)

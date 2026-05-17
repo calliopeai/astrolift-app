@@ -77,6 +77,9 @@ class CreateWebhookSubscriptionInput:
     """When set, scopes the subscription to a single app (#281).
     Empty / null = org-wide subscription, same as before."""
 
+    format: str | None = None
+    """Outbound payload shape: ``generic`` (default) | ``slack`` | ``discord``."""
+
 
 @strawberry.input
 class UpdateWebhookSubscriptionInput:
@@ -84,6 +87,18 @@ class UpdateWebhookSubscriptionInput:
     url: str | None = None
     events: list[str] | None = None
     is_active: bool | None = None
+    format: str | None = None
+    """Outbound payload shape: ``generic`` | ``slack`` | ``discord``."""
+
+
+@strawberry.input
+class RotateOutboundWebhookSecretInput:
+    """Rotate the HMAC secret for an outbound webhook subscription
+    (#426). The previous secret stays valid for the Constance
+    ``WEBHOOK_SECRET_ROTATION_GRACE_SECONDS`` window so subscribers
+    can roll out the new value without dropping deliveries."""
+
+    id: GUID
 
 
 @strawberry.input
@@ -171,6 +186,7 @@ def _deliver_test_webhook(
     secret: bytes,
     payload: dict,
     event_type: str,
+    format: str = "generic",
 ) -> dict:
     """POST ``payload`` to ``url`` with the standard webhook headers
     + HMAC signature. Returns a result dict the caller folds into
@@ -179,8 +195,15 @@ def _deliver_test_webhook(
     Synchronous on purpose: the real DeliverWebhookWorkflow handles
     retries + backoff, but a manual test wants the immediate verdict
     so the operator can wire the integration without leaving the UI.
+
+    ``format`` selects the outbound shape: subscribers wired to
+    Slack / Discord get a vendor-shaped body so the test message
+    renders correctly in their channel.
     """
-    raw_body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    from astrolift_operations.webhook_format import adapt_payload
+
+    shaped = adapt_payload(format=format, envelope=payload)
+    raw_body = json.dumps(shaped, separators=(",", ":")).encode("utf-8")
     timestamp_unix = int(time.time())
     signature = sign_payload(
         secret=secret,
@@ -287,6 +310,15 @@ class OperationsMutation:
         plaintext_secret = "alfthk_" + secrets.token_urlsafe(24)
         digest = hashlib.sha256(plaintext_secret.encode()).hexdigest()
 
+        fmt = (input.format or WebhookSubscription.Format.GENERIC).lower()
+        valid_formats = {c for c, _ in WebhookSubscription.Format.choices}
+        if fmt not in valid_formats:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"format must be one of {sorted(valid_formats)}",
+                field="format",
+            )
+
         sub = WebhookSubscription.objects.create(
             organization=org,
             team=team,
@@ -295,6 +327,7 @@ class OperationsMutation:
             secret_hash=digest,
             events=list(input.events or []),
             is_active=True,
+            format=fmt,
         )
         return gql_success(
             WebhookSecretReveal(
@@ -319,6 +352,30 @@ class OperationsMutation:
             sub.events = list(input.events)
         if input.is_active is not None:
             sub.is_active = input.is_active
+            # Operator re-enable also clears the auto-disable bookkeeping
+            # so the next failure doesn't immediately re-trip the
+            # threshold from a stale counter. Manual disable leaves the
+            # counter alone — operators see history when they look.
+            if input.is_active:
+                sub.disabled_at = None
+                sub.disabled_reason = ""
+                sub.failure_count = 0
+            else:
+                if not sub.disabled_at:
+                    from django.utils import timezone
+
+                    sub.disabled_at = timezone.now()
+                    sub.disabled_reason = "operator-disabled"
+        if input.format is not None:
+            fmt = input.format.lower()
+            valid_formats = {c for c, _ in WebhookSubscription.Format.choices}
+            if fmt not in valid_formats:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"format must be one of {sorted(valid_formats)}",
+                    field="format",
+                )
+            sub.format = fmt
         sub.save()
         return gql_success(webhook_to_type(sub))
 
@@ -384,7 +441,38 @@ class OperationsMutation:
             secret=(sub.secret_hash or "").encode("utf-8"),
             payload=payload,
             event_type="webhook.test",
+            format=sub.format or "generic",
         )
+
+        # Persist a WebhookDelivery row so the test-fire shows up in
+        # the operator UI's history table. Test rows carry is_test=True
+        # so health widgets can exclude probe traffic. We bypass
+        # record_delivery_outcome on purpose — tests must not touch
+        # the subscription's failure_count or auto-disable bookkeeping.
+        try:
+            from astrolift_operations.models import WebhookDelivery
+
+            WebhookDelivery.objects.create(
+                subscription=sub,
+                event_type="webhook.test",
+                retry_attempt=1,
+                status_code=outcome["status_code"],
+                latency_ms=int(outcome["duration_ms"] or 0),
+                success=bool(
+                    outcome["delivered"] and outcome["status_code"] and 200 <= outcome["status_code"] < 300
+                ),
+                is_test=True,
+                request_payload_excerpt=json.dumps(payload, separators=(",", ":"))[:8192],
+                response_body_excerpt=(outcome["response_body_excerpt"] or "")[:8192],
+                error=(outcome["error"] or "")[:512],
+                delivery_id=(outcome["delivery_id"] or "")[:64],
+                delivered_at=datetime.fromtimestamp(outcome["timestamp_unix"], tz=UTC),
+            )
+        except Exception:
+            log.exception(
+                "failed to persist test webhook delivery row",
+                extra={"subscription_id": str(sub.guid)},
+            )
 
         return gql_success(
             WebhookTestResultType(
@@ -397,6 +485,64 @@ class OperationsMutation:
                 error=outcome["error"],
                 delivery_id=outcome["delivery_id"],
                 timestamp=datetime.fromtimestamp(outcome["timestamp_unix"], tz=UTC),
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="webhook.rotate_secret")
+    @require_permission(Permission.WEBHOOK_UPDATE)
+    @tenant_scoped()
+    def rotate_outbound_webhook_secret(
+        self, info: Info, input: RotateOutboundWebhookSecretInput
+    ) -> MutationResultType[WebhookSecretReveal]:
+        """Rotate the HMAC secret. Returns the new plaintext exactly
+        once; the previous hash stays valid for the Constance grace
+        window so subscribers can roll out without dropping
+        deliveries.
+
+        Audit-logged via ``mutation_audit`` so the rotation appears
+        in the audit log; ``mutation_audit`` records the action +
+        actor + target without leaking the plaintext.
+        """
+        from django.utils import timezone
+
+        from astrolift_operations.webhook_rotation import (
+            grace_seconds_from_constance,
+            plan_rotation,
+        )
+
+        sub = WebhookSubscription.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        if sub is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "subscription not found",
+                field="id",
+            )
+
+        grace_seconds = grace_seconds_from_constance()
+        plan = plan_rotation(
+            current_secret_hash=sub.secret_hash or "",
+            now=timezone.now(),
+            grace_seconds=grace_seconds,
+        )
+
+        sub.secret_hash_previous = plan.previous_secret_hash
+        sub.secret_hash = plan.new_secret_hash
+        sub.secret_rotated_at = plan.rotated_at
+        sub.save(
+            update_fields=[
+                "secret_hash",
+                "secret_hash_previous",
+                "secret_rotated_at",
+                "updated_at",
+                "version",
+            ]
+        )
+
+        return gql_success(
+            WebhookSecretReveal(
+                subscription=webhook_to_type(sub),
+                plaintext_secret=plan.plaintext_secret,
             )
         )
 

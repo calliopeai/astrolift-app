@@ -84,9 +84,18 @@ def verify_signature(
     presented: str,
     freshness_window_seconds: int = 300,
     now_unix: int | None = None,
+    previous_secret: bytes | None = None,
 ) -> bool:
     """Constant-time signature check + freshness window. Returns
-    True only when both pass — caller turns False into 401."""
+    True only when both pass — caller turns False into 401.
+
+    ``previous_secret`` lets the platform honour a rotated-out
+    secret during its grace window (#426). When set, the current
+    secret is checked first; on mismatch the previous secret is
+    checked. The caller is responsible for enforcing the grace
+    timeout (only pass the previous secret while it's still
+    within window) — this layer just does the crypto.
+    """
     if presented is None or not presented.startswith("sha256="):
         return False
     if now_unix is not None:
@@ -97,7 +106,16 @@ def verify_signature(
         timestamp_unix=timestamp_unix,
         raw_body=raw_body,
     )
-    return hmac.compare_digest(expected, presented)
+    if hmac.compare_digest(expected, presented):
+        return True
+    if previous_secret:
+        expected_prev = sign_payload(
+            secret=previous_secret,
+            timestamp_unix=timestamp_unix,
+            raw_body=raw_body,
+        )
+        return hmac.compare_digest(expected_prev, presented)
+    return False
 
 
 # ---- headers --------------------------------------------------------

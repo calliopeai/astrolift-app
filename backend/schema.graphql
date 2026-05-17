@@ -1335,14 +1335,32 @@ type AstroliftUser {
   isActive: Boolean!
 }
 
+type AstroliftWebhookDelivery {
+  id: GUID!
+  subscriptionId: GUID!
+  eventType: String!
+  retryAttempt: Int!
+  statusCode: Int
+  latencyMs: Int!
+  success: Boolean!
+  isTest: Boolean!
+  requestPayloadExcerpt: String!
+  responseBodyExcerpt: String!
+  error: String!
+  deliveryId: String!
+  deliveredAt: DateTime!
+}
+
 type AstroliftWebhookSubscription {
   id: GUID!
   url: String!
   events: [String!]!
   isActive: Boolean!
+  format: String!
   lastDeliveryAt: DateTime
   lastResponseStatus: Int
   failureCount: Int!
+  secretRotatedAt: DateTime
   createdAt: DateTime!
 }
 
@@ -1610,6 +1628,7 @@ input CreateWebhookSubscriptionInput {
   events: [String!]!
   teamSlug: String = null
   appSlug: String = null
+  format: String = null
 }
 
 type DataImportUploadResult {
@@ -2098,6 +2117,7 @@ type Mutation {
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
   testWebhookSubscription(input: TestWebhookInput!): AstroliftWebhookTestResultMutationResult!
+  rotateOutboundWebhookSecret(input: RotateOutboundWebhookSecretInput!): WebhookSecretRevealMutationResult!
   testNotificationChannel(input: TestNotificationInput!): AstroliftNotificationMutationResult!
   markNotificationRead(input: MarkNotificationReadInput!): AstroliftNotificationMutationResult!
   markAllNotificationsRead: MarkallreadpayloadMutationResult!
@@ -2411,6 +2431,7 @@ type Query {
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null): [AstroliftAuditEvent!]!
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
+  astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
@@ -2598,6 +2619,10 @@ input RevokeTeamAccessInput {
 }
 
 input RotateDeployTokenInput {
+  id: GUID!
+}
+
+input RotateOutboundWebhookSecretInput {
   id: GUID!
 }
 
@@ -2870,6 +2895,7 @@ input UpdateWebhookSubscriptionInput {
   url: String = null
   events: [String!] = null
   isActive: Boolean = null
+  format: String = null
 }
 
 input UploadCustomDomainCertificateInput {

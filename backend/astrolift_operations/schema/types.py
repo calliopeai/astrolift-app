@@ -122,9 +122,16 @@ class WebhookSubscriptionType:
     url: str
     events: list[str]
     is_active: bool
+    format: str
+    """Outbound payload shape: ``generic`` | ``slack`` | ``discord``."""
+
     last_delivery_at: dt.datetime | None
     last_response_status: int | None
     failure_count: int
+    secret_rotated_at: dt.datetime | None
+    """When the secret was last rotated; null if never. UI surfaces
+    this beside the rotate button."""
+
     created_at: dt.datetime
 
 
@@ -146,9 +153,11 @@ def webhook_to_type(w) -> WebhookSubscriptionType:
         url=w.url,
         events=list(w.events or []),
         is_active=w.is_active,
+        format=w.format or "generic",
         last_delivery_at=w.last_delivery_at,
         last_response_status=w.last_response_status,
         failure_count=w.failure_count,
+        secret_rotated_at=w.secret_rotated_at,
         created_at=w.created_at,
     )
 
@@ -266,6 +275,48 @@ class AppMetricsType:
     time_series: list[AppMetricsPointType]
     source: str
     """``prometheus`` | ``synthetic``."""
+
+
+@strawberry.type(name="AstroliftWebhookDelivery")
+class WebhookDeliveryType:
+    """One persisted delivery attempt against a subscription (#426).
+
+    Surfaced by ``astroliftWebhookDeliveries`` so the operator UI's
+    expand-row can show last-N attempts with status + payload
+    snippet. ``is_test`` separates synthetic probes from real fan-out
+    so the UI can dim test rows."""
+
+    id: GUID
+    subscription_id: GUID
+    event_type: str
+    retry_attempt: int
+    status_code: int | None
+    latency_ms: int
+    success: bool
+    is_test: bool
+    request_payload_excerpt: str
+    response_body_excerpt: str
+    error: str
+    delivery_id: str
+    delivered_at: dt.datetime
+
+
+def webhook_delivery_to_type(d) -> WebhookDeliveryType:
+    return WebhookDeliveryType(
+        id=GUID(str(d.guid)),
+        subscription_id=GUID(str(d.subscription.guid)),
+        event_type=d.event_type or "",
+        retry_attempt=int(d.retry_attempt or 1),
+        status_code=d.status_code,
+        latency_ms=int(d.latency_ms or 0),
+        success=bool(d.success),
+        is_test=bool(d.is_test),
+        request_payload_excerpt=d.request_payload_excerpt or "",
+        response_body_excerpt=d.response_body_excerpt or "",
+        error=d.error or "",
+        delivery_id=d.delivery_id or "",
+        delivered_at=d.delivered_at,
+    )
 
 
 @strawberry.type(name="AstroliftWebhookTestResult")

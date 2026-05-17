@@ -42,10 +42,32 @@ export const LIST_WEBHOOKS = gql`
       url
       events
       isActive
+      format
       lastDeliveryAt
       lastResponseStatus
       failureCount
+      secretRotatedAt
       createdAt
+    }
+  }
+`;
+
+export const LIST_WEBHOOK_DELIVERIES = gql`
+  query ListWebhookDeliveries($subscriptionId: GUID!, $limit: Int) {
+    astroliftWebhookDeliveries(subscriptionId: $subscriptionId, limit: $limit) {
+      id
+      subscriptionId
+      eventType
+      retryAttempt
+      statusCode
+      latencyMs
+      success
+      isTest
+      requestPayloadExcerpt
+      responseBodyExcerpt
+      error
+      deliveryId
+      deliveredAt
     }
   }
 `;

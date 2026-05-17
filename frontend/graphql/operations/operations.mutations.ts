@@ -16,8 +16,10 @@ export const CREATE_WEBHOOK = gql`
           url
           events
           isActive
+          format
           createdAt
           failureCount
+          secretRotatedAt
         }
       }
     }
@@ -31,12 +33,15 @@ export const UPDATE_WEBHOOK = gql`
       errors {
         code
         message
+        field
       }
       data {
         id
         url
         events
         isActive
+        format
+        secretRotatedAt
       }
     }
   }
@@ -53,6 +58,56 @@ export const DELETE_WEBHOOK = gql`
       data {
         id
         deleted
+      }
+    }
+  }
+`;
+
+export const TEST_FIRE_WEBHOOK = gql`
+  mutation TestFireWebhook($input: TestWebhookInput!) {
+    testWebhookSubscription(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        subscriptionId
+        url
+        delivered
+        statusCode
+        durationMs
+        responseBodyExcerpt
+        error
+        deliveryId
+        timestamp
+      }
+    }
+  }
+`;
+
+export const ROTATE_OUTBOUND_WEBHOOK_SECRET = gql`
+  mutation RotateOutboundWebhookSecret($input: RotateOutboundWebhookSecretInput!) {
+    rotateOutboundWebhookSecret(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        plaintextSecret
+        subscription {
+          id
+          url
+          events
+          isActive
+          format
+          createdAt
+          failureCount
+          secretRotatedAt
+        }
       }
     }
   }

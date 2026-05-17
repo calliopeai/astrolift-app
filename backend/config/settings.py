@@ -424,6 +424,14 @@ CONSTANCE_CONFIG = {
         "without a redeploy. Cluster adoption (bringClusterIntoManagement) is not gated. "
         "Seeded from the FEATURE_DEPLOY_PIPELINE env var (default True).",
     ),
+    "WEBHOOK_SECRET_ROTATION_GRACE_SECONDS": (
+        3600,
+        "Window (in seconds) the previous webhook subscription secret stays valid after a "
+        "rotation. Subscribers verify against the new secret first; on mismatch the platform "
+        "falls back to the previous secret until this window expires. Default 1h; bump for "
+        "fleets that need a longer rollout window, lower (e.g. 60) after a compromise so the "
+        "old secret dies fast.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -435,6 +443,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Workflows": {"fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED"), "collapse": False},
+    "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
 }
 
 INTERNAL_IPS = [

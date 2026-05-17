@@ -1365,14 +1365,32 @@ export type AstroliftUser = {
   username: Scalars['String']['output'];
 };
 
+export type AstroliftWebhookDelivery = {
+  deliveredAt: Scalars['DateTime']['output'];
+  deliveryId: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  eventType: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isTest: Scalars['Boolean']['output'];
+  latencyMs: Scalars['Int']['output'];
+  requestPayloadExcerpt: Scalars['String']['output'];
+  responseBodyExcerpt: Scalars['String']['output'];
+  retryAttempt: Scalars['Int']['output'];
+  statusCode?: Maybe<Scalars['Int']['output']>;
+  subscriptionId: Scalars['GUID']['output'];
+  success: Scalars['Boolean']['output'];
+};
+
 export type AstroliftWebhookSubscription = {
   createdAt: Scalars['DateTime']['output'];
   events: Array<Scalars['String']['output']>;
   failureCount: Scalars['Int']['output'];
+  format: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   lastDeliveryAt?: Maybe<Scalars['DateTime']['output']>;
   lastResponseStatus?: Maybe<Scalars['Int']['output']>;
+  secretRotatedAt?: Maybe<Scalars['DateTime']['output']>;
   url: Scalars['String']['output'];
 };
 
@@ -1638,6 +1656,7 @@ export type CreateTeamInput = {
 export type CreateWebhookSubscriptionInput = {
   appSlug: InputMaybe<Scalars['String']['input']>;
   events: Array<Scalars['String']['input']>;
+  format: InputMaybe<Scalars['String']['input']>;
   teamSlug: InputMaybe<Scalars['String']['input']>;
   url: Scalars['String']['input'];
 };
@@ -2088,6 +2107,7 @@ export type Mutation = {
   revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
+  rotateOutboundWebhookSecret: WebhookSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
   runAstroliftJobOnce: AstroliftRunJobOncePayloadMutationResult;
@@ -2734,6 +2754,11 @@ export type MutationRotateDeployTokenArgs = {
 };
 
 
+export type MutationRotateOutboundWebhookSecretArgs = {
+  input: RotateOutboundWebhookSecretInput;
+};
+
+
 export type MutationRotateSecretBundleArgs = {
   input: RotateSecretBundleInput;
 };
@@ -3250,6 +3275,7 @@ export type Query = {
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
   astroliftTeams: Array<AstroliftTeam>;
+  astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
@@ -3525,6 +3551,12 @@ export type QueryAstroliftSshDeployKeysArgs = {
 };
 
 
+export type QueryAstroliftWebhookDeliveriesArgs = {
+  limit?: Scalars['Int']['input'];
+  subscriptionId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftWebhookSubscriptionsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3731,6 +3763,10 @@ export type RevokeTeamAccessInput = {
 };
 
 export type RotateDeployTokenInput = {
+  id: Scalars['GUID']['input'];
+};
+
+export type RotateOutboundWebhookSecretInput = {
   id: Scalars['GUID']['input'];
 };
 
@@ -4018,6 +4054,7 @@ export type UpdateTenantClusterInput = {
 
 export type UpdateWebhookSubscriptionInput = {
   events: InputMaybe<Array<Scalars['String']['input']>>;
+  format: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   url: InputMaybe<Scalars['String']['input']>;
