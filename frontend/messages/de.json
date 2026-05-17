@@ -552,24 +552,6 @@
         "warningBadgeLabel": "Warnung",
         "collapse": "Einklappen",
         "expand": "Ausklappen"
-      },
-      "logs": {
-        "pressStreamAll": "Drücken Sie „Stream“, um alle Replikate zu verfolgen.",
-        "allReplicas": "Alle Replikate",
-        "allReplicasDescription": "Streaming von jedem Replikat dieser App — jede Zeile ist mit ihrem Quell-Pod markiert.",
-        "historicalDescription": "Logzeilen der letzten {range}.",
-        "refreshHistorical": "Aktualisieren",
-        "historicalUnavailableTitle": "Historische Logs sind in diesem Cluster nicht verfügbar",
-        "historicalUnavailableHint": "Dieser Cluster hat kein konfiguriertes Log-Aggregator-Backend (Loki / CloudWatch / Stackdriver / Azure Monitor). Wechseln Sie zu Live, um in Echtzeit zu verfolgen.",
-        "historicalUnavailableEmpty": "Historische Log-Abfragen sind in diesem Cluster nicht verfügbar. Wechseln Sie zu Live, um in Echtzeit zu verfolgen.",
-        "historicalNoResults": "Keine Logzeilen in diesem Zeitfenster gefunden.",
-        "range": {
-          "live": "Live",
-          "15m": "Letzte 15 Minuten",
-          "1h": "Letzte Stunde",
-          "6h": "Letzte 6 Stunden",
-          "24h": "Letzte 24 Stunden"
-        }
       }
     },
     "tokens": {
@@ -1188,19 +1170,62 @@
     "grantRoleRowLabel": "Rolle an {name} vergeben",
     "grantRoleRowTooltip": "Rolle an {name} vergeben"
   },
-  "stepUp": {
-    "title": "Bestätige deine Identität",
-    "description": "Diese Aktion erfordert eine aktuelle Authentifizierung. Bestätige dein Passwort, um fortzufahren.",
-    "passwordLabel": "Passwort",
-    "cancel": "Abbrechen",
-    "confirm": "Bestätigen",
-    "elevating": "Wird bestätigt…",
-    "indicator": "Admin-Modus aktiv für {minutes, plural, one {# weitere Minute} other {# weitere Minuten}}",
-    "deelevateLabel": "Admin-Erhöhung jetzt beenden",
-    "errors": {
-      "passwordRequired": "Passwort ist erforderlich.",
-      "generic": "Passwort konnte nicht bestätigt werden. Bitte erneut versuchen.",
-      "network": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen."
+  "securitySessions": {
+    "title": "Aktive Sitzungen",
+    "description": "Browser-, CLI- und Mobil-Sitzungen, die aktuell unter Ihrem Konto angemeldet sind. Eine einzelne widerrufen, um nur dieses Gerät abzumelden.",
+    "signOutEverywhere": "Überall abmelden",
+    "signingOut": "Abmelden…",
+    "loadError": "Sitzungen konnten nicht geladen werden",
+    "noSessions": "Keine aktiven Sitzungen gefunden.",
+    "columns": {
+      "kind": "Typ",
+      "label": "Bezeichnung",
+      "status": "Status",
+      "lastSeen": "Zuletzt gesehen",
+      "expires": "Läuft ab",
+      "actions": "Aktionen"
+    },
+    "status": {
+      "current": "dieses Gerät",
+      "other": "anderes Gerät"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Mobil",
+      "browser_extension": "Erweiterung",
+      "api_token": "API-Token"
+    },
+    "actions": {
+      "revoke": "Widerrufen"
+    },
+    "confirmRevoke": {
+      "title": "Diese Sitzung widerrufen?",
+      "description": "Die Sitzung muss sich erneut anmelden. Gebundene Token funktionieren sofort nicht mehr.",
+      "confirm": "Widerrufen"
+    },
+    "confirmSignOutAll": {
+      "title": "{count} andere Sitzung{count, plural, one {} other {en}} abmelden?",
+      "description": "Ihre aktuelle Sitzung in diesem Tab bleibt angemeldet. Alle anderen Browser-Tabs, Mobil-Apps und CLIs müssen sich neu anmelden.",
+      "confirm": "Andere abmelden"
+    },
+    "toasts": {
+      "noOthers": "Keine anderen Sitzungen zum Abmelden.",
+      "signedOut": "{count} Sitzung(en) abgemeldet.",
+      "signOutFailed": "Abmelden fehlgeschlagen",
+      "revoked": "Sitzung widerrufen.",
+      "alreadyRevoked": "Sitzung war bereits widerrufen.",
+      "revokeFailed": "Widerruf fehlgeschlagen"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "gerade eben",
+      "sAgo": "vor {n}s",
+      "mAgo": "vor {n}m",
+      "hAgo": "vor {n}h",
+      "dAgo": "vor {n}T",
+      "moAgo": "vor {n}Mon",
+      "yAgo": "vor {n}J"
     }
   }
 }

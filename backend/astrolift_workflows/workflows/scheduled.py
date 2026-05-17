@@ -30,6 +30,7 @@ with workflow.unsafe.imports_passed_through():
         gc_stale_previews,
         poll_scheduled_job_runs,
         prune_audit_log,
+        prune_stale_sessions,
         reconcile_cluster_capabilities,
         reheal_webhook_subscriptions,
     )
@@ -131,3 +132,19 @@ class CapturePlatformCostSnapshotWorkflow:
             start_to_close_timeout=_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"snapshot captured for {n} org(s)")
+
+
+@workflow.defn(name="PruneStaleSessionsWorkflow")
+class PruneStaleSessionsWorkflow:
+    """Soft-revoke ``AstroliftSession`` rows past the per-kind stale TTL (#498)."""
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            prune_stale_sessions,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        return WorkflowResult(
+            ok=True,
+            message=f"pruned {n} stale session{'' if n == 1 else 's'}",
+        )

@@ -556,24 +556,6 @@
         "warningBadgeLabel": "警告",
         "collapse": "折叠",
         "expand": "展开"
-      },
-      "logs": {
-        "pressStreamAll": "按下「Stream」开始追踪所有副本。",
-        "allReplicas": "所有副本",
-        "allReplicasDescription": "正在从此应用的每个副本流式传输 — 每行都标记了源 Pod。",
-        "historicalDescription": "正在显示过去 {range} 的日志行。",
-        "refreshHistorical": "刷新",
-        "historicalUnavailableTitle": "此集群不支持历史日志",
-        "historicalUnavailableHint": "此集群没有配置日志聚合后端 (Loki / CloudWatch / Stackdriver / Azure Monitor)。切换回实时以进行实时追踪。",
-        "historicalUnavailableEmpty": "此集群不支持历史日志查询。切换回实时以进行实时追踪。",
-        "historicalNoResults": "此时间窗口内没有匹配的日志行。",
-        "range": {
-          "live": "实时",
-          "15m": "最近 15 分钟",
-          "1h": "最近 1 小时",
-          "6h": "最近 6 小时",
-          "24h": "最近 24 小时"
-        }
       }
     },
     "tokens": {
@@ -1192,19 +1174,62 @@
     "grantRoleRowLabel": "为 {name} 授予角色",
     "grantRoleRowTooltip": "为 {name} 授予角色"
   },
-  "stepUp": {
-    "title": "确认身份",
-    "description": "此操作需要最近的身份验证。请确认您的密码以继续。",
-    "passwordLabel": "密码",
-    "cancel": "取消",
-    "confirm": "确认",
-    "elevating": "正在确认…",
-    "indicator": "管理员模式还剩 {minutes, plural, one {#分钟} other {#分钟}}",
-    "deelevateLabel": "立即结束管理员模式",
-    "errors": {
-      "passwordRequired": "需要密码。",
-      "generic": "无法确认您的密码。请重试。",
-      "network": "无法连接到服务器。请检查您的连接后重试。"
+  "securitySessions": {
+    "title": "活动会话",
+    "description": "当前以您身份登录的浏览器、CLI 和移动端会话。撤销单个会话以仅注销该设备。",
+    "signOutEverywhere": "全部退出登录",
+    "signingOut": "退出中…",
+    "loadError": "无法加载会话",
+    "noSessions": "未找到活动会话。",
+    "columns": {
+      "kind": "类型",
+      "label": "标签",
+      "status": "状态",
+      "lastSeen": "最近活动",
+      "expires": "到期",
+      "actions": "操作"
+    },
+    "status": {
+      "current": "此设备",
+      "other": "其他设备"
+    },
+    "kind": {
+      "web": "网页",
+      "cli": "CLI",
+      "mobile": "移动端",
+      "browser_extension": "浏览器扩展",
+      "api_token": "API 令牌"
+    },
+    "actions": {
+      "revoke": "撤销"
+    },
+    "confirmRevoke": {
+      "title": "撤销此会话？",
+      "description": "该会话需要重新登录。绑定的令牌将立即失效。",
+      "confirm": "撤销"
+    },
+    "confirmSignOutAll": {
+      "title": "退出其他 {count} 个会话？",
+      "description": "此标签页的当前会话仍保持登录。所有其他浏览器标签页、移动应用和 CLI 都需要重新登录。",
+      "confirm": "退出其他"
+    },
+    "toasts": {
+      "noOthers": "没有其他会话可注销。",
+      "signedOut": "已退出 {count} 个会话。",
+      "signOutFailed": "退出失败",
+      "revoked": "会话已撤销。",
+      "alreadyRevoked": "会话已被撤销。",
+      "revokeFailed": "撤销失败"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "刚刚",
+      "sAgo": "{n}秒前",
+      "mAgo": "{n}分钟前",
+      "hAgo": "{n}小时前",
+      "dAgo": "{n}天前",
+      "moAgo": "{n}个月前",
+      "yAgo": "{n}年前"
     }
   }
 }

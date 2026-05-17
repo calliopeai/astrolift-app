@@ -552,24 +552,6 @@
         "warningBadgeLabel": "Advertencia",
         "collapse": "Contraer",
         "expand": "Expandir"
-      },
-      "logs": {
-        "pressStreamAll": "Pulsa «Stream» para tailear todas las réplicas.",
-        "allReplicas": "Todas las réplicas",
-        "allReplicasDescription": "Transmitiendo desde cada réplica de esta app — cada línea está etiquetada con su pod de origen.",
-        "historicalDescription": "Mostrando líneas de log de los últimos {range}.",
-        "refreshHistorical": "Actualizar",
-        "historicalUnavailableTitle": "Los logs históricos no están disponibles en este clúster",
-        "historicalUnavailableHint": "Este clúster no tiene un backend agregador de logs configurado (Loki / CloudWatch / Stackdriver / Azure Monitor). Vuelve a En vivo para tailear en tiempo real.",
-        "historicalUnavailableEmpty": "Las consultas de logs históricos no están disponibles en este clúster. Vuelve a En vivo para tailear en tiempo real.",
-        "historicalNoResults": "Ninguna línea de log coincide en esta ventana.",
-        "range": {
-          "live": "En vivo",
-          "15m": "Últimos 15 minutos",
-          "1h": "Última hora",
-          "6h": "Últimas 6 horas",
-          "24h": "Últimas 24 horas"
-        }
       }
     },
     "tokens": {
@@ -1188,19 +1170,62 @@
     "grantRoleRowLabel": "Otorgar rol a {name}",
     "grantRoleRowTooltip": "Otorgar rol a {name}"
   },
-  "stepUp": {
-    "title": "Confirma tu identidad",
-    "description": "Esta acción requiere autenticación reciente. Confirma tu contraseña para continuar.",
-    "passwordLabel": "Contraseña",
-    "cancel": "Cancelar",
-    "confirm": "Confirmar",
-    "elevating": "Confirmando…",
-    "indicator": "Modo admin activo por {minutes, plural, one {# minuto más} other {# minutos más}}",
-    "deelevateLabel": "Finalizar elevación de administrador",
-    "errors": {
-      "passwordRequired": "La contraseña es obligatoria.",
-      "generic": "No se pudo confirmar tu contraseña. Inténtalo de nuevo.",
-      "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo."
+  "securitySessions": {
+    "title": "Sesiones activas",
+    "description": "Sesiones de navegador, CLI y móvil iniciadas como tú. Revoca solo una para desconectar ese dispositivo.",
+    "signOutEverywhere": "Cerrar sesión en todas partes",
+    "signingOut": "Cerrando sesión…",
+    "loadError": "No se pudieron cargar las sesiones",
+    "noSessions": "No se encontraron sesiones activas.",
+    "columns": {
+      "kind": "Tipo",
+      "label": "Etiqueta",
+      "status": "Estado",
+      "lastSeen": "Visto por última vez",
+      "expires": "Expira",
+      "actions": "Acciones"
+    },
+    "status": {
+      "current": "este dispositivo",
+      "other": "otro dispositivo"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Móvil",
+      "browser_extension": "Extensión",
+      "api_token": "Token API"
+    },
+    "actions": {
+      "revoke": "Revocar"
+    },
+    "confirmRevoke": {
+      "title": "¿Revocar esta sesión?",
+      "description": "La sesión tendrá que iniciar sesión de nuevo. Los tokens asociados dejarán de funcionar de inmediato.",
+      "confirm": "Revocar"
+    },
+    "confirmSignOutAll": {
+      "title": "¿Cerrar {count} otra{count, plural, one {} other {s}} sesión{count, plural, one {} other {es}}?",
+      "description": "Tu sesión actual en esta pestaña permanece activa. Todas las demás pestañas del navegador, apps móviles y CLI tendrán que iniciar sesión de nuevo.",
+      "confirm": "Cerrar sesión en las demás"
+    },
+    "toasts": {
+      "noOthers": "No hay otras sesiones para cerrar.",
+      "signedOut": "Se cerró sesión en {count} sesion(es).",
+      "signOutFailed": "Error al cerrar sesión",
+      "revoked": "Sesión revocada.",
+      "alreadyRevoked": "La sesión ya estaba revocada.",
+      "revokeFailed": "Error al revocar"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "ahora mismo",
+      "sAgo": "hace {n}s",
+      "mAgo": "hace {n}m",
+      "hAgo": "hace {n}h",
+      "dAgo": "hace {n}d",
+      "moAgo": "hace {n}mes",
+      "yAgo": "hace {n}a"
     }
   }
 }

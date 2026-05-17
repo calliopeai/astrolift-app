@@ -556,24 +556,6 @@
         "warningBadgeLabel": "Aviso",
         "collapse": "Recolher",
         "expand": "Expandir"
-      },
-      "logs": {
-        "pressStreamAll": "Pressione “Stream” para acompanhar todas as réplicas.",
-        "allReplicas": "Todas as réplicas",
-        "allReplicasDescription": "Transmitindo de todas as réplicas deste app — cada linha tem o pod de origem marcado.",
-        "historicalDescription": "Mostrando linhas de log dos últimos {range}.",
-        "refreshHistorical": "Atualizar",
-        "historicalUnavailableTitle": "Logs históricos não estão disponíveis neste cluster",
-        "historicalUnavailableHint": "Este cluster não tem um backend agregador de logs configurado (Loki / CloudWatch / Stackdriver / Azure Monitor). Volte para Ao vivo para acompanhar em tempo real.",
-        "historicalUnavailableEmpty": "Consultas de logs históricos não estão disponíveis neste cluster. Volte para Ao vivo para acompanhar em tempo real.",
-        "historicalNoResults": "Nenhuma linha de log corresponde nesta janela.",
-        "range": {
-          "live": "Ao vivo",
-          "15m": "Últimos 15 minutos",
-          "1h": "Última hora",
-          "6h": "Últimas 6 horas",
-          "24h": "Últimas 24 horas"
-        }
       }
     },
     "tokens": {
@@ -1192,19 +1174,62 @@
     "grantRoleRowLabel": "Conceder função a {name}",
     "grantRoleRowTooltip": "Conceder função a {name}"
   },
-  "stepUp": {
-    "title": "Confirme sua identidade",
-    "description": "Esta ação exige autenticação recente. Confirme sua senha para continuar.",
-    "passwordLabel": "Senha",
-    "cancel": "Cancelar",
-    "confirm": "Confirmar",
-    "elevating": "Confirmando…",
-    "indicator": "Modo admin ativo por mais {minutes, plural, one {# minuto} other {# minutos}}",
-    "deelevateLabel": "Encerrar elevação de admin agora",
-    "errors": {
-      "passwordRequired": "A senha é obrigatória.",
-      "generic": "Não foi possível confirmar sua senha. Tente novamente.",
-      "network": "Não foi possível contatar o servidor. Verifique sua conexão e tente novamente."
+  "securitySessions": {
+    "title": "Sessões ativas",
+    "description": "Sessões de navegador, CLI e mobile atualmente conectadas como você. Revogue uma única para desconectar apenas aquele dispositivo.",
+    "signOutEverywhere": "Sair de todos os lugares",
+    "signingOut": "Saindo…",
+    "loadError": "Não foi possível carregar as sessões",
+    "noSessions": "Nenhuma sessão ativa encontrada.",
+    "columns": {
+      "kind": "Tipo",
+      "label": "Rótulo",
+      "status": "Status",
+      "lastSeen": "Visto por último",
+      "expires": "Expira",
+      "actions": "Ações"
+    },
+    "status": {
+      "current": "este dispositivo",
+      "other": "outro dispositivo"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Mobile",
+      "browser_extension": "Extensão",
+      "api_token": "Token API"
+    },
+    "actions": {
+      "revoke": "Revogar"
+    },
+    "confirmRevoke": {
+      "title": "Revogar esta sessão?",
+      "description": "A sessão precisará entrar novamente. Tokens vinculados param de funcionar imediatamente.",
+      "confirm": "Revogar"
+    },
+    "confirmSignOutAll": {
+      "title": "Sair de {count} outra{count, plural, one {} other {s}} sessão{count, plural, one {} other {es}}?",
+      "description": "Sua sessão atual nesta aba permanece ativa. Todas as outras abas, apps móveis e CLIs precisarão entrar novamente.",
+      "confirm": "Sair das demais"
+    },
+    "toasts": {
+      "noOthers": "Nenhuma outra sessão para encerrar.",
+      "signedOut": "Saiu de {count} sessão(ões).",
+      "signOutFailed": "Falha ao sair",
+      "revoked": "Sessão revogada.",
+      "alreadyRevoked": "Sessão já estava revogada.",
+      "revokeFailed": "Falha ao revogar"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "agora mesmo",
+      "sAgo": "há {n}s",
+      "mAgo": "há {n}m",
+      "hAgo": "há {n}h",
+      "dAgo": "há {n}d",
+      "moAgo": "há {n}m",
+      "yAgo": "há {n}a"
     }
   }
 }

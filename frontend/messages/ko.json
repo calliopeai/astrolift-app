@@ -556,24 +556,6 @@
         "warningBadgeLabel": "경고",
         "collapse": "접기",
         "expand": "펼치기"
-      },
-      "logs": {
-        "pressStreamAll": "모든 복제본을 추적하려면 “Stream”을 누르세요.",
-        "allReplicas": "모든 복제본",
-        "allReplicasDescription": "이 앱의 모든 복제본에서 스트리밍 중 — 각 줄에는 출처 Pod가 표시됩니다.",
-        "historicalDescription": "지난 {range}의 로그 줄을 표시합니다.",
-        "refreshHistorical": "새로고침",
-        "historicalUnavailableTitle": "이 클러스터에서는 기록 로그를 사용할 수 없습니다",
-        "historicalUnavailableHint": "이 클러스터에는 로그 수집 백엔드 (Loki / CloudWatch / Stackdriver / Azure Monitor)가 구성되어 있지 않습니다. 실시간 추적을 위해 Live로 돌아가세요.",
-        "historicalUnavailableEmpty": "이 클러스터에서는 기록 로그 쿼리를 사용할 수 없습니다. 실시간 추적을 위해 Live로 돌아가세요.",
-        "historicalNoResults": "이 윈도우 내에서 일치하는 로그 줄이 없습니다.",
-        "range": {
-          "live": "실시간",
-          "15m": "최근 15분",
-          "1h": "최근 1시간",
-          "6h": "최근 6시간",
-          "24h": "최근 24시간"
-        }
       }
     },
     "tokens": {
@@ -1192,19 +1174,62 @@
     "grantRoleRowLabel": "{name}에게 역할 부여",
     "grantRoleRowTooltip": "{name}에게 역할 부여"
   },
-  "stepUp": {
-    "title": "본인 확인",
-    "description": "이 작업에는 최근 인증이 필요합니다. 계속하려면 비밀번호를 확인하세요.",
-    "passwordLabel": "비밀번호",
-    "cancel": "취소",
-    "confirm": "확인",
-    "elevating": "확인 중…",
-    "indicator": "관리자 모드 {minutes, plural, one {#분} other {#분}} 남음",
-    "deelevateLabel": "지금 관리자 모드 종료",
-    "errors": {
-      "passwordRequired": "비밀번호가 필요합니다.",
-      "generic": "비밀번호를 확인할 수 없습니다. 다시 시도하세요.",
-      "network": "서버에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요."
+  "securitySessions": {
+    "title": "활성 세션",
+    "description": "현재 본인 계정으로 로그인된 브라우저, CLI, 모바일 세션입니다. 하나만 취소하여 해당 기기만 로그아웃할 수 있습니다.",
+    "signOutEverywhere": "모든 곳에서 로그아웃",
+    "signingOut": "로그아웃 중…",
+    "loadError": "세션을 불러올 수 없습니다",
+    "noSessions": "활성 세션이 없습니다.",
+    "columns": {
+      "kind": "종류",
+      "label": "레이블",
+      "status": "상태",
+      "lastSeen": "최근 접속",
+      "expires": "만료",
+      "actions": "작업"
+    },
+    "status": {
+      "current": "이 기기",
+      "other": "다른 기기"
+    },
+    "kind": {
+      "web": "웹",
+      "cli": "CLI",
+      "mobile": "모바일",
+      "browser_extension": "확장 프로그램",
+      "api_token": "API 토큰"
+    },
+    "actions": {
+      "revoke": "취소"
+    },
+    "confirmRevoke": {
+      "title": "이 세션을 취소하시겠습니까?",
+      "description": "세션은 다시 로그인해야 합니다. 바인딩된 토큰은 즉시 작동을 중지합니다.",
+      "confirm": "취소"
+    },
+    "confirmSignOutAll": {
+      "title": "다른 {count}개 세션에서 로그아웃하시겠습니까?",
+      "description": "이 탭의 현재 세션은 유지됩니다. 다른 모든 브라우저 탭, 모바일 앱, CLI는 다시 로그인해야 합니다.",
+      "confirm": "다른 곳에서 로그아웃"
+    },
+    "toasts": {
+      "noOthers": "로그아웃할 다른 세션이 없습니다.",
+      "signedOut": "{count}개 세션에서 로그아웃했습니다.",
+      "signOutFailed": "로그아웃 실패",
+      "revoked": "세션이 취소되었습니다.",
+      "alreadyRevoked": "세션이 이미 취소되었습니다.",
+      "revokeFailed": "취소 실패"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "방금",
+      "sAgo": "{n}초 전",
+      "mAgo": "{n}분 전",
+      "hAgo": "{n}시간 전",
+      "dAgo": "{n}일 전",
+      "moAgo": "{n}개월 전",
+      "yAgo": "{n}년 전"
     }
   }
 }
