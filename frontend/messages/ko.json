@@ -541,6 +541,64 @@
         "redactedNote": "민감한 값(비밀, 토큰, 비밀번호)은 표시 전에 마스킹됩니다.",
         "requestIdSection": "요청 ID"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} / {required} 승인",
+        "remainingBadge": "{count}건 더 필요",
+        "metBadge": "정족수 충족",
+        "approvedLabel": "승인자",
+        "approvedEmpty": "아직 승인이 없습니다.",
+        "awaitingLabel": "대기 중",
+        "awaitingEmpty": "자격 있는 승인자가 없습니다. 앱 정책을 확인하세요."
+      }
+    },
+    "approvalsQueue": {
+      "title": "승인 대기열",
+      "description": "승인을 기다리는 모든 배포. 동일 환경 내에서 일괄 승인/거부할 수 있습니다.",
+      "empty": {
+        "title": "대기 항목 없음",
+        "description": "승인이 필요한 배포가 여기에 나타납니다."
+      },
+      "selectAllLabel": "모두 선택",
+      "selectionStatus": "{selected} / {total} 선택됨",
+      "readOnlyHint": "조회만 가능합니다.",
+      "approveLabel": "승인",
+      "rejectLabel": "거부",
+      "footer": {
+        "selected": "{count}개 배포 선택됨",
+        "summary": "{envs}에서 실행됩니다.",
+        "crossEnvWarning": "일괄 작업에는 동일 앱/환경이 필요합니다. 정책은 환경별로 다릅니다.",
+        "approveButton": "{count}개 승인",
+        "rejectButton": "{count}개 거부"
+      },
+      "confirmApprove": {
+        "title": "{count}개 배포를 승인하시겠습니까?",
+        "description": "{envs}의 롤아웃이 재개됩니다.",
+        "confirm": "모두 승인"
+      },
+      "confirmReject": {
+        "title": "{count}개 배포를 거부하시겠습니까?",
+        "description": "{envs}의 각 배포가 실패로 표시됩니다.",
+        "reasonLabel": "거부 사유",
+        "reasonPlaceholder": "이 배치를 거부하는 이유는 무엇입니까?",
+        "reasonRequired": "사유가 필요합니다",
+        "confirm": "모두 거부"
+      },
+      "toasts": {
+        "unexpected": "일괄 작업 응답이 없습니다.",
+        "allOk": "{label} 성공: {count}개 배포.",
+        "allFailed": "{label} 실패 ({count}개): {message}",
+        "partial": "{label}: 성공 {succeeded}, 실패 {failed}.",
+        "approveFailed": "일괄 승인 실패.",
+        "rejectFailed": "일괄 거부 실패."
+      },
+      "row": {
+        "selectRowLabel": "{app} / {env} 선택",
+        "approvalsCount": "{received}/{required} 승인",
+        "received": "수신 {rel}",
+        "review": "검토"
+      }
     }
   },
   "jobs": {

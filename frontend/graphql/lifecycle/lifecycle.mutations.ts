@@ -225,6 +225,54 @@ export const REJECT_DEPLOYMENT = gql`
   }
 `;
 
+// #420 — bulk approve / reject. Per-id outcomes ride in
+// ``data.results``; the outer envelope is ``ok=false`` only on the
+// validation pre-checks (empty list, > 50 ids, missing reason).
+// Returns just the minimal deployment fields the queue needs to
+// rerender — the global queue refetches after the bulk call settles
+// so we don't pull every approver row across the wire here.
+
+const BULK_DEPLOYMENT_RESULT_FIELDS = `
+  results {
+    deploymentId
+    ok
+    errors { code message field }
+    deployment {
+      id
+      status
+      approvalsReceived
+      approvalsRequired
+      abortedReason
+    }
+  }
+  succeededCount
+  failedCount
+`;
+
+export const BULK_APPROVE_DEPLOYMENTS = gql`
+  mutation BulkApproveDeployments($input: BulkApproveDeploymentsInput!) {
+    bulkApproveDeployments(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        ${BULK_DEPLOYMENT_RESULT_FIELDS}
+      }
+    }
+  }
+`;
+
+export const BULK_REJECT_DEPLOYMENTS = gql`
+  mutation BulkRejectDeployments($input: BulkRejectDeploymentsInput!) {
+    bulkRejectDeployments(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        ${BULK_DEPLOYMENT_RESULT_FIELDS}
+      }
+    }
+  }
+`;
+
 export const ROLLBACK_DEPLOYMENT = gql`
   mutation RollbackDeployment($input: DeploymentByIdInput!) {
     rollbackDeployment(input: $input) {

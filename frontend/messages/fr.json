@@ -537,6 +537,64 @@
         "redactedNote": "Les valeurs sensibles (secrets, tokens, mots de passe) sont masquées avant affichage.",
         "requestIdSection": "ID de requête"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} sur {required} approbations",
+        "remainingBadge": "{count} de plus requises",
+        "metBadge": "Quorum atteint",
+        "approvedLabel": "Approuvé par",
+        "approvedEmpty": "Aucune approbation pour le moment.",
+        "awaitingLabel": "En attente",
+        "awaitingEmpty": "Aucun approbateur éligible — vérifiez la politique de l'application."
+      }
+    },
+    "approvalsQueue": {
+      "title": "File d'attente d'approbations",
+      "description": "Tous les déploiements en attente de validation. Sélectionnez des lignes pour approuver ou rejeter en lot dans un même environnement.",
+      "empty": {
+        "title": "Rien en attente",
+        "description": "Quand un déploiement nécessite une validation, il apparaît ici."
+      },
+      "selectAllLabel": "Tout sélectionner",
+      "selectionStatus": "{selected} sur {total} sélectionnés",
+      "readOnlyHint": "Vous pouvez consulter mais pas approuver.",
+      "approveLabel": "Approuver",
+      "rejectLabel": "Rejeter",
+      "footer": {
+        "selected": "{count, plural, =1 {1 déploiement sélectionné} other {# déploiements sélectionnés}}",
+        "summary": "Dans {envs}.",
+        "crossEnvWarning": "L'approbation en lot exige la même app/environnement — les politiques varient.",
+        "approveButton": "Approuver {count}",
+        "rejectButton": "Rejeter {count}"
+      },
+      "confirmApprove": {
+        "title": "Approuver {count} déploiements ?",
+        "description": "Débloque {envs}.",
+        "confirm": "Tout approuver"
+      },
+      "confirmReject": {
+        "title": "Rejeter {count} déploiements ?",
+        "description": "Chaque déploiement dans {envs} passe en échec.",
+        "reasonLabel": "Motif du rejet",
+        "reasonPlaceholder": "Pourquoi ce lot est-il rejeté ?",
+        "reasonRequired": "Motif requis",
+        "confirm": "Tout rejeter"
+      },
+      "toasts": {
+        "unexpected": "Action en lot sans réponse.",
+        "allOk": "{label} réussi pour {count} déploiements.",
+        "allFailed": "{label} a échoué pour {count} déploiements : {message}",
+        "partial": "{label} : {succeeded} réussis, {failed} échoués.",
+        "approveFailed": "Approbation en lot échouée.",
+        "rejectFailed": "Rejet en lot échoué."
+      },
+      "row": {
+        "selectRowLabel": "Sélectionner {app} / {env}",
+        "approvalsCount": "{received}/{required} approbations",
+        "received": "Reçu {rel}",
+        "review": "Examiner"
+      }
     }
   },
   "jobs": {
