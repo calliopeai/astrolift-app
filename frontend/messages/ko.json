@@ -1054,5 +1054,20 @@
       "lines": "{count}줄",
       "truncated": "200줄 표시 — 콘솔에서 전체 로그를 확인하세요."
     }
+  },
+  "orgMembers": {
+    "searchLabel": "멤버 검색",
+    "searchPlaceholder": "사용자 이름 또는 이메일로 검색…",
+    "lastActiveColumn": "마지막 활동",
+    "actionsColumn": "작업",
+    "noMatchTitle": "일치 항목 없음",
+    "noMatchDescription": "「{term}」과(와) 일치하는 멤버가 없습니다. 다른 검색어를 시도하세요.",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "비활성",
+    "rolePillTooltipPrefix": "{scope}을(를) 통해 부여됨",
+    "sourceTooltipAria": "{scope}을(를) 통해 부여됨",
+    "sourceColumn": "출처",
+    "grantRoleRowLabel": "{name}에게 역할 부여",
+    "grantRoleRowTooltip": "{name}에게 역할 부여"
   }
 }
