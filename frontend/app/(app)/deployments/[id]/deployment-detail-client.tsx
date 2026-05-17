@@ -14,6 +14,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Can } from "@/components/Can";
@@ -487,15 +488,20 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <ConfirmDialog
+      <ConfirmDialogWithReason
         open={confirmAbort}
         onOpenChange={setConfirmAbort}
         title={t("confirmAbort.title", { app: d.registeredAppSlug, env: d.environmentName })}
         description={t("confirmAbort.description")}
+        reasonLabel={t("confirmAbort.reasonLabel")}
+        reasonPlaceholder={t("confirmAbort.reasonPlaceholder")}
+        reasonRequiredError={t("confirmAbort.reasonRequired")}
         confirmLabel={t("confirmAbort.confirm")}
         destructive
-        onConfirm={async () => {
-          const { data } = await abort({ variables: { input: { id: d.id } } });
+        onConfirm={async (reason) => {
+          const { data } = await abort({
+            variables: { input: { id: d.id, reason } },
+          });
           reportResult("abortDeployment", data?.abortDeployment);
         }}
       />
