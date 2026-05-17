@@ -231,6 +231,13 @@ export type AstroliftAppCertificate = {
   renewalStatus: Scalars['String']['output'];
 };
 
+export type AstroliftAppConfigDrift = {
+  environmentName: Scalars['String']['output'];
+  fields: Array<Scalars['String']['output']>;
+  hasDrift: Scalars['Boolean']['output'];
+  lastChecked: Scalars['DateTime']['output'];
+};
+
 export type AstroliftAppDeploymentSummary = {
   commitSha: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -383,6 +390,13 @@ export type AstroliftAppPod = {
   workload: Scalars['String']['output'];
 };
 
+export type AstroliftAppReprovisionState = {
+  elapsedSeconds?: Maybe<Scalars['Int']['output']>;
+  needsReprovision: Scalars['Boolean']['output'];
+  reason: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+};
+
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -438,6 +452,15 @@ export type AstroliftAppTeamAccessMutationResult = {
   data?: Maybe<AstroliftAppTeamAccess>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAppUrlHealth = {
+  lastChecked: Scalars['DateTime']['output'];
+  latencyMs?: Maybe<Scalars['Int']['output']>;
+  message: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  statusCode?: Maybe<Scalars['Int']['output']>;
+  url: Scalars['String']['output'];
 };
 
 export type AstroliftApproverUser = {
@@ -1336,6 +1359,7 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
 export type AstroliftRegisteredApp = {
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
+  configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
   cronPaused: Scalars['Boolean']['output'];
@@ -1372,6 +1396,7 @@ export type AstroliftRegisteredApp = {
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
+  reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
   securityPolicy: AstroliftSecurityPolicy;
   slug: Scalars['String']['output'];
@@ -3767,6 +3792,8 @@ export type Query = {
   astroliftAppSecrets: Array<AstroliftAppSecret>;
   astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
+  astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
+  astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAuditEventsPage: AstroliftAuditEventPage;
@@ -3875,6 +3902,7 @@ export type QueryAstroliftAlertRulesArgs = {
 
 
 export type QueryAstroliftAppArgs = {
+  includeDrift?: Scalars['Boolean']['input'];
   slug: Scalars['String']['input'];
 };
 
@@ -3954,6 +3982,20 @@ export type QueryAstroliftAppStatusCodeBreakdownArgs = {
 
 export type QueryAstroliftAppTeamAccessesArgs = {
   appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppUrlHealthArgs = {
+  appSlug: Scalars['String']['input'];
+  forceRefresh?: Scalars['Boolean']['input'];
+  url: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppUrlProbeHistoryArgs = {
+  appSlug: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
+  url: Scalars['String']['input'];
 };
 
 

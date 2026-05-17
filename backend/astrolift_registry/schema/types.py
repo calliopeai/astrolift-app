@@ -74,6 +74,67 @@ class AppDeploymentSummaryType:
     commit_sha: str
 
 
+@strawberry.type(name="AstroliftAppConfigDrift")
+class AppConfigDriftType:
+    """Per-app config-drift rollup surfaced on the overview (#407 C).
+
+    Compares the most recently applied ``Deployment.config_snapshot``'s
+    ``manifest_hash`` against the live ``RegisteredApp.manifest_hash``
+    and, when the platform has a known repo-side hash, against
+    ``last_synced_hash`` so an unsynced repo push also reads as drift.
+
+    ``fields`` is a short list of the field-path strings that diverge
+    (``manifest_hash``, ``repo_unsynced``, etc.) — the UI renders one
+    bullet per entry under the banner so the operator can see *what*
+    drifted without opening the rendered manifest tab.
+
+    ``environment_name`` is the env whose deploy snapshot drove the
+    comparison (the most recent successful deploy across every env);
+    empty string when the app has no qualifying deploy yet, in which
+    case ``has_drift`` is False because the platform has nothing to
+    compare against.
+
+    ``last_checked`` is the resolver-call timestamp — the comparison
+    is computed live (no cron), so this is always "now" from the
+    operator's perspective. Surfaced so the FE can render a chip like
+    "checked 2s ago" without rolling its own clock state.
+    """
+
+    has_drift: bool
+    fields: list[str]
+    environment_name: str
+    last_checked: dt.datetime
+
+
+@strawberry.type(name="AstroliftAppReprovisionState")
+class AppReprovisionStateType:
+    """Reprovision-callout payload for the overview (#407 A).
+
+    Derived from ``provisioning_status`` plus the post-ready gap the
+    issue calls out (``ready && !registry_repo_uri``). The FE renders
+    a state-appropriate banner above the deploy-activity strip when
+    ``needs_reprovision`` is True and wires the CTA to the existing
+    ``forceAstroliftRedeploy`` mutation.
+
+    ``reason`` is a short human one-liner the banner uses verbatim —
+    operator-facing copy lives backend-side so every shell renders
+    the same words and we don't drift between locales (i18n on the
+    FE still wraps the formatted strings; this is the raw signal).
+
+    ``state`` mirrors ``provisioning_status`` for `failed` / `pending` /
+    `provisioning`, plus the synthetic ``ready_missing_registry`` for
+    the ready-but-broken case. Empty string when no callout applies.
+
+    ``elapsed_seconds`` carries the age of the last ``updated_at`` bump
+    so the FE can render "started 4m ago" for in-flight provisions.
+    None when the app's state doesn't warrant a callout."""
+
+    needs_reprovision: bool
+    state: str
+    reason: str
+    elapsed_seconds: int | None
+
+
 @strawberry.type(name="AstroliftSecurityPolicy")
 class SecurityPolicyType:
     """Resolved supply-chain policy for an app (#313).
@@ -202,6 +263,20 @@ class RegisteredAppType:
     latest_deployment: AppDeploymentSummaryType | None
     last_deployed_at: dt.datetime | None
     health_pulse: AppHealthPulseType | None
+
+    # Reprovision-callout signals (#407 A). Always populated — the
+    # cost is O(1) on the row, so we don't gate it behind an opt-in.
+    # ``needs_reprovision`` collapses to False on a healthy ready app
+    # so the FE can short-circuit the banner with a single null check.
+    reprovision: AppReprovisionStateType
+
+    # Config-drift signals (#407 C). Compares the latest applied
+    # ``Deployment.config_snapshot`` against the live manifest hash;
+    # opt-in via the ``include_drift`` arg on ``astroliftApp`` so the
+    # list path stays cheap (one extra deploy lookup per app row).
+    # Left None on the list resolvers and on detail when the arg is
+    # False; populated by ``astroliftApp(slug, includeDrift: true)``.
+    config_drift: AppConfigDriftType | None
 
 
 @strawberry.type(name="AstroliftAppTeamAccess")
@@ -439,7 +514,12 @@ def build_app_freshness(
     )
 
 
-def app_to_type(app, *, freshness: AppFreshness | None = None) -> RegisteredAppType:
+def app_to_type(
+    app,
+    *,
+    freshness: AppFreshness | None = None,
+    drift: AppConfigDriftType | None = None,
+) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
         classify_state,
@@ -452,6 +532,7 @@ def app_to_type(app, *, freshness: AppFreshness | None = None) -> RegisteredAppT
             last_synced_hash=app.last_synced_hash or "",
         )
     )
+    reprovision = build_reprovision_state(app)
     project = app.project if app.project_id else None
     return RegisteredAppType(
         id=GUID(str(app.guid)),
@@ -509,6 +590,8 @@ def app_to_type(app, *, freshness: AppFreshness | None = None) -> RegisteredAppT
         latest_deployment=(freshness.latest_deployment if freshness else None),
         last_deployed_at=(freshness.last_deployed_at if freshness else None),
         health_pulse=(freshness.pulse if freshness else None),
+        reprovision=reprovision,
+        config_drift=drift,
     )
 
 
@@ -530,6 +613,154 @@ def _paused_by_email(app) -> str | None:
         return None
     email = getattr(user, "email", "") or getattr(user, "username", "")
     return email or None
+
+
+_REPROVISION_STATE_READY_MISSING_REGISTRY = "ready_missing_registry"
+_REPROVISION_REASONS = {
+    "failed": "Provisioning failed — retry to rebuild the registry repo and namespace.",
+    "pending": "Provisioning hasn't started yet — kick it off to bring the app online.",
+    "provisioning": "Provisioning is in progress — re-run only if it stalls.",
+    _REPROVISION_STATE_READY_MISSING_REGISTRY: (
+        "App is ready but the container registry coordinates are missing — "
+        "reprovision to rebuild the ECR repo and push role."
+    ),
+}
+
+
+def build_reprovision_state(app) -> AppReprovisionStateType:
+    """Derive the reprovision-callout payload for one app (#407 A).
+
+    The platform never persists a "needs reprovision" boolean — the
+    UI computes the call from the state machine here so the rule
+    lives in one place. ``elapsed_seconds`` is the age of the last
+    ``updated_at`` bump on the app row (transitions advance it via
+    ``transition_provisioning``), which is what the FE renders as
+    "started X min ago" while a provisioning attempt is in flight.
+
+    The synthetic ``ready_missing_registry`` state catches the post-
+    ready gap where ``provisioning_status == 'ready'`` but
+    ``registry_repo_uri`` is empty — that combination means the
+    bring-up loop landed the manifest + DNS but lost the ECR setup,
+    and a deploy will silently no-op until reprovisioned.
+    """
+
+    status = (app.provisioning_status or "").strip()
+    elapsed: int | None = None
+    updated_at = getattr(app, "updated_at", None)
+    if updated_at is not None:
+        elapsed = max(0, int((dt.datetime.now(dt.UTC) - updated_at).total_seconds()))
+
+    if status == "ready":
+        if not (app.registry_repo_uri or "").strip():
+            return AppReprovisionStateType(
+                needs_reprovision=True,
+                state=_REPROVISION_STATE_READY_MISSING_REGISTRY,
+                reason=_REPROVISION_REASONS[_REPROVISION_STATE_READY_MISSING_REGISTRY],
+                elapsed_seconds=elapsed,
+            )
+        return AppReprovisionStateType(
+            needs_reprovision=False,
+            state="",
+            reason="",
+            elapsed_seconds=None,
+        )
+
+    if status in _REPROVISION_REASONS:
+        return AppReprovisionStateType(
+            needs_reprovision=True,
+            state=status,
+            reason=_REPROVISION_REASONS[status],
+            elapsed_seconds=elapsed,
+        )
+
+    # Defensive: an unknown / empty status string still surfaces a
+    # banner so an operator isn't left guessing. Falls back to a
+    # generic message keyed on the raw status so support can ask
+    # "what state is the row in?" without a DB shell.
+    return AppReprovisionStateType(
+        needs_reprovision=True,
+        state=status or "unknown",
+        reason=f"Unknown provisioning state {status!r} — reprovision to recover.",
+        elapsed_seconds=elapsed,
+    )
+
+
+def build_config_drift(app, *, now: dt.datetime | None = None) -> AppConfigDriftType:
+    """Compare the latest applied deploy snapshot against the live
+    manifest hash (#407 C).
+
+    Drift is True when any of:
+
+    * The DB manifest hash diverges from the snapshot the last
+      successful deploy applied — the operator edited the manifest
+      after the deploy and hasn't redeployed yet.
+    * The repo-side hash is ahead of the DB (``manifest_sync_state``
+      reads ``repo_ahead`` or ``diverged``) — a developer pushed a
+      manifest update that the platform hasn't picked up.
+
+    Both checks live here so the FE renders one banner that covers
+    both authoring sources (UI edits + repo pushes) instead of two
+    competing surfaces. ``fields`` is a stable list of field-path
+    strings the FE bullets under the headline.
+
+    Returns an "in sync" payload (``has_drift=False``) when the app
+    has no qualifying deploy snapshot — we don't surface drift
+    against nothing, that's noise.
+    """
+    # Local imports keep the registry types module free of the
+    # lifecycle / manifest imports for the cheap list resolvers.
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_manifest.sync_state import SyncSnapshot, SyncState, classify_state
+
+    when = now or dt.datetime.now(dt.UTC)
+
+    latest = (
+        Deployment.objects.filter(
+            registered_app_id=app.pk,
+            deleted_at__isnull=True,
+        )
+        .exclude(status=Deployment.Status.PENDING_APPROVAL.value)
+        .exclude(status=Deployment.Status.PENDING.value)
+        .order_by("-created_at")
+        .select_related("app_environment")
+        .first()
+    )
+
+    fields: list[str] = []
+    env_name = ""
+    snapshot_hash = ""
+    snapshot_image_tag = ""
+
+    if latest is not None:
+        env_name = latest.app_environment.name if latest.app_environment_id else ""
+        snapshot = latest.config_snapshot or {}
+        snapshot_hash = str(snapshot.get("manifest_hash", "")).strip()
+        snapshot_image_tag = str(snapshot.get("image_tag", "")).strip()
+        current_hash = (app.manifest_hash or "").strip()
+        if snapshot_hash and current_hash and snapshot_hash != current_hash:
+            fields.append("manifest_hash")
+        if snapshot_image_tag and latest.image_tag and snapshot_image_tag != latest.image_tag:
+            # Different image tag between what the snapshot captured
+            # and what the deploy row records — narrow but real:
+            # surfaces when a manual cluster touch overrode the tag.
+            fields.append("image_tag")
+
+    sync_state = classify_state(
+        SyncSnapshot(
+            db_hash=app.manifest_hash or "",
+            repo_hash=_repo_hash_for(app),
+            last_synced_hash=app.last_synced_hash or "",
+        )
+    )
+    if sync_state in (SyncState.REPO_AHEAD, SyncState.DIVERGED):
+        fields.append("repo_unsynced")
+
+    return AppConfigDriftType(
+        has_drift=bool(fields),
+        fields=fields,
+        environment_name=env_name,
+        last_checked=when,
+    )
 
 
 def _security_policy_to_type(app) -> SecurityPolicyType:

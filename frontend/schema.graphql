@@ -206,6 +206,13 @@ type AstroliftAppCertificate {
   renewalStatus: String!
 }
 
+type AstroliftAppConfigDrift {
+  hasDrift: Boolean!
+  fields: [String!]!
+  environmentName: String!
+  lastChecked: DateTime!
+}
+
 type AstroliftAppDeploymentSummary {
   id: GUID!
   status: String!
@@ -359,6 +366,13 @@ type AstroliftAppPod {
   containerStatuses: [AstroliftContainerStatus!]!
 }
 
+type AstroliftAppReprovisionState {
+  needsReprovision: Boolean!
+  state: String!
+  reason: String!
+  elapsedSeconds: Int
+}
+
 type AstroliftAppSecret {
   id: String!
   key: String!
@@ -414,6 +428,15 @@ type AstroliftAppTeamAccessMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAppTeamAccess
+}
+
+type AstroliftAppUrlHealth {
+  url: String!
+  status: String!
+  statusCode: Int
+  latencyMs: Int
+  lastChecked: DateTime!
+  message: String!
 }
 
 type AstroliftApproverUser {
@@ -1365,6 +1388,8 @@ type AstroliftRegisteredApp {
   latestDeployment: AstroliftAppDeploymentSummary
   lastDeployedAt: DateTime
   healthPulse: AstroliftAppHealthPulse
+  reprovision: AstroliftAppReprovisionState!
+  configDrift: AstroliftAppConfigDrift
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -2916,7 +2941,7 @@ type Query {
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
-  astroliftApp(slug: String!): AstroliftRegisteredApp
+  astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
@@ -2968,6 +2993,8 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
+  astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
