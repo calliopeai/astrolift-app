@@ -19,13 +19,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -41,10 +35,8 @@ import {
 } from "@/graphql/identity/identity.mutations";
 import { LIST_IDENTITY_PROVIDERS } from "@/graphql/identity/identity.queries";
 import { DOC_LINKS } from "@/lib/docs/urls";
-import type {
-  AstroliftIdentityProvider,
-  MutationResult,
-} from "@/graphql/identity/identity.types";
+import type { AstroliftIdentityProvider, MutationResult } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { CreateIdentityProviderDialog } from "./create-identity-provider-dialog";
@@ -69,6 +61,7 @@ export function IdentityProviderClient() {
   const [open, setOpen] = React.useState(false);
   const { can } = useMyPermissions();
   const canManageIdp = can("org.update");
+  const fmt = useFormatters();
   const { data, loading, error } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);
 
   const [setActive, { loading: switching }] = useMutation<{
@@ -85,10 +78,10 @@ export function IdentityProviderClient() {
     awaitRefetchQueries: true,
   });
 
-  const [activateTarget, setActivateTarget] =
-    React.useState<AstroliftIdentityProvider | null>(null);
-  const [deleteTarget, setDeleteTarget] =
-    React.useState<AstroliftIdentityProvider | null>(null);
+  const [activateTarget, setActivateTarget] = React.useState<AstroliftIdentityProvider | null>(
+    null
+  );
+  const [deleteTarget, setDeleteTarget] = React.useState<AstroliftIdentityProvider | null>(null);
 
   function requestSetActive(idp: AstroliftIdentityProvider) {
     if (idp.isActive) return;
@@ -108,9 +101,7 @@ export function IdentityProviderClient() {
     if (data?.setActiveIdentityProvider.ok) {
       toast.success(`Active provider: ${idp.name}`);
     } else {
-      throw new Error(
-        data?.setActiveIdentityProvider.errors?.[0]?.message ?? "Failed",
-      );
+      throw new Error(data?.setActiveIdentityProvider.errors?.[0]?.message ?? "Failed");
     }
   }
 
@@ -119,9 +110,7 @@ export function IdentityProviderClient() {
     if (data?.softDeleteIdentityProvider.ok) {
       toast.success(`Deleted ${idp.name}`);
     } else {
-      throw new Error(
-        data?.softDeleteIdentityProvider.errors?.[0]?.message ?? "Failed",
-      );
+      throw new Error(data?.softDeleteIdentityProvider.errors?.[0]?.message ?? "Failed");
     }
   }
 
@@ -207,14 +196,34 @@ export function IdentityProviderClient() {
                       {idp.oidcDiscoveryUrl || idp.metadataUrl || "—"}
                     </TableCell>
                     <TableCell>
-                      {idp.isActive ? (
-                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 gap-1" variant="secondary">
-                          <CheckCircle2Icon className="size-3" />
-                          active
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">configured</Badge>
-                      )}
+                      <div className="flex flex-col items-start gap-1">
+                        {idp.isActive ? (
+                          <Badge
+                            className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            variant="secondary"
+                          >
+                            <CheckCircle2Icon className="size-3" />
+                            active
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">configured</Badge>
+                        )}
+                        {idp.isActive && idp.updatedAt && (
+                          // `updatedAt` is the closest proxy we have
+                          // for "switched to active at" until the
+                          // backend exposes a dedicated
+                          // `activated_at` / `last_switched_by`
+                          // (filed as a #415 follow-on).
+                          <span className="text-muted-foreground text-[10px]">
+                            Active since {fmt.formatDate(idp.updatedAt)}
+                          </span>
+                        )}
+                        {idp.isActive && idp.lastSwitchedByUsername && (
+                          <span className="text-muted-foreground text-[10px]">
+                            by {idp.lastSwitchedByUsername}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       {canManageIdp ? (
