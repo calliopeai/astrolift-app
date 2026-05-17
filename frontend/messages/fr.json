@@ -166,6 +166,18 @@
       "errorBanner": {
         "title": "Impossible de charger les applications",
         "retry": "Réessayer"
+      },
+      "freshness": {
+        "lastDeployed": "Dernier déploiement {when}",
+        "viewFailed": "Voir le déploiement échoué",
+        "stale": "obsolète",
+        "never": "aucun déploiement",
+        "status": {
+          "OK": "Saine",
+          "DEGRADED": "Dernier déploiement échoué",
+          "STALE": "Aucun déploiement récent",
+          "NEVER": "Jamais déployée"
+        }
       }
     },
     "tabs": {

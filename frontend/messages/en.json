@@ -170,6 +170,18 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "freshness": {
+        "lastDeployed": "Last deployed {when}",
+        "viewFailed": "View failed deploy",
+        "stale": "stale",
+        "never": "no deploys yet",
+        "status": {
+          "OK": "Healthy",
+          "DEGRADED": "Latest deploy failed",
+          "STALE": "No recent deploys",
+          "NEVER": "Never deployed"
+        }
       }
     },
     "tabs": {

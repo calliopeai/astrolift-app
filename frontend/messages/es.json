@@ -166,6 +166,18 @@
       "errorBanner": {
         "title": "No se pudieron cargar las aplicaciones",
         "retry": "Reintentar"
+      },
+      "freshness": {
+        "lastDeployed": "Última implementación {when}",
+        "viewFailed": "Ver implementación fallida",
+        "stale": "obsoleta",
+        "never": "sin implementaciones",
+        "status": {
+          "OK": "Saludable",
+          "DEGRADED": "Última implementación fallida",
+          "STALE": "Sin implementaciones recientes",
+          "NEVER": "Nunca implementada"
+        }
       }
     },
     "tabs": {

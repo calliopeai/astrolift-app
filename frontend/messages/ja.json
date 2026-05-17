@@ -170,6 +170,18 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "freshness": {
+        "lastDeployed": "最終デプロイ {when}",
+        "viewFailed": "失敗したデプロイを表示",
+        "stale": "古い",
+        "never": "デプロイ未実施",
+        "status": {
+          "OK": "正常",
+          "DEGRADED": "最新のデプロイが失敗",
+          "STALE": "最近のデプロイなし",
+          "NEVER": "未デプロイ"
+        }
       }
     },
     "tabs": {

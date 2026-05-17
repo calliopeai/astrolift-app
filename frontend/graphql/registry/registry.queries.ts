@@ -45,10 +45,38 @@ const APP_FIELDS = `
   deletedAt
 `;
 
+/**
+ * Per-row deployment-freshness fragment surfaced on the apps list
+ * when ``includeFreshness: true`` (#405). The backend leaves these
+ * fields null when the flag is off so the cheap list query stays
+ * cheap; the FE opts in only on screens that render the health
+ * pulse + last-deployed badge.
+ */
+const APP_FRESHNESS_FIELDS = `
+  lastDeployedAt
+  healthPulse {
+    status
+    ageSeconds
+    message
+  }
+  latestDeployment {
+    id
+    status
+    startedAt
+    endedAt
+    createdAt
+    environmentName
+    triggeredBy
+    imageTag
+    commitSha
+  }
+`;
+
 export const LIST_APPS = gql`
-  query ListApps {
-    astroliftApps {
+  query ListApps($includeFreshness: Boolean = false) {
+    astroliftApps(includeFreshness: $includeFreshness) {
       ${APP_FIELDS}
+      ${APP_FRESHNESS_FIELDS}
     }
   }
 `;
@@ -86,11 +114,7 @@ export const LIST_WORKLOADS = gql`
 `;
 
 export const GET_RENDERED_MANIFEST = gql`
-  query GetRenderedManifest(
-    $appSlug: String!
-    $environmentName: String
-    $imageTag: String
-  ) {
+  query GetRenderedManifest($appSlug: String!, $environmentName: String, $imageTag: String) {
     astroliftRenderedManifest(
       appSlug: $appSlug
       environmentName: $environmentName
