@@ -7,13 +7,7 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -23,14 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  LIST_BUDGETS,
-  LIST_COST_SNAPSHOTS,
-} from "@/graphql/billing/billing.queries";
-import type {
-  AstroliftBudget,
-  AstroliftCostSnapshot,
-} from "@/graphql/billing/billing.types";
+import { LIST_BUDGETS, LIST_COST_SNAPSHOTS } from "@/graphql/billing/billing.queries";
+import type { AstroliftBudget, AstroliftCostSnapshot } from "@/graphql/billing/billing.types";
 
 interface BudgetsResp {
   astroliftBudgets: AstroliftBudget[];
@@ -75,15 +63,11 @@ export function CostClient() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm">
-              Last 30 days
-            </CardTitle>
+            <CardTitle className="text-muted-foreground text-sm">Last 30 days</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold tabular-nums">
-              {totalCents > 0
-                ? formatMoney(totalCents, costList[0]?.currency ?? "USD")
-                : "—"}
+              {totalCents > 0 ? formatMoney(totalCents, costList[0]?.currency ?? "USD") : "—"}
             </p>
           </CardContent>
         </Card>
