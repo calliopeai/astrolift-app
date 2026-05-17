@@ -20,7 +20,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
-import { LogViewer } from "@/components/observability";
+import { LogViewer, TerminalEmulator } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,6 +131,21 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
   const [streaming, setStreaming] = React.useState(false);
   const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
+
+  // Operator opts into the WS exec connection — keeps an idle
+  // console tab from holding a kubelet exec socket open just
+  // because someone clicked Console while triaging.
+  const [shellOpen, setShellOpen] = React.useState(false);
+  // Reset the open shell when the pod/container picker changes so
+  // the next click starts a clean session against the new target.
+  const [prevShellKey, setPrevShellKey] = React.useState(
+    `${selectedPod ?? ""}::${selectedContainer ?? ""}`
+  );
+  const shellKey = `${selectedPod ?? ""}::${selectedContainer ?? ""}`;
+  if (prevShellKey !== shellKey) {
+    setPrevShellKey(shellKey);
+    if (shellOpen) setShellOpen(false);
+  }
 
   // Reset the buffer whenever the operator switches pod or container.
   // See: https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
@@ -320,32 +335,64 @@ export function ConsoleClient({ slug }: { slug: string }) {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <TerminalIcon className="size-4" />
-            {t("terminal.title")}
-            <Badge variant="outline" className="text-[10px] uppercase">
-              {t("terminal.comingSoon")}
-            </Badge>
-          </CardTitle>
-          <CardDescription>{t("terminal.description")}</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TerminalIcon className="size-4" />
+              {t("terminal.title")}
+            </CardTitle>
+            <CardDescription>
+              {selectedPod && selectedContainer
+                ? t("terminal.targetDescription", {
+                    pod: selectedPod,
+                    container: selectedContainer,
+                  })
+                : t("terminal.pickTarget")}
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {shellOpen ? (
+              <Button size="sm" variant="outline" onClick={() => setShellOpen(false)}>
+                {t("terminal.close")}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => setShellOpen(true)}
+                disabled={!selectedPod || !selectedContainer}
+              >
+                <TerminalIcon className="size-3" />
+                {t("terminal.open")}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted/40 flex h-64 items-center justify-center rounded-md border border-dashed">
-            <div className="text-muted-foreground flex flex-col items-center gap-2 text-center">
-              <TerminalIcon className="size-8" />
-              <p className="text-sm">{t("terminal.lands")}</p>
-              <p className="max-w-md text-xs">
-                {t.rich("terminal.untilThen", {
-                  cli: () => (
-                    <code className="bg-background rounded px-1 py-0.5 font-mono">astro</code>
-                  ),
-                })}
-              </p>
+          {shellOpen && selectedPod && selectedContainer ? (
+            <TerminalEmulator
+              appSlug={a.slug}
+              podName={selectedPod}
+              container={selectedContainer}
+            />
+          ) : (
+            <div className="bg-muted/40 flex h-64 items-center justify-center rounded-md border border-dashed">
+              <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 text-center">
+                <TerminalIcon className="size-8" />
+                <p className="text-sm">
+                  {selectedPod ? t("terminal.readyHint") : t("terminal.pickTarget")}
+                </p>
+                <p className="max-w-md text-xs">
+                  {t.rich("terminal.untilThen", {
+                    cli: () => (
+                      <code className="bg-background rounded px-1 py-0.5 font-mono">astro</code>
+                    ),
+                  })}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex flex-wrap gap-2">
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link href="/downloads">
                 <DownloadIcon className="size-4" />
                 {t("terminal.install")}
@@ -391,11 +438,13 @@ export function ConsoleClient({ slug }: { slug: string }) {
             shippedLabel={t("lands.shipped")}
           />
           <Item
+            done
             label={t("lands.bridgeLabel")}
             note={t("lands.bridgeNote")}
             shippedLabel={t("lands.shipped")}
           />
           <Item
+            done
             label={t("lands.webLabel")}
             note={t("lands.webNote")}
             shippedLabel={t("lands.shipped")}
