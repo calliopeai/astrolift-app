@@ -29,10 +29,7 @@ import {
   useWorkflowInstanceDetail,
   useWorkflowInstances,
 } from "@/graphql/workflows/workflows.hooks";
-import type {
-  WorkflowHistoryEvent,
-  WorkflowInstance,
-} from "@/graphql/workflows/workflows.types";
+import type { WorkflowHistoryEvent, WorkflowInstance } from "@/graphql/workflows/workflows.types";
 
 const STATUS_OPTIONS = [
   { value: "ALL", label: "All statuses" },
@@ -79,7 +76,7 @@ export function WorkflowInstancesPanel({
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <SearchIcon className="text-muted-foreground absolute left-2 top-1/2 size-4 -translate-y-1/2" />
+            <SearchIcon className="text-muted-foreground absolute top-1/2 left-2 size-4 -translate-y-1/2" />
             <Input
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -123,9 +120,8 @@ export function WorkflowInstancesPanel({
 
         {!loading && !error && instances.length === 0 && (
           <div className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">
-            No workflow instances match the current filter. Temporal may be
-            disabled, or the workflow type / status combination has no
-            history yet.
+            No workflow instances match the current filter. Temporal may be disabled, or the
+            workflow type / status combination has no history yet.
           </div>
         )}
 
@@ -141,16 +137,12 @@ export function WorkflowInstancesPanel({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-mono text-xs">
-                      {inst.workflowId}
-                    </span>
+                    <span className="truncate font-mono text-xs">{inst.workflowId}</span>
                     <StatusBadge status={inst.status} />
                   </div>
                   <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span>{inst.workflowType}</span>
-                    {inst.startedAt && (
-                      <span>Started {formatTimestamp(inst.startedAt)}</span>
-                    )}
+                    {inst.startedAt && <span>Started {formatTimestamp(inst.startedAt)}</span>}
                     {inst.durationSeconds != null && (
                       <span>{formatDuration(inst.durationSeconds)}</span>
                     )}
@@ -215,9 +207,7 @@ function InstanceDetailPanel({
               {detail.instance.durationSeconds != null && (
                 <span>{formatDuration(detail.instance.durationSeconds)}</span>
               )}
-              {detail.instance.triggeredBy && (
-                <span>by {detail.instance.triggeredBy}</span>
-              )}
+              {detail.instance.triggeredBy && <span>by {detail.instance.triggeredBy}</span>}
             </div>
           )}
         </div>
@@ -256,17 +246,10 @@ function InstanceDetailPanel({
   );
 }
 
-function AdminControls({
-  workflowId,
-  onAfter,
-}: {
-  workflowId: string;
-  onAfter: () => void;
-}) {
+function AdminControls({ workflowId, onAfter }: { workflowId: string; onAfter: () => void }) {
   const confirm = useConfirm();
   const [cancelMutation, { loading: cancelLoading }] = useCancelWorkflowInstance();
-  const [terminateMutation, { loading: terminateLoading }] =
-    useTerminateWorkflowInstance();
+  const [terminateMutation, { loading: terminateLoading }] = useTerminateWorkflowInstance();
 
   const handleCancel = async () => {
     const ok = await confirm({
@@ -308,20 +291,14 @@ function AdminControls({
       toast.success("Workflow terminated");
       onAfter();
     } else {
-      const msg =
-        data?.terminateWorkflowInstance?.errors?.[0]?.messages?.[0] ?? "Terminate failed";
+      const msg = data?.terminateWorkflowInstance?.errors?.[0]?.messages?.[0] ?? "Terminate failed";
       toast.error(msg);
     }
   };
 
   return (
     <div className="flex items-center gap-2 border-b pb-3">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={handleCancel}
-        disabled={cancelLoading}
-      >
+      <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelLoading}>
         <CircleSlashIcon className="mr-1 size-3" />
         Cancel
       </Button>
@@ -371,9 +348,7 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
                     {ev.decision}
                   </Badge>
                 )}
-                {ev.retryCount > 1 && (
-                  <Badge variant="outline">retry {ev.retryCount}</Badge>
-                )}
+                {ev.retryCount > 1 && <Badge variant="outline">retry {ev.retryCount}</Badge>}
               </div>
               {Object.keys(ev.payload).length > 0 && (
                 <pre className="text-muted-foreground bg-muted/40 mt-1 max-h-32 overflow-auto rounded p-2 text-[10px]">
@@ -382,7 +357,7 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
               )}
             </div>
             {ev.timestamp && (
-              <span className="text-muted-foreground shrink-0 whitespace-nowrap font-mono">
+              <span className="text-muted-foreground shrink-0 font-mono whitespace-nowrap">
                 {formatTimestamp(ev.timestamp)}
               </span>
             )}

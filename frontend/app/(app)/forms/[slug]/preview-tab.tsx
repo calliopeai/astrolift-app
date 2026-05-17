@@ -55,19 +55,12 @@ export function FormPreviewTab({ schema }: { schema: Record<string, unknown> }) 
   }
 
   return (
-    <div className="rounded-md border bg-card p-6">
+    <div className="bg-card rounded-md border p-6">
       {root.title && <h3 className="mb-1 text-lg font-semibold">{root.title}</h3>}
-      {root.description && (
-        <p className="text-muted-foreground mb-4 text-sm">{root.description}</p>
-      )}
+      {root.description && <p className="text-muted-foreground mb-4 text-sm">{root.description}</p>}
       <div className="flex flex-col gap-4">
         {entries.map(([key, field]) => (
-          <FieldPreview
-            key={key}
-            name={key}
-            field={field}
-            required={required.has(key)}
-          />
+          <FieldPreview key={key} name={key} field={field} required={required.has(key)} />
         ))}
       </div>
       <div className="mt-6 flex items-center justify-end gap-2">
@@ -138,8 +131,7 @@ function renderInput(field: JsonSchema): ReactNode {
   if (field.type === "boolean") {
     return (
       <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
-        <input type="checkbox" disabled className="cursor-not-allowed" /> Boolean
-        field
+        <input type="checkbox" disabled className="cursor-not-allowed" /> Boolean field
       </span>
     );
   }

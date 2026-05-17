@@ -43,7 +43,7 @@ export function FormSubmissionsTab({
   const totalPages = Math.max(1, Math.ceil(submissions.length / PAGE_SIZE));
   const pageItems = useMemo(
     () => submissions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [submissions, page],
+    [submissions, page]
   );
 
   if (loading && submissions.length === 0) {
@@ -57,8 +57,8 @@ export function FormSubmissionsTab({
   if (submissions.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
-        No submissions yet. Submissions will appear here once the form is
-        published and submitters fill it out.
+        No submissions yet. Submissions will appear here once the form is published and submitters
+        fill it out.
       </div>
     );
   }
@@ -84,9 +84,7 @@ export function FormSubmissionsTab({
                 onClick={() => setSelected(sub)}
                 className="hover:bg-accent/50 cursor-pointer border-t"
               >
-                <td className="px-3 py-2 font-mono text-xs">
-                  {formatTimestamp(sub.submittedAt)}
-                </td>
+                <td className="px-3 py-2 font-mono text-xs">{formatTimestamp(sub.submittedAt)}</td>
                 <td className="px-3 py-2 text-xs">v{sub.formVersion}</td>
                 <td className="px-3 py-2">
                   <Badge variant="outline">{sub.status}</Badge>
@@ -126,10 +124,7 @@ export function FormSubmissionsTab({
         </div>
       )}
 
-      <SubmissionDetailSheet
-        submission={selected}
-        onClose={() => setSelected(null)}
-      />
+      <SubmissionDetailSheet submission={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
@@ -195,22 +190,13 @@ function renderValue(value: unknown): ReactNode {
   if (typeof value === "string") {
     if (isUrlLike(value)) {
       return (
-        <a
-          href={value}
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary underline"
-        >
+        <a href={value} target="_blank" rel="noreferrer" className="text-primary underline">
           {value}
         </a>
       );
     }
     if (value.length > 80 || value.includes("\n")) {
-      return (
-        <pre className="bg-muted/40 max-h-64 overflow-auto rounded p-2 text-xs">
-          {value}
-        </pre>
-      );
+      return <pre className="bg-muted/40 max-h-64 overflow-auto rounded p-2 text-xs">{value}</pre>;
     }
     return <span>{value}</span>;
   }
@@ -239,9 +225,7 @@ function isUrlLike(s: string): boolean {
 function summarizePayload(payload: Record<string, unknown>): string {
   const entries = Object.entries(payload ?? {}).slice(0, 3);
   if (entries.length === 0) return "(empty)";
-  return entries
-    .map(([k, v]) => `${k}: ${formatLeaf(v)}`)
-    .join(" · ");
+  return entries.map(([k, v]) => `${k}: ${formatLeaf(v)}`).join(" · ");
 }
 
 function formatLeaf(v: unknown): string {
@@ -292,13 +276,7 @@ function buildSparkline(submissions: FormSubmission[]): SparklinePoint[] {
   return [...counts.entries()].map(([day, count]) => ({ day, count }));
 }
 
-function SubmissionsSparkline({
-  data,
-  total,
-}: {
-  data: SparklinePoint[];
-  total: number;
-}) {
+function SubmissionsSparkline({ data, total }: { data: SparklinePoint[]; total: number }) {
   const max = Math.max(1, ...data.map((d) => d.count));
   const width = 280;
   const height = 48;
@@ -329,12 +307,7 @@ function SubmissionsSparkline({
         role="img"
         aria-label="Submission trend"
       >
-        <polyline
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          points={points}
-        />
+        <polyline fill="none" stroke="currentColor" strokeWidth="2" points={points} />
       </svg>
     </div>
   );

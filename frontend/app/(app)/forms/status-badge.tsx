@@ -19,8 +19,7 @@ export function formStatusBadgeProps(status: string): BadgeProps {
     case "published":
       return {
         variant: "secondary",
-        className:
-          "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+        className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
       };
     case "archived":
       return { variant: "outline" };

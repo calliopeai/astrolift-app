@@ -206,7 +206,7 @@ export default function PlaygroundPage() {
               onClick={() => setTab("chat")}
               className={cn(
                 "rounded-l-md px-4 py-2 text-sm",
-                tab === "chat" ? "bg-primary text-primary-foreground" : "hover:bg-accent",
+                tab === "chat" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
               )}
             >
               Chat
@@ -216,7 +216,7 @@ export default function PlaygroundPage() {
               onClick={() => setTab("batch")}
               className={cn(
                 "rounded-r-md border-l px-4 py-2 text-sm",
-                tab === "batch" ? "bg-primary text-primary-foreground" : "hover:bg-accent",
+                tab === "batch" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
               )}
             >
               Batch
@@ -291,9 +291,7 @@ function Sidebar({
   return (
     <aside className="hidden w-64 shrink-0 flex-col gap-2 lg:flex">
       <div className="flex items-center justify-between">
-        <h2 className="text-muted-foreground px-1 text-sm font-semibold">
-          Saved sessions
-        </h2>
+        <h2 className="text-muted-foreground px-1 text-sm font-semibold">Saved sessions</h2>
         <Button size="sm" variant="ghost" onClick={onNew}>
           New
         </Button>
@@ -309,7 +307,7 @@ function Sidebar({
               <div
                 className={cn(
                   "group flex items-center justify-between gap-1 rounded-md px-2 py-1.5",
-                  activeId === s.id ? "bg-accent" : "hover:bg-accent/60",
+                  activeId === s.id ? "bg-accent" : "hover:bg-accent/60"
                 )}
               >
                 <button
@@ -377,10 +375,7 @@ function ChatPanel({
       <Card className="flex-1 overflow-auto">
         <CardContent className="flex flex-col gap-4 p-4">
           {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-            >
+            <div key={i} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
                 {msg.role === "user" ? (
                   <UserIcon className="h-4 w-4" />
@@ -393,7 +388,7 @@ function ChatPanel({
                   "max-w-prose rounded-lg px-4 py-2 text-sm",
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground",
+                    : "bg-muted text-foreground"
                 )}
               >
                 {msg.content}
@@ -427,11 +422,7 @@ function ChatPanel({
           className="resize-none"
           rows={3}
         />
-        <Button
-          onClick={onSend}
-          disabled={loading || !prompt.trim()}
-          className="self-end"
-        >
+        <Button onClick={onSend} disabled={loading || !prompt.trim()} className="self-end">
           <SendIcon className="h-4 w-4" />
         </Button>
       </div>
@@ -450,7 +441,7 @@ function BatchPanel({ model }: { model: string }) {
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line.length > 0),
-    [input],
+    [input]
   );
 
   const handleRun = async () => {

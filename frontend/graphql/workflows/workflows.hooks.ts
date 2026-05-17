@@ -74,14 +74,17 @@ export const useWorkflowInstances = (params: {
   status?: string | null;
   limit?: number;
 }) => {
-  const { data, loading, error, refetch } = useQuery<WorkflowInstancesData>(GET_WORKFLOW_INSTANCES, {
-    variables: {
-      workflowType: params.workflowType ?? null,
-      status: params.status ?? null,
-      limit: params.limit ?? 50,
-    },
-    fetchPolicy: "cache-and-network",
-  });
+  const { data, loading, error, refetch } = useQuery<WorkflowInstancesData>(
+    GET_WORKFLOW_INSTANCES,
+    {
+      variables: {
+        workflowType: params.workflowType ?? null,
+        status: params.status ?? null,
+        limit: params.limit ?? 50,
+      },
+      fetchPolicy: "cache-and-network",
+    }
+  );
   return {
     instances: data?.astroliftWorkflowInstances?.items ?? [],
     nextCursor: data?.astroliftWorkflowInstances?.nextCursor ?? null,
@@ -98,7 +101,7 @@ export const useWorkflowInstanceDetail = (workflowId: string | null) => {
       variables: { workflowId: workflowId ?? "" },
       fetchPolicy: "cache-and-network",
       skip: !workflowId,
-    },
+    }
   );
   return {
     detail: data?.astroliftWorkflowInstanceDetail ?? null,

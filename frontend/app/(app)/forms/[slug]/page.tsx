@@ -124,7 +124,7 @@ export default function FormDetailPage() {
                     "border-b-2 px-4 py-2 text-sm transition-colors",
                     active
                       ? "border-primary text-foreground"
-                      : "text-muted-foreground hover:text-foreground border-transparent",
+                      : "text-muted-foreground hover:text-foreground border-transparent"
                   )}
                 >
                   {t.label}
@@ -140,9 +140,7 @@ export default function FormDetailPage() {
         </ul>
       </nav>
 
-      {tab === "overview" && (
-        <FormOverview form={form} fieldCount={fieldCount} />
-      )}
+      {tab === "overview" && <FormOverview form={form} fieldCount={fieldCount} />}
       {tab === "preview" && (
         <FormPreviewTab schema={(form.schema as Record<string, unknown>) ?? {}} />
       )}
@@ -178,9 +176,7 @@ function FormOverview({
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Published</h3>
           <p className="text-muted-foreground text-sm">
-            {form.publishedAt
-              ? new Date(form.publishedAt).toLocaleDateString()
-              : "Not yet"}
+            {form.publishedAt ? new Date(form.publishedAt).toLocaleDateString() : "Not yet"}
           </p>
         </div>
       </div>

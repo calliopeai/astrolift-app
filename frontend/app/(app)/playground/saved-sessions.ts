@@ -83,7 +83,7 @@ export function saveSession(
   session: Omit<SavedSession, "schema" | "createdAt" | "updatedAt" | "starred"> & {
     starred?: boolean;
     createdAt?: string;
-  },
+  }
 ): SavedSession {
   if (!isClient()) {
     throw new Error("saveSession requires a browser environment");
@@ -128,7 +128,7 @@ export function toggleStar(id: string): boolean {
   session.updatedAt = new Date().toISOString();
   localStorage.setItem(SESSION_PREFIX + id, JSON.stringify(session));
   const index = readIndex().map((e) =>
-    e.id === id ? { ...e, starred: session.starred, updatedAt: session.updatedAt } : e,
+    e.id === id ? { ...e, starred: session.starred, updatedAt: session.updatedAt } : e
   );
   writeIndex(index);
   return session.starred;
@@ -137,9 +137,7 @@ export function toggleStar(id: string): boolean {
 function untitledFromMessages(messages: SavedMessage[]): string {
   const firstUser = messages.find((m) => m.role === "user");
   if (firstUser) {
-    return firstUser.content.length > 60
-      ? `${firstUser.content.slice(0, 57)}…`
-      : firstUser.content;
+    return firstUser.content.length > 60 ? `${firstUser.content.slice(0, 57)}…` : firstUser.content;
   }
   return "Untitled session";
 }
@@ -167,7 +165,7 @@ export function encodeShareHash(session: SavedSession): string {
 }
 
 export function decodeShareHash(
-  hash: string,
+  hash: string
 ): Pick<SavedSession, "title" | "model" | "messages"> | null {
   if (!hash) return null;
   const trimmed = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -209,7 +207,7 @@ export function batchToCsv(results: BatchResult[]): string {
   const rows = results.map((r) =>
     [r.input, r.output, r.ok ? "true" : "false", r.error ?? ""]
       .map((cell) => `"${cell.replace(/"/g, '""')}"`)
-      .join(","),
+      .join(",")
   );
   return [header, ...rows].join("\n");
 }
