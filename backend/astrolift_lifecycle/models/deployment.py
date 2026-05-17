@@ -104,6 +104,17 @@ class Deployment(BaseCoreModel):
     branch = models.CharField(max_length=255, blank=True, default="")
     ci_run_url = models.URLField(blank=True, default="")
     ci_provider = models.CharField(max_length=64, blank=True, default="")
+    # Commit-message provenance (#419) — surfaced on the approval card
+    # so approvers see *what* they're greenlighting without leaving the
+    # page. Optional at the GraphQL boundary; webhook + CLI deploys
+    # populate them, manual UI deploys don't.
+    commit_message = models.TextField(blank=True, default="")
+    commit_author = models.CharField(max_length=255, blank=True, default="")
+    # Rejection / abort context (#419) — non-empty when an operator
+    # rejected or aborted the deploy. Persisted on the row (rather than
+    # only on the audit log) so the approvals UI can render it without
+    # a join even after audit-log retention prunes the entry.
+    aborted_reason = models.TextField(blank=True, default="")
     promoted_from = models.ForeignKey(
         "self",
         related_name="promotions",

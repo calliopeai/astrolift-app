@@ -51,6 +51,28 @@ class DeploymentType:
     branch: str
     ci_run_url: str
     ci_provider: str
+    # Approval decision context (#419)
+    commit_message: str
+    commit_author: str
+    repo_url: str
+    """Public source-repo URL the operator can deep-link into for the
+    full commit/diff. Resolved from ``RegisteredApp.source_url`` at
+    serialization time so we don't denormalize it onto every row."""
+
+    aborted_reason: str
+    """Non-empty when an operator rejected/aborted this deploy. Set by
+    the ``abort_deployment`` mutation (which now requires a non-empty
+    ``reason`` at the boundary)."""
+
+    triggered_by_user_id: str | None
+    """Surface-only echo of the row's ``triggered_by_user`` so the FE
+    can compute ``viewer == triggerer`` without a separate ``me`` join.
+    Null for token / system / CI-bot triggers."""
+
+    triggered_by_me: bool
+    """Convenience: True when the current request's authenticated user
+    is the row's ``triggered_by_user``. The approval CTA hides on this
+    so a deployer can't approve their own deploy from the UI."""
 
 
 @strawberry.type(name="AstroliftDeploymentLogEntry")
@@ -61,6 +83,40 @@ class DeploymentLogEntryType:
     message: str
     detail: JSON
     occurred_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftDeploymentApprovalHistoryEntry")
+class DeploymentApprovalHistoryEntryType:
+    """One row of the approval-decision timeline for a deployment (#419).
+
+    Sourced from ``AuditEvent`` rows whose ``action`` matches one of the
+    deployment lifecycle actions (``deployment.start``,
+    ``deployment.approve``, ``deployment.approve_by_token``,
+    ``deployment.reject``, ``deployment.reject_by_token``,
+    ``deployment.abort``). The history panel renders these
+    chronologically so an approver can see who approved or rejected
+    sibling deploys in the same env before deciding.
+    """
+
+    id: GUID
+    action: str
+    """Dotted audit action — ``deployment.approve`` / ``.reject`` / ``.abort``."""
+
+    decision: str
+    """``ALLOW`` | ``DENY`` | ``UNKNOWN`` — mirrors ``AuditEvent.decision``."""
+
+    actor_kind: str
+    """``user`` | ``token`` | ``system``."""
+
+    actor_id: str
+    """Stringified user id (or token id) — empty for ``system`` actors."""
+
+    actor_display: str
+    """Best-effort human label; UI falls back to ``actor_kind`` when empty."""
+
+    occurred_at: dt.datetime
+    reason: str
+    """Free-form rejection/abort reason when present; empty otherwise."""
 
 
 @strawberry.type(name="AstroliftPreviewEnvironment")
@@ -92,7 +148,26 @@ def app_env_to_type(env) -> AppEnvironmentType:
     )
 
 
-def deployment_to_type(d) -> DeploymentType:
+def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentType:
+    """Serialize a ``Deployment`` row into the GraphQL type.
+
+    ``viewer_user_id`` is the authenticated request's user id, used to
+    compute ``triggered_by_me`` for the self-approval guard (#419).
+    Callers can omit it (defaults to None) — the field then surfaces as
+    False so unauthenticated / system call sites don't accidentally
+    claim ownership of a row.
+    """
+    triggered_by_user_id = d.triggered_by_user_id
+    triggered_by_me = bool(
+        viewer_user_id is not None and triggered_by_user_id == viewer_user_id
+    )
+    repo_url = ""
+    if d.registered_app_id:
+        repo_url = (
+            getattr(d.registered_app, "source_url", "")
+            or getattr(d.registered_app, "source_repo", "")
+            or ""
+        )
     return DeploymentType(
         id=GUID(str(d.guid)),
         registered_app_slug=d.registered_app.slug,
@@ -116,6 +191,14 @@ def deployment_to_type(d) -> DeploymentType:
         branch=d.branch or "",
         ci_run_url=d.ci_run_url or "",
         ci_provider=d.ci_provider or "",
+        commit_message=getattr(d, "commit_message", "") or "",
+        commit_author=getattr(d, "commit_author", "") or "",
+        repo_url=repo_url,
+        aborted_reason=getattr(d, "aborted_reason", "") or "",
+        triggered_by_user_id=(
+            str(triggered_by_user_id) if triggered_by_user_id is not None else None
+        ),
+        triggered_by_me=triggered_by_me,
     )
 
 
