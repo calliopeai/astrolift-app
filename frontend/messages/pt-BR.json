@@ -170,6 +170,18 @@
       "errorBanner": {
         "title": "Não foi possível carregar os aplicativos",
         "retry": "Tentar novamente"
+      },
+      "freshness": {
+        "lastDeployed": "Última implantação {when}",
+        "viewFailed": "Ver implantação com falha",
+        "stale": "obsoleta",
+        "never": "sem implantações",
+        "status": {
+          "OK": "Saudável",
+          "DEGRADED": "Última implantação falhou",
+          "STALE": "Sem implantações recentes",
+          "NEVER": "Nunca implantada"
+        }
       }
     },
     "tabs": {

@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import datetime as dt
+from collections.abc import Iterable
+
 import strawberry
 from django.conf import settings
 from django.db.models import Q
+from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_identity.schema.types import ProjectType, project_to_type
-from astrolift_lifecycle.models import AppEnvironment
+from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
+    AppFreshness,
     AppTeamAccessType,
     ContainerType,
     RegisteredAppType,
@@ -18,12 +23,64 @@ from astrolift_registry.schema.types import (
     WorkloadType,
     app_team_access_to_type,
     app_to_type,
+    build_app_freshness,
     container_to_type,
     workload_to_type,
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _freshness_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, AppFreshness]:
+    """Bulk-build the per-app freshness payload for a list of apps (#405).
+
+    Avoids the N+1 the per-row resolver would otherwise spawn: two
+    queries total regardless of list size — one for the most-recent
+    ``Deployment`` per app, one for the most-recent ``running``
+    deploy per app. Returns a dict keyed by ``RegisteredApp.pk`` so
+    callers can map back without re-fetching.
+
+    Apps with no deployment rows still appear in the result — the
+    builder emits a ``never`` pulse for those.
+    """
+    app_list = list(apps)
+    if not app_list:
+        return {}
+
+    app_ids = [a.pk for a in app_list]
+    now = timezone.now()
+
+    base = (
+        Deployment.objects.filter(
+            registered_app_id__in=app_ids,
+            deleted_at__isnull=True,
+        )
+        .select_related("triggered_by_user", "app_environment")
+        .order_by("registered_app_id", "-created_at")
+    )
+
+    # Two passes — one for the most recent row per app, one for the
+    # most recent ``running`` row per app. Each pass scans the
+    # ordered queryset and keeps the first hit per ``registered_app_id``.
+    latest_by_app: dict[int, Deployment] = {}
+    for d in base:
+        if d.registered_app_id not in latest_by_app:
+            latest_by_app[d.registered_app_id] = d
+
+    success_dt_by_app: dict[int, dt.datetime] = {}
+    for d in base.filter(status=Deployment.Status.RUNNING.value):
+        if d.registered_app_id not in success_dt_by_app:
+            success_dt_by_app[d.registered_app_id] = d.created_at
+
+    freshness_by_app: dict[int, AppFreshness] = {}
+    for app in app_list:
+        freshness_by_app[app.pk] = build_app_freshness(
+            latest_deployment=latest_by_app.get(app.pk),
+            last_success_at=success_dt_by_app.get(app.pk),
+            now=now,
+        )
+    return freshness_by_app
 
 
 @strawberry.type
@@ -47,15 +104,36 @@ class RegistryQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_apps(self, info: Info) -> list[RegisteredAppType]:
+    def astrolift_apps(
+        self,
+        info: Info,
+        include_freshness: bool = False,
+    ) -> list[RegisteredAppType]:
+        """Org-scoped list of registered apps.
+
+        ``include_freshness`` (default False, #405) opts the row into
+        the deployment-freshness rollup — ``latestDeployment``,
+        ``lastDeployedAt``, and ``healthPulse``. Off by default so
+        callers that only need the cheap registry fields don't pay
+        the two-query freshness join.
+        """
+
         qs = RegisteredApp.objects.select_related("organization", "team", "project").order_by("-created_at")[
             :200
         ]
-        return [app_to_type(a) for a in qs]
+        apps = list(qs)
+        if not include_freshness:
+            return [app_to_type(a) for a in apps]
+        freshness_by_app = _freshness_for_apps(apps)
+        return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in apps]
 
     @strawberry.field
     @tenant_scoped()
-    def astrolift_my_apps(self, info: Info) -> list[RegisteredAppType]:
+    def astrolift_my_apps(
+        self,
+        info: Info,
+        include_freshness: bool = False,
+    ) -> list[RegisteredAppType]:
         """Apps the viewer can reach by any RoleBinding on the app or
         an ancestor (project / team / org).
 
@@ -94,7 +172,11 @@ class RegistryQuery:
             base_qs = base_qs.filter(organization_id=tenant.organization_id)
 
         if getattr(viewer, "is_superuser", False) and getattr(viewer, "is_active", True):
-            return [app_to_type(a) for a in base_qs.order_by("slug")[:200]]
+            superuser_apps = list(base_qs.order_by("slug")[:200])
+            if not include_freshness:
+                return [app_to_type(a) for a in superuser_apps]
+            freshness_by_app = _freshness_for_apps(superuser_apps)
+            return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in superuser_apps]
 
         now = timezone.now()
         bindings = list(
@@ -134,7 +216,11 @@ class RegistryQuery:
             return []
 
         qs = base_qs.filter(scope_filter).order_by("slug")[:200]
-        return [app_to_type(a) for a in qs]
+        scoped_apps = list(qs)
+        if not include_freshness:
+            return [app_to_type(a) for a in scoped_apps]
+        freshness_by_app = _freshness_for_apps(scoped_apps)
+        return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in scoped_apps]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

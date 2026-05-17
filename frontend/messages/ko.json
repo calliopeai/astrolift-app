@@ -170,6 +170,18 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "freshness": {
+        "lastDeployed": "마지막 배포 {when}",
+        "viewFailed": "실패한 배포 보기",
+        "stale": "오래됨",
+        "never": "배포 없음",
+        "status": {
+          "OK": "정상",
+          "DEGRADED": "최근 배포 실패",
+          "STALE": "최근 배포 없음",
+          "NEVER": "배포된 적 없음"
+        }
       }
     },
     "tabs": {
