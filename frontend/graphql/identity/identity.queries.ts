@@ -273,6 +273,8 @@ export const LIST_API_TOKENS = gql`
       scopes
       expiresAt
       lastUsedAt
+      lastUsedIp
+      lastUsedAgent
       isRevoked
       createdAt
     }

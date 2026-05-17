@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "Overview",
+    "description": "Identity, registry, and lifecycle data for this Astrolift install.",
+    "errorBanner": {
+      "title": "Couldn't load some data"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Teams",
+        "emptyCta": "Create your first team"
+      },
+      "projects": {
+        "label": "Projects",
+        "emptyCta": "Create a project"
+      },
+      "apps": {
+        "label": "Registered apps",
+        "emptyCta": "Register your first app"
+      },
+      "deployments": {
+        "label": "Active deployments",
+        "emptyCta": "Trigger a deployment"
+      },
+      "costMtd": {
+        "label": "Cost (MTD)",
+        "emptyCta": "Awaiting cost data",
+        "vsPrevMonth": "vs prev month",
+        "noPrevMonth": "no prev month"
+      }
+    },
+    "fleetHealth": {
+      "title": "Fleet health",
+      "description": "Composite of latest deployment status across registered apps.",
+      "healthy": "healthy",
+      "failing": "{count} failing",
+      "hiccup": "{count, plural, one {# hiccup} other {# hiccups}}",
+      "empty": "No registered apps yet. Connect a repo on /apps/new to start.",
+      "tiles": {
+        "running": "Running",
+        "recentFailure": "Recent failure",
+        "failing": "Failing",
+        "noDeploys": "No deploys"
+      }
+    },
+    "recentProjects": {
+      "title": "Recent projects",
+      "description": "Most recently created projects across all teams.",
+      "emptyTitle": "No projects yet",
+      "emptyDescription": "Create a team and a project to start registering apps.",
+      "emptyAction": "Manage teams"
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "Lifecycle events: deploys, config syncs, scaling, cluster bring-in, secret rotations.",
+      "emptyTitle": "No activity yet",
+      "emptyDescription": "Events appear here as deployments, configuration changes, and cluster operations happen.",
+      "errorTitle": "Couldn't load activity",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…"
+    },
+    "registeredApps": {
+      "title": "Registered apps",
+      "description": "Repositories registered for deployment.",
+      "emptyTitle": "No apps registered",
+      "emptyDescription": "The app registry surface lands in the next milestone — once it's wired you can register a Git repo and roll a deployment from this card.",
+      "emptyAction": "Open registry"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
@@ -226,6 +294,16 @@
         "other": "Other"
       }
     },
+    "dangerZone": {
+      "pendingBanner": {
+        "title": "Teardown pending",
+        "body": "Cancel within {countdown} or the destructive workflow starts.",
+        "cancel": "Cancel teardown",
+        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
+        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
+        "toastError": "Cancel failed."
+      }
+    },
     "detail": {
       "actions": {
         "open": "Open",
@@ -328,7 +406,19 @@
         "description": "App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions, alert transitions.",
         "all": "All events",
         "emptyTitle": "No events for this app yet",
-        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire."
+        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire.",
+        "warningCount": "{count, plural, =1 {1 warning} other {# warnings}} in the last hour",
+        "warningBadgeLabel": "Warning",
+        "collapse": "Collapse",
+        "expand": "Expand"
+      },
+      "scope": {
+        "title": "Metric scope",
+        "environment": "Environment",
+        "workload": "Workload",
+        "allWorkloads": "All workloads",
+        "environmentPlaceholder": "Select an environment",
+        "workloadPlaceholder": "Select a workload"
       }
     },
     "console": {
@@ -451,9 +541,22 @@
         "description": "The platform issues a cert via Let's Encrypt once the DNS validation record is in place.",
         "hostname": "Hostname",
         "validationMethod": "Validation method (optional)",
-        "validationHint": "Defaults to the platform's preferred method when blank.",
         "submit": "Add domain",
-        "submitting": "Adding…"
+        "submitting": "Adding…",
+        "byoTitle": "Bring your own certificate",
+        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
+        "methodLabels": {
+          "dns_txt": "DNS-TXT (default)",
+          "http_01": "HTTP-01",
+          "dns_01": "DNS-01",
+          "byo_cert": "Bring your own certificate"
+        },
+        "methodHints": {
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
+          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
+          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
+        }
       },
       "remove": {
         "title": "Remove {hostname}?",
@@ -814,7 +917,14 @@
         "confirmTitle": "Force redeploy {slug}?",
         "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
         "typeToConfirm": "Type <slug></slug> to confirm:",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "preview": {
+          "loading": "Loading in-flight deployments…",
+          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
+          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "triggeredBy": "{actor} · {when}",
+          "ciRun": "CI run"
+        }
       },
       "dangerZone": {
         "title": "Danger zone",
@@ -824,10 +934,30 @@
         "retry": "Retry deregister",
         "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
         "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the following resource classes for this app. The action is irreversible.",
+        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
         "typeToConfirm": "To confirm, type the app's name:",
         "deregistering": "Deregistering…",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "toastNoResponse": "Deregister failed: no response from backend.",
+        "toastNoPayload": "Deregister returned no payload.",
+        "toastFailed": "Deregister failed.",
+        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
+        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "preview": {
+          "loading": "Loading blast-radius preview…",
+          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
+          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
+          "sourceWebhookLabel": "Source-host webhook",
+          "registryRepoLabel": "Image registry repo",
+          "groups": {
+            "k8s": "Kubernetes objects",
+            "managedServices": "Managed services",
+            "secrets": "Cluster secrets",
+            "deployTokens": "Deploy tokens",
+            "identity": "Workload identity roles",
+            "network": "Network / integrations"
+          }
+        }
       },
       "runJob": {
         "title": "Run scheduled job once",
@@ -893,6 +1023,70 @@
         "copyError": "Couldn't copy — select the text and copy manually",
         "unavailable": "FQDN unavailable — the app row is missing an organization."
       }
+    },
+    "tokens": {
+      "title": "Deploy tokens",
+      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
+      "createToken": "Create token",
+      "emptyTitle": "No deploy tokens yet",
+      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "allScopes": "all",
+      "never": "never",
+      "createFailed": "Create failed",
+      "revokeFailed": "Revoke failed",
+      "revokedToast": "Revoked {name}",
+      "columns": {
+        "name": "Name",
+        "last4": "Last 4",
+        "scopes": "Scopes",
+        "lastUsed": "Last used",
+        "expires": "Expires",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "active",
+        "revoked": "revoked"
+      },
+      "lastUsedCell": {
+        "ip": "IP",
+        "agent": "Agent"
+      },
+      "createSheet": {
+        "title": "Create deploy token",
+        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
+        "name": "Name",
+        "scopes": "Scopes (comma-separated)",
+        "scopesHint": "Leave blank for all scopes.",
+        "expires": "Expires in (days)",
+        "submit": "Create token",
+        "submitting": "Creating…"
+      },
+      "revealDialog": {
+        "title": "Token created — copy now",
+        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
+        "last4Label": "last 4",
+        "copy": "Copy",
+        "copied": "Copied to clipboard",
+        "done": "Done",
+        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+      },
+      "rotateDialog": {
+        "title": "Rotate {name}?",
+        "fallbackTitle": "Rotate token?",
+        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
+        "newLine": "New token issued now.",
+        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
+        "confirm": "Rotate token"
+      },
+      "revokeDialog": {
+        "title": "Revoke {name}?",
+        "fallbackTitle": "Revoke token?",
+        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
+        "confirm": "Revoke token"
+      }
     }
   },
   "lists": {
@@ -912,14 +1106,58 @@
         "trigger": "Trigger",
         "status": "Status",
         "duration": "Duration",
-        "started": "Started"
+        "started": "Started",
+        "actions": "Actions"
+      },
+      "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
+      "pills": {
+        "ariaLabel": "Filter by status",
+        "all": "All",
+        "active": "Active",
+        "running": "Running",
+        "failed": "Failed"
       },
       "actions": {
         "label": "Actions",
+        "more": "More actions",
         "approve": "Approve",
-        "abort": "Abort",
+        "abort": "Cancel",
         "rollback": "Rollback",
-        "redeploy": "Redeploy"
+        "redeploy": "Redeploy",
+        "viewLogs": "View detail / logs",
+        "viewCommit": "View commit",
+        "copyGuid": "Copy deployment ID",
+        "copyOk": "Deployment ID copied.",
+        "copyFail": "Couldn't copy to clipboard."
+      },
+      "bulk": {
+        "selectAllLabel": "Select all visible deployments",
+        "selectRowLabel": "Select {app} / {env}",
+        "selected": "{count, plural, =1 {1 deployment selected} other {# deployments selected}}",
+        "summary": "In {envs}.",
+        "mixedWarning": "Selection mixes in-flight and terminal states — bulk actions are disabled until the set is uniform.",
+        "clear": "Clear",
+        "cancelButton": "Cancel {count}",
+        "redeployButton": "Redeploy {count}",
+        "confirmCancel": {
+          "title": "Cancel {count} in-flight deployments?",
+          "description": "Signals each Temporal workflow to cancel. Marks all selected deployments failed. Cluster state already applied stays in place. Affects {envs}.",
+          "reasonLabel": "Reason for cancel",
+          "reasonPlaceholder": "Why are these deploys being cancelled? Persists on the audit log + history sidebar.",
+          "confirm": "Cancel deployments"
+        },
+        "confirmRedeploy": {
+          "title": "Redeploy {count} deployments?",
+          "description": "Spawns a fresh deployment for each selected row with the same image tag. Affects {envs}.",
+          "confirm": "Redeploy all"
+        },
+        "toasts": {
+          "abortLabel": "Cancel",
+          "redeployLabel": "Redeploy",
+          "allOk": "{label} succeeded for {count} deployments.",
+          "allFailed": "{label} failed for {count} deployments: {message}",
+          "partial": "{label}: {succeeded} succeeded, {failed} failed."
+        }
       },
       "statusOptions": {
         "all": "All statuses",
@@ -1137,6 +1375,62 @@
         "reasonPlaceholder": "Why is this deploy being rejected? Persists on the audit log + history sidebar.",
         "reasonRequired": "Reason required",
         "confirm": "Reject deployment"
+      },
+      "quorum": {
+        "header": "{received} of {required} approvals",
+        "remainingBadge": "{count} more needed",
+        "metBadge": "Quorum met",
+        "approvedLabel": "Approved by",
+        "approvedEmpty": "Nobody has approved yet.",
+        "awaitingLabel": "Awaiting",
+        "awaitingEmpty": "No eligible approvers found — check the app's approver policy."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Approvals queue",
+      "description": "Every deploy waiting on a sign-off. Select rows to bulk approve or reject within a single environment.",
+      "empty": {
+        "title": "Nothing pending",
+        "description": "When a deploy needs a sign-off it lands here. Wire up an app's approver policy from its Settings page."
+      },
+      "selectAllLabel": "Select all pending",
+      "selectionStatus": "{selected} of {total} selected",
+      "readOnlyHint": "You can review but not approve — ask an org admin for app.approve_deploy.",
+      "approveLabel": "Approve",
+      "rejectLabel": "Reject",
+      "footer": {
+        "selected": "{count, plural, =1 {1 deploy selected} other {# deploys selected}}",
+        "summary": "Across {envs}.",
+        "crossEnvWarning": "Bulk approval requires all selections to share the same app/environment — approver policies vary by env.",
+        "approveButton": "Approve {count}",
+        "rejectButton": "Reject {count}"
+      },
+      "confirmApprove": {
+        "title": "Approve {count} deploys?",
+        "description": "Unblocks {envs}. Each workflow resumes immediately. Self-approved deploys are skipped automatically.",
+        "confirm": "Approve all"
+      },
+      "confirmReject": {
+        "title": "Reject {count} deploys?",
+        "description": "Each deploy in {envs} moves to failed. CI must re-trigger to retry.",
+        "reasonLabel": "Reason for rejection (recorded per deploy)",
+        "reasonPlaceholder": "Why is this batch being rejected?",
+        "reasonRequired": "Reason required",
+        "confirm": "Reject all"
+      },
+      "toasts": {
+        "unexpected": "Bulk action returned no payload.",
+        "allOk": "{label} succeeded for {count} deploys.",
+        "allFailed": "{label} failed for {count} deploys: {message}",
+        "partial": "{label}: {succeeded} succeeded, {failed} failed.",
+        "approveFailed": "Bulk approve failed.",
+        "rejectFailed": "Bulk reject failed."
+      },
+      "row": {
+        "selectRowLabel": "Select {app} / {env}",
+        "approvalsCount": "{received}/{required} approvals",
+        "received": "Received {rel}",
+        "review": "Review"
       }
     },
     "alerts": {
@@ -1423,6 +1717,81 @@
         "title": "API tokens",
         "description": "Long-lived bearer tokens for CLIs and bots."
       }
+    }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "descriptionGlobal": "Scheduled job runs and ad-hoc command executions across all your apps.",
+    "descriptionForApp": "Scheduled job runs and ad-hoc command executions for {app}.",
+    "tabs": {
+      "scheduled": "Scheduled",
+      "commands": "Commands"
+    },
+    "scheduled": {
+      "emptyTitle": "No scheduled job runs yet",
+      "emptyDescription": "Cronjob workloads land here as soon as the scheduler fires their first run.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Status",
+        "duration": "Duration",
+        "started": "Started"
+      }
+    },
+    "commands": {
+      "emptyTitle": "No command runs yet",
+      "emptyDescription": "Ad-hoc commands invoked against an app workload land here. Run one from the CLI with `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Command",
+        "status": "Status",
+        "invokedBy": "Invoked by",
+        "started": "Started"
+      }
+    },
+    "runStatus": {
+      "running": "Running",
+      "inProgress": "In progress",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "superseded": "Superseded",
+      "unknown": "Unknown",
+      "exitCodeLabel": "exit {code}",
+      "exitCodeTooltip": "Process exited with code {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Forbid",
+        "queue": "Queue",
+        "replace": "Replace"
+      },
+      "tooltip": {
+        "forbid": "Skips the next scheduled firing while a run is in flight.",
+        "queue": "Lets overlapping runs stack — pick this when each firing is independent and short.",
+        "replace": "Kills the in-flight run and starts a fresh one."
+      }
+    },
+    "cron": {
+      "invalid": "Invalid cron expression",
+      "firesIn": "Fires in {relative}",
+      "now": "less than a minute",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "hours": "{count, plural, one {# hour} other {# hours}}",
+      "days": "{count, plural, one {# day} other {# days}}"
+    },
+    "workloadCard": {
+      "title": "Cronjob workloads",
+      "countLabel": "{count, plural, one {# scheduled} other {# scheduled}}",
+      "openLogs": "Open in console"
+    },
+    "output": {
+      "emptyOutput": "No captured output yet.",
+      "openInConsole": "Open in console",
+      "lines": "{count, plural, one {# line} other {# lines}}",
+      "truncated": "200 lines shown — open in console for the full tail."
     }
   }
 }

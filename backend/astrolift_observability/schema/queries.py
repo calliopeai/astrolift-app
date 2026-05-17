@@ -106,12 +106,18 @@ class GoldenSignalsQuery:
         app_slug: str,
         environment_name: str | None = None,
         range_seconds: int | None = None,
+        workload_slug: str | None = None,
     ) -> list[AppGoldenSignal]:
         """Return the four golden signals (traffic / errors / latency /
-        saturation) over ``range_seconds`` for ``app_slug`` (+ env).
+        saturation) over ``range_seconds`` for ``app_slug`` (+ env +
+        optional workload).
 
         Latency expands to three rows — p50, p90, p99 — so the FE can
         render them as a stacked line without a second round-trip.
+
+        ``workload_slug`` narrows the Prometheus query to one workload
+        (``api`` / ``worker`` / ``scheduler`` / ...). Omit to roll up
+        every workload under the app (pre-#422 behavior).
 
         Empty list when the app doesn't exist for the current tenant,
         the cluster has no Prometheus endpoint, or Prometheus errors.
@@ -174,6 +180,7 @@ class GoldenSignalsQuery:
             plan = builder(
                 app_slug=app.slug,
                 environment_name=environment_name,
+                workload_slug=workload_slug,
                 range_seconds=seconds,
                 **extra,
             )
@@ -214,10 +221,15 @@ class GoldenSignalsQuery:
         app_slug: str,
         environment_name: str | None = None,
         range_seconds: int | None = None,
+        workload_slug: str | None = None,
     ) -> StatusCodeBreakdown | None:
         """Per-status-code stacked time-series. ``None`` when the app
         can't be resolved, has no Prometheus endpoint, or Prometheus
         errors.
+
+        ``workload_slug`` narrows the breakdown to a single workload
+        (mirrors :func:`astrolift_app_golden_signals`); omit to roll
+        every workload up.
 
         The FE distinguishes ``null`` ("HTTP metrics unavailable —
         omit the card") from a populated breakdown with zero series
@@ -238,6 +250,7 @@ class GoldenSignalsQuery:
         plan = prom_queries.build_status_code_breakdown_query(
             app_slug=app.slug,
             environment_name=environment_name,
+            workload_slug=workload_slug,
             range_seconds=seconds,
         )
         try:

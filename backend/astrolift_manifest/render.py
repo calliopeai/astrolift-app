@@ -45,6 +45,16 @@ from astrolift_manifest.types import (
     WorkloadManifest,
 )
 
+# Platform → K8s ``CronJob.spec.concurrencyPolicy`` mapping (#427).
+# ``forbid`` / ``queue`` / ``replace`` are the platform names; K8s
+# expects PascalCase enum strings.
+_CONCURRENCY_POLICY_K8S = {
+    "forbid": "Forbid",
+    "queue": "Allow",
+    "replace": "Replace",
+}
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -186,7 +196,7 @@ def _render_cronjob(
         },
         "spec": {
             "schedule": w.schedule,
-            "concurrencyPolicy": "Forbid",
+            "concurrencyPolicy": _CONCURRENCY_POLICY_K8S[w.concurrency_policy or "forbid"],
             "jobTemplate": {
                 "spec": {
                     "template": {

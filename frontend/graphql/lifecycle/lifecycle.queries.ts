@@ -31,6 +31,7 @@ export const LIST_DEPLOYMENTS = gql`
       clusterRevision
       approvalsRequired
       approvalsReceived
+      requiredApproverCount
       startedAt
       succeededAt
       failedAt
@@ -48,6 +49,20 @@ export const LIST_DEPLOYMENTS = gql`
       abortedReason
       triggeredByUserId
       triggeredByMe
+      approvedBy {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
+      awaitingApprovers {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
     }
   }
 `;
@@ -66,6 +81,7 @@ export const GET_DEPLOYMENT = gql`
       clusterRevision
       approvalsRequired
       approvalsReceived
+      requiredApproverCount
       startedAt
       succeededAt
       failedAt
@@ -83,6 +99,20 @@ export const GET_DEPLOYMENT = gql`
       abortedReason
       triggeredByUserId
       triggeredByMe
+      approvedBy {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
+      awaitingApprovers {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
     }
   }
 `;
@@ -145,6 +175,7 @@ export const LIST_SCHEDULED_JOB_RUNS = gql`
       durationSeconds
       exitCode
       logExcerpt
+      output
       createdAt
     }
   }
@@ -162,6 +193,7 @@ export const LIST_COMMAND_RUNS = gql`
       endedAt
       exitCode
       logExcerpt
+      output
       createdAt
     }
   }
@@ -222,6 +254,8 @@ export const LIST_APP_DEPLOY_TOKENS = gql`
       scopes
       expiresAt
       lastUsedAt
+      lastUsedIp
+      lastUsedAgent
       isRevoked
       lastRotatedAt
       createdAt
@@ -356,6 +390,88 @@ export const GET_APP_IDENTITY_BINDING = gql`
       roleArnOrPrincipal
       trustPolicySummary
       lastUsedAt
+    }
+  }
+`;
+
+// #436 A — blast-radius preview for the deregister modal. Fired on
+// modal-open so the operator audits actual object names (not generic
+// resource-class labels) before typing the confirm token. Read-only
+// against real platform state — safe to refetch on every open. The
+// FE groups the response into a collapsible tree by destination.
+
+export const PREVIEW_DEREGISTER_APP = gql`
+  query PreviewDeregisterApp($appSlug: String!) {
+    previewAstroliftDeregister(appSlug: $appSlug) {
+      appSlug
+      appName
+      totalResourceCount
+      registryRepoUri
+      k8sObjects {
+        clusterSlug
+        namespace
+        apiVersion
+        kind
+        name
+      }
+      managedServices {
+        id
+        name
+        kind
+        variant
+        environmentName
+        status
+      }
+      secretRefs {
+        id
+        bundleSlug
+        environmentName
+        clusterSlug
+        prefix
+      }
+      deployTokens {
+        id
+        name
+        last4
+        environmentName
+      }
+      sourceWebhook {
+        installed
+        repo
+        hookId
+      }
+      identityRoles {
+        clusterSlug
+        kind
+        roleArnOrPrincipal
+      }
+    }
+  }
+`;
+
+// #436 D — in-flight deployment preview for the force-redeploy CTA.
+// Returns the exact ``Deployment`` rows the recovery path will transition
+// to FAILED so the operator can audit before confirming. ``environmentName``
+// is optional — omitting it widens the preview to every env on the app.
+
+export const PREVIEW_FORCE_REDEPLOY = gql`
+  query PreviewForceRedeploy($appSlug: String!, $environmentName: String) {
+    previewAstroliftForceRedeploy(appSlug: $appSlug, environmentName: $environmentName) {
+      appSlug
+      environmentName
+      inFlightDeployments {
+        id
+        environmentName
+        workloadSlug
+        status
+        imageTag
+        startedAt
+        createdAt
+        triggerKind
+        triggeredByDisplay
+        ciActorKind
+        ciRunUrl
+      }
     }
   }
 `;

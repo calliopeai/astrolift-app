@@ -162,13 +162,15 @@ function PendingRow({
         </div>
       </div>
       {canApprove && (
-        <div className="flex shrink-0 items-center gap-1.5">
+        // #420 Scope C — stack on mobile, full-width buttons + 44px min
+        // tap target so on-call approvers don't mis-fire reject.
+        <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row sm:items-center">
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setConfirmReject(true)}
             disabled={busy !== null}
-            className="text-muted-foreground hover:text-destructive gap-1"
+            className="text-muted-foreground hover:text-destructive min-h-11 w-full gap-1 sm:w-auto"
           >
             {busy === "reject" ? (
               <Loader2Icon className="size-3.5 animate-spin" />
@@ -177,7 +179,12 @@ function PendingRow({
             )}
             Reject
           </Button>
-          <Button size="sm" onClick={() => setConfirmApprove(true)} disabled={busy !== null} className="gap-1">
+          <Button
+            size="sm"
+            onClick={() => setConfirmApprove(true)}
+            disabled={busy !== null}
+            className="min-h-11 w-full gap-1 sm:w-auto"
+          >
             {busy === "approve" ? (
               <Loader2Icon className="size-3.5 animate-spin" />
             ) : (

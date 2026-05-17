@@ -1,5 +1,24 @@
 import { gql } from "@apollo/client";
 
+export const GET_RECENT_ACTIVITY = gql`
+  query GetRecentActivity($limit: Int, $cursor: String) {
+    astroliftRecentActivity(limit: $limit, cursor: $cursor) {
+      items {
+        id
+        eventType
+        action
+        actorDisplay
+        targetKind
+        targetLabel
+        targetHref
+        occurredAt
+        payload
+      }
+      nextCursor
+    }
+  }
+`;
+
 export const LIST_EVENTS = gql`
   query ListEvents($limit: Int, $eventType: String) {
     astroliftEvents(limit: $limit, eventType: $eventType) {

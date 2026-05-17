@@ -32,6 +32,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_graphql.errors import MutationErrorType
 from astrolift_lifecycle.approval import mint_magic_link
 from astrolift_lifecycle.models import (
     AppEnvironment,
@@ -139,6 +140,60 @@ class RejectByTokenInput:
 
 
 @strawberry.input
+class BulkApproveDeploymentsInput:
+    """Bulk-approve N pending deploys in one call (#420).
+
+    ``deployment_ids`` is capped at 50 — defensive ceiling so a runaway
+    selection doesn't fan into a single huge audit-write burst.
+    ``reason`` is optional and carried onto the audit-extras payload
+    for every approved id."""
+
+    deployment_ids: list[GUID]
+    reason: str | None = None
+
+
+@strawberry.input
+class BulkRejectDeploymentsInput:
+    """Bulk-reject N pending deploys in one call (#420).
+
+    Same shape as :class:`BulkApproveDeploymentsInput` but ``reason``
+    is required + non-empty (mirrors the single-id reject contract)
+    so every rejected deploy carries an auditable explanation."""
+
+    deployment_ids: list[GUID]
+    reason: str
+
+
+@strawberry.type(name="AstroliftBulkDeploymentResultItem")
+class BulkDeploymentResultItem:
+    """Per-id outcome from a bulk approve / reject pass.
+
+    ``ok`` is True when the per-id resolver succeeded; ``deployment``
+    carries the post-mutation row in that case. On failure ``errors``
+    is non-empty and ``deployment`` is null — the FE renders the
+    failure inline alongside the still-pending row so the operator can
+    retry just the failing entries."""
+
+    deployment_id: GUID
+    ok: bool
+    errors: list[MutationErrorType]
+    deployment: DeploymentType | None
+
+
+@strawberry.type(name="AstroliftBulkDeploymentResultData")
+class BulkDeploymentResultData:
+    """Container for the per-id breakdown returned in
+    :class:`AstroliftBulkDeploymentMutationResult.data`. Wrapping the
+    list in a dedicated type keeps the standard ``MutationResult``
+    envelope shape so callers reuse their existing ``ok / errors /
+    data`` handling pattern."""
+
+    results: list[BulkDeploymentResultItem]
+    succeeded_count: int
+    failed_count: int
+
+
+@strawberry.input
 class TearDownPreviewInputGql:
     id: GUID
 
@@ -236,10 +291,20 @@ class RevokeDeployTokenInput:
 @strawberry.type
 class DeployTokenSecretReveal:
     """Returned exactly once on creation/rotation; the plaintext
-    token never lives in DB."""
+    token never lives in DB.
+
+    ``rotation_grace_seconds`` is the live Constance-tunable grace
+    window (``DEPLOY_TOKEN_ROTATION_GRACE_SECONDS``, default 24h)
+    the previous secret stays valid for after a rotate. ``0`` on
+    creation (no previous secret to honour). Surfaced so the rotate
+    ConfirmDialog can display the *actual* grace operators are
+    committing to instead of a hard-coded number that may have
+    drifted (#425).
+    """
 
     token: DeployTokenType
     plaintext_secret: str
+    rotation_grace_seconds: int = 0
 
 
 @strawberry.type
@@ -639,6 +704,220 @@ def _record_approval_vote_and_maybe_start(
 
 
 # ---------------------------------------------------------------------------
+# Bulk approve / reject helpers (#420)
+# ---------------------------------------------------------------------------
+
+
+# Defensive ceiling. Past 50, the right shape is server-side scheduling
+# (a workflow that drains a queue) rather than a synchronous mutation
+# that holds a single request open for N rows.
+_BULK_APPROVE_REJECT_CAP = 50
+
+
+def _bulk_item_failure(deployment_id: str, code: str, message: str, *, field: str | None = None):
+    """Per-id failure envelope shared across bulk approve / reject."""
+    return BulkDeploymentResultItem(
+        deployment_id=GUID(deployment_id),
+        ok=False,
+        errors=[MutationErrorType(code=code, message=message, field=field)],
+        deployment=None,
+    )
+
+
+def _process_bulk_approve_one(
+    *,
+    deployment_id: str,
+    actor: Actor,
+    viewer_user_id: int | None,
+    organization_id: int | None,
+) -> BulkDeploymentResultItem:
+    """Single-id approve path, callable from the bulk resolver.
+
+    Mirrors :meth:`LifecycleMutation.approve_deployment` minus the
+    @mutation_audit decorator (we emit per-id audit entries
+    ourselves below) and minus the @require_permission decorator (the
+    outer bulk resolver already gated on the org-scope permission;
+    the per-id eligibility check still runs)."""
+    from core.mutations import AuditEntry, emit_audit
+    from core.mutations import ErrorCode as CoreErrorCode
+
+    deployment = (
+        Deployment.objects.select_related("registered_app", "app_environment", "workload")
+        .filter(guid=deployment_id, deleted_at__isnull=True)
+        .first()
+    )
+    if deployment is None:
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.NOT_FOUND.value,
+            "deployment not found",
+        )
+    if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.PRECONDITION.value,
+            f"deployment is in status {deployment.status}, expected pending_approval",
+        )
+    if actor.user_id and deployment.triggered_by_user_id == actor.user_id and not _self_approve_allowed():
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.PRECONDITION.value,
+            "cannot approve your own deployment — another approver required",
+        )
+    if actor.user_id and not _is_eligible_approver(deployment.registered_app, user_id=actor.user_id):
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.PERMISSION_DENIED.value,
+            "you are not in this app's approver set",
+        )
+
+    try:
+        with transaction.atomic():
+            _record_approval_vote_and_maybe_start(
+                deployment,
+                actor,
+                organization_id=organization_id,
+            )
+    except Exception as exc:  # noqa: BLE001 — per-id failure shouldn't abort the batch
+        emit_audit(
+            AuditEntry(
+                actor_user_id=actor.user_id,
+                organization_id=organization_id,
+                action="deployment.bulk_approve",
+                decision="DENY",
+                target_kind="Deployment",
+                target_id=deployment_id,
+                duration_ms=0,
+                permissions=("app.approve_deploy",),
+                error_code=CoreErrorCode.INTERNAL.value,
+                error_message=str(exc),
+            )
+        )
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.INTERNAL.value,
+            str(exc) or "approve failed",
+        )
+
+    emit_audit(
+        AuditEntry(
+            actor_user_id=actor.user_id,
+            organization_id=organization_id,
+            action="deployment.approve",
+            decision="ALLOW",
+            target_kind="Deployment",
+            target_id=deployment_id,
+            duration_ms=0,
+            permissions=("app.approve_deploy",),
+            extra={"bulk": True},
+        )
+    )
+    return BulkDeploymentResultItem(
+        deployment_id=GUID(deployment_id),
+        ok=True,
+        errors=[],
+        deployment=deployment_to_type(deployment, viewer_user_id=viewer_user_id),
+    )
+
+
+def _process_bulk_reject_one(
+    *,
+    deployment_id: str,
+    reason: str,
+    actor: Actor,
+    viewer_user_id: int | None,
+) -> BulkDeploymentResultItem:
+    """Single-id reject path, callable from the bulk resolver.
+
+    Mirrors :meth:`LifecycleMutation.reject_deployment` (one nay kills
+    the deploy → FAILED). Per-id audit entries emitted directly so the
+    history panel renders an entry per affected id."""
+    from core.mutations import AuditEntry, emit_audit
+    from core.mutations import ErrorCode as CoreErrorCode
+
+    deployment = (
+        Deployment.objects.select_related("registered_app", "app_environment", "workload")
+        .filter(guid=deployment_id, deleted_at__isnull=True)
+        .first()
+    )
+    if deployment is None:
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.NOT_FOUND.value,
+            "deployment not found",
+        )
+    if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.PRECONDITION.value,
+            f"deployment is in status {deployment.status}, expected pending_approval",
+        )
+    if actor.user_id and deployment.triggered_by_user_id == actor.user_id:
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.PRECONDITION.value,
+            "cannot reject your own deployment",
+        )
+    if actor.user_id and not _is_eligible_approver(deployment.registered_app, user_id=actor.user_id):
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.PERMISSION_DENIED.value,
+            "you are not in this app's approver set",
+        )
+
+    organization_id = deployment.registered_app.organization_id
+    try:
+        with transaction.atomic():
+            deployment.aborted_reason = reason
+            deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
+            if deployment.workflow_run_id:
+                wf_id = deployment.workflow_run.workflow_id  # type: ignore[union-attr]
+                if not signal_workflow(wf_id, "abort"):
+                    terminate_workflow(wf_id, reason=f"bulk_reject_deployment: {reason}")
+            deployment.transition_to(Deployment.Status.FAILED)
+    except Exception as exc:  # noqa: BLE001
+        emit_audit(
+            AuditEntry(
+                actor_user_id=actor.user_id,
+                organization_id=organization_id,
+                action="deployment.bulk_reject",
+                decision="DENY",
+                target_kind="Deployment",
+                target_id=deployment_id,
+                duration_ms=0,
+                permissions=("app.approve_deploy",),
+                error_code=CoreErrorCode.INTERNAL.value,
+                error_message=str(exc),
+            )
+        )
+        return _bulk_item_failure(
+            deployment_id,
+            ErrorCode.INTERNAL.value,
+            str(exc) or "reject failed",
+        )
+
+    emit_audit(
+        AuditEntry(
+            actor_user_id=actor.user_id,
+            organization_id=organization_id,
+            action="deployment.reject",
+            decision="ALLOW",
+            target_kind="Deployment",
+            target_id=deployment_id,
+            duration_ms=0,
+            permissions=("app.approve_deploy",),
+            extra={"reason": reason, "bulk": True},
+        )
+    )
+    return BulkDeploymentResultItem(
+        deployment_id=GUID(deployment_id),
+        ok=True,
+        errors=[],
+        deployment=deployment_to_type(deployment, viewer_user_id=viewer_user_id),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Root mutation type
 # ---------------------------------------------------------------------------
 
@@ -974,6 +1253,115 @@ class LifecycleMutation:
             deployment.transition_to(Deployment.Status.FAILED)
 
         return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
+
+    # ---- Bulk approve / reject (#420) ---------------------------------
+    #
+    # Operators clearing a backlog of pending deploys want a single
+    # action that processes every selection without the per-row round-
+    # trip. Each id is processed independently: a per-id permission /
+    # self-trigger / eligibility failure surfaces in the result item
+    # rather than aborting the batch. Per-id audit rows are emitted by
+    # the underlying single-id call paths so the timeline reads the
+    # same as if the operator had clicked through one at a time.
+
+    @strawberry.field
+    @require_permission(Permission.APP_APPROVE_DEPLOY)
+    @tenant_scoped()
+    def bulk_approve_deployments(
+        self, info: Info, input: BulkApproveDeploymentsInput
+    ) -> MutationResultType[BulkDeploymentResultData]:
+        ids = list(input.deployment_ids or [])
+        if not ids:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "deploymentIds is required",
+                field="deploymentIds",
+            )
+        if len(ids) > _BULK_APPROVE_REJECT_CAP:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"too many deployments (cap is {_BULK_APPROVE_REJECT_CAP})",
+                field="deploymentIds",
+            )
+
+        actor = _actor_from_request(info)
+        tenant = get_current_tenant()
+        organization_id = tenant.organization_id if tenant else None
+
+        results: list[BulkDeploymentResultItem] = []
+        succeeded = 0
+        failed = 0
+        for deployment_id in ids:
+            item = _process_bulk_approve_one(
+                deployment_id=str(deployment_id),
+                actor=actor,
+                viewer_user_id=actor.user_id,
+                organization_id=organization_id,
+            )
+            results.append(item)
+            if item.ok:
+                succeeded += 1
+            else:
+                failed += 1
+        return gql_success(
+            BulkDeploymentResultData(
+                results=results,
+                succeeded_count=succeeded,
+                failed_count=failed,
+            )
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_APPROVE_DEPLOY)
+    @tenant_scoped()
+    def bulk_reject_deployments(
+        self, info: Info, input: BulkRejectDeploymentsInput
+    ) -> MutationResultType[BulkDeploymentResultData]:
+        reason = (input.reason or "").strip()
+        if not reason:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "reason is required",
+                field="reason",
+            )
+        ids = list(input.deployment_ids or [])
+        if not ids:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "deploymentIds is required",
+                field="deploymentIds",
+            )
+        if len(ids) > _BULK_APPROVE_REJECT_CAP:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"too many deployments (cap is {_BULK_APPROVE_REJECT_CAP})",
+                field="deploymentIds",
+            )
+
+        actor = _actor_from_request(info)
+
+        results: list[BulkDeploymentResultItem] = []
+        succeeded = 0
+        failed = 0
+        for deployment_id in ids:
+            item = _process_bulk_reject_one(
+                deployment_id=str(deployment_id),
+                reason=reason,
+                actor=actor,
+                viewer_user_id=actor.user_id,
+            )
+            results.append(item)
+            if item.ok:
+                succeeded += 1
+            else:
+                failed += 1
+        return gql_success(
+            BulkDeploymentResultData(
+                results=results,
+                succeeded_count=succeeded,
+                failed_count=failed,
+            )
+        )
 
     # ---- Public token-based approve / reject (#125, spec 06 §4.6) ----
     #
@@ -1855,6 +2243,8 @@ class LifecycleMutation:
         import secrets as secrets_lib
         from datetime import datetime, timedelta
 
+        from astrolift_lifecycle.deploy_tokens import rotation_grace_seconds_from_constance
+
         token = DeployToken.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if token is None:
             return gql_failure(
@@ -1868,14 +2258,17 @@ class LifecycleMutation:
             )
         plaintext = "alfdt_" + secrets_lib.token_urlsafe(32)
         digest = hashlib.sha256(plaintext.encode()).hexdigest()
-        # Park the previous hash for a 24h grace window so CI
-        # runners holding the old token keep working until they're
-        # updated (matches the model's documented rotation flow).
+        # Park the previous hash for the Constance-tunable grace
+        # window so CI runners holding the old token keep working
+        # until they're updated. The UI surfaces this exact value
+        # on the rotate-confirm dialog (#425).
+        grace_seconds = rotation_grace_seconds_from_constance()
+        now = datetime.now(tz=UTC)
         token.previous_token_hash = token.token_hash
-        token.previous_token_expires_at = datetime.now(tz=UTC) + timedelta(hours=24)
+        token.previous_token_expires_at = now + timedelta(seconds=grace_seconds)
         token.token_hash = digest
         token.token_last_4 = plaintext[-4:]
-        token.last_rotated_at = datetime.now(tz=UTC)
+        token.last_rotated_at = now
         token.save(
             update_fields=[
                 "previous_token_hash",
@@ -1891,6 +2284,7 @@ class LifecycleMutation:
             DeployTokenSecretReveal(
                 token=deploy_token_to_type(token),
                 plaintext_secret=plaintext,
+                rotation_grace_seconds=grace_seconds,
             )
         )
 
@@ -2205,7 +2599,7 @@ class LifecycleMutation:
         if gates_on_approval:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                ("deploy workflow requires approval — " "use startDeployment with approver flow"),
+                ("deploy workflow requires approval — use startDeployment with approver flow"),
             )
 
         branch_input = (input.branch or "").strip() or None
@@ -2663,6 +3057,72 @@ class LifecycleMutation:
             DeregisterAppPayload(
                 workflow_id=workflow_id,
                 still_live_resources=[],
+            ),
+        )
+
+    # ----------------------------------------------------------------
+    # Grace-period teardown cancel (#436 B)
+    # ----------------------------------------------------------------
+    #
+    # Sends the ``cancel_teardown`` signal to a running
+    # ``DeregisterAppWorkflow``. If the signal lands within the 5-min
+    # grace window before the workflow's first destructive activity
+    # fires, the teardown short-circuits and no per-app resource is
+    # touched. After the window elapses the signal is a no-op — the
+    # destructive activities are monotonic by design (a half-applied
+    # teardown is not rolled back; the operator retries instead).
+    # Gated on ``app.delete`` — same permission the deregister
+    # mutation requires.
+
+    @strawberry.field
+    @mutation_audit(action="app.deregister.cancel")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def cancel_astrolift_deregister(
+        self,
+        info: Info,
+        input: CancelDeregisterInput,
+    ) -> MutationResultType[CancelDeregisterPayload]:
+        """Cancel a pending deregister within the 5-min grace window."""
+        wf_id = (input.workflow_id or "").strip()
+        if not wf_id:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "workflow_id is required",
+                field="workflowId",
+            )
+        # Defence-in-depth: the deterministic deregister workflow id
+        # carries the app guid; tenant scoping on the resolver entry
+        # would catch a cross-org request, but pin the id shape here so
+        # an operator can't accidentally cancel an unrelated workflow.
+        if not wf_id.startswith("DeregisterAppWorkflow-"):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "workflow_id must reference a DeregisterAppWorkflow run",
+                field="workflowId",
+            )
+        # Resolve + scope-check the app guid embedded in the workflow id.
+        # The mutation surface is tenant-scoped, so a sibling-org guid
+        # short-circuits to NOT_FOUND rather than leaking row counts.
+        app_guid = wf_id[len("DeregisterAppWorkflow-") :]
+        app = RegisteredApp.objects.filter(guid=app_guid).select_related("organization").first()
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"no deregister workflow found for {wf_id!r}",
+                field="workflowId",
+            )
+
+        reason = (input.reason or "").strip()
+        delivered = signal_workflow(wf_id, "cancel_teardown", reason)
+        # Best-effort: signal failure (workflow not running, Temporal
+        # disabled in dev, etc.) is surfaced as ok=True with
+        # ``signal_delivered=False`` so the FE can render the
+        # "couldn't reach" copy instead of a generic error toast.
+        return gql_success(
+            CancelDeregisterPayload(
+                workflow_id=wf_id,
+                signal_delivered=bool(delivered),
             ),
         )
 
@@ -3150,3 +3610,38 @@ class DeregisterAppPayload:
 
     workflow_id: str
     still_live_resources: list[str]
+
+
+# ---------------------------------------------------------------------------
+# #436 B — grace-period cancel for a pending deregister teardown.
+# Defined at module scope so Strawberry resolves the types alongside the
+# resolver. Appended after the existing deregister types so sibling
+# agents touching this region land on adjacent ranges.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class CancelDeregisterInput:
+    """Input for the grace-period cancel mutation (#436 B).
+
+    ``workflow_id`` is the deterministic id the deregister mutation
+    returned. ``reason`` is a free-form audit note (the operator's
+    why-cancelled context) — surfaces in the workflow log + the
+    mutation_audit event extras."""
+
+    workflow_id: str
+    reason: str | None = None
+
+
+@strawberry.type(name="AstroliftCancelDeregisterPayload")
+class CancelDeregisterPayload:
+    """Read-back for a cancel-deregister attempt (#436 B).
+
+    ``signal_delivered`` is False when the Temporal client couldn't
+    reach the workflow (workflow already finished, Temporal disabled
+    in dev, transport error). The FE renders the "couldn't reach"
+    copy in that case so the operator knows whether their cancel
+    landed."""
+
+    workflow_id: str
+    signal_delivered: bool

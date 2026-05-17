@@ -226,6 +226,8 @@ class ApiTokenType:
     scopes: list[str]
     expires_at: dt.datetime | None
     last_used_at: dt.datetime | None
+    last_used_ip: str | None
+    last_used_agent: str | None
     is_revoked: bool
     created_at: dt.datetime
 
@@ -248,6 +250,8 @@ def api_token_to_type(token) -> ApiTokenType:
         scopes=list(token.scopes or []),
         expires_at=token.expires_at,
         last_used_at=token.last_used_at,
+        last_used_ip=token.last_used_ip or None,
+        last_used_agent=token.last_used_agent or None,
         is_revoked=token.is_revoked,
         created_at=token.created_at,
     )

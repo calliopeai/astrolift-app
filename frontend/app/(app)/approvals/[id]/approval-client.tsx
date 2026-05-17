@@ -21,7 +21,9 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
+import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { PageShell } from "@/components/PageShell";
+import { QuorumWidget } from "@/components/QuorumWidget";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,7 +174,7 @@ export function ApprovalClient({ id }: { id: string }) {
             <CardHeader>
               <CardTitle className="flex flex-wrap items-center gap-3">
                 <StatusDot status={statusToDot[d.status]} />
-                <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
+                <DeploymentStatusPill status={d.status} />
                 {d.approvalsRequired > 0 && (
                   <Badge variant="secondary">
                     {t("approvalsCount", {
@@ -186,6 +188,14 @@ export function ApprovalClient({ id }: { id: string }) {
                 </Badge>
                 {isSelfTrigger && <SelfTriggerBadge label={t("selfTriggerBadge")} />}
               </CardTitle>
+              {/* #420 — quorum widget replaces the count-only badge for
+                  gated deploys. Renders nothing when requiredApproverCount===0
+                  so non-gated views stay clean. */}
+              <QuorumWidget
+                requiredApproverCount={d.requiredApproverCount ?? d.approvalsRequired}
+                approvedBy={d.approvedBy ?? []}
+                awaitingApprovers={d.awaitingApprovers ?? []}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
@@ -218,7 +228,10 @@ export function ApprovalClient({ id }: { id: string }) {
                       remaining: d.approvalsRequired - d.approvalsReceived,
                     })}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  {/* #420 Scope C — mobile-friendly: stack column-by-column
+                      below sm:, expand to full width per row, lock buttons at
+                      44px min so on-call approvers don't mis-tap. */}
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     {!canApprovePermission ? (
                       <p className="text-muted-foreground text-xs">{t("missingPermission")}</p>
                     ) : isSelfTrigger ? (
@@ -229,6 +242,7 @@ export function ApprovalClient({ id }: { id: string }) {
                           <Button
                             onClick={() => setConfirmApprove(true)}
                             disabled={approveState.loading || rejectState.loading}
+                            className="min-h-11 w-full sm:w-auto"
                           >
                             <CheckCircle2Icon className="size-4" /> {t("approve")}
                           </Button>
@@ -238,6 +252,7 @@ export function ApprovalClient({ id }: { id: string }) {
                             variant="destructive"
                             onClick={() => setConfirmReject(true)}
                             disabled={approveState.loading || rejectState.loading}
+                            className="min-h-11 w-full sm:w-auto"
                           >
                             <XCircleIcon className="size-4" /> {t("reject")}
                           </Button>
@@ -248,6 +263,7 @@ export function ApprovalClient({ id }: { id: string }) {
                       asChild
                       variant="outline"
                       disabled={approveState.loading || rejectState.loading}
+                      className="min-h-11 w-full sm:w-auto"
                     >
                       <a href={`/deployments/${d.id}`}>{t("viewDetail")}</a>
                     </Button>

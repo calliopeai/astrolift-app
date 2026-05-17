@@ -31,6 +31,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
@@ -374,6 +381,33 @@ export function AppDomainsClient({ slug }: { slug: string }) {
   );
 }
 
+// Validation method vocabulary surfaced to operators (#425). The
+// platform also accepts an empty value (defaults to ``dns_txt``);
+// the dropdown picks ``dns_txt`` as the default so the operator
+// sees what they're committing to.
+//
+// "byo_cert" is a UX-level sentinel — not a backend
+// ``ValidationMethod``. The backend models BYO as a separate
+// ``CertificateState`` axis: the operator picks ``dns_txt`` to
+// validate the hostname, then uploads their own cert via the
+// per-domain Replace action (which fires
+// ``uploadCustomDomainCertificate``). Picking "byo_cert" in the
+// dropdown is a hint that surfaces the follow-up upload step;
+// under the hood we still send ``dns_txt`` because that's what
+// the API accepts.
+const VALIDATION_METHODS = ["dns_txt", "http_01", "dns_01", "byo_cert"] as const;
+type ValidationMethodChoice = (typeof VALIDATION_METHODS)[number];
+
+const DEFAULT_VALIDATION_METHOD: ValidationMethodChoice = "dns_txt";
+
+function backendValidationMethod(choice: ValidationMethodChoice): string {
+  // BYO is not a real validation method on the backend — fall back
+  // to dns_txt for the initial hostname validation. The follow-up
+  // BYO cert upload lands via ``uploadCustomDomainCertificate``.
+  if (choice === "byo_cert") return "dns_txt";
+  return choice;
+}
+
 function AddDomainSheet({
   open,
   onOpenChange,
@@ -388,14 +422,16 @@ function AddDomainSheet({
   const t = useTranslations("apps.domains");
   const tCommon = useTranslations("apps.common");
   const [hostname, setHostname] = React.useState("");
-  const [validationMethod, setValidationMethod] = React.useState("");
+  const [method, setMethod] = React.useState<ValidationMethodChoice>(DEFAULT_VALIDATION_METHOD);
 
   React.useEffect(() => {
     if (!open) {
       setHostname("");
-      setValidationMethod("");
+      setMethod(DEFAULT_VALIDATION_METHOD);
     }
   }, [open]);
+
+  const isByo = method === "byo_cert";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -408,7 +444,7 @@ function AddDomainSheet({
           onSubmit={async (e) => {
             e.preventDefault();
             if (!hostname.trim()) return;
-            await onSubmit(hostname.trim().toLowerCase(), validationMethod.trim());
+            await onSubmit(hostname.trim().toLowerCase(), backendValidationMethod(method));
           }}
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
@@ -427,17 +463,30 @@ function AddDomainSheet({
           </div>
           <div className="space-y-2">
             <Label htmlFor="d-method">{t("addSheet.validationMethod")}</Label>
-            <Input
-              id="d-method"
-              value={validationMethod}
-              onChange={(e) => setValidationMethod(e.target.value)}
-              placeholder="dns-01"
-              spellCheck={false}
-              className="font-mono"
-            />
-            <p className="text-muted-foreground text-xs">
-              {t("addSheet.validationHint")}
-            </p>
+            <Select
+              value={method}
+              onValueChange={(next) => setMethod(next as ValidationMethodChoice)}
+            >
+              <SelectTrigger id="d-method" className="font-mono">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VALIDATION_METHODS.map((m) => (
+                  <SelectItem key={m} value={m} className="font-mono text-xs">
+                    {t(`addSheet.methodLabels.${m}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">{t(`addSheet.methodHints.${method}`)}</p>
+            {isByo && (
+              <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
+                <p className="font-medium text-sky-700 dark:text-sky-400">
+                  {t("addSheet.byoTitle")}
+                </p>
+                <p className="text-muted-foreground">{t("addSheet.byoFollowup")}</p>
+              </div>
+            )}
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -614,9 +663,7 @@ function CertStateBlock({
       <div className="text-muted-foreground flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
         <Loader2Icon className="size-3.5 animate-spin text-amber-600" />
         <span className="font-medium text-amber-700 dark:text-amber-400">{t("issuing")}</span>
-        <span>
-          {domain.isPlatformManagedZone ? t("issuingPlatform") : t("issuingExternal")}
-        </span>
+        <span>{domain.isPlatformManagedZone ? t("issuingPlatform") : t("issuingExternal")}</span>
       </div>
     );
   }
@@ -875,9 +922,7 @@ function IngressStatusCard({
             </div>
           )}
           {customHosts.length === 0
-            ? !managedHost && (
-                <p className="text-muted-foreground italic">{t("noneBound")}</p>
-              )
+            ? !managedHost && <p className="text-muted-foreground italic">{t("noneBound")}</p>
             : customHosts.map((h) => (
                 <div key={h} className="flex items-center gap-2">
                   <code className="font-mono break-all">{h}</code>

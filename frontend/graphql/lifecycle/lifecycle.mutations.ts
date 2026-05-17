@@ -83,6 +83,8 @@ const DEPLOY_TOKEN_FIELDS = `
   scopes
   expiresAt
   lastUsedAt
+  lastUsedIp
+  lastUsedAgent
   isRevoked
   lastRotatedAt
   registeredAppSlug
@@ -97,6 +99,7 @@ export const CREATE_DEPLOY_TOKEN = gql`
       data {
         token { ${DEPLOY_TOKEN_FIELDS} }
         plaintextSecret
+        rotationGraceSeconds
       }
     }
   }
@@ -110,6 +113,7 @@ export const ROTATE_DEPLOY_TOKEN = gql`
       data {
         token { ${DEPLOY_TOKEN_FIELDS} }
         plaintextSecret
+        rotationGraceSeconds
       }
     }
   }
@@ -220,6 +224,54 @@ export const REJECT_DEPLOYMENT = gql`
       }
       data {
         ${DEPLOYMENT_FIELDS}
+      }
+    }
+  }
+`;
+
+// #420 — bulk approve / reject. Per-id outcomes ride in
+// ``data.results``; the outer envelope is ``ok=false`` only on the
+// validation pre-checks (empty list, > 50 ids, missing reason).
+// Returns just the minimal deployment fields the queue needs to
+// rerender — the global queue refetches after the bulk call settles
+// so we don't pull every approver row across the wire here.
+
+const BULK_DEPLOYMENT_RESULT_FIELDS = `
+  results {
+    deploymentId
+    ok
+    errors { code message field }
+    deployment {
+      id
+      status
+      approvalsReceived
+      approvalsRequired
+      abortedReason
+    }
+  }
+  succeededCount
+  failedCount
+`;
+
+export const BULK_APPROVE_DEPLOYMENTS = gql`
+  mutation BulkApproveDeployments($input: BulkApproveDeploymentsInput!) {
+    bulkApproveDeployments(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        ${BULK_DEPLOYMENT_RESULT_FIELDS}
+      }
+    }
+  }
+`;
+
+export const BULK_REJECT_DEPLOYMENTS = gql`
+  mutation BulkRejectDeployments($input: BulkRejectDeploymentsInput!) {
+    bulkRejectDeployments(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        ${BULK_DEPLOYMENT_RESULT_FIELDS}
       }
     }
   }
@@ -567,6 +619,33 @@ export const DEREGISTER_APP = gql`
       data {
         workflowId
         stillLiveResources
+      }
+    }
+  }
+`;
+
+// --- Cancel pending deregister within grace window (#436 B) --------
+//
+// Sends ``cancel_teardown`` to the running ``DeregisterAppWorkflow``.
+// If the signal lands within the 5-minute grace window before the
+// workflow's first destructive activity runs, the teardown short-
+// circuits and no per-app resource is touched. After the window
+// elapses the signal is a no-op and the mutation surfaces
+// ``signalDelivered=true`` regardless of effect — the operator's
+// pinned countdown banner hides on time-elapsed, not on response.
+
+export const CANCEL_DEREGISTER = gql`
+  mutation CancelAstroliftDeregister($input: CancelDeregisterInput!) {
+    cancelAstroliftDeregister(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        workflowId
+        signalDelivered
       }
     }
   }

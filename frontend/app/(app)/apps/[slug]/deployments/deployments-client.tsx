@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -34,10 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  LIST_DEPLOYMENTS,
-  LIST_ENVIRONMENTS,
-} from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_DEPLOYMENTS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppEnvironment,
   AstroliftDeployment,
@@ -59,10 +57,7 @@ interface EnvsResp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
 
-const statusToDot: Record<
-  DeploymentStatus,
-  "ok" | "warn" | "error" | "muted" | "pending"
-> = {
+const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
   pending_approval: "warn",
   pending: "warn",
   deploying: "pending",
@@ -141,26 +136,22 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     variables: { appSlug: slug },
   });
 
-  const [statusBucket, setStatusBucket] =
-    React.useState<StatusBucket>("all");
-  const [triggerFilter, setTriggerFilter] = React.useState<TriggerKind | "all">(
-    "all",
-  );
+  const [statusBucket, setStatusBucket] = React.useState<StatusBucket>("all");
+  const [triggerFilter, setTriggerFilter] = React.useState<TriggerKind | "all">("all");
   const [envFilter, setEnvFilter] = React.useState<string>("all");
   const [search, setSearch] = React.useState("");
 
   const a = app.data?.astroliftApp;
   const allDeployments = React.useMemo(
     () => deployments.data?.astroliftDeployments ?? [],
-    [deployments.data?.astroliftDeployments],
+    [deployments.data?.astroliftDeployments]
   );
   const envList = envs.data?.astroliftEnvironments ?? [];
 
   const filtered = React.useMemo(() => {
     return allDeployments.filter((d) => {
       if (!statusMatches(statusBucket, d.status)) return false;
-      if (triggerFilter !== "all" && d.triggerKind !== triggerFilter)
-        return false;
+      if (triggerFilter !== "all" && d.triggerKind !== triggerFilter) return false;
       if (envFilter !== "all" && d.environmentName !== envFilter) return false;
       if (search) {
         const needle = search.toLowerCase();
@@ -220,10 +211,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"
         />
-        <Select
-          value={statusBucket}
-          onValueChange={(v) => setStatusBucket(v as StatusBucket)}
-        >
+        <Select value={statusBucket} onValueChange={(v) => setStatusBucket(v as StatusBucket)}>
           <SelectTrigger className="w-44">
             <SelectValue />
           </SelectTrigger>
@@ -281,15 +269,9 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
               <EmptyState
                 icon={<BoxIcon className="size-5" />}
                 title={t("emptyTitle")}
-                description={
-                  allDeployments.length === 0
-                    ? t("emptyNever")
-                    : t("emptyTryAgain")
-                }
+                description={allDeployments.length === 0 ? t("emptyNever") : t("emptyTryAgain")}
                 actionHref={`/apps/${a.slug}/environments`}
-                actionLabel={
-                  allDeployments.length === 0 ? t("emptyStart") : undefined
-                }
+                actionLabel={allDeployments.length === 0 ? t("emptyStart") : undefined}
               />
             </div>
           ) : (
@@ -311,14 +293,12 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                   <TableRow
                     key={d.id}
                     className="hover:bg-accent/30 cursor-pointer"
-                    onClick={() =>
-                      (window.location.href = `/deployments/${d.id}`)
-                    }
+                    onClick={() => (window.location.href = `/deployments/${d.id}`)}
                   >
                     <TableCell className="w-6">
                       <StatusDot status={statusToDot[d.status]} />
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">
+                    <TableCell className="text-sm whitespace-nowrap">
                       {new Date(d.startedAt ?? d.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
@@ -332,18 +312,13 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="font-mono text-xs">
-                        {d.imageTag || "—"}
-                      </div>
+                      <div className="font-mono text-xs">{d.imageTag || "—"}</div>
                       {d.commitSha && (
                         <div className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 font-mono text-xs">
                           <GitCommitIcon className="size-3" />
                           {a.sourceKind === "github" && a.sourceRepo ? (
                             <a
-                              href={githubCommitUrl(
-                                a.sourceRepo,
-                                d.commitSha,
-                              )}
+                              href={githubCommitUrl(a.sourceRepo, d.commitSha)}
                               target="_blank"
                               rel="noreferrer"
                               className="hover:underline"
@@ -355,9 +330,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                             d.commitSha.slice(0, 7)
                           )}
                           {d.branch && (
-                            <span className="text-muted-foreground/80">
-                              · {d.branch}
-                            </span>
+                            <span className="text-muted-foreground/80">· {d.branch}</span>
                           )}
                         </div>
                       )}
@@ -368,9 +341,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {d.status.replace(/_/g, " ")}
-                      </Badge>
+                      <DeploymentStatusPill status={d.status} />
                       {d.approvalsRequired > 0 && (
                         <div className="text-muted-foreground mt-1 text-xs">
                           {t("approvalsCount", {
@@ -412,10 +383,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
       <p className="text-muted-foreground text-center text-xs">
         {t("footer", { count: allDeployments.length })}{" "}
-        <Link
-          href={`/apps/${a.slug}/environments`}
-          className="hover:text-foreground underline"
-        >
+        <Link href={`/apps/${a.slug}/environments`} className="hover:text-foreground underline">
           {t("rollNew")}
         </Link>
         .

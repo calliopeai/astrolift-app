@@ -6,6 +6,7 @@ export const routeLabels: Record<string, string> = {
   members: "Members",
   deployments: "Deployments",
   workflows: "Workflows",
+  approvals: "Approvals",
   ops: "Operations",
   downloads: "Downloads",
   console: "Console",
