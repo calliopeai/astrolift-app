@@ -428,6 +428,17 @@ export type AstroliftAppSecretBundleAttachmentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAppSettingsLastModified = {
+  deployStrategy?: Maybe<Scalars['DateTime']['output']>;
+  deployTokens?: Maybe<Scalars['DateTime']['output']>;
+  domains?: Maybe<Scalars['DateTime']['output']>;
+  managedServices?: Maybe<Scalars['DateTime']['output']>;
+  members?: Maybe<Scalars['DateTime']['output']>;
+  observability?: Maybe<Scalars['DateTime']['output']>;
+  secrets?: Maybe<Scalars['DateTime']['output']>;
+  webhooks?: Maybe<Scalars['DateTime']['output']>;
+};
+
 export type AstroliftAppSummary = {
   id: Scalars['GUID']['output'];
   name: Scalars['String']['output'];
@@ -1499,6 +1510,7 @@ export type AstroliftRegisteredApp = {
   reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
   securityPolicy: AstroliftSecurityPolicy;
+  settingsLastModified?: Maybe<AstroliftAppSettingsLastModified>;
   slug: Scalars['String']['output'];
   sourceKind: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];

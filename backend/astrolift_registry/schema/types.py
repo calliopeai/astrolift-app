@@ -7,6 +7,7 @@ import datetime as dt
 import enum
 
 import strawberry
+from django.db import models
 
 from astrolift_graphql import GUID
 
@@ -154,6 +155,42 @@ class SecurityPolicyType:
     block_on_high_cve_threshold: int | None
 
 
+@strawberry.type(name="AstroliftAppSettingsLastModified")
+class AppSettingsLastModifiedType:
+    """Per-section staleness timestamps for the app settings card grid (#454).
+
+    One ``DateTime | None`` per Settings landing link card. ``None`` means
+    the section has no underlying resources yet — the FE hides the
+    "Modified N ago" caption rather than rendering a misleading
+    fallback. Each timestamp is the ``max(updated_at)`` across the
+    section's primary resource scoped to the parent app.
+
+    Replaces the ``app.updatedAt`` proxy the FE was using as a fallback
+    (#437 scope E) so each card reports its own freshness instead of a
+    single timestamp for the whole app.
+
+    Computed once per ``astroliftApp`` resolver call via aggregate
+    sub-queries; the cost is O(sections) cheap-index scans, no per-row
+    fanout. The fields are populated only on the single-app
+    ``astroliftApp(slug)`` path (where the settings grid renders) —
+    list-shape queries (``astroliftApps`` / ``astroliftMyApps``) leave
+    the whole struct ``None`` so the cheap list path stays cheap.
+    """
+
+    # Deploy strategy lives on the RegisteredApp row + manifest_raw
+    # itself (no separate resource), so this mirrors ``app.updated_at``.
+    # Surfacing it here keeps every card on the same field shape and
+    # lets the FE iterate uniformly.
+    deploy_strategy: dt.datetime | None
+    deploy_tokens: dt.datetime | None
+    secrets: dt.datetime | None
+    managed_services: dt.datetime | None
+    domains: dt.datetime | None
+    webhooks: dt.datetime | None
+    members: dt.datetime | None
+    observability: dt.datetime | None
+
+
 @strawberry.type(name="AstroliftRegisteredApp")
 class RegisteredAppType:
     id: GUID
@@ -277,6 +314,12 @@ class RegisteredAppType:
     # Left None on the list resolvers and on detail when the arg is
     # False; populated by ``astroliftApp(slug, includeDrift: true)``.
     config_drift: AppConfigDriftType | None
+
+    # Per-section "Modified N ago" timestamps for the Settings landing
+    # cards (#454). Populated only on the single-app detail resolver
+    # ``astroliftApp(slug)``; list resolvers leave this None to keep
+    # the cheap path cheap. See ``AppSettingsLastModifiedType``.
+    settings_last_modified: AppSettingsLastModifiedType | None
 
 
 @strawberry.type(name="AstroliftAppTeamAccess")
@@ -519,6 +562,7 @@ def app_to_type(
     *,
     freshness: AppFreshness | None = None,
     drift: AppConfigDriftType | None = None,
+    settings_last_modified: AppSettingsLastModifiedType | None = None,
 ) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
@@ -592,6 +636,7 @@ def app_to_type(
         health_pulse=(freshness.pulse if freshness else None),
         reprovision=reprovision,
         config_drift=drift,
+        settings_last_modified=settings_last_modified,
     )
 
 
@@ -760,6 +805,79 @@ def build_config_drift(app, *, now: dt.datetime | None = None) -> AppConfigDrift
         fields=fields,
         environment_name=env_name,
         last_checked=when,
+    )
+
+
+def build_settings_last_modified(app) -> AppSettingsLastModifiedType:
+    """Derive the per-section "Modified N ago" timestamps for the
+    Settings landing card grid (#454).
+
+    One ``MAX(updated_at)`` per section's primary resource, scoped to
+    the parent app and excluding soft-deleted rows. Returns ``None``
+    for any section that has no rows yet so the FE can hide the
+    caption rather than render a misleading default. The fields map
+    1:1 onto the ``LINK_SECTIONS`` array consumed by
+    ``settings-client.tsx``.
+
+    Cost: 8 cheap aggregates against indexed FKs. Used only on the
+    single-app detail resolver (``astroliftApp(slug)``) — the list
+    paths leave the wrapper ``None`` so the cheap O(rows) path stays
+    cheap.
+    """
+    # Local imports keep the registry types module decoupled from the
+    # lifecycle / services / operations / identity domains for the
+    # cheap list resolvers — these are only walked on the detail path.
+    from astrolift_identity.models.role_binding import RoleBinding
+    from astrolift_lifecycle.models.deploy_token import DeployToken
+    from astrolift_lifecycle.models.ingress import CustomDomain
+    from astrolift_operations.models.alert import AlertRule
+    from astrolift_operations.models.webhook_subscription import WebhookSubscription
+    from astrolift_services.models.managed_service import ManagedServiceBinding
+    from astrolift_services.models.secret_bundle import AppSecretBundleRef
+
+    def _max_updated_at(qs) -> dt.datetime | None:
+        return qs.filter(deleted_at__isnull=True).aggregate(v=models.Max("updated_at"))["v"]
+
+    deploy_tokens = _max_updated_at(DeployToken.objects.filter(registered_app_id=app.pk))
+    secrets = _max_updated_at(AppSecretBundleRef.objects.filter(registered_app_id=app.pk))
+    # Bindings are the user-visible mutation surface for managed
+    # services (env-var wiring); service rows themselves churn on
+    # background status updates and would mis-report freshness if used.
+    managed_services = _max_updated_at(
+        ManagedServiceBinding.objects.filter(managed_service__registered_app_id=app.pk)
+    )
+    domains = _max_updated_at(CustomDomain.objects.filter(registered_app_id=app.pk))
+    webhooks = _max_updated_at(WebhookSubscription.objects.filter(registered_app_id=app.pk))
+    members = _max_updated_at(
+        RoleBinding.objects.filter(
+            scope_kind=RoleBinding.ScopeKind.APP,
+            scope_id=app.pk,
+        )
+    )
+    # AlertRule.target_id is the slug or guid of the targeted object;
+    # for ``target=app`` the slug is the canonical key (used elsewhere
+    # in the alert pipeline). Org-scoped global rules don't surface on
+    # the per-app card.
+    observability = _max_updated_at(
+        AlertRule.objects.filter(
+            target=AlertRule.Target.APP,
+            target_id=app.slug,
+        )
+    )
+    # Deploy strategy lives on the RegisteredApp row + manifest_raw
+    # itself; there's no separate resource to aggregate so the app's
+    # own ``updated_at`` is the freshness signal.
+    deploy_strategy = app.updated_at
+
+    return AppSettingsLastModifiedType(
+        deploy_strategy=deploy_strategy,
+        deploy_tokens=deploy_tokens,
+        secrets=secrets,
+        managed_services=managed_services,
+        domains=domains,
+        webhooks=webhooks,
+        members=members,
+        observability=observability,
     )
 
 
