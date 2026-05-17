@@ -230,14 +230,20 @@ async def prune_audit_log(retention_days: int = 365) -> int:
 
 
 def _capture_platform_cost_snapshot_sync() -> int:
-    """Snapshot platform cost per organization.
+    """Write the daily cost snapshot row per organization.
 
-    Reads from the platform billing surface — the actual cost
-    aggregation lives in ``astrolift_billing`` and the activity just
-    invokes its snapshot writer. Returns the count of org-level rows
-    produced. Returns 0 (no-op) when the billing app isn't installed,
-    keeping the schedule safe to register on environments without
-    billing wired up.
+    The numbers come from each provider's live cost driver (see
+    ``vendor/astrolift-providers/<cloud>/cost.py``) — this activity
+    writes a zero-amount ``OTHER`` placeholder row when no driver
+    yet reports for the org, so the trend chart has a continuous
+    x-axis. Real per-category rows are written by the driver-side
+    cost-collection adapters as they land (#432 from:backend for
+    the cross-provider tag-based attribution gap).
+
+    Returns the count of org-level rows produced. Returns 0
+    (no-op) when the billing app isn't installed, keeping the
+    schedule safe to register on environments without billing
+    wired up.
     """
     try:
         from astrolift_billing.models import CostSnapshot
@@ -249,11 +255,16 @@ def _capture_platform_cost_snapshot_sync() -> int:
     n = 0
     today = timezone.now().date()
     for org in Organization.objects.filter(deleted_at__isnull=True).iterator():
-        # Idempotent: one row per (org, date). Re-runs on the same day
-        # are no-ops at the unique constraint level.
+        # Idempotent: one (org, taken_at, by, source, app, binding)
+        # row per day. Re-runs on the same day are no-ops at the
+        # unique constraint level.
         _, created = CostSnapshot.objects.get_or_create(
             organization=org,
-            snapshot_date=today,
+            taken_at=today,
+            registered_app=None,
+            managed_service_binding=None,
+            by=CostSnapshot.CostBy.OTHER,
+            source=CostSnapshot.Source.PLATFORM_METER,
             defaults={"amount_cents": 0, "currency": "USD"},
         )
         if created:
