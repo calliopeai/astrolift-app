@@ -57,6 +57,8 @@ import {
 } from "@/graphql/services/services.mutations";
 import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface ManagedService {
   id: string;
   name: string;
@@ -165,7 +167,13 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title="Managed services"
-      description={`Databases, caches, queues attached to ${slug}. Provisioned via the platform's driver registry; the workflow loop watches DB-side status and drives the upstream lifecycle.`}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          Databases, caches, queues attached to {slug}. Provisioned via the
+          platform&apos;s driver registry; the workflow loop watches DB-side
+          status and drives the upstream lifecycle.
+        </span>
+      }
       actions={
         <Can permission="app.deploy">
           <Button onClick={() => setOpen(true)}>
@@ -175,6 +183,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
         </Can>
       }
     >
+      <AppTabs slug={slug} active="settings" />
       <Card>
         <CardContent className="p-0">
           {services.loading && list.length === 0 ? (

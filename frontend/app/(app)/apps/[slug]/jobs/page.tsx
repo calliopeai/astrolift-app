@@ -6,6 +6,8 @@ import {
 
 import { JobsClient } from "@/app/(app)/jobs/jobs-client";
 
+import { AppTabs } from "../components/app-tabs";
+
 export const metadata = { title: "Jobs · App · Astrolift" };
 
 export default async function AppJobsPage({
@@ -23,7 +25,10 @@ export default async function AppJobsPage({
         query={LIST_COMMAND_RUNS}
         variables={{ appSlug: slug, limit: 100 }}
       >
-        <JobsClient appSlug={slug} />
+        <JobsClient
+          appSlug={slug}
+          tabs={<AppTabs slug={slug} active="deployments" />}
+        />
       </PreloadQuery>
     </PreloadQuery>
   );

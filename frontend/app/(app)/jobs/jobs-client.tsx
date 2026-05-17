@@ -60,7 +60,10 @@ function formatTime(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString();
 }
 
-export function JobsClient({ appSlug }: { appSlug?: string } = {}) {
+export function JobsClient({
+  appSlug,
+  tabs,
+}: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const [tab, setTab] = React.useState<"scheduled" | "commands">("scheduled");
   const variables = appSlug ? { appSlug, limit: 100 } : { limit: 100 };
   const { data: jobsData, loading: jobsLoading } = useQuery<JobResp>(
@@ -78,11 +81,16 @@ export function JobsClient({ appSlug }: { appSlug?: string } = {}) {
     <PageShell
       title="Jobs"
       description={
-        appSlug
-          ? `Scheduled job runs and ad-hoc command executions for ${appSlug}.`
-          : "Scheduled job runs and ad-hoc command executions across all your apps."
+        appSlug ? (
+          <span className="text-muted-foreground font-mono text-xs">
+            Scheduled job runs and ad-hoc command executions for {appSlug}.
+          </span>
+        ) : (
+          "Scheduled job runs and ad-hoc command executions across all your apps."
+        )
       }
     >
+      {tabs}
       <div className="flex items-center gap-2">
         <Button
           variant={tab === "scheduled" ? "default" : "outline"}

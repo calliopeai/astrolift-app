@@ -54,6 +54,8 @@ import {
 import { LIST_APP_DEPLOY_TOKENS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface DeployToken {
   id: string;
   name: string;
@@ -125,7 +127,12 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title="Deploy tokens"
-      description={`API tokens that CI runners use to push deployments to ${slug}. Plaintext is shown once at create/rotate; we store only the hash.`}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          API tokens that CI runners use to push deployments to {slug}.
+          Plaintext is shown once at create/rotate; we store only the hash.
+        </span>
+      }
       actions={
         <Can permission="app.deploy">
           <Button onClick={() => setCreateOpen(true)}>
@@ -135,6 +142,7 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
         </Can>
       }
     >
+      <AppTabs slug={slug} active="secrets" />
       <Card>
         <CardContent className="p-0">
           {tokens.loading && list.length === 0 ? (

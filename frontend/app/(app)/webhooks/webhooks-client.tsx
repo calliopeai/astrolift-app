@@ -63,7 +63,10 @@ const SUGGESTED_EVENTS = [
   "PREVIEW_TORN_DOWN",
 ];
 
-export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
+export function WebhooksClient({
+  appSlug,
+  tabs,
+}: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const [open, setOpen] = React.useState(false);
   const [reveal, setReveal] = React.useState<AstroliftWebhookSecretReveal | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftWebhookSubscription | null>(null);
@@ -130,9 +133,14 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
     <PageShell
       title="Webhooks"
       description={
-        appSlug
-          ? `Outbound HTTP delivery for ${appSlug}'s event stream. Each subscription's secret is used to HMAC-sign every payload.`
-          : "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
+        appSlug ? (
+          <span className="text-muted-foreground font-mono text-xs">
+            Outbound HTTP delivery for {appSlug}&apos;s event stream. Each
+            subscription&apos;s secret is used to HMAC-sign every payload.
+          </span>
+        ) : (
+          "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
+        )
       }
       actions={
         <>
@@ -151,6 +159,7 @@ export function WebhooksClient({ appSlug }: { appSlug?: string } = {}) {
         </>
       }
     >
+      {tabs}
       {reveal && (
         <Card className="border-emerald-500/30 bg-emerald-500/5">
           <CardContent className="flex flex-col gap-3 p-4">

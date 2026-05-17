@@ -21,6 +21,8 @@ import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface RenderedManifest {
   appSlug: string;
   environmentName: string;
@@ -70,8 +72,15 @@ export function ManifestPreviewClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title="Manifest preview"
-      description={`Renders the stored TOML for ${slug} into the Kubernetes resources the deploy activity would apply. The view is purely a preview — no cluster traffic happens here.`}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          Renders the stored TOML for {slug} into the Kubernetes resources the
+          deploy activity would apply. The view is purely a preview — no
+          cluster traffic happens here.
+        </span>
+      }
     >
+      <AppTabs slug={slug} active="settings" />
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label className="text-xs uppercase tracking-wide">Environment</Label>
