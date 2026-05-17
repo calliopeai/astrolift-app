@@ -12,6 +12,7 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 # ---------------------------------------------------------------------------
 import astrolift_billing.schema as AstroliftBillingSchema  # noqa: E402
 import astrolift_clusters.schema as AstroliftClustersSchema  # noqa: E402
+import astrolift_forms.schema as AstroliftFormsSchema  # noqa: E402
 import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
 import astrolift_lifecycle.schema as AstroliftLifecycleSchema  # noqa: E402
 import astrolift_observability.schema as AstroliftObservabilitySchema  # noqa: E402
@@ -45,6 +46,7 @@ _query_bases = [
     AstroliftServicesSchema.ServicesQuery,
     AstroliftObservabilitySchema.GoldenSignalsQuery,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
+    AstroliftFormsSchema.FormsQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
@@ -58,6 +60,7 @@ _mutation_bases = [
     AstroliftServicesSchema.ServicesMutation,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsMutation,
     AstroliftBillingSchema.BillingMutation,
+    AstroliftFormsSchema.FormsMutation,
 ]
 
 if is_enabled(Feature.WORKFLOWS):

@@ -101,6 +101,14 @@ class Permission(enum.StrEnum):
     SCM_KEY_CREATE = "scm.key_create"
     SCM_KEY_DELETE = "scm.key_delete"
 
+    # --- Forms (form definitions + submissions) -------------------
+    FORM_READ = "form.read"
+    FORM_CREATE = "form.create"
+    FORM_UPDATE = "form.update"
+    FORM_DELETE = "form.delete"
+    FORM_SUBMIT = "form.submit"
+    FORM_MODERATE = "form.moderate"
+
     # --- Admin elevation ------------------------------------------
     ADMIN_ELEVATE = "admin.elevate"
 

@@ -1,10 +1,12 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 
 import {
-  CREATE_FORM_DEFINITION,
-  PUBLISH_FORM,
   ARCHIVE_FORM,
+  CREATE_FORM_DEFINITION,
+  DELETE_FORM_DEFINITION,
+  PUBLISH_FORM,
   SUBMIT_FORM,
+  UPDATE_FORM_DEFINITION,
   UPDATE_SUBMISSION_STATUS,
 } from "./forms.mutations";
 import {
@@ -14,12 +16,17 @@ import {
   GET_FORM_SUBMISSIONS,
 } from "./forms.queries";
 import type {
+  ArchiveFormData,
+  CreateFormDefinitionData,
+  DeleteFormDefinitionData,
   FormDefinitionData,
   FormDefinitionsData,
   FormFieldTypesData,
   FormSubmissionsData,
-  MutationResultData,
+  PublishFormData,
   SubmitFormData,
+  UpdateFormDefinitionData,
+  UpdateSubmissionStatusData,
 } from "./forms.types";
 
 export const useFormDefinitions = (status?: string) => {
@@ -56,22 +63,33 @@ export const useFormFieldTypes = () => {
 };
 
 export const useCreateFormDefinition = () =>
-  useMutation<MutationResultData>(CREATE_FORM_DEFINITION, {
+  useMutation<CreateFormDefinitionData>(CREATE_FORM_DEFINITION, {
     refetchQueries: [GET_FORM_DEFINITIONS],
+  });
+
+export const useUpdateFormDefinition = () =>
+  useMutation<UpdateFormDefinitionData>(UPDATE_FORM_DEFINITION, {
+    refetchQueries: [GET_FORM_DEFINITIONS, GET_FORM_DEFINITION],
   });
 
 export const usePublishForm = () =>
-  useMutation<MutationResultData>(PUBLISH_FORM, {
-    refetchQueries: [GET_FORM_DEFINITIONS],
+  useMutation<PublishFormData>(PUBLISH_FORM, {
+    refetchQueries: [GET_FORM_DEFINITIONS, GET_FORM_DEFINITION],
   });
 
 export const useArchiveForm = () =>
-  useMutation<MutationResultData>(ARCHIVE_FORM, {
+  useMutation<ArchiveFormData>(ARCHIVE_FORM, {
+    refetchQueries: [GET_FORM_DEFINITIONS, GET_FORM_DEFINITION],
+  });
+
+export const useDeleteFormDefinition = () =>
+  useMutation<DeleteFormDefinitionData>(DELETE_FORM_DEFINITION, {
     refetchQueries: [GET_FORM_DEFINITIONS],
   });
 
-export const useSubmitForm = () =>
-  useMutation<SubmitFormData>(SUBMIT_FORM);
+export const useSubmitForm = () => useMutation<SubmitFormData>(SUBMIT_FORM);
 
 export const useUpdateSubmissionStatus = () =>
-  useMutation<MutationResultData>(UPDATE_SUBMISSION_STATUS);
+  useMutation<UpdateSubmissionStatusData>(UPDATE_SUBMISSION_STATUS, {
+    refetchQueries: [GET_FORM_SUBMISSIONS],
+  });
