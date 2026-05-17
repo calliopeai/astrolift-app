@@ -938,6 +938,12 @@ type AstroliftPolicyMutationResult {
   data: AstroliftPolicy
 }
 
+type AstroliftPreviewAggregateResources {
+  cpuCores: Float!
+  memoryBytes: Float!
+  podCount: Int!
+}
+
 type AstroliftPreviewEnvironment {
   id: GUID!
   registeredAppSlug: String!
@@ -949,6 +955,17 @@ type AstroliftPreviewEnvironment {
   namespace: String!
   lastDeployedAt: DateTime
   tornDownAt: DateTime
+  ttlUntil: DateTime!
+  sourceUrl: String!
+  prUrl: String!
+  aggregateResources: AstroliftPreviewAggregateResources!
+  estimatedDailyCostUsd: Float
+}
+
+type AstroliftPreviewEnvironmentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftPreviewEnvironment
 }
 
 type AstroliftProject {
@@ -1834,6 +1851,11 @@ input EnvironmentByIdInput {
   id: GUID!
 }
 
+input ExtendPreviewTtlInputGql {
+  id: GUID!
+  days: Int!
+}
+
 type FileUploadResult {
   preSignedUrl: String
   publicUrl: String
@@ -2197,6 +2219,7 @@ type Mutation {
   pauseAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   tearDownPreview(input: TearDownPreviewInputGql!): AstroliftDeploymentMutationResult!
+  extendPreviewTtl(input: ExtendPreviewTtlInputGql!): AstroliftPreviewEnvironmentMutationResult!
   migrateAppToCluster(input: MigrateAppInputGql!): AstroliftAppEnvironmentMutationResult!
   addAppDomain(input: AddAppDomainInput!): AstroliftAppDomainMutationResult!
   removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!

@@ -2,11 +2,17 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  CheckIcon,
+  EyeIcon,
+  EyeOffIcon,
   KeyIcon,
-  PackageIcon,
+  LayersIcon,
+  Loader2Icon,
+  PencilIcon,
   PlusIcon,
   Trash2Icon,
   UploadIcon,
+  XIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -46,12 +52,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import {
   BULK_IMPORT_APP_SECRETS,
   DELETE_APP_SECRET,
+  DETACH_SECRET_BUNDLE,
+  REVEAL_APP_SECRET,
   SET_APP_SECRET,
 } from "@/graphql/services/services.mutations";
 import {
@@ -63,6 +77,12 @@ import { AppTabs } from "../components/app-tabs";
 
 const ALL_ENVS = "__all__";
 
+interface SecretEditor {
+  id: string;
+  username: string;
+  displayName: string;
+}
+
 interface AppSecret {
   id: string;
   key: string;
@@ -72,6 +92,20 @@ interface AppSecret {
   managedServiceKind: string;
   isMasked: boolean;
   lastEditedAt?: string | null;
+  lastEditedBy?: SecretEditor | null;
+}
+
+interface AppSecretBundleAttachment {
+  id: string;
+  registeredAppSlug: string;
+  environmentName: string;
+  bundleSlug: string;
+  bundleName: string;
+  prefix: string;
+  teamSlug?: string | null;
+  keyCount: number;
+  mergeOrder: number;
+  attachedAt?: string | null;
 }
 
 interface SecretsResp {
@@ -80,6 +114,18 @@ interface SecretsResp {
 
 interface EnvsResp {
   astroliftEnvironments: AstroliftAppEnvironment[];
+}
+
+interface AttachmentsResp {
+  astroliftAppSecretBundleAttachments: AppSecretBundleAttachment[];
+}
+
+interface RevealedSecretData {
+  secretId: string;
+  key: string;
+  environmentName: string;
+  value: string;
+  revealedAt: string;
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -99,7 +145,17 @@ export function SecretsClient({ slug }: { slug: string }) {
   const [envName, setEnvName] = React.useState<string>(ALL_ENVS);
   const [setOpen, setSetOpen] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
-  const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(
+    null,
+  );
+  const [detachTarget, setDetachTarget] =
+    React.useState<AppSecretBundleAttachment | null>(null);
+  // revealedValues maps secret.id -> plaintext while revealed.
+  const [revealedValues, setRevealedValues] = React.useState<
+    Record<string, string>
+  >({});
+  // editingId: which row is in inline-edit mode (must be revealed first).
+  const [editingId, setEditingId] = React.useState<string | null>(null);
 
   const variables = {
     appSlug: slug,
@@ -108,11 +164,19 @@ export function SecretsClient({ slug }: { slug: string }) {
 
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
+    fetchPolicy: "cache-and-network",
   });
   const secrets = useQuery<SecretsResp>(LIST_APP_SECRETS, {
     variables,
     fetchPolicy: "cache-and-network",
   });
+  const attachments = useQuery<AttachmentsResp>(
+    LIST_APP_SECRET_BUNDLE_ATTACHMENTS,
+    {
+      variables,
+      fetchPolicy: "cache-and-network",
+    },
+  );
 
   const refetch = [
     { query: LIST_APP_SECRETS, variables },
@@ -135,7 +199,10 @@ export function SecretsClient({ slug }: { slug: string }) {
       key: string;
       rawManifestStaged: string;
     }>;
-  }>(DELETE_APP_SECRET, { refetchQueries: refetch, awaitRefetchQueries: true });
+  }>(DELETE_APP_SECRET, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
   const [bulkImport, bulkState] = useMutation<{
     bulkImportAppSecrets: MutationResult<{
       appSlug: string;
@@ -146,10 +213,25 @@ export function SecretsClient({ slug }: { slug: string }) {
     refetchQueries: refetch,
     awaitRefetchQueries: true,
   });
+  const [detachBundle, detachState] = useMutation<{
+    detachSecretBundle: MutationResult<{ attachmentId: string }>;
+  }>(DETACH_SECRET_BUNDLE, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+  const [revealSecret, revealState] = useMutation<{
+    revealAppSecret: MutationResult<RevealedSecretData>;
+  }>(REVEAL_APP_SECRET);
 
-  const busy = setState.loading || deleteState.loading || bulkState.loading;
+  const busy =
+    setState.loading ||
+    deleteState.loading ||
+    bulkState.loading ||
+    detachState.loading;
   const list = secrets.data?.astroliftAppSecrets ?? [];
   const envList = envs.data?.astroliftEnvironments ?? [];
+  const attachmentList =
+    attachments.data?.astroliftAppSecretBundleAttachments ?? [];
 
   function requestDelete(s: AppSecret) {
     if (s.source !== "literal") {
@@ -169,8 +251,78 @@ export function SecretsClient({ slug }: { slug: string }) {
     });
     if (data?.deleteAppSecret.ok) {
       toast.success(`Deleted ${s.key}`);
+      setRevealedValues((prev) => {
+        if (!(s.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[s.id];
+        return next;
+      });
     } else {
-      throw new Error(data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(
+        data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed",
+      );
+    }
+  }
+
+  async function handleReveal(s: AppSecret) {
+    if (s.source !== "literal") {
+      toast.error(t("reveal.literalOnly"));
+      return;
+    }
+    if (s.id in revealedValues) {
+      setRevealedValues((prev) => {
+        const next = { ...prev };
+        delete next[s.id];
+        return next;
+      });
+      if (editingId === s.id) setEditingId(null);
+      return;
+    }
+    try {
+      const { data } = await revealSecret({
+        variables: { input: { appSlug: slug, secretId: s.id } },
+      });
+      if (data?.revealAppSecret.ok && data.revealAppSecret.data) {
+        const value = data.revealAppSecret.data.value;
+        setRevealedValues((prev) => ({ ...prev, [s.id]: value }));
+        toast.success(t("reveal.toastRevealed"));
+      } else {
+        const err = data?.revealAppSecret.errors?.[0];
+        if (err?.code === "PERMISSION_DENIED") {
+          toast.error(t("reveal.permissionDenied"));
+        } else {
+          toast.error(err?.message ?? t("reveal.failed"));
+        }
+      }
+    } catch (err) {
+      toast.error((err as Error).message ?? t("reveal.failed"));
+    }
+  }
+
+  async function handleInlineSave(s: AppSecret, nextValue: string) {
+    const { data } = await setSecret({
+      variables: { input: { appSlug: slug, key: s.key, value: nextValue } },
+    });
+    if (data?.setAppSecret.ok) {
+      toast.success(t("edit.toastSaved", { key: s.key }));
+      setRevealedValues((prev) => ({ ...prev, [s.id]: nextValue }));
+      setEditingId(null);
+      return true;
+    }
+    toast.error(data?.setAppSecret.errors?.[0]?.message ?? "Save failed");
+    return false;
+  }
+
+  async function handleDetach(a: AppSecretBundleAttachment) {
+    const { data } = await detachBundle({
+      variables: { input: { attachmentId: a.id } },
+    });
+    if (data?.detachSecretBundle.ok) {
+      toast.success(t("attached.toastDetached", { name: a.bundleName }));
+    } else {
+      throw new Error(
+        data?.detachSecretBundle.errors?.[0]?.message ?? "Detach failed",
+      );
     }
   }
 
@@ -223,6 +375,13 @@ export function SecretsClient({ slug }: { slug: string }) {
         </span>
       </div>
 
+      <AttachedBundlesSection
+        loading={attachments.loading && attachmentList.length === 0}
+        attachments={attachmentList}
+        onDetach={(a) => setDetachTarget(a)}
+        busy={detachState.loading}
+      />
+
       <Card>
         <CardContent className="p-0">
           {secrets.loading && list.length === 0 ? (
@@ -240,65 +399,47 @@ export function SecretsClient({ slug }: { slug: string }) {
               />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("columns.key")}</TableHead>
-                  <TableHead>{t("columns.source")}</TableHead>
-                  <TableHead>{t("columns.env")}</TableHead>
-                  <TableHead>{t("columns.lastEdited")}</TableHead>
-                  <TableHead className="w-12 text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-xs">{s.key}</TableCell>
-                    <TableCell>
-                      <Badge variant={SOURCE_TONE[s.source] ?? "outline"}>
-                        {SOURCE_LABEL[s.source] ?? s.source}
-                      </Badge>
-                      {s.bundleSlug && (
-                        <span className="text-muted-foreground ml-2 font-mono text-[11px]">
-                          {s.bundleSlug}
-                        </span>
-                      )}
-                      {s.managedServiceKind && (
-                        <span className="text-muted-foreground ml-2 font-mono text-[11px]">
-                          {s.managedServiceKind}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {s.environmentName || "—"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {s.lastEditedAt
-                        ? new Date(s.lastEditedAt).toLocaleString()
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {s.source === "literal" && (
-                        <Can permission="app.deploy">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => requestDelete(s)}
-                            disabled={busy}
-                          >
-                            <Trash2Icon className="size-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </Can>
-                      )}
-                    </TableCell>
+            <TooltipProvider delayDuration={200}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("columns.key")}</TableHead>
+                    <TableHead>{t("columns.value")}</TableHead>
+                    <TableHead>{t("columns.source")}</TableHead>
+                    <TableHead>{t("columns.env")}</TableHead>
+                    <TableHead>{t("columns.lastEdited")}</TableHead>
+                    <TableHead className="w-12 text-right"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {list.map((s) => (
+                    <SecretRow
+                      key={s.id}
+                      secret={s}
+                      revealed={
+                        s.id in revealedValues ? revealedValues[s.id] : null
+                      }
+                      editing={editingId === s.id}
+                      onToggleReveal={() => handleReveal(s)}
+                      onStartEdit={() => setEditingId(s.id)}
+                      onCancelEdit={() => setEditingId(null)}
+                      onSave={(value) => handleInlineSave(s, value)}
+                      onRequestDelete={() => requestDelete(s)}
+                      busy={busy}
+                      revealing={
+                        revealState.loading &&
+                        revealState.variables !== undefined &&
+                        (
+                          revealState.variables as {
+                            input?: { secretId?: string };
+                          }
+                        ).input?.secretId === s.id
+                      }
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           )}
         </CardContent>
       </Card>
@@ -340,6 +481,32 @@ export function SecretsClient({ slug }: { slug: string }) {
         }}
       />
 
+      <ConfirmDialog
+        open={detachTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDetachTarget(null);
+        }}
+        title={
+          detachTarget
+            ? t("attached.detachConfirmTitle", {
+                name: detachTarget.bundleName,
+              })
+            : ""
+        }
+        description={
+          detachTarget
+            ? t("attached.detachConfirmDescription", {
+                env: detachTarget.environmentName,
+              })
+            : ""
+        }
+        confirmLabel={t("attached.detachConfirm")}
+        destructive
+        onConfirm={async () => {
+          if (detachTarget) await handleDetach(detachTarget);
+        }}
+      />
+
       <BulkImportSheet
         open={bulkOpen}
         onOpenChange={setBulkOpen}
@@ -349,7 +516,9 @@ export function SecretsClient({ slug }: { slug: string }) {
           });
           if (data?.bulkImportAppSecrets.ok) {
             const keys = data.bulkImportAppSecrets.data?.keysSet ?? [];
-            toast.success(`Imported ${keys.length} key${keys.length === 1 ? "" : "s"}`);
+            toast.success(
+              `Imported ${keys.length} key${keys.length === 1 ? "" : "s"}`,
+            );
             setBulkOpen(false);
             return true;
           }
@@ -361,6 +530,399 @@ export function SecretsClient({ slug }: { slug: string }) {
         busy={busy}
       />
     </PageShell>
+  );
+}
+
+interface SecretRowProps {
+  secret: AppSecret;
+  revealed: string | null;
+  editing: boolean;
+  busy: boolean;
+  revealing: boolean;
+  onToggleReveal: () => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSave: (value: string) => Promise<boolean>;
+  onRequestDelete: () => void;
+}
+
+function SecretRow({
+  secret: s,
+  revealed,
+  editing,
+  busy,
+  revealing,
+  onToggleReveal,
+  onStartEdit,
+  onCancelEdit,
+  onSave,
+  onRequestDelete,
+}: SecretRowProps) {
+  const t = useTranslations("apps.secrets");
+  const isRevealed = revealed !== null;
+  const canEdit = s.source === "literal" && isRevealed;
+  const lastEditedTooltip = s.lastEditedBy
+    ? t("lastEditedBy", {
+        name: s.lastEditedBy.displayName || s.lastEditedBy.username,
+      })
+    : t("lastEditedByUnknown");
+
+  return (
+    <TableRow>
+      <TableCell className="font-mono text-xs">{s.key}</TableCell>
+      <TableCell className="font-mono text-xs">
+        {editing && canEdit ? (
+          <InlineValueEditor
+            initial={revealed ?? ""}
+            busy={busy}
+            onSave={onSave}
+            onCancel={onCancelEdit}
+          />
+        ) : isRevealed ? (
+          <ValueRevealed
+            value={revealed!}
+            canEdit={s.source === "literal"}
+            onStartEdit={onStartEdit}
+          />
+        ) : (
+          <span className="text-muted-foreground select-none">••••••••</span>
+        )}
+      </TableCell>
+      <TableCell>
+        <Badge variant={SOURCE_TONE[s.source] ?? "outline"}>
+          {SOURCE_LABEL[s.source] ?? s.source}
+        </Badge>
+        {s.bundleSlug && (
+          <span className="text-muted-foreground ml-2 font-mono text-[11px]">
+            {s.bundleSlug}
+          </span>
+        )}
+        {s.managedServiceKind && (
+          <span className="text-muted-foreground ml-2 font-mono text-[11px]">
+            {s.managedServiceKind}
+          </span>
+        )}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="font-mono text-[10px]">
+          {s.environmentName || "—"}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-muted-foreground text-xs">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">
+              {s.lastEditedAt
+                ? new Date(s.lastEditedAt).toLocaleString()
+                : "—"}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{lastEditedTooltip}</TooltipContent>
+        </Tooltip>
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="inline-flex items-center gap-1">
+          {s.source === "literal" && (
+            <Can permission="secret.read">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={onToggleReveal}
+                    disabled={busy || revealing}
+                    aria-pressed={isRevealed}
+                  >
+                    {revealing ? (
+                      <Loader2Icon className="size-4 animate-spin" />
+                    ) : isRevealed ? (
+                      <EyeOffIcon className="size-4" />
+                    ) : (
+                      <EyeIcon className="size-4" />
+                    )}
+                    <span className="sr-only">
+                      {isRevealed ? t("reveal.hide") : t("reveal.show")}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isRevealed ? t("reveal.hide") : t("reveal.show")}
+                </TooltipContent>
+              </Tooltip>
+            </Can>
+          )}
+          {s.source === "literal" && (
+            <Can permission="app.deploy">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={onRequestDelete}
+                    disabled={busy}
+                  >
+                    <Trash2Icon className="size-4" />
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("delete.confirm")}</TooltipContent>
+              </Tooltip>
+            </Can>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ValueRevealed({
+  value,
+  canEdit,
+  onStartEdit,
+}: {
+  value: string;
+  canEdit: boolean;
+  onStartEdit: () => void;
+}) {
+  const t = useTranslations("apps.secrets");
+  if (canEdit) {
+    return (
+      <Can
+        permission="app.deploy"
+        fallback={<span className="break-all">{value}</span>}
+      >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onStartEdit}
+              className="group hover:bg-muted/40 inline-flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-left"
+            >
+              <span className="break-all">{value}</span>
+              <PencilIcon className="text-muted-foreground size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{t("edit.save")}</TooltipContent>
+        </Tooltip>
+      </Can>
+    );
+  }
+  return <span className="break-all">{value}</span>;
+}
+
+function InlineValueEditor({
+  initial,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  busy: boolean;
+  onSave: (value: string) => Promise<boolean>;
+  onCancel: () => void;
+}) {
+  const t = useTranslations("apps.secrets");
+  const [value, setValue] = React.useState(initial);
+  const [saving, setSaving] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  async function commit() {
+    if (saving || busy) return;
+    setSaving(true);
+    try {
+      await onSave(value);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        await commit();
+      }}
+      className="flex items-center gap-1"
+    >
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        className="h-8 font-mono text-xs"
+        spellCheck={false}
+        autoComplete="off"
+        disabled={saving}
+      />
+      <Button
+        type="submit"
+        size="icon"
+        variant="ghost"
+        className="size-8"
+        disabled={saving || busy}
+        aria-label={t("edit.save")}
+      >
+        {saving ? (
+          <Loader2Icon className="size-4 animate-spin" />
+        ) : (
+          <CheckIcon className="size-4" />
+        )}
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-8"
+        onClick={onCancel}
+        disabled={saving}
+        aria-label={t("edit.cancel")}
+      >
+        <XIcon className="size-4" />
+      </Button>
+      <span className="text-muted-foreground hidden text-[10px] sm:inline">
+        {t("edit.hint")}
+      </span>
+    </form>
+  );
+}
+
+function AttachedBundlesSection({
+  loading,
+  attachments,
+  onDetach,
+  busy,
+}: {
+  loading: boolean;
+  attachments: AppSecretBundleAttachment[];
+  onDetach: (a: AppSecretBundleAttachment) => void;
+  busy: boolean;
+}) {
+  const t = useTranslations("apps.secrets.attached");
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <LayersIcon className="size-4" />
+              {t("title")}
+            </h2>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {t("description")}
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : attachments.length === 0 ? (
+          <p className="text-muted-foreground text-xs">{t("empty")}</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("columns.bundle")}</TableHead>
+                <TableHead>{t("columns.team")}</TableHead>
+                <TableHead>{t("columns.env")}</TableHead>
+                <TableHead>{t("columns.prefix")}</TableHead>
+                <TableHead>{t("columns.keys")}</TableHead>
+                <TableHead>{t("columns.order")}</TableHead>
+                <TableHead>{t("columns.attached")}</TableHead>
+                <TableHead className="w-12 text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {attachments.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell className="font-mono text-xs">
+                    {a.bundleName}
+                    <span className="text-muted-foreground ml-2 text-[10px]">
+                      {a.bundleSlug}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {a.teamSlug ? (
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[10px]"
+                      >
+                        {a.teamSlug}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">
+                        {t("noTeam")}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {t("perEnvBadge", { env: a.environmentName })}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {a.prefix ? (
+                      a.prefix
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {t("noPrefix")}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {a.keyCount > 0 ? a.keyCount : t("keyCountUnknown")}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="font-mono">
+                            {a.mergeOrder}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("orderHint")}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {a.attachedAt
+                      ? new Date(a.attachedAt).toLocaleString()
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Can permission="app.deploy">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDetach(a)}
+                        disabled={busy}
+                      >
+                        {t("detach")}
+                      </Button>
+                    </Can>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -409,7 +971,9 @@ function SetSecretSheet({
             <Input
               id="secret-key"
               value={key}
-              onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
+              onChange={(e) =>
+                setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))
+              }
               placeholder="DATABASE_URL"
               autoFocus
               required
@@ -431,7 +995,11 @@ function SetSecretSheet({
             <p className="text-muted-foreground text-xs">{t("valueHint")}</p>
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !key || !value}>
@@ -502,7 +1070,11 @@ function BulkImportSheet({
               </p>
               <div className="flex flex-wrap gap-1">
                 {previewKeys.slice(0, 20).map((k) => (
-                  <Badge key={k} variant="outline" className="font-mono text-[10px]">
+                  <Badge
+                    key={k}
+                    variant="outline"
+                    className="font-mono text-[10px]"
+                  >
                     {k}
                   </Badge>
                 ))}
@@ -515,7 +1087,11 @@ function BulkImportSheet({
             </div>
           )}
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !text.trim()}>
@@ -527,7 +1103,3 @@ function BulkImportSheet({
     </Sheet>
   );
 }
-
-// PackageIcon will be used in the upcoming "Attach bundle" sheet —
-// keep imported so the next iteration doesn't have to re-shuffle.
-void PackageIcon;

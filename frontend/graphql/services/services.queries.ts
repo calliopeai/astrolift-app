@@ -11,6 +11,11 @@ export const LIST_APP_SECRETS = gql`
       managedServiceKind
       isMasked
       lastEditedAt
+      lastEditedBy {
+        id
+        username
+        displayName
+      }
     }
   }
 `;
@@ -30,6 +35,10 @@ export const LIST_APP_SECRET_BUNDLE_ATTACHMENTS = gql`
       bundleSlug
       bundleName
       prefix
+      teamSlug
+      keyCount
+      mergeOrder
+      attachedAt
     }
   }
 `;

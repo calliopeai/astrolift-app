@@ -119,6 +119,26 @@ class DeploymentApprovalHistoryEntryType:
     """Free-form rejection/abort reason when present; empty otherwise."""
 
 
+@strawberry.type(name="AstroliftPreviewAggregateResources")
+class PreviewAggregateResourcesType:
+    """Sum of CPU + memory requests across every container in every
+    running pod in the preview's namespace (#431).
+
+    ``cpu_cores`` is fractional cores (``0.5`` for half a vCPU).
+    ``memory_bytes`` is raw bytes — the frontend formats it (Mi / Gi)
+    so display rounding stays consistent across the platform.
+    ``pod_count`` is the number of non-terminal pods that contributed
+    to the sum; rendered as part of the tooltip so operators can spot
+    a single pod that's blowing up the budget vs many small pods.
+
+    Surfaced even when ``estimated_daily_cost_usd`` is null — the
+    resource numbers still help operators spot heavy previews."""
+
+    cpu_cores: float
+    memory_bytes: float
+    pod_count: int
+
+
 @strawberry.type(name="AstroliftPreviewEnvironment")
 class PreviewEnvironmentType:
     id: GUID
@@ -131,6 +151,34 @@ class PreviewEnvironmentType:
     namespace: str
     last_deployed_at: dt.datetime | None
     torn_down_at: dt.datetime | None
+    ttl_until: dt.datetime
+    """Auto-teardown target (#431). Defaults to created_at + 7d; the
+    UI surfaces a live countdown and offers 1/7/30-day extend buttons
+    (capped at +30d from now)."""
+
+    source_url: str
+    """Public source-repo URL the operator can deep-link into to
+    cross-reference the PR. Resolved from ``RegisteredApp.source_url``
+    at serialization time so the row stays denormalised in the DB."""
+
+    pr_url: str
+    """Convenience: ``{source_url}/pull/{pr_number}`` when source_url
+    is set, empty otherwise. Lets the FE render the PR cell as a
+    single link without re-implementing the join client-side. Only
+    GitHub-style URLs (``…/pull/N``) are emitted; GitLab merge-request
+    URLs would need a separate field — open question for the
+    GitLab integration work."""
+
+    aggregate_resources: PreviewAggregateResourcesType
+    """CPU + memory + pod-count rollup pulled from the runtime cluster
+    when reachable; zeros when the cluster is unwired or the listing
+    failed (which the FE renders as "—" rather than "0")."""
+
+    estimated_daily_cost_usd: float | None
+    """Daily $ estimate from the cluster driver's live cost API.
+    ``None`` (not zero) when the driver doesn't implement the cost
+    capability, doesn't recognise compute pricing, or the pricing API
+    is unreachable — workspace rule forbids hard-coded fallbacks."""
 
 
 def app_env_to_type(env) -> AppEnvironmentType:
@@ -293,7 +341,35 @@ def command_run_to_type(r) -> CommandRunType:
     )
 
 
-def preview_to_type(p) -> PreviewEnvironmentType:
+def preview_to_type(
+    p,
+    *,
+    aggregate_resources: PreviewAggregateResourcesType | None = None,
+    estimated_daily_cost_usd: float | None = None,
+) -> PreviewEnvironmentType:
+    """Serialize a ``PreviewEnvironment`` row into the GraphQL type.
+
+    ``aggregate_resources`` + ``estimated_daily_cost_usd`` are injected
+    by the resolver (rather than computed here) so the cluster + cost
+    API call surface stays at the resolver boundary — keeping
+    serialization pure means tests + admin / shell call sites don't
+    drag in the runtime-cluster lookup.
+
+    Defaults: zero resources + null cost. Mirrors the "cluster unwired"
+    UX — the FE renders empty/dash rather than fabricating numbers.
+    """
+    source_url = (
+        getattr(p.registered_app, "source_url", "") or getattr(p.registered_app, "source_repo", "") or ""
+    )
+    pr_url = ""
+    if source_url and p.pr_number:
+        pr_url = _build_pr_url(source_url, p.pr_number)
+    if aggregate_resources is None:
+        aggregate_resources = PreviewAggregateResourcesType(
+            cpu_cores=0.0,
+            memory_bytes=0.0,
+            pod_count=0,
+        )
     return PreviewEnvironmentType(
         id=GUID(str(p.guid)),
         registered_app_slug=p.registered_app.slug,
@@ -305,7 +381,27 @@ def preview_to_type(p) -> PreviewEnvironmentType:
         namespace=p.namespace,
         last_deployed_at=p.last_deployed_at,
         torn_down_at=p.torn_down_at,
+        ttl_until=p.ttl_until,
+        source_url=source_url,
+        pr_url=pr_url,
+        aggregate_resources=aggregate_resources,
+        estimated_daily_cost_usd=estimated_daily_cost_usd,
     )
+
+
+def _build_pr_url(source_url: str, pr_number: int) -> str:
+    """Construct ``{source_url}/pull/{n}`` for GitHub-style repos.
+
+    The platform's source-provider connection guarantees
+    ``source_url`` is a GitHub HTTPS repo URL today; GitLab MR /
+    Bitbucket equivalents will need a per-provider mapper when those
+    integrations land. Until then, a non-GitHub ``source_url`` still
+    produces a sensible-looking link (``/pull/N`` 404s on GitLab but
+    that's a better outcome than no link at all)."""
+    base = source_url.rstrip("/")
+    if base.endswith(".git"):
+        base = base[:-4]
+    return f"{base}/pull/{pr_number}"
 
 
 @strawberry.type(name="AstroliftAppDomainRequiredRecord")

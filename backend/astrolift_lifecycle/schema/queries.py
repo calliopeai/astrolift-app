@@ -369,10 +369,16 @@ class LifecycleQuery:
     def astrolift_preview_environments(
         self, info: Info, app_slug: str | None = None
     ) -> list[PreviewEnvironmentType]:
-        qs = PreviewEnvironment.objects.select_related("registered_app").order_by("-created_at")
+        qs = PreviewEnvironment.objects.select_related(
+            "registered_app",
+            "registered_app__organization",
+            "registered_app__default_tenant_cluster",
+            "app_environment__tenant_cluster",
+        ).order_by("-created_at")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
-        return [preview_to_type(p) for p in qs[:200]]
+        rows = list(qs[:200])
+        return [_preview_with_cost(p) for p in rows]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -679,6 +685,69 @@ class LifecycleQuery:
         if binding is None:
             return None
         return identity_binding_to_type(binding)
+
+
+def _preview_with_cost(p) -> PreviewEnvironmentType:
+    """Project a ``PreviewEnvironment`` row, attaching live pod-resource
+    aggregates + a daily cost estimate from the cluster's provider
+    plugin (#431).
+
+    Cluster resolution mirrors ``_list_pods_for_app`` — prefer the
+    preview's bound ``app_environment.tenant_cluster``, fall back to
+    the app's ``default_tenant_cluster``. When the cluster is unwired
+    / unreachable the resolver still returns the row with zeroed
+    resources + null cost so the page stays renderable.
+
+    Cost is fetched on a per-call basis (no cache) — pricing changes
+    frequently and the read volume is bounded by the 200-row cap on
+    the list resolver. If this becomes a hotspot, the right answer is
+    a short-TTL cache inside the provider plugin's cost driver, not a
+    cache here (we don't want to cache stale numbers across orgs)."""
+    from astrolift_lifecycle.preview_cost import (
+        aggregate_pod_resources,
+        estimate_daily_cost_usd,
+    )
+    from astrolift_lifecycle.schema.types import PreviewAggregateResourcesType
+
+    cluster = None
+    if p.app_environment_id and p.app_environment.tenant_cluster_id:
+        cluster = p.app_environment.tenant_cluster
+    elif p.registered_app.default_tenant_cluster_id:
+        cluster = p.registered_app.default_tenant_cluster
+
+    pods: list = []
+    if cluster is not None and getattr(cluster, "is_active", True):
+        try:
+            pods = list(
+                list_app_pods(
+                    cluster=cluster,
+                    namespace=p.namespace,
+                    app_slug=p.registered_app.slug,
+                )
+            )
+        except ClusterObservabilityError:
+            pods = []
+        except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
+            pods = []
+
+    aggregate = aggregate_pod_resources(pods)
+    cost: float | None = None
+    if cluster is not None and aggregate.pod_count > 0:
+        cost = estimate_daily_cost_usd(
+            cluster=cluster,
+            aggregate=aggregate,
+            region=getattr(cluster, "region", "") or "",
+        )
+
+    return preview_to_type(
+        p,
+        aggregate_resources=PreviewAggregateResourcesType(
+            cpu_cores=aggregate.cpu_cores,
+            memory_bytes=aggregate.memory_bytes,
+            pod_count=aggregate.pod_count,
+        ),
+        estimated_daily_cost_usd=cost,
+    )
 
 
 def _resolve_app_cluster(*, app_slug: str, environment_name: str | None):
