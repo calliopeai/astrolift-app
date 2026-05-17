@@ -959,6 +959,23 @@ type AstroliftDeregisterPreviewSourceWebhook {
   hookId: String!
 }
 
+type AstroliftDeviceRegistration {
+  id: GUID!
+  userId: String!
+  platform: String!
+  label: String!
+  driverName: String!
+  registrationId: String!
+  lastUsedAt: DateTime
+  createdAt: DateTime!
+}
+
+type AstroliftDeviceRegistrationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftDeviceRegistration
+}
+
 type AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: GUID!
   disconnectedId: GUID
@@ -2874,6 +2891,8 @@ type Mutation {
   testNotificationChannel(input: TestNotificationInput!): AstroliftNotificationMutationResult!
   markNotificationRead(input: MarkNotificationReadInput!): AstroliftNotificationMutationResult!
   markAllNotificationsRead: MarkallreadpayloadMutationResult!
+  registerAstroliftDevice(input: RegisterAstroliftDeviceInput!): AstroliftDeviceRegistrationMutationResult!
+  unregisterAstroliftDevice(input: UnregisterAstroliftDeviceInput!): SoftdeletepayloadMutationResult!
   createAlertRule(input: CreateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   updateAlertRule(input: UpdateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   deleteAlertRule(input: DeleteAlertRuleInput!): AlertruledeletedpayloadMutationResult!
@@ -3226,6 +3245,7 @@ type Query {
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
+  astroliftMyDevices: [AstroliftDeviceRegistration!]!
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
@@ -3352,6 +3372,13 @@ input RegisterAppInput {
   approverUserIds: [String!] = null
   minimumApprovals: Int = null
   manifestRaw: String = null
+}
+
+input RegisterAstroliftDeviceInput {
+  token: String!
+  kind: String!
+  label: String = null
+  platformData: JSON = null
 }
 
 input RegisterTenantClusterInput {
@@ -3607,6 +3634,10 @@ scalar UUID
 
 input UnmuteAlertRuleInput {
   ruleId: GUID!
+}
+
+input UnregisterAstroliftDeviceInput {
+  deviceId: GUID!
 }
 
 input UnregisterTenantClusterInput {

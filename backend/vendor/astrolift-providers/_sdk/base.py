@@ -12,6 +12,7 @@ from _sdk.ingress import IngressDriver
 from _sdk.log_stream import LogStreamDriver
 from _sdk.managed_service import ManagedServiceDriver
 from _sdk.metrics import MetricsDriver
+from _sdk.notification import NotificationDriver
 from _sdk.object_store import ObjectStoreDriver
 from _sdk.registry import ImageRegistryDriver
 from _sdk.secrets import SecretsBackend
@@ -67,6 +68,7 @@ __all__ = [
     "ManagedServiceDriver",
     "ManagedServiceRegistry",
     "MetricsDriver",
+    "NotificationDriver",
     "ObjectStoreDriver",
     "ProviderPlugin",
     "SecretsBackend",

@@ -959,6 +959,23 @@ type AstroliftDeregisterPreviewSourceWebhook {
   hookId: String!
 }
 
+type AstroliftDeviceRegistration {
+  id: GUID!
+  userId: String!
+  platform: String!
+  label: String!
+  driverName: String!
+  registrationId: String!
+  lastUsedAt: DateTime
+  createdAt: DateTime!
+}
+
+type AstroliftDeviceRegistrationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftDeviceRegistration
+}
+
 type AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: GUID!
   disconnectedId: GUID
@@ -1020,6 +1037,54 @@ type AstroliftForceRedeployPreviewDeployment {
   triggeredByDisplay: String!
   ciActorKind: String!
   ciRunUrl: String!
+}
+
+type AstroliftFormDefinition {
+  id: GUID!
+  slug: String!
+  name: String!
+  description: String!
+  schema: JSON!
+  fieldConfig: JSON!
+  logicRules: JSON!
+  scoring: JSON!
+  status: String!
+  formType: String!
+  isPublic: Boolean!
+  version: Int!
+  submissionCount: Int!
+  publishedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdByUsername: String
+  updatedByUsername: String
+}
+
+type AstroliftFormDefinitionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftFormDefinition
+}
+
+type AstroliftFormSubmission {
+  id: GUID!
+  formSlug: String!
+  formName: String!
+  formVersion: Int!
+  submittedAt: DateTime!
+  createdAt: DateTime!
+  submitterDisplayName: String!
+  submitterEmail: String!
+  payload: JSON!
+  sourceIp: String
+  userAgent: String!
+  status: String!
+}
+
+type AstroliftFormSubmissionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftFormSubmission
 }
 
 type AstroliftIdentityProvider {
@@ -2319,6 +2384,10 @@ input DeleteAppSecretInput {
   key: String!
 }
 
+input DeleteFormDefinitionInput {
+  slug: String!
+}
+
 input DeleteRoleInput {
   id: GUID!
 }
@@ -2465,6 +2534,30 @@ enum ForecastConfidence {
   LOW
   MEDIUM
   HIGH
+}
+
+input FormDefinitionInput {
+  name: String!
+  slug: String!
+  schema: JSON!
+  description: String = null
+  fieldConfig: JSON = null
+  logicRules: JSON = null
+  scoring: JSON = null
+  formType: String = null
+  isPublic: Boolean = null
+}
+
+input FormDefinitionUpdateInput {
+  slug: String!
+  name: String = null
+  schema: JSON = null
+  description: String = null
+  fieldConfig: JSON = null
+  logicRules: JSON = null
+  scoring: JSON = null
+  formType: String = null
+  isPublic: Boolean = null
 }
 
 """UUID v7 — the platform's external identifier."""
@@ -2798,6 +2891,8 @@ type Mutation {
   testNotificationChannel(input: TestNotificationInput!): AstroliftNotificationMutationResult!
   markNotificationRead(input: MarkNotificationReadInput!): AstroliftNotificationMutationResult!
   markAllNotificationsRead: MarkallreadpayloadMutationResult!
+  registerAstroliftDevice(input: RegisterAstroliftDeviceInput!): AstroliftDeviceRegistrationMutationResult!
+  unregisterAstroliftDevice(input: UnregisterAstroliftDeviceInput!): SoftdeletepayloadMutationResult!
   createAlertRule(input: CreateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   updateAlertRule(input: UpdateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   deleteAlertRule(input: DeleteAlertRuleInput!): AlertruledeletedpayloadMutationResult!
@@ -2880,6 +2975,13 @@ type Mutation {
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
   requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
+  createFormDefinition(input: FormDefinitionInput!): AstroliftFormDefinitionMutationResult!
+  updateFormDefinition(input: FormDefinitionUpdateInput!): AstroliftFormDefinitionMutationResult!
+  publishForm(slug: String!): AstroliftFormDefinitionMutationResult!
+  archiveForm(slug: String!): AstroliftFormDefinitionMutationResult!
+  deleteFormDefinition(input: DeleteFormDefinitionInput!): AstroliftFormDefinitionMutationResult!
+  submitForm(slug: String!, payload: JSON!): AstroliftFormSubmissionMutationResult!
+  updateSubmissionStatus(submissionId: GUID!, status: String!): AstroliftFormSubmissionMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -3143,6 +3245,7 @@ type Query {
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
+  astroliftMyDevices: [AstroliftDeviceRegistration!]!
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
@@ -3211,6 +3314,10 @@ type Query {
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
+  formDefinitions(status: String = null): [AstroliftFormDefinition!]!
+  formDefinition(slug: String!): AstroliftFormDefinition
+  formSubmissions(slug: String!, status: String = null): [AstroliftFormSubmission!]!
+  formFieldTypes: [String!]!
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
@@ -3265,6 +3372,13 @@ input RegisterAppInput {
   approverUserIds: [String!] = null
   minimumApprovals: Int = null
   manifestRaw: String = null
+}
+
+input RegisterAstroliftDeviceInput {
+  token: String!
+  kind: String!
+  label: String = null
+  platformData: JSON = null
 }
 
 input RegisterTenantClusterInput {
@@ -3520,6 +3634,10 @@ scalar UUID
 
 input UnmuteAlertRuleInput {
   ruleId: GUID!
+}
+
+input UnregisterAstroliftDeviceInput {
+  deviceId: GUID!
 }
 
 input UnregisterTenantClusterInput {

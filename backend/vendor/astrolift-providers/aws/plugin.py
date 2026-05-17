@@ -33,6 +33,7 @@ from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
+from aws.notification_sns import SNSNotificationDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
 from aws.tls_acm import ACMDriver
@@ -50,6 +51,7 @@ PLUGIN = ProviderPlugin(
         "tls": ACMDriver,
         "cluster": EKSClusterDriver,
         "ingress": ALBIngressDriver,
+        "notification": SNSNotificationDriver,
     },
     managed_service_drivers={
         # #35 + #351 + #352 — high-traffic kinds (web app + queue +

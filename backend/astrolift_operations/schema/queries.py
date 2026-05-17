@@ -18,6 +18,7 @@ from astrolift_operations.models import (
     AlertEvent,
     AlertRule,
     AuditEvent,
+    DeviceRegistration,
     Event,
     Notification,
     WebhookDelivery,
@@ -34,6 +35,7 @@ from astrolift_operations.schema.types import (
     AuditEventPageType,
     AuditEventType,
     AuditRetentionType,
+    DeviceRegistrationType,
     EventPageType,
     EventType,
     NotificationType,
@@ -43,6 +45,7 @@ from astrolift_operations.schema.types import (
     alert_event_to_type,
     alert_rule_to_type,
     audit_to_type,
+    device_registration_to_type,
     event_to_type,
     notification_to_type,
     shape_activity_item,
@@ -426,6 +429,30 @@ class OperationsQuery:
         if unread_only:
             qs = qs.filter(read_at__isnull=True)
         return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_devices(
+        self,
+        info: Info,
+    ) -> list[DeviceRegistrationType]:
+        """List the caller's registered push devices (#490).
+
+        Auth via tenant binding: caller sees only their own
+        DeviceRegistration rows, never another user's tokens.
+        Order: most recently used first so the surface is useful
+        for "which device did I last log in on" debugging."""
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+        qs = (
+            DeviceRegistration.objects.filter(
+                user_id=tenant.actor_user_id,
+                deleted_at__isnull=True,
+            )
+            .order_by("-last_used_at", "-created_at")
+        )
+        return [device_registration_to_type(d) for d in qs]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
