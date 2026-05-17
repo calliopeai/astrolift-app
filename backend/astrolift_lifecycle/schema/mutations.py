@@ -45,10 +45,12 @@ from astrolift_lifecycle.schema.types import (
     AppEnvironmentType,
     DeploymentType,
     DeployTokenType,
+    PreviewEnvironmentType,
     app_domain_to_type,
     app_env_to_type,
     deploy_token_to_type,
     deployment_to_type,
+    preview_to_type,
 )
 from astrolift_operations.models import WorkflowRun
 from astrolift_registry.models import RegisteredApp
@@ -139,6 +141,20 @@ class RejectByTokenInput:
 @strawberry.input
 class TearDownPreviewInputGql:
     id: GUID
+
+
+@strawberry.input
+class ExtendPreviewTtlInputGql:
+    """Push a preview's auto-teardown out by N days (#431).
+
+    Allowed ``days`` values are locked to ``{1, 7, 30}`` — the resolver
+    rejects anything else. The model layer enforces the +30d ceiling
+    from now so an extension on a preview that's already 25 days in
+    can't sneak past the cap.
+    """
+
+    id: GUID
+    days: int
 
 
 @strawberry.input
@@ -1405,6 +1421,62 @@ class LifecycleMutation:
                 "no deployment exists for this app yet",
             )
         return gql_success(deployment_to_type(latest))
+
+    @strawberry.field
+    @mutation_audit(action="preview.extend_ttl")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def extend_preview_ttl(
+        self, info: Info, input: ExtendPreviewTtlInputGql
+    ) -> MutationResultType[PreviewEnvironmentType]:
+        """Push the preview's auto-teardown out by ``days`` (#431).
+
+        ``days`` must be one of ``{1, 7, 30}``. The new ``ttl_until``
+        is capped at +30 days from now even on a chained set of
+        extensions — see :meth:`PreviewEnvironment.extend_ttl`.
+
+        Returns the updated preview type with the new ``ttl_until``
+        echoed back so the UI can refresh the countdown without a
+        second round-trip. No workflow is started — the GC sweep
+        consults ``ttl_until`` on its own cadence.
+        """
+        from astrolift_lifecycle.models.preview_environment import (
+            PREVIEW_TTL_EXTEND_DAYS,
+        )
+
+        if input.days not in PREVIEW_TTL_EXTEND_DAYS:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"days must be one of {list(PREVIEW_TTL_EXTEND_DAYS)}; got {input.days}",
+            )
+        preview = (
+            PreviewEnvironment.objects.select_related(
+                "registered_app",
+                "registered_app__organization",
+                "registered_app__default_tenant_cluster",
+                "app_environment__tenant_cluster",
+            )
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if preview is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "preview environment not found")
+        if preview.status == PreviewEnvironment.Status.TORN_DOWN.value:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cannot extend a torn-down preview",
+            )
+
+        try:
+            preview.extend_ttl(days=input.days)
+        except ValueError as exc:
+            # Model layer mirrors the resolver's validation — keep
+            # both so programmatic callers (workflows, fixtures) hit
+            # the same guard.
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+
+        preview.save(update_fields=["ttl_until", "updated_at", "version"])
+        return gql_success(preview_to_type(preview))
 
     # ---- App migration -------------------------------------------
 
