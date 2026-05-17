@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "Visão geral",
+    "description": "Dados de identidade, registro e ciclo de vida desta instalação do Astrolift.",
+    "errorBanner": {
+      "title": "Não foi possível carregar alguns dados"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Times",
+        "emptyCta": "Crie seu primeiro time"
+      },
+      "projects": {
+        "label": "Projetos",
+        "emptyCta": "Crie um projeto"
+      },
+      "apps": {
+        "label": "Apps registrados",
+        "emptyCta": "Registre seu primeiro app"
+      },
+      "deployments": {
+        "label": "Deploys ativos",
+        "emptyCta": "Inicie um deploy"
+      },
+      "costMtd": {
+        "label": "Custo (MTD)",
+        "emptyCta": "Aguardando dados de custo",
+        "vsPrevMonth": "vs mês ant.",
+        "noPrevMonth": "sem mês ant."
+      }
+    },
+    "fleetHealth": {
+      "title": "Saúde da frota",
+      "description": "Composição do status do último deploy para todos os apps registrados.",
+      "healthy": "saudável",
+      "failing": "{count} com falha",
+      "hiccup": "{count, plural, one {# soluço} other {# soluços}}",
+      "empty": "Ainda não há apps registrados. Conecte um repositório em /apps/new para começar.",
+      "tiles": {
+        "running": "Em execução",
+        "recentFailure": "Falha recente",
+        "failing": "Com falha",
+        "noDeploys": "Sem deploys"
+      }
+    },
+    "recentProjects": {
+      "title": "Projetos recentes",
+      "description": "Projetos criados mais recentemente em todos os times.",
+      "emptyTitle": "Ainda não há projetos",
+      "emptyDescription": "Crie um time e um projeto para começar a registrar apps.",
+      "emptyAction": "Gerenciar times"
+    },
+    "activity": {
+      "title": "Atividade",
+      "description": "Eventos de ciclo de vida: deploys, sincronizações de configuração, escalonamento, integração de cluster, rotação de segredos.",
+      "emptyTitle": "Ainda não há atividade",
+      "emptyDescription": "Os eventos aparecem aqui à medida que deploys, mudanças de configuração e operações de cluster acontecem.",
+      "errorTitle": "Não foi possível carregar a atividade",
+      "loadMore": "Carregar mais",
+      "loadingMore": "Carregando…"
+    },
+    "registeredApps": {
+      "title": "Apps registrados",
+      "description": "Repositórios registrados para deploy.",
+      "emptyTitle": "Nenhum app registrado",
+      "emptyDescription": "A superfície do registro de apps chega no próximo marco — quando conectada você poderá registrar um repositório Git e fazer deploy a partir deste card.",
+      "emptyAction": "Abrir registro"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",

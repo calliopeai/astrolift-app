@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "概览",
+    "description": "此 Astrolift 安装的身份、注册表与生命周期数据。",
+    "errorBanner": {
+      "title": "无法加载部分数据"
+    },
+    "tiles": {
+      "teams": {
+        "label": "团队",
+        "emptyCta": "创建你的第一个团队"
+      },
+      "projects": {
+        "label": "项目",
+        "emptyCta": "创建项目"
+      },
+      "apps": {
+        "label": "已注册应用",
+        "emptyCta": "注册你的第一个应用"
+      },
+      "deployments": {
+        "label": "进行中的部署",
+        "emptyCta": "触发部署"
+      },
+      "costMtd": {
+        "label": "成本(月初至今)",
+        "emptyCta": "等待成本数据",
+        "vsPrevMonth": "环比上月",
+        "noPrevMonth": "无上月数据"
+      }
+    },
+    "fleetHealth": {
+      "title": "舰队健康度",
+      "description": "已注册应用的最新部署状态综合。",
+      "healthy": "健康",
+      "failing": "{count} 个失败",
+      "hiccup": "{count, plural, one {# 次抖动} other {# 次抖动}}",
+      "empty": "暂无已注册应用。在 /apps/new 连接仓库以开始。",
+      "tiles": {
+        "running": "运行中",
+        "recentFailure": "近期失败",
+        "failing": "失败中",
+        "noDeploys": "无部署"
+      }
+    },
+    "recentProjects": {
+      "title": "最近项目",
+      "description": "所有团队中最近创建的项目。",
+      "emptyTitle": "暂无项目",
+      "emptyDescription": "创建团队和项目以开始注册应用。",
+      "emptyAction": "管理团队"
+    },
+    "activity": {
+      "title": "活动",
+      "description": "生命周期事件:部署、配置同步、扩缩容、集群接入、密钥轮换。",
+      "emptyTitle": "暂无活动",
+      "emptyDescription": "随着部署、配置变更和集群操作发生,事件将显示在此。",
+      "errorTitle": "无法加载活动",
+      "loadMore": "加载更多",
+      "loadingMore": "加载中…"
+    },
+    "registeredApps": {
+      "title": "已注册应用",
+      "description": "为部署而注册的仓库。",
+      "emptyTitle": "无已注册应用",
+      "emptyDescription": "应用注册表界面将在下一个里程碑上线 —— 一旦接通,你可以从此卡片注册 Git 仓库并发起部署。",
+      "emptyAction": "打开注册表"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",

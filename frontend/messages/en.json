@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "Overview",
+    "description": "Identity, registry, and lifecycle data for this Astrolift install.",
+    "errorBanner": {
+      "title": "Couldn't load some data"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Teams",
+        "emptyCta": "Create your first team"
+      },
+      "projects": {
+        "label": "Projects",
+        "emptyCta": "Create a project"
+      },
+      "apps": {
+        "label": "Registered apps",
+        "emptyCta": "Register your first app"
+      },
+      "deployments": {
+        "label": "Active deployments",
+        "emptyCta": "Trigger a deployment"
+      },
+      "costMtd": {
+        "label": "Cost (MTD)",
+        "emptyCta": "Awaiting cost data",
+        "vsPrevMonth": "vs prev month",
+        "noPrevMonth": "no prev month"
+      }
+    },
+    "fleetHealth": {
+      "title": "Fleet health",
+      "description": "Composite of latest deployment status across registered apps.",
+      "healthy": "healthy",
+      "failing": "{count} failing",
+      "hiccup": "{count, plural, one {# hiccup} other {# hiccups}}",
+      "empty": "No registered apps yet. Connect a repo on /apps/new to start.",
+      "tiles": {
+        "running": "Running",
+        "recentFailure": "Recent failure",
+        "failing": "Failing",
+        "noDeploys": "No deploys"
+      }
+    },
+    "recentProjects": {
+      "title": "Recent projects",
+      "description": "Most recently created projects across all teams.",
+      "emptyTitle": "No projects yet",
+      "emptyDescription": "Create a team and a project to start registering apps.",
+      "emptyAction": "Manage teams"
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "Lifecycle events: deploys, config syncs, scaling, cluster bring-in, secret rotations.",
+      "emptyTitle": "No activity yet",
+      "emptyDescription": "Events appear here as deployments, configuration changes, and cluster operations happen.",
+      "errorTitle": "Couldn't load activity",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…"
+    },
+    "registeredApps": {
+      "title": "Registered apps",
+      "description": "Repositories registered for deployment.",
+      "emptyTitle": "No apps registered",
+      "emptyDescription": "The app registry surface lands in the next milestone — once it's wired you can register a Git repo and roll a deployment from this card.",
+      "emptyAction": "Open registry"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",

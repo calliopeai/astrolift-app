@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "概要",
+    "description": "この Astrolift インストールの ID・レジストリ・ライフサイクル情報。",
+    "errorBanner": {
+      "title": "一部のデータを読み込めませんでした"
+    },
+    "tiles": {
+      "teams": {
+        "label": "チーム",
+        "emptyCta": "最初のチームを作成"
+      },
+      "projects": {
+        "label": "プロジェクト",
+        "emptyCta": "プロジェクトを作成"
+      },
+      "apps": {
+        "label": "登録済みアプリ",
+        "emptyCta": "最初のアプリを登録"
+      },
+      "deployments": {
+        "label": "進行中のデプロイ",
+        "emptyCta": "デプロイを実行"
+      },
+      "costMtd": {
+        "label": "コスト (月初来)",
+        "emptyCta": "コストデータを待機中",
+        "vsPrevMonth": "前月比",
+        "noPrevMonth": "前月実績なし"
+      }
+    },
+    "fleetHealth": {
+      "title": "フリートの状態",
+      "description": "登録済みアプリ全体の直近デプロイ状態のサマリ。",
+      "healthy": "正常",
+      "failing": "{count} 件が失敗中",
+      "hiccup": "{count, plural, one {# 件の不具合} other {# 件の不具合}}",
+      "empty": "登録済みアプリがありません。/apps/new でリポジトリを接続して開始してください。",
+      "tiles": {
+        "running": "実行中",
+        "recentFailure": "直近の失敗",
+        "failing": "失敗中",
+        "noDeploys": "デプロイなし"
+      }
+    },
+    "recentProjects": {
+      "title": "最近のプロジェクト",
+      "description": "すべてのチームで最近作成されたプロジェクト。",
+      "emptyTitle": "プロジェクトがありません",
+      "emptyDescription": "チームとプロジェクトを作成して、アプリの登録を始めましょう。",
+      "emptyAction": "チームを管理"
+    },
+    "activity": {
+      "title": "アクティビティ",
+      "description": "ライフサイクルイベント: デプロイ、設定同期、スケーリング、クラスタ追加、シークレットローテーション。",
+      "emptyTitle": "アクティビティはまだありません",
+      "emptyDescription": "デプロイや設定変更、クラスタ操作が発生するとここに表示されます。",
+      "errorTitle": "アクティビティを読み込めませんでした",
+      "loadMore": "さらに読み込む",
+      "loadingMore": "読み込み中…"
+    },
+    "registeredApps": {
+      "title": "登録済みアプリ",
+      "description": "デプロイ対象として登録されたリポジトリ。",
+      "emptyTitle": "登録されたアプリがありません",
+      "emptyDescription": "アプリレジストリの UI は次のマイルストーンで提供されます。実装後は、このカードから Git リポジトリを登録してデプロイを開始できます。",
+      "emptyAction": "レジストリを開く"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",

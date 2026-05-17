@@ -63,6 +63,74 @@
       "sports": "Sport"
     }
   },
+  "overview": {
+    "title": "Übersicht",
+    "description": "Identitäts-, Registry- und Lebenszyklusdaten für diese Astrolift-Installation.",
+    "errorBanner": {
+      "title": "Einige Daten konnten nicht geladen werden"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Teams",
+        "emptyCta": "Erstes Team anlegen"
+      },
+      "projects": {
+        "label": "Projekte",
+        "emptyCta": "Projekt erstellen"
+      },
+      "apps": {
+        "label": "Registrierte Apps",
+        "emptyCta": "Erste App registrieren"
+      },
+      "deployments": {
+        "label": "Aktive Deployments",
+        "emptyCta": "Deployment auslösen"
+      },
+      "costMtd": {
+        "label": "Kosten (MTD)",
+        "emptyCta": "Warte auf Kostendaten",
+        "vsPrevMonth": "ggü. Vormonat",
+        "noPrevMonth": "kein Vormonat"
+      }
+    },
+    "fleetHealth": {
+      "title": "Flottenzustand",
+      "description": "Zusammenfassung des letzten Deployment-Status für alle registrierten Apps.",
+      "healthy": "gesund",
+      "failing": "{count} fehlerhaft",
+      "hiccup": "{count, plural, one {# Aussetzer} other {# Aussetzer}}",
+      "empty": "Noch keine registrierten Apps. Verbinde ein Repo unter /apps/new, um zu starten.",
+      "tiles": {
+        "running": "Läuft",
+        "recentFailure": "Kürzliche Störung",
+        "failing": "Fehlerhaft",
+        "noDeploys": "Keine Deployments"
+      }
+    },
+    "recentProjects": {
+      "title": "Aktuelle Projekte",
+      "description": "Zuletzt erstellte Projekte aller Teams.",
+      "emptyTitle": "Noch keine Projekte",
+      "emptyDescription": "Erstelle ein Team und ein Projekt, um Apps zu registrieren.",
+      "emptyAction": "Teams verwalten"
+    },
+    "activity": {
+      "title": "Aktivität",
+      "description": "Lebenszyklus-Ereignisse: Deployments, Config-Syncs, Skalierung, Cluster-Aufnahme, Secret-Rotationen.",
+      "emptyTitle": "Noch keine Aktivität",
+      "emptyDescription": "Ereignisse erscheinen hier, sobald Deployments, Konfigurationsänderungen und Cluster-Vorgänge stattfinden.",
+      "errorTitle": "Aktivität konnte nicht geladen werden",
+      "loadMore": "Mehr laden",
+      "loadingMore": "Lädt…"
+    },
+    "registeredApps": {
+      "title": "Registrierte Apps",
+      "description": "Repositories, die für ein Deployment registriert sind.",
+      "emptyTitle": "Keine Apps registriert",
+      "emptyDescription": "Die App-Registry-Oberfläche kommt im nächsten Meilenstein — sobald sie verdrahtet ist, kannst du ein Git-Repo registrieren und ein Deployment von dieser Karte aus starten.",
+      "emptyAction": "Registry öffnen"
+    }
+  },
   "dataTable": {
     "search": "Suchen…",
     "filters": "Filter",
