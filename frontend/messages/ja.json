@@ -167,6 +167,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "設定セクション",
+      "openMobileNav": "設定メニューを開く",
+      "openMobileNavLabel": "セクション",
+      "mobileTitle": "設定セクション",
+      "mobileDescription": "設定の任意の領域にジャンプします。",
+      "groups": {
+        "organization": "組織",
+        "personal": "個人",
+        "tokens": "トークン"
+      }
+    },
+    "breadcrumb": {
+      "root": "設定"
     }
   },
   "hooks": {
@@ -499,6 +514,9 @@
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
+    "cardMeta": {
+      "modified": "Modified {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -515,6 +533,10 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",
