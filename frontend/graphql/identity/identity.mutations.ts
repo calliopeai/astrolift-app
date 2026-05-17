@@ -355,6 +355,7 @@ export const GRANT_ROLE = gql`
         }
         scopeKind
         scopeId
+        sourceScopeLabel
         grantedAt
       }
     }
@@ -426,9 +427,7 @@ export const REVOKE_INVITATION = gql`
 `;
 
 export const ADD_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
-  mutation AddOrganizationAllowlistDomain(
-    $input: AddOrganizationAllowlistDomainInput!
-  ) {
+  mutation AddOrganizationAllowlistDomain($input: AddOrganizationAllowlistDomainInput!) {
     addOrganizationAllowlistDomain(input: $input) {
       ok
       errors {
@@ -449,9 +448,7 @@ export const ADD_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
 `;
 
 export const REMOVE_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
-  mutation RemoveOrganizationAllowlistDomain(
-    $input: RemoveOrganizationAllowlistDomainInput!
-  ) {
+  mutation RemoveOrganizationAllowlistDomain($input: RemoveOrganizationAllowlistDomainInput!) {
     removeOrganizationAllowlistDomain(input: $input) {
       ok
       errors {

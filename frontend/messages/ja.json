@@ -572,5 +572,20 @@
         "cancel": "Cancel"
       }
     }
+  },
+  "orgMembers": {
+    "searchLabel": "メンバーを検索",
+    "searchPlaceholder": "ユーザー名またはメールで検索…",
+    "lastActiveColumn": "最終アクティブ",
+    "actionsColumn": "アクション",
+    "noMatchTitle": "一致するものがありません",
+    "noMatchDescription": "「{term}」に一致するメンバーはいません。別の検索語をお試しください。",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "非アクティブ",
+    "rolePillTooltipPrefix": "{scope} 経由で付与",
+    "sourceTooltipAria": "{scope} 経由で付与",
+    "sourceColumn": "ソース",
+    "grantRoleRowLabel": "{name} にロールを付与",
+    "grantRoleRowTooltip": "{name} にロールを付与"
   }
 }

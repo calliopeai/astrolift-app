@@ -568,5 +568,20 @@
         "cancel": "Cancel"
       }
     }
+  },
+  "orgMembers": {
+    "searchLabel": "Buscar miembros",
+    "searchPlaceholder": "Buscar por nombre de usuario o correo…",
+    "lastActiveColumn": "Última actividad",
+    "actionsColumn": "Acciones",
+    "noMatchTitle": "Sin coincidencias",
+    "noMatchDescription": "Ningún miembro coincide con \"{term}\". Prueba con otro término de búsqueda.",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "inactivo",
+    "rolePillTooltipPrefix": "Otorgado a través de {scope}",
+    "sourceTooltipAria": "Otorgado a través de {scope}",
+    "sourceColumn": "Origen",
+    "grantRoleRowLabel": "Otorgar rol a {name}",
+    "grantRoleRowTooltip": "Otorgar rol a {name}"
   }
 }

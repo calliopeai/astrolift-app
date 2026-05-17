@@ -572,5 +572,20 @@
         "cancel": "Cancel"
       }
     }
+  },
+  "orgMembers": {
+    "searchLabel": "搜索成员",
+    "searchPlaceholder": "按用户名或邮箱搜索…",
+    "lastActiveColumn": "最近活动",
+    "actionsColumn": "操作",
+    "noMatchTitle": "无匹配项",
+    "noMatchDescription": "没有成员与 \"{term}\" 匹配。请尝试其他搜索词。",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "不活跃",
+    "rolePillTooltipPrefix": "通过 {scope} 授予",
+    "sourceTooltipAria": "通过 {scope} 授予",
+    "sourceColumn": "来源",
+    "grantRoleRowLabel": "向 {name} 授予角色",
+    "grantRoleRowTooltip": "向 {name} 授予角色"
   }
 }

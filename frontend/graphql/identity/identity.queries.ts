@@ -146,8 +146,8 @@ export const LIST_ROLES = gql`
 `;
 
 export const LIST_MEMBERS = gql`
-  query ListMembers {
-    astroliftMembers {
+  query ListMembers($search: String) {
+    astroliftMembers(search: $search) {
       id
       user {
         id
@@ -161,6 +161,7 @@ export const LIST_MEMBERS = gql`
       lifecycle
       joinedAt
       lastSeenAt
+      lastActiveAt
       createdAt
       deletedAt
     }
@@ -185,6 +186,7 @@ export const LIST_ROLE_BINDINGS = gql`
       }
       scopeKind
       scopeId
+      sourceScopeLabel
       grantedAt
       expiresAt
       inherits
