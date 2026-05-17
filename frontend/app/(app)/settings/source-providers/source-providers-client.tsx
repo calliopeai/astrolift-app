@@ -47,10 +47,18 @@ import type {
   MutationResult,
 } from "@/graphql/scm/scm.types";
 
+import { useLocalStorage } from "@/hooks/use-local-storage";
+
 import { ConnectGitHubDialog } from "./connect-github-dialog";
 import { ConnectGitLabDialog } from "./connect-gitlab-dialog";
 import { ConnectSourceDialog } from "./connect-source-dialog";
 import { GenerateSshKeyDialog } from "./generate-ssh-key-dialog";
+
+// localStorage key for the Advanced (paste-credentials) toggle.
+// Persisting it removes a chore from re-opening the page after a
+// config session: operators don't have to re-expand to get back to
+// the form they were just in.
+const ADVANCED_OPEN_STORAGE_KEY = "astrolift.settings.source-providers.advancedOpen";
 
 const KIND_LABEL: Record<string, string> = {
   github_oauth_app: "GitHub OAuth App",
@@ -87,7 +95,10 @@ export function SourceProvidersClient() {
   const [openConnectGithub, setOpenConnectGithub] = React.useState(false);
   const [openConnectGitlab, setOpenConnectGitlab] = React.useState(false);
   const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
-  const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [showAdvanced, setShowAdvanced] = useLocalStorage<boolean>(
+    ADVANCED_OPEN_STORAGE_KEY,
+    false
+  );
   const [disconnectTarget, setDisconnectTarget] = React.useState<AstroliftSourceConnection | null>(
     null
   );
@@ -457,7 +468,7 @@ export function SourceProvidersClient() {
         <div className="text-muted-foreground text-xs">
           <button
             type="button"
-            onClick={() => setShowAdvanced((x) => !x)}
+            onClick={() => setShowAdvanced(!showAdvanced)}
             className="hover:text-foreground inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
           >
             {showAdvanced ? (
@@ -619,6 +630,7 @@ function PublicKeyCell({ value }: { value: string }) {
       await navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
+      toast.success("Public key copied");
     } catch {
       toast.error("Couldn't copy — paste manually below");
     }
