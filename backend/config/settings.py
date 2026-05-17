@@ -526,6 +526,55 @@ CONSTANCE_CONFIG = {
         "for. The spec ceiling is 15 minutes; a longer-lived elevation defeats the "
         "purpose of step-up auth. Anything above this is silently clamped.",
     ),
+    # ---- Device attestation (#496) ----
+    "REQUIRE_ATTESTATION_FOR_MOBILE": (
+        False,
+        "Master feature flag for device attestation. When True, mobile sessions must "
+        "produce a verified iOS App Attest or Android Play Integrity blob before the "
+        "platform will run any mutation through them. Most installs leave this off; "
+        "regulated-industry tenants flip it on. Browser / CLI / API-token sessions are "
+        "never affected by this flag.",
+    ),
+    "REQUIRE_ATTESTATION_FOR_SENSITIVE_OPS": (
+        False,
+        "When True, only step-up-gated (sensitive) mutations require device attestation "
+        "from mobile sessions; non-sensitive reads + day-to-day mutations are unaffected. "
+        "Use this when REQUIRE_ATTESTATION_FOR_MOBILE is too broad — the mobile app can "
+        "still browse but must attest before approving deploys / setting secrets / "
+        "rotating tokens.",
+    ),
+    "REQUIRE_STRONG_ANDROID_INTEGRITY": (
+        False,
+        "When True, Android sessions must produce a MEETS_STRONG_INTEGRITY verdict "
+        "(hardware-backed keystore) — excludes older / cheaper devices that only pass "
+        "MEETS_DEVICE_INTEGRITY. Off by default to match the broadest device matrix.",
+    ),
+    "IOS_APP_ID": (
+        "",
+        "iOS App ID in the canonical <TEAM_ID>.<BUNDLE_ID> form, e.g. "
+        "'A1B2C3D4E5.com.example.mobile'. Required when REQUIRE_ATTESTATION_FOR_MOBILE "
+        "is on; used as the App Attest RP ID and verified against the rpIdHash field "
+        "of the attestation authenticator data.",
+    ),
+    "ANDROID_PACKAGE_NAME": (
+        "",
+        "Android application package name, e.g. 'com.example.mobile'. Required when "
+        "REQUIRE_ATTESTATION_FOR_MOBILE is on; verified against the "
+        "requestPackageName field of the decoded Play Integrity token.",
+    ),
+    "GOOGLE_PLAY_INTEGRITY_API_KEY": (
+        "",
+        "API key (or service-account JSON) used to call Google's Play Integrity API "
+        "decodeIntegrityToken endpoint. Required when REQUIRE_ATTESTATION_FOR_MOBILE "
+        "is on for any Android session. Treat as secret — do NOT commit to source.",
+    ),
+    "ATTESTATION_CHALLENGE_TTL_SECONDS": (
+        300,
+        "How long a server-issued attestation nonce stays valid before the verifier "
+        "rejects it. Default 300s (5 min) matches Apple's recommended ceiling for the "
+        "App Attest ceremony. Lower for high-security envs; raise only if a tap-to-"
+        "approve UX legitimately needs more time.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -564,6 +613,18 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "STALE_SESSION_TTL_SECONDS_MOBILE",
             "STALE_SESSION_TTL_SECONDS_BROWSER_EXTENSION",
             "STALE_SESSION_TTL_SECONDS_API_TOKEN",
+        ),
+        "collapse": False,
+    },
+    "Device attestation": {
+        "fields": (
+            "REQUIRE_ATTESTATION_FOR_MOBILE",
+            "REQUIRE_ATTESTATION_FOR_SENSITIVE_OPS",
+            "REQUIRE_STRONG_ANDROID_INTEGRITY",
+            "IOS_APP_ID",
+            "ANDROID_PACKAGE_NAME",
+            "GOOGLE_PLAY_INTEGRITY_API_KEY",
+            "ATTESTATION_CHALLENGE_TTL_SECONDS",
         ),
         "collapse": False,
     },

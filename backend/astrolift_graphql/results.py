@@ -28,9 +28,22 @@ def success[T](data: T) -> MutationResultType[T]:
     return MutationResultType(ok=True, data=data, errors=[])
 
 
-def failure(code: str, message: str, *, field: str | None = None) -> MutationResultType[None]:
+def failure(
+    code: str,
+    message: str,
+    *,
+    field: str | None = None,
+    requires_attestation: bool | None = None,
+) -> MutationResultType[None]:
     return MutationResultType(
         ok=False,
         data=None,
-        errors=[MutationErrorType(code=code, message=message, field=field)],
+        errors=[
+            MutationErrorType(
+                code=code,
+                message=message,
+                field=field,
+                requires_attestation=requires_attestation,
+            )
+        ],
     )

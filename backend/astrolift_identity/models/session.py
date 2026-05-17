@@ -83,6 +83,37 @@ DEFAULT_STALE_SESSION_TTL_SECONDS: dict[str, int] = {
 LAST_SEEN_WRITE_THROTTLE_SECONDS = 60
 
 
+class AttestationKind(models.TextChoices):
+    """Which attestation flavour was applied to an :class:`AstroliftSession` (#496).
+
+    Mobile-only by design — desktop browser / CLI clients can't pass
+    Apple/Google attestation and stay on ``NONE``. Stored lowercase
+    in the DB; surfaced uppercase to Strawberry.
+    """
+
+    NONE = "none", "Not attested"
+    IOS_APPATTEST = "ios_appattest", "iOS App Attest"
+    ANDROID_PLAY_INTEGRITY = "android_play_integrity", "Android Play Integrity"
+
+
+class AttestationTrustLevel(models.TextChoices):
+    """Outcome of the verification ceremony (#496).
+
+    Lifted directly from the issue body so the FE narrow string union
+    matches what the backend writes. ``NOT_ATTESTED`` is the default
+    for any session that hasn't attempted attestation; ``UNKNOWN`` is
+    the slot for "we got a response but neither pass nor fail
+    semantics applied" (network blip, partial decode); ``FAILED`` is
+    the explicit deny — caller produced an attestation, verification
+    rejected it.
+    """
+
+    NOT_ATTESTED = "not_attested", "Not attested"
+    GENUINE = "genuine", "Genuine"
+    UNKNOWN = "unknown", "Unknown"
+    FAILED = "failed", "Failed"
+
+
 class AstroliftSession(BaseCoreModel):
     """Sidecar for one authenticated session.
 
@@ -161,10 +192,55 @@ class AstroliftSession(BaseCoreModel):
         on_delete=models.SET_NULL,
     )
 
+    # ---- Device attestation (#496) -----------------------------------
+    # Mobile sessions only; ``NONE`` for browser / CLI / API-token
+    # sessions where neither App Attest nor Play Integrity is
+    # applicable. Set by ``attestSession`` mutation after verification
+    # against Apple / Google services succeeds.
+    attestation_kind = models.CharField(
+        max_length=32,
+        choices=AttestationKind.choices,
+        default=AttestationKind.NONE.value,
+        db_index=True,
+    )
+
+    # ``not_attested`` until the verifier returns; ``genuine`` after a
+    # successful verification; ``failed`` when verification was
+    # attempted and rejected; ``unknown`` when verification produced an
+    # indeterminate result (network failure, partial response).
+    attestation_trust_level = models.CharField(
+        max_length=16,
+        choices=AttestationTrustLevel.choices,
+        default=AttestationTrustLevel.NOT_ATTESTED.value,
+        db_index=True,
+    )
+
+    attestation_verified_at = models.DateTimeField(null=True, blank=True)
+
+    # iOS App Attest stores the attested public key (PEM) here so
+    # subsequent ``assertSession`` calls can verify the assertion
+    # signature without re-running the full attestation. Empty on
+    # Android (Play Integrity is per-token; no long-lived key).
+    attestation_public_key = models.TextField(blank=True, default="")
+
+    # iOS App Attest signed-counter — must strictly increase on every
+    # assertion to defeat replay. Initialised to 0 at attestation
+    # time per the App Attest spec.
+    attestation_counter = models.IntegerField(default=0)
+
+    # Verified claims from the attestation response: kept for audit /
+    # forensics so a future incident review can answer "what did
+    # Apple/Google tell us about this device when it attested".
+    attestation_payload = models.JSONField(default=dict, blank=True)
+
     class Meta:
         indexes = [
             models.Index(fields=["user", "client_kind"], name="astrosess_user_kind_idx"),
             models.Index(fields=["organization", "user"], name="astrosess_org_user_idx"),
+            models.Index(
+                fields=["attestation_kind", "attestation_trust_level"],
+                name="astrosess_attest_idx",
+            ),
         ]
 
 

@@ -1,4 +1,5 @@
 from astrolift_identity.models.api_token import ApiToken
+from astrolift_identity.models.attestation_challenge import AttestationChallenge
 from astrolift_identity.models.device_flow_session import DeviceFlowSession
 from astrolift_identity.models.group_role_mapping import GroupRoleMapping
 from astrolift_identity.models.identity_provider import IdentityProvider
@@ -18,6 +19,8 @@ from astrolift_identity.models.session import (
     DEFAULT_STALE_SESSION_TTL_SECONDS,
     LAST_SEEN_WRITE_THROTTLE_SECONDS,
     AstroliftSession,
+    AttestationKind,
+    AttestationTrustLevel,
     ClientKind,
     RevocationReason,
 )
@@ -29,6 +32,9 @@ __all__ = [
     "LAST_SEEN_WRITE_THROTTLE_SECONDS",
     "ApiToken",
     "AstroliftSession",
+    "AttestationChallenge",
+    "AttestationKind",
+    "AttestationTrustLevel",
     "ClientKind",
     "DeviceFlowSession",
     "GroupRoleMapping",

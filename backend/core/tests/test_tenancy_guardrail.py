@@ -94,6 +94,27 @@ EXEMPT: dict[str, str] = {
         "permission gate (every authed user can drop their own "
         "elevation)."
     ),
+    "IdentityMutation.request_attestation_challenge": (
+        "#496 device attestation: issues a one-shot nonce bound to "
+        "the caller's user + chosen kind. Self-service, tenant-"
+        "orthogonal — the mobile app attests its own session before "
+        "any tenant context can be picked. Per-user rate via the "
+        "ATTESTATION_CHALLENGE_TTL_SECONDS knob caps abuse."
+    ),
+    "IdentityMutation.attest_session": (
+        "#496 device attestation: submits the iOS App Attest / Android "
+        "Play Integrity blob for the caller's own session. Self-"
+        "service, tenant-orthogonal — the session is bound to a user, "
+        "not an org, and the verifier itself (Apple/Google signature) "
+        "is the gate. The nonce-consume step rejects replays + "
+        "wrong-user submissions inline."
+    ),
+    "IdentityMutation.assert_session": (
+        "#496 device attestation: periodic iOS App Attest assertion "
+        "against the caller's own session. Self-service, tenant-"
+        "orthogonal — same rationale as attest_session; the stored "
+        "public key + monotonic counter are the gate."
+    ),
     "IdentityQuery.astrolift_elevation_status": (
         "#487 step-up auth: returns the caller's own session elevation "
         "snapshot. Self-service, tenant-orthogonal — drives the nav "
