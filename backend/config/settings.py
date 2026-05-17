@@ -440,6 +440,15 @@ CONSTANCE_CONFIG = {
         "see the exact grace they're committing to. Use the explicit ``revokeDeployToken`` "
         "path (or ``immediate=True`` in code) for compromised-token cutover.",
     ),
+    "DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED": (
+        True,
+        "Accept the pre-#449 legacy ``alfdt_`` deploy-token prefix in addition to the "
+        "canonical ``alft_dt_`` shape. Default True so in-flight tokens issued before #449 "
+        "keep authenticating after the canonicalisation ships. Flip to False once the "
+        "``deploy_token.legacy_prefix_accepted`` audit stream confirms no caller is still "
+        "presenting the legacy shape — at that point any straggler legacy token will fail "
+        "auth with a 401 and operators can re-issue.",
+    ),
     "ALLOW_SELF_APPROVE_DEPLOYS": (
         False,
         "When False (default), the user who triggered a deployment cannot also approve it — "
@@ -483,7 +492,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
     },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
     "Deploy tokens": {
-        "fields": ("DEPLOY_TOKEN_ROTATION_GRACE_SECONDS",),
+        "fields": (
+            "DEPLOY_TOKEN_ROTATION_GRACE_SECONDS",
+            "DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED",
+        ),
         "collapse": False,
     },
     "Audit": {

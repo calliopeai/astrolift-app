@@ -274,8 +274,11 @@ def test_push_secrets_sealed_values_round_trip(
     assert _decrypt("ASTROLIFT_API_URL") == "https://api.astrolift.example.com"
     # Deploy token plaintext: shape is alft_dt_<urlsafe>; we don't have
     # the plaintext in the response (only last4), so assert format.
+    # #449: pre-canonicalisation we tolerated both ``alft_dt_`` and the
+    # buggy ``alfdt_`` here; the mint now writes the canonical prefix
+    # only, so the legacy fallback is gone.
     token_plain = _decrypt("ASTROLIFT_DEPLOY_TOKEN")
-    assert token_plain.startswith(("alft_dt_", "alfdt_"))
+    assert token_plain.startswith("alft_dt_")
     assert token_plain[-4:] == result.data.rotated_token_last_4
 
 
