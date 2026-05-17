@@ -15,6 +15,7 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_identity.models import (
     ApiToken,
     IdentityProvider,
@@ -194,6 +195,32 @@ class IdentityQuery:
     @tenant_scoped()
     def astrolift_members(self, info: Info) -> list[MemberType]:
         qs = Member.objects.select_related("user").order_by("-created_at")[:500]
+        return [member_to_type(m) for m in qs]
+
+    @strawberry.field
+    @require_permission(Permission.TEAM_READ)
+    @tenant_scoped()
+    def astrolift_team_members(self, info: Info, team_id: GUID) -> list[MemberType]:
+        """Members attached to one team, by team GUID.
+
+        The Member.scope_id column stores the team's integer pk, so a
+        consumer that only has the team's GUID can't filter via the
+        generic ``astrolift_members`` resolver — this resolver does the
+        GUID→pk hop server-side. Used by the team detail page's bulk
+        role-assign panel (#416).
+        """
+        team = Team.objects.filter(guid=str(team_id), deleted_at__isnull=True).first()
+        if team is None:
+            return []
+        qs = (
+            Member.objects.select_related("user")
+            .filter(
+                scope_kind=Member.ScopeKind.TEAM,
+                scope_id=team.pk,
+                deleted_at__isnull=True,
+            )
+            .order_by("-created_at")[:500]
+        )
         return [member_to_type(m) for m in qs]
 
     @strawberry.field

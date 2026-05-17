@@ -377,6 +377,58 @@ export const REVOKE_ROLE_BINDING = gql`
   }
 `;
 
+const BULK_OP_RESULT_FIELDS = `
+  results {
+    id
+    ok
+    alreadyExisted
+    errors {
+      code
+      message
+      field
+    }
+  }
+`;
+
+export const BULK_REVOKE_ROLE_BINDINGS = gql`
+  mutation BulkRevokeAstroliftRoleBindings($input: BulkRevokeRoleBindingsInput!) {
+    bulkRevokeAstroliftRoleBindings(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${BULK_OP_RESULT_FIELDS}
+        revokedCount
+        failedCount
+      }
+    }
+  }
+`;
+
+export const BULK_ASSIGN_TEAM_MEMBER_ROLES = gql`
+  mutation BulkAssignAstroliftTeamMemberRoles(
+    $input: BulkAssignTeamMemberRolesInput!
+  ) {
+    bulkAssignAstroliftTeamMemberRoles(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${BULK_OP_RESULT_FIELDS}
+        assignedCount
+        alreadyAssignedCount
+        failedCount
+      }
+    }
+  }
+`;
+
 const INVITATION_FIELDS = `
   id
   email
@@ -426,9 +478,7 @@ export const REVOKE_INVITATION = gql`
 `;
 
 export const ADD_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
-  mutation AddOrganizationAllowlistDomain(
-    $input: AddOrganizationAllowlistDomainInput!
-  ) {
+  mutation AddOrganizationAllowlistDomain($input: AddOrganizationAllowlistDomainInput!) {
     addOrganizationAllowlistDomain(input: $input) {
       ok
       errors {
@@ -449,9 +499,7 @@ export const ADD_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
 `;
 
 export const REMOVE_ORGANIZATION_ALLOWLIST_DOMAIN = gql`
-  mutation RemoveOrganizationAllowlistDomain(
-    $input: RemoveOrganizationAllowlistDomainInput!
-  ) {
+  mutation RemoveOrganizationAllowlistDomain($input: RemoveOrganizationAllowlistDomainInput!) {
     removeOrganizationAllowlistDomain(input: $input) {
       ok
       errors {

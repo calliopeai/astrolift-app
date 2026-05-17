@@ -1780,6 +1780,57 @@
         "redactedNote": "Sensitive values (secrets, tokens, passwords) are redacted before display.",
         "requestIdSection": "Request ID"
       }
+    },
+    "membersBulk": {
+      "selectAllLabel": "Select all role bindings",
+      "selectRowLabel": "Select binding {role} on {subject}",
+      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
+      "clear": "Clear",
+      "revokeButton": "Revoke {count}",
+      "permissionHint": "You don't have permission to manage members.",
+      "confirm": {
+        "title": "Revoke {count} role binding(s)?",
+        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
+        "confirmLabel": "Revoke {count}"
+      },
+      "toasts": {
+        "allOk": "Revoked {count} role binding(s).",
+        "partial": "Revoked {revoked}, {failed} failed.",
+        "allFailed": "Bulk revoke failed: {message}"
+      }
+    },
+    "teamMembersBulk": {
+      "tabTitle": "Team members",
+      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
+      "loadError": "Couldn't load team members.",
+      "emptyTitle": "No members on this team yet",
+      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "columns": {
+        "user": "User",
+        "lifecycle": "Lifecycle",
+        "joined": "Joined"
+      },
+      "selectAllLabel": "Select all team members",
+      "selectRowLabel": "Select member {user}",
+      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
+      "clear": "Clear",
+      "assignButton": "Assign role to {count}",
+      "permissionHint": "You don't have permission to manage members on this team.",
+      "assignDialog": {
+        "title": "Assign role to {count} member(s)",
+        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
+        "roleLabel": "Team-scoped role",
+        "rolePlaceholder": "Choose a role",
+        "noRoles": "No team-scoped roles available. Create one on /roles first.",
+        "cancel": "Cancel",
+        "confirmLabel": "Assign role"
+      },
+      "toasts": {
+        "allOk": "Assigned role to {count} member(s).",
+        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
+        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
+        "allFailed": "Bulk assign failed: {message}"
+      }
     }
   },
   "settingsIndex": {

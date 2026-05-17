@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "概要",
+    "description": "この Astrolift インストールの ID・レジストリ・ライフサイクル情報。",
+    "errorBanner": {
+      "title": "一部のデータを読み込めませんでした"
+    },
+    "tiles": {
+      "teams": {
+        "label": "チーム",
+        "emptyCta": "最初のチームを作成"
+      },
+      "projects": {
+        "label": "プロジェクト",
+        "emptyCta": "プロジェクトを作成"
+      },
+      "apps": {
+        "label": "登録済みアプリ",
+        "emptyCta": "最初のアプリを登録"
+      },
+      "deployments": {
+        "label": "進行中のデプロイ",
+        "emptyCta": "デプロイを実行"
+      },
+      "costMtd": {
+        "label": "コスト (月初来)",
+        "emptyCta": "コストデータを待機中",
+        "vsPrevMonth": "前月比",
+        "noPrevMonth": "前月実績なし"
+      }
+    },
+    "fleetHealth": {
+      "title": "フリートの状態",
+      "description": "登録済みアプリ全体の直近デプロイ状態のサマリ。",
+      "healthy": "正常",
+      "failing": "{count} 件が失敗中",
+      "hiccup": "{count, plural, one {# 件の不具合} other {# 件の不具合}}",
+      "empty": "登録済みアプリがありません。/apps/new でリポジトリを接続して開始してください。",
+      "tiles": {
+        "running": "実行中",
+        "recentFailure": "直近の失敗",
+        "failing": "失敗中",
+        "noDeploys": "デプロイなし"
+      }
+    },
+    "recentProjects": {
+      "title": "最近のプロジェクト",
+      "description": "すべてのチームで最近作成されたプロジェクト。",
+      "emptyTitle": "プロジェクトがありません",
+      "emptyDescription": "チームとプロジェクトを作成して、アプリの登録を始めましょう。",
+      "emptyAction": "チームを管理"
+    },
+    "activity": {
+      "title": "アクティビティ",
+      "description": "ライフサイクルイベント: デプロイ、設定同期、スケーリング、クラスタ追加、シークレットローテーション。",
+      "emptyTitle": "アクティビティはまだありません",
+      "emptyDescription": "デプロイや設定変更、クラスタ操作が発生するとここに表示されます。",
+      "errorTitle": "アクティビティを読み込めませんでした",
+      "loadMore": "さらに読み込む",
+      "loadingMore": "読み込み中…"
+    },
+    "registeredApps": {
+      "title": "登録済みアプリ",
+      "description": "デプロイ対象として登録されたリポジトリ。",
+      "emptyTitle": "登録されたアプリがありません",
+      "emptyDescription": "アプリレジストリの UI は次のマイルストーンで提供されます。実装後は、このカードから Git リポジトリを登録してデプロイを開始できます。",
+      "emptyAction": "レジストリを開く"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
@@ -99,6 +167,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "設定セクション",
+      "openMobileNav": "設定メニューを開く",
+      "openMobileNavLabel": "セクション",
+      "mobileTitle": "設定セクション",
+      "mobileDescription": "設定の任意の領域にジャンプします。",
+      "groups": {
+        "organization": "組織",
+        "personal": "個人",
+        "tokens": "トークン"
+      }
+    },
+    "breadcrumb": {
+      "root": "設定"
     }
   },
   "hooks": {
@@ -170,18 +253,6 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
-      },
-      "freshness": {
-        "lastDeployed": "最終デプロイ {when}",
-        "viewFailed": "失敗したデプロイを表示",
-        "stale": "古い",
-        "never": "デプロイ未実施",
-        "status": {
-          "OK": "正常",
-          "DEGRADED": "最新のデプロイが失敗",
-          "STALE": "最近のデプロイなし",
-          "NEVER": "未デプロイ"
-        }
       }
     },
     "tabs": {
@@ -319,39 +390,133 @@
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     },
-    "settings": {
-      "webhookDeploys": {
-        "title": "Webhook deploys",
-        "description": "App-global pause for CI / push / scheduled deploys. Manual deploys from the UI or CLI keep working so you can still ship a fix.",
-        "paused": "Paused",
-        "live": "Live",
-        "pause": "Pause webhook deploys",
-        "resume": "Resume webhook deploys",
-        "scopeNoteLive": "Webhook-fired deploys (push, CI, scheduled) accept normally. Pausing stops all three; manual deploys remain available.",
-        "scopeNotePaused": "Webhook-fired deploys refused. Manual deploys, rollbacks, promotions, and teardown remain available.",
-        "pausedBy": "Paused by <who></who> · <when></when>",
-        "reasonPrefix": "Reason:",
-        "noReason": "No reason recorded.",
-        "unknownActor": "unknown",
-        "unknownTime": "just now",
-        "confirmTitle": "Pause webhook deploys for this app?",
-        "confirmDescription": "Future deploys from CI, push events, and cron will be refused until you resume. Manual deploys from the UI or CLI continue to work.",
-        "reasonLabel": "Reason (optional)",
-        "reasonPlaceholder": "e.g. CI is misfiring, holding until the upstream pipeline is fixed",
-        "reasonHelp": "Recorded on the audit log and shown on this page until the pause is lifted. Up to 512 characters.",
-        "confirmButton": "Pause webhook deploys",
-        "cancel": "Cancel",
-        "toastPaused": "Webhook deploys paused.",
-        "toastResumed": "Webhook deploys resumed.",
-        "toastPauseFailed": "Pause failed.",
-        "toastResumeFailed": "Resume failed.",
-        "toastNoResponse": "No response from backend."
+    "observability": {
+      "scope": {
+        "title": "メトリクスのスコープ",
+        "environment": "環境",
+        "workload": "ワークロード",
+        "allWorkloads": "すべてのワークロード",
+        "environmentPlaceholder": "環境を選択",
+        "workloadPlaceholder": "ワークロードを選択"
+      },
+      "events": {
+        "warningCount": "過去1時間に{count}件の警告",
+        "warningBadgeLabel": "警告",
+        "collapse": "折りたたむ",
+        "expand": "展開する"
+      }
+    },
+    "tokens": {
+      "title": "Deploy tokens",
+      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
+      "createToken": "Create token",
+      "emptyTitle": "No deploy tokens yet",
+      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "allScopes": "all",
+      "never": "never",
+      "createFailed": "Create failed",
+      "revokeFailed": "Revoke failed",
+      "revokedToast": "Revoked {name}",
+      "columns": {
+        "name": "Name",
+        "last4": "Last 4",
+        "scopes": "Scopes",
+        "lastUsed": "Last used",
+        "expires": "Expires",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "active",
+        "revoked": "revoked"
+      },
+      "lastUsedCell": {
+        "ip": "IP",
+        "agent": "Agent"
+      },
+      "createSheet": {
+        "title": "Create deploy token",
+        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
+        "name": "Name",
+        "scopes": "Scopes (comma-separated)",
+        "scopesHint": "Leave blank for all scopes.",
+        "expires": "Expires in (days)",
+        "submit": "Create token",
+        "submitting": "Creating…"
+      },
+      "revealDialog": {
+        "title": "Token created — copy now",
+        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
+        "last4Label": "last 4",
+        "copy": "Copy",
+        "copied": "Copied to clipboard",
+        "done": "Done",
+        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+      },
+      "rotateDialog": {
+        "title": "Rotate {name}?",
+        "fallbackTitle": "Rotate token?",
+        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
+        "newLine": "New token issued now.",
+        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
+        "confirm": "Rotate token"
+      },
+      "revokeDialog": {
+        "title": "Revoke {name}?",
+        "fallbackTitle": "Revoke token?",
+        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
+        "confirm": "Revoke token"
+      }
+    },
+    "domains": {
+      "addSheet": {
+        "byoTitle": "Bring your own certificate",
+        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
+        "methodLabels": {
+          "dns_txt": "DNS-TXT (default)",
+          "http_01": "HTTP-01",
+          "dns_01": "DNS-01",
+          "byo_cert": "Bring your own certificate"
+        },
+        "methodHints": {
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
+          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
+          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
+        }
+      }
+    },
+    "detail": {
+      "urlHealth": {
+        "checking": "確認中…",
+        "unknown": "未確認",
+        "ariaLabel": "URL ヘルス: {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "到達不能",
+        "tooltip": {
+          "title": "最近のチェック",
+          "empty": "プローブ履歴はまだありません。",
+          "uptime": "{ok}/{total} 正常 · 平均 {avgMs}ms",
+          "now": "たった今",
+          "secondsAgo": "{seconds} 秒前",
+          "minutesAgo": "{minutes} 分前",
+          "hoursAgo": "{hours} 時間前",
+          "recheck": "クリックして再プローブ",
+          "rechecking": "再プローブ中…"
+        }
       }
     }
   },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
+    "cardMeta": {
+      "modified": "Modified {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -368,6 +533,10 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",
@@ -499,6 +668,64 @@
         "requestIdSection": "リクエスト ID"
       }
     },
+    "approval": {
+      "quorum": {
+        "header": "{received} / {required} 承認",
+        "remainingBadge": "あと {count} 件必要",
+        "metBadge": "クォーラム達成",
+        "approvedLabel": "承認者",
+        "approvedEmpty": "まだ承認はありません。",
+        "awaitingLabel": "未承認",
+        "awaitingEmpty": "対象の承認者が見つかりません。アプリのポリシーを確認してください。"
+      }
+    },
+    "approvalsQueue": {
+      "title": "承認キュー",
+      "description": "承認待ちの全デプロイ。同一環境内で行を選択して一括承認または拒否できます。",
+      "empty": {
+        "title": "保留中なし",
+        "description": "承認が必要なデプロイはここに表示されます。"
+      },
+      "selectAllLabel": "すべて選択",
+      "selectionStatus": "{selected} / {total} 件選択中",
+      "readOnlyHint": "閲覧のみ可能です。",
+      "approveLabel": "承認",
+      "rejectLabel": "拒否",
+      "footer": {
+        "selected": "{count} 件のデプロイを選択中",
+        "summary": "{envs} で実行されます。",
+        "crossEnvWarning": "一括操作には同一アプリ/環境が必要です。ポリシーは環境ごとに異なります。",
+        "approveButton": "{count} 件承認",
+        "rejectButton": "{count} 件拒否"
+      },
+      "confirmApprove": {
+        "title": "{count} 件のデプロイを承認しますか?",
+        "description": "{envs} のロールアウトが再開されます。",
+        "confirm": "すべて承認"
+      },
+      "confirmReject": {
+        "title": "{count} 件のデプロイを拒否しますか?",
+        "description": "{envs} の各デプロイが失敗状態になります。",
+        "reasonLabel": "拒否理由",
+        "reasonPlaceholder": "このバッチを拒否する理由を入力してください。",
+        "reasonRequired": "理由は必須です",
+        "confirm": "すべて拒否"
+      },
+      "toasts": {
+        "unexpected": "一括操作の応答がありません。",
+        "allOk": "{label} が {count} 件で成功しました。",
+        "allFailed": "{label} が {count} 件で失敗: {message}",
+        "partial": "{label}: 成功 {succeeded} 件 / 失敗 {failed} 件",
+        "approveFailed": "一括承認に失敗しました。",
+        "rejectFailed": "一括拒否に失敗しました。"
+      },
+      "row": {
+        "selectRowLabel": "{app} / {env} を選択",
+        "approvalsCount": "{received}/{required} 承認",
+        "received": "受信 {rel}",
+        "review": "確認"
+      }
+    },
     "events": {
       "title": "Events",
       "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
@@ -571,6 +798,132 @@
         "submit": "Mute rule",
         "cancel": "Cancel"
       }
+    },
+    "membersBulk": {
+      "selectAllLabel": "Select all role bindings",
+      "selectRowLabel": "Select binding {role} on {subject}",
+      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
+      "clear": "Clear",
+      "revokeButton": "Revoke {count}",
+      "permissionHint": "You don't have permission to manage members.",
+      "confirm": {
+        "title": "Revoke {count} role binding(s)?",
+        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
+        "confirmLabel": "Revoke {count}"
+      },
+      "toasts": {
+        "allOk": "Revoked {count} role binding(s).",
+        "partial": "Revoked {revoked}, {failed} failed.",
+        "allFailed": "Bulk revoke failed: {message}"
+      }
+    },
+    "teamMembersBulk": {
+      "tabTitle": "Team members",
+      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
+      "loadError": "Couldn't load team members.",
+      "emptyTitle": "No members on this team yet",
+      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "columns": {
+        "user": "User",
+        "lifecycle": "Lifecycle",
+        "joined": "Joined"
+      },
+      "selectAllLabel": "Select all team members",
+      "selectRowLabel": "Select member {user}",
+      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
+      "clear": "Clear",
+      "assignButton": "Assign role to {count}",
+      "permissionHint": "You don't have permission to manage members on this team.",
+      "assignDialog": {
+        "title": "Assign role to {count} member(s)",
+        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
+        "roleLabel": "Team-scoped role",
+        "rolePlaceholder": "Choose a role",
+        "noRoles": "No team-scoped roles available. Create one on /roles first.",
+        "cancel": "Cancel",
+        "confirmLabel": "Assign role"
+      },
+      "toasts": {
+        "allOk": "Assigned role to {count} member(s).",
+        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
+        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
+        "allFailed": "Bulk assign failed: {message}"
+      }
+    }
+  },
+  "jobs": {
+    "title": "ジョブ",
+    "descriptionGlobal": "全アプリにわたるスケジュールされたジョブ実行とアドホックコマンド実行。",
+    "descriptionForApp": "{app} のスケジュールされたジョブ実行とアドホックコマンド実行。",
+    "tabs": {
+      "scheduled": "スケジュール済み",
+      "commands": "コマンド"
+    },
+    "scheduled": {
+      "emptyTitle": "まだスケジュールされたジョブ実行はありません",
+      "emptyDescription": "Cronjob ワークロードは、スケジューラが最初の実行をトリガーするとここに表示されます。",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "アプリ / 環境 / ワークロード",
+        "k8sJob": "K8s ジョブ",
+        "status": "ステータス",
+        "duration": "実行時間",
+        "started": "開始"
+      }
+    },
+    "commands": {
+      "emptyTitle": "まだコマンド実行はありません",
+      "emptyDescription": "ワークロードに対するアドホックコマンドはここに表示されます。`astro app run …` でCLIから実行してください。",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "アプリ / ワークロード",
+        "command": "コマンド",
+        "status": "ステータス",
+        "invokedBy": "実行者",
+        "started": "開始"
+      }
+    },
+    "runStatus": {
+      "running": "実行中",
+      "inProgress": "進行中",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "superseded": "置換済み",
+      "unknown": "不明",
+      "exitCodeLabel": "終了コード {code}",
+      "exitCodeTooltip": "プロセスは終了コード {code} で終了しました"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "禁止",
+        "queue": "キュー",
+        "replace": "置換"
+      },
+      "tooltip": {
+        "forbid": "実行中の間、次のスケジュールをスキップします。",
+        "queue": "重複する実行をスタックできます — 各トリガーが独立して短い場合に選択してください。",
+        "replace": "実行中のジョブを停止し、新しいジョブを開始します。"
+      }
+    },
+    "cron": {
+      "invalid": "無効な cron 式",
+      "firesIn": "{relative}後に実行",
+      "now": "1分未満",
+      "minutes": "{count}分",
+      "hours": "{count}時間",
+      "days": "{count}日"
+    },
+    "workloadCard": {
+      "title": "Cronjob ワークロード",
+      "countLabel": "{count}件スケジュール済み",
+      "openLogs": "コンソールで開く"
+    },
+    "output": {
+      "emptyOutput": "まだ出力がキャプチャされていません。",
+      "openInConsole": "コンソールで開く",
+      "lines": "{count}行",
+      "truncated": "200行表示 — コンソールで全ログを確認できます。"
     }
   }
 }
