@@ -1,5 +1,7 @@
 export { WorkflowTimeline } from "./WorkflowTimeline";
 export { GitOpsCommitTimeline } from "./GitOpsCommitTimeline";
+export { TerminalEmulator } from "./TerminalEmulator";
+export type { TerminalEmulatorProps } from "./TerminalEmulator";
 export { DnsRecordsCard } from "./DnsRecordsCard";
 export { TlsCertificatesCard } from "./TlsCertificatesCard";
 export { WorkloadIdentityCard } from "./WorkloadIdentityCard";
