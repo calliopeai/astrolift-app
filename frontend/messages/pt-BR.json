@@ -1054,5 +1054,20 @@
       "lines": "{count, plural, one {# linha} other {# linhas}}",
       "truncated": "200 linhas exibidas — abra o console para o registro completo."
     }
+  },
+  "orgMembers": {
+    "searchLabel": "Pesquisar membros",
+    "searchPlaceholder": "Pesquisar por nome de usuário ou e-mail…",
+    "lastActiveColumn": "Última atividade",
+    "actionsColumn": "Ações",
+    "noMatchTitle": "Sem correspondências",
+    "noMatchDescription": "Nenhum membro corresponde a \"{term}\". Tente outro termo de pesquisa.",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "inativo",
+    "rolePillTooltipPrefix": "Concedido via {scope}",
+    "sourceTooltipAria": "Concedido via {scope}",
+    "sourceColumn": "Origem",
+    "grantRoleRowLabel": "Conceder função a {name}",
+    "grantRoleRowTooltip": "Conceder função a {name}"
   }
 }

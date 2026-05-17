@@ -1054,5 +1054,20 @@
       "lines": "{count}行",
       "truncated": "200行表示 — コンソールで全ログを確認できます。"
     }
+  },
+  "orgMembers": {
+    "searchLabel": "メンバーを検索",
+    "searchPlaceholder": "ユーザー名またはメールアドレスで検索…",
+    "lastActiveColumn": "最終アクティブ",
+    "actionsColumn": "アクション",
+    "noMatchTitle": "一致なし",
+    "noMatchDescription": "「{term}」に一致するメンバーはいません。別の検索語をお試しください。",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "非アクティブ",
+    "rolePillTooltipPrefix": "{scope} 経由で付与",
+    "sourceTooltipAria": "{scope} 経由で付与",
+    "sourceColumn": "ソース",
+    "grantRoleRowLabel": "{name} にロールを付与",
+    "grantRoleRowTooltip": "{name} にロールを付与"
   }
 }

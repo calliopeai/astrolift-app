@@ -1054,5 +1054,20 @@
       "lines": "{count}行",
       "truncated": "已显示 200 行 — 在控制台中查看完整日志。"
     }
+  },
+  "orgMembers": {
+    "searchLabel": "搜索成员",
+    "searchPlaceholder": "按用户名或邮箱搜索…",
+    "lastActiveColumn": "最近活跃",
+    "actionsColumn": "操作",
+    "noMatchTitle": "无匹配项",
+    "noMatchDescription": "没有成员匹配“{term}”。请尝试其他搜索词。",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "未活跃",
+    "rolePillTooltipPrefix": "通过 {scope} 授予",
+    "sourceTooltipAria": "通过 {scope} 授予",
+    "sourceColumn": "来源",
+    "grantRoleRowLabel": "为 {name} 授予角色",
+    "grantRoleRowTooltip": "为 {name} 授予角色"
   }
 }
