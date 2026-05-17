@@ -26,6 +26,28 @@ class AppEnvironmentType:
     created_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftDeploymentApprover")
+class DeploymentApproverType:
+    """One approver entry rendered on the quorum widget (#420).
+
+    Surfaced in two slots on ``AstroliftDeployment``:
+
+    * ``approvedBy`` — users who already voted approve (``approvedAt``
+      is set to the audit-event occurrence).
+    * ``awaitingApprovers`` — eligible org/team members who haven't
+      approved yet (``approvedAt`` is null).
+
+    ``mailtoUrl`` is a pre-built ``mailto:`` link so the UI can render
+    a one-click nudge without rebuilding the subject line per locale.
+    Empty when the approver has no recorded email."""
+
+    user_id: str
+    display_name: str
+    email: str
+    approved_at: dt.datetime | None
+    mailto_url: str
+
+
 @strawberry.type(name="AstroliftDeployment")
 class DeploymentType:
     id: GUID
@@ -39,6 +61,26 @@ class DeploymentType:
     cluster_revision: str
     approvals_required: int
     approvals_received: int
+    required_approver_count: int
+    """Alias of ``approvals_required`` exposed under the quorum
+    vocabulary (#420). Kept distinct from ``approvals_required`` so the
+    quorum-widget query can switch to the new name without touching
+    callers that still read the older one (badges on the queue page,
+    per-app pending row, deployment metrics tile)."""
+
+    approved_by: list[DeploymentApproverType]
+    """Users who already voted approve on this deployment. Drawn from
+    ``AuditEvent`` rows whose action is ``deployment.approve`` and
+    whose target matches the deployment guid."""
+
+    awaiting_approvers: list[DeploymentApproverType]
+    """Eligible approvers who haven't voted yet. Resolution order:
+    ``app.approver_users`` when non-empty, else members of
+    ``app.approver_team`` when set, else holders of
+    ``app.approve_deploy`` at the org scope. The triggerer is filtered
+    out when self-approval is disabled (Constance flag
+    ``ALLOW_SELF_APPROVE_DEPLOYS``)."""
+
     started_at: dt.datetime | None
     succeeded_at: dt.datetime | None
     failed_at: dt.datetime | None
@@ -204,6 +246,13 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
     Callers can omit it (defaults to None) — the field then surfaces as
     False so unauthenticated / system call sites don't accidentally
     claim ownership of a row.
+
+    Quorum surface (#420):
+    ``approved_by`` + ``awaiting_approvers`` resolve from the audit
+    log + the app's approver policy. Both lists default to empty when
+    the row isn't gated (``approvals_required == 0``) — that's the
+    cheap path and keeps list queries (``astrolift_deployments``) from
+    fanning out into per-row identity joins.
     """
     triggered_by_user_id = d.triggered_by_user_id
     triggered_by_me = bool(viewer_user_id is not None and triggered_by_user_id == viewer_user_id)
@@ -212,6 +261,8 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         repo_url = (
             getattr(d.registered_app, "source_url", "") or getattr(d.registered_app, "source_repo", "") or ""
         )
+
+    approved_by, awaiting = _resolve_quorum_lists(d)
     return DeploymentType(
         id=GUID(str(d.guid)),
         registered_app_slug=d.registered_app.slug,
@@ -224,6 +275,9 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         cluster_revision=d.cluster_revision or "",
         approvals_required=d.approvals_required,
         approvals_received=d.approvals_received,
+        required_approver_count=d.approvals_required,
+        approved_by=approved_by,
+        awaiting_approvers=awaiting,
         started_at=d.started_at,
         succeeded_at=d.succeeded_at,
         failed_at=d.failed_at,
@@ -242,6 +296,219 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         triggered_by_user_id=(str(triggered_by_user_id) if triggered_by_user_id is not None else None),
         triggered_by_me=triggered_by_me,
     )
+
+
+# ---------------------------------------------------------------------------
+# Quorum resolution (#420)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_quorum_lists(
+    deployment,
+) -> tuple[list[DeploymentApproverType], list[DeploymentApproverType]]:
+    """Return ``(approved_by, awaiting_approvers)`` for a deployment.
+
+    Both lists are empty when the deployment isn't gated
+    (``approvals_required == 0``) or the deployment has already moved
+    past the pending state (terminal/in-flight rows show their final
+    audit trail via the approval-history panel instead).
+
+    Eligibility chain (matches ``_is_eligible_approver`` in mutations):
+    explicit ``approver_users`` > ``approver_team`` members > org-scope
+    holders of the ``app.approve_deploy`` permission. Triggerer is
+    filtered out when self-approval is disabled.
+    """
+    if deployment is None or deployment.approvals_required <= 0:
+        return [], []
+
+    from astrolift_operations.models import AuditEvent
+
+    app = deployment.registered_app
+    deployment_guid = str(deployment.guid)
+
+    approved_events = list(
+        AuditEvent.objects.filter(
+            action__in=("deployment.approve", "deployment.approve_by_token"),
+            target_id=deployment_guid,
+            actor_kind="user",
+        )
+        .exclude(actor_id="")
+        .order_by("occurred_at")
+    )
+    approved_user_ids: list[int] = []
+    approved_at_by_user: dict[int, dt.datetime] = {}
+    for e in approved_events:
+        try:
+            uid = int(e.actor_id)
+        except (TypeError, ValueError):
+            continue
+        if uid in approved_at_by_user:
+            continue
+        approved_user_ids.append(uid)
+        approved_at_by_user[uid] = e.occurred_at
+
+    eligible_user_ids = _eligible_approver_user_ids(app)
+
+    triggerer_id = deployment.triggered_by_user_id
+    if triggerer_id is not None and not _self_approve_allowed_safe():
+        eligible_user_ids = [uid for uid in eligible_user_ids if uid != triggerer_id]
+
+    awaiting_user_ids = [uid for uid in eligible_user_ids if uid not in approved_at_by_user]
+
+    users_by_id = _hydrate_users(set(approved_user_ids) | set(awaiting_user_ids))
+
+    approved_by: list[DeploymentApproverType] = []
+    for uid in approved_user_ids:
+        user = users_by_id.get(uid)
+        if user is None:
+            continue
+        approved_by.append(_approver_entry(user, approved_at=approved_at_by_user[uid], app_slug=app.slug))
+
+    awaiting: list[DeploymentApproverType] = []
+    for uid in awaiting_user_ids:
+        user = users_by_id.get(uid)
+        if user is None:
+            continue
+        awaiting.append(_approver_entry(user, approved_at=None, app_slug=app.slug))
+
+    return approved_by, awaiting
+
+
+def _eligible_approver_user_ids(app) -> list[int]:
+    """Resolve the eligible approver user-id set for an app.
+
+    Mirrors ``_is_eligible_approver`` in
+    ``astrolift_lifecycle.schema.mutations``: explicit ``approver_users``
+    when non-empty, then ``approver_team`` members, then org-scope
+    RoleBinding holders of ``app.approve_deploy``. Returns a
+    deduplicated, deterministically-ordered list.
+    """
+    from astrolift_identity.models import Member
+
+    if not app.requires_approval and not app.approver_users.exists() and app.approver_team_id is None:
+        # No explicit approver policy. Fall back to org-scope holders of
+        # the permission so the awaiting set is non-empty for env-level
+        # required_approvals deploys.
+        return _org_approver_user_ids(app)
+
+    explicit_user_ids = list(app.approver_users.filter(is_active=True).values_list("pk", flat=True))
+    team_user_ids: list[int] = []
+    if app.approver_team_id is not None:
+        team_user_ids = list(
+            Member.objects.filter(
+                scope_kind=Member.ScopeKind.TEAM,
+                scope_id=app.approver_team_id,
+                is_active=True,
+                deleted_at__isnull=True,
+            ).values_list("user_id", flat=True)
+        )
+
+    combined = explicit_user_ids + team_user_ids
+    if combined:
+        return _dedup_preserve_order(combined)
+
+    # ``requires_approval`` is True but no explicit set was configured
+    # — surface the org-scope permission holders so the widget isn't
+    # blank.
+    return _org_approver_user_ids(app)
+
+
+def _org_approver_user_ids(app) -> list[int]:
+    """Resolve org-scope users who hold ``app.approve_deploy``.
+
+    Uses ``RoleBinding`` directly so we don't fan out into the request-
+    time permission resolver per user. Group bindings (SCIM) are
+    intentionally skipped — they don't expand to individual users at
+    rest, and the widget would render an opaque "Group: …" entry
+    which doesn't help approver nudges.
+    """
+    from astrolift_identity.models import Role, RoleBinding
+
+    org_id = app.organization_id
+    if org_id is None:
+        return []
+
+    role_ids = list(
+        Role.objects.filter(
+            permissions__contains=["app.approve_deploy"],
+        ).values_list("pk", flat=True)
+    )
+    if not role_ids:
+        return []
+    user_ids = list(
+        RoleBinding.objects.filter(
+            user__isnull=False,
+            role_id__in=role_ids,
+            scope_kind=RoleBinding.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        ).values_list("user_id", flat=True)
+    )
+    return _dedup_preserve_order(user_ids)
+
+
+def _hydrate_users(user_ids: set[int]) -> dict[int, object]:
+    """One bulk fetch instead of N per-row lookups in the quorum
+    widget. Returns the resolved users keyed by pk."""
+    if not user_ids:
+        return {}
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    rows = User.objects.filter(pk__in=user_ids)
+    return {u.pk: u for u in rows}
+
+
+def _approver_entry(user, *, approved_at: dt.datetime | None, app_slug: str) -> DeploymentApproverType:
+    display = (
+        (getattr(user, "first_name", "") + " " + getattr(user, "last_name", "")).strip()
+        or getattr(user, "username", "")
+        or getattr(user, "email", "")
+    )
+    email = (getattr(user, "email", "") or "").strip()
+    mailto_url = ""
+    if email:
+        # Subject is intentionally English — the approval-request email
+        # is operator-facing and the deployment row already carries the
+        # app slug. The FE locale handles button labels; this URL is the
+        # raw mailto: scheme.
+        mailto_url = "mailto:" + email + "?subject=Approval%20requested%20for%20" + _urlquote(app_slug)
+    return DeploymentApproverType(
+        user_id=str(user.pk),
+        display_name=display or email or "approver",
+        email=email,
+        approved_at=approved_at,
+        mailto_url=mailto_url,
+    )
+
+
+def _urlquote(s: str) -> str:
+    from urllib.parse import quote
+
+    return quote(s, safe="")
+
+
+def _dedup_preserve_order(ids: list[int]) -> list[int]:
+    seen: set[int] = set()
+    out: list[int] = []
+    for uid in ids:
+        if uid in seen:
+            continue
+        seen.add(uid)
+        out.append(uid)
+    return out
+
+
+def _self_approve_allowed_safe() -> bool:
+    """Mirror of ``_self_approve_allowed`` in mutations.py — duplicated
+    here so the serializer doesn't import the mutations module (the
+    resolver path is the import root for this module)."""
+    try:
+        from constance import config as constance_config
+
+        return bool(getattr(constance_config, "ALLOW_SELF_APPROVE_DEPLOYS", False))
+    except Exception:
+        return False
 
 
 def deployment_log_to_type(entry) -> DeploymentLogEntryType:
