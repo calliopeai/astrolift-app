@@ -48,7 +48,9 @@ from astrolift_identity.schema.types import (
     ProjectType,
     RoleBindingType,
     RoleType,
+    SearchableUserType,
     TeamType,
+    _resolve_display_name,
     api_token_to_type,
     app_to_summary,
     approver_user_to_type,
@@ -347,7 +349,13 @@ class IdentityQuery:
     def astrolift_invitations(self, info: Info, status: str | None = None) -> list[InvitationType]:
         """Org-scoped invitation list. Filter by status (pending /
         accepted / expired / revoked); default surfaces every status
-        so the UI can show full history without an extra round-trip."""
+        so the UI can show full history without an extra round-trip.
+
+        Pre-fetches Auth0 ``UserInfo`` rows for every distinct inviter
+        in one query so the invitation row can render the inviter's
+        avatar URL (#418) without a per-row lookup.
+        """
+        from auth1.models import UserInfo
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
@@ -363,7 +371,16 @@ class IdentityQuery:
         )
         if status:
             qs = qs.filter(status=status)
-        return [invitation_to_type(i) for i in qs[:500]]
+        rows = list(qs[:500])
+        inviter_ids = {r.invited_by_id for r in rows if r.invited_by_id}
+        userinfo_by_user_id: dict[int, object] = {}
+        if inviter_ids:
+            for ui in UserInfo.objects.filter(internal_user_id__in=inviter_ids):
+                # A user can have multiple UserInfo rows (one per Auth0
+                # subject claim) — last write wins; the picker only
+                # needs a representative avatar, so any is fine.
+                userinfo_by_user_id[ui.internal_user_id] = ui
+        return [invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id) for r in rows]
 
     @strawberry.field
     @require_permission(Permission.ORG_READ)
@@ -371,6 +388,217 @@ class IdentityQuery:
     def astrolift_roles(self, info: Info) -> list[RoleType]:
         qs = Role.objects.order_by("scope_level", "slug")[:200]
         return [role_to_type(r) for r in qs]
+
+    # ---- Invite-flow polish (#418) -------------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_searchable_users(self, info: Info, query: str) -> list[SearchableUserType]:
+        """De-dupe search the InviteDialog runs before letting the
+        operator dispatch ``create_invitation`` (#418).
+
+        Returns up to 10 matches across two sources:
+
+        * Existing active org members (``Member.lifecycle==active``,
+          ``is_active=True``, scope=ORG) whose username, email,
+          first_name or last_name contains ``query``.
+        * Pending invitations at the org scope (``status==pending``,
+          ``deleted_at is null``) whose email contains ``query``.
+
+        Both share a single row shape (``match_kind`` discriminates)
+        so the FE renders one combobox with a small badge instead of
+        two separate sections. Cross-tenant rows are excluded — the
+        tenant context is the visibility boundary; a leaked org_id
+        from a different tenant would just produce an empty list.
+
+        Empty / whitespace ``query`` returns an empty list (don't dump
+        every member into the dropdown — that's what
+        ``astrolift_members`` is for).
+        """
+        from django.contrib.auth import get_user_model
+        from django.db.models import Q
+
+        from auth1.models import UserInfo
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+
+        needle = (query or "").strip()
+        if not needle:
+            return []
+        # Cap the LIKE input so a runaway operator paste can't blow
+        # the planner's pattern budget. 254 = max email length.
+        needle = needle[:254]
+
+        User = get_user_model()
+        # Phase 1: collect candidate user ids from members of this org.
+        # We restrict the user table search to those ids so that an
+        # operator can't probe global username uniqueness across orgs
+        # by typing fragments (PII leak vector).
+        member_user_ids = list(
+            Member.objects.filter(
+                scope_kind=Member.ScopeKind.ORG,
+                scope_id=org_id,
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=Member.Lifecycle.ACTIVE,
+            )
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+
+        rows: list[SearchableUserType] = []
+        if member_user_ids:
+            matched_users = list(
+                User.objects.filter(pk__in=member_user_ids)
+                .filter(
+                    Q(username__icontains=needle)
+                    | Q(email__icontains=needle)
+                    | Q(first_name__icontains=needle)
+                    | Q(last_name__icontains=needle)
+                )
+                .order_by("first_name", "last_name", "username", "email")[:10]
+            )
+            userinfo_by_user_id: dict[int, object] = {}
+            if matched_users:
+                for ui in UserInfo.objects.filter(internal_user_id__in=[u.pk for u in matched_users]):
+                    userinfo_by_user_id[ui.internal_user_id] = ui
+            for u in matched_users:
+                ui = userinfo_by_user_id.get(u.pk)
+                rows.append(
+                    SearchableUserType(
+                        match_kind="MEMBER",
+                        email=u.email or "",
+                        display_label=_resolve_display_name(u, userinfo=ui),
+                        avatar_url=(getattr(ui, "picture", "") or "") if ui is not None else "",
+                        user_id=str(u.pk),
+                        invitation_id=None,
+                        invitation_status=None,
+                        expires_at=None,
+                    )
+                )
+
+        # Phase 2: pending invitations at this org scope.
+        invs = list(
+            Invitation.objects.filter(
+                scope_kind=Invitation.ScopeKind.ORG,
+                scope_id=org_id,
+                status=Invitation.Status.PENDING,
+                deleted_at__isnull=True,
+                email__icontains=needle,
+            ).order_by("-created_at")[:10]
+        )
+        for inv in invs:
+            rows.append(
+                SearchableUserType(
+                    match_kind="INVITATION",
+                    email=inv.email,
+                    display_label=inv.email,
+                    avatar_url="",
+                    user_id=None,
+                    invitation_id=GUID(str(inv.guid)),
+                    invitation_status=inv.status,
+                    expires_at=inv.expires_at,
+                )
+            )
+
+        return rows
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_roles_i_can_grant(self, info: Info) -> list[RoleType]:
+        """Roles the active viewer is permitted to grant on invite (#418).
+
+        A role is grantable iff its permission set is a (non-strict)
+        subset of the viewer's effective permissions at the active
+        org scope. Rationale: an operator who lacks ``app.deploy``
+        can't legitimately promote someone else into a role that
+        carries it — the deferred grant would just be rejected by
+        the resolver chain at use time, and surfacing it in the
+        picker is misleading. Django superusers see every role.
+
+        Empty list is a legitimate result and tells the FE to disable
+        the picker with an explainer; not the same as
+        PERMISSION_DENIED (which still surfaces if the caller lacks
+        ``org.manage_members`` entirely).
+
+        System roles + this org's custom roles are both considered.
+        Soft-deleted roles are skipped. Bound to the org scope of the
+        active tenant; cross-tenant custom roles are excluded.
+        """
+        from django.contrib.auth import get_user_model
+        from django.db.models import Q
+
+        from core.permissions import Permission as _Permission
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        actor_id = tenant.actor_user_id if tenant else None
+        if org_id is None or actor_id is None:
+            return []
+
+        User = get_user_model()
+        is_superuser = User.objects.filter(pk=actor_id, is_superuser=True, is_active=True).exists()
+
+        # System roles have ``organization_id is null``; custom roles
+        # are bound to the org. Either is a candidate.
+        candidates = list(
+            Role.objects.filter(deleted_at__isnull=True)
+            .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+            .order_by("scope_level", "slug")
+        )
+
+        if is_superuser:
+            return [role_to_type(r) for r in candidates]
+
+        # Compute the viewer's effective permission set once; mirrors
+        # the logic in ``astrolift_my_permissions`` but kept inline so
+        # this resolver is self-contained.
+        from django.utils import timezone
+
+        now = timezone.now()
+        candidate_scopes: list[tuple[str, int]] = []
+        if tenant.project_id is not None:
+            candidate_scopes.append(("PROJECT", tenant.project_id))
+        if tenant.team_id is not None:
+            candidate_scopes.append(("TEAM", tenant.team_id))
+        candidate_scopes.append(("ORG", org_id))
+        scope_kinds = {k for k, _ in candidate_scopes}
+        scope_ids_by_kind: dict[str, set[int]] = {}
+        for k, sid in candidate_scopes:
+            scope_ids_by_kind.setdefault(k, set()).add(sid)
+
+        bindings = RoleBinding.objects.select_related("role").filter(
+            user_id=actor_id, scope_kind__in=scope_kinds, deleted_at__isnull=True
+        )
+        effective: set[str] = set()
+        for binding in bindings:
+            if binding.expires_at is not None and binding.expires_at <= now:
+                continue
+            ids = scope_ids_by_kind.get(binding.scope_kind, set())
+            if binding.scope_id not in ids:
+                continue
+            for slug in binding.role.permissions or ():
+                effective.add(slug)
+
+        # Reject roles that name a permission not in the catalog so a
+        # corrupt role row can never be promoted; a strict subset
+        # check on a smaller-than-catalog effective set is meaningless.
+        catalog = {p.value for p in _Permission}
+        grantable: list[Role] = []
+        for r in candidates:
+            perms = set(r.permissions or ())
+            if not perms.issubset(catalog):
+                continue
+            if perms.issubset(effective):
+                grantable.append(r)
+        return [role_to_type(r) for r in grantable]
 
     @strawberry.field
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
