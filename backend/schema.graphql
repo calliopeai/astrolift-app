@@ -541,6 +541,10 @@ type AstroliftCommandRun {
   endedAt: DateTime
   exitCode: Int
   logExcerpt: String!
+  """Last 200 lines of ``log_excerpt`` (#427). Mirrors the
+  ``ScheduledJobRun.output`` surface so the FE's shared row-expand
+  component works against both run kinds."""
+  output: String!
   createdAt: DateTime!
 }
 
@@ -1276,6 +1280,11 @@ type AstroliftScheduledJobRun {
   durationSeconds: Int
   exitCode: Int
   logExcerpt: String!
+  """Last 200 lines of ``log_excerpt`` (#427). Powers the inline
+  row-expand surface on the jobs table so operators can confirm a
+  run worked without leaving the page. The full tail lives behind
+  the per-app logs surface; the UI footer flags truncation."""
+  output: String!
   createdAt: DateTime!
 }
 
@@ -1564,6 +1573,12 @@ type AstroliftWorkload {
   kind: String!
   isPublic: Boolean!
   schedule: String!
+  """CronJob concurrency policy (#427): ``forbid`` | ``queue`` |
+  ``replace``. Only meaningful when ``kind == "cronjob"``; always
+  present so the FE doesn't have to branch on null. Defaults to
+  ``forbid`` for non-cronjob rows so the badge component never
+  renders garbage."""
+  concurrencyPolicy: String!
   replicas: Int!
   cpuRequest: String!
   cpuLimit: String!

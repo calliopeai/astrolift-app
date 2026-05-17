@@ -564,6 +564,12 @@ export type AstroliftCommandRun = {
   id: Scalars['GUID']['output'];
   invokedByUsername?: Maybe<Scalars['String']['output']>;
   logExcerpt: Scalars['String']['output'];
+  /**
+   * Last 200 lines of ``log_excerpt`` (#427). Mirrors the
+   * ``ScheduledJobRun.output`` surface so the FE's shared row-expand
+   * component works against both run kinds.
+   */
+  output: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   workloadSlug?: Maybe<Scalars['String']['output']>;
@@ -1298,6 +1304,13 @@ export type AstroliftScheduledJobRun = {
   id: Scalars['GUID']['output'];
   k8sJobName: Scalars['String']['output'];
   logExcerpt: Scalars['String']['output'];
+  /**
+   * Last 200 lines of ``log_excerpt`` (#427). Powers the inline
+   * row-expand surface on the jobs table so operators can confirm a
+   * run worked without leaving the page. The full tail lives behind
+   * the per-app logs surface; the UI footer flags truncation.
+   */
+  output: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
@@ -1588,6 +1601,14 @@ export type AstroliftWorkflowRun = {
 };
 
 export type AstroliftWorkload = {
+  /**
+   * CronJob concurrency policy (#427): ``forbid`` | ``queue`` |
+   * ``replace``. Only meaningful when ``kind == "cronjob"``; always
+   * present so the FE doesn't have to branch on null. Defaults to
+   * ``forbid`` for non-cronjob rows so the badge component never
+   * renders garbage.
+   */
+  concurrencyPolicy: Scalars['String']['output'];
   cpuLimit: Scalars['String']['output'];
   cpuRequest: Scalars['String']['output'];
   hpaMaxReplicas?: Maybe<Scalars['Int']['output']>;

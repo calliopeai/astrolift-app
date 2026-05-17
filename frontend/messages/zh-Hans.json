@@ -458,5 +458,80 @@
         "requestIdSection": "请求 ID"
       }
     }
+  },
+  "jobs": {
+    "title": "任务",
+    "descriptionGlobal": "所有应用的计划任务运行和临时命令执行。",
+    "descriptionForApp": "{app} 的计划任务运行和临时命令执行。",
+    "tabs": {
+      "scheduled": "计划",
+      "commands": "命令"
+    },
+    "scheduled": {
+      "emptyTitle": "尚无计划任务运行",
+      "emptyDescription": "Cronjob 工作负载在调度器触发首次运行后会显示在此。",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "应用 / 环境 / 工作负载",
+        "k8sJob": "K8s 任务",
+        "status": "状态",
+        "duration": "时长",
+        "started": "开始时间"
+      }
+    },
+    "commands": {
+      "emptyTitle": "尚无命令运行",
+      "emptyDescription": "针对工作负载的临时命令会显示在此。使用 CLI 运行 `astro app run …`。",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "应用 / 工作负载",
+        "command": "命令",
+        "status": "状态",
+        "invokedBy": "调用者",
+        "started": "开始时间"
+      }
+    },
+    "runStatus": {
+      "running": "运行中",
+      "inProgress": "进行中",
+      "succeeded": "成功",
+      "failed": "失败",
+      "superseded": "已被替换",
+      "unknown": "未知",
+      "exitCodeLabel": "退出 {code}",
+      "exitCodeTooltip": "进程以代码 {code} 退出"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "禁止",
+        "queue": "排队",
+        "replace": "替换"
+      },
+      "tooltip": {
+        "forbid": "运行期间跳过下次触发。",
+        "queue": "允许重叠运行堆叠 — 每次触发独立且短小时选用。",
+        "replace": "停止正在运行的任务并启动新任务。"
+      }
+    },
+    "cron": {
+      "invalid": "无效的 cron 表达式",
+      "firesIn": "{relative}后触发",
+      "now": "少于一分钟",
+      "minutes": "{count}分钟",
+      "hours": "{count}小时",
+      "days": "{count}天"
+    },
+    "workloadCard": {
+      "title": "Cronjob 工作负载",
+      "countLabel": "已计划 {count} 个",
+      "openLogs": "在控制台中打开"
+    },
+    "output": {
+      "emptyOutput": "尚无捕获的输出。",
+      "openInConsole": "在控制台中打开",
+      "lines": "{count}行",
+      "truncated": "已显示 200 行 — 在控制台中查看完整日志。"
+    }
   }
 }

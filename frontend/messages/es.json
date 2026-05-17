@@ -454,5 +454,80 @@
         "requestIdSection": "ID de solicitud"
       }
     }
+  },
+  "jobs": {
+    "title": "Trabajos",
+    "descriptionGlobal": "Ejecuciones de trabajos programados y comandos ad-hoc en todas tus apps.",
+    "descriptionForApp": "Ejecuciones de trabajos programados y comandos ad-hoc para {app}.",
+    "tabs": {
+      "scheduled": "Programados",
+      "commands": "Comandos"
+    },
+    "scheduled": {
+      "emptyTitle": "Aún no hay ejecuciones de trabajos programados",
+      "emptyDescription": "Los workloads cronjob aparecen aquí cuando el planificador dispara su primera ejecución.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Estado",
+        "duration": "Duración",
+        "started": "Iniciado"
+      }
+    },
+    "commands": {
+      "emptyTitle": "Aún no hay ejecuciones de comandos",
+      "emptyDescription": "Los comandos ad-hoc invocados contra un workload aparecen aquí. Ejecuta uno desde la CLI con `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Comando",
+        "status": "Estado",
+        "invokedBy": "Invocado por",
+        "started": "Iniciado"
+      }
+    },
+    "runStatus": {
+      "running": "En ejecución",
+      "inProgress": "En progreso",
+      "succeeded": "Exitoso",
+      "failed": "Fallido",
+      "superseded": "Reemplazado",
+      "unknown": "Desconocido",
+      "exitCodeLabel": "salida {code}",
+      "exitCodeTooltip": "El proceso salió con código {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Prohibir",
+        "queue": "Encolar",
+        "replace": "Reemplazar"
+      },
+      "tooltip": {
+        "forbid": "Salta el próximo disparo mientras una ejecución está en curso.",
+        "queue": "Permite que las ejecuciones se acumulen — elige esto cuando cada disparo es independiente y corto.",
+        "replace": "Detiene la ejecución en curso y comienza una nueva."
+      }
+    },
+    "cron": {
+      "invalid": "Expresión cron inválida",
+      "firesIn": "Se ejecuta en {relative}",
+      "now": "menos de un minuto",
+      "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+      "hours": "{count, plural, one {# hora} other {# horas}}",
+      "days": "{count, plural, one {# día} other {# días}}"
+    },
+    "workloadCard": {
+      "title": "Workloads cronjob",
+      "countLabel": "{count, plural, one {# programado} other {# programados}}",
+      "openLogs": "Abrir en consola"
+    },
+    "output": {
+      "emptyOutput": "Aún no hay salida capturada.",
+      "openInConsole": "Abrir en consola",
+      "lines": "{count, plural, one {# línea} other {# líneas}}",
+      "truncated": "Mostradas 200 líneas — abre la consola para ver el rastro completo."
+    }
   }
 }

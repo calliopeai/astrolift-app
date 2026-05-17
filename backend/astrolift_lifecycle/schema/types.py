@@ -279,6 +279,28 @@ class AppHealthSummaryType:
     has_recent_failure: bool
 
 
+# Max lines surfaced on the ``output`` field of a run row (#427).
+# The full tail still lives behind the per-app logs surface; this is
+# the "did it work" inline view the operator scans without leaving
+# the jobs table.
+_RUN_OUTPUT_LINES = 200
+
+
+def _last_n_lines(text: str, n: int = _RUN_OUTPUT_LINES) -> str:
+    """Return the last ``n`` lines of ``text``.
+
+    ``log_excerpt`` is the raw capture from the cluster — possibly
+    thousands of lines for chatty jobs. Truncating server-side caps
+    the wire payload + keeps the row-expand snappy. The UI footer
+    tells the operator when content was trimmed."""
+    if not text:
+        return ""
+    lines = text.splitlines()
+    if len(lines) <= n:
+        return text
+    return "\n".join(lines[-n:])
+
+
 @strawberry.type(name="AstroliftScheduledJobRun")
 class ScheduledJobRunType:
     id: GUID
@@ -292,6 +314,11 @@ class ScheduledJobRunType:
     duration_seconds: int | None
     exit_code: int | None
     log_excerpt: str
+    output: str
+    """Last 200 lines of ``log_excerpt`` (#427). Powers the inline
+    row-expand surface on the jobs table so operators can confirm a
+    run worked without leaving the page. The full tail lives behind
+    the per-app logs surface; the UI footer flags truncation."""
     created_at: dt.datetime
 
 
@@ -306,10 +333,15 @@ class CommandRunType:
     ended_at: dt.datetime | None
     exit_code: int | None
     log_excerpt: str
+    output: str
+    """Last 200 lines of ``log_excerpt`` (#427). Mirrors the
+    ``ScheduledJobRun.output`` surface so the FE's shared row-expand
+    component works against both run kinds."""
     created_at: dt.datetime
 
 
 def scheduled_job_run_to_type(r) -> ScheduledJobRunType:
+    log_excerpt = r.log_excerpt or ""
     return ScheduledJobRunType(
         id=GUID(str(r.guid)),
         registered_app_slug=r.workload.registered_app.slug,
@@ -321,12 +353,14 @@ def scheduled_job_run_to_type(r) -> ScheduledJobRunType:
         ended_at=r.ended_at,
         duration_seconds=r.duration_seconds,
         exit_code=r.exit_code,
-        log_excerpt=r.log_excerpt or "",
+        log_excerpt=log_excerpt,
+        output=_last_n_lines(log_excerpt),
         created_at=r.created_at,
     )
 
 
 def command_run_to_type(r) -> CommandRunType:
+    log_excerpt = r.log_excerpt or ""
     return CommandRunType(
         id=GUID(str(r.guid)),
         registered_app_slug=r.registered_app.slug,
@@ -336,7 +370,8 @@ def command_run_to_type(r) -> CommandRunType:
         started_at=r.started_at,
         ended_at=r.ended_at,
         exit_code=r.exit_code,
-        log_excerpt=r.log_excerpt or "",
+        log_excerpt=log_excerpt,
+        output=_last_n_lines(log_excerpt),
         created_at=r.created_at,
     )
 

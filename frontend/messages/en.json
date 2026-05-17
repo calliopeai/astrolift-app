@@ -1353,5 +1353,80 @@
         "description": "Long-lived bearer tokens for CLIs and bots."
       }
     }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "descriptionGlobal": "Scheduled job runs and ad-hoc command executions across all your apps.",
+    "descriptionForApp": "Scheduled job runs and ad-hoc command executions for {app}.",
+    "tabs": {
+      "scheduled": "Scheduled",
+      "commands": "Commands"
+    },
+    "scheduled": {
+      "emptyTitle": "No scheduled job runs yet",
+      "emptyDescription": "Cronjob workloads land here as soon as the scheduler fires their first run.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Status",
+        "duration": "Duration",
+        "started": "Started"
+      }
+    },
+    "commands": {
+      "emptyTitle": "No command runs yet",
+      "emptyDescription": "Ad-hoc commands invoked against an app workload land here. Run one from the CLI with `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Command",
+        "status": "Status",
+        "invokedBy": "Invoked by",
+        "started": "Started"
+      }
+    },
+    "runStatus": {
+      "running": "Running",
+      "inProgress": "In progress",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "superseded": "Superseded",
+      "unknown": "Unknown",
+      "exitCodeLabel": "exit {code}",
+      "exitCodeTooltip": "Process exited with code {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Forbid",
+        "queue": "Queue",
+        "replace": "Replace"
+      },
+      "tooltip": {
+        "forbid": "Skips the next scheduled firing while a run is in flight.",
+        "queue": "Lets overlapping runs stack — pick this when each firing is independent and short.",
+        "replace": "Kills the in-flight run and starts a fresh one."
+      }
+    },
+    "cron": {
+      "invalid": "Invalid cron expression",
+      "firesIn": "Fires in {relative}",
+      "now": "less than a minute",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "hours": "{count, plural, one {# hour} other {# hours}}",
+      "days": "{count, plural, one {# day} other {# days}}"
+    },
+    "workloadCard": {
+      "title": "Cronjob workloads",
+      "countLabel": "{count, plural, one {# scheduled} other {# scheduled}}",
+      "openLogs": "Open in console"
+    },
+    "output": {
+      "emptyOutput": "No captured output yet.",
+      "openInConsole": "Open in console",
+      "lines": "{count, plural, one {# line} other {# lines}}",
+      "truncated": "200 lines shown — open in console for the full tail."
+    }
   }
 }

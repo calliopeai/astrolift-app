@@ -18,6 +18,12 @@ class WorkloadManifest:
     kind: str
     is_public: bool = False
     schedule: str | None = None
+    # CronJob concurrency policy (#427). One of ``forbid`` / ``queue``
+    # / ``replace``; only meaningful when ``kind == "cronjob"``. The
+    # default ``forbid`` mirrors the manifest renderer's pre-#427
+    # hard-coded value, so a manifest that omits the key keeps the
+    # existing K8s behaviour.
+    concurrency_policy: str = "forbid"
     replicas: int = 1
     cpu_request: str | None = None
     cpu_limit: str | None = None
