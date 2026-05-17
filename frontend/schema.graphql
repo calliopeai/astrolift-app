@@ -81,6 +81,23 @@ type AstroliftActiveSession {
   userAgent: String
 }
 
+type AstroliftActivityItem {
+  id: GUID!
+  eventType: String!
+  action: String!
+  actorDisplay: String!
+  targetKind: String!
+  targetLabel: String!
+  targetHref: String
+  occurredAt: DateTime!
+  payload: JSON!
+}
+
+type AstroliftActivityPage {
+  items: [AstroliftActivityItem!]!
+  nextCursor: String
+}
+
 type AstroliftAlertEvent {
   id: GUID!
   ruleId: GUID!
@@ -2611,6 +2628,7 @@ type Query {
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftEvents(limit: Int! = 100, eventType: String = null): [AstroliftEvent!]!
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!
+  astroliftRecentActivity(limit: Int! = 20, cursor: String = null): AstroliftActivityPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null): [AstroliftAuditEvent!]!
   astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false): AstroliftAuditEventPage!
   astroliftAuditRetention: AstroliftAuditRetention!
