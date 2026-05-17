@@ -567,15 +567,50 @@ export type AstroliftContainerStatus = {
   waitingReason: Scalars['String']['output'];
 };
 
+export type AstroliftCostAttribution = {
+  attributedRows: Array<AstroliftCostBindingRow>;
+  currency: Scalars['String']['output'];
+  totalCents: Scalars['Int']['output'];
+  unattributedCents: Scalars['Int']['output'];
+};
+
+export type AstroliftCostBindingRow = {
+  amountCents: Scalars['Int']['output'];
+  by: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  managedServiceBindingId?: Maybe<Scalars['String']['output']>;
+  managedServiceId?: Maybe<Scalars['String']['output']>;
+  managedServiceKind?: Maybe<Scalars['String']['output']>;
+  managedServiceName?: Maybe<Scalars['String']['output']>;
+  registeredAppSlug?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftCostForecast = {
+  confidence: ForecastConfidence;
+  currency: Scalars['String']['output'];
+  deltaPct: Scalars['Float']['output'];
+  mtdCents: Scalars['Int']['output'];
+  previousMonthCents: Scalars['Int']['output'];
+  projectedMonthlyCents: Scalars['Int']['output'];
+};
+
 export type AstroliftCostSnapshot = {
   amountCents: Scalars['Int']['output'];
   by: Scalars['String']['output'];
   currency: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  managedServiceBindingId?: Maybe<Scalars['String']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
   registeredAppId?: Maybe<Scalars['String']['output']>;
   source: Scalars['String']['output'];
   takenAt: Scalars['Date']['output'];
+};
+
+export type AstroliftCostTrendPoint = {
+  amountCents: Scalars['Int']['output'];
+  currency: Scalars['String']['output'];
+  date: Scalars['Date']['output'];
+  isAnomaly: Scalars['Boolean']['output'];
 };
 
 export type AstroliftDeployToken = {
@@ -1609,6 +1644,12 @@ export type ConnectUserSourceProviderInput = {
   providerConfigId: Scalars['GUID']['input'];
 };
 
+export type CostWindow =
+  | 'D7'
+  | 'D30'
+  | 'H24'
+  | 'MTD';
+
 export type CreateAlertRuleInput = {
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
@@ -1868,6 +1909,11 @@ export type ForceRedeployInput = {
   confirmSlug: Scalars['String']['input'];
   environmentName: InputMaybe<Scalars['String']['input']>;
 };
+
+export type ForecastConfidence =
+  | 'HIGH'
+  | 'LOW'
+  | 'MEDIUM';
 
 export type GenerateSshDeployKeyInput = {
   appSlug: InputMaybe<Scalars['String']['input']>;
@@ -3284,7 +3330,10 @@ export type Query = {
   astroliftClusters: Array<AstroliftTenantCluster>;
   astroliftCommandRuns: Array<AstroliftCommandRun>;
   astroliftContainers: Array<AstroliftContainer>;
+  astroliftCostByBinding: AstroliftCostAttribution;
+  astroliftCostForecast: AstroliftCostForecast;
   astroliftCostSnapshots: Array<AstroliftCostSnapshot>;
+  astroliftCostTrend: Array<AstroliftCostTrendPoint>;
   astroliftDeployment?: Maybe<AstroliftDeployment>;
   astroliftDeploymentApprovalHistory: Array<AstroliftDeploymentApprovalHistoryEntry>;
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
@@ -3494,9 +3543,23 @@ export type QueryAstroliftContainersArgs = {
 };
 
 
+export type QueryAstroliftCostByBindingArgs = {
+  days?: InputMaybe<Scalars['Int']['input']>;
+  registeredAppSlug?: InputMaybe<Scalars['String']['input']>;
+  window?: InputMaybe<CostWindow>;
+};
+
+
 export type QueryAstroliftCostSnapshotsArgs = {
-  days?: Scalars['Int']['input'];
+  days?: InputMaybe<Scalars['Int']['input']>;
   limit?: Scalars['Int']['input'];
+  window?: InputMaybe<CostWindow>;
+};
+
+
+export type QueryAstroliftCostTrendArgs = {
+  days?: InputMaybe<Scalars['Int']['input']>;
+  window?: InputMaybe<CostWindow>;
 };
 
 
