@@ -840,3 +840,72 @@ class WebhookTestResultType:
     error: str
     delivery_id: str
     timestamp: dt.datetime
+
+
+# ---- Notification preference + device registration (#476 / #499) ----
+
+
+@strawberry.type(name="AstroliftDeviceRegistration")
+class DeviceRegistrationType:
+    """One push-receivable endpoint owned by the current user.
+
+    Surfaced under ``/settings/devices`` for revoke. ``token_last_4``
+    is the only part of the token we expose — the platform never
+    re-shows the full registration token to the user (it's already
+    in their device's secure storage; surfacing it would just be a
+    leak surface)."""
+
+    id: GUID
+    platform: str
+    label: str
+    token_last_4: str
+    driver: str
+    registered_at: dt.datetime
+    last_seen_at: dt.datetime | None
+
+
+def device_registration_to_type(d) -> DeviceRegistrationType:
+    token = d.device_token or ""
+    return DeviceRegistrationType(
+        id=GUID(str(d.guid)),
+        platform=d.platform,
+        label=d.label or "",
+        token_last_4=token[-4:] if token else "",
+        driver=d.driver,
+        registered_at=d.registered_at,
+        last_seen_at=d.last_seen_at,
+    )
+
+
+@strawberry.type(name="AstroliftNotificationPreference")
+class NotificationPreferenceType:
+    """One user × channel × event-kind preference row.
+
+    ``id`` is the GUID of the underlying preference row. ``enabled``
+    reflects the effective value: when no row exists, the API
+    returns a synthetic preference with ``id=""`` and the platform
+    default for that (channel, event_kind)."""
+
+    id: GUID | None
+    channel: str
+    event_kind: str
+    enabled: bool
+
+
+def notification_preference_to_type(p) -> NotificationPreferenceType:
+    return NotificationPreferenceType(
+        id=GUID(str(p.guid)) if getattr(p, "guid", None) else None,
+        channel=p.channel,
+        event_kind=p.event_kind,
+        enabled=p.enabled,
+    )
+
+
+def synthetic_preference_type(*, channel: str, event_kind: str, enabled: bool) -> NotificationPreferenceType:
+    """Construct a preference type for a defaulted row (no DB entry)."""
+    return NotificationPreferenceType(
+        id=None,
+        channel=channel,
+        event_kind=event_kind,
+        enabled=enabled,
+    )

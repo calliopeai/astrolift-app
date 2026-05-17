@@ -203,6 +203,42 @@ def test_record_session_returns_none_for_anonymous_request():
     assert record_session(request) is None
 
 
+def test_record_session_emits_auth_session_created_on_new_session():
+    """Per #499 — a brand-new session emits
+    ``auth.session.created`` which the dispatcher routes to OTHER
+    devices. We capture at the subscriber boundary (rather than
+    reading the DB Event row) because tenantless session-create
+    events are intentionally dropped by the persistent writer — the
+    fan-out still fires via the subscriber chain.
+    """
+    import core.events as _events_mod
+    from core.events import register_event_subscriber
+
+    captured: list = []
+
+    def _capture(envelope):
+        if envelope.event_type == "auth.session.created":
+            captured.append(envelope)
+
+    snapshot = list(_events_mod._subscribers)
+    register_event_subscriber(_capture)
+    try:
+        user = _user()
+        request = _request_with_session(user, client_kind=ClientKind.MOBILE.value)
+        row = record_session(request)
+        assert row is not None
+        assert len(captured) == 1
+        env = captured[0]
+        assert env.payload["user_id"] == user.pk
+        assert env.payload["session_pk"] == row.pk
+        assert env.payload["client_kind"] == "mobile"
+        # Re-record (no new row) → no new event.
+        record_session(request)
+        assert len(captured) == 1, "re-recording an existing session must not re-fire the event"
+    finally:
+        _events_mod._subscribers[:] = snapshot
+
+
 # ---- per-kind quota enforcement (#495) -----------------------------
 
 

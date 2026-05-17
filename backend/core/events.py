@@ -142,6 +142,57 @@ def register_event_writer(writer: EventWriter) -> None:
     _writer = writer
 
 
+# ---- subscriber registry -------------------------------------------
+#
+# Subscribers run *after* the writer persists the envelope. They are
+# additive and side-effect-only: a subscriber that raises is logged
+# and dropped, never propagated back to the emit caller. Used by the
+# notification dispatcher (#476/#499) so push fan-out can be wired
+# without bypassing the persistent event row write.
+#
+# Keep this list module-scoped (not per-class) so tests that swap a
+# subscriber in can deterministically restore the previous list — the
+# same shape as ``register_event_writer`` above.
+
+EventSubscriber = Callable[[EventEnvelope], None]
+
+_subscribers: list[EventSubscriber] = []
+
+
+def register_event_subscriber(subscriber: EventSubscriber) -> None:
+    """Add a subscriber called after every successful emit.
+
+    Subscribers see the envelope *after* the writer has persisted it
+    so a subscriber can safely look up the Event row by
+    request_id/trace_id correlation. Subscribers that raise are
+    logged at WARNING and dropped — never propagated back to the
+    mutation that emitted the event.
+    """
+    if subscriber in _subscribers:
+        # Idempotent — apps.ready may run twice in some test paths
+        # (django.setup() + a per-app re-register in conftest).
+        return
+    _subscribers.append(subscriber)
+
+
+def unregister_event_subscriber(subscriber: EventSubscriber) -> None:
+    """Drop a previously-registered subscriber. No-op if not present."""
+    if subscriber in _subscribers:
+        _subscribers.remove(subscriber)
+
+
+def _fanout_to_subscribers(envelope: EventEnvelope) -> None:
+    for sub in list(_subscribers):
+        try:
+            sub(envelope)
+        except Exception:  # noqa: BLE001 — fan-out must never fail emit
+            log.warning(
+                "event subscriber raised",
+                exc_info=True,
+                extra={"event_type": envelope.event_type},
+            )
+
+
 class Event:
     """Namespace holder so call sites read ``Event.emit(...)``.
 
@@ -187,4 +238,5 @@ class Event:
             trace_id=trace_id or "",
         )
         _writer(envelope)
+        _fanout_to_subscribers(envelope)
         return envelope
