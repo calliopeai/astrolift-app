@@ -242,6 +242,15 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
       namespace
       lastDeployedAt
       tornDownAt
+      ttlUntil
+      sourceUrl
+      prUrl
+      aggregateResources {
+        cpuCores
+        memoryBytes
+        podCount
+      }
+      estimatedDailyCostUsd
     }
   }
 `;

@@ -4,7 +4,6 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   CalendarClockIcon,
-  ExternalLinkIcon,
   GitPullRequestIcon,
   TrashIcon,
 } from "lucide-react";
@@ -14,6 +13,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { CopyBadge } from "@/components/CopyBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
@@ -29,14 +29,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TEAR_DOWN_PREVIEW } from "@/graphql/lifecycle/lifecycle.mutations";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  EXTEND_PREVIEW_TTL,
+  TEAR_DOWN_PREVIEW,
+} from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_PREVIEW_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftPreviewEnvironment,
   PreviewStatus,
+  PreviewTtlExtendDays,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { cn } from "@/lib/utils";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -68,12 +74,76 @@ const statusToDot: Record<
 const STALE_DAYS = 7;
 const STALE_THRESHOLD_MS = STALE_DAYS * 24 * 60 * 60 * 1000;
 
+// Status-filter buttons in the list header (#431 scope B). "active"
+// (default) hides torn-down rows since drowning in them is the #1
+// reported friction; "all" lets an operator audit teardown history
+// without leaving the page.
+type StatusFilter = "active" | "running" | "failed" | "all";
+
+const STATUS_FILTERS: StatusFilter[] = ["active", "running", "failed", "all"];
+
+function matchesFilter(p: AstroliftPreviewEnvironment, filter: StatusFilter): boolean {
+  switch (filter) {
+    case "active":
+      return p.status !== "torn_down";
+    case "running":
+      return p.status === "running";
+    case "failed":
+      return p.status === "failed";
+    case "all":
+      return true;
+  }
+}
+
 function isStale(p: AstroliftPreviewEnvironment): boolean {
   if (p.status !== "running") return false;
   if (!p.lastDeployedAt) return false;
   const last = new Date(p.lastDeployedAt).getTime();
   return Date.now() - last > STALE_THRESHOLD_MS;
 }
+
+// Live countdown. Returns "expired" when ttl_until is in the past, an
+// "Xd Yh" / "Xh Ym" / "Xm" string otherwise. Granularity drops as the
+// window shrinks so the column doesn't show "0d 5h 23m 14s" on a
+// preview about to be torn down.
+function formatCountdown(ttlIsoString: string, now: number): { label: string; expired: boolean } {
+  const target = new Date(ttlIsoString).getTime();
+  const delta = target - now;
+  if (delta <= 0) return { label: "expired", expired: true };
+  const seconds = Math.floor(delta / 1000);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (days >= 1) return { label: `${days}d ${hours}h`, expired: false };
+  if (hours >= 1) return { label: `${hours}h ${mins}m`, expired: false };
+  return { label: `${mins}m`, expired: false };
+}
+
+// Render bytes in Mi / Gi, mirroring kubectl describe so the column
+// aligns with what operators read in pod specs. The backend returns
+// raw bytes for currency-of-rounding reasons.
+function formatMemoryBytes(byteCount: number): string {
+  if (byteCount <= 0) return "0 Mi";
+  const gi = 1024 ** 3;
+  const mi = 1024 ** 2;
+  if (byteCount >= gi) {
+    const value = byteCount / gi;
+    return value >= 100 ? `${Math.round(value)} Gi` : `${value.toFixed(1)} Gi`;
+  }
+  const value = byteCount / mi;
+  return value >= 100 ? `${Math.round(value)} Mi` : `${value.toFixed(0)} Mi`;
+}
+
+function formatCpuCores(cores: number): string {
+  if (cores <= 0) return "0 CPU";
+  if (cores < 1) return `${Math.round(cores * 1000)}m CPU`;
+  return `${Number(cores.toFixed(2))} CPU`;
+}
+
+// Docs URL — keeps the empty-state "Learn more" link consistent across
+// the platform. Lives in the in-app resources index (not an external
+// site) so operators stay inside the app.
+const DOCS_PREVIEWS_HREF = "/resources/docs#previews";
 
 export function AppPreviewsClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
@@ -82,6 +152,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   const previews = useQuery<PreviewsResp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: slug },
     pollInterval: 30000,
+    fetchPolicy: "cache-and-network",
   });
 
   const [tearDown, tearState] = useMutation<{
@@ -92,13 +163,47 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
     ],
   });
 
+  const [extendTtl, extendState] = useMutation<{
+    extendPreviewTtl: MutationResultLite;
+  }>(EXTEND_PREVIEW_TTL, {
+    refetchQueries: [
+      { query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } },
+    ],
+  });
+
   const a = app.data?.astroliftApp;
   const list = previews.data?.astroliftPreviewEnvironments ?? [];
-  const active = list.filter((p) => p.status !== "torn_down");
-  const stale = active.filter(isStale);
+
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
+  const filtered = React.useMemo(
+    () => list.filter((p) => matchesFilter(p, statusFilter)),
+    [list, statusFilter],
+  );
+
+  const counts = React.useMemo(
+    () => ({
+      running: list.filter((p) => p.status === "running").length,
+      building: list.filter((p) => p.status === "building").length,
+      failed: list.filter((p) => p.status === "failed").length,
+      tornDown: list.filter((p) => p.status === "torn_down").length,
+      total: list.length,
+    }),
+    [list],
+  );
+
+  const stale = list.filter((p) => p.status !== "torn_down").filter(isStale);
   const [tearDownTarget, setTearDownTarget] = React.useState<AstroliftPreviewEnvironment | null>(
     null,
   );
+
+  // Live countdown ticker. Re-renders every 60s — that's the right
+  // cadence for "5d 3h" granularity; faster updates would flash the
+  // column without changing anything operators care about.
+  const [now, setNow] = React.useState<number>(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   if (app.loading && !a) {
     return (
@@ -126,11 +231,25 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
     const { data } = await tearDown({ variables: { input: { id: p.id } } });
     const r = data?.tearDownPreview;
     if (r?.ok) {
-      toast.success(`Teardown enqueued for PR #${p.prNumber}`);
+      toast.success(t("toasts.teardownEnqueued", { pr: p.prNumber }));
     } else {
-      throw new Error(r?.errors[0]?.message ?? "Teardown failed");
+      throw new Error(r?.errors[0]?.message ?? t("toasts.teardownFailed"));
     }
   }
+
+  async function handleExtend(p: AstroliftPreviewEnvironment, days: PreviewTtlExtendDays) {
+    const { data } = await extendTtl({
+      variables: { input: { id: p.id, days } },
+    });
+    const r = data?.extendPreviewTtl;
+    if (r?.ok) {
+      toast.success(t("toasts.ttlExtended", { pr: p.prNumber, days }));
+    } else {
+      toast.error(r?.errors[0]?.message ?? t("toasts.extendFailed"));
+    }
+  }
+
+  const isEmpty = list.length === 0;
 
   return (
     <PageShell
@@ -172,22 +291,56 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       )}
 
       <Card>
+        {!isEmpty && (
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {STATUS_FILTERS.map((f) => (
+                <Button
+                  key={f}
+                  variant={statusFilter === f ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter(f)}
+                  className="h-7 text-xs"
+                >
+                  {t(`filters.${f}`)}
+                  <span className="text-muted-foreground ml-1">
+                    {f === "active"
+                      ? counts.running + counts.failed + counts.building
+                      : f === "running"
+                        ? counts.running
+                        : f === "failed"
+                          ? counts.failed
+                          : counts.total}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            <div className="text-muted-foreground text-xs">
+              {t("groupSummary", {
+                running: counts.running,
+                failed: counts.failed,
+                tornDown: counts.tornDown,
+              })}
+            </div>
+          </CardHeader>
+        )}
+
         <CardContent className="p-0">
           {previews.loading && list.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : list.length === 0 ? (
+          ) : isEmpty ? (
             <div className="p-6">
               <EmptyState
                 icon={<GitPullRequestIcon className="size-5" />}
-                title={t("emptyTitle")}
-                description={
-                  a.previewEnabled ? t("emptyEnabled") : t("emptyDisabled")
-                }
+                title={t("empty.title")}
+                description={a.previewEnabled ? t("empty.enabledHint") : t("empty.disabledHint")}
                 actionHref={
-                  a.previewEnabled ? a.sourceUrl ?? undefined : `/apps/${a.slug}/config`
+                  a.previewEnabled
+                    ? a.sourceUrl ?? undefined
+                    : `/apps/${a.slug}/config`
                 }
                 actionLabel={
                   a.previewEnabled
@@ -196,101 +349,58 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                       : undefined
                     : t("enablePreviews")
                 }
+                learnMoreHref={DOCS_PREVIEWS_HREF}
+                learnMoreLabel={t("empty.learnMore")}
+                secondary={<EmptyStateSteps />}
               />
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-muted-foreground p-10 text-center text-sm">
+              {t("filterEmpty")}
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-6"></TableHead>
-                  <TableHead>{t("columns.prBranch")}</TableHead>
-                  <TableHead>{t("columns.hostname")}</TableHead>
-                  <TableHead>{t("columns.lastDeploy")}</TableHead>
-                  <TableHead>{t("columns.status")}</TableHead>
-                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="w-6">
-                      <StatusDot status={statusToDot[p.status]} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">
-                        #{p.prNumber} · {p.branch}
-                      </div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        ns {p.namespace}
-                        {p.commitSha && (
-                          <> · {p.commitSha.slice(0, 7)}</>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {p.status === "running" ? (
-                        <a
-                          href={`https://${p.hostname}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-sm hover:underline"
-                        >
-                          {p.hostname}
-                          <ExternalLinkIcon className="size-3" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground font-mono text-xs">
-                          {p.hostname}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {p.lastDeployedAt
-                        ? new Date(p.lastDeployedAt).toLocaleString()
-                        : "—"}
-                      {isStale(p) && (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 text-[10px] uppercase"
-                        >
-                          {t("staleBadge")}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {p.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.status !== "torn_down" && (
-                        <Can permission="app.deploy">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={tearState.loading}
-                            onClick={() => setTearDownTarget(p)}
-                          >
-                            <TrashIcon className="size-3" /> {t("tearDown")}
-                          </Button>
-                        </Can>
-                      )}
-                    </TableCell>
+            <TooltipProvider delayDuration={200}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-6"></TableHead>
+                    <TableHead>{t("columns.pr")}</TableHead>
+                    <TableHead>{t("columns.hostname")}</TableHead>
+                    <TableHead>{t("columns.ttl")}</TableHead>
+                    <TableHead>{t("columns.footprint")}</TableHead>
+                    <TableHead>{t("columns.lastDeploy")}</TableHead>
+                    <TableHead>{t("columns.status")}</TableHead>
+                    <TableHead className="text-right">{t("columns.actions")}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((p) => (
+                    <PreviewRow
+                      key={p.id}
+                      preview={p}
+                      now={now}
+                      tearLoading={tearState.loading}
+                      extendLoading={extendState.loading}
+                      onTearDown={() => setTearDownTarget(p)}
+                      onExtend={(days) => handleExtend(p, days)}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           )}
         </CardContent>
       </Card>
 
-      <p className="text-muted-foreground text-center text-xs">
-        {t("footer", {
-          count: a.previewMaxActive,
-          plural: a.previewMaxActive === 1 ? "" : "s",
-          days: STALE_DAYS,
-        })}
-      </p>
+      {!isEmpty && (
+        <p className="text-muted-foreground text-center text-xs">
+          {t("footer", {
+            count: a.previewMaxActive,
+            plural: a.previewMaxActive === 1 ? "" : "s",
+            days: STALE_DAYS,
+          })}
+        </p>
+      )}
 
       <ConfirmDialog
         open={tearDownTarget !== null}
@@ -318,5 +428,185 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
         }}
       />
     </PageShell>
+  );
+}
+
+// ---- row -------------------------------------------------------------
+
+interface PreviewRowProps {
+  preview: AstroliftPreviewEnvironment;
+  now: number;
+  tearLoading: boolean;
+  extendLoading: boolean;
+  onTearDown: () => void;
+  onExtend: (days: PreviewTtlExtendDays) => void | Promise<void>;
+}
+
+function PreviewRow({
+  preview: p,
+  now,
+  tearLoading,
+  extendLoading,
+  onTearDown,
+  onExtend,
+}: PreviewRowProps) {
+  const t = useTranslations("apps.previews");
+  const countdown = formatCountdown(p.ttlUntil, now);
+  const ttlDate = new Date(p.ttlUntil);
+  const aggregate = p.aggregateResources;
+  const hasFootprint = aggregate.podCount > 0;
+  const dailyCost = p.estimatedDailyCostUsd;
+  const teardown = p.status !== "torn_down";
+
+  return (
+    <TableRow>
+      <TableCell className="w-6">
+        <StatusDot status={statusToDot[p.status]} />
+      </TableCell>
+      <TableCell>
+        {p.prUrl ? (
+          <a
+            href={p.prUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium hover:underline"
+            title={t("openPr", { pr: p.prNumber })}
+          >
+            #{p.prNumber}
+          </a>
+        ) : (
+          <span className="font-medium">#{p.prNumber}</span>
+        )}
+        <span className="text-muted-foreground"> · {p.branch}</span>
+        <div className="text-muted-foreground font-mono text-xs">
+          ns {p.namespace}
+          {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
+        </div>
+      </TableCell>
+      <TableCell>
+        {p.status === "running" ? (
+          <CopyBadge
+            value={p.hostname}
+            openHref={`https://${p.hostname}`}
+            openLabel={t("openInTab")}
+            title={t("copyHostname")}
+          />
+        ) : (
+          <span className="text-muted-foreground font-mono text-xs">{p.hostname}</span>
+        )}
+      </TableCell>
+      <TableCell>
+        {teardown ? (
+          <div className="flex flex-col gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "font-mono text-xs",
+                    countdown.expired
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {countdown.label}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {t("ttlTooltip", { date: ttlDate.toLocaleString() })}
+              </TooltipContent>
+            </Tooltip>
+            <Can permission="app.deploy">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={extendLoading}
+                  onClick={() => onExtend(1)}
+                >
+                  {t("extend.1d")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={extendLoading}
+                  onClick={() => onExtend(7)}
+                >
+                  {t("extend.7d")}
+                </Button>
+              </div>
+            </Can>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </TableCell>
+      <TableCell>
+        {hasFootprint ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-default">
+                <div className="text-xs">
+                  {formatCpuCores(aggregate.cpuCores)} · {formatMemoryBytes(aggregate.memoryBytes)}
+                </div>
+                <div className="text-muted-foreground text-xs">
+                  {dailyCost != null
+                    ? t("costPerDay", { cost: dailyCost.toFixed(2) })
+                    : t("costUnavailable")}
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              {dailyCost != null
+                ? t("costTooltip", { pods: aggregate.podCount, cost: dailyCost.toFixed(2) })
+                : t("costTooltipUnavailable", { pods: aggregate.podCount })}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {p.lastDeployedAt ? new Date(p.lastDeployedAt).toLocaleString() : "—"}
+        {isStale(p) && (
+          <Badge variant="outline" className="ml-2 text-[10px] uppercase">
+            {t("staleBadge")}
+          </Badge>
+        )}
+      </TableCell>
+      <TableCell>
+        <Badge variant="secondary" className="capitalize">
+          {p.status.replace(/_/g, " ")}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        {teardown && (
+          <Can permission="app.deploy">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={tearLoading}
+              onClick={onTearDown}
+            >
+              <TrashIcon className="size-3" /> {t("tearDown")}
+            </Button>
+          </Can>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ---- empty-state onboarding ------------------------------------------
+
+function EmptyStateSteps() {
+  const t = useTranslations("apps.previews");
+  return (
+    <ol className="text-muted-foreground mx-auto mt-4 max-w-md list-decimal space-y-1.5 pl-5 text-left text-sm">
+      <li>{t("empty.step1")}</li>
+      <li>{t("empty.step2")}</li>
+      <li>{t("empty.step3")}</li>
+    </ol>
   );
 }

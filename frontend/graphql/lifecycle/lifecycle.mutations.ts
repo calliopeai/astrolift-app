@@ -270,6 +270,22 @@ export const TEAR_DOWN_PREVIEW = gql`
   }
 `;
 
+export const EXTEND_PREVIEW_TTL = gql`
+  mutation ExtendPreviewTtl($input: ExtendPreviewTtlInputGql!) {
+    extendPreviewTtl(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        ttlUntil
+      }
+    }
+  }
+`;
+
 const ENVIRONMENT_FIELDS = `
   id
   name

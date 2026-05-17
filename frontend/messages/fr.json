@@ -233,6 +233,75 @@
         "copyError": "Couldn't copy — select the text and copy manually",
         "unavailable": "FQDN unavailable — the app row is missing an organization."
       }
+    },
+    "previews": {
+      "title": "{name} · Previews",
+      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "disabled": {
+        "title": "Previews are disabled for this app",
+        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+      },
+      "stale": {
+        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
+        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+      },
+      "openRepo": "Open repo",
+      "enablePreviews": "Enable previews",
+      "openInTab": "Ouvrir dans un nouvel onglet",
+      "openPr": "Ouvrir la PR #{pr} sur l'hôte source",
+      "copyHostname": "Copier le hostname du preview",
+      "filterEmpty": "Aucun preview ne correspond au filtre actuel.",
+      "filters": {
+        "active": "Actifs",
+        "running": "En cours",
+        "failed": "Échec",
+        "all": "Tous"
+      },
+      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "columns": {
+        "pr": "PR / branche",
+        "hostname": "Hostname",
+        "ttl": "TTL",
+        "footprint": "Empreinte",
+        "lastDeploy": "Dernier déploiement",
+        "status": "Statut",
+        "actions": "Actions",
+        "prBranch": "PR / branche"
+      },
+      "ttlTooltip": "Auto-teardown le {date}",
+      "extend": {
+        "1d": "+1j",
+        "7d": "+7j"
+      },
+      "costPerDay": "${cost}/jour",
+      "costUnavailable": "Coût indisponible",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
+      "staleBadge": "stale",
+      "tearDown": "Supprimer",
+      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
+      "confirmTitle": "Tear down preview for PR #{pr}?",
+      "confirmFallback": "Tear down preview?",
+      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "empty": {
+        "title": "Aucun environnement de preview",
+        "enabledHint": "Ouvrez une PR et le preview se construit automatiquement — en général en moins de deux minutes.",
+        "disabledHint": "Activez les previews dans la configuration de l'application pour en lancer un automatiquement sur chaque PR.",
+        "step1": "Activez les previews dans la configuration de cette application.",
+        "step2": "Ouvrez une PR sur le dépôt connecté.",
+        "step3": "Regardez le preview se construire en environ deux minutes.",
+        "learnMore": "Comment fonctionnent les previews"
+      },
+      "toasts": {
+        "teardownEnqueued": "Teardown en file pour la PR #{pr}",
+        "teardownFailed": "Échec du teardown",
+        "ttlExtended": "Preview de la PR #{pr} prolongé de {days}j",
+        "extendFailed": "Impossible de prolonger le TTL"
+      },
+      "emptyTitle": "No preview environments yet",
+      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     }
   },
   "settingsIndex": {
