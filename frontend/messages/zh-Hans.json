@@ -541,6 +541,64 @@
         "redactedNote": "敏感值（密钥、令牌、密码）在显示前已被遮蔽。",
         "requestIdSection": "请求 ID"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} / {required} 已审批",
+        "remainingBadge": "还需 {count} 项",
+        "metBadge": "已达法定人数",
+        "approvedLabel": "已审批",
+        "approvedEmpty": "尚无审批。",
+        "awaitingLabel": "待审批",
+        "awaitingEmpty": "未找到符合条件的审批人，请检查应用策略。"
+      }
+    },
+    "approvalsQueue": {
+      "title": "审批队列",
+      "description": "所有等待审批的部署。可在同一环境内批量审批或拒绝。",
+      "empty": {
+        "title": "暂无待办",
+        "description": "需要审批的部署会出现在这里。"
+      },
+      "selectAllLabel": "全选",
+      "selectionStatus": "已选 {selected} / {total}",
+      "readOnlyHint": "仅可查看，无法审批。",
+      "approveLabel": "审批",
+      "rejectLabel": "拒绝",
+      "footer": {
+        "selected": "已选择 {count} 个部署",
+        "summary": "覆盖：{envs}。",
+        "crossEnvWarning": "批量操作要求同一应用/环境 — 不同环境策略不同。",
+        "approveButton": "审批 {count} 个",
+        "rejectButton": "拒绝 {count} 个"
+      },
+      "confirmApprove": {
+        "title": "审批 {count} 个部署？",
+        "description": "将解锁 {envs}。",
+        "confirm": "全部审批"
+      },
+      "confirmReject": {
+        "title": "拒绝 {count} 个部署？",
+        "description": "{envs} 中的每个部署将被标记为失败。",
+        "reasonLabel": "拒绝原因",
+        "reasonPlaceholder": "为什么拒绝这批部署？",
+        "reasonRequired": "必须填写原因",
+        "confirm": "全部拒绝"
+      },
+      "toasts": {
+        "unexpected": "批量操作无响应。",
+        "allOk": "{label} 成功：{count} 个部署。",
+        "allFailed": "{label} 失败：{count} 个部署 — {message}",
+        "partial": "{label}：成功 {succeeded}，失败 {failed}。",
+        "approveFailed": "批量审批失败。",
+        "rejectFailed": "批量拒绝失败。"
+      },
+      "row": {
+        "selectRowLabel": "选择 {app} / {env}",
+        "approvalsCount": "{received}/{required} 已审批",
+        "received": "接收于 {rel}",
+        "review": "查看"
+      }
     }
   },
   "jobs": {

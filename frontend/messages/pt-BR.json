@@ -541,6 +541,64 @@
         "redactedNote": "Valores sensíveis (segredos, tokens, senhas) são ocultados antes da exibição.",
         "requestIdSection": "ID da requisição"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} de {required} aprovações",
+        "remainingBadge": "Faltam {count}",
+        "metBadge": "Quórum atingido",
+        "approvedLabel": "Aprovado por",
+        "approvedEmpty": "Ainda sem aprovações.",
+        "awaitingLabel": "Aguardando",
+        "awaitingEmpty": "Sem aprovadores elegíveis — verifique a política do app."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Fila de aprovações",
+      "description": "Todos os deploys aguardando aprovação. Selecione linhas para aprovar/rejeitar em lote dentro do mesmo ambiente.",
+      "empty": {
+        "title": "Nada pendente",
+        "description": "Quando um deploy precisar de aprovação, aparecerá aqui."
+      },
+      "selectAllLabel": "Selecionar todos",
+      "selectionStatus": "{selected} de {total} selecionados",
+      "readOnlyHint": "Você pode revisar, mas não aprovar.",
+      "approveLabel": "Aprovar",
+      "rejectLabel": "Rejeitar",
+      "footer": {
+        "selected": "{count, plural, =1 {1 deploy selecionado} other {# deploys selecionados}}",
+        "summary": "Em {envs}.",
+        "crossEnvWarning": "Operações em lote exigem o mesmo app/ambiente — políticas variam por ambiente.",
+        "approveButton": "Aprovar {count}",
+        "rejectButton": "Rejeitar {count}"
+      },
+      "confirmApprove": {
+        "title": "Aprovar {count} deploys?",
+        "description": "Libera {envs}.",
+        "confirm": "Aprovar todos"
+      },
+      "confirmReject": {
+        "title": "Rejeitar {count} deploys?",
+        "description": "Cada deploy em {envs} será marcado como falho.",
+        "reasonLabel": "Motivo da rejeição",
+        "reasonPlaceholder": "Por que este lote está sendo rejeitado?",
+        "reasonRequired": "Motivo obrigatório",
+        "confirm": "Rejeitar todos"
+      },
+      "toasts": {
+        "unexpected": "Ação em lote sem resposta.",
+        "allOk": "{label} com sucesso para {count} deploys.",
+        "allFailed": "{label} falhou para {count} deploys: {message}",
+        "partial": "{label}: {succeeded} com sucesso, {failed} falhos.",
+        "approveFailed": "Aprovação em lote falhou.",
+        "rejectFailed": "Rejeição em lote falhou."
+      },
+      "row": {
+        "selectRowLabel": "Selecionar {app} / {env}",
+        "approvalsCount": "{received}/{required} aprovações",
+        "received": "Recebido {rel}",
+        "review": "Revisar"
+      }
     }
   },
   "jobs": {
