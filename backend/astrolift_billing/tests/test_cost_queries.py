@@ -43,9 +43,7 @@ pytestmark = pytest.mark.django_db
 
 
 def _info():
-    return SimpleNamespace(
-        context=SimpleNamespace(user=None, request=SimpleNamespace(user=None))
-    )
+    return SimpleNamespace(context=SimpleNamespace(user=None, request=SimpleNamespace(user=None)))
 
 
 def _tenant(org):
@@ -56,9 +54,7 @@ def _scaffold():
     """Mint a self-contained org + app + binding pair."""
     org = Organization.objects.create(name="Acme Cost", slug="acme-cost")
     team = Team.objects.create(organization=org, name="Eng", slug="eng-cost")
-    project = Project.objects.create(
-        organization=org, team=team, name="Demo", slug="demo-cost"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-cost")
 
     plugin_obj = ProviderPlugin(
         name="K8s",
@@ -272,9 +268,7 @@ def test_window_takes_precedence_over_days(permission_resolver):
     _seed_day(org=org, day=today, amount_cents=10, app=app)
     _seed_day(org=org, day=today - dt.timedelta(days=15), amount_cents=20, app=app)
     with _tenant(org):
-        out = BillingQuery().astrolift_cost_snapshots(
-            _info(), window=CostWindow.H24, days=30
-        )
+        out = BillingQuery().astrolift_cost_snapshots(_info(), window=CostWindow.H24, days=30)
     assert len(out) == 1
     assert out[0].amount_cents == 10
 
@@ -304,9 +298,7 @@ def test_trend_has_continuous_xaxis(permission_resolver):
     assert len(out) == 7
     dates = [p.date for p in out]
     assert dates == sorted(dates)
-    assert all(
-        (dates[i + 1] - dates[i]).days == 1 for i in range(len(dates) - 1)
-    )
+    assert all((dates[i + 1] - dates[i]).days == 1 for i in range(len(dates) - 1))
     zero_days = [p.amount_cents for p in out if p.amount_cents == 0]
     assert len(zero_days) == 4
 
@@ -436,9 +428,7 @@ def test_cost_by_binding_groups_by_binding(permission_resolver):
         by=CostSnapshot.CostBy.MANAGED_SERVICE,
     )
     with _tenant(org):
-        out = BillingQuery().astrolift_cost_by_binding(
-            _info(), window=CostWindow.D7
-        )
+        out = BillingQuery().astrolift_cost_by_binding(_info(), window=CostWindow.D7)
     assert out.unattributed_cents == 0
     assert out.total_cents == 800
     assert len(out.attributed_rows) == 1
@@ -455,16 +445,10 @@ def test_cost_by_binding_separates_attributed_and_orphan(permission_resolver):
     org, app, _, binding = _scaffold()
     permission_resolver.grant(Permission.BILLING_READ)
     today = dt.date.today()
-    _seed_day(
-        org=org, day=today, amount_cents=400, app=app, binding=binding
-    )
-    _seed_day(
-        org=org, day=today, amount_cents=600, app=app, binding=None
-    )
+    _seed_day(org=org, day=today, amount_cents=400, app=app, binding=binding)
+    _seed_day(org=org, day=today, amount_cents=600, app=app, binding=None)
     with _tenant(org):
-        out = BillingQuery().astrolift_cost_by_binding(
-            _info(), window=CostWindow.D7
-        )
+        out = BillingQuery().astrolift_cost_by_binding(_info(), window=CostWindow.D7)
     assert out.unattributed_cents == 600
     assert out.total_cents == 1000
     assert len(out.attributed_rows) == 1

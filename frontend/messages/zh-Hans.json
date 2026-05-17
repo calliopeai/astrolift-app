@@ -170,6 +170,18 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "freshness": {
+        "lastDeployed": "上次部署 {when}",
+        "viewFailed": "查看失败的部署",
+        "stale": "已过时",
+        "never": "从未部署",
+        "status": {
+          "OK": "健康",
+          "DEGRADED": "最近部署失败",
+          "STALE": "近期无部署",
+          "NEVER": "从未部署"
+        }
       }
     },
     "tabs": {

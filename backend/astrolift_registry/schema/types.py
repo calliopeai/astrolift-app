@@ -2,13 +2,76 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
+import enum
 
 import strawberry
 
 from astrolift_graphql import GUID
 
 JSON = strawberry.scalars.JSON
+
+
+@strawberry.enum
+class AstroliftAppHealthPulseStatus(enum.Enum):
+    """Coarse freshness signal for the apps list (#405).
+
+    Derived from the app's most recent deployment; the FE renders one
+    coloured dot per row so operators can spot the bad apples without
+    drilling into each detail page:
+
+    - ``ok``       — a successful (``running``) deploy within the last 7d
+    - ``degraded`` — the most recent deploy is ``failed``
+    - ``stale``    — no deploy in the last 30d (even if it succeeded once)
+    - ``never``    — the app has no deployments at all yet
+    """
+
+    OK = "ok"
+    DEGRADED = "degraded"
+    STALE = "stale"
+    NEVER = "never"
+
+
+@strawberry.type(name="AstroliftAppHealthPulse")
+class AppHealthPulseType:
+    """Per-app freshness rollup surfaced on the apps list (#405).
+
+    ``age_seconds`` is the age of the signal used to derive ``status``:
+    the most recent deploy's ``created_at`` for ``ok`` / ``degraded`` /
+    ``stale``, and ``None`` for ``never`` (there's nothing to age).
+    ``message`` is a short, FE-renderable hint operators see in the
+    badge tooltip (e.g. ``"latest deploy failed 5m ago"``).
+    """
+
+    status: AstroliftAppHealthPulseStatus
+    age_seconds: int | None
+    message: str
+
+
+@strawberry.type(name="AstroliftAppDeploymentSummary")
+class AppDeploymentSummaryType:
+    """Slimmed deployment shape carried inline on each app row (#405).
+
+    A flat scalar projection — no nested user / env types — so the
+    apps-list query stays cheap. Powers the row's "last deployed"
+    badge and the "Failed" deep-link.
+    """
+
+    id: GUID
+    status: str
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    created_at: dt.datetime
+    environment_name: str
+    triggered_by: str
+    """Best-effort display label for who/what kicked the deploy:
+    the triggering user's email if known, otherwise the trigger
+    kind (``push`` / ``ci`` / ``manual`` / …). Empty string when
+    neither is available."""
+
+    image_tag: str
+    commit_sha: str
 
 
 @strawberry.type(name="AstroliftSecurityPolicy")
@@ -117,6 +180,19 @@ class RegisteredAppType:
     # card (#307) reads this directly to seed the form.
     security_policy: SecurityPolicyType
 
+    # Per-row deployment freshness (#405). All three are nullable and
+    # opt-in via the ``include_freshness`` arg on ``astroliftApps`` /
+    # ``astroliftMyApps`` — when the arg is False (default), the
+    # resolver leaves these null to keep the cheap list query cheap.
+    # ``last_deployed_at`` is the most recent SUCCESSFUL deploy across
+    # every env (so "stale" means "no successful deploy in N days",
+    # not "no attempt"). ``latest_deployment`` is the most recent
+    # deploy regardless of status (so "failed" can surface even if a
+    # successful deploy preceded it months ago).
+    latest_deployment: AppDeploymentSummaryType | None
+    last_deployed_at: dt.datetime | None
+    health_pulse: AppHealthPulseType | None
+
 
 @strawberry.type(name="AstroliftAppTeamAccess")
 class AppTeamAccessType:
@@ -216,7 +292,144 @@ class ContainerType:
     workload_slug: str
 
 
-def app_to_type(app) -> RegisteredAppType:
+# Pulse thresholds (#405). Pulled out as module-level constants so
+# the resolver, the test cases, and any future "ok / degraded / stale"
+# alerter agree on the same windows. Days; converted to a real
+# timedelta in the resolver.
+HEALTHY_DEPLOY_WINDOW_DAYS = 7
+STALE_DEPLOY_WINDOW_DAYS = 30
+
+
+@dataclasses.dataclass(frozen=True)
+class AppFreshness:
+    """Resolver-side freshness payload for one app row (#405).
+
+    Built once per ``astroliftApps`` call from a bulk deployment
+    query, then handed to ``app_to_type`` so the per-row serialiser
+    doesn't need its own DB roundtrip — that's the N+1 guardrail."""
+
+    latest_deployment: AppDeploymentSummaryType | None
+    last_deployed_at: dt.datetime | None
+    pulse: AppHealthPulseType
+
+
+def _deployment_to_summary(deployment) -> AppDeploymentSummaryType:
+    """Project one ``Deployment`` row into the slim summary type."""
+    triggered = ""
+    user = getattr(deployment, "triggered_by_user", None)
+    if user is not None:
+        triggered = getattr(user, "email", "") or getattr(user, "username", "") or ""
+    if not triggered:
+        triggered = deployment.trigger_kind or ""
+    env_name = deployment.app_environment.name if deployment.app_environment_id else ""
+    return AppDeploymentSummaryType(
+        id=GUID(str(deployment.guid)),
+        status=deployment.status,
+        started_at=deployment.started_at,
+        ended_at=deployment.ended_at,
+        created_at=deployment.created_at,
+        environment_name=env_name,
+        triggered_by=triggered,
+        image_tag=deployment.image_tag or "",
+        commit_sha=deployment.commit_sha or "",
+    )
+
+
+def build_app_freshness(
+    *,
+    latest_deployment,
+    last_success_at: dt.datetime | None,
+    now: dt.datetime,
+) -> AppFreshness:
+    """Derive the health-pulse rollup from one app's deploy history.
+
+    ``latest_deployment`` is the most recent ``Deployment`` row across
+    every env (None when the app has never deployed). ``last_success_at``
+    is the ``created_at`` of the most recent ``running`` deploy across
+    every env (None when the app never reached running). ``now`` is
+    passed in so tests can pin the window without monkey-patching
+    ``timezone.now``.
+
+    Pulse rules mirror the docstring on
+    :class:`AstroliftAppHealthPulseStatus`. Order matters: a failed
+    *latest* deploy always reads as ``degraded`` even if a successful
+    deploy is still inside the 7-day window — operators want the most
+    recent state surfaced, not the rosiest one.
+    """
+
+    if latest_deployment is None:
+        return AppFreshness(
+            latest_deployment=None,
+            last_deployed_at=None,
+            pulse=AppHealthPulseType(
+                status=AstroliftAppHealthPulseStatus.NEVER,
+                age_seconds=None,
+                message="no deploys yet",
+            ),
+        )
+
+    summary = _deployment_to_summary(latest_deployment)
+    latest_age = int((now - latest_deployment.created_at).total_seconds())
+
+    if latest_deployment.status == "failed":
+        return AppFreshness(
+            latest_deployment=summary,
+            last_deployed_at=last_success_at,
+            pulse=AppHealthPulseType(
+                status=AstroliftAppHealthPulseStatus.DEGRADED,
+                age_seconds=latest_age,
+                message=f"latest deploy failed in {summary.environment_name or 'unknown'}",
+            ),
+        )
+
+    if last_success_at is None:
+        # Latest exists but isn't ``running`` (e.g. it's still
+        # pending / deploying or it was superseded). Treat as
+        # ``stale`` when older than the stale window, else ``ok`` so
+        # in-flight deploys still read healthy. We use the latest
+        # row's age — the only deploy we've got.
+        if latest_age >= STALE_DEPLOY_WINDOW_DAYS * 86400:
+            status = AstroliftAppHealthPulseStatus.STALE
+            message = f"no successful deploy in {STALE_DEPLOY_WINDOW_DAYS}d"
+        else:
+            status = AstroliftAppHealthPulseStatus.OK
+            message = f"latest deploy {latest_deployment.status}"
+        return AppFreshness(
+            latest_deployment=summary,
+            last_deployed_at=None,
+            pulse=AppHealthPulseType(
+                status=status,
+                age_seconds=latest_age,
+                message=message,
+            ),
+        )
+
+    success_age = int((now - last_success_at).total_seconds())
+    if success_age <= HEALTHY_DEPLOY_WINDOW_DAYS * 86400:
+        status = AstroliftAppHealthPulseStatus.OK
+        message = "healthy"
+    elif success_age >= STALE_DEPLOY_WINDOW_DAYS * 86400:
+        status = AstroliftAppHealthPulseStatus.STALE
+        message = f"no successful deploy in {STALE_DEPLOY_WINDOW_DAYS}d"
+    else:
+        # Between 7d and 30d — not fresh, not yet stale. Surface as
+        # ``ok`` with the actual age so the FE can decide to soften
+        # the badge (or not) without a third state.
+        status = AstroliftAppHealthPulseStatus.OK
+        message = "healthy"
+
+    return AppFreshness(
+        latest_deployment=summary,
+        last_deployed_at=last_success_at,
+        pulse=AppHealthPulseType(
+            status=status,
+            age_seconds=success_age,
+            message=message,
+        ),
+    )
+
+
+def app_to_type(app, *, freshness: AppFreshness | None = None) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
         classify_state,
@@ -279,6 +492,9 @@ def app_to_type(app) -> RegisteredAppType:
         last_resync_at=app.last_resync_at,
         source_webhook_installed_at=app.source_webhook_installed_at,
         security_policy=_security_policy_to_type(app),
+        latest_deployment=(freshness.latest_deployment if freshness else None),
+        last_deployed_at=(freshness.last_deployed_at if freshness else None),
+        health_pulse=(freshness.pulse if freshness else None),
     )
 
 

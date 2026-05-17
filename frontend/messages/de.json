@@ -166,6 +166,18 @@
       "errorBanner": {
         "title": "Apps konnten nicht geladen werden",
         "retry": "Erneut versuchen"
+      },
+      "freshness": {
+        "lastDeployed": "Zuletzt bereitgestellt {when}",
+        "viewFailed": "Fehlgeschlagene Bereitstellung ansehen",
+        "stale": "veraltet",
+        "never": "keine Bereitstellungen",
+        "status": {
+          "OK": "Gesund",
+          "DEGRADED": "Letzte Bereitstellung fehlgeschlagen",
+          "STALE": "Keine kürzlichen Bereitstellungen",
+          "NEVER": "Noch nie bereitgestellt"
+        }
       }
     },
     "tabs": {
