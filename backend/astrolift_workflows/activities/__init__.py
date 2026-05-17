@@ -96,6 +96,7 @@ from astrolift_workflows.activities.scheduled import (
     gc_stale_previews,
     poll_scheduled_job_runs,
     prune_audit_log,
+    prune_stale_sessions,
     reconcile_cluster_capabilities,
     reheal_webhook_subscriptions,
 )
@@ -167,6 +168,7 @@ __all__ = [
     "provision_registry_repo",
     "provision_secrets_backend",
     "prune_audit_log",
+    "prune_stale_sessions",
     "reconcile_cluster_capabilities",
     "refresh_secret_bundle_in_cluster",
     "reheal_webhook_subscriptions",

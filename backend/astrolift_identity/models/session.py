@@ -1,0 +1,184 @@
+"""
+AstroliftSession — sidecar to the underlying django_session row.
+
+The Django default session store tracks ``session_key`` + opaque blob
++ ``expire_date`` and nothing else. The platform needs more:
+
+* ``client_kind`` — was this session issued to a browser, the CLI,
+  the mobile app? Lets the platform apply per-kind policy (max
+  concurrent sessions per user-kind, reveal-on-mobile blocks, etc.).
+* ``last_seen_at`` — when did the holder of this session last call
+  the API? Drives the "this CLI hasn't checked in for 90 days,
+  auto-revoke" pruner and the operator-facing "stale device" hint.
+* ``revoked_at`` + ``revocation_reason`` — explicit revoke vs. expiry
+  vs. auto-prune so the audit trail can answer "why did this session
+  die?" months later.
+
+This model is populated by ``SessionTrackingMiddleware`` on every
+authed request — that gives us a single write point so the schema
+isn't lying about ``last_seen_at`` being current.
+
+The underlying ``django_session`` row is the source of truth for
+authentication; this row is the sidecar that surfaces and *governs*
+that session. Revoke flows delete both: the ``django_session`` row so
+the cookie immediately fails auth, and this row's soft-delete fields
+so the audit trail survives.
+"""
+
+from __future__ import annotations
+
+from django.conf import settings
+from django.db import models
+
+from core.models.base import BaseCoreModel
+
+
+class ClientKind(models.TextChoices):
+    """Issuance kind of an :class:`AstroliftSession`.
+
+    Stored as the lowercase value but surfaced uppercase via Strawberry
+    (matches the FE convention for narrow string unions).
+    """
+
+    WEB = "web", "Web browser"
+    CLI = "cli", "Command-line tool"
+    MOBILE = "mobile", "Mobile app"
+    BROWSER_EXTENSION = "browser_extension", "Browser extension"
+    API_TOKEN = "api_token", "API token"
+
+
+# Per-kind defaults for ``MAX_SESSIONS_PER_CLIENT_KIND``. Surfaced as
+# constants so tests + the per-user enforcer have a single source of
+# truth for "what should happen on a fresh install where the operator
+# hasn't tuned the Constance entry yet."
+DEFAULT_MAX_SESSIONS_PER_CLIENT_KIND: dict[str, int] = {
+    ClientKind.WEB.value: 5,
+    ClientKind.CLI.value: 3,
+    ClientKind.MOBILE.value: 3,
+    ClientKind.BROWSER_EXTENSION.value: 2,
+    ClientKind.API_TOKEN.value: 10,
+}
+
+
+# Per-kind staleness thresholds (seconds). ``PruneStaleSessionsWorkflow``
+# reads the matching Constance entry per kind, falling back to these on
+# a fresh install. Browsers age out fastest (operator usually doesn't
+# notice an old tab); CLI sessions age out slowest (long-running CI
+# tokens shouldn't get reaped just because they sat idle between
+# pipeline runs).
+DEFAULT_STALE_SESSION_TTL_SECONDS: dict[str, int] = {
+    ClientKind.WEB.value: 30 * 24 * 3600,
+    ClientKind.CLI.value: 90 * 24 * 3600,
+    ClientKind.MOBILE.value: 60 * 24 * 3600,
+    ClientKind.BROWSER_EXTENSION.value: 60 * 24 * 3600,
+    ClientKind.API_TOKEN.value: 180 * 24 * 3600,
+}
+
+
+# Minimum interval (seconds) between ``last_seen_at`` writes for the
+# same session row. A chatty client (the FE issues a query every few
+# seconds) would otherwise hammer the DB; coarsening to 60s keeps the
+# liveness signal useful (within a minute of truth) without write
+# amplification.
+LAST_SEEN_WRITE_THROTTLE_SECONDS = 60
+
+
+class AstroliftSession(BaseCoreModel):
+    """Sidecar for one authenticated session.
+
+    Owned by exactly one user. Bound to exactly one underlying auth
+    artefact: either a ``django_session.session_key`` (browser /
+    mobile / CLI device-flow) or an ``ApiToken.token_hash`` (API
+    token sessions). Exactly one of the two FKs is populated.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="astrolift_sessions",
+        on_delete=models.CASCADE,
+    )
+
+    # The ``django_session`` row this sidecar tracks. Indexed because
+    # the lookup-by-key path runs on every authed request.
+    session_key = models.CharField(max_length=64, blank=True, default="", db_index=True)
+
+    # API-token-backed sessions don't have a ``django_session`` row;
+    # they reference the ``ApiToken`` directly. Mutually exclusive with
+    # ``session_key`` — enforced in the middleware that creates the row.
+    api_token = models.ForeignKey(
+        "astrolift_identity.ApiToken",
+        related_name="sessions",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
+
+    # Org context at issuance time. Lets the admin-revoke gate check
+    # "is this session for someone in the active org" without a join
+    # through Member every time.
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        related_name="astrolift_sessions",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
+    client_kind = models.CharField(
+        max_length=32,
+        choices=ClientKind.choices,
+        default=ClientKind.WEB.value,
+        db_index=True,
+    )
+
+    # Free-form display name the client (CLI / mobile) supplies at
+    # session-issue time, e.g. ``"alice@laptop"`` or ``"iPhone 17 Pro"``.
+    # Truncated at 200 chars so a pathological label can't bloat the row.
+    label = models.CharField(max_length=200, blank=True, default="")
+
+    # Stamped by the session-tracking middleware on every authed
+    # request; rate-limited per
+    # :data:`LAST_SEEN_WRITE_THROTTLE_SECONDS` so we don't write to
+    # the row on every poll.
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_seen_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_seen_agent = models.CharField(max_length=512, blank=True, default="")
+
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    # Explicit revocation state. ``deleted_at`` is the soft-delete
+    # marker (same row gets it too), but ``revoked_at`` answers the
+    # "was this revoked vs. just aged out" question in the audit
+    # trail. ``revocation_reason`` is a short tag drawn from
+    # ``RevocationReason`` below.
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revocation_reason = models.CharField(max_length=64, blank=True, default="")
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="+",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "client_kind"], name="astrosess_user_kind_idx"),
+            models.Index(fields=["organization", "user"], name="astrosess_org_user_idx"),
+        ]
+
+
+class RevocationReason:
+    """Stable string tags for :attr:`AstroliftSession.revocation_reason`.
+
+    Not a Django ``TextChoices`` because the set has to stay open
+    enough for future tags (a security-incident-driven mass revoke
+    pass would add its own) without forcing a schema migration on
+    each addition.
+    """
+
+    USER_REVOKE = "user_revoke"
+    ADMIN_REVOKE = "admin_revoke"
+    QUOTA_EVICTION = "quota_eviction"
+    AUTO_STALE = "auto_stale"
+    LOGOUT = "logout"
