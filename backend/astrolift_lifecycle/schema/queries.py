@@ -35,6 +35,8 @@ from astrolift_lifecycle.schema.types import (
     DeployTokenType,
     PreviewEnvironmentType,
     ScheduledJobRunType,
+    WorkloadPodStatusBucketType,
+    WorkloadPodSummaryType,
     app_domain_to_type,
     app_env_to_type,
     certificate_info_to_type,
@@ -79,6 +81,121 @@ def _viewer_user_id(info: Info) -> int | None:
     return None
 
 
+# Ordering for the workload status grid (#429). Worst-first so the
+# incident-responder sees the actionable buckets at the top. Anything
+# not in the list sorts to the tail in alphabetical order.
+_WORKLOAD_STATUS_ORDER = (
+    "CrashLoopBackOff",
+    "ImagePullBackOff",
+    "ErrImagePull",
+    "CreateContainerConfigError",
+    "CreateContainerError",
+    "InvalidImageName",
+    "OOMKilled",
+    "Error",
+    "Unknown",
+    "Pending",
+    "Terminating",
+    "ContainerCreating",
+    "Running",
+    "Succeeded",
+)
+
+
+def _list_pods_for_app(app_slug: str, *, environment_name: str | None = None) -> list:
+    """Resolve cluster + namespace for an app and ask the driver for
+    live pods.
+
+    Extracted from ``astrolift_app_pods`` (#429) so the workload-
+    detail breakdown resolver shares the exact same resolution rules
+    (env-named cluster preferred → default cluster, ``namespace_for_app``).
+    Returns an empty list on any kind of cluster-side failure so the
+    UI stays renderable.
+    """
+    app = (
+        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        .filter(slug=app_slug, deleted_at__isnull=True)
+        .first()
+    )
+    if app is None:
+        return []
+
+    cluster = None
+    if environment_name:
+        env = (
+            AppEnvironment.objects.select_related("tenant_cluster")
+            .filter(
+                registered_app=app,
+                name=environment_name,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+    if cluster is None:
+        cluster = app.default_tenant_cluster
+    if cluster is None or not getattr(cluster, "is_active", True):
+        return []
+
+    namespace = namespace_for_app(app)
+    try:
+        return list(
+            list_app_pods(
+                cluster=cluster,
+                namespace=namespace,
+                app_slug=app.slug,
+            )
+        )
+    except ClusterObservabilityError:
+        return []
+    except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
+        # Cluster transient errors (timeouts, 5xx) keep the UI alive;
+        # the platform-event log carries the diagnostic.
+        return []
+
+
+def _bucket_pods_by_status(pods: list) -> list[WorkloadPodStatusBucketType]:
+    """Group ``PodInfo`` rows into status buckets for the workload
+    status grid (#429). ``percent`` is rounded to one decimal place so
+    the UI doesn't render fractions like ``33.3333%``."""
+    total = len(pods)
+    by_status: dict[str, list] = {}
+    for pod in pods:
+        key = (pod.status or "Unknown").strip() or "Unknown"
+        by_status.setdefault(key, []).append(pod)
+
+    def _sort_key(status: str) -> tuple[int, str]:
+        if status in _WORKLOAD_STATUS_ORDER:
+            return (_WORKLOAD_STATUS_ORDER.index(status), status)
+        return (len(_WORKLOAD_STATUS_ORDER) + 1, status)
+
+    buckets: list[WorkloadPodStatusBucketType] = []
+    for status in sorted(by_status, key=_sort_key):
+        rows = by_status[status]
+        count = len(rows)
+        percent = round((count / total) * 100.0, 1) if total else 0.0
+        # Sort pods within a bucket by age (oldest first) — operators
+        # usually want the long-running pods at the top so a fresh
+        # pod thrashing into CrashLoopBackOff is visually separable.
+        rows = sorted(rows, key=lambda p: (p.age is None, p.age))
+        buckets.append(
+            WorkloadPodStatusBucketType(
+                status=status,
+                count=count,
+                percent=percent,
+                pods=[
+                    WorkloadPodSummaryType(
+                        name=p.name,
+                        age=p.age,
+                        ready=bool(p.ready),
+                    )
+                    for p in rows
+                ],
+            )
+        )
+    return buckets
+
+
 @strawberry.type
 class LifecycleQuery:
     @strawberry.field
@@ -110,10 +227,7 @@ class LifecycleQuery:
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)
         viewer = _viewer_user_id(info)
-        return [
-            deployment_to_type(d, viewer_user_id=viewer)
-            for d in qs[: max(1, min(limit, 200))]
-        ]
+        return [deployment_to_type(d, viewer_user_id=viewer) for d in qs[: max(1, min(limit, 200))]]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -137,15 +251,22 @@ class LifecycleQuery:
     ) -> list[DeploymentApprovalHistoryEntryType]:
         """Approve / reject / abort audit trail for one deployment (#419).
 
-        Pulls from ``AuditEvent`` rows whose ``action`` is one of the
-        approval lifecycle actions and whose ``target_id`` matches the
-        deployment's primary key. Sorted oldest-first so the UI can
-        render a chronological timeline.
+        Returns ``AuditEvent`` rows whose ``action`` is one of the
+        deployment-lifecycle actions and whose ``target_id`` (set by
+        the resolver's audit-decorator ``target`` hook) matches the
+        deployment guid, plus the ``deployment.start`` row whose
+        extras payload stamped this deployment's guid under
+        ``data['deployment_id']`` (the start row can't carry the guid
+        as ``target_id`` because the guid is minted inside the
+        resolver). Sorted oldest-first so the UI can render a
+        chronological timeline.
 
-        Tenant scoping rides on the deployment lookup: a request for a
-        sibling-org deployment returns an empty list rather than leaking
-        row counts.
+        Tenant scoping rides on the deployment lookup — a request for
+        a sibling-org deployment returns an empty list rather than
+        leaking row counts.
         """
+        from django.db.models import Q
+
         from astrolift_operations.models import AuditEvent
 
         deployment = (
@@ -156,11 +277,14 @@ class LifecycleQuery:
         if deployment is None:
             return []
 
-        target_id = str(deployment.pk)
-        events = AuditEvent.objects.filter(
-            action__in=_APPROVAL_LIFECYCLE_ACTIONS,
-            target_id=target_id,
-        ).order_by("occurred_at")[:200]
+        deployment_guid = str(deployment.guid)
+        events = (
+            AuditEvent.objects.filter(action__in=_APPROVAL_LIFECYCLE_ACTIONS)
+            .filter(
+                Q(target_id=deployment_guid) | Q(data__deployment_id=deployment_guid),
+            )
+            .order_by("occurred_at")[:200]
+        )
         out: list[DeploymentApprovalHistoryEntryType] = []
         for e in events:
             data = e.data or {}
@@ -404,45 +528,45 @@ class LifecycleQuery:
         to break the page over it. Cluster outages surface via
         platform-event alerts instead.
         """
-        app = (
-            RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
-            .filter(slug=app_slug, deleted_at__isnull=True)
-            .first()
-        )
-        if app is None:
-            return []
-
-        cluster = None
-        if environment_name:
-            env = (
-                AppEnvironment.objects.select_related("tenant_cluster")
-                .filter(
-                    registered_app=app,
-                    name=environment_name,
-                    deleted_at__isnull=True,
-                )
-                .first()
-            )
-            cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
-        if cluster is None:
-            cluster = app.default_tenant_cluster
-        if cluster is None or not getattr(cluster, "is_active", True):
-            return []
-
-        namespace = namespace_for_app(app)
-        try:
-            pods = list_app_pods(
-                cluster=cluster,
-                namespace=namespace,
-                app_slug=app.slug,
-            )
-        except ClusterObservabilityError:
-            return []
-        except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
-            # Cluster transient errors (timeouts, 5xx) keep the UI
-            # alive; the platform-event log carries the diagnostic.
-            return []
+        pods = _list_pods_for_app(app_slug, environment_name=environment_name)
         return [pod_info_to_type(p) for p in pods]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_workload_pod_status_breakdown(
+        self,
+        info: Info,
+        app_slug: str,
+        workload_slug: str,
+        environment_name: str | None = None,
+    ) -> list[WorkloadPodStatusBucketType]:
+        """Aggregate live pods for one workload into status buckets
+        (#429).
+
+        Powers the status grid at the top of the workload detail
+        page. Filters the same ``list_app_pods`` payload the
+        observability surface consumes (so a single k8s API hit
+        backs both views) by ``PodInfo.workload`` — which the SDK
+        pulls from the ``astrolift.io/workload`` label or the pod's
+        owner-reference.
+
+        Returns buckets ordered worst-first
+        (``CrashLoopBackOff`` / ``ImagePullBackOff`` →
+        ``Pending`` / ``Terminating`` → ``Running`` → other) so the
+        UI's incident-response framing surfaces actionable rows at
+        the top without sorting client-side.
+
+        Behaviour mirrors ``astrolift_app_pods`` — empty list when
+        the cluster is unwired / unreachable rather than raising,
+        so the workload page stays renderable during a cluster
+        outage. ``APP_READ_LOGS`` gates both surfaces so an operator
+        with read-only access to deploys (but not logs) doesn't see
+        pod names they couldn't tail anyway.
+        """
+        pods = _list_pods_for_app(app_slug, environment_name=environment_name)
+        scoped = [p for p in pods if (p.workload or "") == workload_slug]
+        return _bucket_pods_by_status(scoped)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

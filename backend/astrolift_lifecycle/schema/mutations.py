@@ -374,6 +374,43 @@ def _abort_extras(result) -> dict | None:
     return {"reason": reason}
 
 
+def _deployment_target_from_input(*_args, **kwargs) -> tuple[str, str] | None:
+    """Audit ``target`` hook for deployment lifecycle mutations whose
+    input carries the deployment guid (approve / reject / abort /
+    rollback / redeploy / approve_by_token / reject_by_token).
+
+    Returns ``("Deployment", "<guid>")`` so the audit row carries the
+    deployment-scoped key the history query (#419) filters on. We
+    swallow KeyErrors / AttributeErrors so an unexpected input shape
+    never breaks the mutation — the row just won't carry a target.
+    """
+    try:
+        payload = kwargs.get("input")
+        if payload is None:
+            return None
+        identifier = getattr(payload, "id", None)
+        if identifier is None:
+            return None
+        return ("Deployment", str(identifier))
+    except (AttributeError, KeyError):
+        return None
+
+
+def _start_extras(result) -> dict | None:
+    """Audit-extras hook for ``start_deployment``: stamps the
+    freshly-created deployment guid onto the audit row's data
+    payload so the approval-history query can correlate the
+    lifecycle-start event back to the same deployment id the
+    later approve/reject/abort rows carry on ``target_id``."""
+    if not getattr(result, "ok", False):
+        return None
+    data = getattr(result, "data", None)
+    deployment_id = getattr(data, "id", None) if data is not None else None
+    if deployment_id is None:
+        return None
+    return {"deployment_id": str(deployment_id)}
+
+
 def _actor_from_request(info: Info) -> Actor:
     request = getattr(info.context, "request", None)
     user = getattr(request, "user", None) if request else None
@@ -666,7 +703,10 @@ def _kick_validate_custom_domain(domain) -> None:
 @strawberry.type
 class LifecycleMutation:
     @strawberry.field
-    @mutation_audit(action="deployment.start")
+    @mutation_audit(
+        action="deployment.start",
+        extras=lambda result: _start_extras(result),
+    )
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
     def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
@@ -798,7 +838,10 @@ class LifecycleMutation:
         return gql_success(deployment_to_type(deployment))
 
     @strawberry.field
-    @mutation_audit(action="deployment.approve")
+    @mutation_audit(
+        action="deployment.approve",
+        target=_deployment_target_from_input,
+    )
     @require_permission(Permission.APP_APPROVE_DEPLOY)
     @tenant_scoped()
     def approve_deployment(
@@ -819,19 +862,14 @@ class LifecycleMutation:
 
         actor = _actor_from_request(info)
         tenant = get_current_tenant()
-        if (
-            actor.user_id
-            and deployment.triggered_by_user_id == actor.user_id
-            and not _self_approve_allowed()
-        ):
-            # Self-approval blocked (#419). The detail flag is the
-            # contract the FE keys off — see the SELF_APPROVE_BLOCKED
-            # warning badge — so the message can evolve without
-            # breaking the renderer.
+        if actor.user_id and deployment.triggered_by_user_id == actor.user_id and not _self_approve_allowed():
+            # Self-approval blocked (#419). The FE primarily hides the
+            # approve CTA based on the Deployment.triggered_by_me flag
+            # from the query; this resolver guard is the backstop so
+            # an out-of-date page or scripted client can't slip through.
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 "cannot approve your own deployment — another approver required",
-                detail={"selfApproveBlocked": True},
             )
 
         if actor.user_id and not _is_eligible_approver(
@@ -855,11 +893,14 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(
         action="deployment.reject",
+        target=_deployment_target_from_input,
         extras=lambda result: _abort_extras(result),
     )
     @require_permission(Permission.APP_APPROVE_DEPLOY)
     @tenant_scoped()
-    def reject_deployment(self, info: Info, input: AbortDeploymentInput) -> MutationResultType[DeploymentType]:
+    def reject_deployment(
+        self, info: Info, input: AbortDeploymentInput
+    ) -> MutationResultType[DeploymentType]:
         """Reject a pending_approval deploy from in-band.
 
         Mirrors :meth:`reject_deployment_by_token` but requires an
@@ -995,6 +1036,7 @@ class LifecycleMutation:
     @strawberry.field
     @mutation_audit(
         action="deployment.abort",
+        target=_deployment_target_from_input,
         extras=lambda result: _abort_extras(result),
     )
     @require_permission(Permission.APP_DEPLOY)
