@@ -86,6 +86,26 @@ export const DETACH_SECRET_BUNDLE = gql`
   }
 `;
 
+export const REVEAL_APP_SECRET = gql`
+  mutation RevealAppSecret($input: RevealAppSecretInput!) {
+    revealAppSecret(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        secretId
+        key
+        environmentName
+        value
+        revealedAt
+      }
+    }
+  }
+`;
+
 const MANAGED_SERVICE_FIELDS = `
   id
   name
