@@ -21,6 +21,7 @@ import pytest
 
 from astrolift_lifecycle.models import Deployment
 from astrolift_lifecycle.schema.mutations import (
+    AbortDeploymentInput,
     DeploymentByIdInput,
     LifecycleMutation,
     StartDeploymentInput,
@@ -254,13 +255,45 @@ def test_abort_signals_workflow_and_marks_failed(
                 image_tag="v1.0.0",
             ),
         )
-        abort = mut.abort_deployment(fake_info, input=DeploymentByIdInput(id=start.data.id))
+        abort = mut.abort_deployment(
+            fake_info,
+            input=AbortDeploymentInput(id=start.data.id, reason="bad image, halting"),
+        )
 
     assert abort.ok, abort.errors
     assert abort.data.status == Deployment.Status.FAILED.value
+    # Reason persisted on the row so the history sidebar can render it.
+    assert abort.data.aborted_reason == "bad image, halting"
 
     # Should have signalled the in-flight workflow with 'abort'.
     assert any(s[1] == "abort" for s in temporal_recorder.signals)
+
+
+def test_abort_requires_reason(org, app, env, actor, fake_info, permission_resolver, temporal_recorder):
+    """#419 — empty / whitespace reason is rejected at the boundary."""
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    with _tenant_for(org, actor):
+        start = mut.start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="v1.0.0",
+            ),
+        )
+        abort = mut.abort_deployment(
+            fake_info,
+            input=AbortDeploymentInput(id=start.data.id, reason="   "),
+        )
+
+    assert not abort.ok
+    assert abort.errors[0].code == "VALIDATION"
+    assert abort.errors[0].field == "reason"
+    # No signal fired because validation short-circuited before the
+    # workflow call site.
+    assert not any(s[1] == "abort" for s in temporal_recorder.signals)
 
 
 def test_abort_refuses_when_not_in_flight(
@@ -279,7 +312,10 @@ def test_abort_refuses_when_not_in_flight(
     )
 
     with _tenant_for(org, actor):
-        abort = mut.abort_deployment(fake_info, input=DeploymentByIdInput(id=deploy.guid))
+        abort = mut.abort_deployment(
+            fake_info,
+            input=AbortDeploymentInput(id=deploy.guid, reason="operator override"),
+        )
 
     assert not abort.ok
     assert abort.errors[0].code == "PRECONDITION"

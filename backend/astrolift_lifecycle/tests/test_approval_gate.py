@@ -15,6 +15,7 @@ import pytest
 from astrolift_identity.models import Member
 from astrolift_lifecycle.models import Deployment
 from astrolift_lifecycle.schema.mutations import (
+    AbortDeploymentInput,
     DeploymentByIdInput,
     LifecycleMutation,
     StartDeploymentInput,
@@ -296,7 +297,7 @@ def test_reject_deployment_marks_failed(
     with _tenant_for(org, other_actor):
         reject = mut.reject_deployment(
             fake_info_other,
-            input=DeploymentByIdInput(id=start.data.id),
+            input=AbortDeploymentInput(id=start.data.id, reason="approver rejected"),
         )
 
     assert reject.ok, reject.errors
@@ -329,7 +330,7 @@ def test_reject_deployment_refuses_self_reject(
         )
         reject = mut.reject_deployment(
             fake_info,
-            input=DeploymentByIdInput(id=start.data.id),
+            input=AbortDeploymentInput(id=start.data.id, reason="trying to self-reject"),
         )
 
     assert not reject.ok

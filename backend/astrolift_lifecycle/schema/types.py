@@ -158,15 +158,11 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
     claim ownership of a row.
     """
     triggered_by_user_id = d.triggered_by_user_id
-    triggered_by_me = bool(
-        viewer_user_id is not None and triggered_by_user_id == viewer_user_id
-    )
+    triggered_by_me = bool(viewer_user_id is not None and triggered_by_user_id == viewer_user_id)
     repo_url = ""
     if d.registered_app_id:
         repo_url = (
-            getattr(d.registered_app, "source_url", "")
-            or getattr(d.registered_app, "source_repo", "")
-            or ""
+            getattr(d.registered_app, "source_url", "") or getattr(d.registered_app, "source_repo", "") or ""
         )
     return DeploymentType(
         id=GUID(str(d.guid)),
@@ -195,9 +191,7 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         commit_author=getattr(d, "commit_author", "") or "",
         repo_url=repo_url,
         aborted_reason=getattr(d, "aborted_reason", "") or "",
-        triggered_by_user_id=(
-            str(triggered_by_user_id) if triggered_by_user_id is not None else None
-        ),
+        triggered_by_user_id=(str(triggered_by_user_id) if triggered_by_user_id is not None else None),
         triggered_by_me=triggered_by_me,
     )
 
@@ -444,6 +438,23 @@ def deploy_token_to_type(t) -> DeployTokenType:
 # ---- Pod state (runtime cluster) ------------------------------------
 
 
+@strawberry.type(name="AstroliftContainerResources")
+class ContainerResourcesType:
+    """Per-container CPU + memory requests / limits as reported by
+    the pod spec. Each field is a raw kubernetes resource-quantity
+    string (``"100m"``, ``"512Mi"``) — empty string means the
+    manifest left that knob unset.
+
+    Surfaced on every container slot so the workload-detail page
+    (#429) can show istio-proxy / linkerd-proxy sidecars' resource
+    cost separately from the primary container's budget."""
+
+    cpu_request: str
+    cpu_limit: str
+    memory_request: str
+    memory_limit: str
+
+
 @strawberry.type(name="AstroliftContainerStatus")
 class ContainerStatusType:
     """One container slot's runtime state.
@@ -451,7 +462,21 @@ class ContainerStatusType:
     ``state`` is ``running`` | ``waiting`` | ``terminated`` |
     ``unknown``. ``waiting_reason`` / ``terminated_reason`` carry
     the K8s reason string — that's where actionable diagnostics
-    live (``CrashLoopBackOff``, ``ImagePullBackOff``, …)."""
+    live (``CrashLoopBackOff``, ``ImagePullBackOff``, …).
+
+    ``kind`` is ``init`` | ``primary`` | ``sidecar`` so the UI can
+    bucket containers without re-deriving the classification on the
+    client (#429).
+
+    ``last_restart_reasons`` carries up to three reason strings for
+    recent restarts (most-recent first). The kubernetes API only
+    reports ``lastState`` (one history slot per container) so the
+    list is best-effort — surfaces the latest ``OOMKilled`` /
+    ``Error`` / probe-failure for incident response.
+
+    ``last_restart_at`` is the timestamp of the most recent restart;
+    used by the UI to flag flapping pods (count > 5 in the past
+    hour)."""
 
     name: str
     ready: bool
@@ -460,6 +485,10 @@ class ContainerStatusType:
     state: str
     waiting_reason: str
     terminated_reason: str
+    kind: str
+    last_restart_reasons: list[str]
+    last_restart_at: dt.datetime | None
+    resources: ContainerResourcesType
 
 
 @strawberry.type(name="AstroliftAppPod")
@@ -485,6 +514,14 @@ class AppPodType:
 
 
 def container_status_to_type(c) -> ContainerStatusType:
+    """Project an SDK ``ContainerStatusInfo`` onto the GraphQL type.
+
+    ``resources`` and ``kind`` were added in #429; the SDK provides
+    sane defaults (empty strings, ``primary``) so older test fixtures
+    that build ``ContainerStatusInfo`` positionally keep working.
+    ``last_restart_reasons`` defaults to ``[]`` for the same reason.
+    """
+    resources = getattr(c, "resources", None)
     return ContainerStatusType(
         name=c.name,
         ready=c.ready,
@@ -493,6 +530,15 @@ def container_status_to_type(c) -> ContainerStatusType:
         state=c.state,
         waiting_reason=c.waiting_reason,
         terminated_reason=c.terminated_reason,
+        kind=getattr(c, "kind", "primary") or "primary",
+        last_restart_reasons=list(getattr(c, "last_restart_reasons", []) or []),
+        last_restart_at=getattr(c, "last_restart_at", None),
+        resources=ContainerResourcesType(
+            cpu_request=getattr(resources, "cpu_request", "") if resources else "",
+            cpu_limit=getattr(resources, "cpu_limit", "") if resources else "",
+            memory_request=getattr(resources, "memory_request", "") if resources else "",
+            memory_limit=getattr(resources, "memory_limit", "") if resources else "",
+        ),
     )
 
 
@@ -508,6 +554,39 @@ def pod_info_to_type(p) -> AppPodType:
         node=p.node,
         container_statuses=[container_status_to_type(c) for c in p.container_statuses],
     )
+
+
+# ---- #429 — Workload pod status breakdown -----------------------------
+
+
+@strawberry.type(name="AstroliftWorkloadPodSummary")
+class WorkloadPodSummaryType:
+    """A pod stub used by the status-grid expander.
+
+    Only the fields the UI needs to render a click-to-logs row —
+    ``name`` for the link target, ``age`` for the relative-time
+    label, ``ready`` to dim the row when the pod isn't serving."""
+
+    name: str
+    age: dt.datetime | None
+    ready: bool
+
+
+@strawberry.type(name="AstroliftWorkloadPodStatusBucket")
+class WorkloadPodStatusBucketType:
+    """One row of the pod status grid on the workload detail page
+    (#429).
+
+    ``status`` is the same rolled-up surface label the ``AppPod``
+    type uses (``Running`` / ``Pending`` / ``CrashLoopBackOff`` /
+    ``ImagePullBackOff`` / ``Terminating`` / ``Unknown`` / …).
+    ``percent`` is 0-100 rounded to one decimal place — the resolver
+    pre-computes so every client renders the same number."""
+
+    status: str
+    count: int
+    percent: float
+    pods: list[WorkloadPodSummaryType]
 
 
 @strawberry.type(name="AstroliftAppLogLine")
