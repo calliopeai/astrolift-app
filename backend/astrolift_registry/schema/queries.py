@@ -20,6 +20,7 @@ from astrolift_registry.schema.types import (
     ContainerType,
     RegisteredAppType,
     RenderedManifestType,
+    WorkloadScalingStatus,
     WorkloadType,
     app_team_access_to_type,
     app_to_type,
@@ -31,6 +32,49 @@ from astrolift_registry.schema.types import (
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _scaling_environment_for_workload(workload, environment_name: str | None):
+    """Pick the env to drive the scaling policy off of (#430).
+
+    Mirrors the same resolution rules ``k8s_ops._primary_environment_for_workload``
+    uses — the first active env on the app, or the env named
+    explicitly. Returns ``None`` when nothing matches so
+    ``resolve_replica_bounds`` falls back to the platform default.
+    """
+    qs = AppEnvironment.objects.filter(
+        registered_app=workload.registered_app,
+        deleted_at__isnull=True,
+    ).order_by("id")
+    if environment_name:
+        qs = qs.filter(name=environment_name)
+    return qs.first()
+
+
+def _read_live_replicas(*, workload, environment_name: str | None) -> tuple[int, int]:
+    """Best-effort live (current, desired) read from the cluster.
+
+    Calls into ``ClusterDriver.get_workload_status`` on the Deployment
+    backing ``workload`` and returns the ``(ready_replicas,
+    desired_replicas)`` tuple. Raises on any error — the caller
+    swallows so an unreachable cluster degrades to the manifest-side
+    replica count, not a 500.
+    """
+    from core.app_deploy import namespace_for_app
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    env = _scaling_environment_for_workload(workload, environment_name)
+    if env is None or env.tenant_cluster_id is None:
+        raise RuntimeError("no env / cluster")
+    cluster = env.tenant_cluster
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    namespace = namespace_for_app(workload.registered_app)
+    get_status = getattr(driver, "get_workload_status", None)
+    if not callable(get_status):
+        raise RuntimeError("driver lacks get_workload_status")
+    status = get_status(ctx.slug, namespace, "Deployment", workload.slug)
+    return int(status.ready_replicas or 0), int(status.desired_replicas or 0)
 
 
 def _freshness_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, AppFreshness]:
@@ -298,6 +342,97 @@ class RegistryQuery:
             .first()
         )
         return workload_to_type(w) if w else None
+
+    # ----------------------------------------------------------------
+    # Live workload scaling status (#430)
+    # ----------------------------------------------------------------
+    #
+    # Combines the manifest-side HPA configuration (Workload row) with
+    # the live ``WorkloadStatus`` read from the cluster driver. Powers
+    # the scaling card on the workload-detail page — the slider, the
+    # HPA gauge, and the "Scaling…" indicator.
+    #
+    # Live read degrades to manifest-only when the driver doesn't
+    # surface ``get_workload_status`` (older provider plugins) or the
+    # cluster is unreachable; the resolver never raises — empty-state
+    # rendering happens client-side off the same single round-trip.
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_workload_scaling_status(
+        self,
+        info: Info,
+        app_slug: str,
+        workload_slug: str,
+        environment_name: str | None = None,
+    ) -> WorkloadScalingStatus | None:
+        """Live + configured scaling status for one workload.
+
+        Returns ``None`` when the workload doesn't exist for the
+        current tenant. Returns a populated value with zero live
+        replica counts when the cluster is unreachable / unwired so
+        the FE can still render the slider (the manual-scale mutation
+        will fail loudly if the driver can't reach the cluster, which
+        is the right place to surface that error).
+        """
+        from astrolift_lifecycle.services.k8s_ops import resolve_replica_bounds
+
+        workload = (
+            Workload.objects.filter(
+                registered_app__slug=app_slug,
+                slug=workload_slug,
+                deleted_at__isnull=True,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if workload is None:
+            return None
+
+        # Manifest-side HPA fields — always present.
+        hpa_min = workload.hpa_min_replicas
+        hpa_max = workload.hpa_max_replicas
+        hpa_target = workload.hpa_target_cpu_pct
+        # The renderer only emits an HPA when both min + max are set
+        # (and positive); mirror that here so the FE doesn't render a
+        # gauge for an HPA the cluster doesn't actually have.
+        hpa_enabled = bool(hpa_min and hpa_max and hpa_min > 0 and hpa_max > 0)
+
+        # Live read — best effort. We honour the same cluster
+        # resolution rules as the pod-list query so an environment
+        # override picks the same target.
+        live_current = workload.replicas
+        live_desired = workload.replicas
+        try:
+            live_current, live_desired = _read_live_replicas(
+                workload=workload,
+                environment_name=environment_name,
+            )
+        except Exception:  # noqa: BLE001 — cluster-side failures are non-fatal
+            pass
+
+        # Replica bounds — share the same policy the scale mutation
+        # uses so the slider can't propose an out-of-range value.
+        env = _scaling_environment_for_workload(workload, environment_name)
+        lower, upper = resolve_replica_bounds(env)
+        # When HPA is enabled, the slider caps at the HPA max so manual
+        # scales don't immediately get reconciled away.
+        if hpa_enabled and hpa_max is not None:
+            upper = min(upper, hpa_max)
+
+        return WorkloadScalingStatus(
+            hpa_enabled=hpa_enabled,
+            hpa_min_replicas=hpa_min,
+            hpa_max_replicas=hpa_max,
+            hpa_target_cpu_pct=hpa_target,
+            current_replicas=live_current,
+            desired_replicas=live_desired,
+            is_scaling=live_current != live_desired,
+            replica_lower_bound=lower,
+            replica_upper_bound=upper,
+            sourced_at=timezone.now(),
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

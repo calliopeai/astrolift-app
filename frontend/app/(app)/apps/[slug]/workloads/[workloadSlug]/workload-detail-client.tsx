@@ -47,9 +47,11 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_WORKLOAD, LIST_CONTAINERS } from "@/graphql/registry/registry.queries";
 import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { cn } from "@/lib/utils";
 
 import { ResourceUsageGauges } from "./resource-usage-gauges";
+import { ScalingCard } from "./scaling-card";
 
 interface WorkloadResp {
   astroliftWorkload: AstroliftWorkload | null;
@@ -154,6 +156,8 @@ export function WorkloadDetailClient({
   workloadSlug: string;
 }) {
   const t = useTranslations("apps.workloadDetail");
+  const { can } = useMyPermissions();
+  const canDeploy = can("app.deploy");
   const { data: wlData, loading: wlLoading } = useQuery<WorkloadResp>(GET_WORKLOAD, {
     variables: { appSlug, slug: workloadSlug },
     fetchPolicy: "cache-and-network",
@@ -336,6 +340,40 @@ export function WorkloadDetailClient({
           sourcedAt: t("resourceUsage.sourcedAt"),
         }}
       />
+
+      {w.kind !== "cronjob" && (
+        <ScalingCard
+          workloadId={w.id}
+          appSlug={appSlug}
+          workloadSlug={workloadSlug}
+          environmentName={null}
+          canDeploy={canDeploy}
+          labels={{
+            title: t("scaling.title"),
+            manualHeading: t("scaling.manualHeading"),
+            manualDescription: t("scaling.manualDescription"),
+            currentReplicas: t("scaling.currentReplicas"),
+            desiredReplicas: t("scaling.desiredReplicas"),
+            readyReplicas: t("scaling.readyReplicas"),
+            hpaHeading: t("scaling.hpaHeading"),
+            hpaEnabledLabel: t("scaling.hpaEnabledLabel"),
+            hpaDisabledLabel: t("scaling.hpaDisabledLabel"),
+            hpaDescription: t("scaling.hpaDescription"),
+            hpaMin: t("scaling.hpaMin"),
+            hpaMax: t("scaling.hpaMax"),
+            hpaTarget: t("scaling.hpaTarget"),
+            hpaCurrent: t("scaling.hpaCurrent"),
+            hpaLastScaleAt: t("scaling.hpaLastScaleAt"),
+            scalingUp: t("scaling.scalingUp"),
+            scalingDown: t("scaling.scalingDown"),
+            applyButton: t("scaling.applyButton"),
+            applyingButton: t("scaling.applyingButton"),
+            successToast: t("scaling.successToast"),
+            errorToast: t("scaling.errorToast"),
+            permissionDenied: t("scaling.permissionDenied"),
+          }}
+        />
+      )}
 
       <PodStatusGridCard
         appSlug={appSlug}

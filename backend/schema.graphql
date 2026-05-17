@@ -1973,6 +1973,19 @@ type AstroliftWorkloadResourceUsage {
   sourcedAt: DateTime!
 }
 
+type AstroliftWorkloadScalingStatus {
+  hpaEnabled: Boolean!
+  hpaMinReplicas: Int
+  hpaMaxReplicas: Int
+  hpaTargetCpuPct: Int!
+  currentReplicas: Int!
+  desiredReplicas: Int!
+  isScaling: Boolean!
+  replicaLowerBound: Int!
+  replicaUpperBound: Int!
+  sourcedAt: DateTime!
+}
+
 input AttachSecretBundleInput {
   appSlug: String!
   environmentName: String!
@@ -3070,6 +3083,7 @@ type Query {
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
+  astroliftWorkloadScalingStatus(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadScalingStatus
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
   assignableAstroliftProjects: [AstroliftProject!]!

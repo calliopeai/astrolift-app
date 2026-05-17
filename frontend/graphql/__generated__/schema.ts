@@ -2002,6 +2002,19 @@ export type AstroliftWorkloadResourceUsage = {
   sourcedAt: Scalars['DateTime']['output'];
 };
 
+export type AstroliftWorkloadScalingStatus = {
+  currentReplicas: Scalars['Int']['output'];
+  desiredReplicas: Scalars['Int']['output'];
+  hpaEnabled: Scalars['Boolean']['output'];
+  hpaMaxReplicas?: Maybe<Scalars['Int']['output']>;
+  hpaMinReplicas?: Maybe<Scalars['Int']['output']>;
+  hpaTargetCpuPct: Scalars['Int']['output'];
+  isScaling: Scalars['Boolean']['output'];
+  replicaLowerBound: Scalars['Int']['output'];
+  replicaUpperBound: Scalars['Int']['output'];
+  sourcedAt: Scalars['DateTime']['output'];
+};
+
 export type AttachSecretBundleInput = {
   appSlug: Scalars['String']['input'];
   bundleSlug: Scalars['String']['input'];
@@ -4009,6 +4022,7 @@ export type Query = {
   astroliftWorkload?: Maybe<AstroliftWorkload>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
   astroliftWorkloadResourceUsage?: Maybe<AstroliftWorkloadResourceUsage>;
+  astroliftWorkloadScalingStatus?: Maybe<AstroliftWorkloadScalingStatus>;
   astroliftWorkloads: Array<AstroliftWorkload>;
   /** Query mutation audit logs. Admin only. */
   auditLogs: Array<AuditLogEntry>;
@@ -4426,6 +4440,13 @@ export type QueryAstroliftWorkloadPodStatusBreakdownArgs = {
 
 
 export type QueryAstroliftWorkloadResourceUsageArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkloadScalingStatusArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   workloadSlug: Scalars['String']['input'];

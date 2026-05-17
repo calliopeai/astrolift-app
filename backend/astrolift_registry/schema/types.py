@@ -800,6 +800,46 @@ def _in_cluster_service_fqdn(workload) -> str:
     return f"{workload.slug}.{namespace}.svc.cluster.local"
 
 
+@strawberry.type(name="AstroliftWorkloadScalingStatus")
+class WorkloadScalingStatus:
+    """Live + configured scaling status for one workload (#430).
+
+    Composes the manifest-side HPA configuration (``hpa_min_replicas``,
+    ``hpa_max_replicas``, ``hpa_target_cpu_pct`` from the Workload row)
+    with the live Deployment status read from the cluster
+    (``current_replicas`` = ``status.readyReplicas``,
+    ``desired_replicas`` = ``spec.replicas``).
+
+    ``hpa_enabled`` is True when the manifest declares both an HPA min
+    and an HPA max — the renderer emits a HorizontalPodAutoscaler
+    resource only in that case, so this flag is the single source of
+    truth for "is auto-scaling on?".
+
+    ``is_scaling`` is the resolver-computed delta — True when
+    ``current != desired``. The FE renders the "Scaling…" indicator on
+    this signal.
+
+    ``replica_upper_bound`` is the maximum the manual-scale slider
+    should allow. It mirrors :func:`resolve_replica_bounds` so the
+    slider can't propose a value the mutation would reject.
+
+    Live fields fall back to manifest values when the driver doesn't
+    surface them (cluster unreachable / unwired); the FE renders the
+    same gauge in either case but the "Scaling…" indicator stays off.
+    """
+
+    hpa_enabled: bool
+    hpa_min_replicas: int | None
+    hpa_max_replicas: int | None
+    hpa_target_cpu_pct: int
+    current_replicas: int
+    desired_replicas: int
+    is_scaling: bool
+    replica_lower_bound: int
+    replica_upper_bound: int
+    sourced_at: dt.datetime
+
+
 def workload_to_type(workload) -> WorkloadType:
     return WorkloadType(
         id=GUID(str(workload.guid)),

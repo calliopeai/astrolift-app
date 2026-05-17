@@ -240,3 +240,35 @@ export const LIST_APP_TEAM_ACCESSES = gql`
     }
   }
 `;
+
+/**
+ * Live workload scaling status (#430).
+ *
+ * Combines the manifest-side HPA configuration with the live
+ * Deployment status read from the cluster driver. Powers the
+ * scaling card on the workload-detail page.
+ */
+export const GET_WORKLOAD_SCALING_STATUS = gql`
+  query GetWorkloadScalingStatus(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentName: String
+  ) {
+    astroliftWorkloadScalingStatus(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentName: $environmentName
+    ) {
+      hpaEnabled
+      hpaMinReplicas
+      hpaMaxReplicas
+      hpaTargetCpuPct
+      currentReplicas
+      desiredReplicas
+      isScaling
+      replicaLowerBound
+      replicaUpperBound
+      sourcedAt
+    }
+  }
+`;
