@@ -33,9 +33,10 @@ from collections.abc import Callable
 import strawberry
 from strawberry.types import Info
 
-from astrolift_observability import prom_client, prom_queries
+from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
 from astrolift_observability.schema.types import (
     AppGoldenSignal,
+    AppUrlHealth,
     GoldenSignalKind,
     StatusCodeBreakdown,
     StatusCodeSeries,
@@ -304,3 +305,123 @@ class GoldenSignalsQuery:
             series=series_out,
             promql=plan.promql,
         )
+
+    # -- URL health probe (#406) -------------------------------------
+    #
+    # Live HTTP health for an app's public URLs. Separate resolver
+    # from the Prometheus-derived signals because this hits the app
+    # directly from the control plane rather than scraping the
+    # cluster — different failure modes, different latency budget,
+    # different empty-state semantics.
+    #
+    # Both resolvers validate the URL belongs to the app (env URLs +
+    # public-workload subdomain hosts) before issuing a request, so
+    # a caller with APP_READ can't turn the platform into an
+    # arbitrary HTTP fetcher.
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_url_health(
+        self,
+        info: Info,
+        app_slug: str,
+        url: str,
+        force_refresh: bool = False,
+    ) -> AppUrlHealth | None:
+        """Probe ``url`` for ``app_slug`` and return the current health.
+
+        ``force_refresh`` skips the 30s result cache (the FE passes
+        ``true`` when an operator clicks the pill to re-run the
+        probe immediately).
+
+        Returns ``None`` when:
+
+        * the app doesn't exist in the current tenant
+        * ``url`` isn't a known URL for the app (env URLs +
+          ``<workload.slug>.<app.subdomain>`` for public workloads)
+
+        The ``unknown`` status value in :class:`AppUrlHealth` is
+        reserved for the FE's pre-first-probe pill; a live probe
+        always lands on ``ok`` / ``degraded`` / ``down``.
+        """
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "guid", "slug", "subdomain")
+            .first()
+        )
+        if app is None:
+            return None
+
+        normalized = url_resolution.normalize_url(url)
+        if normalized is None:
+            return None
+        if normalized not in url_resolution.app_urls(app):
+            return None
+
+        result = url_probe.probe_url(
+            app_guid=str(app.guid),
+            url=normalized,
+            use_cache=not force_refresh,
+        )
+        return AppUrlHealth(
+            url=result.url,
+            status=result.status,
+            status_code=result.status_code,
+            latency_ms=result.latency_ms,
+            last_checked=result.last_checked,
+            message=result.message,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_url_probe_history(
+        self,
+        info: Info,
+        app_slug: str,
+        url: str,
+        limit: int = 5,
+    ) -> list[AppUrlHealth]:
+        """Recent probe results for (``app_slug``, ``url``).
+
+        Newest entries come first. Bounded server-side to
+        :data:`url_probe.HISTORY_MAX_ENTRIES` regardless of the
+        requested ``limit``. Empty list when the app/url is unknown
+        or no probes have run yet.
+
+        Backed by a cache ring buffer rather than a DB table — this
+        widget is a glanceable tooltip, not a persistent timeline.
+        Persistence is its own ticket if/when operators ask for
+        cross-restart probe history.
+        """
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "guid", "slug", "subdomain")
+            .first()
+        )
+        if app is None:
+            return []
+
+        normalized = url_resolution.normalize_url(url)
+        if normalized is None:
+            return []
+        if normalized not in url_resolution.app_urls(app):
+            return []
+
+        results = url_probe.history_for(
+            app_guid=str(app.guid),
+            url=normalized,
+            limit=limit,
+        )
+        return [
+            AppUrlHealth(
+                url=r.url,
+                status=r.status,
+                status_code=r.status_code,
+                latency_ms=r.latency_ms,
+                last_checked=r.last_checked,
+                message=r.message,
+            )
+            for r in results
+        ]
