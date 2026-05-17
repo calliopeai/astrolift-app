@@ -27,13 +27,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -165,32 +159,19 @@ export function CostClient() {
           </CardContent>
         </Card>
 
-        <ForecastCard
-          forecast={forecastData}
-          loading={forecast.loading}
-          t={t}
-        />
+        <ForecastCard forecast={forecastData} loading={forecast.loading} t={t} />
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm">
-              {t("kpis.budgets")}
-            </CardTitle>
+            <CardTitle className="text-muted-foreground text-sm">{t("kpis.budgets")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold tabular-nums">
-              {budgetList.length}
-            </p>
+            <p className="text-2xl font-bold tabular-nums">{budgetList.length}</p>
           </CardContent>
         </Card>
       </div>
 
-      <TrendChart
-        points={trendPoints}
-        loading={trend.loading}
-        currency={currency}
-        t={t}
-      />
+      <TrendChart points={trendPoints} loading={trend.loading} currency={currency} t={t} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -225,10 +206,7 @@ export function CostClient() {
                 <TableBody>
                   {budgetList.map((b) => {
                     const usagePct = b.amountCents
-                      ? Math.min(
-                          100,
-                          (b.currentSpendCents / b.amountCents) * 100,
-                        )
+                      ? Math.min(100, (b.currentSpendCents / b.amountCents) * 100)
                       : 0;
                     return (
                       <TableRow key={b.id}>
@@ -275,19 +253,12 @@ export function CostClient() {
           </CardHeader>
           <CardContent>
             {byCategory.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {t("byCategory.empty")}
-              </p>
+              <p className="text-muted-foreground text-sm">{t("byCategory.empty")}</p>
             ) : (
               <ul className="space-y-3">
                 {byCategory.map(([cat, amount]) => (
-                  <li
-                    key={cat}
-                    className="flex items-center justify-between"
-                  >
-                    <span className="text-sm capitalize">
-                      {cat.replace(/_/g, " ")}
-                    </span>
+                  <li key={cat} className="flex items-center justify-between">
+                    <span className="text-sm capitalize">{cat.replace(/_/g, " ")}</span>
                     <span className="font-mono text-sm tabular-nums">
                       {formatMoney(amount, currency)}
                     </span>
@@ -350,9 +321,7 @@ function CostWindowTabs({ value, onChange }: CostWindowTabsProps) {
   );
 }
 
-function windowLabelKey(
-  w: CostWindow,
-): "h24" | "d7" | "d30" | "mtd" {
+function windowLabelKey(w: CostWindow): "h24" | "d7" | "d30" | "mtd" {
   switch (w) {
     case "H24":
       return "h24";
@@ -400,20 +369,13 @@ function ForecastCard({ forecast, loading, t }: ForecastCardProps) {
         </CardHeader>
         <CardContent>
           <p className="text-2xl font-bold tabular-nums">—</p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            {t("forecast.insufficientData")}
-          </p>
+          <p className="text-muted-foreground mt-1 text-xs">{t("forecast.insufficientData")}</p>
         </CardContent>
       </Card>
     );
   }
   const delta = forecast.deltaPct;
-  const Direction =
-    delta > 0
-      ? ArrowUpIcon
-      : delta < 0
-        ? ArrowDownIcon
-        : ArrowRightIcon;
+  const Direction = delta > 0 ? ArrowUpIcon : delta < 0 ? ArrowDownIcon : ArrowRightIcon;
   const deltaColor =
     delta > 0
       ? "text-amber-600 dark:text-amber-400"
@@ -422,7 +384,7 @@ function ForecastCard({ forecast, loading, t }: ForecastCardProps) {
         : "text-muted-foreground";
   return (
     <Card>
-      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-muted-foreground text-sm">
           {t("kpis.projectedMonthly")}
         </CardTitle>
@@ -432,9 +394,7 @@ function ForecastCard({ forecast, loading, t }: ForecastCardProps) {
         <p className="text-2xl font-bold tabular-nums">
           {formatMoney(forecast.projectedMonthlyCents, forecast.currency)}
         </p>
-        <div
-          className={"mt-1 flex items-center gap-1 text-xs " + deltaColor}
-        >
+        <div className={"mt-1 flex items-center gap-1 text-xs " + deltaColor}>
           <Direction className="size-3" />
           <span className="font-mono">
             {Math.abs(delta).toFixed(1)}% {t("forecast.vsPreviousMonth")}
@@ -442,14 +402,8 @@ function ForecastCard({ forecast, loading, t }: ForecastCardProps) {
         </div>
         <p className="text-muted-foreground mt-1 text-xs">
           {t("forecast.mtdLine", {
-            mtd: formatMoneyDetailed(
-              forecast.mtdCents,
-              forecast.currency,
-            ),
-            previous: formatMoneyDetailed(
-              forecast.previousMonthCents,
-              forecast.currency,
-            ),
+            mtd: formatMoneyDetailed(forecast.mtdCents, forecast.currency),
+            previous: formatMoneyDetailed(forecast.previousMonthCents, forecast.currency),
           })}
         </p>
       </CardContent>
@@ -465,18 +419,15 @@ function ConfidenceBadge({
   t: ReturnType<typeof useTranslations<"lists.cost">>;
 }) {
   const tone =
-    value === "high"
+    value === "HIGH"
       ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-      : value === "medium"
+      : value === "MEDIUM"
         ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
         : "bg-muted text-muted-foreground";
+  const lowerKey = value.toLowerCase() as "low" | "medium" | "high";
   return (
-    <span
-      className={
-        "rounded-full px-2 py-0.5 text-[10px] font-medium " + tone
-      }
-    >
-      {t(`forecast.confidence.${value}`)}
+    <span className={"rounded-full px-2 py-0.5 text-[10px] font-medium " + tone}>
+      {t(`forecast.confidence.${lowerKey}`)}
     </span>
   );
 }
@@ -531,16 +482,10 @@ function TrendChart({ points, loading, currency, t }: TrendChartProps) {
                 }))}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10 }}
-                  minTickGap={32}
-                />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={32} />
                 <YAxis
                   tick={{ fontSize: 10 }}
-                  tickFormatter={(v: number) =>
-                    formatMoney(v, currency).replace(/\.\d+$/, "")
-                  }
+                  tickFormatter={(v: number) => formatMoney(v, currency).replace(/\.\d+$/, "")}
                   width={56}
                 />
                 <Tooltip
@@ -590,12 +535,7 @@ interface AttributionPanelProps {
   t: ReturnType<typeof useTranslations<"lists.cost">>;
 }
 
-function AttributionPanel({
-  attribution,
-  loading,
-  currency,
-  t,
-}: AttributionPanelProps) {
+function AttributionPanel({ attribution, loading, currency, t }: AttributionPanelProps) {
   const [expanded, setExpanded] = React.useState(true);
 
   if (loading && !attribution) {
@@ -615,8 +555,7 @@ function AttributionPanel({
   const rows = attribution?.attributedRows ?? [];
   const total = attribution?.totalCents ?? 0;
   const unattributed = attribution?.unattributedCents ?? 0;
-  const attributedPct =
-    total > 0 ? Math.round(((total - unattributed) / total) * 100) : 0;
+  const attributedPct = total > 0 ? Math.round(((total - unattributed) / total) * 100) : 0;
 
   return (
     <Card>
@@ -668,32 +607,22 @@ function AttributionPanel({
                   <TableHead>{t("attribution.columns.kind")}</TableHead>
                   <TableHead>{t("attribution.columns.app")}</TableHead>
                   <TableHead>{t("attribution.columns.category")}</TableHead>
-                  <TableHead className="text-right">
-                    {t("attribution.columns.amount")}
-                  </TableHead>
+                  <TableHead className="text-right">{t("attribution.columns.amount")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow
-                    key={`${r.managedServiceBindingId ?? "?"}-${r.by}`}
-                  >
+                  <TableRow key={`${r.managedServiceBindingId ?? "?"}-${r.by}`}>
                     <TableCell className="font-medium">
-                      {r.managedServiceName ??
-                        r.managedServiceBindingId ??
-                        "—"}
+                      {r.managedServiceName ?? r.managedServiceBindingId ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {r.managedServiceKind ?? "—"}
-                      </Badge>
+                      <Badge variant="outline">{r.managedServiceKind ?? "—"}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {r.registeredAppSlug ?? "—"}
                     </TableCell>
-                    <TableCell className="capitalize">
-                      {r.by.replace(/_/g, " ")}
-                    </TableCell>
+                    <TableCell className="capitalize">{r.by.replace(/_/g, " ")}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatMoney(r.amountCents, r.currency)}
                     </TableCell>
@@ -701,10 +630,7 @@ function AttributionPanel({
                 ))}
                 {unattributed > 0 && (
                   <TableRow className="bg-muted/30">
-                    <TableCell
-                      colSpan={4}
-                      className="text-muted-foreground italic"
-                    >
+                    <TableCell colSpan={4} className="text-muted-foreground italic">
                       {t("attribution.unattributedRow")}
                     </TableCell>
                     <TableCell className="text-right font-mono">
