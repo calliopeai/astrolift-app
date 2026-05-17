@@ -59,6 +59,14 @@ class ManagedService(BaseCoreModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     status_error = models.TextField(blank=True, default="")
     connection_secret_ref = models.CharField(max_length=512, blank=True, default="")
+    # Per-service quick-action audit surface (#401). Captures the
+    # most-recent operator-fired action against this service so the
+    # Settings landing summary can render "tested 3m ago" / "revealed
+    # 1h ago" without re-walking the platform audit log. The full audit
+    # trail still lives in core.events; this column is the cached
+    # latest-event for UI rendering only.
+    last_action_at = models.DateTimeField(null=True, blank=True)
+    last_action_kind = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         constraints = [

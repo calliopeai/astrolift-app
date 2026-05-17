@@ -55,11 +55,46 @@ export const LIST_MANAGED_SERVICES = gql`
       id
       kind
       name
+      variant
       environmentName
       registeredAppSlug
       status
+      statusError
       config
       createdAt
+      updatedAt
+      lastActionAt
+      lastActionKind
+    }
+  }
+`;
+
+export const LIST_MANAGED_SERVICE_OBJECTS = gql`
+  query ListManagedServiceObjects($managedServiceId: GUID!, $limit: Int) {
+    astroliftManagedServiceObjects(managedServiceId: $managedServiceId, limit: $limit) {
+      managedServiceId
+      kind
+      name
+      truncated
+      cacheAgeSeconds
+      objects {
+        key
+        sizeBytes
+        lastModified
+      }
+    }
+  }
+`;
+
+export const GET_MANAGED_SERVICE_QUEUE_DEPTH = gql`
+  query GetManagedServiceQueueDepth($managedServiceId: GUID!) {
+    astroliftManagedServiceQueueDepth(managedServiceId: $managedServiceId) {
+      managedServiceId
+      kind
+      name
+      depth
+      inFlight
+      sampledAt
     }
   }
 `;

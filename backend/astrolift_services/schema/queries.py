@@ -5,6 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_manifest.env_injection import envelope_keys_for
@@ -17,6 +18,9 @@ from astrolift_services.models import (
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
     AppSecretType,
+    ManagedServiceObjectsType,
+    ManagedServiceObjectType,
+    ManagedServiceQueueDepthType,
     ManagedServiceType,
     SecretBundleType,
     attachment_to_type,
@@ -247,3 +251,164 @@ class ServicesQuery:
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)
         return [managed_service_to_type(s) for s in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_managed_service_objects(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+        limit: int = 10,
+    ) -> ManagedServiceObjectsType | None:
+        """Top-N entries from the recent-objects cache for an
+        `object_store` kind managed service (#401).
+
+        Sourced from `config['recent_objects']` which the workflow loop
+        is expected to refresh on a schedule.  A live cloud list call
+        needs the driver SDK to expose `list_recent_objects`, filed as
+        a backend gap follow-up — until then the field returns whatever
+        the cache contains (often empty for freshly-provisioned rows;
+        UI surfaces a friendly hint in that case).
+        """
+        if limit < 1:
+            limit = 10
+        if limit > 100:
+            limit = 100
+
+        svc = (
+            ManagedService.objects.select_related("app_environment", "registered_app")
+            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return None
+        if svc.kind != ManagedService.Kind.OBJECT_STORE:
+            return ManagedServiceObjectsType(
+                managed_service_id=managed_service_id,
+                kind=svc.kind,
+                name=svc.name,
+                objects=[],
+                truncated=False,
+                cache_age_seconds=None,
+            )
+
+        config = svc.config or {}
+        raw_objects = config.get("recent_objects") or []
+        sampled_at = config.get("recent_objects_sampled_at")
+        cache_age = None
+        if sampled_at:
+            try:
+                # Stored as ISO 8601 string by the workflow refresh.
+                from datetime import datetime
+
+                if isinstance(sampled_at, str):
+                    parsed = datetime.fromisoformat(sampled_at.replace("Z", "+00:00"))
+                else:
+                    parsed = sampled_at
+                from django.utils import timezone
+
+                now = timezone.now()
+                # Use timezone-aware diff; treat naive snapshots as UTC.
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=now.tzinfo)
+                cache_age = max(int((now - parsed).total_seconds()), 0)
+            except (ValueError, TypeError):
+                cache_age = None
+
+        objects: list[ManagedServiceObjectType] = []
+        for entry in raw_objects[:limit]:
+            if not isinstance(entry, dict):
+                continue
+            key = entry.get("key") or entry.get("name") or ""
+            if not key:
+                continue
+            size = entry.get("size_bytes") or entry.get("size") or 0
+            last_modified_raw = entry.get("last_modified")
+            last_modified = None
+            if last_modified_raw:
+                try:
+                    from datetime import datetime
+
+                    if isinstance(last_modified_raw, str):
+                        last_modified = datetime.fromisoformat(last_modified_raw.replace("Z", "+00:00"))
+                    else:
+                        last_modified = last_modified_raw
+                except (ValueError, TypeError):
+                    last_modified = None
+            objects.append(
+                ManagedServiceObjectType(
+                    key=str(key),
+                    size_bytes=int(size) if isinstance(size, (int, float)) else 0,
+                    last_modified=last_modified,
+                )
+            )
+
+        return ManagedServiceObjectsType(
+            managed_service_id=managed_service_id,
+            kind=svc.kind,
+            name=svc.name,
+            objects=objects,
+            truncated=len(raw_objects) > limit,
+            cache_age_seconds=cache_age,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_managed_service_queue_depth(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+    ) -> ManagedServiceQueueDepthType | None:
+        """Cached depth snapshot for a `queue` / `topic` managed
+        service (#401).
+
+        Reads `config['depth_snapshot']` — populated by the workflow's
+        scheduled refresh.  Live depth needs `queue_depth` on the driver
+        SDK (backend gap follow-up); until then this field returns the
+        cached values plus a `sampled_at` timestamp so operators can see
+        how stale the reading is.
+        """
+        svc = (
+            ManagedService.objects.select_related("app_environment", "registered_app")
+            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return None
+        if svc.kind not in (ManagedService.Kind.QUEUE, ManagedService.Kind.TOPIC):
+            return ManagedServiceQueueDepthType(
+                managed_service_id=managed_service_id,
+                kind=svc.kind,
+                name=svc.name,
+                depth=0,
+                in_flight=0,
+                sampled_at=None,
+            )
+
+        config = svc.config or {}
+        snapshot = config.get("depth_snapshot") or {}
+        sampled_at_raw = snapshot.get("sampled_at")
+        sampled_at = None
+        if sampled_at_raw:
+            try:
+                from datetime import datetime
+
+                if isinstance(sampled_at_raw, str):
+                    sampled_at = datetime.fromisoformat(sampled_at_raw.replace("Z", "+00:00"))
+                else:
+                    sampled_at = sampled_at_raw
+            except (ValueError, TypeError):
+                sampled_at = None
+
+        depth = snapshot.get("depth") or 0
+        in_flight = snapshot.get("in_flight") or 0
+        return ManagedServiceQueueDepthType(
+            managed_service_id=managed_service_id,
+            kind=svc.kind,
+            name=svc.name,
+            depth=int(depth) if isinstance(depth, (int, float)) else 0,
+            in_flight=int(in_flight) if isinstance(in_flight, (int, float)) else 0,
+            sampled_at=sampled_at,
+        )
