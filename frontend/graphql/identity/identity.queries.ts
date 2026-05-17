@@ -347,6 +347,22 @@ export const LIST_INVITATIONS = gql`
   }
 `;
 
+/**
+ * Active org-member set, shaped for the approval-policy picker (#410).
+ * Reused by the register-app wizard and any later surface that needs a
+ * user-picker scoped to an org. Permission: `org.manage_members`.
+ */
+export const ORG_MEMBERS_FOR_APPROVAL_PICKER = gql`
+  query OrgMembersForApprovalPicker($orgSlug: String!) {
+    astroliftOrgMembersForApprovalPicker(orgSlug: $orgSlug) {
+      id
+      email
+      displayName
+      avatarUrl
+    }
+  }
+`;
+
 export const LIST_MY_CONNECTED_ACCOUNTS = gql`
   query ListMyConnectedAccounts {
     astroliftMyConnectedAccounts {

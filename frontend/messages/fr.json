@@ -63,6 +63,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "Vue d'ensemble",
+    "description": "Données d'identité, de registre et de cycle de vie pour cette installation Astrolift.",
+    "errorBanner": {
+      "title": "Impossible de charger certaines données"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Équipes",
+        "emptyCta": "Créez votre première équipe"
+      },
+      "projects": {
+        "label": "Projets",
+        "emptyCta": "Créez un projet"
+      },
+      "apps": {
+        "label": "Apps enregistrées",
+        "emptyCta": "Enregistrez votre première app"
+      },
+      "deployments": {
+        "label": "Déploiements actifs",
+        "emptyCta": "Lancer un déploiement"
+      },
+      "costMtd": {
+        "label": "Coût (MTD)",
+        "emptyCta": "En attente des données de coût",
+        "vsPrevMonth": "vs mois préc.",
+        "noPrevMonth": "pas de mois préc."
+      }
+    },
+    "fleetHealth": {
+      "title": "Santé de la flotte",
+      "description": "Synthèse de l'état du dernier déploiement pour toutes les apps enregistrées.",
+      "healthy": "saine",
+      "failing": "{count} en échec",
+      "hiccup": "{count, plural, one {# incident} other {# incidents}}",
+      "empty": "Aucune app enregistrée pour le moment. Connectez un dépôt sur /apps/new pour démarrer.",
+      "tiles": {
+        "running": "En cours",
+        "recentFailure": "Échec récent",
+        "failing": "En échec",
+        "noDeploys": "Aucun déploiement"
+      }
+    },
+    "recentProjects": {
+      "title": "Projets récents",
+      "description": "Projets créés le plus récemment dans toutes les équipes.",
+      "emptyTitle": "Aucun projet pour le moment",
+      "emptyDescription": "Créez une équipe et un projet pour commencer à enregistrer des apps.",
+      "emptyAction": "Gérer les équipes"
+    },
+    "activity": {
+      "title": "Activité",
+      "description": "Événements du cycle de vie : déploiements, syncs de config, scaling, intégration de cluster, rotations de secrets.",
+      "emptyTitle": "Aucune activité pour le moment",
+      "emptyDescription": "Les événements apparaissent ici à mesure que les déploiements, changements de configuration et opérations de cluster se produisent.",
+      "errorTitle": "Impossible de charger l'activité",
+      "loadMore": "Charger plus",
+      "loadingMore": "Chargement…"
+    },
+    "registeredApps": {
+      "title": "Apps enregistrées",
+      "description": "Dépôts enregistrés pour le déploiement.",
+      "emptyTitle": "Aucune app enregistrée",
+      "emptyDescription": "L'interface du registre arrive au prochain jalon — une fois branchée, vous pourrez enregistrer un dépôt Git et déployer depuis cette carte.",
+      "emptyAction": "Ouvrir le registre"
+    }
+  },
   "dataTable": {
     "search": "Rechercher…",
     "filters": "Filtres",
@@ -95,6 +163,21 @@
       "light": "Clair",
       "dark": "Sombre",
       "system": "Système"
+    },
+    "nav": {
+      "ariaLabel": "Sections des paramètres",
+      "openMobileNav": "Ouvrir le menu des paramètres",
+      "openMobileNavLabel": "Sections",
+      "mobileTitle": "Sections des paramètres",
+      "mobileDescription": "Passez à n'importe quelle zone de paramètres.",
+      "groups": {
+        "organization": "Organisation",
+        "personal": "Personnel",
+        "tokens": "Jetons"
+      }
+    },
+    "breadcrumb": {
+      "root": "Paramètres"
     }
   },
   "hooks": {
@@ -166,18 +249,6 @@
       "errorBanner": {
         "title": "Impossible de charger les applications",
         "retry": "Réessayer"
-      },
-      "freshness": {
-        "lastDeployed": "Dernier déploiement {when}",
-        "viewFailed": "Voir le déploiement échoué",
-        "stale": "obsolète",
-        "never": "aucun déploiement",
-        "status": {
-          "OK": "Saine",
-          "DEGRADED": "Dernier déploiement échoué",
-          "STALE": "Aucun déploiement récent",
-          "NEVER": "Jamais déployée"
-        }
       }
     },
     "tabs": {
@@ -314,11 +385,134 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "Portée des métriques",
+        "environment": "Environnement",
+        "workload": "Charge de travail",
+        "allWorkloads": "Toutes les charges de travail",
+        "environmentPlaceholder": "Sélectionnez un environnement",
+        "workloadPlaceholder": "Sélectionnez une charge de travail"
+      },
+      "events": {
+        "warningCount": "{count, plural, =1 {1 avertissement} other {# avertissements}} au cours de la dernière heure",
+        "warningBadgeLabel": "Avertissement",
+        "collapse": "Réduire",
+        "expand": "Développer"
+      }
+    },
+    "tokens": {
+      "title": "Deploy tokens",
+      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
+      "createToken": "Create token",
+      "emptyTitle": "No deploy tokens yet",
+      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "allScopes": "all",
+      "never": "never",
+      "createFailed": "Create failed",
+      "revokeFailed": "Revoke failed",
+      "revokedToast": "Revoked {name}",
+      "columns": {
+        "name": "Name",
+        "last4": "Last 4",
+        "scopes": "Scopes",
+        "lastUsed": "Last used",
+        "expires": "Expires",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "active",
+        "revoked": "revoked"
+      },
+      "lastUsedCell": {
+        "ip": "IP",
+        "agent": "Agent"
+      },
+      "createSheet": {
+        "title": "Create deploy token",
+        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
+        "name": "Name",
+        "scopes": "Scopes (comma-separated)",
+        "scopesHint": "Leave blank for all scopes.",
+        "expires": "Expires in (days)",
+        "submit": "Create token",
+        "submitting": "Creating…"
+      },
+      "revealDialog": {
+        "title": "Token created — copy now",
+        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
+        "last4Label": "last 4",
+        "copy": "Copy",
+        "copied": "Copied to clipboard",
+        "done": "Done",
+        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+      },
+      "rotateDialog": {
+        "title": "Rotate {name}?",
+        "fallbackTitle": "Rotate token?",
+        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
+        "newLine": "New token issued now.",
+        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
+        "confirm": "Rotate token"
+      },
+      "revokeDialog": {
+        "title": "Revoke {name}?",
+        "fallbackTitle": "Revoke token?",
+        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
+        "confirm": "Revoke token"
+      }
+    },
+    "domains": {
+      "addSheet": {
+        "byoTitle": "Bring your own certificate",
+        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
+        "methodLabels": {
+          "dns_txt": "DNS-TXT (default)",
+          "http_01": "HTTP-01",
+          "dns_01": "DNS-01",
+          "byo_cert": "Bring your own certificate"
+        },
+        "methodHints": {
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
+          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
+          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
+        }
+      }
+    },
+    "detail": {
+      "urlHealth": {
+        "checking": "Vérification…",
+        "unknown": "Non vérifié",
+        "ariaLabel": "État de l'URL : {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "Inaccessible",
+        "tooltip": {
+          "title": "Sondes récentes",
+          "empty": "Aucun historique de sonde.",
+          "uptime": "{ok}/{total} ok · moy. {avgMs}ms",
+          "now": "à l'instant",
+          "secondsAgo": "il y a {seconds}s",
+          "minutesAgo": "il y a {minutes}m",
+          "hoursAgo": "il y a {hours}h",
+          "recheck": "Cliquer pour relancer la sonde",
+          "rechecking": "Nouvelle sonde…"
+        }
+      }
     }
   },
   "settingsIndex": {
     "title": "Paramètres",
     "description": "Configurez l'identité, la sécurité et les surfaces de la plateforme.",
+    "cardMeta": {
+      "modified": "Modifié {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organisation",
@@ -335,6 +529,10 @@
       "policies": {
         "title": "Politiques ABAC",
         "description": "Prédicats d'exécution superposés au RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspectez chaque permission résolue pour l'utilisateur actuel."
       },
       "profile": {
         "title": "Profil",
@@ -466,6 +664,64 @@
         "requestIdSection": "ID de requête"
       }
     },
+    "approval": {
+      "quorum": {
+        "header": "{received} sur {required} approbations",
+        "remainingBadge": "{count} de plus requises",
+        "metBadge": "Quorum atteint",
+        "approvedLabel": "Approuvé par",
+        "approvedEmpty": "Aucune approbation pour le moment.",
+        "awaitingLabel": "En attente",
+        "awaitingEmpty": "Aucun approbateur éligible — vérifiez la politique de l'application."
+      }
+    },
+    "approvalsQueue": {
+      "title": "File d'attente d'approbations",
+      "description": "Tous les déploiements en attente de validation. Sélectionnez des lignes pour approuver ou rejeter en lot dans un même environnement.",
+      "empty": {
+        "title": "Rien en attente",
+        "description": "Quand un déploiement nécessite une validation, il apparaît ici."
+      },
+      "selectAllLabel": "Tout sélectionner",
+      "selectionStatus": "{selected} sur {total} sélectionnés",
+      "readOnlyHint": "Vous pouvez consulter mais pas approuver.",
+      "approveLabel": "Approuver",
+      "rejectLabel": "Rejeter",
+      "footer": {
+        "selected": "{count, plural, =1 {1 déploiement sélectionné} other {# déploiements sélectionnés}}",
+        "summary": "Dans {envs}.",
+        "crossEnvWarning": "L'approbation en lot exige la même app/environnement — les politiques varient.",
+        "approveButton": "Approuver {count}",
+        "rejectButton": "Rejeter {count}"
+      },
+      "confirmApprove": {
+        "title": "Approuver {count} déploiements ?",
+        "description": "Débloque {envs}.",
+        "confirm": "Tout approuver"
+      },
+      "confirmReject": {
+        "title": "Rejeter {count} déploiements ?",
+        "description": "Chaque déploiement dans {envs} passe en échec.",
+        "reasonLabel": "Motif du rejet",
+        "reasonPlaceholder": "Pourquoi ce lot est-il rejeté ?",
+        "reasonRequired": "Motif requis",
+        "confirm": "Tout rejeter"
+      },
+      "toasts": {
+        "unexpected": "Action en lot sans réponse.",
+        "allOk": "{label} réussi pour {count} déploiements.",
+        "allFailed": "{label} a échoué pour {count} déploiements : {message}",
+        "partial": "{label} : {succeeded} réussis, {failed} échoués.",
+        "approveFailed": "Approbation en lot échouée.",
+        "rejectFailed": "Rejet en lot échoué."
+      },
+      "row": {
+        "selectRowLabel": "Sélectionner {app} / {env}",
+        "approvalsCount": "{received}/{required} approbations",
+        "received": "Reçu {rel}",
+        "review": "Examiner"
+      }
+    },
     "events": {
       "title": "Events",
       "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
@@ -589,6 +845,81 @@
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
       }
+    }
+  },
+  "jobs": {
+    "title": "Tâches",
+    "descriptionGlobal": "Exécutions de tâches planifiées et commandes ad-hoc sur toutes vos apps.",
+    "descriptionForApp": "Exécutions de tâches planifiées et commandes ad-hoc pour {app}.",
+    "tabs": {
+      "scheduled": "Planifiées",
+      "commands": "Commandes"
+    },
+    "scheduled": {
+      "emptyTitle": "Aucune exécution de tâche planifiée",
+      "emptyDescription": "Les workloads cronjob apparaissent ici dès que l'ordonnanceur déclenche leur première exécution.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Statut",
+        "duration": "Durée",
+        "started": "Démarré"
+      }
+    },
+    "commands": {
+      "emptyTitle": "Aucune exécution de commande",
+      "emptyDescription": "Les commandes ad-hoc invoquées contre un workload apparaissent ici. Lancez-en une depuis la CLI avec `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Commande",
+        "status": "Statut",
+        "invokedBy": "Invoqué par",
+        "started": "Démarré"
+      }
+    },
+    "runStatus": {
+      "running": "En cours",
+      "inProgress": "En cours",
+      "succeeded": "Réussi",
+      "failed": "Échec",
+      "superseded": "Remplacé",
+      "unknown": "Inconnu",
+      "exitCodeLabel": "code {code}",
+      "exitCodeTooltip": "Le processus s'est terminé avec le code {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Interdire",
+        "queue": "File",
+        "replace": "Remplacer"
+      },
+      "tooltip": {
+        "forbid": "Saute le prochain déclenchement tant qu'une exécution est en cours.",
+        "queue": "Laisse les exécutions se cumuler — à choisir quand chaque déclenchement est indépendant et court.",
+        "replace": "Arrête l'exécution en cours et en démarre une nouvelle."
+      }
+    },
+    "cron": {
+      "invalid": "Expression cron invalide",
+      "firesIn": "Se déclenche dans {relative}",
+      "now": "moins d'une minute",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "hours": "{count, plural, one {# heure} other {# heures}}",
+      "days": "{count, plural, one {# jour} other {# jours}}"
+    },
+    "workloadCard": {
+      "title": "Workloads cronjob",
+      "countLabel": "{count, plural, one {# planifié} other {# planifiés}}",
+      "openLogs": "Ouvrir dans la console"
+    },
+    "output": {
+      "emptyOutput": "Aucune sortie capturée pour l'instant.",
+      "openInConsole": "Ouvrir dans la console",
+      "lines": "{count, plural, one {# ligne} other {# lignes}}",
+      "truncated": "200 lignes affichées — ouvrez la console pour la suite."
     }
   }
 }

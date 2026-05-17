@@ -32,6 +32,7 @@ from astrolift_identity.models import (
 from astrolift_identity.schema.types import (
     ActiveSessionType,
     ApiTokenType,
+    ApproverUserType,
     IdentityProviderType,
     InvitationType,
     MemberType,
@@ -48,6 +49,7 @@ from astrolift_identity.schema.types import (
     TeamType,
     api_token_to_type,
     app_to_summary,
+    approver_user_to_type,
     identity_provider_to_type,
     invitation_to_type,
     member_to_type,
@@ -220,6 +222,70 @@ class IdentityQuery:
             .order_by("-created_at")[:500]
         )
         return [member_to_type(m) for m in qs]
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_org_members_for_approval_picker(self, info: Info, org_slug: str) -> list[ApproverUserType]:
+        """Active org members shaped for the approval-policy picker (#410).
+
+        Returns the de-duplicated set of users with an ACTIVE
+        ``Member(scope_kind=ORG, scope_id=<org>)`` row, projected as
+        ``ApproverUserType`` (id + email + display name + avatar URL).
+        Reused by the register-app wizard, the per-app Settings page,
+        and any later surface that needs to render an org-scoped user
+        picker — keeping the projection in one place keeps the picker
+        UX consistent.
+
+        Org-scoped: ``orgSlug`` is resolved + cross-tenant-checked
+        against the active ``TenantContext.organization_id``. A slug
+        belonging to a different org returns an empty list rather than
+        leaking that the org exists. Anonymous callers are gated by
+        ``@tenant_scoped`` (no tenant -> no result).
+        """
+        from auth1.models import UserInfo
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        tenant_org_id = tenant.organization_id if tenant else None
+        if tenant_org_id is None:
+            return []
+
+        org = Organization.objects.filter(slug=org_slug, deleted_at__isnull=True).first()
+        if org is None or org.id != tenant_org_id:
+            # Cross-tenant or unknown slug — fail closed without leaking
+            # whether the slug exists.
+            return []
+
+        member_user_ids = list(
+            Member.objects.filter(
+                scope_kind=Member.ScopeKind.ORG,
+                scope_id=org.id,
+                deleted_at__isnull=True,
+                is_active=True,
+            )
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+        if not member_user_ids:
+            return []
+
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        users = list(
+            User.objects.filter(pk__in=member_user_ids, is_active=True).order_by(
+                "first_name", "last_name", "username", "email"
+            )
+        )
+        userinfo_by_user_id: dict[int, object] = {}
+        for ui in UserInfo.objects.filter(internal_user_id__in=member_user_ids):
+            # A user can have multiple Auth0 UserInfo rows (one per
+            # subject claim) — last write wins. The picker only needs a
+            # representative avatar, so any is fine.
+            userinfo_by_user_id[ui.internal_user_id] = ui
+
+        return [approver_user_to_type(u, userinfo=userinfo_by_user_id.get(u.pk)) for u in users]
 
     @strawberry.field
     @require_permission(Permission.ORG_MANAGE_MEMBERS)

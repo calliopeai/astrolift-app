@@ -15,6 +15,7 @@ import type {
   AstroliftActiveSession as GeneratedActiveSession,
   AstroliftApiToken as GeneratedApiToken,
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
+  AstroliftApproverUser as GeneratedApproverUser,
   AstroliftAppSummary as GeneratedAppSummary,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
   AstroliftInvitation as GeneratedInvitation,
@@ -91,6 +92,14 @@ export interface AstroliftNavTree {
 }
 
 export type AstroliftUser = GeneratedUser;
+
+/**
+ * Row shape used by the approval-policy picker (#410) — surfaces
+ * display_name + avatar_url so the picker can render an identifiable
+ * chip without a follow-up lookup. Backed by
+ * `astroliftOrgMembersForApprovalPicker(orgSlug)`.
+ */
+export type AstroliftApproverUser = GeneratedApproverUser;
 
 export type AstroliftRole = Omit<GeneratedRole, "scopeLevel"> & {
   scopeLevel: ScopeKind;

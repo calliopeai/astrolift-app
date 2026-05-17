@@ -167,6 +167,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "Settings sections",
+      "openMobileNav": "Open settings menu",
+      "openMobileNavLabel": "Sections",
+      "mobileTitle": "Settings sections",
+      "mobileDescription": "Jump to any settings area.",
+      "groups": {
+        "organization": "Organization",
+        "personal": "Personal",
+        "tokens": "Tokens"
+      }
+    },
+    "breadcrumb": {
+      "root": "Settings"
     }
   },
   "hooks": {
@@ -337,6 +352,53 @@
         "title": "Delete {slug}?",
         "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
         "confirm": "Delete app"
+      },
+      "urlHealth": {
+        "checking": "Checking…",
+        "unknown": "Unchecked",
+        "ariaLabel": "URL health: {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "Unreachable",
+        "tooltip": {
+          "title": "Recent probes",
+          "empty": "No probe history yet.",
+          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
+          "now": "now",
+          "secondsAgo": "{seconds}s ago",
+          "minutesAgo": "{minutes}m ago",
+          "hoursAgo": "{hours}h ago",
+          "recheck": "Click to re-run probe",
+          "rechecking": "Re-running probe…"
+        }
+      }
+    },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "Require approval before deploying",
+        "safer": "Safer",
+        "toggleHint": "Triggered deploys land in \"pending approval\" until an approver signs off. Pick a team OR a specific set of users — approvers can't self-approve a deploy they pushed.",
+        "teamLabel": "Approver team",
+        "teamPlaceholder": "No team selected",
+        "teamNoneOption": "No team — pick users instead",
+        "teamHint": "Any active member of this team may approve. Mutually exclusive with the user picker.",
+        "minimumLabel": "Required approver count",
+        "minimumHintUsers": "1–{max} based on your user selection.",
+        "minimumHintTeam": "Number of distinct approvers required. At least 1.",
+        "usersLabel": "Approver users",
+        "usersPlaceholderTeam": "Team mode selected — clear the team picker to add users.",
+        "usersPlaceholderEmpty": "No users selected yet.",
+        "userRemove": "Remove {label}",
+        "orphanRemove": "Remove orphaned approver {id}",
+        "orphanSuffix": "(no longer a member)",
+        "search": "Search org members by name or email…",
+        "loading": "Loading org members…",
+        "noMembers": "No active org members yet — invite someone first.",
+        "noMatch": "No members match the search.",
+        "errorPickAny": "Pick at least one approver — a team or one or more users.",
+        "errorBoth": "Pick a team OR specific users, not both.",
+        "errorMinTooHigh": "Minimum approvals cannot exceed the number of selected users."
       }
     },
     "deployments": {
@@ -1747,6 +1809,9 @@
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
+    "cardMeta": {
+      "modified": "Modified {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -1763,6 +1828,10 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",
