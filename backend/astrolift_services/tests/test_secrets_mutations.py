@@ -627,6 +627,8 @@ def test_attachment_query_surfaces_team_count_order(permission_resolver):
     assert [r.merge_order for r in rows] == [0, 1]
     assert rows[0].team_slug == bundle.team.slug
     assert rows[0].attached_at is not None
-    # key_count is 0 today (backend gap — values live in the secrets backend);
-    # the UI surfaces '?' when count is 0.
+    # key_count comes from the SecretBundle.last_known_keys cache (#441).
+    # No driver is wired in this scaffold (the cluster has the k8s_native
+    # plugin but no secrets driver registered), and we didn't pre-seed the
+    # cache, so the count is 0 + the UI surfaces '?'.
     assert rows[0].key_count == 0

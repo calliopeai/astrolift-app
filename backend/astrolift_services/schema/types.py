@@ -69,6 +69,18 @@ class SecretBundleType:
     team_slug: str | None
     created_at: dt.datetime
 
+    key_count: int = 0
+    """Cached count of keys the bundle projects (#441).  Backed by
+    the same ``SecretBundle.last_known_keys`` snapshot the attachment
+    resolver consumes -- 0 when the cache has never populated."""
+
+    last_known_keys_at: dt.datetime | None = None
+    """Timestamp of the last successful key enumeration (#441).
+    Null means the cache has never populated -- typically a brand-new
+    bundle whose first ``setBundleSecret`` / scheduled refresh hasn't
+    fired yet.  Operator UI surfaces this as a 'last updated'
+    indicator next to ``keyCount``."""
+
 
 @strawberry.type(name="AstroliftAppSecretBundleAttachment")
 class AppSecretBundleAttachmentType:
@@ -257,6 +269,8 @@ def secret_bundle_to_type(b) -> SecretBundleType:
         organization_slug=b.organization.slug,
         team_slug=b.team.slug if b.team_id else None,
         created_at=b.created_at,
+        key_count=len(b.last_known_keys or []),
+        last_known_keys_at=b.last_key_enum_at,
     )
 
 

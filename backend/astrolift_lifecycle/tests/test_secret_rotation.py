@@ -113,6 +113,58 @@ def test_materialize_secret_manifest_missing_backend_ref_raises():
         )
 
 
+@pytest.mark.django_db
+def test_materialize_refreshes_last_known_keys_when_bundle_provided(org, team):
+    """#441 — materialise refreshes ``SecretBundle.last_known_keys`` off
+    the just-fetched payload so the rotate workflow keeps the operator
+    UI's keyCount aligned with what was actually written to k8s."""
+    bundle = SecretBundle.objects.create(
+        organization=org,
+        team=team,
+        name="DB bundle",
+        slug="db-bundle-key-refresh",
+        backend_ref="vault/db",
+    )
+    backend = _FakeSecretsBackend(
+        {"vault/db": {"DATABASE_URL": "x", "API_KEY": "y", "REDIS_URL": "z"}},
+    )
+    _materialize_secret_manifest(
+        bundle_slug=bundle.slug,
+        bundle_backend_ref=bundle.backend_ref,
+        prefix="",
+        namespace="ns",
+        secrets_backend=backend,
+        bundle=bundle,
+    )
+    bundle.refresh_from_db()
+    assert bundle.last_known_keys == ["API_KEY", "DATABASE_URL", "REDIS_URL"]
+    assert bundle.last_key_enum_at is not None
+
+
+@pytest.mark.django_db
+def test_materialize_without_bundle_doesnt_persist(org, team):
+    """Calling without ``bundle`` (older call sites, defensive) is a
+    no-op on the cache."""
+    bundle = SecretBundle.objects.create(
+        organization=org,
+        team=team,
+        name="DB bundle",
+        slug="db-bundle-no-cache",
+        backend_ref="vault/db",
+    )
+    backend = _FakeSecretsBackend({"vault/db": {"K": "v"}})
+    _materialize_secret_manifest(
+        bundle_slug=bundle.slug,
+        bundle_backend_ref=bundle.backend_ref,
+        prefix="",
+        namespace="ns",
+        secrets_backend=backend,
+    )
+    bundle.refresh_from_db()
+    assert bundle.last_known_keys == []
+    assert bundle.last_key_enum_at is None
+
+
 # ---- _list_targets_sync (DB) ----------------------------------------------
 
 

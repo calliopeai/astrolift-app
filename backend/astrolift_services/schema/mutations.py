@@ -601,7 +601,15 @@ class ServicesMutation:
                     existing.updated_by = actor
                     update_fields.append("updated_by")
                 existing.save(update_fields=update_fields)
-            return gql_success(attachment_to_type(existing))
+            # #441: prefix change doesn't alter the key set itself, but
+            # surface the cached count back to the operator so the UI
+            # shows a real number rather than '?' on first render.
+            return gql_success(
+                attachment_to_type(
+                    existing,
+                    key_count=len(bundle.last_known_keys or []),
+                )
+            )
         ref = AppSecretBundleRef.objects.create(
             registered_app=app,
             app_environment=env,
@@ -610,7 +618,19 @@ class ServicesMutation:
             created_by=actor,
             updated_by=actor,
         )
-        return gql_success(attachment_to_type(ref))
+        # #441: eagerly enumerate so the UI can show the count on the
+        # first read after attach.  Errors are swallowed inside the
+        # helper -- attach must not fail because the secrets backend
+        # was momentarily unreachable.
+        from astrolift_services.bundle_keys import force_refresh_bundle_known_keys
+
+        force_refresh_bundle_known_keys(bundle)
+        return gql_success(
+            attachment_to_type(
+                ref,
+                key_count=len(bundle.last_known_keys or []),
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.detach")
