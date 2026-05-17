@@ -65,11 +65,13 @@ import {
   SET_APP_SECRET,
 } from "@/graphql/services/services.mutations";
 import {
+  GET_APP_VERSION,
   LIST_APP_SECRETS,
   LIST_APP_SECRET_BUNDLE_ATTACHMENTS,
   LIST_SECRET_CHANGE_PROPOSALS,
 } from "@/graphql/services/services.queries";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
+import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -163,6 +165,14 @@ export function SecretsClient({ slug }: { slug: string }) {
     variables: { appSlug: slug },
     fetchPolicy: "cache-and-network",
   });
+  // #497 — fetch the app's current ``version`` so every
+  // ``setAppSecret`` mutation can carry ``ifMatchVersion``. Cheap query
+  // (id + version only); Apollo will merge into any other cache entry
+  // for this app slug.
+  const appVersion = useQuery<{ astroliftApp: { id: string; version: number } | null }>(
+    GET_APP_VERSION,
+    { variables: { slug }, fetchPolicy: "cache-and-network" },
+  );
   const secrets = useQuery<SecretsResp>(LIST_APP_SECRETS, {
     variables,
     fetchPolicy: "cache-and-network",
@@ -301,13 +311,23 @@ export function SecretsClient({ slug }: { slug: string }) {
 
   async function handleInlineSave(s: AppSecret, nextValue: string) {
     const { data } = await setSecret({
-      variables: { input: { appSlug: slug, key: s.key, value: nextValue } },
+      variables: {
+        input: {
+          appSlug: slug,
+          key: s.key,
+          value: nextValue,
+          ifMatchVersion: appVersion.data?.astroliftApp?.version ?? null,
+        },
+      },
     });
     if (data?.setAppSecret.ok) {
       toast.success(t("edit.toastSaved", { key: s.key }));
       setRevealedValues((prev) => ({ ...prev, [s.id]: nextValue }));
       setEditingId(null);
       return true;
+    }
+    if (handleVersionMismatch(data?.setAppSecret, { label: "app", onRefresh: () => appVersion.refetch() })) {
+      return false;
     }
     toast.error(data?.setAppSecret.errors?.[0]?.message ?? "Save failed");
     return false;
@@ -442,12 +462,27 @@ export function SecretsClient({ slug }: { slug: string }) {
         slug={slug}
         onSubmit={async (key, value) => {
           const { data } = await setSecret({
-            variables: { input: { appSlug: slug, key, value } },
+            variables: {
+              input: {
+                appSlug: slug,
+                key,
+                value,
+                ifMatchVersion: appVersion.data?.astroliftApp?.version ?? null,
+              },
+            },
           });
           if (data?.setAppSecret.ok) {
             toast.success(`Set ${key}`);
             setSetOpen(false);
             return true;
+          }
+          if (
+            handleVersionMismatch(data?.setAppSecret, {
+              label: "app",
+              onRefresh: () => appVersion.refetch(),
+            })
+          ) {
+            return false;
           }
           toast.error(data?.setAppSecret.errors?.[0]?.message ?? "Save failed");
           return false;

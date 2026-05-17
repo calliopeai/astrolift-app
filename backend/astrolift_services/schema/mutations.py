@@ -47,6 +47,7 @@ from astrolift_services.secret_change_apply import apply_proposal
 from astrolift_services.secret_change_diff import build_diff
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
+from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -66,6 +67,12 @@ class SetAppSecretInput:
     app_slug: str
     key: str
     value: str
+    # Optimistic-concurrency gate (#497). When set, the mutation
+    # compares against ``RegisteredApp.version`` and refuses to apply
+    # the secret write if the app row has moved on since the caller
+    # fetched it (a concurrent settings/secret edit, etc.). Null =
+    # skip the check (back-compat).
+    if_match_version: int | None = None
 
 
 @strawberry.input
@@ -502,6 +509,14 @@ class ServicesMutation:
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # #497 — optimistic-concurrency gate. Refuse to apply the
+        # secret write when the caller's cached version is stale; the
+        # FE refetches and re-prompts the operator instead of silently
+        # overwriting a concurrent edit (e.g. another admin updated a
+        # different setting on the same app while this form was open).
+        mismatch = _check_version_match(app, if_match_version=input.if_match_version, kind="App")
+        if mismatch is not None:
+            return mismatch
         # #488: when the app requires secret approval the mutation
         # creates a proposal instead of applying.  Returning the
         # proposal id in the same envelope shape (with empty raw

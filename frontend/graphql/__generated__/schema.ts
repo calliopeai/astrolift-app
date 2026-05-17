@@ -1088,6 +1088,22 @@ export type AstroliftDeregisterPreviewSourceWebhook = {
   repo: Scalars['String']['output'];
 };
 
+export type AstroliftDeviceRegistration = {
+  driver: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  label: Scalars['String']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
+  platform: Scalars['String']['output'];
+  registeredAt: Scalars['DateTime']['output'];
+  tokenLast4: Scalars['String']['output'];
+};
+
+export type AstroliftDeviceRegistrationMutationResult = {
+  data?: Maybe<AstroliftDeviceRegistration>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftDisconnectUserSourceProviderPayload = {
   disconnectedId?: Maybe<Scalars['GUID']['output']>;
   providerConfigId: Scalars['GUID']['output'];
@@ -1260,6 +1276,7 @@ export type AstroliftIdentityProvider = {
   oidcDiscoveryUrl: Scalars['String']['output'];
   organizationSlug: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftIdentityProviderMutationResult = {
@@ -1510,6 +1527,19 @@ export type AstroliftNotificationMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftNotificationPreference = {
+  channel: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  eventKind: Scalars['String']['output'];
+  id?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftNotificationPreferenceMutationResult = {
+  data?: Maybe<AstroliftNotificationPreference>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftOrganization = {
   allowUserProfileEdit: Scalars['Boolean']['output'];
   auditLogRetentionDays: Scalars['Int']['output'];
@@ -1564,6 +1594,7 @@ export type AstroliftPolicy = {
   slug: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   updatedByUsername?: Maybe<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftPolicyMutationResult = {
@@ -1737,6 +1768,7 @@ export type AstroliftRegisteredApp = {
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  version: Scalars['Int']['output'];
   viewerPermissions: Array<Scalars['String']['output']>;
   webhookDeploysPauseReason: Scalars['String']['output'];
   webhookDeploysPaused: Scalars['Boolean']['output'];
@@ -2184,6 +2216,7 @@ export type AstroliftWebhookSubscription = {
   lastResponseStatus?: Maybe<Scalars['Int']['output']>;
   secretRotatedAt?: Maybe<Scalars['DateTime']['output']>;
   url: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftWebhookSubscriptionMutationResult = {
@@ -3118,6 +3151,7 @@ export type Mutation = {
   redeployApp: AstroliftDeploymentMutationResult;
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
+  registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
@@ -3138,6 +3172,7 @@ export type Mutation = {
   revokeAstroliftSession: AstroliftRevokeAstroliftSessionPayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
+  revokeMobileDevice: RevokemobiledevicepayloadMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
@@ -3151,6 +3186,7 @@ export type Mutation = {
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
+  setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED. */
@@ -3822,6 +3858,11 @@ export type MutationRegisterAppArgs = {
 };
 
 
+export type MutationRegisterMobileDeviceArgs = {
+  input: RegisterMobileDeviceInput;
+};
+
+
 export type MutationRegisterTenantClusterArgs = {
   input: RegisterTenantClusterInput;
 };
@@ -3922,6 +3963,11 @@ export type MutationRevokeInvitationArgs = {
 };
 
 
+export type MutationRevokeMobileDeviceArgs = {
+  input: RevokeMobileDeviceInput;
+};
+
+
 export type MutationRevokeRoleBindingArgs = {
   input: RevokeRoleBindingInput;
 };
@@ -3984,6 +4030,11 @@ export type MutationSetAppSecretArgs = {
 
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
+};
+
+
+export type MutationSetNotificationPreferenceArgs = {
+  input: SetNotificationPreferenceInput;
 };
 
 
@@ -4261,8 +4312,10 @@ export type MutationWithdrawSecretChangeArgs = {
 
 export type MutationError = {
   code: Scalars['String']['output'];
+  currentVersion?: Maybe<Scalars['Int']['output']>;
   field?: Maybe<Scalars['String']['output']>;
   message: Scalars['String']['output'];
+  requestedVersion?: Maybe<Scalars['Int']['output']>;
   requiresAttestation?: Maybe<Scalars['Boolean']['output']>;
 };
 
@@ -4523,6 +4576,9 @@ export type Query = {
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
   astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
+  astroliftMyDevices: Array<AstroliftDeviceRegistration>;
+  astroliftMyMobileDevices: Array<AstroliftDeviceRegistration>;
+  astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
@@ -4926,6 +4982,11 @@ export type QueryAstroliftMyAppsPageArgs = {
 };
 
 
+export type QueryAstroliftMyNotificationPreferencesArgs = {
+  channel?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
@@ -5214,6 +5275,12 @@ export type RegisterAppInput = {
   triggerMode: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RegisterMobileDeviceInput = {
+  deviceToken: Scalars['String']['input'];
+  label: InputMaybe<Scalars['String']['input']>;
+  platform: Scalars['String']['input'];
+};
+
 export type RegisterTenantClusterInput = {
   authConfig: InputMaybe<Scalars['JSON']['input']>;
   authMethod: Scalars['String']['input'];
@@ -5316,6 +5383,10 @@ export type RevokeInvitationInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type RevokeMobileDeviceInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type RevokeRoleBindingInput = {
   id: Scalars['GUID']['input'];
 };
@@ -5323,6 +5394,17 @@ export type RevokeRoleBindingInput = {
 export type RevokeTeamAccessInput = {
   appId: Scalars['GUID']['input'];
   teamId: Scalars['GUID']['input'];
+};
+
+export type Revokemobiledevicepayload = {
+  id: Scalars['GUID']['output'];
+  revoked: Scalars['Boolean']['output'];
+};
+
+export type RevokemobiledevicepayloadMutationResult = {
+  data?: Maybe<Revokemobiledevicepayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type RotateDeployTokenInput = {
@@ -5365,6 +5447,7 @@ export type SetActiveIdentityProviderInput = {
 
 export type SetAppSecretInput = {
   appSlug: Scalars['String']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   key: Scalars['String']['input'];
   value: Scalars['String']['input'];
 };
@@ -5372,6 +5455,12 @@ export type SetAppSecretInput = {
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
+};
+
+export type SetNotificationPreferenceInput = {
+  channel: Scalars['String']['input'];
+  enabled: Scalars['Boolean']['input'];
+  eventKind: Scalars['String']['input'];
 };
 
 export type SharedDirectoryType = {
@@ -5534,6 +5623,7 @@ export type UpdateAppInput = {
   deployBranch: InputMaybe<Scalars['String']['input']>;
   description: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   manifestPath: InputMaybe<Scalars['String']['input']>;
   minimumApprovals: InputMaybe<Scalars['Int']['input']>;
@@ -5550,6 +5640,7 @@ export type UpdateIdentityProviderInput = {
   config: InputMaybe<Scalars['JSON']['input']>;
   displayName: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   metadataUrl: InputMaybe<Scalars['String']['input']>;
   oidcDiscoveryUrl: InputMaybe<Scalars['String']['input']>;
 };
@@ -5593,6 +5684,7 @@ export type UpdatePolicyInput = {
   description: InputMaybe<Scalars['String']['input']>;
   effect: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
   resourcePattern: InputMaybe<Scalars['JSON']['input']>;
 };
@@ -5643,6 +5735,7 @@ export type UpdateWebhookSubscriptionInput = {
   events: InputMaybe<Array<Scalars['String']['input']>>;
   format: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   url: InputMaybe<Scalars['String']['input']>;
 };

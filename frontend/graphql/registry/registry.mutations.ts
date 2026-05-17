@@ -35,6 +35,8 @@ export const UPDATE_APP = gql`
         code
         message
         field
+        currentVersion
+        requestedVersion
       }
       data {
         id
@@ -49,6 +51,7 @@ export const UPDATE_APP = gql`
         cronExpression
         previewEnabled
         isActive
+        version
       }
     }
   }

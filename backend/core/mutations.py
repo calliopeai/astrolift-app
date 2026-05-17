@@ -50,6 +50,12 @@ class ErrorCode(enum.StrEnum):
     # code, opens the ``StepUpPrompt`` modal, elevates the session,
     # and retries the original mutation.
     STEP_UP_REQUIRED = "STEP_UP_REQUIRED"
+    # #497 — optimistic concurrency. Returned when a mutation supplied
+    # ``ifMatchVersion`` and the persisted row's version no longer
+    # matches. The error envelope carries ``currentVersion`` so the FE
+    # can refetch the latest state and rebuild the form. The mutation
+    # is a no-op when this code fires.
+    VERSION_MISMATCH = "VERSION_MISMATCH"
 
 
 @dataclasses.dataclass(slots=True)

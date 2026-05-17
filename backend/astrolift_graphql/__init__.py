@@ -10,7 +10,7 @@ Per-app schemas (``astrolift_identity/schema/``,
 """
 
 from astrolift_graphql.errors import MutationErrorType
-from astrolift_graphql.results import MutationResultType, failure, success
+from astrolift_graphql.results import MutationResultType, failure, success, version_mismatch
 from astrolift_graphql.scalars import GUID
 
 __all__ = [
@@ -19,4 +19,5 @@ __all__ = [
     "MutationResultType",
     "failure",
     "success",
+    "version_mismatch",
 ]

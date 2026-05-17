@@ -48,6 +48,7 @@ from astrolift_operations.schema.types import (
 from astrolift_operations.webhook_delivery import build_headers, sign_payload
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
+from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -99,6 +100,9 @@ class UpdateWebhookSubscriptionInput:
     is_active: bool | None = None
     format: str | None = None
     """Outbound payload shape: ``generic`` | ``slack`` | ``discord``."""
+
+    # Optimistic-concurrency gate (#497) — null skips the check.
+    if_match_version: int | None = None
 
 
 @strawberry.input
@@ -498,6 +502,12 @@ class OperationsMutation:
         sub = WebhookSubscription.objects.filter(guid=str(input.id)).first()
         if sub is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "subscription not found")
+        # #497 — optimistic-concurrency gate.
+        mismatch = _check_version_match(
+            sub, if_match_version=input.if_match_version, kind="WebhookSubscription"
+        )
+        if mismatch is not None:
+            return mismatch
         if input.url is not None:
             sub.url = input.url
         if input.events is not None:

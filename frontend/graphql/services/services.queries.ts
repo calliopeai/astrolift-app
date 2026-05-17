@@ -20,6 +20,26 @@ export const LIST_APP_SECRETS = gql`
   }
 `;
 
+/**
+ * Minimal version-only fetch on the parent app row (#497).
+ *
+ * The secrets editor needs the app's current ``version`` to pass on
+ * ``setAppSecret(input.ifMatchVersion)`` so concurrent edits to other
+ * settings (deploy strategy, security policy, …) can't race the
+ * secret write. The full ``GET_APP`` query pulls dozens of fields we
+ * don't need on this page, so we fetch only ``{id, version}`` and let
+ * Apollo's normalized cache cross-pollinate with whatever else is in
+ * memory.
+ */
+export const GET_APP_VERSION = gql`
+  query GetAppVersion($slug: String!) {
+    astroliftApp(slug: $slug) {
+      id
+      version
+    }
+  }
+`;
+
 export const LIST_APP_SECRET_BUNDLE_ATTACHMENTS = gql`
   query ListAppSecretBundleAttachments($appSlug: String!, $environmentName: String) {
     astroliftAppSecretBundleAttachments(appSlug: $appSlug, environmentName: $environmentName) {

@@ -312,6 +312,12 @@ class RegisteredAppType:
     created_at: dt.datetime
     updated_at: dt.datetime
     deleted_at: dt.datetime | None
+    # Monotonic per-row version used by the optimistic-concurrency
+    # gate on update mutations (#497). Clients fetch this with every
+    # read and pass it back as ``ifMatchVersion`` on subsequent writes;
+    # a stale value returns a ``VERSION_MISMATCH`` envelope rather than
+    # silently overwriting a concurrent edit.
+    version: int
     # Last operator-initiated "Resync from source" timestamp (#386).
     # Null until the operator has clicked the button for the first
     # time; surfaces on the Settings page as relative time.
@@ -688,6 +694,7 @@ def app_to_type(
         created_at=app.created_at,
         updated_at=app.updated_at,
         deleted_at=app.deleted_at,
+        version=int(app.version or 0),
         last_resync_at=app.last_resync_at,
         source_webhook_installed_at=app.source_webhook_installed_at,
         security_policy=_security_policy_to_type(app),
