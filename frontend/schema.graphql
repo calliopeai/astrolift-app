@@ -697,6 +697,8 @@ type AstroliftDeployToken {
   scopes: [String!]!
   expiresAt: DateTime
   lastUsedAt: DateTime
+  lastUsedIp: String!
+  lastUsedAgent: String!
   isRevoked: Boolean!
   lastRotatedAt: DateTime
   registeredAppSlug: String!
@@ -2042,6 +2044,7 @@ input DeleteWebhookSubscriptionInput {
 type DeployTokenSecretReveal {
   token: AstroliftDeployToken!
   plaintextSecret: String!
+  rotationGraceSeconds: Int!
 }
 
 type DeployTokenSecretRevealMutationResult {

@@ -432,6 +432,14 @@ CONSTANCE_CONFIG = {
         "fleets that need a longer rollout window, lower (e.g. 60) after a compromise so the "
         "old secret dies fast.",
     ),
+    "DEPLOY_TOKEN_ROTATION_GRACE_SECONDS": (
+        86400,
+        "Window (in seconds) the previous deploy-token secret stays valid after a rotation "
+        "so in-flight CI runs holding the old token finish without failing. Default 24h. "
+        "Lower bound 60s, upper bound 7d. Surfaced in the rotate-confirm dialog so operators "
+        "see the exact grace they're committing to. Use the explicit ``revokeDeployToken`` "
+        "path (or ``immediate=True`` in code) for compromised-token cutover.",
+    ),
     "ALLOW_SELF_APPROVE_DEPLOYS": (
         False,
         "When False (default), the user who triggered a deployment cannot also approve it — "
@@ -474,6 +482,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "collapse": False,
     },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
+    "Deploy tokens": {
+        "fields": ("DEPLOY_TOKEN_ROTATION_GRACE_SECONDS",),
+        "collapse": False,
+    },
     "Audit": {
         "fields": (
             "AUDIT_RETENTION_DAYS",
@@ -527,6 +539,13 @@ MIDDLEWARE = [
     # CurrentUserMiddleware so the thread-local picks up the
     # token-authed identity.
     "astrolift_identity.middleware.ApiTokenAuthMiddleware",
+    # Deploy-token bearer auth (#425): resolves alft_dt_… tokens for
+    # CI deploys, stamps last_used_* columns onto the matched
+    # DeployToken row, attaches the row to request._deploy_token so
+    # downstream views can read the app binding without re-verifying.
+    # Doesn't swap request.user — deploy tokens are app-scoped
+    # credentials with their own permission model.
+    "astrolift_lifecycle.middleware.DeployTokenAuthMiddleware",
     "core.middleware.current_user.CurrentUserMiddleware",  # Track current user for signals
     "core.middleware.request_id.RequestIdMiddleware",  # ULID + W3C traceparent → contextvar
     "core.middleware.tenant.TenantContextMiddleware",  # Resolve org/team/project, populate TenantContext
