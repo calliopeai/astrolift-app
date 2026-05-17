@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, MutationResultType
@@ -12,6 +13,7 @@ from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import (
     delete_app_env_key,
     parse_dotenv,
+    read_app_env,
     set_app_env_keys,
 )
 from astrolift_manifest.parser import ManifestError, parse_raw
@@ -24,14 +26,16 @@ from astrolift_services.models import (
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
     ManagedServiceType,
+    RevealedSecretType,
     SecretBundleType,
     attachment_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
 )
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode, mutation_audit
+from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
 
 # ---------------------------------------------------------------------
 # Inputs
@@ -75,6 +79,24 @@ class AttachSecretBundleInput:
 @strawberry.input
 class DetachSecretBundleInput:
     attachment_id: GUID
+
+
+@strawberry.input
+class RevealAppSecretInput:
+    """Persistent reveal-on-demand for one secret row (#424).
+
+    `app_slug` scopes the lookup to one app (the caller's current page);
+    `secret_id` is the stable id minted by `_list_app_secrets` —
+    ``{source}:{env}:{key}`` — so the UI can ask for "this row I'm
+    looking at" without re-deriving the source/env tuple.
+
+    Reveal is intentionally an explicit per-row mutation rather than
+    a query: every successful call audit-logs the actor + IP so the
+    org's audit trail captures the disclosure.
+    """
+
+    app_slug: str
+    secret_id: str
 
 
 @strawberry.input
@@ -178,9 +200,41 @@ def _validate_env_key(key: str) -> str | None:
     return None
 
 
-def _stage_manifest(app, new_text: str) -> str:
+def _actor_user(info):
+    """Return the authenticated user from the resolver context or None.
+
+    Anonymous / unauthenticated contexts (CLI bypass, system actor)
+    return None so the caller can no-op the attribution write."""
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) if request else None
+    if user is None:
+        user = getattr(info.context, "user", None)
+    if user is None or not getattr(user, "is_authenticated", False):
+        return None
+    return user
+
+
+def _client_ip(info) -> str:
+    """Best-effort caller-IP for the audit row. Honours
+    X-Forwarded-For first (left-most hop) then REMOTE_ADDR."""
+    request = getattr(info.context, "request", None)
+    if request is None:
+        return ""
+    fwd = request.META.get("HTTP_X_FORWARDED_FOR", "") if hasattr(request, "META") else ""
+    if fwd:
+        return fwd.split(",")[0].strip()
+    if hasattr(request, "META"):
+        return request.META.get("REMOTE_ADDR", "") or ""
+    return ""
+
+
+def _stage_manifest(app, new_text: str, *, actor=None) -> str:
     """Validate the new TOML parses, then write to the staging
-    buffer + clear it when it matches the source-of-truth."""
+    buffer + clear it when it matches the source-of-truth.
+
+    ``actor`` is the user attributing this write so the secrets row's
+    ``lastEditedBy`` surface (#424) shows who staged the change. Pass
+    None for system writes and the existing updated_by value stands."""
     try:
         parse_raw(new_text)
     except ManifestError as exc:
@@ -189,13 +243,15 @@ def _stage_manifest(app, new_text: str) -> str:
         app.manifest_raw_staged = ""
     else:
         app.manifest_raw_staged = new_text
-    app.save(
-        update_fields=[
-            "manifest_raw_staged",
-            "updated_at",
-            "version",
-        ]
-    )
+    update_fields = [
+        "manifest_raw_staged",
+        "updated_at",
+        "version",
+    ]
+    if actor is not None:
+        app.updated_by = actor
+        update_fields.append("updated_by")
+    app.save(update_fields=update_fields)
     return app.manifest_raw_staged
 
 
@@ -226,7 +282,7 @@ class ServicesMutation:
         source = app.manifest_raw_staged or app.manifest_raw or ""
         new_text = set_app_env_keys(source, {input.key: input.value})
         try:
-            staged = _stage_manifest(app, new_text)
+            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
         except ManifestError as exc:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -262,7 +318,7 @@ class ServicesMutation:
                 field="key",
             )
         try:
-            staged = _stage_manifest(app, new_text)
+            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
         except ManifestError as exc:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -309,7 +365,7 @@ class ServicesMutation:
         source = app.manifest_raw_staged or app.manifest_raw or ""
         new_text = set_app_env_keys(source, kvs)
         try:
-            staged = _stage_manifest(app, new_text)
+            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
         except ManifestError as exc:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -321,6 +377,124 @@ class ServicesMutation:
                 app_slug=app.slug,
                 keys_set=sorted(kvs.keys()),
                 raw_manifest_staged=staged,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="app.secret.reveal",
+        extras=lambda result: (
+            {
+                "secret_id": result.data.secret_id,
+                "key": result.data.key,
+                "environment_name": result.data.environment_name,
+            }
+            if result.ok and result.data is not None
+            else None
+        ),
+    )
+    @require_permission(Permission.APP_READ, Permission.SECRET_READ)
+    @tenant_scoped()
+    def reveal_app_secret(
+        self,
+        info: Info,
+        input: RevealAppSecretInput,
+    ) -> MutationResultType[RevealedSecretType]:
+        """Return plaintext for one secret row (#424).
+
+        Requires both `app.read` (the caller can see the app) and
+        `secret.read` (the caller can disclose the value). Plaintext
+        is returned **only** for `literal`-source secrets — bundle and
+        managed-service values live in the platform secrets backend
+        and aren't reachable from the API surface.
+
+        Every successful reveal lands in the audit log via the
+        wrapping `@mutation_audit` decorator (actor + IP + tenant +
+        target secret id). Failures audit-log too with the failure
+        code so the trail captures attempted disclosures.
+        """
+        # Stable id format: ``{source}:{env}:{key}``. ``env`` is a
+        # POSIX-shape env name (no colons); ``key`` is too for
+        # literal secrets. Split on the first two colons so a key
+        # that contains a colon (managed-service style ``svc.k``)
+        # survives reassembly even though we won't reveal those.
+        secret_id = input.secret_id or ""
+        parts = secret_id.split(":", 2)
+        if len(parts) != 3 or not all(parts):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "secretId must look like 'literal:<env>:<KEY>'",
+                field="secretId",
+            )
+        source, env_name, key = parts
+        if source != "literal":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                (
+                    f"reveal is only supported for literal-source secrets; "
+                    f"{source!r} values live in the platform secrets backend "
+                    f"and aren't reachable from the API"
+                ),
+                field="secretId",
+            )
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        if app is None or app.deleted_at is not None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+        env_exists = AppEnvironment.objects.filter(
+            registered_app=app,
+            name=env_name,
+            deleted_at__isnull=True,
+        ).exists()
+        if not env_exists:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"environment {env_name!r} not found",
+                field="secretId",
+            )
+        raw_text = app.manifest_raw_staged or app.manifest_raw or ""
+        literals = read_app_env(raw_text)
+        if key not in literals:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"no literal secret {key!r} in environment {env_name!r}",
+                field="secretId",
+            )
+        # @mutation_audit (above) already records actor + tenant +
+        # secret_id via its extras hook. Emit a sibling audit entry
+        # carrying the client IP so the trail captures the disclosure
+        # source — done as a separate emit_audit call so the IP isn't
+        # surfaced in the GraphQL response payload (which would leak
+        # the caller's IP back to a layered proxy).
+        ip = _client_ip(info)
+        tenant = get_current_tenant()
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="app.secret.reveal.disclosure",
+                decision="ALLOW",
+                target_kind="app_secret",
+                target_id=secret_id,
+                duration_ms=0,
+                permissions=(
+                    Permission.APP_READ.value,
+                    Permission.SECRET_READ.value,
+                ),
+                extra={
+                    "app_slug": input.app_slug,
+                    "environment_name": env_name,
+                    "key": key,
+                    "client_ip": ip,
+                },
+            )
+        )
+        return gql_success(
+            RevealedSecretType(
+                secret_id=secret_id,
+                key=key,
+                environment_name=env_name,
+                value=literals[key],
+                revealed_at=timezone.now(),
             )
         )
 
@@ -363,6 +537,7 @@ class ServicesMutation:
                 ErrorCode.PERMISSION_DENIED.value,
                 "bundle and app belong to different organizations",
             )
+        actor = _actor_user(info)
         existing = AppSecretBundleRef.objects.filter(
             registered_app=app,
             app_environment=env,
@@ -375,19 +550,23 @@ class ServicesMutation:
             new_prefix = input.prefix or ""
             if existing.prefix != new_prefix:
                 existing.prefix = new_prefix
-                existing.save(
-                    update_fields=[
-                        "prefix",
-                        "updated_at",
-                        "version",
-                    ]
-                )
+                update_fields = [
+                    "prefix",
+                    "updated_at",
+                    "version",
+                ]
+                if actor is not None:
+                    existing.updated_by = actor
+                    update_fields.append("updated_by")
+                existing.save(update_fields=update_fields)
             return gql_success(attachment_to_type(existing))
         ref = AppSecretBundleRef.objects.create(
             registered_app=app,
             app_environment=env,
             secret_bundle=bundle,
             prefix=input.prefix or "",
+            created_by=actor,
+            updated_by=actor,
         )
         return gql_success(attachment_to_type(ref))
 

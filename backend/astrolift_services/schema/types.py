@@ -11,16 +11,31 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftSecretEditor")
+class SecretEditorType:
+    """Compact actor reference for the `lastEditedBy` surface (#424).
+
+    Resolved from `Tracking.updated_by`; null when the record predates
+    the per-field-attribution work or was set by a system actor.
+    Mirrors the shape of `AstroliftUser` for the fields the UI needs
+    without forcing a circular schema import.
+    """
+
+    id: str
+    """Django auth user pk rendered as string (mirrors AstroliftUser)."""
+
+    username: str
+    display_name: str
+
+
 @strawberry.type(name="AstroliftAppSecret")
 class AppSecretType:
     """A secret reference visible to the workload at runtime.
 
-    The ``value`` is never exposed via GraphQL — secrets stay in
-    the platform's secrets backend or in the source manifest.
-    ``isMasked`` is always True for now (literals from the manifest
-    are committed in plaintext to the source repo, but the API
-    treats them as opaque on read so the editor surface stays
-    write-only).
+    The ``value`` is never exposed via GraphQL except through the
+    explicit ``revealAppSecret`` mutation (`secret.read`-gated) for
+    literals; bundle / managed-service rows always stay opaque on
+    read since the values live in the secrets backend.
     """
 
     id: str
@@ -41,6 +56,7 @@ class AppSecretType:
 
     is_masked: bool = True
     last_edited_at: dt.datetime | None = None
+    last_edited_by: SecretEditorType | None = None
 
 
 @strawberry.type(name="AstroliftSecretBundle")
@@ -62,6 +78,25 @@ class AppSecretBundleAttachmentType:
     environment_name: str
     prefix: str
     registered_app_slug: str
+    team_slug: str | None = None
+    """Owning team of the underlying bundle; null for org-wide bundles."""
+
+    key_count: int = 0
+    """Number of keys the bundle is expected to project at runtime.
+
+    Bundle values themselves live in the platform secrets backend
+    (Vault / SecretsManager / GSM / KeyVault) — the platform stores
+    only a reference + the manifest-declared envelope. When the
+    envelope is unknown the count is 0 and the UI shows '?'.
+    """
+
+    merge_order: int = 0
+    """Lowest-first merge order across attachments on the same
+    (app, environment). App-local literals always win on collision
+    regardless of merge order — operators read this column to debug
+    precedence when two bundles project the same key."""
+
+    attached_at: dt.datetime | None = None
 
 
 @strawberry.type(name="AstroliftManagedService")
@@ -78,6 +113,39 @@ class ManagedServiceType:
     updated_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftRevealedSecret")
+class RevealedSecretType:
+    """Plaintext payload returned by `revealAppSecret` (#424).
+
+    Returned only for `literal` source secrets — bundle and managed-
+    service values live in the platform secrets backend and need a
+    separate workflow to fetch (out of scope for this mutation)."""
+
+    secret_id: str
+    key: str
+    environment_name: str
+    value: str
+    revealed_at: dt.datetime
+
+
+def secret_editor_from_user(user) -> SecretEditorType | None:
+    """Strawberry-friendly shaped from a Django auth user; returns
+    None when no user is on the record (system writes, legacy)."""
+    if user is None:
+        return None
+    username = getattr(user, "username", "") or ""
+    try:
+        full_name = user.get_full_name()
+    except Exception:  # noqa: BLE001 — user model swap-safety
+        full_name = ""
+    display = full_name or username or getattr(user, "email", "") or ""
+    return SecretEditorType(
+        id=str(user.pk),
+        username=username,
+        display_name=display,
+    )
+
+
 def secret_bundle_to_type(b) -> SecretBundleType:
     return SecretBundleType(
         id=GUID(str(b.guid)),
@@ -90,7 +158,12 @@ def secret_bundle_to_type(b) -> SecretBundleType:
     )
 
 
-def attachment_to_type(ref) -> AppSecretBundleAttachmentType:
+def attachment_to_type(
+    ref,
+    *,
+    key_count: int = 0,
+    merge_order: int = 0,
+) -> AppSecretBundleAttachmentType:
     return AppSecretBundleAttachmentType(
         id=GUID(str(ref.guid)),
         bundle_slug=ref.secret_bundle.slug,
@@ -98,6 +171,10 @@ def attachment_to_type(ref) -> AppSecretBundleAttachmentType:
         environment_name=ref.app_environment.name,
         prefix=ref.prefix or "",
         registered_app_slug=ref.registered_app.slug,
+        team_slug=(ref.secret_bundle.team.slug if ref.secret_bundle.team_id else None),
+        key_count=key_count,
+        merge_order=merge_order,
+        attached_at=ref.created_at,
     )
 
 
