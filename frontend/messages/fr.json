@@ -63,6 +63,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "Vue d'ensemble",
+    "description": "Données d'identité, de registre et de cycle de vie pour cette installation Astrolift.",
+    "errorBanner": {
+      "title": "Impossible de charger certaines données"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Équipes",
+        "emptyCta": "Créez votre première équipe"
+      },
+      "projects": {
+        "label": "Projets",
+        "emptyCta": "Créez un projet"
+      },
+      "apps": {
+        "label": "Apps enregistrées",
+        "emptyCta": "Enregistrez votre première app"
+      },
+      "deployments": {
+        "label": "Déploiements actifs",
+        "emptyCta": "Lancer un déploiement"
+      },
+      "costMtd": {
+        "label": "Coût (MTD)",
+        "emptyCta": "En attente des données de coût",
+        "vsPrevMonth": "vs mois préc.",
+        "noPrevMonth": "pas de mois préc."
+      }
+    },
+    "fleetHealth": {
+      "title": "Santé de la flotte",
+      "description": "Synthèse de l'état du dernier déploiement pour toutes les apps enregistrées.",
+      "healthy": "saine",
+      "failing": "{count} en échec",
+      "hiccup": "{count, plural, one {# incident} other {# incidents}}",
+      "empty": "Aucune app enregistrée pour le moment. Connectez un dépôt sur /apps/new pour démarrer.",
+      "tiles": {
+        "running": "En cours",
+        "recentFailure": "Échec récent",
+        "failing": "En échec",
+        "noDeploys": "Aucun déploiement"
+      }
+    },
+    "recentProjects": {
+      "title": "Projets récents",
+      "description": "Projets créés le plus récemment dans toutes les équipes.",
+      "emptyTitle": "Aucun projet pour le moment",
+      "emptyDescription": "Créez une équipe et un projet pour commencer à enregistrer des apps.",
+      "emptyAction": "Gérer les équipes"
+    },
+    "activity": {
+      "title": "Activité",
+      "description": "Événements du cycle de vie : déploiements, syncs de config, scaling, intégration de cluster, rotations de secrets.",
+      "emptyTitle": "Aucune activité pour le moment",
+      "emptyDescription": "Les événements apparaissent ici à mesure que les déploiements, changements de configuration et opérations de cluster se produisent.",
+      "errorTitle": "Impossible de charger l'activité",
+      "loadMore": "Charger plus",
+      "loadingMore": "Chargement…"
+    },
+    "registeredApps": {
+      "title": "Apps enregistrées",
+      "description": "Dépôts enregistrés pour le déploiement.",
+      "emptyTitle": "Aucune app enregistrée",
+      "emptyDescription": "L'interface du registre arrive au prochain jalon — une fois branchée, vous pourrez enregistrer un dépôt Git et déployer depuis cette carte.",
+      "emptyAction": "Ouvrir le registre"
+    }
+  },
   "dataTable": {
     "search": "Rechercher…",
     "filters": "Filtres",

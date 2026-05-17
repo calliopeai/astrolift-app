@@ -3,6 +3,8 @@
  */
 
 import type {
+  AstroliftActivityItem as GeneratedActivityItem,
+  AstroliftActivityPage as GeneratedActivityPage,
   AstroliftAuditEvent as GeneratedAuditEvent,
   AstroliftAuditEventPage as GeneratedAuditEventPage,
   AstroliftAuditExport as GeneratedAuditExport,
@@ -29,6 +31,12 @@ export type WorkflowRunStatus =
   | "timed_out";
 
 export type AstroliftEvent = GeneratedEvent;
+
+export type AstroliftActivityItem = GeneratedActivityItem;
+
+export type AstroliftActivityPage = Omit<GeneratedActivityPage, "items"> & {
+  items: AstroliftActivityItem[];
+};
 
 export type AstroliftAuditEvent = Omit<GeneratedAuditEvent, "decision"> & {
   decision: AuditDecision;
