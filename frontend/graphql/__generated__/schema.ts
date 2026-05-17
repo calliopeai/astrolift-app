@@ -23,6 +23,11 @@ export type Scalars = {
   UUID: { input: any; output: any; }
 };
 
+export type AbortDeploymentInput = {
+  id: Scalars['GUID']['input'];
+  reason: Scalars['String']['input'];
+};
+
 export type AcceptInvitationInput = {
   token: Scalars['String']['input'];
 };
@@ -541,10 +546,21 @@ export type AstroliftContainer = {
   workloadSlug: Scalars['String']['output'];
 };
 
+export type AstroliftContainerResources = {
+  cpuLimit: Scalars['String']['output'];
+  cpuRequest: Scalars['String']['output'];
+  memoryLimit: Scalars['String']['output'];
+  memoryRequest: Scalars['String']['output'];
+};
+
 export type AstroliftContainerStatus = {
   image: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  lastRestartAt?: Maybe<Scalars['DateTime']['output']>;
+  lastRestartReasons: Array<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   ready: Scalars['Boolean']['output'];
+  resources: AstroliftContainerResources;
   restarts: Scalars['Int']['output'];
   state: Scalars['String']['output'];
   terminatedReason: Scalars['String']['output'];
@@ -576,6 +592,7 @@ export type AstroliftDeployToken = {
 };
 
 export type AstroliftDeployment = {
+  abortedReason: Scalars['String']['output'];
   approvalsReceived: Scalars['Int']['output'];
   approvalsRequired: Scalars['Int']['output'];
   branch: Scalars['String']['output'];
@@ -583,6 +600,8 @@ export type AstroliftDeployment = {
   ciProvider: Scalars['String']['output'];
   ciRunUrl: Scalars['String']['output'];
   clusterRevision: Scalars['String']['output'];
+  commitAuthor: Scalars['String']['output'];
+  commitMessage: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
@@ -593,11 +612,25 @@ export type AstroliftDeployment = {
   imageDigest: Scalars['String']['output'];
   imageTag: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
+  repoUrl: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
   triggerKind: Scalars['String']['output'];
+  triggeredByMe: Scalars['Boolean']['output'];
+  triggeredByUserId?: Maybe<Scalars['String']['output']>;
   workloadSlug?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftDeploymentApprovalHistoryEntry = {
+  action: Scalars['String']['output'];
+  actorDisplay: Scalars['String']['output'];
+  actorId: Scalars['String']['output'];
+  actorKind: Scalars['String']['output'];
+  decision: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  occurredAt: Scalars['DateTime']['output'];
+  reason: Scalars['String']['output'];
 };
 
 export type AstroliftDeploymentLifecycleEvent = {
@@ -1438,6 +1471,7 @@ export type AstroliftWorkload = {
   hpaMinReplicas?: Maybe<Scalars['Int']['output']>;
   hpaTargetCpuPct: Scalars['Int']['output'];
   id: Scalars['GUID']['output'];
+  inClusterServiceFqdn: Scalars['String']['output'];
   isPublic: Scalars['Boolean']['output'];
   kind: Scalars['String']['output'];
   memoryLimit: Scalars['String']['output'];
@@ -1462,6 +1496,19 @@ export type AstroliftWorkloadOpPayloadMutationResult = {
   data?: Maybe<AstroliftWorkloadOpPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftWorkloadPodStatusBucket = {
+  count: Scalars['Int']['output'];
+  percent: Scalars['Float']['output'];
+  pods: Array<AstroliftWorkloadPodSummary>;
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadPodSummary = {
+  age?: Maybe<Scalars['DateTime']['output']>;
+  name: Scalars['String']['output'];
+  ready: Scalars['Boolean']['output'];
 };
 
 export type AttachSecretBundleInput = {
@@ -2172,7 +2219,7 @@ export type Mutation = {
 
 
 export type MutationAbortDeploymentArgs = {
-  input: DeploymentByIdInput;
+  input: AbortDeploymentInput;
 };
 
 
@@ -2675,7 +2722,7 @@ export type MutationRegisterTenantClusterArgs = {
 
 
 export type MutationRejectDeploymentArgs = {
-  input: DeploymentByIdInput;
+  input: AbortDeploymentInput;
 };
 
 
@@ -3239,6 +3286,7 @@ export type Query = {
   astroliftContainers: Array<AstroliftContainer>;
   astroliftCostSnapshots: Array<AstroliftCostSnapshot>;
   astroliftDeployment?: Maybe<AstroliftDeployment>;
+  astroliftDeploymentApprovalHistory: Array<AstroliftDeploymentApprovalHistoryEntry>;
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
   astroliftDeployments: Array<AstroliftDeployment>;
@@ -3279,6 +3327,7 @@ export type Query = {
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
+  astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
   astroliftWorkloads: Array<AstroliftWorkload>;
   /** Query mutation audit logs. Admin only. */
   auditLogs: Array<AuditLogEntry>;
@@ -3456,6 +3505,11 @@ export type QueryAstroliftDeploymentArgs = {
 };
 
 
+export type QueryAstroliftDeploymentApprovalHistoryArgs = {
+  deploymentId: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftDeploymentLogArgs = {
   deploymentId: Scalars['String']['input'];
 };
@@ -3570,6 +3624,13 @@ export type QueryAstroliftWorkflowRunsArgs = {
 export type QueryAstroliftWorkloadArgs = {
   appSlug: Scalars['String']['input'];
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkloadPodStatusBreakdownArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug: Scalars['String']['input'];
 };
 
 
@@ -3838,6 +3899,8 @@ export type StartDeploymentInput = {
   ciActorKind: InputMaybe<Scalars['String']['input']>;
   ciProvider: InputMaybe<Scalars['String']['input']>;
   ciRunUrl: InputMaybe<Scalars['String']['input']>;
+  commitAuthor: InputMaybe<Scalars['String']['input']>;
+  commitMessage: InputMaybe<Scalars['String']['input']>;
   commitSha: InputMaybe<Scalars['String']['input']>;
   environmentName: Scalars['String']['input'];
   imageDigest: InputMaybe<Scalars['String']['input']>;

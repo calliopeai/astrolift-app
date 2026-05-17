@@ -53,7 +53,7 @@ def _constance_flag(monkeypatch):
 
     def _setter(value: bool) -> None:
         state["DEPLOY_PIPELINE_ENABLED"] = value
-        setattr(fake_module.config, "DEPLOY_PIPELINE_ENABLED", value)
+        fake_module.config.DEPLOY_PIPELINE_ENABLED = value
 
     _setter(True)
     monkeypatch.setitem(__import__("sys").modules, "constance", fake_module)

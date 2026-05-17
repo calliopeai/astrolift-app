@@ -172,9 +172,7 @@ def test_self_anonymization_works_without_org_manage_members(actor, org, permiss
 # ---------------------------------------------------------------------------
 
 
-def test_anonymizing_another_user_with_permission_succeeds(
-    actor, target, org, permission_resolver
-):
+def test_anonymizing_another_user_with_permission_succeeds(actor, target, org, permission_resolver):
     """Operator with ``org.manage_members`` can anonymize another user."""
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     _make_member(target, org)
@@ -310,9 +308,7 @@ def test_already_anonymized_user_is_idempotent(actor, target, org, permission_re
     assert target.username == first_username
 
 
-def test_already_anonymized_self_returns_ok_without_requiring_logout(
-    actor, org, permission_resolver
-):
+def test_already_anonymized_self_returns_ok_without_requiring_logout(actor, org, permission_resolver):
     """If the actor is themselves already anonymized (somehow they
     still have a session), the idempotent path runs and does NOT ask
     for another logout."""

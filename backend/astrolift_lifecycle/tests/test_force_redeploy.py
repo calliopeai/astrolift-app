@@ -238,13 +238,13 @@ def test_force_redeploy_cancels_deploys_deletes_objects_and_dispatches(
 ):
     """Full happy path:
 
-      * Two in-flight deploys (PENDING_APPROVAL, DEPLOYING) → both
-        transition to FAILED.
-      * Two workloads (api, worker) + bare-slug fallback → driver
-        receives stubs for Deployment / Service / Ingress / CronJob
-        per name, on the env's cluster.
-      * CI dispatch is fired, run_url surfaces in the payload.
-      * Audit entry carries the cancellation + delete counts."""
+    * Two in-flight deploys (PENDING_APPROVAL, DEPLOYING) → both
+      transition to FAILED.
+    * Two workloads (api, worker) + bare-slug fallback → driver
+      receives stubs for Deployment / Service / Ingress / CronJob
+      per name, on the env's cluster.
+    * CI dispatch is fired, run_url surfaces in the payload.
+    * Audit entry carries the cancellation + delete counts."""
     permission_resolver.grant(Permission.APP_DEPLOY)
     permission_resolver.grant(Permission.APP_UPDATE)
 
