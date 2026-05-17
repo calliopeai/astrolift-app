@@ -116,10 +116,25 @@ export type AstroliftRoleBinding = Omit<GeneratedRoleBinding, "scopeKind"> & {
 export type AstroliftPolicy = Omit<GeneratedPolicy, "scopeLevel" | "effect"> & {
   scopeLevel: ScopeKind;
   effect: PolicyEffect;
+  /**
+   * Optional username of the operator who created this policy. Not
+   * yet on the GraphQL `AstroliftPolicy` type — the policies table
+   * surfaces it as "—" until the backend exposes
+   * `created_by_username` (tracked in #415 backend follow-on).
+   */
+  createdByUsername?: string | null;
 };
 
 export type AstroliftIdentityProvider = Omit<GeneratedIdentityProvider, "kind"> & {
   kind: IdpKind;
+  /**
+   * Username of the operator who last flipped this provider to
+   * active. Not yet on the GraphQL `AstroliftIdentityProvider`
+   * type — surfaced only when the backend wires it in via the
+   * #415 follow-on; until then `updatedAt` is the closest proxy
+   * for "active since".
+   */
+  lastSwitchedByUsername?: string | null;
 };
 
 export type AstroliftApiToken = GeneratedApiToken;
@@ -169,4 +184,27 @@ export interface AstroliftConnectUserSourceProviderPayload {
 export interface AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: string;
   disconnectedId: string | null;
+}
+
+/** Per-id outcome row for a bulk identity mutation. */
+export interface AstroliftBulkOpItemResult {
+  id: AstroliftGuid;
+  ok: boolean;
+  alreadyExisted: boolean;
+  errors: MutationError[];
+}
+
+/** Payload of `bulkRevokeAstroliftRoleBindings`. */
+export interface AstroliftBulkRevokeRoleBindingsPayload {
+  results: AstroliftBulkOpItemResult[];
+  revokedCount: number;
+  failedCount: number;
+}
+
+/** Payload of `bulkAssignAstroliftTeamMemberRoles`. */
+export interface AstroliftBulkAssignTeamMemberRolesPayload {
+  results: AstroliftBulkOpItemResult[];
+  assignedCount: number;
+  alreadyAssignedCount: number;
+  failedCount: number;
 }

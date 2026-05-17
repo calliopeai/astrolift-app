@@ -206,6 +206,13 @@ type AstroliftAppCertificate {
   renewalStatus: String!
 }
 
+type AstroliftAppConfigDrift {
+  hasDrift: Boolean!
+  fields: [String!]!
+  environmentName: String!
+  lastChecked: DateTime!
+}
+
 type AstroliftAppDeploymentSummary {
   id: GUID!
   status: String!
@@ -359,6 +366,13 @@ type AstroliftAppPod {
   containerStatuses: [AstroliftContainerStatus!]!
 }
 
+type AstroliftAppReprovisionState {
+  needsReprovision: Boolean!
+  state: String!
+  reason: String!
+  elapsedSeconds: Int
+}
+
 type AstroliftAppSecret {
   id: String!
   key: String!
@@ -488,6 +502,19 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftBulkAssignTeamMemberRolesPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  assignedCount: Int!
+  alreadyAssignedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkAssignTeamMemberRolesPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkAssignTeamMemberRolesPayload
+}
+
 type AstroliftBulkDeploymentResultData {
   results: [AstroliftBulkDeploymentResultItem!]!
   succeededCount: Int!
@@ -505,6 +532,25 @@ type AstroliftBulkDeploymentResultItem {
   ok: Boolean!
   errors: [MutationError!]!
   deployment: AstroliftDeployment
+}
+
+type AstroliftBulkOpItemResult {
+  id: GUID!
+  ok: Boolean!
+  alreadyExisted: Boolean!
+  errors: [MutationError!]!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  revokedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkRevokeRoleBindingsPayload
 }
 
 type AstroliftCancelDeregisterPayload {
@@ -1062,17 +1108,80 @@ type AstroliftManagedService {
   kind: String!
   variant: String!
   status: String!
+  statusError: String!
   config: JSON!
   registeredAppSlug: String!
   environmentName: String!
   createdAt: DateTime!
   updatedAt: DateTime!
+  lastActionAt: DateTime
+  lastActionKind: String!
+}
+
+type AstroliftManagedServiceConnection {
+  managedServiceId: GUID!
+  kind: String!
+  name: String!
+  environmentName: String!
+  connectionSecretRef: String!
+  keys: [AstroliftManagedServiceConnectionKey!]!
+  revealedAt: DateTime!
+}
+
+type AstroliftManagedServiceConnectionKey {
+  key: String!
+  value: String!
+  isSecret: Boolean!
+}
+
+type AstroliftManagedServiceConnectionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedServiceConnection
 }
 
 type AstroliftManagedServiceMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedService
+}
+
+type AstroliftManagedServiceObject {
+  key: String!
+  sizeBytes: Int!
+  lastModified: DateTime
+}
+
+type AstroliftManagedServiceObjects {
+  managedServiceId: GUID!
+  kind: String!
+  name: String!
+  objects: [AstroliftManagedServiceObject!]!
+  truncated: Boolean!
+  cacheAgeSeconds: Int
+}
+
+type AstroliftManagedServiceQueueDepth {
+  managedServiceId: GUID!
+  kind: String!
+  name: String!
+  depth: Int!
+  inFlight: Int!
+  sampledAt: DateTime
+}
+
+type AstroliftManagedServiceTestEmailResult {
+  managedServiceId: GUID!
+  recipient: String!
+  subject: String!
+  sentAt: DateTime!
+  transport: String!
+}
+
+type AstroliftManagedServiceTestEmailResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedServiceTestEmailResult
 }
 
 type AstroliftMember {
@@ -1084,7 +1193,6 @@ type AstroliftMember {
   lifecycle: String!
   joinedAt: DateTime
   lastSeenAt: DateTime
-  lastActiveAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
 }
@@ -1375,6 +1483,8 @@ type AstroliftRegisteredApp {
   latestDeployment: AstroliftAppDeploymentSummary
   lastDeployedAt: DateTime
   healthPulse: AstroliftAppHealthPulse
+  reprovision: AstroliftAppReprovisionState!
+  configDrift: AstroliftAppConfigDrift
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1447,7 +1557,6 @@ type AstroliftRoleBinding {
   role: AstroliftRole!
   scopeKind: String!
   scopeId: String!
-  sourceScopeLabel: String!
   grantedAt: DateTime!
   expiresAt: DateTime
   inherits: Boolean!
@@ -1909,6 +2018,12 @@ input BulkApproveDeploymentsInput {
   reason: String = null
 }
 
+input BulkAssignTeamMemberRolesInput {
+  teamId: GUID!
+  roleId: GUID!
+  memberIds: [GUID!]!
+}
+
 input BulkImportAppSecretsInput {
   appSlug: String!
   dotenvText: String!
@@ -1917,6 +2032,10 @@ input BulkImportAppSecretsInput {
 input BulkRejectDeploymentsInput {
   deploymentIds: [GUID!]!
   reason: String!
+}
+
+input BulkRevokeRoleBindingsInput {
+  bindingIds: [GUID!]!
 }
 
 type Bulkimportpayload {
@@ -2537,6 +2656,8 @@ type Mutation {
   softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   grantRole(input: GrantRoleInput!): AstroliftRoleBindingMutationResult!
   revokeRoleBinding(input: RevokeRoleBindingInput!): SoftdeletepayloadMutationResult!
+  bulkRevokeAstroliftRoleBindings(input: BulkRevokeRoleBindingsInput!): AstroliftBulkRevokeRoleBindingsPayloadMutationResult!
+  bulkAssignAstroliftTeamMemberRoles(input: BulkAssignTeamMemberRolesInput!): AstroliftBulkAssignTeamMemberRolesPayloadMutationResult!
   createRole(input: CreateRoleInput!): AstroliftRoleMutationResult!
   updateRole(input: UpdateRoleInput!): AstroliftRoleMutationResult!
   softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
@@ -2657,6 +2778,8 @@ type Mutation {
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
+  revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
+  sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
@@ -2897,7 +3020,8 @@ type Query {
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
-  astroliftMembers(search: String = null): [AstroliftMember!]!
+  astroliftMembers: [AstroliftMember!]!
+  astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
@@ -2927,7 +3051,7 @@ type Query {
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
-  astroliftApp(slug: String!): AstroliftRegisteredApp
+  astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
@@ -2977,6 +3101,8 @@ type Query {
   astroliftSecretBundles: [AstroliftSecretBundle!]!
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
+  astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
+  astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
@@ -3108,6 +3234,10 @@ input RevealAppSecretInput {
   secretId: String!
 }
 
+input RevealManagedServiceConnectionInput {
+  managedServiceId: GUID!
+}
+
 input RevokeApiTokenInput {
   id: GUID!
 }
@@ -3158,6 +3288,13 @@ input RunJobOnceInput {
 input ScaleWorkloadInput {
   workloadId: GUID!
   replicas: Int!
+}
+
+input SendManagedServiceTestEmailInput {
+  managedServiceId: GUID!
+  recipient: String!
+  subject: String = null
+  body: String = null
 }
 
 input SetActiveIdentityProviderInput {

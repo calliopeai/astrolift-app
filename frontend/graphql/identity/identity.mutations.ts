@@ -378,6 +378,58 @@ export const REVOKE_ROLE_BINDING = gql`
   }
 `;
 
+const BULK_OP_RESULT_FIELDS = `
+  results {
+    id
+    ok
+    alreadyExisted
+    errors {
+      code
+      message
+      field
+    }
+  }
+`;
+
+export const BULK_REVOKE_ROLE_BINDINGS = gql`
+  mutation BulkRevokeAstroliftRoleBindings($input: BulkRevokeRoleBindingsInput!) {
+    bulkRevokeAstroliftRoleBindings(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${BULK_OP_RESULT_FIELDS}
+        revokedCount
+        failedCount
+      }
+    }
+  }
+`;
+
+export const BULK_ASSIGN_TEAM_MEMBER_ROLES = gql`
+  mutation BulkAssignAstroliftTeamMemberRoles(
+    $input: BulkAssignTeamMemberRolesInput!
+  ) {
+    bulkAssignAstroliftTeamMemberRoles(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${BULK_OP_RESULT_FIELDS}
+        assignedCount
+        alreadyAssignedCount
+        failedCount
+      }
+    }
+  }
+`;
+
 const INVITATION_FIELDS = `
   id
   email

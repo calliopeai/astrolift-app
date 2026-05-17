@@ -15,7 +15,7 @@ export default async function AppDetailPage({
 }) {
   const { slug } = await params;
   return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
+    <PreloadQuery query={GET_APP} variables={{ slug, includeDrift: true }}>
       <PreloadQuery query={LIST_WORKLOADS} variables={{ appSlug: slug }}>
         <AppDetailClient slug={slug} />
       </PreloadQuery>

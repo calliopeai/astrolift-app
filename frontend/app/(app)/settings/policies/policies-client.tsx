@@ -21,16 +21,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  CREATE_POLICY,
-  SOFT_DELETE_POLICY,
-} from "@/graphql/identity/identity.mutations";
+import { CREATE_POLICY, SOFT_DELETE_POLICY } from "@/graphql/identity/identity.mutations";
 import { LIST_POLICIES } from "@/graphql/identity/identity.queries";
 import { DOC_LINKS } from "@/lib/docs/urls";
-import type {
-  AstroliftPolicy,
-  MutationResult,
-} from "@/graphql/identity/identity.types";
+import type { AstroliftPolicy, MutationResult } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { CreatePolicyDialog } from "./create-policy-dialog";
 
@@ -46,6 +41,7 @@ const effectStyles: Record<string, string> = {
 export function PoliciesClient() {
   const [open, setOpen] = React.useState(false);
   const policies = useQuery<Resp>(LIST_POLICIES);
+  const fmt = useFormatters();
 
   const [softDelete, { loading: deleting }] = useMutation<{
     softDeletePolicy: MutationResult<{ id: string; deleted: boolean }>;
@@ -109,47 +105,61 @@ export function PoliciesClient() {
                   <TableHead>Effect</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Conditions</TableHead>
+                  <TableHead>Created by</TableHead>
+                  <TableHead>Created at</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <div className="font-medium">{p.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        {p.slug}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{p.scopeLevel}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={effectStyles[p.effect]} variant="secondary">
-                        {p.effect}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {p.actionPattern}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {Array.isArray(p.conditions) && p.conditions.length > 0
-                        ? `${p.conditions.length} condition${p.conditions.length === 1 ? "" : "s"}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteTarget(p)}
-                        disabled={deleting}
-                      >
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {list.map((p) => {
+                  const isDeny = p.effect === "DENY";
+                  // DENY rows get a flush left border in destructive
+                  // tone so the danger-zone read is obvious at a
+                  // glance — a DENY can lock operators out even when
+                  // role bindings would otherwise permit the call.
+                  return (
+                    <TableRow
+                      key={p.id}
+                      className={isDeny ? "border-l-destructive/70 border-l-2" : undefined}
+                    >
+                      <TableCell>
+                        <div className="font-medium">{p.name}</div>
+                        <div className="text-muted-foreground font-mono text-xs">{p.slug}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{p.scopeLevel}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={effectStyles[p.effect]} variant="secondary">
+                          {p.effect}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{p.actionPattern}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {Array.isArray(p.conditions) && p.conditions.length > 0
+                          ? `${p.conditions.length} condition${p.conditions.length === 1 ? "" : "s"}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {p.createdByUsername ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {p.createdAt ? fmt.formatDate(p.createdAt) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget(p)}
+                          disabled={deleting}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -168,6 +168,28 @@ export const LIST_MEMBERS = gql`
   }
 `;
 
+export const LIST_TEAM_MEMBERS = gql`
+  query ListTeamMembers($teamId: GUID!) {
+    astroliftTeamMembers(teamId: $teamId) {
+      id
+      user {
+        id
+        username
+        email
+        isActive
+      }
+      scopeKind
+      scopeId
+      isActive
+      lifecycle
+      joinedAt
+      lastSeenAt
+      createdAt
+      deletedAt
+    }
+  }
+`;
+
 export const LIST_ROLE_BINDINGS = gql`
   query ListRoleBindings {
     astroliftRoleBindings {

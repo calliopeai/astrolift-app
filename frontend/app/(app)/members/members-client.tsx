@@ -44,7 +44,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { REVOKE_INVITATION, REVOKE_ROLE_BINDING } from "@/graphql/identity/identity.mutations";
+import {
+  BULK_REVOKE_ROLE_BINDINGS,
+  REVOKE_INVITATION,
+  REVOKE_ROLE_BINDING,
+} from "@/graphql/identity/identity.mutations";
 import {
   LIST_INVITATIONS,
   LIST_MEMBERS,
@@ -54,6 +58,7 @@ import {
   LIST_TEAMS,
 } from "@/graphql/identity/identity.queries";
 import type {
+  AstroliftBulkRevokeRoleBindingsPayload,
   AstroliftInvitation,
   AstroliftMember,
   AstroliftProject,
@@ -136,6 +141,12 @@ export function MembersClient() {
     refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
     awaitRefetchQueries: true,
   });
+  const [bulkRevoke, { loading: bulkRevoking }] = useMutation<{
+    bulkRevokeAstroliftRoleBindings: MutationResult<AstroliftBulkRevokeRoleBindingsPayload>;
+  }>(BULK_REVOKE_ROLE_BINDINGS, {
+    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    awaitRefetchQueries: true,
+  });
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
     revokeInvitation: MutationResult<AstroliftInvitation>;
   }>(REVOKE_INVITATION, {
@@ -160,6 +171,56 @@ export function MembersClient() {
       toast.success("Role revoked");
     } else {
       throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
+    }
+  }
+
+  function toggleBinding(id: string) {
+    setSelectedBindings((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllBindings(visibleIds: string[]) {
+    setSelectedBindings((prev) => {
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      if (allSelected) return new Set();
+      return new Set(visibleIds);
+    });
+  }
+
+  async function handleBulkRevoke() {
+    const ids = Array.from(selectedBindings);
+    if (ids.length === 0) return;
+    try {
+      const { data } = await bulkRevoke({
+        variables: { input: { bindingIds: ids } },
+      });
+      const env = data?.bulkRevokeAstroliftRoleBindings;
+      if (!env?.ok || !env.data) {
+        toast.error(
+          tBulk("toasts.allFailed", {
+            message: env?.errors?.[0]?.message ?? "unknown error",
+          })
+        );
+        return;
+      }
+      const { revokedCount, failedCount } = env.data;
+      if (failedCount === 0) {
+        toast.success(tBulk("toasts.allOk", { count: revokedCount }));
+      } else {
+        toast.warning(
+          tBulk("toasts.partial", {
+            revoked: revokedCount,
+            failed: failedCount,
+          })
+        );
+      }
+      setSelectedBindings(new Set());
+    } finally {
+      setConfirmBulkRevoke(false);
     }
   }
 
