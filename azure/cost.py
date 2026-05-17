@@ -7,11 +7,26 @@ GET with OData $filter.
 
 CRITICAL: never substitute hard-coded prices. The Retail Prices API
 call is the source of truth; failures map to CostEstimateUnavailable.
+
+Compute (#440) — the `(kind=compute, variant=node_hour)` pair asks
+the driver for Virtual Machines pricing. Azure's Retail Prices
+response doesn't carry vCPU / memory attributes on each price row,
+only the SKU name (``D4s_v3`` etc.), so the driver needs a second
+data source for VM capacity. It calls `azure-mgmt-compute`'s
+``VirtualMachineSizes.list(location)`` (auth required for that one)
+to join SKU -> (vCPU, memory_gib), then picks the cheapest D-series
+Consumption price whose capacity meets the caller's request.
+
+Tests inject a fake ``vm_sizes`` lookup so they don't have to model
+the SDK.
 """
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from _sdk.cost import (
@@ -28,26 +43,57 @@ from _sdk.cost import (
 SERVICE_NAME_BY_VARIANT: dict[tuple[str, str], str] = {
     ("object_store", "blob"): "Storage",
     ("queue", "servicebus"): "Service Bus",
-    ("postgres", "flexible_server"): (
-        "Azure Database for PostgreSQL"
-    ),
+    ("postgres", "flexible_server"): ("Azure Database for PostgreSQL"),
     ("redis", "cache"): "Redis Cache",
     ("nosql", "cosmos"): "Azure Cosmos DB",
     ("filesystem", "files"): "Storage",
+    # Cluster compute capacity (#440). Retail Prices service name
+    # `Virtual Machines` covers all VM SKUs across families; the
+    # driver narrows to D-series consumption and joins with a
+    # VM-size catalog for the vCPU + memory attributes.
+    ("compute", "node_hour"): "Virtual Machines",
 }
 
 PRICES_ENDPOINT = "https://prices.azure.com/api/retail/prices"
 
 
+# Type for the VM-size lookup. A callable that takes the cluster's
+# armRegionName and returns a dict mapping armSkuName (e.g.
+# ``Standard_D4s_v3``) to ``(vcpu, memory_gib)``. The default impl
+# pulls from `azure-mgmt-compute`'s VirtualMachineSizesOperations;
+# tests inject a fake.
+VmSizeLookup = Callable[[str], dict[str, tuple[int, float]]]
+
+
 @dataclass(frozen=True)
 class AzureCostConfig:
     http_client: Any | None = None
+    vm_sizes_lookup: VmSizeLookup | None = None
+    """Resolver for armSkuName -> (vcpu, memory_gib). Required for
+    compute pricing. The default implementation lazy-loads
+    `azure-mgmt-compute` and asks per-region; injectable for tests."""
+
+    cache_ttl_seconds: int = 6 * 60 * 60
+    """How long a Retail Prices response is cached per
+    (region, filters) tuple. Pricing tables don't churn often;
+    6h keeps preview-cost responsive without pinning a stale
+    snapshot. Set to 0 to disable (tests use this)."""
 
 
 class AzureCostEstimator(CostEstimator):
     def __init__(self, *, config: AzureCostConfig) -> None:
         self._config = config
         self._http = config.http_client or _DefaultHttp()
+        self._prices_cache: dict[
+            tuple[str, str],
+            tuple[float, dict[str, Any]],
+        ] = {}
+        self._prices_lock = threading.Lock()
+        self._vm_size_cache: dict[
+            str,
+            tuple[float, dict[str, tuple[int, float]]],
+        ] = {}
+        self._vm_size_lock = threading.Lock()
 
     def supported(self, *, kind: str, variant: str) -> bool:
         return (kind, variant) in SERVICE_NAME_BY_VARIANT
@@ -60,14 +106,18 @@ class AzureCostEstimator(CostEstimator):
             return CostEstimateUnavailable(
                 request=request,
                 reason="unsupported",
-                message=(
-                    f"no Azure Retail Prices service name for "
-                    f"({request.kind!r}, {request.variant!r})"
-                ),
+                message=(f"no Azure Retail Prices service name for ({request.kind!r}, {request.variant!r})"),
+            )
+
+        if request.kind == "compute" and request.variant == "node_hour":
+            return self._estimate_compute_node_hour(
+                request=request,
+                service_name=service_name,
             )
 
         odata_filter = self._build_filter(
-            service_name=service_name, request=request,
+            service_name=service_name,
+            request=request,
         )
         try:
             response = self._http.get(
@@ -86,18 +136,15 @@ class AzureCostEstimator(CostEstimator):
 
         body = response.json() if hasattr(response, "json") else response
         line_items = self._extract_line_items(
-            body=body, request=request,
+            body=body,
+            request=request,
         )
         if not line_items:
             return CostEstimateUnavailable(
                 request=request,
                 reason="sku_not_found",
-                message=(
-                    f"no SKUs matched filter {odata_filter!r}"
-                ),
+                message=(f"no SKUs matched filter {odata_filter!r}"),
             )
-
-        from datetime import UTC, datetime
 
         total = sum(item.monthly_amount for item in line_items)
         return CostEstimate(
@@ -105,15 +152,292 @@ class AzureCostEstimator(CostEstimator):
             line_items=line_items,
             monthly_total=round(total, 2),
             currency=request.currency,
-            pricing_source_url=(
-                f"{PRICES_ENDPOINT}?$filter={odata_filter}"
-            ),
+            pricing_source_url=(f"{PRICES_ENDPOINT}?$filter={odata_filter}"),
+            pricing_fetched_at=datetime.now(tz=UTC).isoformat(),
+            notes=[
+                "Azure Retail Prices returns list price; Reservations and Hybrid Benefit are not applied.",
+            ],
+        )
+
+    # ---- compute / node_hour ------------------------------------------
+
+    def _estimate_compute_node_hour(
+        self,
+        *,
+        request: CostEstimateRequest,
+        service_name: str,
+    ) -> CostResult:
+        """Pick the cheapest VM SKU whose vCPU + memory meet the
+        caller's request in the cluster's region, then bill at
+        the live hourly rate * `expected_usage.hours_per_month`.
+
+        Steps:
+          1. Fetch the VM-size catalog (vCPU/memory per armSkuName)
+             via the injected lookup; cached per region.
+          2. Fetch Retail Prices for the requested region + family
+             (default D-series) + Consumption priceType + Linux OS
+             (no Windows surcharge).
+          3. Join SKU -> price -> capacity; keep the cheapest
+             that fits.
+        """
+        if not request.region:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="sku_not_found",
+                message="compute node_hour estimate needs region",
+            )
+
+        cpu_cores = float(
+            request.expected_usage.get("cpu_cores", 0.0) or 0.0,
+        )
+        memory_gib = float(
+            request.expected_usage.get("memory_gib", 0.0) or 0.0,
+        )
+        if cpu_cores <= 0.0 and memory_gib <= 0.0:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="sku_not_found",
+                message=("compute node_hour estimate needs cpu_cores or memory_gib in expected_usage"),
+            )
+
+        # 1. VM size catalog.
+        vm_sizes = self._lookup_vm_sizes(request=request)
+        if vm_sizes is None:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="api_error",
+                message=("VM size lookup unavailable — pass AzureCostConfig.vm_sizes_lookup to enable compute pricing"),
+            )
+        if not vm_sizes:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="sku_not_found",
+                message=(f"no VM sizes returned for region {request.region!r}"),
+            )
+
+        # 2. Retail prices.
+        family_prefix = request.config.get("instance_family", "D")
+        odata_filter = self._compute_filter(
+            service_name=service_name,
+            request=request,
+        )
+        try:
+            body = self._fetch_prices(
+                odata_filter=odata_filter,
+                currency=request.currency,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return CostEstimateUnavailable(
+                request=request,
+                reason="api_error",
+                message=f"Retail Prices API call failed: {exc}",
+            )
+
+        # 3. Match + pick cheapest.
+        cheapest = self._select_cheapest_vm_sku(
+            body=body,
+            vm_sizes=vm_sizes,
+            cpu_cores=cpu_cores,
+            memory_gib=memory_gib,
+            family_prefix=family_prefix,
+        )
+        if cheapest is None:
+            return CostEstimateUnavailable(
+                request=request,
+                reason="sku_not_found",
+                message=(
+                    f"no Azure VM SKU in {request.region!r} fits "
+                    f"cpu_cores={cpu_cores} memory_gib={memory_gib} "
+                    f"(family prefix {family_prefix!r})"
+                ),
+            )
+
+        hourly_price, arm_sku_name, sku_id, vcpu, memory = cheapest
+        hours_per_month = float(
+            request.expected_usage.get("hours_per_month", 720.0) or 720.0,
+        )
+        monthly = hourly_price * hours_per_month
+
+        line_item = CostLineItem(
+            label=(f"Azure {arm_sku_name} ({vcpu} vCPU, {memory:g} GiB) — ${hourly_price:.4f}/hr"),
+            sku=sku_id,
+            monthly_amount=round(monthly, 4),
+            currency=request.currency,
+            notes="1 Hour",
+        )
+        return CostEstimate(
+            request=request,
+            line_items=[line_item],
+            monthly_total=round(monthly, 2),
+            currency=request.currency,
+            pricing_source_url=(f"{PRICES_ENDPOINT}?$filter={odata_filter}"),
             pricing_fetched_at=datetime.now(tz=UTC).isoformat(),
             notes=[
                 "Azure Retail Prices returns list price; "
-                "Reservations and Hybrid Benefit are not applied.",
+                "Reservations and Hybrid Benefit are not applied — "
+                "actual bill may be lower.",
+                (
+                    f"selected cheapest {family_prefix}-series "
+                    f"Consumption Linux SKU fitting cpu_cores="
+                    f"{cpu_cores} memory_gib={memory_gib}"
+                ),
             ],
         )
+
+    def _compute_filter(
+        self,
+        *,
+        service_name: str,
+        request: CostEstimateRequest,
+    ) -> str:
+        """OData filter pinning the price set to consumption VMs in
+        the cluster's region. We don't filter by SKU family in OData
+        (Retail Prices' name filter doesn't accept ``startswith`` on
+        all fields); the post-filter step does that based on the VM
+        catalog. We do pin `priceType eq 'Consumption'` so reserved
+        and spot rows are excluded."""
+        parts = [
+            f"serviceName eq '{service_name}'",
+            f"armRegionName eq '{request.region}'",
+            "priceType eq 'Consumption'",
+        ]
+        for key, value in request.config.items():
+            if key in {"instance_family"}:
+                continue
+            parts.append(f"{key} eq '{value}'")
+        return " and ".join(parts)
+
+    def _select_cheapest_vm_sku(
+        self,
+        *,
+        body: dict[str, Any],
+        vm_sizes: dict[str, tuple[int, float]],
+        cpu_cores: float,
+        memory_gib: float,
+        family_prefix: str,
+    ) -> tuple[float, str, str, int, float] | None:
+        """Walk Retail Prices items + join with the VM-size catalog
+        and pick the cheapest fitting SKU. Skips:
+
+          - Windows / Spot / Low-Priority SKUs (product/sku names
+            carry these as suffixes)
+          - Any SKU not in the requested family prefix
+          - Any SKU whose vCPU/memory don't meet the request
+        """
+        family_upper = family_prefix.upper()
+        best: tuple[float, str, str, int, float] | None = None
+        for record in body.get("Items", []) or []:
+            unit_price = float(record.get("unitPrice", 0.0) or 0.0)
+            if unit_price <= 0.0:
+                continue
+            unit_of_measure = (record.get("unitOfMeasure", "") or "").lower()
+            if "hour" not in unit_of_measure:
+                continue
+            arm_sku_name = record.get("armSkuName", "") or record.get("skuName", "")
+            if not arm_sku_name:
+                continue
+            arm_sku_upper = arm_sku_name.upper()
+            # Skip spot / low-priority — operator-facing preview
+            # should reflect the on-demand bill.
+            product_name = (record.get("productName", "") or "").lower()
+            sku_name = (record.get("skuName", "") or "").lower()
+            if any(token in sku_name or token in product_name for token in ("spot", "low priority", "windows")):
+                continue
+            # Family prefix check. Azure ARM SKU names look like
+            # ``Standard_D4s_v3`` / ``D4s_v3`` / ``Standard_D2as_v5``.
+            # Match after the optional ``Standard_`` prefix.
+            sku_body = arm_sku_upper.removeprefix("STANDARD_")
+            if not sku_body.startswith(family_upper):
+                continue
+
+            capacity = vm_sizes.get(arm_sku_name)
+            if capacity is None:
+                # Try without `Standard_` prefix as the lookup key.
+                capacity = vm_sizes.get(sku_body)
+            if capacity is None:
+                continue
+            vcpu, memory = capacity
+            if vcpu < cpu_cores or memory < memory_gib:
+                continue
+
+            sku_id = record.get("skuId", "") or record.get("meterId", "") or arm_sku_name
+            candidate = (unit_price, arm_sku_name, sku_id, vcpu, memory)
+            if best is None or unit_price < best[0]:
+                best = candidate
+        return best
+
+    def _lookup_vm_sizes(
+        self,
+        *,
+        request: CostEstimateRequest,
+    ) -> dict[str, tuple[int, float]] | None:
+        """Return the VM size catalog for the request's region.
+
+        Returns None when no lookup is wired and the default
+        SDK-backed one can't be initialized — the caller surfaces
+        a clear CostEstimateUnavailable with the wiring instruction.
+        Returns an empty dict when the lookup runs but yields zero
+        SKUs (genuinely empty region).
+        """
+        ttl = self._config.cache_ttl_seconds
+        now = datetime.now(tz=UTC).timestamp()
+        region = request.region
+
+        if ttl > 0:
+            with self._vm_size_lock:
+                cached = self._vm_size_cache.get(region)
+                if cached is not None:
+                    fetched_at, sizes = cached
+                    if (now - fetched_at) < ttl:
+                        return sizes
+
+        lookup = self._config.vm_sizes_lookup
+        if lookup is None:
+            lookup = _default_vm_size_lookup(config=request.config)
+        if lookup is None:
+            return None
+        try:
+            sizes = lookup(region)
+        except Exception:  # noqa: BLE001
+            return None
+
+        if ttl > 0:
+            with self._vm_size_lock:
+                self._vm_size_cache[region] = (now, sizes)
+        return sizes
+
+    def _fetch_prices(
+        self,
+        *,
+        odata_filter: str,
+        currency: str,
+    ) -> dict[str, Any]:
+        """Cached GET against the Retail Prices API. Keyed on
+        (filter, currency)."""
+        ttl = self._config.cache_ttl_seconds
+        now = datetime.now(tz=UTC).timestamp()
+        cache_key = (odata_filter, currency)
+
+        if ttl > 0:
+            with self._prices_lock:
+                cached = self._prices_cache.get(cache_key)
+                if cached is not None:
+                    fetched_at, body = cached
+                    if (now - fetched_at) < ttl:
+                        return body
+
+        response = self._http.get(
+            PRICES_ENDPOINT,
+            params={"$filter": odata_filter, "currencyCode": currency},
+        )
+        body = response.json() if hasattr(response, "json") else response
+
+        if ttl > 0:
+            with self._prices_lock:
+                self._prices_cache[cache_key] = (now, body)
+        return body
+
+    # ---- managed-service path (existing) ------------------------------
 
     def _build_filter(
         self,
@@ -146,13 +470,15 @@ class AzureCostEstimator(CostEstimator):
                 usage_unit=usage_unit,
                 request=request,
             )
-            items.append(CostLineItem(
-                label=record.get("productName", "Azure line item"),
-                sku=record.get("skuId", "") or record.get("meterId", ""),
-                monthly_amount=round(monthly, 4),
-                currency=request.currency,
-                notes=usage_unit,
-            ))
+            items.append(
+                CostLineItem(
+                    label=record.get("productName", "Azure line item"),
+                    sku=record.get("skuId", "") or record.get("meterId", ""),
+                    monthly_amount=round(monthly, 4),
+                    currency=request.currency,
+                    notes=usage_unit,
+                )
+            )
         return items
 
     def _monthly_amount(
@@ -168,12 +494,59 @@ class AzureCostEstimator(CostEstimator):
             return unit_price * usage.get("storage_gb_month", 0.0)
         if "request" in unit_lower or "10k" in unit_lower:
             divisor = 10_000.0 if "10k" in unit_lower else 1.0
-            return unit_price * usage.get(
-                "requests_per_month", 0.0,
-            ) / divisor
+            return (
+                unit_price
+                * usage.get(
+                    "requests_per_month",
+                    0.0,
+                )
+                / divisor
+            )
         if "hour" in unit_lower:
             return unit_price * usage.get("hours_per_month", 720.0)
         return unit_price
+
+
+def _default_vm_size_lookup(
+    *,
+    config: dict[str, str],
+) -> VmSizeLookup | None:
+    """Build the default `azure-mgmt-compute`-backed lookup if a
+    subscription id is in the request config.
+
+    Caller wires the subscription id via ``CostEstimateRequest.config
+    ['subscription_id']``; without it we can't construct the
+    ComputeManagementClient, and the driver surfaces
+    CostEstimateUnavailable so the operator knows what to add.
+    """
+    subscription_id = config.get("subscription_id", "")
+    if not subscription_id:
+        return None
+
+    def _lookup(region: str) -> dict[str, tuple[int, float]]:
+        from azure.identity import DefaultAzureCredential
+        from azure.mgmt.compute import ComputeManagementClient
+
+        credential = DefaultAzureCredential()
+        client = ComputeManagementClient(
+            credential=credential,
+            subscription_id=subscription_id,
+        )
+        result: dict[str, tuple[int, float]] = {}
+        for vm_size in client.virtual_machine_sizes.list(location=region):
+            name = getattr(vm_size, "name", "") or ""
+            vcpu = int(getattr(vm_size, "number_of_cores", 0) or 0)
+            # number_of_cores * memory_in_mb -> GiB
+            memory_mb = float(getattr(vm_size, "memory_in_mb", 0) or 0)
+            memory_gib = memory_mb / 1024.0
+            if name:
+                result[name] = (vcpu, memory_gib)
+                # Also index with the ``Standard_`` prefix that
+                # Retail Prices uses on `armSkuName`.
+                result[f"Standard_{name}"] = (vcpu, memory_gib)
+        return result
+
+    return _lookup
 
 
 class _DefaultHttp:
