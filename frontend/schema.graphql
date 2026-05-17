@@ -306,6 +306,7 @@ type AstroliftAppSecret {
   managedServiceKind: String!
   isMasked: Boolean!
   lastEditedAt: DateTime
+  lastEditedBy: AstroliftSecretEditor
 }
 
 type AstroliftAppSecretBundleAttachment {
@@ -315,6 +316,10 @@ type AstroliftAppSecretBundleAttachment {
   environmentName: String!
   prefix: String!
   registeredAppSlug: String!
+  teamSlug: String
+  keyCount: Int!
+  mergeOrder: Int!
+  attachedAt: DateTime
 }
 
 type AstroliftAppSecretBundleAttachmentMutationResult {
@@ -1118,6 +1123,20 @@ type AstroliftRenderedManifest {
   errorColumn: Int
 }
 
+type AstroliftRevealedSecret {
+  secretId: String!
+  key: String!
+  environmentName: String!
+  value: String!
+  revealedAt: DateTime!
+}
+
+type AstroliftRevealedSecretMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRevealedSecret
+}
+
 type AstroliftRole {
   id: GUID!
   slug: String!
@@ -1233,6 +1252,12 @@ type AstroliftSecretBundleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftSecretBundle
+}
+
+type AstroliftSecretEditor {
+  id: String!
+  username: String!
+  displayName: String!
 }
 
 type AstroliftSecurityPolicy {
@@ -2253,6 +2278,7 @@ type Mutation {
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
+  revealAppSecret(input: RevealAppSecretInput!): AstroliftRevealedSecretMutationResult!
   attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
   detachSecretBundle(input: DetachSecretBundleInput!): AttachmentremovedpayloadMutationResult!
   rotateSecretBundle(input: RotateSecretBundleInput!): AstroliftSecretBundleMutationResult!
@@ -2663,6 +2689,11 @@ type ResyncManifestPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: ResyncManifestPayload
+}
+
+input RevealAppSecretInput {
+  appSlug: String!
+  secretId: String!
 }
 
 input RevokeApiTokenInput {
