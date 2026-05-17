@@ -423,6 +423,20 @@ class TriggerDeployWorkflowPayload:
 
 _VALID_TRIGGER_KINDS = {k.value for k in Deployment.TriggerKind}
 
+# Trigger kinds that the app-global ``webhook_deploys_paused`` gate
+# (#399) blocks. Webhook-shaped triggers (push / ci / scheduled) come
+# from automation and are exactly what the operator wants to stop
+# during a deploy storm. Manual / rollback / promotion are operator-
+# initiated and bypass the gate — that's the on-call escape valve
+# the issue calls out explicitly.
+_WEBHOOK_TRIGGER_KINDS = frozenset(
+    {
+        Deployment.TriggerKind.PUSH.value,
+        Deployment.TriggerKind.CI.value,
+        Deployment.TriggerKind.SCHEDULED.value,
+    }
+)
+
 
 def _self_approve_allowed() -> bool:
     """Self-approval policy gate (#419).
@@ -1033,6 +1047,19 @@ class LifecycleMutation:
                 ErrorCode.PRECONDITION.value,
                 f"environment {env.name!r} has deploys paused",
                 field="environmentName",
+            )
+
+        # App-global webhook-deploy pause (#399). Only blocks
+        # webhook-shaped triggers (push / ci / scheduled). Manual
+        # deploys from the UI / CLI continue to flow so the operator
+        # can still ship a fix while the storm is stopped.
+        if app.webhook_deploys_paused and input.trigger_kind in _WEBHOOK_TRIGGER_KINDS:
+            reason = (app.webhook_deploys_pause_reason or "").strip()
+            suffix = f" Reason: {reason}" if reason else ""
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"app {app.slug!r} has webhook-fired deploys paused.{suffix}",
+                field="triggerKind",
             )
 
         actor = _actor_from_request(info)

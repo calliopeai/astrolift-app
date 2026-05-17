@@ -108,6 +108,28 @@ class RegisteredApp(NamedBaseCoreModel):
     cron_paused = models.BooleanField(default=False)
     deploy_branch = models.CharField(max_length=128, default="main")
 
+    # App-global webhook-deploy pause (#399). Independent of the
+    # per-env ``deploys_paused`` (#378) and the per-env ``ingress_paused``
+    # axes: this flag short-circuits CI-fired deploys across every
+    # environment of the app. The gate fires inside ``start_deployment``
+    # and the CI REST endpoint when ``trigger_kind`` is webhook-shaped
+    # (push / ci / scheduled). Operator-fired ``manual`` deploys bypass
+    # the pause — explicit on-call escape valve so a wedged CI can be
+    # stopped without locking the operator out of fixing the app.
+    # ``paused_at`` / ``paused_by`` are stamped on the off→on
+    # transition so the Settings UI can render "Paused by <user>,
+    # <relative time> — reason: <reason>" without joining the audit log.
+    webhook_deploys_paused = models.BooleanField(default=False)
+    webhook_deploys_paused_at = models.DateTimeField(null=True, blank=True)
+    webhook_deploys_paused_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="webhook_deploys_paused_apps",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    webhook_deploys_pause_reason = models.CharField(max_length=512, blank=True, default="")
+
     # Approval policy (#291). Applies in addition to (and OR'd with)
     # ``AppEnvironment.required_approvals`` — whichever path requires
     # more approvers wins. Empty approver sets with

@@ -241,6 +241,58 @@ export const ASSIGN_APP_TO_PROJECT = gql`
   }
 `;
 
+const APP_WEBHOOK_PAUSE_FIELDS = `
+  id
+  slug
+  webhookDeploysPaused
+  webhookDeploysPausedAt
+  webhookDeploysPausedByEmail
+  webhookDeploysPauseReason
+`;
+
+/**
+ * Pause app-global webhook-fired deploys (#399). Stops the deploy
+ * storm from CI / push / scheduled triggers across every environment
+ * without paging through each env's deploys_paused or pausing ingress.
+ * Manual operator deploys continue to flow — explicit on-call escape
+ * valve. Optional `reason` is recorded on the row + audit log.
+ */
+export const PAUSE_APP_WEBHOOK_DEPLOYS = gql`
+  mutation PauseAstroliftAppWebhookDeploys($input: PauseAppWebhookDeploysInput!) {
+    pauseAstroliftAppWebhookDeploys(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${APP_WEBHOOK_PAUSE_FIELDS}
+      }
+    }
+  }
+`;
+
+/**
+ * Lift the app-global webhook-deploy pause (#399). Clears the
+ * audit columns on the row; the audit log retains the history.
+ */
+export const RESUME_APP_WEBHOOK_DEPLOYS = gql`
+  mutation ResumeAstroliftAppWebhookDeploys($input: ResumeAppWebhookDeploysInput!) {
+    resumeAstroliftAppWebhookDeploys(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${APP_WEBHOOK_PAUSE_FIELDS}
+      }
+    }
+  }
+`;
+
 /**
  * Re-fetch the deploy branch's astrolift.toml and reconcile workloads,
  * env, managed services, and schedules — the "Resync from source"

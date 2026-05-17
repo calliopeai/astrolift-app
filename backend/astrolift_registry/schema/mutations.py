@@ -461,6 +461,36 @@ def _viewer_can_access_project(*, project, viewer) -> bool:
 
 
 @strawberry.input
+class PauseAppWebhookDeploysInput:
+    """Pause app-global webhook-fired deploys (#399).
+
+    ``reason`` is optional but encouraged — it lands on the audit log
+    AND the row itself so the Settings card can render "Paused by X
+    · 5m ago — reason: storm" without an audit-log join. Empty / null
+    is accepted (the operator may pause without recording context).
+    Capped at 512 chars on the model — anything longer is truncated
+    at the resolver boundary to keep the audit row reasonable.
+    """
+
+    app_slug: str
+    reason: str | None = None
+
+
+@strawberry.input
+class ResumeAppWebhookDeploysInput:
+    """Lift the app-global webhook-deploy pause (#399).
+
+    No reason field on resume — the audit log captures who flipped it
+    back and the timestamp, which is enough provenance for the
+    inverse operation. (The original pause's reason stays on the
+    audit history; we clear it from the row so a stale string
+    doesn't read as the *current* reason on the next pause.)
+    """
+
+    app_slug: str
+
+
+@strawberry.input
 class UpdateSecurityPolicyInput:
     """Update the supply-chain / scanner policy for an app (#313).
 
@@ -1496,4 +1526,102 @@ class RegistryMutation:
             ),
         }
         app.save(update_fields=["security_policy", "updated_at", "version"])
+        return gql_success(app_to_type(app))
+
+    @strawberry.field
+    @mutation_audit(action="app.webhook_deploys.pause")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def pause_astrolift_app_webhook_deploys(
+        self,
+        info: Info,
+        input: PauseAppWebhookDeploysInput,
+    ) -> MutationResultType[RegisteredAppType]:
+        """Pause app-global webhook-fired deploys (#399).
+
+        Stops the deploy storm from CI / push / scheduled triggers
+        across every environment without paging through each env's
+        deploys_paused toggle and without taking ingress down. Manual
+        operator deploys (``trigger_kind == "manual"``) continue to
+        flow — the explicit on-call escape valve. The gate is
+        consulted by ``start_deployment`` and the CI REST endpoint;
+        forward-only (re-deploys remain blocked but teardown +
+        rollback are unaffected, matching the per-env semantics).
+
+        Idempotent: re-firing pause on an already-paused app no-ops
+        beyond a fresh actor stamp would be — we explicitly skip the
+        save when the flag is already set so the timestamp + reason
+        on the row reflect the *original* pause, not the latest
+        re-confirmation. Operators get reliable "paused 3h ago by X"
+        copy that way.
+        """
+        from django.utils import timezone
+
+        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        if app.webhook_deploys_paused:
+            # Already paused — keep the original actor / timestamp /
+            # reason so the UI's "paused 3h ago" copy stays accurate.
+            return gql_success(app_to_type(app))
+
+        actor = _actor()
+        reason = (input.reason or "").strip()[:512]
+        app.webhook_deploys_paused = True
+        app.webhook_deploys_paused_at = timezone.now()
+        app.webhook_deploys_paused_by = actor
+        app.webhook_deploys_pause_reason = reason
+        app.save(
+            update_fields=[
+                "webhook_deploys_paused",
+                "webhook_deploys_paused_at",
+                "webhook_deploys_paused_by",
+                "webhook_deploys_pause_reason",
+                "updated_at",
+                "version",
+            ]
+        )
+        return gql_success(app_to_type(app))
+
+    @strawberry.field
+    @mutation_audit(action="app.webhook_deploys.resume")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def resume_astrolift_app_webhook_deploys(
+        self,
+        info: Info,
+        input: ResumeAppWebhookDeploysInput,
+    ) -> MutationResultType[RegisteredAppType]:
+        """Lift the app-global webhook-deploy pause (#399).
+
+        Resumes acceptance of webhook-fired deploys; the next push /
+        CI event lands a Deployment row as normal. Clears the
+        actor / timestamp / reason on the row so a subsequent pause
+        records fresh context — keeping stale state would mislead
+        the Settings card's "Paused by X" copy.
+
+        Idempotent on an already-resumed app.
+        """
+        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        if not app.webhook_deploys_paused:
+            return gql_success(app_to_type(app))
+
+        app.webhook_deploys_paused = False
+        app.webhook_deploys_paused_at = None
+        app.webhook_deploys_paused_by = None
+        app.webhook_deploys_pause_reason = ""
+        app.save(
+            update_fields=[
+                "webhook_deploys_paused",
+                "webhook_deploys_paused_at",
+                "webhook_deploys_paused_by",
+                "webhook_deploys_pause_reason",
+                "updated_at",
+                "version",
+            ]
+        )
         return gql_success(app_to_type(app))
