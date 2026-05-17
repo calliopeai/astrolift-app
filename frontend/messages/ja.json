@@ -710,6 +710,49 @@
         "empty": "まだデプロイがありません — CLIから実行するか、デプロイブランチにプッシュしてください。",
         "ariaLabel": "最新のデプロイ: {status}, {when}"
       }
+    },
+    "deployStrategy": {
+      "eyebrow": "デプロイ戦略",
+      "edit": "編集",
+      "previewEnvironments": "プレビュー環境",
+      "previewEnvironmentsHelp": "プルリクエストごとに一時的な環境を立ち上げます。",
+      "sheetTitle": "デプロイ戦略を編集",
+      "sheetDescription": "変更は次のデプロイから適用されます。実行中のロールアウトは以前の戦略で完了します。",
+      "triggerModeLabel": "トリガーモード",
+      "cronExpressionLabel": "Cron 式",
+      "cronExpressionHelp": "5 つのフィールド (分 時 日 月 曜日)。バックエンドは不正な式を拒否します。",
+      "deployBranchLabel": "デプロイブランチ",
+      "deployBranchHelp": "リポジトリのデフォルトブランチは <branch></branch> です。",
+      "cancel": "キャンセル",
+      "save": "戦略を保存",
+      "toastSaved": "デプロイ戦略を更新しました。",
+      "toastFailed": "更新に失敗しました。",
+      "modes": {
+        "auto_on_push": {
+          "label": "プッシュで自動",
+          "hint": "デプロイブランチへのプッシュごとにデプロイを実行します。"
+        },
+        "manual": {
+          "label": "手動のみ",
+          "hint": "UI または CLI からのみデプロイをトリガーします。"
+        },
+        "external_ci": {
+          "label": "外部 CI",
+          "hint": "CI がデプロイトークンで Astrolift を呼び出します。Webhook なし。"
+        },
+        "cron": {
+          "label": "Cron スケジュール",
+          "hint": "Cron 式で定義された定期スケジュールでデプロイが実行されます。"
+        }
+      }
+    },
+    "settings": {
+      "links": {
+        "manifestEditor": {
+          "title": "Manifest TOML を編集",
+          "description": "完全な astrolift.toml エディタを開きます — イメージビルド、環境、トリガー、承認、ロールアウト戦略。"
+        }
+      }
     }
   },
   "settingsIndex": {

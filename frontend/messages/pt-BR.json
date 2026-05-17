@@ -710,6 +710,49 @@
         "empty": "Nenhum deploy ainda — dispare um pelo CLI ou faça push no branch de deploy.",
         "ariaLabel": "Último deploy: {status}, {when}"
       }
+    },
+    "deployStrategy": {
+      "eyebrow": "Estratégia de implantação",
+      "edit": "Editar",
+      "previewEnvironments": "Ambientes de prévia",
+      "previewEnvironmentsHelp": "Cria um ambiente efêmero por pull request.",
+      "sheetTitle": "Editar estratégia de implantação",
+      "sheetDescription": "Mudanças se aplicam à próxima implantação. Rollouts em andamento terminam com a estratégia anterior.",
+      "triggerModeLabel": "Modo de gatilho",
+      "cronExpressionLabel": "Expressão cron",
+      "cronExpressionHelp": "Cinco campos (minuto hora dia mês dia-semana). O backend rejeita expressões mal formadas.",
+      "deployBranchLabel": "Branch de implantação",
+      "deployBranchHelp": "O branch padrão do repositório é <branch></branch>.",
+      "cancel": "Cancelar",
+      "save": "Salvar estratégia",
+      "toastSaved": "Estratégia de implantação atualizada.",
+      "toastFailed": "Falha na atualização.",
+      "modes": {
+        "auto_on_push": {
+          "label": "Automático no push",
+          "hint": "Qualquer push para o branch de implantação dispara uma implantação."
+        },
+        "manual": {
+          "label": "Somente manual",
+          "hint": "Implanta somente quando acionado pela UI ou CLI."
+        },
+        "external_ci": {
+          "label": "CI externo",
+          "hint": "Sua CI chama o Astrolift com um token de implantação. Sem webhook."
+        },
+        "cron": {
+          "label": "Agendamento cron",
+          "hint": "Implantações rodam em uma agenda recorrente definida pela expressão cron."
+        }
+      }
+    },
+    "settings": {
+      "links": {
+        "manifestEditor": {
+          "title": "Editar manifest TOML",
+          "description": "Abre o editor completo do astrolift.toml — build de imagem, ambientes, triggers, aprovações e estratégia de rollout."
+        }
+      }
     }
   },
   "settingsIndex": {

@@ -706,6 +706,49 @@
         "empty": "Noch keine Deployments — lösen Sie eines über die CLI aus oder pushen Sie in den Deploy-Branch.",
         "ariaLabel": "Letztes Deployment: {status}, {when}"
       }
+    },
+    "deployStrategy": {
+      "eyebrow": "Deploy-Strategie",
+      "edit": "Bearbeiten",
+      "previewEnvironments": "Vorschau-Umgebungen",
+      "previewEnvironmentsHelp": "Erstellt eine kurzlebige Umgebung pro Pull Request.",
+      "sheetTitle": "Deploy-Strategie bearbeiten",
+      "sheetDescription": "Änderungen gelten ab dem nächsten Deploy. Laufende Rollouts werden mit der vorherigen Strategie abgeschlossen.",
+      "triggerModeLabel": "Trigger-Modus",
+      "cronExpressionLabel": "Cron-Ausdruck",
+      "cronExpressionHelp": "Fünf Felder (Minute Stunde Tag Monat Wochentag). Das Backend lehnt fehlerhafte Ausdrücke ab.",
+      "deployBranchLabel": "Deploy-Branch",
+      "deployBranchHelp": "Der Standard-Branch des Repos ist <branch></branch>.",
+      "cancel": "Abbrechen",
+      "save": "Strategie speichern",
+      "toastSaved": "Deploy-Strategie aktualisiert.",
+      "toastFailed": "Aktualisierung fehlgeschlagen.",
+      "modes": {
+        "auto_on_push": {
+          "label": "Automatisch bei Push",
+          "hint": "Jeder Push auf den Deploy-Branch löst einen Deploy aus."
+        },
+        "manual": {
+          "label": "Nur manuell",
+          "hint": "Deployt nur, wenn aus der UI oder CLI ausgelöst."
+        },
+        "external_ci": {
+          "label": "Externe CI",
+          "hint": "Deine CI ruft Astrolift mit einem Deploy-Token auf. Kein Webhook."
+        },
+        "cron": {
+          "label": "Cron-Zeitplan",
+          "hint": "Deploys laufen nach einem wiederkehrenden Zeitplan, definiert durch den Cron-Ausdruck."
+        }
+      }
+    },
+    "settings": {
+      "links": {
+        "manifestEditor": {
+          "title": "Manifest-TOML bearbeiten",
+          "description": "Öffnet den vollständigen astrolift.toml-Editor — Image-Build, Umgebungen, Trigger, Genehmigungen und Rollout-Strategie."
+        }
+      }
     }
   },
   "settingsIndex": {

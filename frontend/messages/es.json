@@ -706,6 +706,49 @@
         "empty": "Aún no hay despliegues — dispara uno desde la CLI o haz push a la rama de despliegue.",
         "ariaLabel": "Último despliegue: {status}, {when}"
       }
+    },
+    "deployStrategy": {
+      "eyebrow": "Estrategia de despliegue",
+      "edit": "Editar",
+      "previewEnvironments": "Entornos de vista previa",
+      "previewEnvironmentsHelp": "Crea un entorno efímero por cada pull request.",
+      "sheetTitle": "Editar estrategia de despliegue",
+      "sheetDescription": "Los cambios se aplican en el próximo despliegue. Los rollouts en curso terminan con la estrategia anterior.",
+      "triggerModeLabel": "Modo de activación",
+      "cronExpressionLabel": "Expresión cron",
+      "cronExpressionHelp": "Cinco campos (minuto hora día mes día-semana). El backend rechaza expresiones malformadas.",
+      "deployBranchLabel": "Rama de despliegue",
+      "deployBranchHelp": "La rama por defecto del repositorio es <branch></branch>.",
+      "cancel": "Cancelar",
+      "save": "Guardar estrategia",
+      "toastSaved": "Estrategia de despliegue actualizada.",
+      "toastFailed": "Actualización fallida.",
+      "modes": {
+        "auto_on_push": {
+          "label": "Automático en push",
+          "hint": "Cualquier push a la rama de despliegue dispara un despliegue."
+        },
+        "manual": {
+          "label": "Solo manual",
+          "hint": "Solo se despliega cuando se activa desde la UI o CLI."
+        },
+        "external_ci": {
+          "label": "CI externo",
+          "hint": "Tu CI llama a Astrolift con un token de despliegue. Sin webhook."
+        },
+        "cron": {
+          "label": "Programación cron",
+          "hint": "Los despliegues se ejecutan en un horario recurrente definido por la expresión cron."
+        }
+      }
+    },
+    "settings": {
+      "links": {
+        "manifestEditor": {
+          "title": "Editar manifest TOML",
+          "description": "Abre el editor completo de astrolift.toml — build de imagen, entornos, triggers, aprobaciones y estrategia de rollout."
+        }
+      }
     }
   },
   "settingsIndex": {

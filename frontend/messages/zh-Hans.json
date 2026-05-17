@@ -710,6 +710,49 @@
         "empty": "尚无部署 — 从 CLI 触发或推送到部署分支。",
         "ariaLabel": "最新部署: {status}, {when}"
       }
+    },
+    "deployStrategy": {
+      "eyebrow": "部署策略",
+      "edit": "编辑",
+      "previewEnvironments": "预览环境",
+      "previewEnvironmentsHelp": "为每个拉取请求创建一个临时环境。",
+      "sheetTitle": "编辑部署策略",
+      "sheetDescription": "更改将在下次部署时生效。正在进行的发布将使用之前的策略完成。",
+      "triggerModeLabel": "触发模式",
+      "cronExpressionLabel": "Cron 表达式",
+      "cronExpressionHelp": "五个字段(分 时 日 月 周)。后端会拒绝格式错误的表达式。",
+      "deployBranchLabel": "部署分支",
+      "deployBranchHelp": "仓库的默认分支是 <branch></branch>。",
+      "cancel": "取消",
+      "save": "保存策略",
+      "toastSaved": "部署策略已更新。",
+      "toastFailed": "更新失败。",
+      "modes": {
+        "auto_on_push": {
+          "label": "推送时自动",
+          "hint": "对部署分支的任何推送都会触发部署。"
+        },
+        "manual": {
+          "label": "仅手动",
+          "hint": "仅在从 UI 或 CLI 触发时才部署。"
+        },
+        "external_ci": {
+          "label": "外部 CI",
+          "hint": "你的 CI 使用部署令牌调用 Astrolift。无 webhook。"
+        },
+        "cron": {
+          "label": "Cron 计划",
+          "hint": "部署按 cron 表达式定义的定期计划运行。"
+        }
+      }
+    },
+    "settings": {
+      "links": {
+        "manifestEditor": {
+          "title": "编辑 manifest TOML",
+          "description": "打开完整的 astrolift.toml 编辑器 — 镜像构建、环境、触发器、审批和发布策略。"
+        }
+      }
     }
   },
   "settingsIndex": {
