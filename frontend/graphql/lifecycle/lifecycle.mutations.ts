@@ -620,6 +620,33 @@ export const DEREGISTER_APP = gql`
   }
 `;
 
+// --- Cancel pending deregister within grace window (#436 B) --------
+//
+// Sends ``cancel_teardown`` to the running ``DeregisterAppWorkflow``.
+// If the signal lands within the 5-minute grace window before the
+// workflow's first destructive activity runs, the teardown short-
+// circuits and no per-app resource is touched. After the window
+// elapses the signal is a no-op and the mutation surfaces
+// ``signalDelivered=true`` regardless of effect — the operator's
+// pinned countdown banner hides on time-elapsed, not on response.
+
+export const CANCEL_DEREGISTER = gql`
+  mutation CancelAstroliftDeregister($input: CancelDeregisterInput!) {
+    cancelAstroliftDeregister(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        workflowId
+        signalDelivered
+      }
+    }
+  }
+`;
+
 // --- Run scheduled job once (#390) --------------------------------
 //
 // Spawn a one-shot k8s Job from a manifest-declared CronJob without

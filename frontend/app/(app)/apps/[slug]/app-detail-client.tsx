@@ -47,6 +47,7 @@ import { DeployStrategyCard } from "./components/deploy-strategy-card";
 import { DeployTokenControl } from "./components/deploy-token-control";
 import { DeploymentPanel } from "./components/deployment-panel";
 import { GithubConnectCallout } from "./components/github-connect-callout";
+import { DeregisterPendingBanner } from "./components/deregister-pending-banner";
 import { ObservabilitySection } from "./components/observability-section";
 import { PendingDeployments } from "./components/pending-deployments";
 import { QuickLinksGrid } from "./components/quick-links-grid";
@@ -276,11 +277,15 @@ export function AppDetailClient({ slug }: { slug: string }) {
     >
       <AppTabs slug={a.slug} active="overview" />
 
+      {/* Grace-period cancel banner (#436 B). Renders only when the
+          operator just kicked off a deregister and the 5-min window
+          is still open — clears itself once the countdown elapses or
+          the cancel signal lands. */}
+      <DeregisterPendingBanner appSlug={a.slug} />
+
       {a.provisioningStatus === "failed" && a.provisioningError && (
         <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
-          <p className="text-destructive text-xs font-semibold">
-            {tDetail("provisioning.failed")}
-          </p>
+          <p className="text-destructive text-xs font-semibold">{tDetail("provisioning.failed")}</p>
           <p className="text-muted-foreground mt-1 font-mono text-xs break-all">
             {a.provisioningError}
           </p>

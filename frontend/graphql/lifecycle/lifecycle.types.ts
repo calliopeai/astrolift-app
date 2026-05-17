@@ -30,6 +30,9 @@ import type {
   AstroliftDeploymentApprover as GeneratedDeploymentApprover,
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
+  AstroliftDeregisterPreview as GeneratedDeregisterPreview,
+  AstroliftForceRedeployPreview as GeneratedForceRedeployPreview,
+  AstroliftForceRedeployPreviewDeployment as GeneratedForceRedeployPreviewDeployment,
   AstroliftPreviewEnvironment as GeneratedPreviewEnvironment,
   AstroliftScheduledJobRun as GeneratedScheduledJobRun,
 } from "@/graphql/__generated__/schema";
@@ -222,3 +225,13 @@ export type AstroliftAppCertificate = Omit<GeneratedAppCertificate, "renewalStat
 export type AstroliftAppIdentityBinding = Omit<GeneratedAppIdentityBinding, "kind"> & {
   kind: IdentityBindingKind;
 };
+
+// #436 — destructive-flow preview types (deregister blast-radius +
+// force-redeploy in-flight). Re-export the codegen output so consumer
+// components import from one place.
+
+export type AstroliftDeregisterPreview = GeneratedDeregisterPreview;
+
+export type AstroliftForceRedeployPreview = GeneratedForceRedeployPreview;
+
+export type AstroliftForceRedeployPreviewDeployment = GeneratedForceRedeployPreviewDeployment;
