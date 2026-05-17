@@ -460,3 +460,59 @@ def policy_to_type(policy) -> PolicyType:
         updated_at=policy.updated_at,
         deleted_at=policy.deleted_at,
     )
+
+
+# ---- Approver picker types (#410) --------------------------------------
+#
+# A shape stable enough to drive an approver multi-select on the
+# register-app wizard *and* any later surface that needs to render a
+# user identity (settings approval policy, env approval policy, etc.).
+# Distinct from ``UserType`` because the picker shows a display name and
+# avatar URL that ``UserType`` doesn't carry — the existing UserType is
+# used in admin views where the auth username is enough.
+
+
+@strawberry.type(name="AstroliftApproverUser")
+class ApproverUserType:
+    id: str  # Django auth user pk rendered as string (matches UserType convention)
+    email: str
+    display_name: str  # Best-available human label: full name / nickname / username / email-local
+    avatar_url: str  # Best-available avatar URL (from Auth0 UserInfo.picture); empty when none
+
+
+def _resolve_display_name(user, *, userinfo=None) -> str:
+    """Best-effort human label for an approver picker entry.
+
+    Priority: full name (first + last) → nickname → username → email-local.
+    Falls back to an empty string when the user has no usable identity
+    fields at all (shouldn't happen for active members, but the picker
+    rendering needs to be defensive).
+    """
+    first = (getattr(user, "first_name", "") or "").strip()
+    last = (getattr(user, "last_name", "") or "").strip()
+    full = f"{first} {last}".strip()
+    if full:
+        return full
+    if userinfo is not None:
+        for attr in ("name", "nickname"):
+            value = (getattr(userinfo, attr, "") or "").strip()
+            if value:
+                return value
+    username = (user.get_username() or "").strip()
+    if username and "@" not in username:
+        return username
+    email = (getattr(user, "email", "") or "").strip()
+    if email:
+        local = email.split("@", 1)[0]
+        if local:
+            return local
+    return username or email or ""
+
+
+def approver_user_to_type(user, *, userinfo=None) -> ApproverUserType:
+    return ApproverUserType(
+        id=str(user.pk),
+        email=(getattr(user, "email", "") or ""),
+        display_name=_resolve_display_name(user, userinfo=userinfo),
+        avatar_url=((getattr(userinfo, "picture", "") or "") if userinfo is not None else ""),
+    )

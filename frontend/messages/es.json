@@ -314,6 +314,33 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "Requerir aprobación antes de desplegar",
+        "safer": "Más seguro",
+        "toggleHint": "Los despliegues disparados quedan en «pendiente de aprobación» hasta que un aprobador da el visto bueno. Elige un equipo O un conjunto específico de usuarios — los aprobadores no pueden autoaprobar un despliegue que ellos mismos pusieron.",
+        "teamLabel": "Equipo de aprobación",
+        "teamPlaceholder": "Sin equipo seleccionado",
+        "teamNoneOption": "Sin equipo — elige usuarios en su lugar",
+        "teamHint": "Cualquier miembro activo de este equipo puede aprobar. Mutuamente excluyente con el selector de usuarios.",
+        "minimumLabel": "Aprobadores requeridos",
+        "minimumHintUsers": "1–{max} según tu selección de usuarios.",
+        "minimumHintTeam": "Cantidad de aprobadores distintos requeridos. Al menos 1.",
+        "usersLabel": "Usuarios aprobadores",
+        "usersPlaceholderTeam": "Modo equipo seleccionado — limpia el selector de equipo para añadir usuarios.",
+        "usersPlaceholderEmpty": "Ningún usuario seleccionado aún.",
+        "userRemove": "Quitar {label}",
+        "orphanRemove": "Quitar aprobador huérfano {id}",
+        "orphanSuffix": "(ya no es miembro)",
+        "search": "Buscar miembros por nombre o email…",
+        "loading": "Cargando miembros de la organización…",
+        "noMembers": "Aún no hay miembros activos — invita a alguien primero.",
+        "noMatch": "Ningún miembro coincide con la búsqueda.",
+        "errorPickAny": "Selecciona al menos un aprobador — un equipo o uno o más usuarios.",
+        "errorBoth": "Elige un equipo O usuarios específicos, no ambos.",
+        "errorMinTooHigh": "Las aprobaciones mínimas no pueden exceder el número de usuarios seleccionados."
+      }
     }
   },
   "settingsIndex": {
