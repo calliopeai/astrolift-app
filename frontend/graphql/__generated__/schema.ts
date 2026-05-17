@@ -1046,6 +1046,54 @@ export type AstroliftForceRedeployPreviewDeployment = {
   workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftFormDefinition = {
+  createdAt: Scalars['DateTime']['output'];
+  createdByUsername?: Maybe<Scalars['String']['output']>;
+  description: Scalars['String']['output'];
+  fieldConfig: Scalars['JSON']['output'];
+  formType: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isPublic: Scalars['Boolean']['output'];
+  logicRules: Scalars['JSON']['output'];
+  name: Scalars['String']['output'];
+  publishedAt?: Maybe<Scalars['DateTime']['output']>;
+  schema: Scalars['JSON']['output'];
+  scoring: Scalars['JSON']['output'];
+  slug: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  submissionCount: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  updatedByUsername?: Maybe<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type AstroliftFormDefinitionMutationResult = {
+  data?: Maybe<AstroliftFormDefinition>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftFormSubmission = {
+  createdAt: Scalars['DateTime']['output'];
+  formName: Scalars['String']['output'];
+  formSlug: Scalars['String']['output'];
+  formVersion: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  payload: Scalars['JSON']['output'];
+  sourceIp?: Maybe<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  submittedAt: Scalars['DateTime']['output'];
+  submitterDisplayName: Scalars['String']['output'];
+  submitterEmail: Scalars['String']['output'];
+  userAgent: Scalars['String']['output'];
+};
+
+export type AstroliftFormSubmissionMutationResult = {
+  data?: Maybe<AstroliftFormSubmission>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftIdentityProvider = {
   activatedAt?: Maybe<Scalars['DateTime']['output']>;
   clientId: Scalars['String']['output'];
@@ -1741,6 +1789,21 @@ export type AstroliftSecurityPolicy = {
   blockOnMissingSignature: Scalars['Boolean']['output'];
 };
 
+/** Install identity + capabilities handshake (#479). Returned by ``astroliftServerInfo``. Callable by unauthenticated clients so multi-install mobile / CLI / SDK callers can pick the right UI and gate commands before login. */
+export type AstroliftServerInfo = {
+  apiVersion: Scalars['String']['output'];
+  authMethods: Array<Scalars['String']['output']>;
+  capabilities: Array<Scalars['String']['output']>;
+  featureFlags: Array<FeatureFlagInfo>;
+  installId: Scalars['String']['output'];
+  installLabel?: Maybe<Scalars['String']['output']>;
+  installSlug: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  /** Current server-side wall clock (UTC). Used by clients to detect clock drift. */
+  serverTime: Scalars['DateTime']['output'];
+  version: Scalars['String']['output'];
+};
+
 export type AstroliftSourceConnection = {
   accountLogin: Scalars['String']['output'];
   apiBaseUrl: Scalars['String']['output'];
@@ -2341,6 +2404,10 @@ export type DeleteAppSecretInput = {
   key: Scalars['String']['input'];
 };
 
+export type DeleteFormDefinitionInput = {
+  slug: Scalars['String']['input'];
+};
+
 export type DeleteRoleInput = {
   id: Scalars['GUID']['input'];
 };
@@ -2470,6 +2537,13 @@ export type ExtendPreviewTtlInputGql = {
   id: Scalars['GUID']['input'];
 };
 
+/** Runtime feature toggle reported by ``astroliftServerInfo``. */
+export type FeatureFlagInfo = {
+  description?: Maybe<Scalars['String']['output']>;
+  enabled: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+};
+
 export type FileUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
@@ -2486,6 +2560,30 @@ export type ForecastConfidence =
   | 'HIGH'
   | 'LOW'
   | 'MEDIUM';
+
+export type FormDefinitionInput = {
+  description: InputMaybe<Scalars['String']['input']>;
+  fieldConfig: InputMaybe<Scalars['JSON']['input']>;
+  formType: InputMaybe<Scalars['String']['input']>;
+  isPublic: InputMaybe<Scalars['Boolean']['input']>;
+  logicRules: InputMaybe<Scalars['JSON']['input']>;
+  name: Scalars['String']['input'];
+  schema: Scalars['JSON']['input'];
+  scoring: InputMaybe<Scalars['JSON']['input']>;
+  slug: Scalars['String']['input'];
+};
+
+export type FormDefinitionUpdateInput = {
+  description: InputMaybe<Scalars['String']['input']>;
+  fieldConfig: InputMaybe<Scalars['JSON']['input']>;
+  formType: InputMaybe<Scalars['String']['input']>;
+  isPublic: InputMaybe<Scalars['Boolean']['input']>;
+  logicRules: InputMaybe<Scalars['JSON']['input']>;
+  name: InputMaybe<Scalars['String']['input']>;
+  schema: InputMaybe<Scalars['JSON']['input']>;
+  scoring: InputMaybe<Scalars['JSON']['input']>;
+  slug: Scalars['String']['input'];
+};
 
 export type GenerateSshDeployKeyInput = {
   appSlug: InputMaybe<Scalars['String']['input']>;
@@ -2646,6 +2744,7 @@ export type Mutation = {
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
+  archiveForm: AstroliftFormDefinitionMutationResult;
   assignAstroliftAppToProject: AstroliftRegisteredAppMutationResult;
   astroliftAnonymizeUser: AstroliftAnonymizeUserPayloadMutationResult;
   astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
@@ -2666,6 +2765,7 @@ export type Mutation = {
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
+  createFormDefinition: AstroliftFormDefinitionMutationResult;
   createIdentityProvider: AstroliftIdentityProviderMutationResult;
   createInvitation: AstroliftInvitationCreatedMutationResult;
   createManagedDomain: AstroliftManagedDomainMutationResult;
@@ -2685,6 +2785,7 @@ export type Mutation = {
   deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppIngress: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppSecret: AppsecretwritepayloadMutationResult;
+  deleteFormDefinition: AstroliftFormDefinitionMutationResult;
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
   /** Delete a workflow definition by slug (staff only). */
@@ -2761,6 +2862,7 @@ export type Mutation = {
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
   provisionManagedService: AstroliftManagedServiceMutationResult;
+  publishForm: AstroliftFormDefinitionMutationResult;
   pushAstroliftCiSecretsToRepo: AstroliftPushCiSecretsPayloadMutationResult;
   pushAstroliftCiWorkflowToRepo: AstroliftPushCiWorkflowPayloadMutationResult;
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
@@ -2818,6 +2920,7 @@ export type Mutation = {
   startDeployment: AstroliftDeploymentMutationResult;
   /** Start a workflow for an object. */
   startWorkflow: StartWorkflowResult;
+  submitForm: AstroliftFormSubmissionMutationResult;
   /** Switch the active user (impersonation). */
   switchUser: SwitchUserResult;
   syncManifestFromRepo: ManifeststagepayloadMutationResult;
@@ -2835,6 +2938,7 @@ export type Mutation = {
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
+  updateFormDefinition: AstroliftFormDefinitionMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
   updateManagedDomain: AstroliftManagedDomainMutationResult;
   updateManagedService: AstroliftManagedServiceMutationResult;
@@ -2845,6 +2949,7 @@ export type Mutation = {
   updateProject: AstroliftProjectMutationResult;
   updateRole: AstroliftRoleMutationResult;
   updateSourceConnection: AstroliftSourceConnectionMutationResult;
+  updateSubmissionStatus: AstroliftFormSubmissionMutationResult;
   updateTeam: AstroliftTeamMutationResult;
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
@@ -2902,6 +3007,11 @@ export type MutationApproveDeploymentByTokenArgs = {
 
 export type MutationArchiveAppRegistryRepoArgs = {
   input: ArchiveAppRegistryRepoInput;
+};
+
+
+export type MutationArchiveFormArgs = {
+  slug: Scalars['String']['input'];
 };
 
 
@@ -3004,6 +3114,11 @@ export type MutationCreateDeployTokenArgs = {
 };
 
 
+export type MutationCreateFormDefinitionArgs = {
+  input: FormDefinitionInput;
+};
+
+
 export type MutationCreateIdentityProviderArgs = {
   input: CreateIdentityProviderInput;
 };
@@ -3092,6 +3207,11 @@ export type MutationDeleteAppIngressArgs = {
 
 export type MutationDeleteAppSecretArgs = {
   input: DeleteAppSecretInput;
+};
+
+
+export type MutationDeleteFormDefinitionArgs = {
+  input: DeleteFormDefinitionInput;
 };
 
 
@@ -3367,6 +3487,11 @@ export type MutationProvisionManagedServiceArgs = {
 };
 
 
+export type MutationPublishFormArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationPushAstroliftCiSecretsToRepoArgs = {
   input: PushCiSecretsToRepoInput;
 };
@@ -3638,6 +3763,12 @@ export type MutationStartWorkflowArgs = {
 };
 
 
+export type MutationSubmitFormArgs = {
+  payload: Scalars['JSON']['input'];
+  slug: Scalars['String']['input'];
+};
+
+
 export type MutationSwitchUserArgs = {
   id: Scalars['ID']['input'];
 };
@@ -3716,6 +3847,11 @@ export type MutationUpdateAstroliftSecurityPolicyArgs = {
 };
 
 
+export type MutationUpdateFormDefinitionArgs = {
+  input: FormDefinitionUpdateInput;
+};
+
+
 export type MutationUpdateIdentityProviderArgs = {
   input: UpdateIdentityProviderInput;
 };
@@ -3763,6 +3899,12 @@ export type MutationUpdateRoleArgs = {
 
 export type MutationUpdateSourceConnectionArgs = {
   input: UpdateSourceConnectionInput;
+};
+
+
+export type MutationUpdateSubmissionStatusArgs = {
+  status: Scalars['String']['input'];
+  submissionId: Scalars['GUID']['input'];
 };
 
 
@@ -4083,6 +4225,8 @@ export type Query = {
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
+  /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
+  astroliftServerInfo: AstroliftServerInfo;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
@@ -4105,6 +4249,10 @@ export type Query = {
   /** List all effective permissions for a user, with the groups that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
   employees: EmployeesConnection;
+  formDefinition?: Maybe<AstroliftFormDefinition>;
+  formDefinitions: Array<AstroliftFormDefinition>;
+  formFieldTypes: Array<Scalars['String']['output']>;
+  formSubmissions: Array<AstroliftFormSubmission>;
   members: Array<OrganizationMemberType>;
   organization?: Maybe<OrganizationType>;
   organizations: Array<OrganizationType>;
@@ -4571,6 +4719,22 @@ export type QueryEmployeesArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   showDeactivated?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+export type QueryFormDefinitionArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryFormDefinitionsArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryFormSubmissionsArgs = {
+  slug: Scalars['String']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
 };
 
 
