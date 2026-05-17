@@ -1,0 +1,53 @@
+"""URL routes owned by ``astrolift_identity``.
+
+Currently exposes the CLI / mobile device-flow surface (#475). The
+REST endpoints (``/api/cli/v1/auth/{start,complete,refresh}``) are
+mounted at the project root by ``config.urls``; the in-browser
+approval page lives under the auth1-protected ``/app/`` prefix.
+"""
+
+from __future__ import annotations
+
+from django.urls import path
+from django_ratelimit.decorators import ratelimit
+
+from astrolift_identity import device_flow_views
+
+app_name = "astrolift_identity"
+
+
+# Public, no-auth REST surface for the CLI. The /start endpoint is
+# the rate-limit hot spot (an attacker could mint thousands of pending
+# rows otherwise). /complete + /refresh are rate-limited *per session*
+# in the business layer (see ``device_flow.MIN_POLL_INTERVAL``); the
+# IP-level limit here is a coarse second line.
+api_urlpatterns = [
+    path(
+        "api/cli/v1/auth/start",
+        ratelimit(key="ip", rate="10/m", block=True)(device_flow_views.device_flow_start),
+        name="device-flow-start",
+    ),
+    path(
+        "api/cli/v1/auth/complete",
+        ratelimit(key="ip", rate="120/m", block=True)(device_flow_views.device_flow_complete),
+        name="device-flow-complete",
+    ),
+    path(
+        "api/cli/v1/auth/refresh",
+        ratelimit(key="ip", rate="60/m", block=True)(device_flow_views.device_flow_refresh),
+        name="device-flow-refresh",
+    ),
+]
+
+
+# Auth1 session-cookie-protected approval surface. Mounted under the
+# ``/app/`` prefix (BASE_URL) by config.urls so the login_required
+# middleware redirects unauth'd users to /auth/login like every other
+# operator page.
+app_urlpatterns = [
+    path(
+        "cli/auth/device/<str:session_guid>/",
+        device_flow_views.device_flow_approval,
+        name="device-flow-approval",
+    ),
+]
