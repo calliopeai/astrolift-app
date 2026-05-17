@@ -85,6 +85,8 @@ type AstroliftActiveSession {
   lastSeenAt: DateTime
   ipAddress: String
   userAgent: String
+  elevatedUntil: DateTime
+  elevationMethod: String
 }
 
 type AstroliftActivityItem {
@@ -811,6 +813,16 @@ type AstroliftCostTrendPoint {
   isAnomaly: Boolean!
 }
 
+type AstroliftDeelevatePayload {
+  previouslyElevated: Boolean!
+}
+
+type AstroliftDeelevatePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftDeelevatePayload
+}
+
 type AstroliftDeployToken {
   id: GUID!
   name: String!
@@ -991,6 +1003,26 @@ type AstroliftDisconnectUserSourceProviderPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftDisconnectUserSourceProviderPayload
+}
+
+type AstroliftElevatePayload {
+  elevatedUntil: DateTime!
+  secondsRemaining: Int!
+  method: String!
+}
+
+type AstroliftElevatePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftElevatePayload
+}
+
+type AstroliftElevationStatus {
+  elevated: Boolean!
+  elevatedUntil: DateTime
+  secondsRemaining: Int!
+  method: String
+  requiredFor: [String!]!
 }
 
 type AstroliftEvent {
@@ -2520,6 +2552,12 @@ input DisconnectUserSourceProviderInput {
   confirmAccountLogin: String!
 }
 
+input ElevateAdminSessionInput {
+  method: String!
+  credential: String!
+  ttlSeconds: Int = null
+}
+
 type EmployeeAvatarType {
   publicPermanentUrl: String
 }
@@ -2942,6 +2980,8 @@ type Mutation {
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
   markOnboardingComplete(input: MarkOnboardingCompleteInput!): AstroliftMarkOnboardingCompletePayloadMutationResult!
   logoutAllSessions(input: LogoutAllSessionsInput!): AstroliftLogoutAllSessionsPayloadMutationResult!
+  elevateAdminSession(input: ElevateAdminSessionInput!): AstroliftElevatePayloadMutationResult!
+  deelevateAdminSession: AstroliftDeelevatePayloadMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
@@ -3328,6 +3368,7 @@ type Query {
   astroliftMyPermissions: [String!]!
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
+  astroliftElevationStatus: AstroliftElevationStatus!
   astroliftEvents(limit: Int! = 100, eventType: String = null): [AstroliftEvent!]!
   astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]!
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!

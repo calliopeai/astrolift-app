@@ -61,6 +61,25 @@ EXEMPT: dict[str, str] = {
         "self-service: revokes the caller's own sessions; tenant context "
         "is irrelevant — a session is bound to a user, not an org"
     ),
+    "IdentityMutation.elevate_admin_session": (
+        "#487 step-up auth: elevates the caller's own session timer; "
+        "tenant context is irrelevant — elevation is session-scoped, "
+        "not org-scoped. The credential verifier IS the gate; "
+        "@require_permission would need a special 'can elevate' "
+        "permission that every authed user trivially has."
+    ),
+    "IdentityMutation.deelevate_admin_session": (
+        "#487 step-up auth: the 'log me out of admin' counterpart to "
+        "elevate_admin_session — self-service, tenant-orthogonal, no "
+        "permission gate (every authed user can drop their own "
+        "elevation)."
+    ),
+    "IdentityQuery.astrolift_elevation_status": (
+        "#487 step-up auth: returns the caller's own session elevation "
+        "snapshot. Self-service, tenant-orthogonal — drives the nav "
+        "indicator that has to render before any tenant context is "
+        "picked (e.g. on the org switcher itself)."
+    ),
     "IdentityMutation.set_active_organization": (
         "the act of selecting a tenant context cannot itself be tenant-scoped"
     ),

@@ -45,6 +45,11 @@ class ErrorCode(enum.StrEnum):
     INTERNAL = "INTERNAL"
     PRECONDITION = "PRECONDITION"
     RATE_LIMITED = "RATE_LIMITED"
+    # #487 — step-up auth. Returned by ``@requires_elevation`` when
+    # the session lacks a fresh elevation. The FE intercepts this
+    # code, opens the ``StepUpPrompt`` modal, elevates the session,
+    # and retries the original mutation.
+    STEP_UP_REQUIRED = "STEP_UP_REQUIRED"
 
 
 @dataclasses.dataclass(slots=True)

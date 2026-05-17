@@ -342,12 +342,12 @@
         "ariaLabel": "Search apps"
       },
       "filters": {
-        "ariaLabel": "ステータスでフィルタ",
-        "all": "すべて",
-        "ok": "正常",
-        "degraded": "劣化",
-        "stale": "古い",
-        "never_deployed": "未デプロイ"
+        "ariaLabel": "Filter by status",
+        "all": "All",
+        "running": "Running",
+        "failed": "Failed",
+        "inflight": "In-flight",
+        "notDeployed": "Not deployed"
       },
       "noMatch": {
         "title": "No apps match the current filter",
@@ -357,11 +357,6 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
-      },
-      "count": "{total} 件中 {shown} 件を表示",
-      "loadMore": {
-        "label": "もっと読み込む",
-        "loading": "読み込み中…"
       }
     },
     "tabs": {
@@ -561,34 +556,6 @@
         "warningBadgeLabel": "警告",
         "collapse": "折りたたむ",
         "expand": "展開する"
-      },
-      "logs": {
-        "export": "エクスポート",
-        "exportTitle": "選択した Pod のログをエクスポート"
-      },
-      "logExport": {
-        "title": "アプリのログをエクスポート",
-        "description": "Pod {pod} の現在のログをダウンロード可能なファイルにまとめます。リンクは1回のみ使用でき、設定された TTL の後に期限切れになります。",
-        "descriptionNoPod": "エクスポートを有効にするには、まず Pod を選択してください。",
-        "missingPod": "エクスポート前に Pod を選択してください。",
-        "formatLabel": "形式",
-        "formatPlaceholder": "形式を選択",
-        "formatTxt": "テキスト (.log)",
-        "formatNdjson": "NDJSON (.ndjson)",
-        "formatCsv": "CSV (.csv)",
-        "sinceLabel": "開始 (UTC)",
-        "untilLabel": "終了 (UTC)",
-        "levelLabel": "レベルフィルター",
-        "levelPlaceholder": "例: ERROR",
-        "regexLabel": "正規表現フィルター",
-        "regexPlaceholder": "例: 5\\d{2}",
-        "submitButton": "エクスポート",
-        "submittingButton": "準備中…",
-        "toastStart": "アプリログのエクスポートを準備中…",
-        "toastReady": "エクスポート完了 — {rows} 行 ({format})",
-        "toastReadyTruncated": "エクスポート完了 (切り詰め) — {rows} 行 ({format})。フィルターを絞り込んで再試行してください",
-        "toastDownload": "ダウンロード",
-        "toastFailure": "エクスポートに失敗しました"
       }
     },
     "tokens": {
@@ -724,14 +691,6 @@
       "latestDeploy": {
         "empty": "まだデプロイがありません — CLIから実行するか、デプロイブランチにプッシュしてください。",
         "ariaLabel": "最新のデプロイ: {status}, {when}"
-      }
-    },
-    "secrets": {
-      "pendingProposals": {
-        "title": "{count, plural, =1 {1 secret-change proposal pending review} other {# secret-change proposals pending review}}",
-        "appWide": "(app-wide)",
-        "votes": "({received}/{required} votes)",
-        "seeAll": "See all {count} in the approvals queue →"
       }
     }
   },
@@ -1123,23 +1082,6 @@
         "linkCopied": "受諾リンクをコピーしました",
         "copyFailed": "コピー失敗 — 手動で選択してコピーしてください"
       }
-    },
-    "secretProposalsQueue": {
-      "title": "Pending secret-change proposals",
-      "empty": {
-        "title": "No pending secret-change proposals",
-        "description": "Proposals appear here when an app with secret-approval gating receives a setSecret / attach-bundle write. Enable the gate on a RegisteredApp's settings to start using this queue."
-      },
-      "row": {
-        "appWide": "(app-wide)",
-        "typeBadge": "Secret",
-        "opLabel": "{op}",
-        "approvalsCount": "{received}/{required} approvals",
-        "summary": "{summary}",
-        "proposer": "by {name}",
-        "received": "Received {rel}",
-        "review": "Review"
-      }
     }
   },
   "jobs": {
@@ -1232,63 +1174,19 @@
     "grantRoleRowLabel": "{name} にロールを付与",
     "grantRoleRowTooltip": "{name} にロールを付与"
   },
-  "approvals": {
-    "secretProposalDetail": {
-      "title": "{app} → {env}",
-      "appWide": "(app-wide)",
-      "opLabel": "{op}",
-      "approvalsCount": "{received}/{required} approvals",
-      "proposedBy": "Proposed by {name}, {rel}",
-      "unknownProposer": "(unknown)",
-      "expiresIn": "Expires {rel}",
-      "applyError": "Apply failed: {message}",
-      "loading": {
-        "title": "Loading proposal…"
-      },
-      "notFound": {
-        "title": "Proposal not found",
-        "description": "It may have been withdrawn, expired, or you may not have access."
-      },
-      "approve": "Approve",
-      "reject": "Reject",
-      "withdraw": "Withdraw",
-      "confirmApprove": {
-        "title": "Approve this proposal?",
-        "description": "When the quorum is reached the change applies immediately to the staged manifest or bundle attachment.",
-        "confirm": "Approve"
-      },
-      "confirmReject": {
-        "title": "Reject this proposal?",
-        "description": "One nay closes the proposal as rejected. The proposer can re-open with a fresh proposal.",
-        "reasonLabel": "Reason for rejection (recorded on the audit log)",
-        "reasonPlaceholder": "Why is this proposal being rejected?",
-        "reasonRequired": "Reason required",
-        "confirm": "Reject"
-      },
-      "confirmWithdraw": {
-        "title": "Withdraw this proposal?",
-        "description": "The proposal moves to withdrawn and stops counting against the queue. Re-open with a fresh proposeSecretChange.",
-        "confirm": "Withdraw"
-      },
-      "diff": {
-        "title": "Diff",
-        "before": "Before",
-        "after": "After",
-        "maskNote": "Values are masked. Use revealAppSecret on the secrets page to inspect plaintext (audit-logged)."
-      },
-      "approvers": {
-        "title": "Approvers",
-        "empty": "No one has voted yet.",
-        "unknownApprover": "(unknown)"
-      },
-      "toasts": {
-        "approveOk": "Proposal approved.",
-        "approveFailed": "Approve failed.",
-        "rejectOk": "Proposal rejected.",
-        "rejectFailed": "Reject failed.",
-        "withdrawOk": "Proposal withdrawn.",
-        "withdrawFailed": "Withdraw failed."
-      }
+  "stepUp": {
+    "title": "本人確認",
+    "description": "この操作には最近の認証が必要です。続行するにはパスワードを確認してください。",
+    "passwordLabel": "パスワード",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "elevating": "確認中…",
+    "indicator": "管理者モードは残り {minutes, plural, one {#分} other {#分}} 有効",
+    "deelevateLabel": "管理者モードを今すぐ終了",
+    "errors": {
+      "passwordRequired": "パスワードを入力してください。",
+      "generic": "パスワードを確認できませんでした。もう一度お試しください。",
+      "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
     }
   }
 }

@@ -585,3 +585,40 @@ export const DISCONNECT_USER_SOURCE_PROVIDER = gql`
     }
   }
 `;
+
+// #487 — step-up auth. Elevate the session for a configurable
+// short window (default 15 minutes, server-clamped) so sensitive
+// mutations gated by ``@requires_elevation`` can run.
+export const ELEVATE_ADMIN_SESSION = gql`
+  mutation ElevateAdminSession($input: ElevateAdminSessionInput!) {
+    elevateAdminSession(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        elevatedUntil
+        secondsRemaining
+        method
+      }
+    }
+  }
+`;
+
+export const DEELEVATE_ADMIN_SESSION = gql`
+  mutation DeelevateAdminSession {
+    deelevateAdminSession {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        previouslyElevated
+      }
+    }
+  }
+`;

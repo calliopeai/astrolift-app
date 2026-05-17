@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { LiveRegionProvider } from "@/components/LiveRegion";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
+import { StepUpPrompt } from "@/components/StepUpPrompt";
 import { PreloadQuery, getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
@@ -49,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </SidebarInset>
             <CommandPalette />
             <SessionExpiredModal />
+            <StepUpPrompt />
           </SidebarProvider>
         </LiveRegionProvider>
         </PreloadQuery>
