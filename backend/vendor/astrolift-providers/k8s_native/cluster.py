@@ -28,6 +28,7 @@ from _sdk.cluster import (
     ClusterEvent,
     DeleteResult,
     ExecResult,
+    InteractiveExecSession,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -38,6 +39,10 @@ from _sdk.cluster import (
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
+)
+from k8s_native.interactive_exec import (
+    InteractiveExecBackend,
+    default_interactive_exec_backend,
 )
 from k8s_native.management import (
     ManagementBackend,
@@ -95,6 +100,7 @@ class K8sNativeClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
+        exec_backend: InteractiveExecBackend | None = None,
     ) -> None:
         self._config = config
         self._factory = k8s_client_factory or _build_k8s_client
@@ -109,6 +115,12 @@ class K8sNativeClusterDriver(ClusterDriver):
         # that records what would have been applied / probed / awaited.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
+        )
+        # Interactive exec backend (#423). Powers the in-browser console
+        # terminal; default lives in k8s_native.interactive_exec and
+        # bridges the kubernetes-client WSClient into an async session.
+        self._exec_backend: InteractiveExecBackend = (
+            exec_backend if exec_backend is not None else default_interactive_exec_backend()
         )
 
     # ---- apply / delete -------------------------------------------
@@ -424,6 +436,28 @@ class K8sNativeClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> InteractiveExecSession:
+        """Delegate to the (pluggable) interactive-exec backend. Returns
+        an :class:`InteractiveExecSession`; tear-down is the caller's
+        responsibility via ``session.close()``."""
+        return self._exec_backend.open(
+            auth=auth,
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
+        )
+
     # ---- bring-into-management (#316) -----------------------------
 
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
@@ -632,7 +666,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001 — no creds / unreachable
+        except Exception:
             return []
         return pod_phase_summary_from_client(
             client, namespaces=default_namespaces(namespaces),
@@ -650,7 +684,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return events_from_client(
             client,
@@ -672,7 +706,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001 — no creds / unreachable
+        except Exception:
             return []
         return workload_health_from_client(
             client, namespaces=default_namespaces(namespaces),

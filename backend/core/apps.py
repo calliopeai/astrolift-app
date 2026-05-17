@@ -6,27 +6,33 @@ from django.db.models.signals import post_migrate
 
 
 class CoreConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'core'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "core"
 
     def ready(self):
         from django.conf import settings as _settings
+
         # Indexing is opt-in (OPENSEARCH_INDEXING). Off by default in
         # test/local where no OpenSearch host is reachable — running
         # the signals there produces stderr noise on every model save.
-        if getattr(_settings, 'OPENSEARCH_INDEXING', False):
+        if getattr(_settings, "OPENSEARCH_INDEXING", False):
             from core.documents import register_profile_signals, setup_opensearch
+
             setup_opensearch()
             register_profile_signals()
 
+        from health_check.plugins import plugin_dir
+
         from config.health_graphql import GraphQLHealthCheck
         from config.health_opensearch import OpenSearchHealthCheck
-        from health_check.plugins import plugin_dir
+
         plugin_dir.register(OpenSearchHealthCheck)
         plugin_dir.register(GraphQLHealthCheck)
 
-        from config.telemetry import setup as telemetry_setup
         from django.conf import settings
+
+        from config.telemetry import setup as telemetry_setup
+
         telemetry_setup(
             service_name="astrolift",
             service_version=settings.VERSION,
@@ -42,13 +48,23 @@ class CoreConfig(AppConfig):
         # Register core processors
         self._register_processors()
 
+        # Wire the production WebSocket exec backend (#423). The
+        # default backend in core.schema.exec_ws is a stub that
+        # emits a 'not wired' message; replacing it here means the
+        # console terminal opens a real kubernetes-client exec
+        # session as soon as Django boots.
+        from core.cluster_exec import K8sExecBackend
+        from core.schema.exec_ws import set_exec_backend
+
+        set_exec_backend(K8sExecBackend())
+
     @staticmethod
     def _register_file_exporters():
         """Register core file exporters."""
         from core.utils.file_export_registry import register_file_exporter
         from core.utils.file_processor.file_export import ChatHistory
 
-        register_file_exporter('rocket-channel-history', ChatHistory)
+        register_file_exporter("rocket-channel-history", ChatHistory)
 
     @staticmethod
     def _register_processors():
@@ -64,17 +80,23 @@ class CoreConfig(AppConfig):
     @classmethod
     def register_objects(cls, sender, **kwargs):
         from django.contrib.auth.models import User
+
         try:
-            if not User.objects.filter(username='admin').exists():
-                User.objects.create_superuser('admin', 'admin@astrolift.dev', os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'changeme'))
+            if not User.objects.filter(username="admin").exists():
+                User.objects.create_superuser(
+                    "admin", "admin@astrolift.dev", os.environ.get("DJANGO_SUPERUSER_PASSWORD", "changeme")
+                )
         except Exception:
             logging.info("Unable to create admin user.")
 
         from .emails import Emails
+
         Emails.register(sender)
 
         from .models.interval import Intervals
+
         Intervals.register(sender)
 
         from .models.authorization.actions import SharedFilePermissions
+
         SharedFilePermissions.register(sender)

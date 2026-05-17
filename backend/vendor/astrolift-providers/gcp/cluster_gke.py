@@ -20,6 +20,7 @@ from _sdk.cluster import (
     ClusterContext,
     ClusterDriver,
     DeleteResult,
+    InteractiveExecSession,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -30,6 +31,10 @@ from _sdk.cluster import (
     WorkloadStatus,
 )
 from gcp._errors import NotFoundError, map_api_error
+from k8s_native.interactive_exec import (
+    InteractiveExecBackend,
+    default_interactive_exec_backend,
+)
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -67,6 +72,7 @@ class GKEClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
+        exec_backend: InteractiveExecBackend | None = None,
     ) -> None:
         self._config = config
         if config.container_client is not None:
@@ -89,6 +95,11 @@ class GKEClusterDriver(ClusterDriver):
         # auth, both of which go straight through to ``build_api_client``.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
+        )
+        # Interactive exec backend (#423) — see EKS sibling for the
+        # materialize-then-delegate pattern.
+        self._exec_backend: InteractiveExecBackend = (
+            exec_backend if exec_backend is not None else default_interactive_exec_backend()
         )
 
     def apply_manifests(
@@ -342,6 +353,26 @@ class GKEClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    def interactive_exec(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        pod_name: str,
+        container: str,
+        command: list[str],
+        tty: bool = True,
+    ) -> InteractiveExecSession:
+        """See ``list_pods`` — same shared k8s_native path."""
+        return self._exec_backend.open(
+            auth=auth,
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            command=command,
+            tty=tty,
+        )
+
     # ---- bring-into-management (#316) -----------------------------
 
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
@@ -505,7 +536,7 @@ class GKEClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return pod_phase_summary_from_client(
             client, namespaces=default_namespaces(namespaces),
@@ -523,7 +554,7 @@ class GKEClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return events_from_client(
             client,
@@ -545,7 +576,7 @@ class GKEClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
         return workload_health_from_client(
             client, namespaces=default_namespaces(namespaces),
