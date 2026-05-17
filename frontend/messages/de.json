@@ -538,5 +538,80 @@
         "requestIdSection": "Anfrage-ID"
       }
     }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "descriptionGlobal": "Geplante Job-Läufe und Ad-hoc-Befehlsausführungen über alle Apps hinweg.",
+    "descriptionForApp": "Geplante Job-Läufe und Ad-hoc-Befehlsausführungen für {app}.",
+    "tabs": {
+      "scheduled": "Geplant",
+      "commands": "Befehle"
+    },
+    "scheduled": {
+      "emptyTitle": "Noch keine geplanten Job-Läufe",
+      "emptyDescription": "Cronjob-Workloads erscheinen hier, sobald der Scheduler den ersten Lauf auslöst.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s-Job",
+        "status": "Status",
+        "duration": "Dauer",
+        "started": "Gestartet"
+      }
+    },
+    "commands": {
+      "emptyTitle": "Noch keine Befehlsausführungen",
+      "emptyDescription": "Ad-hoc-Befehle gegen einen App-Workload erscheinen hier. Per CLI ausführen mit `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Befehl",
+        "status": "Status",
+        "invokedBy": "Aufgerufen von",
+        "started": "Gestartet"
+      }
+    },
+    "runStatus": {
+      "running": "Läuft",
+      "inProgress": "In Bearbeitung",
+      "succeeded": "Erfolgreich",
+      "failed": "Fehlgeschlagen",
+      "superseded": "Ersetzt",
+      "unknown": "Unbekannt",
+      "exitCodeLabel": "Exit {code}",
+      "exitCodeTooltip": "Prozess endete mit Code {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Verbieten",
+        "queue": "Reihen",
+        "replace": "Ersetzen"
+      },
+      "tooltip": {
+        "forbid": "Überspringt den nächsten Trigger, während ein Lauf aktiv ist.",
+        "queue": "Lässt überlappende Läufe stapeln — wähle dies, wenn jeder Trigger unabhängig und kurz ist.",
+        "replace": "Beendet den aktiven Lauf und startet einen neuen."
+      }
+    },
+    "cron": {
+      "invalid": "Ungültiger Cron-Ausdruck",
+      "firesIn": "Startet in {relative}",
+      "now": "weniger als einer Minute",
+      "minutes": "{count, plural, one {# Minute} other {# Minuten}}",
+      "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
+      "days": "{count, plural, one {# Tag} other {# Tage}}"
+    },
+    "workloadCard": {
+      "title": "Cronjob-Workloads",
+      "countLabel": "{count, plural, one {# geplant} other {# geplant}}",
+      "openLogs": "In Konsole öffnen"
+    },
+    "output": {
+      "emptyOutput": "Noch keine erfasste Ausgabe.",
+      "openInConsole": "In Konsole öffnen",
+      "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
+      "truncated": "200 Zeilen angezeigt — öffne die Konsole für die vollständige Ausgabe."
+    }
   }
 }

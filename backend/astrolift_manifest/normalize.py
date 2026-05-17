@@ -130,6 +130,7 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "kind": w.kind,
         "is_public": w.is_public,
         "schedule": w.schedule,
+        "concurrency_policy": w.concurrency_policy,
         "replicas": w.replicas,
         "cpu_request": w.cpu_request,
         "cpu_limit": w.cpu_limit,
