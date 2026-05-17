@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import enum
+from collections.abc import Iterable
 
 import strawberry
 from django.db import models
@@ -321,6 +322,21 @@ class RegisteredAppType:
     # the cheap path cheap. See ``AppSettingsLastModifiedType``.
     settings_last_modified: AppSettingsLastModifiedType | None
 
+    # Effective permission slugs the viewer holds on THIS app (#478),
+    # after scope inheritance (ORG → TEAM → PROJECT → APP). Lets the
+    # FE (and mobile next) render only the actions a viewer can take
+    # without round-tripping a separate query per app row.
+    #
+    # Populated by every read path that returns ``RegisteredAppType``:
+    # the single-app detail resolver computes it directly; the list
+    # resolvers (``astroliftApps`` / ``astroliftMyApps``) compute it
+    # in one bulk binding fetch so the field is O(1) per row instead
+    # of an N+1 join. Always non-null — an empty list means "viewer
+    # has no permissions on this app" (a legitimate, common state),
+    # not "we couldn't resolve". See
+    # :func:`astrolift_identity.permission_resolver.resolve_effective_permissions_for_apps`.
+    viewer_permissions: list[str]
+
 
 @strawberry.type(name="AstroliftAppTeamAccess")
 class AppTeamAccessType:
@@ -563,6 +579,7 @@ def app_to_type(
     freshness: AppFreshness | None = None,
     drift: AppConfigDriftType | None = None,
     settings_last_modified: AppSettingsLastModifiedType | None = None,
+    viewer_permissions: Iterable[str] | None = None,
 ) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
@@ -637,6 +654,7 @@ def app_to_type(
         reprovision=reprovision,
         config_drift=drift,
         settings_last_modified=settings_last_modified,
+        viewer_permissions=sorted(viewer_permissions) if viewer_permissions is not None else [],
     )
 
 

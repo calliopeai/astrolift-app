@@ -175,6 +175,28 @@ def _freshness_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, AppFreshness
     return freshness_by_app
 
 
+def _viewer_permissions_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, set[str]]:
+    """Bulk-resolve the active viewer's effective permissions per app (#478).
+
+    Resolver-local thin wrapper around
+    :func:`astrolift_identity.permission_resolver.resolve_effective_permissions_for_apps`
+    that pulls the active ``TenantContext`` from the request-scoped
+    context var so the per-row serialisers don't have to.
+
+    Returns an empty dict (and never raises) when there's no tenant or
+    no actor — the caller's ``perms_by_app.get(app.pk)`` then resolves
+    to ``None``, which ``app_to_type`` collapses into the empty-list
+    field default. That keeps the cheap pre-auth schema-introspection
+    paths working without special-casing every call site.
+    """
+    from astrolift_identity.permission_resolver import resolve_effective_permissions_for_apps
+
+    tenant = get_current_tenant()
+    if tenant is None or tenant.actor_user_id is None:
+        return {}
+    return resolve_effective_permissions_for_apps(tenant, apps)
+
+
 @strawberry.type
 class RegistryQuery:
     @strawberry.field
@@ -214,10 +236,18 @@ class RegistryQuery:
             :200
         ]
         apps = list(qs)
+        perms_by_app = _viewer_permissions_for_apps(apps)
         if not include_freshness:
-            return [app_to_type(a) for a in apps]
+            return [app_to_type(a, viewer_permissions=perms_by_app.get(a.pk)) for a in apps]
         freshness_by_app = _freshness_for_apps(apps)
-        return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in apps]
+        return [
+            app_to_type(
+                a,
+                freshness=freshness_by_app.get(a.pk),
+                viewer_permissions=perms_by_app.get(a.pk),
+            )
+            for a in apps
+        ]
 
     @strawberry.field
     @tenant_scoped()
@@ -265,10 +295,18 @@ class RegistryQuery:
 
         if getattr(viewer, "is_superuser", False) and getattr(viewer, "is_active", True):
             superuser_apps = list(base_qs.order_by("slug")[:200])
+            perms_by_app = _viewer_permissions_for_apps(superuser_apps)
             if not include_freshness:
-                return [app_to_type(a) for a in superuser_apps]
+                return [app_to_type(a, viewer_permissions=perms_by_app.get(a.pk)) for a in superuser_apps]
             freshness_by_app = _freshness_for_apps(superuser_apps)
-            return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in superuser_apps]
+            return [
+                app_to_type(
+                    a,
+                    freshness=freshness_by_app.get(a.pk),
+                    viewer_permissions=perms_by_app.get(a.pk),
+                )
+                for a in superuser_apps
+            ]
 
         now = timezone.now()
         bindings = list(
@@ -309,10 +347,18 @@ class RegistryQuery:
 
         qs = base_qs.filter(scope_filter).order_by("slug")[:200]
         scoped_apps = list(qs)
+        perms_by_app = _viewer_permissions_for_apps(scoped_apps)
         if not include_freshness:
-            return [app_to_type(a) for a in scoped_apps]
+            return [app_to_type(a, viewer_permissions=perms_by_app.get(a.pk)) for a in scoped_apps]
         freshness_by_app = _freshness_for_apps(scoped_apps)
-        return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in scoped_apps]
+        return [
+            app_to_type(
+                a,
+                freshness=freshness_by_app.get(a.pk),
+                viewer_permissions=perms_by_app.get(a.pk),
+            )
+            for a in scoped_apps
+        ]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -340,11 +386,53 @@ class RegistryQuery:
         # landing card grid (#454). Computed only on the detail path —
         # the list resolvers leave the wrapper None.
         settings_last_modified = build_settings_last_modified(app)
+        perms_by_app = _viewer_permissions_for_apps([app])
         return app_to_type(
             app,
             drift=drift,
             settings_last_modified=settings_last_modified,
+            viewer_permissions=perms_by_app.get(app.pk),
         )
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_app_permissions(self, info: Info, app_slug: str) -> list[str]:
+        """Effective permission slugs the viewer holds on ``app_slug`` (#478).
+
+        Read-side mirror of the resolver chain used by
+        ``@require_permission`` decorators, scoped to a single app
+        instead of the whole tenant. Mobile / web render only the
+        actions the viewer can take — the alternative (try-and-403)
+        is bad UX on a phone (tap → toast).
+
+        Self-service: not gated by ``@require_permission``. Listed in
+        the tenancy-guardrail EXEMPT set with this rationale. Returns
+        an empty list when:
+
+          * No authenticated viewer.
+          * The app slug doesn't resolve in the active tenant.
+          * The viewer has no RoleBinding that reaches the app.
+
+        Empty list is a legitimate signal, not an error — the FE will
+        disable every action button when it sees one.
+        """
+        from astrolift_identity.permission_resolver import (
+            resolve_effective_permissions_for_apps,
+        )
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+
+        qs = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+        if tenant.organization_id is not None:
+            qs = qs.filter(organization_id=tenant.organization_id)
+        app = qs.first()
+        if app is None:
+            return []
+
+        perms_by_app = resolve_effective_permissions_for_apps(tenant, [app])
+        return sorted(perms_by_app.get(app.pk, set()))
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
