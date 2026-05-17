@@ -1,0 +1,232 @@
+"""ApiToken minting, verification, scope enforcement, last-used touch.
+
+Companion of :mod:`astrolift_lifecycle.deploy_tokens` — same lifecycle
+shape (issue + verify + last-used stamp) but for the *user-level*
+``alft_at_`` bearer instead of the *app-level* ``alft_dt_`` bearer.
+
+The mutation in :mod:`astrolift_identity.schema.mutations` mints rows;
+the auth integration in :mod:`astrolift_identity.auth_drf` calls
+``verify_token`` + ``touch_token`` on every authed request.
+
+Scopes are coarse-grained access classes (``read:apps``,
+``write:apps``, ``read:clusters``, ``admin``). They narrow the
+*user's* permission set down to the subset the token may exercise —
+they never widen it. ``admin`` implies all other scopes (operators
+intentionally treat it as the "full power" wildcard so they don't
+have to enumerate every scope at mint time).
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import datetime as dt
+import hashlib
+import secrets
+from collections.abc import Iterable
+
+from django.utils import timezone
+
+PLAINTEXT_PREFIX = "alft_at_"
+
+# Canonical scope catalog. Mirrored in the UI's create-token sheet.
+# Keep names lower-case + colon-separated to match the deploy-token
+# convention (``app.deploy`` → here ``read:apps`` etc). New scopes
+# get added here first so the mutation's validator picks them up.
+SCOPE_READ_APPS = "read:apps"
+SCOPE_WRITE_APPS = "write:apps"
+SCOPE_READ_CLUSTERS = "read:clusters"
+SCOPE_ADMIN = "admin"
+
+ALLOWED_SCOPES: frozenset[str] = frozenset(
+    {SCOPE_READ_APPS, SCOPE_WRITE_APPS, SCOPE_READ_CLUSTERS, SCOPE_ADMIN}
+)
+
+DEFAULT_SCOPES: tuple[str, ...] = (
+    SCOPE_READ_APPS,
+    SCOPE_WRITE_APPS,
+    SCOPE_READ_CLUSTERS,
+    SCOPE_ADMIN,
+)
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class IssuedApiToken:
+    plaintext: str
+    token_hash: str
+    last4: str
+
+
+def _hash(plaintext: str) -> str:
+    return hashlib.sha256(plaintext.encode()).hexdigest()
+
+
+def mint_token() -> IssuedApiToken:
+    """Generate a fresh ``alft_at_…`` secret. Caller persists the
+    hash + last4 onto the ``ApiToken`` row and discloses the
+    plaintext to the operator exactly once."""
+    plaintext = PLAINTEXT_PREFIX + secrets.token_urlsafe(32)
+    return IssuedApiToken(
+        plaintext=plaintext,
+        token_hash=_hash(plaintext),
+        last4=plaintext[-4:],
+    )
+
+
+def normalize_scopes(scopes: Iterable[str] | None) -> list[str]:
+    """Apply the default scope set when caller passed none.
+
+    Deduplicates while preserving order so the badge order in the UI
+    matches the order the operator picked. Unknown scopes are NOT
+    silently dropped — callers (the mutation) should call
+    :func:`validate_scopes` first to surface them as a VALIDATION
+    error.
+    """
+    if scopes is None:
+        return list(DEFAULT_SCOPES)
+    raw = [s.strip() for s in scopes if s and s.strip()]
+    if not raw:
+        return list(DEFAULT_SCOPES)
+    seen: set[str] = set()
+    out: list[str] = []
+    for s in raw:
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def validate_scopes(scopes: Iterable[str]) -> list[str]:
+    """Return the list of unknown scope strings from ``scopes``.
+
+    Empty list means everything is valid. Mutation surfaces the
+    unknowns as a single VALIDATION envelope error.
+    """
+    return sorted({s for s in scopes if s not in ALLOWED_SCOPES})
+
+
+def has_scope(token, required: str) -> bool:
+    """Does ``token`` carry ``required`` (or the ``admin`` wildcard)?
+
+    ``token`` is an ``ApiToken`` row. Pure read; no DB roundtrip.
+    """
+    scopes = token.scopes or []
+    if SCOPE_ADMIN in scopes:
+        return True
+    return required in scopes
+
+
+def enforce_scopes(token, required: Iterable[str]) -> str | None:
+    """Return the first missing required scope, or None on success.
+
+    Caller maps a return value into a 403 / PERMISSION_DENIED.
+    """
+    for r in required:
+        if not has_scope(token, r):
+            return r
+    return None
+
+
+def verify_token(plaintext: str):
+    """Hash-lookup a presented plaintext bearer.
+
+    Returns the matching ``ApiToken`` row when:
+
+    * the hash matches a live row (``deleted_at IS NULL``)
+    * the row is not revoked
+    * the row has not expired
+
+    Returns ``None`` in every other case — the caller should respond
+    with a generic ``401`` regardless of *why* so we don't leak
+    "exists-but-revoked" vs "no such token".
+    """
+    if not plaintext or not plaintext.startswith(PLAINTEXT_PREFIX):
+        return None
+
+    from astrolift_identity.models import ApiToken
+
+    digest = _hash(plaintext)
+    now = timezone.now()
+    row = ApiToken.objects.filter(
+        token_hash=digest,
+        deleted_at__isnull=True,
+        is_revoked=False,
+    ).first()
+    if row is None:
+        return None
+    if row.expires_at is not None and row.expires_at <= now:
+        return None
+    return row
+
+
+def touch_token(token, *, ip: str | None = None, user_agent: str | None = None) -> None:
+    """Stamp ``last_used_at`` / ``last_used_ip`` / ``last_used_agent``.
+
+    Called on every request that authed against this token. Uses
+    ``update_fields`` so the audit ``Tracking`` columns
+    (``updated_at`` / ``version``) advance but no other row data
+    accidentally re-saves. ``ip`` is whatever
+    :func:`client_ip_from_request` resolved; an invalid string is
+    coerced to ``None`` because ``GenericIPAddressField`` would
+    otherwise raise.
+    """
+    now = timezone.now()
+    token.last_used_at = now
+    token.last_used_ip = ip if _is_ip(ip) else None
+    token.last_used_agent = (user_agent or "")[:512]
+    token.save(
+        update_fields=[
+            "last_used_at",
+            "last_used_ip",
+            "last_used_agent",
+            "updated_at",
+            "version",
+        ]
+    )
+
+
+def client_ip_from_request(request) -> str | None:
+    """Extract the caller's IP, honoring ``X-Forwarded-For``.
+
+    Behind ALB / Cloudfront we receive a comma-separated chain; the
+    left-most entry is the original client. Falls back to
+    ``REMOTE_ADDR`` (single proxy / direct connect) when no XFF is
+    present. Returns ``None`` when we can't resolve a usable IP.
+    """
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "") if hasattr(request, "META") else ""
+    if xff:
+        first = xff.split(",")[0].strip()
+        if _is_ip(first):
+            return first
+    remote = request.META.get("REMOTE_ADDR", "") if hasattr(request, "META") else ""
+    return remote if _is_ip(remote) else None
+
+
+def user_agent_from_request(request) -> str:
+    if not hasattr(request, "META"):
+        return ""
+    return (request.META.get("HTTP_USER_AGENT", "") or "")[:512]
+
+
+def _is_ip(value: str | None) -> bool:
+    """Cheap parse: GenericIPAddressField needs a well-formed v4/v6."""
+    if not value:
+        return False
+    import ipaddress
+
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
+def deadline_from_days(days: int | None) -> dt.datetime | None:
+    """Translate ``expires_in_days`` to an absolute UTC instant.
+
+    Centralized here so the mutation and any future re-issue flow
+    agree on how the input shape maps to a deadline column.
+    """
+    if not days or int(days) <= 0:
+        return None
+    return timezone.now() + dt.timedelta(days=int(days))

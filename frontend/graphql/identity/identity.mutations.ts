@@ -304,6 +304,9 @@ export const CREATE_API_TOKEN = gql`
           tokenLast4
           scopes
           expiresAt
+          lastUsedAt
+          lastUsedIp
+          lastUsedAgent
           createdAt
           isRevoked
         }
