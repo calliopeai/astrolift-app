@@ -35,6 +35,51 @@ class EventPageType:
     next_cursor: str | None
 
 
+@strawberry.type(name="AstroliftActivityItem")
+class ActivityItemType:
+    """One pre-shaped row for the dashboard activity feed (#435).
+
+    The raw ``Event`` row carries IDs and a payload blob; the dashboard
+    needs presentation-ready fields so the client doesn't have to know
+    the payload schema for every emit site. Shaped fields here are
+    derived in the resolver — see ``shape_activity_item``:
+
+    * ``actor_display`` — user-friendly actor label
+      (``user_full_name`` / ``email`` / ``"system"``).
+    * ``action`` — verb extracted from ``event_type`` (e.g.
+      ``deploy.completed`` → ``"completed"``).
+    * ``target_kind`` / ``target_label`` — what the event happened to
+      (e.g. app slug, cluster name) so the row reads like a sentence.
+    * ``target_href`` — the resolved drill-down route into the rest of
+      the app, or ``None`` when no canonical route exists for that
+      event kind.
+
+    Raw ``event_type`` + ``payload`` are still exposed so the UI can
+    pick its own icon and so future surfaces (filters, export) don't
+    need a backend round-trip."""
+
+    id: GUID
+    event_type: str
+    action: str
+    actor_display: str
+    target_kind: str
+    target_label: str
+    target_href: str | None
+    occurred_at: dt.datetime
+    payload: JSON
+
+
+@strawberry.type(name="AstroliftActivityPage")
+class ActivityPageType:
+    """Cursor-paginated activity slice. Same cursor format as
+    ``AstroliftEventPage`` — base64-JSON of
+    ``[occurred_at_iso, guid_str]``. ``next_cursor`` is null when
+    the caller has reached the end of the stream."""
+
+    items: list[ActivityItemType]
+    next_cursor: str | None
+
+
 @strawberry.type(name="AstroliftAuditEvent")
 class AuditEventType:
     id: GUID
@@ -148,6 +193,166 @@ def event_to_type(e) -> EventType:
         registered_app_id=_maybe_str(e.registered_app_id),
         occurred_at=e.occurred_at,
     )
+
+
+def shape_activity_item(e) -> ActivityItemType:
+    """Pre-shape one ``Event`` row for the dashboard activity feed.
+
+    Returns ``AstroliftActivityItem`` with derived display fields so
+    the dashboard client doesn't have to know payload shapes:
+
+    * ``actor_display`` — picks the best available user-readable label
+      from ``actor_user`` (full name → email → username), falling back
+      to ``"system"`` for unattributed emits.
+    * ``action`` — last segment of ``event_type`` (``deploy.completed``
+      → ``"completed"``); the resource segment goes into
+      ``target_kind`` when no explicit ``resource_kind`` was stamped.
+    * ``target_label`` / ``target_href`` — derived from
+      ``(event_type, payload, registered_app)``. App-scoped events get
+      a slug-based label and deep link; cluster events route by
+      ``resource_id`` GUID. Returns ``None`` for ``target_href`` when
+      no canonical route exists so the UI can render the row as
+      non-clickable.
+
+    Caller is expected to ``select_related("actor_user",
+    "registered_app")`` so this stays cheap when called in a loop.
+    """
+    event_type = e.event_type or ""
+    resource_segment, _, action_segment = event_type.partition(".")
+    actor_display = _actor_display(getattr(e, "actor_user", None))
+    target_kind = (e.resource_kind or resource_segment or "").strip()
+    target_label, target_href = _resolve_activity_target(
+        event_type=event_type,
+        resource_kind=target_kind,
+        resource_id=e.resource_id or "",
+        payload=e.payload or {},
+        registered_app=getattr(e, "registered_app", None),
+    )
+    return ActivityItemType(
+        id=GUID(str(e.guid)),
+        event_type=event_type,
+        action=action_segment or event_type,
+        actor_display=actor_display,
+        target_kind=target_kind,
+        target_label=target_label,
+        target_href=target_href,
+        occurred_at=e.occurred_at,
+        payload=e.payload or {},
+    )
+
+
+def _actor_display(user) -> str:
+    """Best-effort display label for an ``Event.actor_user``.
+
+    Order of preference: full name (first + last) → email → username
+    → ``"system"`` when no user is attached. Returning a non-empty
+    string in all cases keeps the dashboard row layout stable."""
+    if user is None:
+        return "system"
+    first = (getattr(user, "first_name", "") or "").strip()
+    last = (getattr(user, "last_name", "") or "").strip()
+    full = (first + " " + last).strip()
+    if full:
+        return full
+    email = (getattr(user, "email", "") or "").strip()
+    if email:
+        return email
+    username = (getattr(user, "username", "") or "").strip()
+    if username:
+        return username
+    return "system"
+
+
+def _resolve_activity_target(
+    *,
+    event_type: str,
+    resource_kind: str,
+    resource_id: str,
+    payload: dict,
+    registered_app,
+) -> tuple[str, str | None]:
+    """Map an event to ``(label, href)`` for the activity row.
+
+    Routing rules:
+
+    * ``deploy.*`` / ``deployment.*`` → ``/apps/<slug>/deployments/<id>``
+      when both slug and deployment id are recoverable; otherwise
+      falls back to ``/apps/<slug>`` if a slug exists.
+    * ``cluster.*`` → ``/clusters/<id>`` keyed off ``resource_id`` or
+      ``payload['cluster_id']``.
+    * ``secret.*`` → ``/apps/<slug>/secrets`` when scoped to an app.
+    * ``app.*`` / ``config.*`` / ``scale.*`` → ``/apps/<slug>``.
+    * ``binding.*`` / ``managed_service.*`` → ``/services``.
+    * ``preview.*`` / ``promotion.*`` / ``rollback.*`` / ``drift.*``
+      route through their app's overview when a slug is known.
+
+    The label always falls back to the raw ``resource_id`` so the row
+    never renders an empty target column."""
+    payload = payload or {}
+    app_slug = (
+        (getattr(registered_app, "slug", None) if registered_app else None)
+        or payload.get("app_slug")
+        or payload.get("slug")
+        or ""
+    )
+    app_slug = str(app_slug).strip()
+
+    label = ""
+    href: str | None = None
+
+    if event_type.startswith(("deploy.", "deployment.")):
+        deployment_id = (
+            payload.get("deployment_guid")
+            or payload.get("deployment_id")
+            or (resource_id if resource_kind.lower() == "deployment" else "")
+        )
+        deployment_id = str(deployment_id or "").strip()
+        if app_slug and deployment_id:
+            label = f"{app_slug} · deploy {deployment_id[:8]}"
+            href = f"/apps/{app_slug}/deployments/{deployment_id}"
+        elif app_slug:
+            label = app_slug
+            href = f"/apps/{app_slug}"
+    elif event_type.startswith("cluster."):
+        cluster_id = payload.get("cluster_guid") or payload.get("cluster_id") or resource_id or ""
+        cluster_id = str(cluster_id or "").strip()
+        label = (
+            payload.get("cluster_name")
+            or payload.get("name")
+            or (cluster_id[:8] if cluster_id else "cluster")
+        )
+        if cluster_id:
+            href = f"/clusters/{cluster_id}"
+    elif event_type.startswith("secret."):
+        if app_slug:
+            label = f"{app_slug} · secrets"
+            href = f"/apps/{app_slug}/secrets"
+        else:
+            label = payload.get("secret_name") or resource_id or "secret"
+    elif event_type.startswith(("binding.", "managed_service.")):
+        label = payload.get("binding_name") or payload.get("service_name") or resource_id or "managed service"
+        href = "/services"
+    elif event_type.startswith(("app.", "config.", "scale.")):
+        if app_slug:
+            label = app_slug
+            href = f"/apps/{app_slug}"
+        else:
+            label = resource_id or resource_kind or "app"
+    elif event_type.startswith(("preview.", "promotion.", "rollback.", "drift.", "environment.")):
+        if app_slug:
+            label = app_slug
+            href = f"/apps/{app_slug}"
+        else:
+            label = resource_id or resource_kind or "app"
+    elif event_type.startswith("service."):
+        label = payload.get("service_name") or resource_id or "service"
+        href = "/services"
+    else:
+        label = resource_id or resource_kind or event_type
+
+    if not label:
+        label = resource_id or event_type
+    return (str(label), href)
 
 
 def audit_to_type(a) -> AuditEventType:
