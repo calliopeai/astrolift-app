@@ -17,5 +17,5 @@ rsync -av --delete \
 
 Then update `SOURCE_COMMIT` below and commit.
 
-- **SOURCE_COMMIT**: `38c2a29` (partial — adds `_sdk/notification.py`, `_sdk/base.py`, and `{aws,gcp,azure,k8s_native}/notification_*.py` + `{aws,gcp,azure,k8s_native}/plugin.py` for #490)
+- **SOURCE_COMMIT**: `9f0e346` (partial — `_sdk/cost.py`, `aws/cost.py`, `gcp/cost.py`, `azure/cost.py` synced for #502 billing-actuals on top of #490 notification sync at `38c2a29`)
 - **Upstream repo**: `git@github.com:calliopeai/astrolift-providers.git`
