@@ -72,6 +72,11 @@ input ArchiveAppRegistryRepoInput {
   archive: Boolean! = true
 }
 
+input AssertSessionInput {
+  assertion: String!
+  challenge: String!
+}
+
 input AssignAppToProjectInput {
   appSlug: String!
   projectGuid: GUID = null
@@ -89,6 +94,9 @@ type AstroliftActiveSession {
   userAgent: String
   elevatedUntil: DateTime
   elevationMethod: String
+  attestationKind: String!
+  attestationTrustLevel: String!
+  attestedAt: DateTime
 }
 
 type AstroliftActivityItem {
@@ -519,6 +527,31 @@ type AstroliftApproverUser {
   email: String!
   displayName: String!
   avatarUrl: String!
+}
+
+type AstroliftAttestationChallengePayload {
+  challenge: String!
+  expiresAt: DateTime!
+  kind: String!
+}
+
+type AstroliftAttestationChallengePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAttestationChallengePayload
+}
+
+type AstroliftAttestationResult {
+  trustLevel: String!
+  kind: String!
+  attestedAt: DateTime
+  reason: String
+}
+
+type AstroliftAttestationResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAttestationResult
 }
 
 type AstroliftAuditEvent {
@@ -1179,7 +1212,6 @@ type AstroliftFormSubmissionMutationResult {
   data: AstroliftFormSubmission
 }
 
-<<<<<<< HEAD
 type AstroliftHeartbeatSessionPayload {
   id: GUID!
   lastSeenAt: DateTime
@@ -1191,8 +1223,6 @@ type AstroliftHeartbeatSessionPayloadMutationResult {
   data: AstroliftHeartbeatSessionPayload
 }
 
-=======
->>>>>>> origin/main
 type AstroliftIdentityProvider {
   id: GUID!
   organizationSlug: String!
@@ -2312,6 +2342,14 @@ type AttachmentremovedpayloadMutationResult {
   data: Attachmentremovedpayload
 }
 
+input AttestSessionInput {
+  kind: String!
+  challenge: String!
+  attestationObject: String = null
+  keyId: String = null
+  integrityToken: String = null
+}
+
 type AuditLogEntry {
   operation: String!
   variables: JSON!
@@ -3078,13 +3116,13 @@ type Mutation {
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
   markOnboardingComplete(input: MarkOnboardingCompleteInput!): AstroliftMarkOnboardingCompletePayloadMutationResult!
   logoutAllSessions(input: LogoutAllSessionsInput!): AstroliftLogoutAllSessionsPayloadMutationResult!
-<<<<<<< HEAD
   revokeAstroliftSession(input: RevokeAstroliftSessionInput!): AstroliftRevokeAstroliftSessionPayloadMutationResult!
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult!
-=======
   elevateAdminSession(input: ElevateAdminSessionInput!): AstroliftElevatePayloadMutationResult!
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult!
->>>>>>> origin/main
+  requestAttestationChallenge(input: RequestAttestationChallengeInput!): AstroliftAttestationChallengePayloadMutationResult!
+  attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
+  assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
   setAppSubdomain(input: SetAppSubdomainInput!): AstroliftRegisteredAppMutationResult!
@@ -3231,6 +3269,7 @@ type MutationError {
   code: String!
   message: String!
   field: String
+  requiresAttestation: Boolean
 }
 
 """Standard mutation result with ok flag and validation errors."""
@@ -3647,6 +3686,10 @@ input RemoveAppDomainInput {
 
 input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
+}
+
+input RequestAttestationChallengeInput {
+  kind: String!
 }
 
 input RequestQuotaIncreaseInput {

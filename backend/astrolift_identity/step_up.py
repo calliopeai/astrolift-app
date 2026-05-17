@@ -89,35 +89,46 @@ def requires_elevation(
                 return fn(self, info, *args, **kwargs)
             session = request.session
             status = get_status(session)
-            if status.elevated:
+
+            # #496 — when the install requires attestation for
+            # sensitive ops, the attestation gate runs in *addition*
+            # to the standard step-up freshness gate. A session that
+            # is freshly elevated but not attested still gets the
+            # deny, with ``requires_attestation: true`` so the FE
+            # opens the attest-prompt instead of the password-prompt.
+            attest_required = _attestation_gate_active(request)
+            if status.elevated and not attest_required:
                 return fn(self, info, *args, **kwargs)
+            if attest_required:
+                _emit_deny_audit(
+                    fn=fn,
+                    action="auth.attestation.required",
+                    action_label=action_label,
+                    extra={
+                        "resolver": fn.__qualname__,
+                        "action_label": action_label,
+                        "reason": "attestation_required",
+                    },
+                )
+                return gql_failure(
+                    ErrorCode.STEP_UP_REQUIRED.value,
+                    _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
+                    requires_attestation=True,
+                )
 
             # Audit the deny so security review can spot patterns
             # (operator hammering a sensitive mutation without ever
             # elevating, scripted callers that don't know about
             # step-up, etc.).
-            tenant = get_current_tenant()
-            try:
-                emit_audit(
-                    AuditEntry(
-                        actor_user_id=tenant.actor_user_id if tenant else None,
-                        organization_id=tenant.organization_id if tenant else None,
-                        action="auth.step_up.denied",
-                        decision="DENY",
-                        target_kind="resolver",
-                        target_id=fn.__qualname__,
-                        duration_ms=0,
-                        permissions=(),
-                        error_code=ErrorCode.STEP_UP_REQUIRED.value,
-                        error_message=_DEFAULT_MESSAGE,
-                        extra={
-                            "resolver": fn.__qualname__,
-                            "action_label": action_label,
-                        },
-                    )
-                )
-            except Exception:  # noqa: BLE001 — audit emission must never break a deny
-                log.exception("step_up: audit emit failed on deny for %s", fn.__qualname__)
+            _emit_deny_audit(
+                fn=fn,
+                action="auth.step_up.denied",
+                action_label=action_label,
+                extra={
+                    "resolver": fn.__qualname__,
+                    "action_label": action_label,
+                },
+            )
 
             return gql_failure(
                 ErrorCode.STEP_UP_REQUIRED.value,
@@ -132,6 +143,65 @@ def requires_elevation(
         return wrapper
 
     return decorator
+
+
+def _emit_deny_audit(
+    *,
+    fn: Callable[..., Any],
+    action: str,
+    action_label: str | None,
+    extra: dict[str, Any],
+) -> None:
+    """Best-effort deny-audit emission shared by step-up + attestation deny paths."""
+    tenant = get_current_tenant()
+    try:
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action=action,
+                decision="DENY",
+                target_kind="resolver",
+                target_id=fn.__qualname__,
+                duration_ms=0,
+                permissions=(),
+                error_code=ErrorCode.STEP_UP_REQUIRED.value,
+                error_message=_DEFAULT_MESSAGE,
+                extra=extra,
+            )
+        )
+    except Exception:  # noqa: BLE001 — audit emission must never break a deny
+        log.exception("step_up: audit emit failed on deny for %s", fn.__qualname__)
+
+
+def _attestation_gate_active(request: Any) -> bool:
+    """Return True when the current request's session must be device-attested.
+
+    Resolves the mobile session sidecar from the request and asks
+    :func:`astrolift_identity.attestation.service.attestation_required`
+    to apply the per-install Constance policy.
+
+    Returns False on any error (no session row yet, lookup failed) —
+    the gate is opt-in by Constance flag and a transient failure on
+    the lookup mustn't lock out non-mobile callers. The
+    ``sensitive_op=True`` argument here is hard-coded because
+    ``@requires_elevation`` is the marker for "this is a sensitive
+    mutation"; if you wrapped the resolver, it's sensitive by
+    definition.
+    """
+    try:
+        from astrolift_identity.attestation.service import attestation_required
+        from astrolift_identity.models import AstroliftSession
+
+        session = getattr(request, "session", None)
+        session_key = getattr(session, "session_key", None) if session else None
+        if not session_key:
+            return False
+        row = AstroliftSession.objects.filter(session_key=session_key).first()
+        return attestation_required(session=row, sensitive_op=True)
+    except Exception:  # noqa: BLE001 — never block on a lookup failure
+        log.exception("step_up: attestation gate lookup failed; allowing through")
+        return False
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
