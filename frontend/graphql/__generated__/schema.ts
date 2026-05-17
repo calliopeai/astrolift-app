@@ -998,17 +998,34 @@ export type AstroliftPolicyMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftPreviewAggregateResources = {
+  cpuCores: Scalars['Float']['output'];
+  memoryBytes: Scalars['Float']['output'];
+  podCount: Scalars['Int']['output'];
+};
+
 export type AstroliftPreviewEnvironment = {
+  aggregateResources: AstroliftPreviewAggregateResources;
   branch: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
+  estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   namespace: Scalars['String']['output'];
   prNumber: Scalars['Int']['output'];
+  prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
+  sourceUrl: Scalars['String']['output'];
   status: Scalars['String']['output'];
   tornDownAt?: Maybe<Scalars['DateTime']['output']>;
+  ttlUntil: Scalars['DateTime']['output'];
+};
+
+export type AstroliftPreviewEnvironmentMutationResult = {
+  data?: Maybe<AstroliftPreviewEnvironment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftProject = {
