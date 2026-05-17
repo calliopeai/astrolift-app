@@ -470,6 +470,18 @@
         "title": "Organisation",
         "description": "Anzeigename, Website, Aufbewahrungs-Standardwerte."
       },
+      "members": {
+        "title": "Mitglieder",
+        "description": "Org-Mitglieder, Einladungen und Rollenbindungen."
+      },
+      "teams": {
+        "title": "Teams",
+        "description": "Mitglieder für gemeinsame Verantwortung von Apps und Projekten gruppieren."
+      },
+      "projects": {
+        "title": "Projekte",
+        "description": "Logische Gruppierungen von Apps, die Teams gehören."
+      },
       "identityProvider": {
         "title": "Identity Provider",
         "description": "OIDC / SAML-Konfiguration + SCIM-Bereitstellung."
