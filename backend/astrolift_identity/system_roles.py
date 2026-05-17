@@ -237,7 +237,14 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "app_approver",
         "APP",
         "App Approver",
-        "Approve deploys only.",
-        (Permission.APP_APPROVE_DEPLOY, Permission.APP_READ),
+        "Approve deploys + secret changes only.",
+        (
+            Permission.APP_APPROVE_DEPLOY,
+            Permission.APP_READ,
+            # Secret-change approval (#488) — the approver role covers
+            # both axes so a single grant lets a reviewer act on the
+            # full approval queue without juggling two role grants.
+            Permission.SECRET_APPROVE,
+        ),
     ),
 )

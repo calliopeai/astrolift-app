@@ -150,6 +150,23 @@ class RegisteredApp(NamedBaseCoreModel):
     )
     minimum_approvals = models.PositiveIntegerField(default=1)
 
+    # Secret-change approval policy (#488). Parallel to the deployment
+    # approval gear above. When ``requires_secret_approval=True``, the
+    # secret-write mutations (``setAppSecret`` / ``deleteAppSecret`` /
+    # ``attachSecretBundle`` / ``detachSecretBundle``) stop applying
+    # directly and instead create a ``SecretChangeProposal`` that needs
+    # ``secret_minimum_approvals`` approvers before the underlying op
+    # fires.  Empty ``secret_approver_users`` with the flag on means
+    # "any user holding the secret-approve permission on the app's
+    # org can approve" — the permission gate covers that case.
+    requires_secret_approval = models.BooleanField(default=False)
+    secret_approver_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="secret_approver_for_apps",
+        blank=True,
+    )
+    secret_minimum_approvals = models.PositiveIntegerField(default=1)
+
     # Latest preview screenshot URL for this app, written by the
     # platform's screenshotter service (spec 09 §4.21). Stays empty
     # until the service captures and uploads its first frame; the UI

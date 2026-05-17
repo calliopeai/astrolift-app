@@ -953,6 +953,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, =1 {1 secret-change proposal pending review} other {# secret-change proposals pending review}}",
+        "appWide": "(app-wide)",
+        "votes": "({received}/{required} votes)",
+        "seeAll": "See all {count} in the approvals queue →"
       }
     },
     "security": {
@@ -2214,6 +2220,23 @@
         "linkCopied": "Accept link copied",
         "copyFailed": "Copy failed — select and copy manually"
       }
+    },
+    "secretProposalsQueue": {
+      "title": "Pending secret-change proposals",
+      "empty": {
+        "title": "No pending secret-change proposals",
+        "description": "Proposals appear here when an app with secret-approval gating receives a setSecret / attach-bundle write. Enable the gate on a RegisteredApp's settings to start using this queue."
+      },
+      "row": {
+        "appWide": "(app-wide)",
+        "typeBadge": "Secret",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} approvals",
+        "summary": "{summary}",
+        "proposer": "by {name}",
+        "received": "Received {rel}",
+        "review": "Review"
+      }
     }
   },
   "settingsIndex": {
@@ -2362,5 +2385,64 @@
     "sourceColumn": "Source",
     "grantRoleRowLabel": "Grant role to {name}",
     "grantRoleRowTooltip": "Grant role to {name}"
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "title": "{app} → {env}",
+      "appWide": "(app-wide)",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} approvals",
+      "proposedBy": "Proposed by {name}, {rel}",
+      "unknownProposer": "(unknown)",
+      "expiresIn": "Expires {rel}",
+      "applyError": "Apply failed: {message}",
+      "loading": {
+        "title": "Loading proposal…"
+      },
+      "notFound": {
+        "title": "Proposal not found",
+        "description": "It may have been withdrawn, expired, or you may not have access."
+      },
+      "approve": "Approve",
+      "reject": "Reject",
+      "withdraw": "Withdraw",
+      "confirmApprove": {
+        "title": "Approve this proposal?",
+        "description": "When the quorum is reached the change applies immediately to the staged manifest or bundle attachment.",
+        "confirm": "Approve"
+      },
+      "confirmReject": {
+        "title": "Reject this proposal?",
+        "description": "One nay closes the proposal as rejected. The proposer can re-open with a fresh proposal.",
+        "reasonLabel": "Reason for rejection (recorded on the audit log)",
+        "reasonPlaceholder": "Why is this proposal being rejected?",
+        "reasonRequired": "Reason required",
+        "confirm": "Reject"
+      },
+      "confirmWithdraw": {
+        "title": "Withdraw this proposal?",
+        "description": "The proposal moves to withdrawn and stops counting against the queue. Re-open with a fresh proposeSecretChange.",
+        "confirm": "Withdraw"
+      },
+      "diff": {
+        "title": "Diff",
+        "before": "Before",
+        "after": "After",
+        "maskNote": "Values are masked. Use revealAppSecret on the secrets page to inspect plaintext (audit-logged)."
+      },
+      "approvers": {
+        "title": "Approvers",
+        "empty": "No one has voted yet.",
+        "unknownApprover": "(unknown)"
+      },
+      "toasts": {
+        "approveOk": "Proposal approved.",
+        "approveFailed": "Approve failed.",
+        "rejectOk": "Proposal rejected.",
+        "rejectFailed": "Reject failed.",
+        "withdrawOk": "Proposal withdrawn.",
+        "withdrawFailed": "Withdraw failed."
+      }
+    }
   }
 }
