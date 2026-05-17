@@ -276,5 +276,77 @@
         "description": "Tokens de portador de longa duração para CLIs e bots."
       }
     }
+  },
+  "lists": {
+    "cost": {
+      "title": "Cost",
+      "description": "Currency-denominated platform spend, rolled up from CostSnapshot rows. Pick a time range; the trend chart marks anomalies (> 2σ day-over-day jumps); the per-resource panel attributes spend to specific managed-service bindings.",
+      "tabsLabel": "Time range",
+      "tab24h": "24h",
+      "tab7d": "7d",
+      "tab30d": "30d",
+      "tabMtd": "MTD",
+      "kpis": {
+        "projectedMonthly": "Projected monthly",
+        "budgets": "Budgets",
+        "window": {
+          "h24": "Last 24 hours",
+          "d7": "Last 7 days",
+          "d30": "Last 30 days",
+          "mtd": "Month to date"
+        }
+      },
+      "forecast": {
+        "vsPreviousMonth": "vs prev month",
+        "mtdLine": "MTD {mtd} · prev month {previous}",
+        "insufficientData": "Not enough daily cost data yet for a confident projection.",
+        "confidence": {
+          "low": "low confidence",
+          "medium": "med confidence",
+          "high": "high confidence"
+        }
+      },
+      "trend": {
+        "title": "Daily trend",
+        "description": "Per-day platform spend over the selected range. Marked points exceed the day-over-day rolling 2σ.",
+        "tooltipDailyTotal": "Daily total",
+        "anomaliesBadge": "{count} anomaly",
+        "emptyTitle": "No cost data in this window",
+        "emptyDescription": "The daily cost collector hasn't written snapshots for the selected range yet, or the cloud-side billing API hasn't reported usage. Live pricing data only — nothing is estimated client-side."
+      },
+      "budgets": {
+        "title": "Budgets",
+        "description": "Budgets fire alerts as you cross each percentage threshold.",
+        "emptyTitle": "No budgets configured",
+        "emptyDescription": "Budgets can be set per organization, team, or project.",
+        "columns": {
+          "scope": "Scope",
+          "period": "Period",
+          "spend": "Spend",
+          "budget": "Budget",
+          "alerts": "Alerts"
+        }
+      },
+      "byCategory": {
+        "title": "By category",
+        "description": "Spend split across workload / managed-service / egress / storage / other.",
+        "empty": "No cost data yet."
+      },
+      "attribution": {
+        "title": "Per-resource attribution",
+        "description": "Spend broken out by managed-service binding (e.g. main_db, events_queue, uploads_bucket). Untagged rows roll up under \"shared / untagged\" — usually shared egress or providers that don't yet apply the platform binding tag.",
+        "coverage": "Attribution coverage: {pct}% ({attributed} of {total})",
+        "unattributedRow": "Shared / untagged",
+        "emptyTitle": "No attributed cost rows",
+        "emptyDescription": "Bindings are visible only after the cloud-side cost driver tags resources with astrolift.io/binding at provision time. Track #432 from:backend for the provider-side rollout.",
+        "columns": {
+          "resource": "Resource",
+          "kind": "Kind",
+          "app": "App",
+          "category": "Category",
+          "amount": "Amount"
+        }
+      }
+    }
   }
 }
