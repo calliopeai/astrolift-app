@@ -1212,6 +1212,17 @@ export type AstroliftManagedServiceTestEmailResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftMarkOnboardingCompletePayload = {
+  alreadyCompleted: Scalars['Boolean']['output'];
+  organization: AstroliftOrganization;
+};
+
+export type AstroliftMarkOnboardingCompletePayloadMutationResult = {
+  data?: Maybe<AstroliftMarkOnboardingCompletePayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftMember = {
   createdAt: Scalars['DateTime']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1295,6 +1306,7 @@ export type AstroliftOrganization = {
   id: Scalars['GUID']['output'];
   logRetentionDaysDefault: Scalars['Int']['output'];
   name: Scalars['String']['output'];
+  onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
   scimEnabled: Scalars['Boolean']['output'];
   slug: Scalars['String']['output'];
@@ -2580,6 +2592,10 @@ export type MarkNotificationReadInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type MarkOnboardingCompleteInput = {
+  skip: Scalars['Boolean']['input'];
+};
+
 export type Markallreadpayload = {
   marked: Scalars['Int']['output'];
 };
@@ -2691,6 +2707,7 @@ export type Mutation = {
   logoutAllSessions: AstroliftLogoutAllSessionsPayloadMutationResult;
   markAllNotificationsRead: MarkallreadpayloadMutationResult;
   markNotificationRead: AstroliftNotificationMutationResult;
+  markOnboardingComplete: AstroliftMarkOnboardingCompletePayloadMutationResult;
   /** Create or update a Metabase chart via MetabaseChartSerializer. */
   metabaseChart: MutationResult;
   migrateAppToCluster: AstroliftAppEnvironmentMutationResult;
@@ -3199,6 +3216,11 @@ export type MutationLogoutAllSessionsArgs = {
 
 export type MutationMarkNotificationReadArgs = {
   input: MarkNotificationReadInput;
+};
+
+
+export type MutationMarkOnboardingCompleteArgs = {
+  input: MarkOnboardingCompleteInput;
 };
 
 

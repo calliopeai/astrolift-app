@@ -302,6 +302,26 @@ class LogoutAllSessionsInput:
     keep_current: bool = True
 
 
+@strawberry.input
+class MarkOnboardingCompleteInput:
+    """Flip the active org's ``onboarding_completed_at`` to now.
+
+    ``skip`` distinguishes "operator explicitly skipped the wizard"
+    from "operator completed it" so the audit log can carry the
+    intent — the persisted timestamp is the same either way.
+    Idempotent: a re-run on an already-complete org is a no-op and
+    returns the existing payload rather than failing.
+    """
+
+    skip: bool = False
+
+
+@strawberry.type(name="AstroliftMarkOnboardingCompletePayload")
+class _MarkOnboardingCompletePayload:
+    organization: OrganizationType
+    already_completed: bool
+
+
 @strawberry.type(name="AstroliftLogoutAllSessionsPayload")
 class _LogoutAllSessionsPayload:
     revoked_count: int
@@ -1664,6 +1684,44 @@ class IdentityMutation:
         viewer.save(update_fields=["first_name", "last_name", "email"])
 
         return gql_success(_my_profile_payload(viewer, org, locked))
+
+    @strawberry.field
+    @mutation_audit(action="organization.mark_onboarding_complete")
+    @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
+    def mark_onboarding_complete(
+        self, info: Info, input: MarkOnboardingCompleteInput
+    ) -> MutationResultType[_MarkOnboardingCompletePayload]:
+        """Mark the active organization's first-run wizard as done.
+
+        Idempotent on purpose: the FE may race a manual re-run with
+        the auto-open path, and we want both calls to succeed so the
+        wizard reliably closes. ``already_completed`` lets the FE
+        suppress the "great, you're set up!" toast on the re-entry
+        path. ``skip`` only affects the audit row's ``extra`` payload —
+        the persisted timestamp is the same.
+        """
+        from django.utils import timezone
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        already = org.onboarding_completed_at is not None
+        if not already:
+            org.onboarding_completed_at = timezone.now()
+            org.save(update_fields=["onboarding_completed_at", "updated_at", "version"])
+
+        return gql_success(
+            _MarkOnboardingCompletePayload(
+                organization=organization_to_type(org),
+                already_completed=already,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="session.logout_all")

@@ -27,6 +27,10 @@ class OrganizationType:
     preview_max_active_default: int
     log_retention_days_default: int
     allow_user_profile_edit: bool
+    # Non-null once the first-run wizard has been completed or
+    # explicitly skipped. The FE opens the onboarding wizard when
+    # this is null AND the operator has zero team memberships.
+    onboarding_completed_at: dt.datetime | None
     created_at: dt.datetime
     updated_at: dt.datetime
     deleted_at: dt.datetime | None
@@ -86,6 +90,7 @@ def organization_to_type(org) -> OrganizationType:
         preview_max_active_default=org.preview_max_active_default,
         log_retention_days_default=org.log_retention_days_default,
         allow_user_profile_edit=org.allow_user_profile_edit,
+        onboarding_completed_at=org.onboarding_completed_at,
         created_at=org.created_at,
         updated_at=org.updated_at,
         deleted_at=org.deleted_at,

@@ -1188,6 +1188,17 @@ type AstroliftManagedServiceTestEmailResultMutationResult {
   data: AstroliftManagedServiceTestEmailResult
 }
 
+type AstroliftMarkOnboardingCompletePayload {
+  organization: AstroliftOrganization!
+  alreadyCompleted: Boolean!
+}
+
+type AstroliftMarkOnboardingCompletePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftMarkOnboardingCompletePayload
+}
+
 type AstroliftMember {
   id: GUID!
   user: AstroliftUser!
@@ -1197,6 +1208,7 @@ type AstroliftMember {
   lifecycle: String!
   joinedAt: DateTime
   lastSeenAt: DateTime
+  lastActiveAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
 }
@@ -1272,6 +1284,7 @@ type AstroliftOrganization {
   previewMaxActiveDefault: Int!
   logRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
+  onboardingCompletedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
@@ -1561,6 +1574,7 @@ type AstroliftRoleBinding {
   role: AstroliftRole!
   scopeKind: String!
   scopeId: String!
+  sourceScopeLabel: String!
   grantedAt: DateTime!
   expiresAt: DateTime
   inherits: Boolean!
@@ -2567,6 +2581,10 @@ input MarkNotificationReadInput {
   id: GUID!
 }
 
+input MarkOnboardingCompleteInput {
+  skip: Boolean! = false
+}
+
 type Markallreadpayload {
   marked: Int!
 }
@@ -2735,6 +2753,7 @@ type Mutation {
   setActiveIdentityProvider(input: SetActiveIdentityProviderInput!): AstroliftIdentityProviderMutationResult!
   softDeleteIdentityProvider(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
+  markOnboardingComplete(input: MarkOnboardingCompleteInput!): AstroliftMarkOnboardingCompletePayloadMutationResult!
   logoutAllSessions(input: LogoutAllSessionsInput!): AstroliftLogoutAllSessionsPayloadMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!
@@ -3079,7 +3098,7 @@ type Query {
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
-  astroliftMembers: [AstroliftMember!]!
+  astroliftMembers(search: String = null): [AstroliftMember!]!
   astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
