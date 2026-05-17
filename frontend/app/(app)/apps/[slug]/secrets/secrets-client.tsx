@@ -14,6 +14,7 @@ import {
   UploadIcon,
   XIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -66,7 +67,9 @@ import {
 import {
   LIST_APP_SECRETS,
   LIST_APP_SECRET_BUNDLE_ATTACHMENTS,
+  LIST_SECRET_CHANGE_PROPOSALS,
 } from "@/graphql/services/services.queries";
+import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -167,6 +170,16 @@ export function SecretsClient({ slug }: { slug: string }) {
   const attachments = useQuery<AttachmentsResp>(LIST_APP_SECRET_BUNDLE_ATTACHMENTS, {
     variables,
     fetchPolicy: "cache-and-network",
+  });
+  // #488 — show inline "N pending proposal" banner when the app has
+  // pending secret-change proposals. Poll lazily; the banner is
+  // ambient context, not a primary action surface.
+  const pendingProposals = useQuery<{
+    astroliftSecretChangeProposals: AstroliftSecretChangeProposal[];
+  }>(LIST_SECRET_CHANGE_PROPOSALS, {
+    variables: { appSlug: slug, status: "pending" },
+    fetchPolicy: "cache-and-network",
+    pollInterval: 60_000,
   });
 
   const refetch = [
@@ -337,6 +350,10 @@ export function SecretsClient({ slug }: { slug: string }) {
       }
     >
       <AppTabs slug={slug} active="secrets" />
+
+      <PendingProposalsBanner
+        proposals={pendingProposals.data?.astroliftSecretChangeProposals ?? []}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Label className="text-muted-foreground text-xs tracking-wide uppercase">
@@ -1027,5 +1044,52 @@ function BulkImportSheet({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// #488 — secret-change proposal banner. Rendered above the secrets
+// table when the app has pending proposals. Each proposal links into
+// the global proposal-detail page; from there the approver can
+// approve / reject. Banner is ambient context only — primary action
+// surface is the /approvals queue.
+function PendingProposalsBanner({ proposals }: { proposals: AstroliftSecretChangeProposal[] }) {
+  const t = useTranslations("apps.secrets.pendingProposals");
+  if (proposals.length === 0) {
+    return null;
+  }
+  return (
+    <div className="bg-card rounded-md border p-3 text-sm">
+      <p className="font-medium">{t("title", { count: proposals.length })}</p>
+      <ul className="mt-2 flex flex-col gap-1">
+        {proposals.slice(0, 5).map((proposal) => {
+          const summary =
+            (proposal.payloadDiff as { summary?: string })?.summary ??
+            `${proposal.op} on ${proposal.environmentName || t("appWide")}`;
+          return (
+            <li key={proposal.id} className="text-muted-foreground text-xs">
+              <Link
+                className="text-foreground hover:underline"
+                href={`/approvals/secret/${proposal.id}`}
+              >
+                {summary}
+              </Link>
+              <span className="ml-2">
+                {t("votes", {
+                  received: proposal.approvalsCount,
+                  required: proposal.requiredApproverCount,
+                })}
+              </span>
+            </li>
+          );
+        })}
+        {proposals.length > 5 && (
+          <li className="text-muted-foreground text-xs">
+            <Link className="hover:underline" href="/approvals">
+              {t("seeAll", { count: proposals.length })}
+            </Link>
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }

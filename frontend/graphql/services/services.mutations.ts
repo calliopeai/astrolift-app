@@ -13,6 +13,7 @@ export const SET_APP_SECRET = gql`
         appSlug
         key
         rawManifestStaged
+        pendingProposalId
       }
     }
   }
@@ -30,6 +31,7 @@ export const DELETE_APP_SECRET = gql`
         appSlug
         key
         rawManifestStaged
+        pendingProposalId
       }
     }
   }
@@ -81,6 +83,8 @@ export const DETACH_SECRET_BUNDLE = gql`
       }
       data {
         attachmentId
+        deleted
+        pendingProposalId
       }
     }
   }
@@ -190,6 +194,97 @@ export const REVEAL_MANAGED_SERVICE_CONNECTION = gql`
           value
           isSecret
         }
+      }
+    }
+  }
+`;
+
+// #488 Secret-change approval workflow mutations ----------------------
+
+const SECRET_PROPOSAL_FIELDS = `
+  id
+  registeredAppSlug
+  environmentName
+  op
+  status
+  proposerUserId
+  proposerDisplayName
+  payload
+  payloadDiff
+  requiredApproverCount
+  approvalsCount
+  expiresAt
+  decidedAt
+  appliedAt
+  applyError
+  createdAt
+  approvals {
+    id
+    approverUserId
+    approverDisplayName
+    decision
+    decidedAt
+    reason
+  }
+`;
+
+export const PROPOSE_SECRET_CHANGE = gql`
+  mutation ProposeSecretChange($input: ProposeSecretChangeInput!) {
+    proposeSecretChange(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${SECRET_PROPOSAL_FIELDS}
+      }
+    }
+  }
+`;
+
+export const APPROVE_SECRET_CHANGE = gql`
+  mutation ApproveSecretChange($input: ApproveSecretChangeInput!) {
+    approveSecretChange(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${SECRET_PROPOSAL_FIELDS}
+      }
+    }
+  }
+`;
+
+export const REJECT_SECRET_CHANGE = gql`
+  mutation RejectSecretChange($input: RejectSecretChangeInput!) {
+    rejectSecretChange(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${SECRET_PROPOSAL_FIELDS}
+      }
+    }
+  }
+`;
+
+export const WITHDRAW_SECRET_CHANGE = gql`
+  mutation WithdrawSecretChange($input: WithdrawSecretChangeInput!) {
+    withdrawSecretChange(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${SECRET_PROPOSAL_FIELDS}
       }
     }
   }

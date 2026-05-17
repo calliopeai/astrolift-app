@@ -11,8 +11,9 @@ import {
   SearchIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
@@ -23,15 +24,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LIST_APPS } from "@/graphql/registry/registry.queries";
-import type { AstroliftRegisteredApp, ProvisioningStatus } from "@/graphql/registry/registry.types";
+import { LIST_APPS_PAGE } from "@/graphql/registry/registry.queries";
+import type {
+  AppListStatusFilter,
+  AstroliftRegisteredApp,
+  AstroliftRegisteredAppPage,
+  ProvisioningStatus,
+} from "@/graphql/registry/registry.types";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
 import { AppFreshnessRow } from "./components/AppFreshnessRow";
 
 interface Resp {
-  astroliftApps: AstroliftRegisteredApp[];
+  astroliftAppsPage: AstroliftRegisteredAppPage;
 }
 
 const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending"> = {
@@ -41,50 +47,101 @@ const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending">
   failed: "error",
 };
 
-type Bucket = "all" | "running" | "failed" | "inflight" | "notDeployed";
+// Filter pill identifiers — the union is the user-facing axis (matches
+// the health pulse + a synthetic "in-flight" bucket). The pill-to-server
+// mapping lives in `PILL_TO_STATUS_FILTER`.
+type Pill = "all" | "ok" | "degraded" | "stale" | "never_deployed";
 
-const BUCKET_ORDER: Bucket[] = ["all", "running", "failed", "inflight", "notDeployed"];
+const PILL_ORDER: Pill[] = ["all", "ok", "degraded", "stale", "never_deployed"];
 
-// Derive a triage bucket from the raw provisioning status. Anything outside
-// the known set lands in `notDeployed` so the pill counts always add up.
-function bucketFor(status: ProvisioningStatus | string | null | undefined): Exclude<Bucket, "all"> {
-  switch (status) {
-    case "ready":
-      return "running";
-    case "failed":
-      return "failed";
-    case "pending":
-    case "provisioning":
-      return "inflight";
-    default:
-      return "notDeployed";
-  }
+const PILL_TO_STATUS_FILTER: Record<Pill, AppListStatusFilter | null> = {
+  all: null,
+  ok: "OK",
+  degraded: "DEGRADED",
+  stale: "STALE",
+  never_deployed: "NEVER_DEPLOYED",
+};
+
+const STATUS_FILTER_TO_PILL: Record<AppListStatusFilter, Pill> = {
+  ALL: "all",
+  OK: "ok",
+  DEGRADED: "degraded",
+  STALE: "stale",
+  NEVER_DEPLOYED: "never_deployed",
+};
+
+const PAGE_SIZE = 50;
+
+function pillFromParam(value: string | null): Pill {
+  if (!value) return "all";
+  const upper = value.toUpperCase() as AppListStatusFilter;
+  return STATUS_FILTER_TO_PILL[upper] ?? "all";
 }
 
 export function AppsClient() {
   const t = useTranslations("apps.list");
-  const { data, loading, error, refetch } = useQuery<Resp>(LIST_APPS, {
-    // Opt into per-row deployment freshness (#405). Drives the
-    // health pulse, last-deployed badge, and failed-deploy chip on
-    // each card. Backend keeps the fields null until this is true,
-    // so the apps-list query stays cheap for callers (the command
-    // palette, etc.) that only want the registry fields.
-    variables: { includeFreshness: true },
-    notifyOnNetworkStatusChange: true,
-  });
-  // Memoize so dependent useMemos don't re-run on every render when Apollo
-  // returns the same `data` reference but the `?? []` fallback would
-  // otherwise mint a fresh array each time.
-  const apps = useMemo(() => data?.astroliftApps ?? [], [data]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [rawSearch, setRawSearch] = useState("");
+  // URL params seed the initial filter state so a shared link arrives
+  // pre-filtered. We treat the URL as the source of truth for filter
+  // state and round-trip user input through router.replace so the
+  // browser back/forward buttons still work as expected.
+  const initialSearch = searchParams.get("q") ?? "";
+  const initialPill = pillFromParam(searchParams.get("status"));
+  const initialTeam = searchParams.get("team") ?? "";
+  const initialProject = searchParams.get("project") ?? "";
+
+  const [rawSearch, setRawSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(rawSearch, 200);
-  const [bucket, setBucket] = useState<Bucket>("all");
+  const [pill, setPill] = useState<Pill>(initialPill);
+  const [teamSlug, setTeamSlug] = useState(initialTeam);
+  const [projectSlug, setProjectSlug] = useState(initialProject);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // `/` global shortcut focuses the search input — but only when the user
-  // isn't already typing into a form control / contenteditable, and no
-  // modifier key is held (so it doesn't intercept browser shortcuts).
+  // Reflect filter state back into the URL whenever it changes — this
+  // is what makes the page state shareable. Skips replace when the URL
+  // already matches so the router doesn't churn on first paint.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (debouncedSearch.trim()) next.set("q", debouncedSearch.trim());
+    if (pill !== "all") next.set("status", PILL_TO_STATUS_FILTER[pill] ?? "");
+    if (teamSlug) next.set("team", teamSlug);
+    if (projectSlug) next.set("project", projectSlug);
+    const target = next.toString();
+    const current = searchParams.toString();
+    if (target === current) return;
+    const url = target ? `${pathname}?${target}` : pathname;
+    router.replace(url, { scroll: false });
+  }, [debouncedSearch, pill, teamSlug, projectSlug, pathname, router, searchParams]);
+
+  const queryVariables = useMemo(() => {
+    const status = PILL_TO_STATUS_FILTER[pill];
+    return {
+      includeFreshness: true,
+      limit: PAGE_SIZE,
+      search: debouncedSearch.trim() || null,
+      status: status,
+      teamSlug: teamSlug || null,
+      projectSlug: projectSlug || null,
+    };
+  }, [debouncedSearch, pill, teamSlug, projectSlug]);
+
+  const { data, loading, error, refetch, fetchMore } = useQuery<Resp>(LIST_APPS_PAGE, {
+    variables: queryVariables,
+    notifyOnNetworkStatusChange: true,
+  });
+
+  const page = data?.astroliftAppsPage;
+  const apps: AstroliftRegisteredApp[] = useMemo(() => page?.items ?? [], [page]);
+  const totalCount = page?.totalCount ?? 0;
+  const nextCursor = page?.nextCursor ?? null;
+
+  // `/` global shortcut focuses the search input — but only when the
+  // user isn't already typing into a form control / contenteditable,
+  // and no modifier key is held (so it doesn't intercept browser
+  // shortcuts).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "/") return;
@@ -104,39 +161,43 @@ export function AppsClient() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Counts always reflect the unfiltered list, so operators can see at a
-  // glance how many apps fall into each triage bucket regardless of what's
-  // currently filtered.
-  const counts = useMemo(() => {
-    const acc: Record<Bucket, number> = {
-      all: apps.length,
-      running: 0,
-      failed: 0,
-      inflight: 0,
-      notDeployed: 0,
-    };
-    for (const app of apps) {
-      acc[bucketFor(app.provisioningStatus)] += 1;
-    }
-    return acc;
-  }, [apps]);
-
-  const filtered = useMemo(() => {
-    const needle = debouncedSearch.trim().toLowerCase();
-    return apps.filter((app) => {
-      if (bucket !== "all" && bucketFor(app.provisioningStatus) !== bucket) {
-        return false;
-      }
-      if (!needle) return true;
-      const haystack = [app.name, app.slug, app.sourceRepo ?? ""].join(" ").toLowerCase();
-      return haystack.includes(needle);
+  const onLoadMore = useCallback(() => {
+    if (!nextCursor) return;
+    void fetchMore({
+      variables: { ...queryVariables, cursor: nextCursor },
+      updateQuery: (prev, { fetchMoreResult }) => {
+        if (!fetchMoreResult) return prev;
+        const prevPage = prev.astroliftAppsPage;
+        const nextPage = fetchMoreResult.astroliftAppsPage;
+        return {
+          astroliftAppsPage: {
+            ...nextPage,
+            // Merge dedupes by id in case a row appears in both pages
+            // (the cursor seek key is stable so this should never
+            // happen in practice, but defensive merging avoids React
+            // key collisions if it does).
+            items: dedupeApps([...(prevPage?.items ?? []), ...nextPage.items]),
+          },
+        };
+      },
+    }).catch(() => {
+      // Swallowed: a failed `fetchMore` leaves the existing page in
+      // place; the error banner re-renders from the parent query.
     });
-  }, [apps, debouncedSearch, bucket]);
+  }, [fetchMore, nextCursor, queryVariables]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setRawSearch("");
-    setBucket("all");
-  };
+    setPill("all");
+    setTeamSlug("");
+    setProjectSlug("");
+  }, []);
+
+  const hasActiveFilters =
+    debouncedSearch.trim() !== "" ||
+    pill !== "all" ||
+    teamSlug !== "" ||
+    projectSlug !== "";
 
   return (
     <PageShell
@@ -205,13 +266,13 @@ export function AppsClient() {
           role="group"
           aria-label={t("filters.ariaLabel")}
         >
-          {BUCKET_ORDER.map((b) => {
-            const isActive = bucket === b;
+          {PILL_ORDER.map((p) => {
+            const isActive = pill === p;
             return (
               <button
-                key={b}
+                key={p}
                 type="button"
-                onClick={() => setBucket(b)}
+                onClick={() => setPill(p)}
                 aria-pressed={isActive}
                 className={cn(
                   "border-border focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
@@ -220,19 +281,25 @@ export function AppsClient() {
                     : "bg-background text-muted-foreground hover:text-foreground hover:bg-accent/40"
                 )}
               >
-                <span>{t(`filters.${b}`)}</span>
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
-                    isActive ? "bg-background/15 text-background" : "bg-muted text-foreground/70"
-                  )}
-                >
-                  {counts[b]}
-                </span>
+                <span>{t(`filters.${p}`)}</span>
               </button>
             );
           })}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="border-border text-muted-foreground hover:text-foreground hover:bg-accent/40 ml-1 inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+            >
+              {t("noMatch.clear")}
+            </button>
+          )}
         </div>
+        {totalCount > 0 && (
+          <p className="text-muted-foreground text-xs">
+            {t("count", { shown: apps.length, total: totalCount })}
+          </p>
+        )}
       </div>
 
       {loading && !data ? (
@@ -241,7 +308,7 @@ export function AppsClient() {
           <Skeleton className="h-44 w-full" />
           <Skeleton className="h-44 w-full" />
         </div>
-      ) : apps.length === 0 ? (
+      ) : apps.length === 0 && !hasActiveFilters ? (
         <Card className="border-dashed">
           <CardContent className="p-8">
             <EmptyState
@@ -253,7 +320,7 @@ export function AppsClient() {
             />
           </CardContent>
         </Card>
-      ) : filtered.length === 0 ? (
+      ) : apps.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="p-8">
             <EmptyState
@@ -269,58 +336,83 @@ export function AppsClient() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((app) => (
-            <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
-              <Card className="hover:bg-accent/30 group transition-colors">
-                <CardContent className="flex flex-col gap-3 p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-lg font-semibold">{app.name}</h3>
-                      <p className="text-muted-foreground font-mono text-xs">
-                        {app.teamSlug}/{app.projectSlug}/{app.slug}
-                      </p>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {apps.map((app) => (
+              <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
+                <Card className="hover:bg-accent/30 group transition-colors">
+                  <CardContent className="flex flex-col gap-3 p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-lg font-semibold">{app.name}</h3>
+                        <p className="text-muted-foreground font-mono text-xs">
+                          {app.teamSlug}/{app.projectSlug}/{app.slug}
+                        </p>
+                      </div>
+                      <StatusDot status={statusDot[app.provisioningStatus]} />
                     </div>
-                    <StatusDot status={statusDot[app.provisioningStatus]} />
-                  </div>
 
-                  {app.description && (
-                    <p className="text-muted-foreground line-clamp-2 text-sm">{app.description}</p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    {app.sourceRepo && (
-                      <Badge variant="outline" className="gap-1">
-                        <GitBranchIcon className="size-3" />
-                        {app.sourceRepo}
-                      </Badge>
+                    {app.description && (
+                      <p className="text-muted-foreground line-clamp-2 text-sm">{app.description}</p>
                     )}
-                    <Badge variant="secondary">{app.sourceKind}</Badge>
-                    <Badge variant={app.isActive ? "default" : "secondary"}>
-                      {app.provisioningStatus}
-                    </Badge>
-                  </div>
 
-                  <AppFreshnessRow
-                    pulse={app.healthPulse}
-                    latestDeployment={app.latestDeployment}
-                    lastDeployedAt={app.lastDeployedAt ?? null}
-                  />
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {app.sourceRepo && (
+                        <Badge variant="outline" className="gap-1">
+                          <GitBranchIcon className="size-3" />
+                          {app.sourceRepo}
+                        </Badge>
+                      )}
+                      <Badge variant="secondary">{app.sourceKind}</Badge>
+                      <Badge variant={app.isActive ? "default" : "secondary"}>
+                        {app.provisioningStatus}
+                      </Badge>
+                    </div>
 
-                  <div className="text-muted-foreground flex items-center justify-between text-xs">
-                    <span>
-                      {t("branchLabel")} <span className="font-mono">{app.deployBranch}</span>
-                    </span>
-                    <span className="group-hover:text-foreground inline-flex items-center gap-1">
-                      {t("open")} <ExternalLinkIcon className="size-3" />
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                    <AppFreshnessRow
+                      pulse={app.healthPulse}
+                      latestDeployment={app.latestDeployment}
+                      lastDeployedAt={app.lastDeployedAt ?? null}
+                    />
+
+                    <div className="text-muted-foreground flex items-center justify-between text-xs">
+                      <span>
+                        {t("branchLabel")} <span className="font-mono">{app.deployBranch}</span>
+                      </span>
+                      <span className="group-hover:text-foreground inline-flex items-center gap-1">
+                        {t("open")} <ExternalLinkIcon className="size-3" />
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+          {nextCursor && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLoadMore}
+                disabled={loading}
+              >
+                {loading ? t("loadMore.loading") : t("loadMore.label")}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </PageShell>
   );
+}
+
+function dedupeApps(rows: AstroliftRegisteredApp[]): AstroliftRegisteredApp[] {
+  const seen = new Set<string>();
+  const out: AstroliftRegisteredApp[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
 }

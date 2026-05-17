@@ -458,6 +458,20 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
+    "ALLOW_SELF_APPROVE_SECRETS": (
+        False,
+        "When False (default), the user who proposed a secret change cannot also approve it. "
+        "Mirrors ALLOW_SELF_APPROVE_DEPLOYS for the secret-change approval workflow (#488). "
+        "Flip to True for single-engineer / dev orgs that want the audit trail without "
+        "blocking on a second approver.",
+    ),
+    "SECRET_PROPOSAL_TTL_SECONDS": (
+        7 * 24 * 3600,
+        "How long a pending secret-change proposal (#488) stays open before auto-expiring. "
+        "Default 7 days. Expired proposals are not applied; the proposer must re-open. The "
+        "TTL is snapshotted onto the proposal row at create time so a later config change "
+        "does not retroactively expire / un-expire in-flight proposals.",
+    ),
     "AUDIT_RETENTION_DAYS": (
         90,
         "How long audit log entries are retained, in days, per compliance policy. Surfaces "
@@ -501,7 +515,13 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Workflows": {
-        "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
+        "fields": (
+            "TEMPORAL_ENABLED",
+            "DEPLOY_PIPELINE_ENABLED",
+            "ALLOW_SELF_APPROVE_DEPLOYS",
+            "ALLOW_SELF_APPROVE_SECRETS",
+            "SECRET_PROPOSAL_TTL_SECONDS",
+        ),
         "collapse": False,
     },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
