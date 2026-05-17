@@ -1,4 +1,4 @@
-import { ApolloLink, HttpLink, split } from "@apollo/client";
+import { ApolloLink, HttpLink, Observable, split } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
@@ -7,6 +7,10 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
 import { getClientToken, clearToken } from "@/lib/auth/token-store";
 import { getActiveOrgGuid } from "@/lib/identity/active-org";
+import {
+  STEP_UP_EVENT,
+  type StepUpEventDetail,
+} from "@/lib/auth/step-up-events";
 
 const authLink = setContext(async (_, { headers }) => {
   const token = await getClientToken();
@@ -77,9 +81,68 @@ function buildWsLink(): GraphQLWsLink | null {
   );
 }
 
+// #487 — server-side step-up afterware. The backend gates sensitive
+// mutations on a session-scoped elevation timer; the deny path
+// returns the MutationResult envelope with ``errors[].code ===
+// "STEP_UP_REQUIRED"`` so the operator can re-auth without losing
+// the form they had open. This link inspects mutation responses,
+// dispatches ``astrolift:step-up-required`` with enough context for
+// the modal to render the right copy + offer a retry, and forwards
+// the original response so the caller's loading state resolves
+// (otherwise we'd leave every mutation hanging behind the modal).
+const stepUpLink = new ApolloLink((operation, forward) => {
+  return new Observable((observer) => {
+    const sub = forward(operation).subscribe({
+      next: (result) => {
+        try {
+          const op = operation.query.definitions.find(
+            (d) =>
+              d.kind === "OperationDefinition" && d.operation === "mutation",
+          );
+          if (op && result.data && typeof result.data === "object") {
+            for (const value of Object.values(result.data)) {
+              if (
+                value &&
+                typeof value === "object" &&
+                "errors" in value &&
+                Array.isArray((value as { errors: unknown[] }).errors)
+              ) {
+                const errs = (
+                  value as { errors: { code?: string; message?: string }[] }
+                ).errors;
+                const stepUp = errs.find((e) => e.code === "STEP_UP_REQUIRED");
+                if (stepUp && typeof window !== "undefined") {
+                  const detail: StepUpEventDetail = {
+                    operationName: operation.operationName ?? "",
+                    message: stepUp.message ?? "",
+                  };
+                  window.dispatchEvent(
+                    new CustomEvent(STEP_UP_EVENT, { detail }),
+                  );
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Inspection must never blow up the response — log + carry on.
+          console.error("[Apollo] step-up afterware:", e);
+        }
+        observer.next(result);
+      },
+      error: (err) => observer.error(err),
+      complete: () => observer.complete(),
+    });
+    return () => sub.unsubscribe();
+  });
+});
+
 export function buildClientLinks(httpLink: HttpLink): ApolloLink {
   const wsLink = buildWsLink();
-  const httpStack = ApolloLink.from([errorLink, authLink.concat(httpLink)]);
+  const httpStack = ApolloLink.from([
+    errorLink,
+    stepUpLink,
+    authLink.concat(httpLink),
+  ]);
   if (!wsLink) return httpStack;
   // Subscription operations get the WS link; everything else
   // (queries, mutations) goes through the HTTP stack so the

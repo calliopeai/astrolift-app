@@ -1187,5 +1187,20 @@
     "sourceColumn": "Quelle",
     "grantRoleRowLabel": "Rolle an {name} vergeben",
     "grantRoleRowTooltip": "Rolle an {name} vergeben"
+  },
+  "stepUp": {
+    "title": "Bestätige deine Identität",
+    "description": "Diese Aktion erfordert eine aktuelle Authentifizierung. Bestätige dein Passwort, um fortzufahren.",
+    "passwordLabel": "Passwort",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "elevating": "Wird bestätigt…",
+    "indicator": "Admin-Modus aktiv für {minutes, plural, one {# weitere Minute} other {# weitere Minuten}}",
+    "deelevateLabel": "Admin-Erhöhung jetzt beenden",
+    "errors": {
+      "passwordRequired": "Passwort ist erforderlich.",
+      "generic": "Passwort konnte nicht bestätigt werden. Bitte erneut versuchen.",
+      "network": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen."
+    }
   }
 }

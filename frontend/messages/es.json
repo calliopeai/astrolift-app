@@ -139,7 +139,9 @@
     "backCta": "Atrás",
     "nextCta": "Siguiente",
     "finishCta": "Finalizar configuración",
-    "a11y": { "steps": "Progreso de la incorporación" },
+    "a11y": {
+      "steps": "Progreso de la incorporación"
+    },
     "toast": {
       "success": "Incorporación completada — todo listo.",
       "skipFailed": "No se pudo guardar la omisión. Inténtalo de nuevo.",
@@ -1185,5 +1187,20 @@
     "sourceColumn": "Origen",
     "grantRoleRowLabel": "Otorgar rol a {name}",
     "grantRoleRowTooltip": "Otorgar rol a {name}"
+  },
+  "stepUp": {
+    "title": "Confirma tu identidad",
+    "description": "Esta acción requiere autenticación reciente. Confirma tu contraseña para continuar.",
+    "passwordLabel": "Contraseña",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "elevating": "Confirmando…",
+    "indicator": "Modo admin activo por {minutes, plural, one {# minuto más} other {# minutos más}}",
+    "deelevateLabel": "Finalizar elevación de administrador",
+    "errors": {
+      "passwordRequired": "La contraseña es obligatoria.",
+      "generic": "No se pudo confirmar tu contraseña. Inténtalo de nuevo.",
+      "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo."
+    }
   }
 }

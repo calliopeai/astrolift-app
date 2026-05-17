@@ -166,3 +166,29 @@ export const EXPORT_AUDIT_EVENTS = gql`
     }
   }
 `;
+
+export const EXPORT_ASTROLIFT_APP_LOGS = gql`
+  mutation ExportAstroliftAppLogs($input: ExportAppLogsInput!) {
+    exportAstroliftAppLogs(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        format
+        status
+        rowCount
+        byteCount
+        sha256
+        truncated
+        downloadUrl
+        expiresAt
+        createdAt
+        errorMessage
+      }
+    }
+  }
+`;

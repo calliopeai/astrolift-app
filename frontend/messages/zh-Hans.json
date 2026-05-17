@@ -1191,5 +1191,20 @@
     "sourceColumn": "来源",
     "grantRoleRowLabel": "为 {name} 授予角色",
     "grantRoleRowTooltip": "为 {name} 授予角色"
+  },
+  "stepUp": {
+    "title": "确认身份",
+    "description": "此操作需要最近的身份验证。请确认您的密码以继续。",
+    "passwordLabel": "密码",
+    "cancel": "取消",
+    "confirm": "确认",
+    "elevating": "正在确认…",
+    "indicator": "管理员模式还剩 {minutes, plural, one {#分钟} other {#分钟}}",
+    "deelevateLabel": "立即结束管理员模式",
+    "errors": {
+      "passwordRequired": "需要密码。",
+      "generic": "无法确认您的密码。请重试。",
+      "network": "无法连接到服务器。请检查您的连接后重试。"
+    }
   }
 }

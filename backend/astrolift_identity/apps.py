@@ -15,3 +15,16 @@ class AstroliftIdentityConfig(AppConfig):
         from core.permissions import register_permission_resolver
 
         register_permission_resolver(resolve)
+
+        # #487 — register the default password verifier so the
+        # elevateAdminSession mutation works out of the box on
+        # local-login installs. SSO-only installs override at
+        # startup via ``register_credential_verifier`` with a
+        # composed verifier covering their IdP-specific methods
+        # (WebAuthn assertion, OTP, magic-link).
+        from astrolift_identity.session_elevation import (
+            default_password_verifier,
+            register_credential_verifier,
+        )
+
+        register_credential_verifier(default_password_verifier)

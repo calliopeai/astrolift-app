@@ -350,6 +350,13 @@ export type AstroliftAppIdentityBinding = {
   trustPolicySummary: Scalars['String']['output'];
 };
 
+export type AstroliftAppListStatusFilter =
+  | 'ALL'
+  | 'DEGRADED'
+  | 'NEVER_DEPLOYED'
+  | 'OK'
+  | 'STALE';
+
 export type AstroliftAppLogLine = {
   container: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -455,6 +462,14 @@ export type AstroliftAppSettingsLastModified = {
   secrets?: Maybe<Scalars['DateTime']['output']>;
   webhooks?: Maybe<Scalars['DateTime']['output']>;
 };
+
+export type AstroliftAppSourceKindFilter =
+  | 'ALL'
+  | 'BITBUCKET'
+  | 'GITEA'
+  | 'GITHUB'
+  | 'GITLAB'
+  | 'GIT_URL';
 
 export type AstroliftAppSummary = {
   id: Scalars['GUID']['output'];
@@ -1603,6 +1618,7 @@ export type AstroliftRegisteredApp = {
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  viewerPermissions: Array<Scalars['String']['output']>;
   webhookDeploysPauseReason: Scalars['String']['output'];
   webhookDeploysPaused: Scalars['Boolean']['output'];
   webhookDeploysPausedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1613,6 +1629,12 @@ export type AstroliftRegisteredAppMutationResult = {
   data?: Maybe<AstroliftRegisteredApp>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRegisteredAppPage = {
+  items: Array<AstroliftRegisteredApp>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type AstroliftRemoteRepo = {
@@ -1804,6 +1826,21 @@ export type AstroliftSecurityPolicy = {
   blockOnCriticalCves: Scalars['Boolean']['output'];
   blockOnHighCveThreshold?: Maybe<Scalars['Int']['output']>;
   blockOnMissingSignature: Scalars['Boolean']['output'];
+};
+
+/** Install identity + capabilities handshake (#479). Returned by ``astroliftServerInfo``. Callable by unauthenticated clients so multi-install mobile / CLI / SDK callers can pick the right UI and gate commands before login. */
+export type AstroliftServerInfo = {
+  apiVersion: Scalars['String']['output'];
+  authMethods: Array<Scalars['String']['output']>;
+  capabilities: Array<Scalars['String']['output']>;
+  featureFlags: Array<FeatureFlagInfo>;
+  installId: Scalars['String']['output'];
+  installLabel?: Maybe<Scalars['String']['output']>;
+  installSlug: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  /** Current server-side wall clock (UTC). Used by clients to detect clock drift. */
+  serverTime: Scalars['DateTime']['output'];
+  version: Scalars['String']['output'];
 };
 
 export type AstroliftSourceConnection = {
@@ -2537,6 +2574,13 @@ export type ExportAuditEventsInput = {
 export type ExtendPreviewTtlInputGql = {
   days: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
+};
+
+/** Runtime feature toggle reported by ``astroliftServerInfo``. */
+export type FeatureFlagInfo = {
+  description?: Maybe<Scalars['String']['output']>;
+  enabled: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
 };
 
 export type FileUploadResult = {
@@ -4155,6 +4199,7 @@ export type Query = {
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppPermissions: Array<Scalars['String']['output']>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
@@ -4163,6 +4208,7 @@ export type Query = {
   astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
   astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
+  astroliftAppsPage: AstroliftRegisteredAppPage;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAuditEventsPage: AstroliftAuditEventPage;
   astroliftAuditRetention: AstroliftAuditRetention;
@@ -4197,6 +4243,7 @@ export type Query = {
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
+  astroliftMyAppsPage: AstroliftRegisteredAppPage;
   astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
@@ -4221,6 +4268,8 @@ export type Query = {
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
+  /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
+  astroliftServerInfo: AstroliftServerInfo;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
@@ -4347,6 +4396,11 @@ export type QueryAstroliftAppMetricsArgs = {
 };
 
 
+export type QueryAstroliftAppPermissionsArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftAppPodsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -4394,6 +4448,23 @@ export type QueryAstroliftAppUrlProbeHistoryArgs = {
 
 export type QueryAstroliftAppsArgs = {
   includeFreshness?: Scalars['Boolean']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  includeFreshness?: Scalars['Boolean']['input'];
+  limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -4560,6 +4631,23 @@ export type QueryAstroliftMembersArgs = {
 
 export type QueryAstroliftMyAppsArgs = {
   includeFreshness?: Scalars['Boolean']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMyAppsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  includeFreshness?: Scalars['Boolean']['input'];
+  limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
