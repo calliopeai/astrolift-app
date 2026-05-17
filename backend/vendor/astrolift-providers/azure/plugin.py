@@ -34,6 +34,7 @@ from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.object_store_blob import BlobStorageDriver
 from azure.managed.queue_servicebus import ServiceBusDriver
+from azure.notification_anh import AzureNotificationHubsDriver
 from azure.registry_acr import ACRDriver
 from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
@@ -50,6 +51,7 @@ PLUGIN = ProviderPlugin(
         "tls": AzureAppGatewayTlsDriver,
         "cluster": AKSClusterDriver,
         "ingress": AzureAppGatewayIngressDriver,
+        "notification": AzureNotificationHubsDriver,
     },
     managed_service_drivers={
         ("object_store", "blob"): BlobStorageDriver,
