@@ -43,9 +43,17 @@ class AuthScheme(StrEnum):
 # Token prefix conventions. Pairs with #143 deploy_token (alft_dt_)
 # and the broader API token scheme. Lets the classifier disambiguate
 # bearer types without a DB lookup.
+#
+# ``alfdt_`` is the pre-#449 legacy deploy-token shape; we route it to
+# the deploy-token verifier so the verifier (gated by the
+# ``DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED`` Constance flag) can decide
+# whether to accept or reject. Without this entry the classifier would
+# reject the bearer with "token format not recognized" before the
+# verifier ever ran.
 _TOKEN_PREFIXES: dict[str, AuthScheme] = {
     "alft_at_": AuthScheme.API_TOKEN,
     "alft_dt_": AuthScheme.DEPLOY_TOKEN,
+    "alfdt_": AuthScheme.DEPLOY_TOKEN,
     "alft_st_": AuthScheme.SCIM,
 }
 

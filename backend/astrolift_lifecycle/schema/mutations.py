@@ -2223,10 +2223,16 @@ class LifecycleMutation:
         import secrets as secrets_lib
         from datetime import datetime, timedelta
 
+        from astrolift_lifecycle.deploy_tokens import PLAINTEXT_PREFIX
+
         app = RegisteredApp.objects.filter(slug=input.app_slug).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
-        plaintext = "alfdt_" + secrets_lib.token_urlsafe(32)
+        # #449: mint with the canonical ``alft_dt_`` prefix so
+        # ``verify_token`` + ``DeployTokenAuthMiddleware`` accept the
+        # round-trip. Previously hard-coded ``alfdt_`` mismatched the
+        # verifier and silently broke CI runners.
+        plaintext = PLAINTEXT_PREFIX + secrets_lib.token_urlsafe(32)
         digest = hashlib.sha256(plaintext.encode()).hexdigest()
         expires_at = None
         if input.expires_at_iso:
@@ -2270,7 +2276,10 @@ class LifecycleMutation:
         import secrets as secrets_lib
         from datetime import datetime, timedelta
 
-        from astrolift_lifecycle.deploy_tokens import rotation_grace_seconds_from_constance
+        from astrolift_lifecycle.deploy_tokens import (
+            PLAINTEXT_PREFIX,
+            rotation_grace_seconds_from_constance,
+        )
 
         token = DeployToken.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if token is None:
@@ -2283,7 +2292,8 @@ class LifecycleMutation:
                 ErrorCode.PRECONDITION.value,
                 "cannot rotate a revoked token; create a new one",
             )
-        plaintext = "alfdt_" + secrets_lib.token_urlsafe(32)
+        # #449: canonical ``alft_dt_`` prefix — see ``create_deploy_token``.
+        plaintext = PLAINTEXT_PREFIX + secrets_lib.token_urlsafe(32)
         digest = hashlib.sha256(plaintext.encode()).hexdigest()
         # Park the previous hash for the Constance-tunable grace
         # window so CI runners holding the old token keep working

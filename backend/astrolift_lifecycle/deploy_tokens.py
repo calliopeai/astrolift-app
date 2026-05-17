@@ -24,15 +24,26 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import hashlib
+import logging
 import secrets
 
 from django.db.models import Q
 from django.utils import timezone
 
+log = logging.getLogger(__name__)
+
 DEFAULT_GRACE_PERIOD_SECONDS = 24 * 60 * 60  # 24h — matches the UI rotate-dialog copy (#425)
 DEFAULT_TTL_DAYS = 365
 MAX_TTL_DAYS = 365 * 5
 PLAINTEXT_PREFIX = "alft_dt_"
+# Legacy prefix shipped by the early ``create_deploy_token`` /
+# ``rotate_deploy_token`` mutations before #449 canonicalised the mint
+# sites onto ``PLAINTEXT_PREFIX``. Verification accepts both shapes
+# while the Constance ``DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED`` flag is
+# on; operators flip it off after a rotation cycle confirms no in-flight
+# token still wears the legacy shape. Keep the constant exported so the
+# middleware and auth-scheme classifier reuse the exact bytes.
+LEGACY_PLAINTEXT_PREFIX = "alfdt_"
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -131,6 +142,24 @@ def rotate_token(
     return token, minted.plaintext
 
 
+def is_acceptable_prefix(plaintext: str) -> bool:
+    """Return True when ``plaintext`` carries a prefix the verifier
+    would consider for lookup. Always accepts the canonical
+    ``alft_dt_`` shape; accepts the legacy ``alfdt_`` shape only while
+    the Constance ``DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED`` flag is on.
+
+    Exposed so the bearer middleware and the auth-scheme classifier can
+    use the same gate the verifier does — keeps prefix policy in one
+    place (#449)."""
+    if not plaintext:
+        return False
+    if plaintext.startswith(PLAINTEXT_PREFIX):
+        return True
+    if plaintext.startswith(LEGACY_PLAINTEXT_PREFIX) and legacy_prefix_accepted_from_constance():
+        return True
+    return False
+
+
 def verify_token(plaintext: str, app=None):
     """Look up a DeployToken by plaintext, honouring the rotation
     grace window.
@@ -143,10 +172,20 @@ def verify_token(plaintext: str, app=None):
     ``app`` is optional; if passed we further restrict to that
     registered_app so a leaked token can't be used against the
     wrong app.
+
+    Prefix policy (#449): the canonical ``alft_dt_`` is always
+    accepted; the legacy ``alfdt_`` shape (issued by pre-#449 mint
+    sites) is accepted while the Constance
+    ``DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED`` flag is on, and a warning
+    + audit event fires on every legacy-prefix accept so operators
+    can size the straggler population before flipping the flag off.
     """
     from astrolift_lifecycle.models import DeployToken
 
-    if not plaintext or not plaintext.startswith(PLAINTEXT_PREFIX):
+    if not plaintext:
+        return None
+    is_legacy = plaintext.startswith(LEGACY_PLAINTEXT_PREFIX) and not plaintext.startswith(PLAINTEXT_PREFIX)
+    if not is_acceptable_prefix(plaintext):
         return None
     digest = _hash(plaintext)
     now = timezone.now()
@@ -162,7 +201,46 @@ def verify_token(plaintext: str, app=None):
         return None
     if row.expires_at and row.expires_at <= now:
         return None
+    if is_legacy:
+        _emit_legacy_prefix_accepted(row)
     return row
+
+
+def _emit_legacy_prefix_accepted(row) -> None:
+    """Surface a warning + audit event when verify accepts a legacy
+    ``alfdt_`` token. Keeps an audit-visible trail of straggler
+    callers so operators know when it's safe to flip the
+    ``DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED`` flag off.
+
+    Failures inside the audit writer must never break verification —
+    a deploy-token caller's auth path is the wrong place to surface
+    an event-pipeline outage. Both the log and the event emit run
+    inside a try/except for that reason."""
+    try:
+        log.warning(
+            "deploy_token.legacy_prefix_accepted",
+            extra={
+                "deploy_token_id": str(getattr(row, "guid", "")),
+                "registered_app_id": getattr(row, "registered_app_id", None),
+            },
+        )
+    except Exception:
+        pass
+    try:
+        from core.events import Event
+
+        Event.emit(
+            "deploy_token.legacy_prefix_accepted",
+            payload={
+                "deploy_token_guid": str(getattr(row, "guid", "")),
+                "token_last_4": getattr(row, "token_last_4", ""),
+            },
+            resource_kind="deploy_token",
+            resource_id=str(getattr(row, "guid", "")),
+        )
+    except Exception:
+        # Audit pipeline outages must not break deploy-token auth.
+        pass
 
 
 def touch_deploy_token(token, *, ip: str | None = None, user_agent: str | None = None) -> None:
@@ -267,3 +345,27 @@ def rotation_grace_seconds_from_constance() -> int:
     if value > MAX_ROTATION_GRACE_SECONDS:
         return MAX_ROTATION_GRACE_SECONDS
     return value
+
+
+def legacy_prefix_accepted_from_constance() -> bool:
+    """Resolve whether the verifier should accept the legacy
+    ``alfdt_`` prefix (#449).
+
+    Defaults to ``True`` when Constance is unavailable so an in-flight
+    DB row issued by a pre-#449 mint can still auth — refusing-by-default
+    here would silently break every existing CI runner the moment this
+    code ships. Operators flip the flag to ``False`` once they've
+    confirmed (via the ``deploy_token.legacy_prefix_accepted`` audit
+    stream) that no callers carry the legacy prefix anymore.
+    """
+    try:
+        from constance import config as constance_config
+
+        raw = getattr(
+            constance_config,
+            "DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED",
+            True,
+        )
+    except Exception:
+        return True
+    return bool(raw)
