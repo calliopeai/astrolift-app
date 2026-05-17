@@ -227,7 +227,19 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <div className="flex flex-col gap-3">
         {LINK_SECTIONS.map((s) => {
-          const card = <SettingsLinkCard key={s.key} section={s} slug={a.slug} />;
+          // App-level updatedAt is the best available staleness proxy
+          // until each linked config surface exposes its own
+          // lastModifiedAt (filed on the from:backend follow-up for
+          // #437 scope E). Renders consistently for every card so the
+          // visual cue lands today without per-section wiring.
+          const card = (
+            <SettingsLinkCard
+              key={s.key}
+              section={s}
+              slug={a.slug}
+              lastModifiedAt={a.updatedAt ?? null}
+            />
+          );
           // CI-setup section slots between Deploy strategy and Deploy
           // tokens (#382). Hidden when the app has no source repo —
           // there's nothing to wire up to until registration captures
@@ -500,7 +512,15 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
 
 // ─── link card ────────────────────────────────────────────────────────────────
 
-function SettingsLinkCard({ section, slug }: { section: LinkSection; slug: string }) {
+function SettingsLinkCard({
+  section,
+  slug,
+  lastModifiedAt,
+}: {
+  section: LinkSection;
+  slug: string;
+  lastModifiedAt?: string | null;
+}) {
   const t = useTranslations("apps.settings.links");
   const Icon = section.icon;
   return (
@@ -515,12 +535,38 @@ function SettingsLinkCard({ section, slug }: { section: LinkSection; slug: strin
             <p className="text-muted-foreground mt-0.5 text-xs">
               {t(`${section.i18nKey}.description`)}
             </p>
+            {lastModifiedAt && (
+              <p className="text-muted-foreground mt-1 text-xs">
+                Modified {formatRelativeAge(lastModifiedAt)}
+              </p>
+            )}
           </div>
           <ChevronRightIcon className="text-muted-foreground group-hover:text-foreground size-5 shrink-0 transition-colors" />
         </CardContent>
       </Card>
     </Link>
   );
+}
+
+/**
+ * Format an ISO timestamp as a human-friendly relative age
+ * (``5m ago`` / ``3h ago`` / ``2d ago``). Falls back to the absolute
+ * date once the delta exceeds 30 days so the cue stays useful for
+ * dormant config sections. Caller is responsible for the empty / null
+ * check — this helper assumes a real timestamp arrived.
+ */
+function formatRelativeAge(iso: string): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "";
+  const seconds = Math.max(0, (Date.now() - then) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(then).toLocaleDateString();
 }
 
 // ─── force redeploy recovery (#389) ───────────────────────────────────────────

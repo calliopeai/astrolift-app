@@ -7,11 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFormDefinitions } from "@/graphql/forms/forms.hooks";
 
-const statusColors: Record<string, string> = {
-  draft: "bg-gray-500",
-  published: "bg-green-500",
-  archived: "bg-yellow-500",
-};
+import { formStatusBadgeProps } from "./status-badge";
 
 export default function FormsPage() {
   const { forms, loading, error } = useFormDefinitions();
@@ -62,9 +58,7 @@ export default function FormsPage() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{form.name}</span>
-                <Badge variant="secondary" className={`text-white ${statusColors[form.status] ?? "bg-gray-500"}`}>
-                  {form.status}
-                </Badge>
+                <Badge {...formStatusBadgeProps(form.status)}>{form.status}</Badge>
                 {form.isPublic && <Badge variant="outline">Public</Badge>}
               </div>
               <span className="text-muted-foreground text-sm">{form.description || form.slug}</span>

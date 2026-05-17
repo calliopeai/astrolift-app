@@ -24,12 +24,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
-import type {
-  AstroliftRegisteredApp,
-  ProvisioningStatus,
-} from "@/graphql/registry/registry.types";
+import type { AstroliftRegisteredApp, ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
+
+import { AppFreshnessRow } from "./components/AppFreshnessRow";
 
 interface Resp {
   astroliftApps: AstroliftRegisteredApp[];
@@ -44,13 +43,7 @@ const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending">
 
 type Bucket = "all" | "running" | "failed" | "inflight" | "notDeployed";
 
-const BUCKET_ORDER: Bucket[] = [
-  "all",
-  "running",
-  "failed",
-  "inflight",
-  "notDeployed",
-];
+const BUCKET_ORDER: Bucket[] = ["all", "running", "failed", "inflight", "notDeployed"];
 
 // Derive a triage bucket from the raw provisioning status. Anything outside
 // the known set lands in `notDeployed` so the pill counts always add up.
@@ -71,6 +64,12 @@ function bucketFor(status: ProvisioningStatus | string | null | undefined): Excl
 export function AppsClient() {
   const t = useTranslations("apps.list");
   const { data, loading, error, refetch } = useQuery<Resp>(LIST_APPS, {
+    // Opt into per-row deployment freshness (#405). Drives the
+    // health pulse, last-deployed badge, and failed-deploy chip on
+    // each card. Backend keeps the fields null until this is true,
+    // so the apps-list query stays cheap for callers (the command
+    // palette, etc.) that only want the registry fields.
+    variables: { includeFreshness: true },
     notifyOnNetworkStatusChange: true,
   });
   // Memoize so dependent useMemos don't re-run on every render when Apollo
@@ -93,12 +92,7 @@ export function AppsClient() {
       const target = e.target as HTMLElement | null;
       if (target) {
         const tag = target.tagName;
-        if (
-          tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          target.isContentEditable
-        ) {
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) {
           return;
         }
       }
@@ -134,9 +128,7 @@ export function AppsClient() {
         return false;
       }
       if (!needle) return true;
-      const haystack = [app.name, app.slug, app.sourceRepo ?? ""]
-        .join(" ")
-        .toLowerCase();
+      const haystack = [app.name, app.slug, app.sourceRepo ?? ""].join(" ").toLowerCase();
       return haystack.includes(needle);
     });
   }, [apps, debouncedSearch, bucket]);
@@ -170,9 +162,7 @@ export function AppsClient() {
             <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
             <div className="min-w-0">
               <p className="font-medium">{t("errorBanner.title")}</p>
-              <p className="text-destructive/90 mt-0.5 break-words text-xs">
-                {error.message}
-              </p>
+              <p className="text-destructive/90 mt-0.5 text-xs break-words">{error.message}</p>
             </div>
           </div>
           <Button
@@ -193,7 +183,7 @@ export function AppsClient() {
           narrow viewports so the row never overflows. */}
       <div className="flex flex-col gap-3">
         <div className="relative max-w-md">
-          <SearchIcon className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+          <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
           <Input
             ref={searchRef}
             type="search"
@@ -205,12 +195,16 @@ export function AppsClient() {
           />
           <kbd
             aria-hidden="true"
-            className="border-border bg-muted text-muted-foreground pointer-events-none absolute right-2 top-1/2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-[10px] sm:inline-flex"
+            className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-[10px] sm:inline-flex"
           >
             /
           </kbd>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("filters.ariaLabel")}>
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          role="group"
+          aria-label={t("filters.ariaLabel")}
+        >
           {BUCKET_ORDER.map((b) => {
             const isActive = bucket === b;
             return (
@@ -230,9 +224,7 @@ export function AppsClient() {
                 <span
                   className={cn(
                     "rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
-                    isActive
-                      ? "bg-background/15 text-background"
-                      : "bg-muted text-foreground/70"
+                    isActive ? "bg-background/15 text-background" : "bg-muted text-foreground/70"
                   )}
                 >
                   {counts[b]}
@@ -279,11 +271,7 @@ export function AppsClient() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((app) => (
-            <Link
-              key={app.id}
-              href={`/apps/${app.slug}`}
-              className="contents"
-            >
+            <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
               <Card className="hover:bg-accent/30 group transition-colors">
                 <CardContent className="flex flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-2">
@@ -297,9 +285,7 @@ export function AppsClient() {
                   </div>
 
                   {app.description && (
-                    <p className="text-muted-foreground line-clamp-2 text-sm">
-                      {app.description}
-                    </p>
+                    <p className="text-muted-foreground line-clamp-2 text-sm">{app.description}</p>
                   )}
 
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -315,10 +301,15 @@ export function AppsClient() {
                     </Badge>
                   </div>
 
+                  <AppFreshnessRow
+                    pulse={app.healthPulse}
+                    latestDeployment={app.latestDeployment}
+                    lastDeployedAt={app.lastDeployedAt ?? null}
+                  />
+
                   <div className="text-muted-foreground flex items-center justify-between text-xs">
                     <span>
-                      {t("branchLabel")}{" "}
-                      <span className="font-mono">{app.deployBranch}</span>
+                      {t("branchLabel")} <span className="font-mono">{app.deployBranch}</span>
                     </span>
                     <span className="group-hover:text-foreground inline-flex items-center gap-1">
                       {t("open")} <ExternalLinkIcon className="size-3" />

@@ -111,6 +111,15 @@ EXEMPT: dict[str, str] = {
     "LifecycleMutation.reject_deployment_by_token": (
         "public: rejection magic-link token IS the auth proof; no tenant context at the point of click"
     ),
+    "TemporalWorkflowsMutation.cancel_workflow_instance": (
+        "admin-only: Temporal workflow ids span tenants; gated on AUDIT_LOG_READ + ADMIN_ELEVATE permissions"
+    ),
+    "TemporalWorkflowsMutation.terminate_workflow_instance": (
+        "admin-only: Temporal workflow ids span tenants; gated on AUDIT_LOG_READ + ADMIN_ELEVATE permissions"
+    ),
+    "TemporalWorkflowsMutation.signal_workflow_instance": (
+        "admin-only: Temporal signals span tenants; gated on AUDIT_LOG_READ + ADMIN_ELEVATE permissions"
+    ),
 }
 
 

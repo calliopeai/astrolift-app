@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.contrib import admin
 
 from astrolift_operations.models import (
+    AlertMute,
     AuditEvent,
     Event,
     Notification,
@@ -128,3 +129,11 @@ class NotificationAdmin(admin.ModelAdmin):
 class WorkloadIdentityRoleAdmin(admin.ModelAdmin):
     list_display = ("registered_app", "tenant_cluster", "service_account", "namespace")
     search_fields = ("role_arn", "service_account", "namespace")
+
+
+@admin.register(AlertMute)
+class AlertMuteAdmin(admin.ModelAdmin):
+    list_display = ("rule", "organization", "ttl_until", "muted_by", "reason")
+    list_filter = ("organization",)
+    search_fields = ("rule__name", "reason")
+    readonly_fields = ("guid", "created_at", "updated_at", "deleted_at")

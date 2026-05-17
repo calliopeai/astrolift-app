@@ -231,6 +231,18 @@ export type AstroliftAppCertificate = {
   renewalStatus: Scalars['String']['output'];
 };
 
+export type AstroliftAppDeploymentSummary = {
+  commitSha: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  triggeredBy: Scalars['String']['output'];
+};
+
 export type AstroliftAppDnsRecord = {
   name: Scalars['String']['output'];
   propagationStatus: Scalars['String']['output'];
@@ -301,6 +313,18 @@ export type AstroliftAppGoldenSignal = {
   samples: Array<AstroliftTimeSeriesPoint>;
   unit: Scalars['String']['output'];
 };
+
+export type AstroliftAppHealthPulse = {
+  ageSeconds?: Maybe<Scalars['Int']['output']>;
+  message: Scalars['String']['output'];
+  status: AstroliftAppHealthPulseStatus;
+};
+
+export type AstroliftAppHealthPulseStatus =
+  | 'DEGRADED'
+  | 'NEVER'
+  | 'OK'
+  | 'STALE';
 
 export type AstroliftAppHealthSummary = {
   appName: Scalars['String']['output'];
@@ -414,15 +438,6 @@ export type AstroliftAppTeamAccessMutationResult = {
   data?: Maybe<AstroliftAppTeamAccess>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
-};
-
-export type AstroliftAppUrlHealth = {
-  lastChecked: Scalars['DateTime']['output'];
-  latencyMs?: Maybe<Scalars['Int']['output']>;
-  message: Scalars['String']['output'];
-  status: Scalars['String']['output'];
-  statusCode?: Maybe<Scalars['Int']['output']>;
-  url: Scalars['String']['output'];
 };
 
 export type AstroliftAuditEvent = {
@@ -1324,11 +1339,14 @@ export type AstroliftRegisteredApp = {
   description: Scalars['String']['output'];
   ecrPushRoleArn: Scalars['String']['output'];
   ecrRepoUri: Scalars['String']['output'];
+  healthPulse?: Maybe<AstroliftAppHealthPulse>;
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   k8sNamespace: Scalars['String']['output'];
+  lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   lastResyncAt?: Maybe<Scalars['DateTime']['output']>;
   lastSyncedHash: Scalars['String']['output'];
+  latestDeployment?: Maybe<AstroliftAppDeploymentSummary>;
   logRetentionDays: Scalars['Int']['output'];
   manifestHash: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
@@ -1745,6 +1763,36 @@ export type AstroliftWebhookTestResultMutationResult = {
   data?: Maybe<AstroliftWebhookTestResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftWorkflowHistoryEvent = {
+  decision: Scalars['String']['output'];
+  eventType: Scalars['String']['output'];
+  payload: Scalars['JSON']['output'];
+  retryCount: Scalars['Int']['output'];
+  timestamp: Scalars['String']['output'];
+};
+
+export type AstroliftWorkflowInstance = {
+  closedAt: Scalars['String']['output'];
+  durationSeconds?: Maybe<Scalars['Float']['output']>;
+  runId: Scalars['String']['output'];
+  startedAt: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  taskQueue: Scalars['String']['output'];
+  triggeredBy: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
+  workflowType: Scalars['String']['output'];
+};
+
+export type AstroliftWorkflowInstanceDetail = {
+  history: Array<AstroliftWorkflowHistoryEvent>;
+  instance: AstroliftWorkflowInstance;
+};
+
+export type AstroliftWorkflowInstancePage = {
+  items: Array<AstroliftWorkflowInstance>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftWorkflowRun = {
@@ -2372,6 +2420,7 @@ export type Mutation = {
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
   bulkRejectDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
+  cancelWorkflowInstance: MutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -2514,6 +2563,7 @@ export type Mutation = {
   signRequestSign: Scalars['Boolean']['output'];
   /** Request a sign from a user. The user must have SIGNREQUEST_CHANGE_SIGN permission. */
   signRequestUser: Scalars['Boolean']['output'];
+  signalWorkflowInstance: MutationResult;
   softDeleteApp: SoftdeletepayloadMutationResult;
   softDeleteIdentityProvider: SoftdeletepayloadMutationResult;
   softDeleteManagedDomain: SoftdeletepayloadMutationResult;
@@ -2530,6 +2580,7 @@ export type Mutation = {
   syncManifestFromRepo: ManifeststagepayloadMutationResult;
   tearDownApp: SoftdeletepayloadMutationResult;
   tearDownPreview: AstroliftDeploymentMutationResult;
+  terminateWorkflowInstance: MutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
@@ -2658,6 +2709,11 @@ export type MutationBulkRejectDeploymentsArgs = {
 
 export type MutationCancelAstroliftDeregisterArgs = {
   input: CancelDeregisterInput;
+};
+
+
+export type MutationCancelWorkflowInstanceArgs = {
+  workflowId: Scalars['String']['input'];
 };
 
 
@@ -3245,6 +3301,13 @@ export type MutationSignRequestUserArgs = {
 };
 
 
+export type MutationSignalWorkflowInstanceArgs = {
+  payload?: InputMaybe<Scalars['JSON']['input']>;
+  signalName: Scalars['String']['input'];
+  workflowId: Scalars['String']['input'];
+};
+
+
 export type MutationSoftDeleteAppArgs = {
   input: SoftDeleteAppInput;
 };
@@ -3314,6 +3377,12 @@ export type MutationTearDownAppArgs = {
 
 export type MutationTearDownPreviewArgs = {
   input: TearDownPreviewInputGql;
+};
+
+
+export type MutationTerminateWorkflowInstanceArgs = {
+  reason: Scalars['String']['input'];
+  workflowId: Scalars['String']['input'];
 };
 
 
@@ -3670,8 +3739,6 @@ export type Query = {
   astroliftAppSecrets: Array<AstroliftAppSecret>;
   astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
-  astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
-  astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAuditEventsPage: AstroliftAuditEventPage;
@@ -3732,6 +3799,9 @@ export type Query = {
   astroliftTeams: Array<AstroliftTeam>;
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
+  astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
+  astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
+  astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
@@ -3858,17 +3928,8 @@ export type QueryAstroliftAppTeamAccessesArgs = {
 };
 
 
-export type QueryAstroliftAppUrlHealthArgs = {
-  appSlug: Scalars['String']['input'];
-  forceRefresh?: Scalars['Boolean']['input'];
-  url: Scalars['String']['input'];
-};
-
-
-export type QueryAstroliftAppUrlProbeHistoryArgs = {
-  appSlug: Scalars['String']['input'];
-  limit?: Scalars['Int']['input'];
-  url: Scalars['String']['input'];
+export type QueryAstroliftAppsArgs = {
+  includeFreshness?: Scalars['Boolean']['input'];
 };
 
 
@@ -4017,6 +4078,11 @@ export type QueryAstroliftManagedServicesArgs = {
 };
 
 
+export type QueryAstroliftMyAppsArgs = {
+  includeFreshness?: Scalars['Boolean']['input'];
+};
+
+
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
@@ -4080,6 +4146,24 @@ export type QueryAstroliftWebhookDeliveriesArgs = {
 
 export type QueryAstroliftWebhookSubscriptionsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftWorkflowInstanceArgs = {
+  workflowId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkflowInstanceDetailArgs = {
+  workflowId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkflowInstancesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+  workflowType?: InputMaybe<Scalars['String']['input']>;
 };
 
 
