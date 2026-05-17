@@ -1932,6 +1932,22 @@ type AstroliftWorkload {
   inClusterServiceFqdn: String!
 }
 
+type AstroliftWorkloadManifest {
+  appSlug: String!
+  workloadSlug: String!
+  environmentName: String!
+  imageTag: String!
+  namespace: String!
+  resources: JSON!
+  previousImageTag: String!
+  previousDeploymentId: String!
+  resourcesPrevious: JSON!
+  error: String
+  errorPath: String
+  errorLine: Int
+  errorColumn: Int
+}
+
 type AstroliftWorkloadOpPayload {
   workloadId: GUID!
   newRevision: Int
@@ -3086,6 +3102,7 @@ type Query {
   astroliftWorkloadScalingStatus(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadScalingStatus
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
+  astroliftWorkloadManifest(appSlug: String!, workloadSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftWorkloadManifest
   assignableAstroliftProjects: [AstroliftProject!]!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!

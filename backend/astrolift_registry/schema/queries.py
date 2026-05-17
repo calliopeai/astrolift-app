@@ -20,6 +20,7 @@ from astrolift_registry.schema.types import (
     ContainerType,
     RegisteredAppType,
     RenderedManifestType,
+    WorkloadManifestType,
     WorkloadScalingStatus,
     WorkloadType,
     app_team_access_to_type,
@@ -75,6 +76,51 @@ def _read_live_replicas(*, workload, environment_name: str | None) -> tuple[int,
         raise RuntimeError("driver lacks get_workload_status")
     status = get_status(ctx.slug, namespace, "Deployment", workload.slug)
     return int(status.ready_replicas or 0), int(status.desired_replicas or 0)
+
+
+def _filter_resources_for_workload(resources: list[dict], workload_slug: str) -> list[dict]:
+    """Filter a rendered manifest down to one workload's resources (#430).
+
+    The renderer tags every workload resource with
+    ``metadata.labels['astrolift.dev/workload']``. Anything missing
+    that label (cluster-scoped resources, app-wide ConfigMaps) is
+    excluded — those don't belong on the per-workload page.
+    """
+    out: list[dict] = []
+    for resource in resources:
+        metadata = resource.get("metadata") or {}
+        labels = metadata.get("labels") or {}
+        if labels.get("astrolift.dev/workload") == workload_slug:
+            out.append(resource)
+    return out
+
+
+def _previous_deployment_for(*, app, environment, current_image_tag: str):
+    """Find the most recent deployment to render a diff against (#430).
+
+    Strategy:
+      - Restrict to the same (app, env) pair.
+      - Only ``RUNNING``, ``SUPERSEDED``, or ``ROLLED_BACK`` count — a
+        deploy that never reached running can't serve as a baseline.
+      - Skip rows whose ``image_tag`` matches the current image tag —
+        diff-against-self is noise, not signal.
+
+    Returns the Deployment row or ``None`` when no candidate exists.
+    """
+    qs = Deployment.objects.filter(
+        registered_app=app,
+        deleted_at__isnull=True,
+        status__in=[
+            Deployment.Status.RUNNING.value,
+            Deployment.Status.SUPERSEDED.value,
+            Deployment.Status.ROLLED_BACK.value,
+        ],
+    ).order_by("-created_at")
+    if environment is not None:
+        qs = qs.filter(app_environment=environment)
+    if current_image_tag:
+        qs = qs.exclude(image_tag=current_image_tag)
+    return qs.first()
 
 
 def _freshness_for_apps(apps: Iterable[RegisteredApp]) -> dict[int, AppFreshness]:
@@ -563,6 +609,176 @@ class RegistryQuery:
             image_tag=image,
             namespace=namespace,
             resources=resources,
+            error=None,
+            error_path=None,
+            error_line=None,
+            error_column=None,
+        )
+
+    # ----------------------------------------------------------------
+    # Per-workload manifest preview + diff (#430)
+    # ----------------------------------------------------------------
+    #
+    # Renders the platform's full manifest for the app, then filters
+    # resources down to ones labelled ``astrolift.dev/workload=<slug>``
+    # — the per-workload subset of what the deploy activity would
+    # apply.
+    #
+    # For the diff side: render the same manifest twice — once at the
+    # current image tag, once at the prior deployment's tag — and
+    # surface both side-by-side. v1 limitation: the platform doesn't
+    # store the raw ``astrolift.toml`` per deployment, so a structural
+    # change to the manifest between deploys won't show up in the
+    # diff — only the image-tag delta will. Full historical TOML diff
+    # is a follow-up backend ticket.
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_workload_manifest(
+        self,
+        info: Info,
+        app_slug: str,
+        workload_slug: str,
+        environment_name: str | None = None,
+        image_tag: str | None = None,
+    ) -> WorkloadManifestType | None:
+        """Return the rendered Kubernetes resources for one workload.
+
+        Filters the app-wide manifest to resources whose
+        ``metadata.labels['astrolift.dev/workload']`` matches
+        ``workload_slug``. Populates ``previous_image_tag`` +
+        ``resources_previous`` from the most-recent prior deployment
+        for the same (app, environment) so the FE can render an
+        image-tag diff without a second round-trip.
+
+        Returns ``None`` when the app doesn't exist for the current
+        tenant. Returns a populated result with an empty
+        ``resources`` list when the workload isn't in the manifest
+        yet (the FE renders the "no resources" empty state).
+        """
+        from astrolift_manifest.normalize import (
+            NormalizationDefaults,
+            normalize,
+        )
+        from astrolift_manifest.parser import ManifestError, parse_raw
+        from astrolift_manifest.render import render_manifests
+
+        app = RegisteredApp.objects.select_related("organization").filter(slug=app_slug).first()
+        if app is None:
+            return None
+
+        env = (
+            AppEnvironment.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+                **({"name": environment_name} if environment_name else {}),
+            )
+            .order_by("created_at")
+            .first()
+        )
+        env_name = env.name if env else (environment_name or "preview")
+        namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
+        image = image_tag or "preview"
+
+        prior = _previous_deployment_for(app=app, environment=env, current_image_tag=image)
+        previous_image_tag = prior.image_tag if prior else ""
+        previous_deployment_id = str(prior.guid) if prior else ""
+
+        if not (app.manifest_raw or "").strip():
+            return WorkloadManifestType(
+                app_slug=app.slug,
+                workload_slug=workload_slug,
+                environment_name=env_name,
+                image_tag=image,
+                namespace=namespace,
+                resources=[],
+                previous_image_tag=previous_image_tag,
+                previous_deployment_id=previous_deployment_id,
+                resources_previous=[],
+                error=(
+                    "No manifest saved for this app yet. Open the Manifest "
+                    "tab and paste your astrolift.toml, or re-run the app "
+                    "registration wizard to fetch from the source repo."
+                ),
+                error_path=None,
+                error_line=None,
+                error_column=None,
+            )
+
+        try:
+            normalized = normalize(
+                parse_raw(app.manifest_raw),
+                defaults=NormalizationDefaults(),
+            )
+        except ManifestError as exc:
+            from astrolift_manifest.parser import locate_in_source
+
+            error_path = getattr(exc, "path", None) or None
+            line, column = exc.line, exc.column
+            if line is None and error_path:
+                line, column = locate_in_source(app.manifest_raw, error_path)
+            return WorkloadManifestType(
+                app_slug=app.slug,
+                workload_slug=workload_slug,
+                environment_name=env_name,
+                image_tag=image,
+                namespace=namespace,
+                resources=[],
+                previous_image_tag=previous_image_tag,
+                previous_deployment_id=previous_deployment_id,
+                resources_previous=[],
+                error=str(exc),
+                error_path=error_path,
+                error_line=line,
+                error_column=column,
+            )
+        except Exception as exc:  # noqa: BLE001 — defensive: never blow up the resolver
+            return WorkloadManifestType(
+                app_slug=app.slug,
+                workload_slug=workload_slug,
+                environment_name=env_name,
+                image_tag=image,
+                namespace=namespace,
+                resources=[],
+                previous_image_tag=previous_image_tag,
+                previous_deployment_id=previous_deployment_id,
+                resources_previous=[],
+                error=f"unexpected error: {exc}",
+                error_path=None,
+                error_line=None,
+                error_column=None,
+            )
+
+        rendered = render_manifests(
+            normalized,
+            namespace=namespace,
+            image_tag=image,
+            image_repository=app.registry_repo_uri or app.slug,
+            environment_name=env_name,
+        )
+        scoped = _filter_resources_for_workload(rendered, workload_slug)
+        scoped_previous: list[dict[str, object]] = []
+        if previous_image_tag and previous_image_tag != image:
+            rendered_previous = render_manifests(
+                normalized,
+                namespace=namespace,
+                image_tag=previous_image_tag,
+                image_repository=app.registry_repo_uri or app.slug,
+                environment_name=env_name,
+            )
+            scoped_previous = _filter_resources_for_workload(rendered_previous, workload_slug)
+
+        return WorkloadManifestType(
+            app_slug=app.slug,
+            workload_slug=workload_slug,
+            environment_name=env_name,
+            image_tag=image,
+            namespace=namespace,
+            resources=scoped,
+            previous_image_tag=previous_image_tag,
+            previous_deployment_id=previous_deployment_id,
+            resources_previous=scoped_previous,
             error=None,
             error_path=None,
             error_line=None,

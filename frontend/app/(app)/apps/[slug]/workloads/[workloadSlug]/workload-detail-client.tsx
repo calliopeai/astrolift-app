@@ -50,6 +50,7 @@ import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/r
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { cn } from "@/lib/utils";
 
+import { ManifestCard } from "./manifest-card";
 import { ResourceUsageGauges } from "./resource-usage-gauges";
 import { ScalingCard } from "./scaling-card";
 
@@ -429,6 +430,24 @@ export function WorkloadDetailClient({
           memReqLimit: t("containers.memReqLimit"),
           restarts: t("containers.restarts"),
           empty: t("containers.empty"),
+        }}
+      />
+
+      <ManifestCard
+        appSlug={appSlug}
+        workloadSlug={workloadSlug}
+        environmentName={null}
+        labels={{
+          title: t("manifest.title"),
+          description: t("manifest.description"),
+          viewToggleManifest: t("manifest.viewToggleManifest"),
+          viewToggleDiff: t("manifest.viewToggleDiff"),
+          noResources: t("manifest.noResources"),
+          errorTitle: t("manifest.errorTitle"),
+          diffEmpty: t("manifest.diffEmpty"),
+          diffPreviousLabel: t("manifest.diffPreviousLabel"),
+          diffCurrentLabel: t("manifest.diffCurrentLabel"),
+          diffNoHistory: t("manifest.diffNoHistory"),
         }}
       />
 

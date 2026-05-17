@@ -874,6 +874,43 @@ def _repo_hash_for(app) -> str:
     return app.last_synced_hash or app.manifest_hash or ""
 
 
+@strawberry.type(name="AstroliftWorkloadManifest")
+class WorkloadManifestType:
+    """Rendered Kubernetes resources scoped to one workload (#430).
+
+    Mirrors :class:`RenderedManifestType` but filters ``resources`` to
+    those whose ``metadata.labels['astrolift.dev/workload']`` matches
+    the requested workload slug — the per-workload subset of the
+    app-wide manifest the deploy activity would apply.
+
+    ``previous_image_tag`` is populated from the most-recent prior
+    deployment for the same (app, environment) so the FE can render a
+    diff against the previously deployed image without needing a
+    second round-trip. Empty string when no prior deployment exists.
+
+    ``previous_deployment_id`` is the GUID of that prior deployment
+    (so the FE can link to it). Empty string when there's no prior.
+
+    The error fields mirror the app-level resolver — parse / normalize
+    errors carry a human-readable message and (where available) a
+    1-based source position so the editor can squiggle.
+    """
+
+    app_slug: str
+    workload_slug: str
+    environment_name: str
+    image_tag: str
+    namespace: str
+    resources: JSON
+    previous_image_tag: str
+    previous_deployment_id: str
+    resources_previous: JSON
+    error: str | None
+    error_path: str | None
+    error_line: int | None
+    error_column: int | None
+
+
 @strawberry.type(name="AstroliftRenderedManifest")
 class RenderedManifestType:
     """The output of running the platform renderer against the

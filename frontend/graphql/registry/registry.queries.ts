@@ -272,3 +272,41 @@ export const GET_WORKLOAD_SCALING_STATUS = gql`
     }
   }
 `;
+
+/**
+ * Per-workload manifest preview + diff (#430).
+ *
+ * Returns the platform-rendered K8s resources scoped to one workload
+ * plus, when a prior deployment exists for the same env, the resources
+ * rendered at that deployment's image tag — so the FE can render an
+ * image-tag diff client-side without a second round-trip.
+ */
+export const GET_WORKLOAD_MANIFEST = gql`
+  query GetWorkloadManifest(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentName: String
+    $imageTag: String
+  ) {
+    astroliftWorkloadManifest(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentName: $environmentName
+      imageTag: $imageTag
+    ) {
+      appSlug
+      workloadSlug
+      environmentName
+      imageTag
+      namespace
+      resources
+      previousImageTag
+      previousDeploymentId
+      resourcesPrevious
+      error
+      errorPath
+      errorLine
+      errorColumn
+    }
+  }
+`;

@@ -1961,6 +1961,22 @@ export type AstroliftWorkload = {
   storageSize: Scalars['String']['output'];
 };
 
+export type AstroliftWorkloadManifest = {
+  appSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  error?: Maybe<Scalars['String']['output']>;
+  errorColumn?: Maybe<Scalars['Int']['output']>;
+  errorLine?: Maybe<Scalars['Int']['output']>;
+  errorPath?: Maybe<Scalars['String']['output']>;
+  imageTag: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  previousDeploymentId: Scalars['String']['output'];
+  previousImageTag: Scalars['String']['output'];
+  resources: Scalars['JSON']['output'];
+  resourcesPrevious: Scalars['JSON']['output'];
+  workloadSlug: Scalars['String']['output'];
+};
+
 export type AstroliftWorkloadOpPayload = {
   desiredReplicas?: Maybe<Scalars['Int']['output']>;
   newRevision?: Maybe<Scalars['Int']['output']>;
@@ -4020,6 +4036,7 @@ export type Query = {
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
+  astroliftWorkloadManifest?: Maybe<AstroliftWorkloadManifest>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
   astroliftWorkloadResourceUsage?: Maybe<AstroliftWorkloadResourceUsage>;
   astroliftWorkloadScalingStatus?: Maybe<AstroliftWorkloadScalingStatus>;
@@ -4429,6 +4446,14 @@ export type QueryAstroliftWorkflowRunsArgs = {
 export type QueryAstroliftWorkloadArgs = {
   appSlug: Scalars['String']['input'];
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkloadManifestArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  imageTag?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug: Scalars['String']['input'];
 };
 
 
