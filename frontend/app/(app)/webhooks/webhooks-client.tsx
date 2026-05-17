@@ -65,6 +65,7 @@ import {
   UPDATE_WEBHOOK,
 } from "@/graphql/operations/operations.mutations";
 import { LIST_WEBHOOK_DELIVERIES, LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
+import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import type {
   AstroliftWebhookDelivery,
@@ -200,10 +201,17 @@ export function WebhooksClient({
   async function handleToggleActive(s: AstroliftWebhookSubscription) {
     const next = !s.isActive;
     const { data } = await updateWebhook({
-      variables: { input: { id: s.id, isActive: next } },
+      variables: { input: { id: s.id, isActive: next, ifMatchVersion: s.version } },
     });
     if (data?.updateWebhookSubscription.ok) {
       toast.success(next ? "Resumed" : "Paused");
+    } else if (
+      handleVersionMismatch(data?.updateWebhookSubscription, {
+        label: "webhook subscription",
+        onRefresh: () => subs.refetch(),
+      })
+    ) {
+      // toast already raised by helper
     } else {
       toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Toggle failed");
     }
@@ -211,10 +219,17 @@ export function WebhooksClient({
 
   async function handleFormatChange(s: AstroliftWebhookSubscription, next: WebhookFormat) {
     const { data } = await updateWebhook({
-      variables: { input: { id: s.id, format: next } },
+      variables: { input: { id: s.id, format: next, ifMatchVersion: s.version } },
     });
     if (data?.updateWebhookSubscription.ok) {
       toast.success(`Format set to ${next}`);
+    } else if (
+      handleVersionMismatch(data?.updateWebhookSubscription, {
+        label: "webhook subscription",
+        onRefresh: () => subs.refetch(),
+      })
+    ) {
+      // toast already raised by helper
     } else {
       toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Update failed");
     }

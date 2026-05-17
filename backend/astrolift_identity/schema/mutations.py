@@ -73,6 +73,7 @@ from astrolift_identity.schema.types import (
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
+from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -287,6 +288,8 @@ class UpdatePolicyInput:
     resource_pattern: strawberry.scalars.JSON | None = None
     conditions: strawberry.scalars.JSON | None = None
     actor_pattern: strawberry.scalars.JSON | None = None
+    # Optimistic-concurrency gate (#497) — null skips the check.
+    if_match_version: int | None = None
 
 
 @strawberry.input
@@ -312,6 +315,8 @@ class UpdateIdentityProviderInput:
     oidc_discovery_url: str | None = None
     client_id: str | None = None
     client_secret_ref: str | None = None
+    # Optimistic-concurrency gate (#497) — null skips the check.
+    if_match_version: int | None = None
 
 
 @strawberry.input
@@ -1739,6 +1744,12 @@ class IdentityMutation:
         if policy is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "policy not found")
 
+        # #497 — optimistic-concurrency gate. Detect concurrent edits
+        # before we overwrite a peer admin's policy change.
+        mismatch = _check_version_match(policy, if_match_version=input.if_match_version, kind="Policy")
+        if mismatch is not None:
+            return mismatch
+
         for field in (
             "name",
             "description",
@@ -1852,6 +1863,11 @@ class IdentityMutation:
         idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
+
+        # #497 — optimistic-concurrency gate.
+        mismatch = _check_version_match(idp, if_match_version=input.if_match_version, kind="IdentityProvider")
+        if mismatch is not None:
+            return mismatch
 
         for field in (
             "display_name",

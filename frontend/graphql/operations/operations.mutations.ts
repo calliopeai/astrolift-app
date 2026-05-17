@@ -34,6 +34,8 @@ export const UPDATE_WEBHOOK = gql`
         code
         message
         field
+        currentVersion
+        requestedVersion
       }
       data {
         id
@@ -42,6 +44,7 @@ export const UPDATE_WEBHOOK = gql`
         isActive
         format
         secretRotatedAt
+        version
       }
     }
   }

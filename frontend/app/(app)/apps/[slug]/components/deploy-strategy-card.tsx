@@ -30,6 +30,7 @@ import { UPDATE_APP } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, TriggerMode } from "@/graphql/registry/registry.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 
 // Per-mode icon mapping. Labels + hints come from the i18n bundle so
 // every locale renders consistently; the icon is purely presentational.
@@ -130,12 +131,22 @@ function EditStrategySheet({
           // and requires it when mode == 'cron'. Send the trimmed value
           // straight through; validation lives server-side.
           cronExpression: triggerMode === "cron" ? cronExpression.trim() : null,
+          // #497 — optimistic-concurrency guard. Passing the version
+          // we cached when the sheet opened tells the backend to
+          // refuse the write if a peer admin edited the app row
+          // first; the helper below shows a toast and the GET_APP
+          // refetch (refetchQueries above) reloads the latest state.
+          ifMatchVersion: app.version,
         },
       },
     });
     if (data?.updateApp.ok) {
       toast.success(t("toastSaved"));
       onOpenChange(false);
+    } else if (handleVersionMismatch(data?.updateApp, { label: "app" })) {
+      // Stale write — refetch already scheduled by ``refetchQueries``;
+      // leave the sheet open so the operator can re-confirm on the
+      // freshly loaded values.
     } else {
       toast.error(data?.updateApp.errors?.[0]?.message ?? t("toastFailed"));
     }

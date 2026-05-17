@@ -521,6 +521,10 @@ class WebhookSubscriptionType:
     this beside the rotate button."""
 
     created_at: dt.datetime
+    version: int
+    """Optimistic-concurrency version (#497). Pass back as
+    ``ifMatchVersion`` on ``updateAstroliftWebhookSubscription`` to
+    detect a concurrent edit."""
 
 
 @strawberry.type(name="AstroliftNotification")
@@ -547,6 +551,7 @@ def webhook_to_type(w) -> WebhookSubscriptionType:
         failure_count=w.failure_count,
         secret_rotated_at=w.secret_rotated_at,
         created_at=w.created_at,
+        version=int(w.version or 0),
     )
 
 

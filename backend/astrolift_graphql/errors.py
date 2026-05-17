@@ -22,3 +22,10 @@ class MutationErrorType:
     # attest-prompt instead of the password-prompt. Null on every
     # other envelope.
     requires_attestation: bool | None = None
+    # Optimistic-concurrency context (#497). Populated only when
+    # ``code == VERSION_MISMATCH`` so the client can show
+    # "this entity changed since you opened it; current is N" copy
+    # and refetch the latest server-side version. Null on every
+    # other error code.
+    current_version: int | None = None
+    requested_version: int | None = None

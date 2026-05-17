@@ -8,6 +8,8 @@ export const SET_APP_SECRET = gql`
         code
         message
         field
+        currentVersion
+        requestedVersion
       }
       data {
         appSlug
