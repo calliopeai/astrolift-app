@@ -106,11 +106,113 @@ class ManagedServiceType:
     kind: str
     variant: str
     status: str
+    status_error: str
     config: JSON
     registered_app_slug: str
     environment_name: str
     created_at: dt.datetime
     updated_at: dt.datetime
+    last_action_at: dt.datetime | None = None
+    last_action_kind: str = ""
+
+
+@strawberry.type(name="AstroliftManagedServiceConnectionKey")
+class ManagedServiceConnectionKeyType:
+    """One entry of the connection envelope projected into the
+    workload at runtime.
+
+    The platform synthesizes a fixed key set per kind (see
+    ``astrolift_manifest.env_injection._ENVELOPES``); the actual values
+    live in the platform secrets backend and are not reachable from this
+    API surface.  ``value`` is therefore a placeholder string ('secret-
+    ref:<ref>' / 'env-ref:<key>') rather than plaintext — the audit
+    trail still captures the disclosure of the key set so the operator
+    can demonstrate provenance later.
+    """
+
+    key: str
+    value: str
+    """Always opaque — never plaintext.  The shape is
+    ``secret-ref:<connection_secret_ref>`` when the platform has minted
+    a secrets-backend pointer for this service, or
+    ``placeholder:<note>`` when the workflow loop hasn't populated the
+    binding yet."""
+
+    is_secret: bool = True
+
+
+@strawberry.type(name="AstroliftManagedServiceConnection")
+class ManagedServiceConnectionType:
+    managed_service_id: GUID
+    kind: str
+    name: str
+    environment_name: str
+    connection_secret_ref: str
+    """Pointer into the platform secrets backend (e.g.
+    ``vault:/acme/app/prod/postgres-primary``); empty until the workflow
+    finalizes the binding."""
+
+    keys: list[ManagedServiceConnectionKeyType]
+    revealed_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftManagedServiceObject")
+class ManagedServiceObjectType:
+    """A single entry in the recent-objects listing for an
+    ``object_store`` managed service.  Populated from the
+    ``config['recent_objects']`` cache the workflow refreshes on a
+    schedule — a live S3/GCS/Azure list call needs the driver SDK to
+    expose ``list_recent_objects``, which is filed as a backend gap
+    follow-up."""
+
+    key: str
+    size_bytes: int = 0
+    last_modified: dt.datetime | None = None
+
+
+@strawberry.type(name="AstroliftManagedServiceObjects")
+class ManagedServiceObjectsType:
+    managed_service_id: GUID
+    kind: str
+    name: str
+    objects: list[ManagedServiceObjectType]
+    truncated: bool = False
+    cache_age_seconds: int | None = None
+    """How stale the ``recent_objects`` snapshot is; ``None`` when the
+    workflow has never populated it (operator sees an info hint in that
+    case)."""
+
+
+@strawberry.type(name="AstroliftManagedServiceQueueDepth")
+class ManagedServiceQueueDepthType:
+    """Snapshot of the message depth on a `queue` / `topic` kind
+    managed service.
+
+    Sourced from the `config['depth_snapshot']` cache the workflow
+    refreshes on a schedule — a live cloud round-trip needs the driver
+    SDK to expose `queue_depth`, filed as a backend gap follow-up.
+    """
+
+    managed_service_id: GUID
+    kind: str
+    name: str
+    depth: int = 0
+    in_flight: int = 0
+    sampled_at: dt.datetime | None = None
+    """When the cached snapshot was last refreshed; ``None`` until the
+    workflow loop has populated it."""
+
+
+@strawberry.type(name="AstroliftManagedServiceTestEmailResult")
+class ManagedServiceTestEmailResultType:
+    managed_service_id: GUID
+    recipient: str
+    subject: str
+    sent_at: dt.datetime
+    transport: str
+    """Configured transport kind at the time of send (``aws_ses`` /
+    ``sendgrid`` / ``smtp`` / ``postmark``).  Useful for the operator
+    to confirm which provider received the call."""
 
 
 @strawberry.type(name="AstroliftRevealedSecret")
@@ -185,9 +287,12 @@ def managed_service_to_type(svc) -> ManagedServiceType:
         kind=svc.kind,
         variant=svc.variant or "",
         status=svc.status,
+        status_error=svc.status_error or "",
         config=svc.config or {},
         registered_app_slug=svc.registered_app.slug,
         environment_name=svc.app_environment.name,
         created_at=svc.created_at,
         updated_at=svc.updated_at,
+        last_action_at=svc.last_action_at,
+        last_action_kind=svc.last_action_kind or "",
     )

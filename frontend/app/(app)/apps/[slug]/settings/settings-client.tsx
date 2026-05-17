@@ -96,6 +96,7 @@ import {
   DeregisterPendingBanner,
   recordDeregisterPending,
 } from "../components/deregister-pending-banner";
+import { ManagedServicesSummaryCard } from "../components/managed-services-summary-card";
 import { TeamsCard } from "../components/teams-card";
 
 interface AppResp {
@@ -238,6 +239,8 @@ export function SettingsClient({ slug }: { slug: string }) {
       />
 
       <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />
+
+      <ManagedServicesSummaryCard appSlug={a.slug} />
 
       <div className="flex flex-col gap-3">
         {LINK_SECTIONS.map((s) => {

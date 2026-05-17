@@ -42,6 +42,11 @@ class EmailKind(StrEnum):
     MEMBER_INVITATION = "member_invitation"
     DEPLOY_FAILURE = "deploy_failure"
     SCHEDULED_JOB_FAILURE = "scheduled_job_failure"
+    MANAGED_SERVICE_TEST = "managed_service_test"
+    """Operator-initiated 'send test' against a bound email kind
+    managed service. Bypasses unsubscribe (treated as transactional)
+    so it lands even if the recipient previously opted out — the
+    operator triggered it deliberately to verify deliverability."""
 
 
 class TransportKind(StrEnum):
@@ -140,6 +145,7 @@ class SuppressionEntry:
 _TRANSACTIONAL_KINDS: frozenset[EmailKind] = frozenset(
     {
         EmailKind.DEPLOY_APPROVAL,
+        EmailKind.MANAGED_SERVICE_TEST,
     }
 )
 
