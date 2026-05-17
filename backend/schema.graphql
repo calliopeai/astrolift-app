@@ -416,6 +416,15 @@ type AstroliftAppTeamAccessMutationResult {
   data: AstroliftAppTeamAccess
 }
 
+type AstroliftAppUrlHealth {
+  url: String!
+  status: String!
+  statusCode: Int
+  latencyMs: Int
+  lastChecked: DateTime!
+  message: String!
+}
+
 type AstroliftApproverUser {
   id: String!
   email: String!
@@ -1075,6 +1084,7 @@ type AstroliftMember {
   lifecycle: String!
   joinedAt: DateTime
   lastSeenAt: DateTime
+  lastActiveAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
 }
@@ -1437,6 +1447,7 @@ type AstroliftRoleBinding {
   role: AstroliftRole!
   scopeKind: String!
   scopeId: String!
+  sourceScopeLabel: String!
   grantedAt: DateTime!
   expiresAt: DateTime
   inherits: Boolean!
@@ -2886,7 +2897,7 @@ type Query {
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
-  astroliftMembers: [AstroliftMember!]!
+  astroliftMembers(search: String = null): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
@@ -2968,6 +2979,8 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
+  astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
