@@ -8,6 +8,7 @@ import strawberry
 from django.utils import timezone
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_lifecycle.models import (
     AppEnvironment,
     CommandRun,
@@ -27,6 +28,7 @@ from astrolift_lifecycle.schema.types import (
     AppIdentityBindingType,
     AppPodType,
     CommandRunType,
+    DeploymentApprovalHistoryEntryType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
     DeploymentType,
@@ -54,6 +56,27 @@ from core.cluster_observability import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+
+# Audit-log ``action`` values that make up the approval timeline for a
+# deployment (#419). Kept here (rather than scraping all
+# ``deployment.*`` events) so promotion / rollback / redeploy don't
+# pollute the approval-history panel.
+_APPROVAL_LIFECYCLE_ACTIONS = (
+    "deployment.start",
+    "deployment.approve",
+    "deployment.approve_by_token",
+    "deployment.reject",
+    "deployment.reject_by_token",
+    "deployment.abort",
+)
+
+
+def _viewer_user_id(info: Info) -> int | None:
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) if request else None
+    if user is not None and getattr(user, "is_authenticated", False):
+        return user.pk
+    return None
 
 
 @strawberry.type
@@ -86,7 +109,11 @@ class LifecycleQuery:
             qs = qs.filter(registered_app__slug=app_slug)
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)
-        return [deployment_to_type(d) for d in qs[: max(1, min(limit, 200))]]
+        viewer = _viewer_user_id(info)
+        return [
+            deployment_to_type(d, viewer_user_id=viewer)
+            for d in qs[: max(1, min(limit, 200))]
+        ]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -98,7 +125,73 @@ class LifecycleQuery:
             .filter(guid=id)
             .first()
         )
-        return deployment_to_type(d) if d else None
+        return deployment_to_type(d, viewer_user_id=_viewer_user_id(info)) if d else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_deployment_approval_history(
+        self,
+        info: Info,
+        deployment_id: str,
+    ) -> list[DeploymentApprovalHistoryEntryType]:
+        """Approve / reject / abort audit trail for one deployment (#419).
+
+        Pulls from ``AuditEvent`` rows whose ``action`` is one of the
+        approval lifecycle actions and whose ``target_id`` matches the
+        deployment's primary key. Sorted oldest-first so the UI can
+        render a chronological timeline.
+
+        Tenant scoping rides on the deployment lookup: a request for a
+        sibling-org deployment returns an empty list rather than leaking
+        row counts.
+        """
+        from astrolift_operations.models import AuditEvent
+
+        deployment = (
+            Deployment.objects.filter(guid=deployment_id, deleted_at__isnull=True)
+            .only("id", "guid", "aborted_reason")
+            .first()
+        )
+        if deployment is None:
+            return []
+
+        target_id = str(deployment.pk)
+        events = AuditEvent.objects.filter(
+            action__in=_APPROVAL_LIFECYCLE_ACTIONS,
+            target_id=target_id,
+        ).order_by("occurred_at")[:200]
+        out: list[DeploymentApprovalHistoryEntryType] = []
+        for e in events:
+            data = e.data or {}
+            reason = ""
+            # abort/reject mutations stuff the operator's free-form
+            # reason onto ``data['reason']`` via the @mutation_audit
+            # extras hook. We also fall back to the deployment row's
+            # ``aborted_reason`` for the terminal abort entry so the
+            # panel reads correctly even when the audit row was
+            # written by an older code path.
+            if isinstance(data.get("reason"), str):
+                reason = data["reason"]
+            elif e.action in {
+                "deployment.abort",
+                "deployment.reject",
+                "deployment.reject_by_token",
+            }:
+                reason = deployment.aborted_reason or ""
+            out.append(
+                DeploymentApprovalHistoryEntryType(
+                    id=GUID(str(e.guid)),
+                    action=e.action,
+                    decision=e.decision,
+                    actor_kind=e.actor_kind,
+                    actor_id=e.actor_id or "",
+                    actor_display=e.actor_display or "",
+                    occurred_at=e.occurred_at,
+                    reason=reason,
+                )
+            )
+        return out
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

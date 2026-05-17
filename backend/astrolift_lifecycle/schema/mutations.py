@@ -91,11 +91,27 @@ class StartDeploymentInput:
     branch: str | None = None
     ci_run_url: str | None = None
     ci_provider: str | None = None
+    # Commit-message provenance (#419) — surfaced on the approval card
+    # so approvers can see what they're greenlighting. Optional so the
+    # manual-UI path keeps working.
+    commit_message: str | None = None
+    commit_author: str | None = None
 
 
 @strawberry.input
 class DeploymentByIdInput:
     id: GUID
+
+
+@strawberry.input
+class AbortDeploymentInput:
+    """``reason`` is required + non-empty (#419) so every rejection
+    leaves a paper trail. Validated at the resolver boundary; we
+    persist it on the row + the audit-log extras payload so the
+    history sidebar can render it without an extra join."""
+
+    id: GUID
+    reason: str
 
 
 @strawberry.input
@@ -325,6 +341,37 @@ class TriggerDeployWorkflowPayload:
 
 
 _VALID_TRIGGER_KINDS = {k.value for k in Deployment.TriggerKind}
+
+
+def _self_approve_allowed() -> bool:
+    """Self-approval policy gate (#419).
+
+    Default: False — the same person can't push and approve.
+    Operators flip the Constance flag ``ALLOW_SELF_APPROVE_DEPLOYS``
+    at runtime to override (e.g. single-engineer dev orgs that still
+    want the audit trail). Constance unavailable (DB not migrated,
+    plugin disabled) falls back to the safe default."""
+    try:
+        from constance import config as constance_config
+
+        return bool(getattr(constance_config, "ALLOW_SELF_APPROVE_DEPLOYS", False))
+    except Exception:
+        return False
+
+
+def _abort_extras(result) -> dict | None:
+    """Audit-extras hook for abort/reject mutations.
+
+    Stuffs the deployment's ``aborted_reason`` onto ``AuditEntry.extra``
+    so the approval-history query can render it even when the
+    deployment row has been pruned by a later force-redeploy."""
+    if not getattr(result, "ok", False):
+        return None
+    data = getattr(result, "data", None)
+    reason = getattr(data, "aborted_reason", "") if data is not None else ""
+    if not reason:
+        return None
+    return {"reason": reason}
 
 
 def _actor_from_request(info: Info) -> Actor:
@@ -691,6 +738,8 @@ class LifecycleMutation:
                 branch=(input.branch or "").strip(),
                 ci_run_url=(input.ci_run_url or "").strip(),
                 ci_provider=(input.ci_provider or "").strip(),
+                commit_message=(input.commit_message or "").strip(),
+                commit_author=(input.commit_author or "").strip(),
             )
 
             if approval_token_plaintext:
@@ -770,10 +819,19 @@ class LifecycleMutation:
 
         actor = _actor_from_request(info)
         tenant = get_current_tenant()
-        if actor.user_id and deployment.triggered_by_user_id == actor.user_id:
+        if (
+            actor.user_id
+            and deployment.triggered_by_user_id == actor.user_id
+            and not _self_approve_allowed()
+        ):
+            # Self-approval blocked (#419). The detail flag is the
+            # contract the FE keys off — see the SELF_APPROVE_BLOCKED
+            # warning badge — so the message can evolve without
+            # breaking the renderer.
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                "cannot approve your own deployment",
+                "cannot approve your own deployment — another approver required",
+                detail={"selfApproveBlocked": True},
             )
 
         if actor.user_id and not _is_eligible_approver(
@@ -792,20 +850,35 @@ class LifecycleMutation:
                 organization_id=tenant.organization_id if tenant else None,
             )
 
-        return gql_success(deployment_to_type(deployment))
+        return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
 
     @strawberry.field
-    @mutation_audit(action="deployment.reject")
+    @mutation_audit(
+        action="deployment.reject",
+        extras=lambda result: _abort_extras(result),
+    )
     @require_permission(Permission.APP_APPROVE_DEPLOY)
     @tenant_scoped()
-    def reject_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
+    def reject_deployment(self, info: Info, input: AbortDeploymentInput) -> MutationResultType[DeploymentType]:
         """Reject a pending_approval deploy from in-band.
 
         Mirrors :meth:`reject_deployment_by_token` but requires an
         authenticated approver. ANY rejection short-circuits to
         FAILED — one nay kills the deploy, matching the quorum
         policy in :mod:`astrolift_lifecycle.approval`.
+
+        ``reason`` is required + non-empty (#419) so every rejection
+        leaves an auditable explanation. The reason is persisted on
+        the deployment row (``aborted_reason``) so the history sidebar
+        can render it without an extra join.
         """
+        reason = (input.reason or "").strip()
+        if not reason:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "reason is required",
+                field="reason",
+            )
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment", "workload")
             .filter(guid=str(input.id), deleted_at__isnull=True)
@@ -835,13 +908,15 @@ class LifecycleMutation:
             )
 
         with transaction.atomic():
+            deployment.aborted_reason = reason
+            deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
             if deployment.workflow_run_id:
                 wf_id = deployment.workflow_run.workflow_id  # type: ignore[union-attr]
                 if not signal_workflow(wf_id, "abort"):
-                    terminate_workflow(wf_id, reason="reject_deployment mutation")
+                    terminate_workflow(wf_id, reason=f"reject_deployment: {reason}")
             deployment.transition_to(Deployment.Status.FAILED)
 
-        return gql_success(deployment_to_type(deployment))
+        return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
 
     # ---- Public token-based approve / reject (#125, spec 06 §4.6) ----
     #
@@ -918,10 +993,28 @@ class LifecycleMutation:
         return gql_success(deployment_to_type(deployment))
 
     @strawberry.field
-    @mutation_audit(action="deployment.abort")
+    @mutation_audit(
+        action="deployment.abort",
+        extras=lambda result: _abort_extras(result),
+    )
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
-    def abort_deployment(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
+    def abort_deployment(self, info: Info, input: AbortDeploymentInput) -> MutationResultType[DeploymentType]:
+        """Abort an in-flight deploy.
+
+        ``reason`` is required + non-empty (#419) so every abort leaves
+        an auditable explanation — matches the rejection-reason flow.
+        Persisted on the deployment row so the history sidebar can
+        render it without an extra audit-log join.
+        """
+        reason = (input.reason or "").strip()
+        if not reason:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "reason is required",
+                field="reason",
+            )
+
         deployment = (
             Deployment.objects.select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True)
@@ -946,12 +1039,15 @@ class LifecycleMutation:
             wf_id = deployment.workflow_run.workflow_id  # type: ignore[union-attr]
             # Try a graceful signal first; fall back to terminate.
             if not signal_workflow(wf_id, "abort"):
-                terminate_workflow(wf_id, reason="abort_deployment mutation")
+                terminate_workflow(wf_id, reason=f"abort_deployment: {reason}")
 
         with transaction.atomic():
+            deployment.aborted_reason = reason
+            deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
             deployment.transition_to(Deployment.Status.FAILED)
 
-        return gql_success(deployment_to_type(deployment))
+        actor = _actor_from_request(info)
+        return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
 
     @strawberry.field
     @mutation_audit(action="deployment.rollback")
