@@ -286,6 +286,33 @@
     },
     "breadcrumb": {
       "root": "Configuración"
+    },
+    "security": {
+      "devices": {
+        "title": "Dispositivos móviles",
+        "description": "Empareja la app móvil de Astrolift con esta instalación escaneando un código QR — sin escribir URLs en el teléfono.",
+        "buttonPair": "Emparejar nuevo dispositivo",
+        "dialogTitle": "Emparejar un dispositivo móvil",
+        "dialogDescription": "Genera un código QR de un solo uso y escanéalo con la app móvil de Astrolift para registrar esta instalación.",
+        "labelLabel": "Etiqueta del dispositivo (opcional)",
+        "labelPlaceholder": "iPhone de Sarah",
+        "labelHelp": "Se muestra junto a las credenciales emitidas para que puedas distinguir los dispositivos más adelante.",
+        "buttonCancel": "Cancelar",
+        "buttonGenerate": "Generar QR",
+        "buttonGenerating": "Generando…",
+        "buttonRegenerate": "Nuevo QR",
+        "buttonDone": "Listo",
+        "buttonCopyPayload": "Copiar carga útil",
+        "qrAriaLabel": "Código QR de registro de la instalación",
+        "expiresIn": "Expira en {time}",
+        "expiredLabel": "QR expirado — genera uno nuevo",
+        "sessionIdLabel": "ID de sesión",
+        "verificationUriLabel": "URL de verificación",
+        "verificationUriHelp": "Si el QR no se escanea, escribe esta URL en tu dispositivo.",
+        "toastGenerateFailed": "No se pudo generar el QR — inténtalo de nuevo.",
+        "toastUriCopied": "URL de verificación copiada",
+        "toastPayloadCopied": "Carga útil copiada"
+      }
     }
   },
   "hooks": {

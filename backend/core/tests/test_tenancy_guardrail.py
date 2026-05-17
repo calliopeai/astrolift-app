@@ -57,6 +57,14 @@ EXEMPT: dict[str, str] = {
     "IdentityMutation.update_my_profile": (
         "self-service: callers can edit their own profile fields when the IdP doesn't lock them"
     ),
+    "IdentityMutation.generate_install_enrollment_qr": (
+        "#494 self-service: any authed user can enroll their own mobile device — the "
+        "operator's web session IS the proof, same pattern as update_my_profile. The "
+        "permission check is implicit (authenticated user), not org-scoped; per-user "
+        "rate limit (ENROLLMENT_MAX_ACTIVE_PER_USER) caps abuse. The resulting "
+        "session inherits the operator's active org when one is set, so the redeemed "
+        "token is tenant-scoped at issue time even though the mutation isn't."
+    ),
     "IdentityMutation.logout_all_sessions": (
         "self-service: revokes the caller's own sessions; tenant context "
         "is irrelevant — a session is bound to a user, not an org"

@@ -286,6 +286,33 @@
     },
     "breadcrumb": {
       "root": "設定"
+    },
+    "security": {
+      "devices": {
+        "title": "モバイルデバイス",
+        "description": "QRコードをスキャンして Astrolift モバイルアプリをこのインストールにペアリングします — 電話で URL を入力する必要はありません。",
+        "buttonPair": "新しいデバイスをペアリング",
+        "dialogTitle": "モバイルデバイスをペアリング",
+        "dialogDescription": "1回限りの QR コードを生成し、Astrolift モバイルアプリでスキャンしてこのインストールを登録します。",
+        "labelLabel": "デバイスラベル (オプション)",
+        "labelPlaceholder": "Sarah の iPhone",
+        "labelHelp": "後でデバイスを区別できるように、発行された資格情報の横に表示されます。",
+        "buttonCancel": "キャンセル",
+        "buttonGenerate": "QR を生成",
+        "buttonGenerating": "生成中…",
+        "buttonRegenerate": "新しい QR",
+        "buttonDone": "完了",
+        "buttonCopyPayload": "ペイロードをコピー",
+        "qrAriaLabel": "インストール登録 QR コード",
+        "expiresIn": "{time} で期限切れ",
+        "expiredLabel": "QR の期限が切れました — 新しいものを生成してください",
+        "sessionIdLabel": "セッション ID",
+        "verificationUriLabel": "検証 URL",
+        "verificationUriHelp": "QR がスキャンできない場合は、この URL をデバイスに入力してください。",
+        "toastGenerateFailed": "QR を生成できませんでした — もう一度お試しください。",
+        "toastUriCopied": "検証 URL をコピーしました",
+        "toastPayloadCopied": "ペイロードをコピーしました"
+      }
     }
   },
   "hooks": {
