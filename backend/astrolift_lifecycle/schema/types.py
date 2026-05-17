@@ -771,3 +771,130 @@ def identity_binding_to_type(b) -> AppIdentityBindingType:
         trust_policy_summary=b.trust_policy_summary,
         last_used_at=b.last_used_at,
     )
+
+
+# ---------------------------------------------------------------------------
+# #436 — destructive-flow preview types (blast-radius + force-redeploy
+# in-flight preview). Each surfaces a structured read of what an
+# irreversible operation is about to destroy so the operator can audit
+# before confirming the click.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.type(name="AstroliftDeregisterPreviewK8sObject")
+class DeregisterPreviewK8sObjectType:
+    """One Kubernetes object the deregister will cascade-delete.
+
+    The cluster slug + namespace pin the object to the (env, cluster)
+    pair so the FE can group by destination. ``kind`` mirrors the
+    apiVersion / kind tuple in the renderer; ``name`` is the canonical
+    per-workload name (``<app-slug>-<workload-slug>``) plus the bare
+    slug fallback the force-redeploy delete path also targets."""
+
+    cluster_slug: str
+    namespace: str
+    api_version: str
+    kind: str
+    name: str
+
+
+@strawberry.type(name="AstroliftDeregisterPreviewManagedService")
+class DeregisterPreviewManagedServiceType:
+    id: GUID
+    name: str
+    kind: str
+    variant: str
+    environment_name: str
+    status: str
+
+
+@strawberry.type(name="AstroliftDeregisterPreviewSecretRef")
+class DeregisterPreviewSecretRefType:
+    id: GUID
+    bundle_slug: str
+    environment_name: str
+    cluster_slug: str | None
+    prefix: str
+
+
+@strawberry.type(name="AstroliftDeregisterPreviewDeployToken")
+class DeregisterPreviewDeployTokenType:
+    id: GUID
+    name: str
+    last4: str
+    environment_name: str | None
+
+
+@strawberry.type(name="AstroliftDeregisterPreviewSourceWebhook")
+class DeregisterPreviewSourceWebhookType:
+    """Push-event webhook the source-host integration installed for the
+    app. ``installed`` is False when the app has no recorded hook id
+    (GitHub-App install delivery or never-installed) — the deregister
+    path still clears the bookkeeping but no host DELETE fires."""
+
+    installed: bool
+    repo: str
+    hook_id: str
+
+
+@strawberry.type(name="AstroliftDeregisterPreviewIdentityRole")
+class DeregisterPreviewIdentityRoleType:
+    """IRSA / WI / FI role bound to the app's ServiceAccount."""
+
+    cluster_slug: str
+    kind: str
+    role_arn_or_principal: str
+
+
+@strawberry.type(name="AstroliftDeregisterPreview")
+class DeregisterPreviewType:
+    """Blast-radius read for a deregister-app click (#436 A).
+
+    Resolved on modal-open so the operator audits the actual object
+    names — not generic resource-class labels — before typing the
+    confirm token. Counts are denormalized so the FE can render the
+    trigger-button badge without traversing the grouped lists."""
+
+    app_slug: str
+    app_name: str
+    k8s_objects: list[DeregisterPreviewK8sObjectType]
+    managed_services: list[DeregisterPreviewManagedServiceType]
+    secret_refs: list[DeregisterPreviewSecretRefType]
+    deploy_tokens: list[DeregisterPreviewDeployTokenType]
+    source_webhook: DeregisterPreviewSourceWebhookType | None
+    identity_roles: list[DeregisterPreviewIdentityRoleType]
+    registry_repo_uri: str
+    total_resource_count: int
+
+
+@strawberry.type(name="AstroliftForceRedeployPreviewDeployment")
+class ForceRedeployPreviewDeploymentType:
+    """One in-flight ``Deployment`` row that a force-redeploy will
+    transition to FAILED. Surfaces just enough provenance (who, when,
+    what image) for the operator to weigh "let this finish" vs. "blow
+    it away"."""
+
+    id: GUID
+    environment_name: str
+    workload_slug: str | None
+    status: str
+    image_tag: str
+    started_at: dt.datetime | None
+    created_at: dt.datetime
+    trigger_kind: str
+    triggered_by_display: str
+    ci_actor_kind: str
+    ci_run_url: str
+
+
+@strawberry.type(name="AstroliftForceRedeployPreview")
+class ForceRedeployPreviewType:
+    """Pre-confirm read for the force-redeploy CTA (#436 D).
+
+    ``in_flight_deployments`` is the exact list the recovery path's
+    ``_cancel_in_flight_deploys_sync`` will transition to FAILED — the
+    operator sees what they're about to interrupt."""
+
+    app_slug: str
+    environment_name: str | None
+    in_flight_deployments: list[ForceRedeployPreviewDeploymentType]

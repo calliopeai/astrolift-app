@@ -294,6 +294,16 @@
         "other": "Other"
       }
     },
+    "dangerZone": {
+      "pendingBanner": {
+        "title": "Teardown pending",
+        "body": "Cancel within {countdown} or the destructive workflow starts.",
+        "cancel": "Cancel teardown",
+        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
+        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
+        "toastError": "Cancel failed."
+      }
+    },
     "detail": {
       "actions": {
         "open": "Open",
@@ -882,7 +892,14 @@
         "confirmTitle": "Force redeploy {slug}?",
         "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
         "typeToConfirm": "Type <slug></slug> to confirm:",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "preview": {
+          "loading": "Loading in-flight deployments…",
+          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
+          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "triggeredBy": "{actor} · {when}",
+          "ciRun": "CI run"
+        }
       },
       "dangerZone": {
         "title": "Danger zone",
@@ -892,10 +909,30 @@
         "retry": "Retry deregister",
         "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
         "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the following resource classes for this app. The action is irreversible.",
+        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
         "typeToConfirm": "To confirm, type the app's name:",
         "deregistering": "Deregistering…",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "toastNoResponse": "Deregister failed: no response from backend.",
+        "toastNoPayload": "Deregister returned no payload.",
+        "toastFailed": "Deregister failed.",
+        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
+        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "preview": {
+          "loading": "Loading blast-radius preview…",
+          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
+          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
+          "sourceWebhookLabel": "Source-host webhook",
+          "registryRepoLabel": "Image registry repo",
+          "groups": {
+            "k8s": "Kubernetes objects",
+            "managedServices": "Managed services",
+            "secrets": "Cluster secrets",
+            "deployTokens": "Deploy tokens",
+            "identity": "Workload identity roles",
+            "network": "Network / integrations"
+          }
+        }
       },
       "runJob": {
         "title": "Run scheduled job once",

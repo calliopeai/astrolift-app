@@ -454,6 +454,17 @@ export type AstroliftBudget = {
   scopeKind: Scalars['String']['output'];
 };
 
+export type AstroliftCancelDeregisterPayload = {
+  signalDelivered: Scalars['Boolean']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftCancelDeregisterPayloadMutationResult = {
+  data?: Maybe<AstroliftCancelDeregisterPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftCapabilityDeprovisionPayload = {
   appId?: Maybe<Scalars['GUID']['output']>;
   clusterSlug: Scalars['String']['output'];
@@ -767,6 +778,63 @@ export type AstroliftDeregisterAppPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftDeregisterPreview = {
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  deployTokens: Array<AstroliftDeregisterPreviewDeployToken>;
+  identityRoles: Array<AstroliftDeregisterPreviewIdentityRole>;
+  k8sObjects: Array<AstroliftDeregisterPreviewK8sObject>;
+  managedServices: Array<AstroliftDeregisterPreviewManagedService>;
+  registryRepoUri: Scalars['String']['output'];
+  secretRefs: Array<AstroliftDeregisterPreviewSecretRef>;
+  sourceWebhook?: Maybe<AstroliftDeregisterPreviewSourceWebhook>;
+  totalResourceCount: Scalars['Int']['output'];
+};
+
+export type AstroliftDeregisterPreviewDeployToken = {
+  environmentName?: Maybe<Scalars['String']['output']>;
+  id: Scalars['GUID']['output'];
+  last4: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type AstroliftDeregisterPreviewIdentityRole = {
+  clusterSlug: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  roleArnOrPrincipal: Scalars['String']['output'];
+};
+
+export type AstroliftDeregisterPreviewK8sObject = {
+  apiVersion: Scalars['String']['output'];
+  clusterSlug: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+};
+
+export type AstroliftDeregisterPreviewManagedService = {
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  variant: Scalars['String']['output'];
+};
+
+export type AstroliftDeregisterPreviewSecretRef = {
+  bundleSlug: Scalars['String']['output'];
+  clusterSlug?: Maybe<Scalars['String']['output']>;
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  prefix: Scalars['String']['output'];
+};
+
+export type AstroliftDeregisterPreviewSourceWebhook = {
+  hookId: Scalars['String']['output'];
+  installed: Scalars['Boolean']['output'];
+  repo: Scalars['String']['output'];
+};
+
 export type AstroliftDisconnectUserSourceProviderPayload = {
   disconnectedId?: Maybe<Scalars['GUID']['output']>;
   providerConfigId: Scalars['GUID']['output'];
@@ -806,6 +874,26 @@ export type AstroliftForceRedeployPayloadMutationResult = {
   data?: Maybe<AstroliftForceRedeployPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftForceRedeployPreview = {
+  appSlug: Scalars['String']['output'];
+  environmentName?: Maybe<Scalars['String']['output']>;
+  inFlightDeployments: Array<AstroliftForceRedeployPreviewDeployment>;
+};
+
+export type AstroliftForceRedeployPreviewDeployment = {
+  ciActorKind: Scalars['String']['output'];
+  ciRunUrl: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+  triggeredByDisplay: Scalars['String']['output'];
+  workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftIdentityProvider = {
@@ -1708,6 +1796,11 @@ export type BulkimportpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type CancelDeregisterInput = {
+  reason: InputMaybe<Scalars['String']['input']>;
+  workflowId: Scalars['String']['input'];
+};
+
 export type ConfigureProviderPluginInput = {
   config: Scalars['JSON']['input'];
   organizationScoped: Scalars['Boolean']['input'];
@@ -2181,6 +2274,7 @@ export type Mutation = {
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
+  cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -2449,6 +2543,11 @@ export type MutationBringClusterIntoManagementArgs = {
 
 export type MutationBulkImportAppSecretsArgs = {
   input: BulkImportAppSecretsInput;
+};
+
+
+export type MutationCancelAstroliftDeregisterArgs = {
+  input: CancelDeregisterInput;
 };
 
 
@@ -3515,6 +3614,8 @@ export type Query = {
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission. */
   permissionDiagnose?: Maybe<PermissionDiagnosis>;
+  previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
+  previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
   /** Get a workflow definition by slug. */
   workflowDefinition?: Maybe<WorkflowDefinitionType>;
   /** List all workflow definitions. */
@@ -3889,6 +3990,17 @@ export type QueryPermissionCompareArgs = {
 export type QueryPermissionDiagnoseArgs = {
   permission: Scalars['String']['input'];
   userId: Scalars['ID']['input'];
+};
+
+
+export type QueryPreviewAstroliftDeregisterArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryPreviewAstroliftForceRedeployArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
 };
 
 

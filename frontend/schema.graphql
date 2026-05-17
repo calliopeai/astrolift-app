@@ -429,6 +429,17 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftCancelDeregisterPayload {
+  workflowId: String!
+  signalDelivered: Boolean!
+}
+
+type AstroliftCancelDeregisterPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftCancelDeregisterPayload
+}
+
 type AstroliftCapabilityDeprovisionPayload {
   appId: GUID
   clusterSlug: String!
@@ -742,6 +753,63 @@ type AstroliftDeregisterAppPayloadMutationResult {
   data: AstroliftDeregisterAppPayload
 }
 
+type AstroliftDeregisterPreview {
+  appSlug: String!
+  appName: String!
+  k8sObjects: [AstroliftDeregisterPreviewK8sObject!]!
+  managedServices: [AstroliftDeregisterPreviewManagedService!]!
+  secretRefs: [AstroliftDeregisterPreviewSecretRef!]!
+  deployTokens: [AstroliftDeregisterPreviewDeployToken!]!
+  sourceWebhook: AstroliftDeregisterPreviewSourceWebhook
+  identityRoles: [AstroliftDeregisterPreviewIdentityRole!]!
+  registryRepoUri: String!
+  totalResourceCount: Int!
+}
+
+type AstroliftDeregisterPreviewDeployToken {
+  id: GUID!
+  name: String!
+  last4: String!
+  environmentName: String
+}
+
+type AstroliftDeregisterPreviewIdentityRole {
+  clusterSlug: String!
+  kind: String!
+  roleArnOrPrincipal: String!
+}
+
+type AstroliftDeregisterPreviewK8sObject {
+  clusterSlug: String!
+  namespace: String!
+  apiVersion: String!
+  kind: String!
+  name: String!
+}
+
+type AstroliftDeregisterPreviewManagedService {
+  id: GUID!
+  name: String!
+  kind: String!
+  variant: String!
+  environmentName: String!
+  status: String!
+}
+
+type AstroliftDeregisterPreviewSecretRef {
+  id: GUID!
+  bundleSlug: String!
+  environmentName: String!
+  clusterSlug: String
+  prefix: String!
+}
+
+type AstroliftDeregisterPreviewSourceWebhook {
+  installed: Boolean!
+  repo: String!
+  hookId: String!
+}
+
 type AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: GUID!
   disconnectedId: GUID
@@ -781,6 +849,26 @@ type AstroliftForceRedeployPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftForceRedeployPayload
+}
+
+type AstroliftForceRedeployPreview {
+  appSlug: String!
+  environmentName: String
+  inFlightDeployments: [AstroliftForceRedeployPreviewDeployment!]!
+}
+
+type AstroliftForceRedeployPreviewDeployment {
+  id: GUID!
+  environmentName: String!
+  workloadSlug: String
+  status: String!
+  imageTag: String!
+  startedAt: DateTime
+  createdAt: DateTime!
+  triggerKind: String!
+  triggeredByDisplay: String!
+  ciActorKind: String!
+  ciRunUrl: String!
 }
 
 type AstroliftIdentityProvider {
@@ -1678,6 +1766,11 @@ type BulkimportpayloadMutationResult {
   data: Bulkimportpayload
 }
 
+input CancelDeregisterInput {
+  workflowId: String!
+  reason: String = null
+}
+
 input ConfigureProviderPluginInput {
   pluginSlug: String!
   config: JSON!
@@ -2371,6 +2464,7 @@ type Mutation {
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
   pushAstroliftCiWorkflowToRepo(input: PushCiWorkflowToRepoInput!): AstroliftPushCiWorkflowPayloadMutationResult!
   deregisterAstroliftApp(input: DeregisterAppInput!): AstroliftDeregisterAppPayloadMutationResult!
+  cancelAstroliftDeregister(input: CancelDeregisterInput!): AstroliftCancelDeregisterPayloadMutationResult!
   forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
   runAstroliftJobOnce(input: RunJobOnceInput!): AstroliftRunJobOncePayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -2668,6 +2762,8 @@ type Query {
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): [AstroliftAppDnsRecord!]!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): [AstroliftAppCertificate!]!
   astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBinding
+  previewAstroliftDeregister(appSlug: String!): AstroliftDeregisterPreview
+  previewAstroliftForceRedeploy(appSlug: String!, environmentName: String = null): AstroliftForceRedeployPreview
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!

@@ -2667,6 +2667,72 @@ class LifecycleMutation:
         )
 
     # ----------------------------------------------------------------
+    # Grace-period teardown cancel (#436 B)
+    # ----------------------------------------------------------------
+    #
+    # Sends the ``cancel_teardown`` signal to a running
+    # ``DeregisterAppWorkflow``. If the signal lands within the 5-min
+    # grace window before the workflow's first destructive activity
+    # fires, the teardown short-circuits and no per-app resource is
+    # touched. After the window elapses the signal is a no-op — the
+    # destructive activities are monotonic by design (a half-applied
+    # teardown is not rolled back; the operator retries instead).
+    # Gated on ``app.delete`` — same permission the deregister
+    # mutation requires.
+
+    @strawberry.field
+    @mutation_audit(action="app.deregister.cancel")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def cancel_astrolift_deregister(
+        self,
+        info: Info,
+        input: CancelDeregisterInput,
+    ) -> MutationResultType[CancelDeregisterPayload]:
+        """Cancel a pending deregister within the 5-min grace window."""
+        wf_id = (input.workflow_id or "").strip()
+        if not wf_id:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "workflow_id is required",
+                field="workflowId",
+            )
+        # Defence-in-depth: the deterministic deregister workflow id
+        # carries the app guid; tenant scoping on the resolver entry
+        # would catch a cross-org request, but pin the id shape here so
+        # an operator can't accidentally cancel an unrelated workflow.
+        if not wf_id.startswith("DeregisterAppWorkflow-"):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "workflow_id must reference a DeregisterAppWorkflow run",
+                field="workflowId",
+            )
+        # Resolve + scope-check the app guid embedded in the workflow id.
+        # The mutation surface is tenant-scoped, so a sibling-org guid
+        # short-circuits to NOT_FOUND rather than leaking row counts.
+        app_guid = wf_id[len("DeregisterAppWorkflow-") :]
+        app = RegisteredApp.objects.filter(guid=app_guid).select_related("organization").first()
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"no deregister workflow found for {wf_id!r}",
+                field="workflowId",
+            )
+
+        reason = (input.reason or "").strip()
+        delivered = signal_workflow(wf_id, "cancel_teardown", reason)
+        # Best-effort: signal failure (workflow not running, Temporal
+        # disabled in dev, etc.) is surfaced as ok=True with
+        # ``signal_delivered=False`` so the FE can render the
+        # "couldn't reach" copy instead of a generic error toast.
+        return gql_success(
+            CancelDeregisterPayload(
+                workflow_id=wf_id,
+                signal_delivered=bool(delivered),
+            ),
+        )
+
+    # ----------------------------------------------------------------
     # Force redeploy recovery (#389)
     # ----------------------------------------------------------------
     #
@@ -3150,3 +3216,38 @@ class DeregisterAppPayload:
 
     workflow_id: str
     still_live_resources: list[str]
+
+
+# ---------------------------------------------------------------------------
+# #436 B — grace-period cancel for a pending deregister teardown.
+# Defined at module scope so Strawberry resolves the types alongside the
+# resolver. Appended after the existing deregister types so sibling
+# agents touching this region land on adjacent ranges.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class CancelDeregisterInput:
+    """Input for the grace-period cancel mutation (#436 B).
+
+    ``workflow_id`` is the deterministic id the deregister mutation
+    returned. ``reason`` is a free-form audit note (the operator's
+    why-cancelled context) — surfaces in the workflow log + the
+    mutation_audit event extras."""
+
+    workflow_id: str
+    reason: str | None = None
+
+
+@strawberry.type(name="AstroliftCancelDeregisterPayload")
+class CancelDeregisterPayload:
+    """Read-back for a cancel-deregister attempt (#436 B).
+
+    ``signal_delivered`` is False when the Temporal client couldn't
+    reach the workflow (workflow already finished, Temporal disabled
+    in dev, transport error). The FE renders the "couldn't reach"
+    copy in that case so the operator knows whether their cancel
+    landed."""
+
+    workflow_id: str
+    signal_delivered: bool
