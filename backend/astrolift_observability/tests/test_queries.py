@@ -385,3 +385,143 @@ def test_status_code_breakdown_workload_slug_threads_into_promql(permission_reso
 
     assert result is not None
     assert 'workload="worker"' in result.promql
+
+
+# ----------------------------------------------------------------------
+# astroliftWorkloadResourceUsage (#430)
+# ----------------------------------------------------------------------
+
+
+def test_workload_resource_usage_unknown_app_returns_null(permission_resolver):
+    """Soft-null when the app slug doesn't resolve for the tenant."""
+    org, _ = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+            _info(),
+            app_slug="nope",
+            workload_slug="api",
+        )
+    assert result is None
+
+
+def test_workload_resource_usage_no_prometheus_endpoint_returns_null(permission_resolver):
+    """No prom endpoint → null, FE shows the metrics-not-flowing card."""
+    org, app = _scaffold(prometheus_endpoint=None)
+    permission_resolver.grant(Permission.APP_READ)
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+            _info(),
+            app_slug=app.slug,
+            workload_slug="api",
+        )
+    assert result is None
+
+
+def test_workload_resource_usage_happy_path(permission_resolver):
+    """Six instant queries (usage+request+limit × CPU+memory) → gauge
+    pair with percent fields filled."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    # Return values keyed by the substring of the PromQL — keeps the
+    # stub readable without re-parsing.
+    def fake_query_instant(*, endpoint, query, timeout=5.0):
+        if "container_cpu_usage_seconds_total" in query:
+            return 0.5  # 0.5 cores used
+        if "container_memory_working_set_bytes" in query:
+            return 256.0 * 1024 * 1024  # 256 MiB used
+        if "kube_pod_container_resource_requests" in query and 'resource="cpu"' in query:
+            return 1.0
+        if "kube_pod_container_resource_limits" in query and 'resource="cpu"' in query:
+            return 2.0
+        if "kube_pod_container_resource_requests" in query and 'resource="memory"' in query:
+            return 512.0 * 1024 * 1024
+        if "kube_pod_container_resource_limits" in query and 'resource="memory"' in query:
+            return 1024.0 * 1024 * 1024
+        raise AssertionError(f"unexpected query {query!r}")
+
+    from astrolift_operations import prometheus_client as ops_client
+
+    with patch.object(ops_client, "query_instant", side_effect=fake_query_instant):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+                _info(),
+                app_slug=app.slug,
+                workload_slug="api",
+                environment_name="prod",
+            )
+
+    assert result is not None
+    assert result.cpu.current == pytest.approx(0.5)
+    assert result.cpu.request == pytest.approx(1.0)
+    assert result.cpu.limit == pytest.approx(2.0)
+    assert result.cpu.percent_of_request == pytest.approx(50.0)
+    assert result.cpu.percent_of_limit == pytest.approx(25.0)
+    assert result.cpu.unit == "cores"
+    assert result.memory.current == pytest.approx(256.0 * 1024 * 1024)
+    assert result.memory.percent_of_request == pytest.approx(50.0)
+    assert result.memory.percent_of_limit == pytest.approx(25.0)
+    assert result.memory.unit == "bytes"
+
+
+def test_workload_resource_usage_all_errors_returns_null(permission_resolver):
+    """Every prom call failing on both resources → null (the
+    Prometheus-is-dark signal)."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    def fake_raise(**kwargs):
+        raise PrometheusUnavailable("connection refused")
+
+    from astrolift_operations import prometheus_client as ops_client
+
+    with patch.object(ops_client, "query_instant", side_effect=fake_raise):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+                _info(),
+                app_slug=app.slug,
+                workload_slug="api",
+            )
+    assert result is None
+
+
+def test_workload_resource_usage_partial_errors_zero_denominator(permission_resolver):
+    """A single failed call → field is 0.0, percent collapses safely."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    def fake_query_instant(*, endpoint, query, timeout=5.0):
+        if "container_cpu_usage_seconds_total" in query:
+            return 0.5
+        if "container_memory_working_set_bytes" in query:
+            return 0.0
+        # All request/limit calls succeed with 0 → percent must be 0,
+        # not a ZeroDivisionError.
+        return 0.0
+
+    from astrolift_operations import prometheus_client as ops_client
+
+    with patch.object(ops_client, "query_instant", side_effect=fake_query_instant):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+                _info(),
+                app_slug=app.slug,
+                workload_slug="api",
+            )
+    assert result is not None
+    assert result.cpu.percent_of_request == 0.0
+    assert result.cpu.percent_of_limit == 0.0
+
+
+def test_workload_resource_usage_permission_denied_raises(permission_resolver):
+    """Without ``APP_READ`` the decorator raises before the resolver
+    runs — same shape as every other observability query."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    # No grant.
+    with _tenant(org), pytest.raises(PermissionDenied):
+        GoldenSignalsQuery().astrolift_workload_resource_usage(
+            _info(),
+            app_slug=app.slug,
+            workload_slug="api",
+        )

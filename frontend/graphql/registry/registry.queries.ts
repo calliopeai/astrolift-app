@@ -240,3 +240,73 @@ export const LIST_APP_TEAM_ACCESSES = gql`
     }
   }
 `;
+
+/**
+ * Live workload scaling status (#430).
+ *
+ * Combines the manifest-side HPA configuration with the live
+ * Deployment status read from the cluster driver. Powers the
+ * scaling card on the workload-detail page.
+ */
+export const GET_WORKLOAD_SCALING_STATUS = gql`
+  query GetWorkloadScalingStatus(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentName: String
+  ) {
+    astroliftWorkloadScalingStatus(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentName: $environmentName
+    ) {
+      hpaEnabled
+      hpaMinReplicas
+      hpaMaxReplicas
+      hpaTargetCpuPct
+      currentReplicas
+      desiredReplicas
+      isScaling
+      replicaLowerBound
+      replicaUpperBound
+      sourcedAt
+    }
+  }
+`;
+
+/**
+ * Per-workload manifest preview + diff (#430).
+ *
+ * Returns the platform-rendered K8s resources scoped to one workload
+ * plus, when a prior deployment exists for the same env, the resources
+ * rendered at that deployment's image tag — so the FE can render an
+ * image-tag diff client-side without a second round-trip.
+ */
+export const GET_WORKLOAD_MANIFEST = gql`
+  query GetWorkloadManifest(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentName: String
+    $imageTag: String
+  ) {
+    astroliftWorkloadManifest(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentName: $environmentName
+      imageTag: $imageTag
+    ) {
+      appSlug
+      workloadSlug
+      environmentName
+      imageTag
+      namespace
+      resources
+      previousImageTag
+      previousDeploymentId
+      resourcesPrevious
+      error
+      errorPath
+      errorLine
+      errorColumn
+    }
+  }
+`;

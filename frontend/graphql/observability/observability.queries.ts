@@ -93,3 +93,42 @@ export const GET_APP_URL_PROBE_HISTORY = gql`
     }
   }
 `;
+
+/**
+ * Live resource usage gauges for one workload (#430).
+ *
+ * Returns null when the cluster has no Prometheus endpoint or every
+ * underlying PromQL call errored — the workload-detail page renders
+ * the "metrics not flowing" callout in either case.
+ */
+export const GET_WORKLOAD_RESOURCE_USAGE = gql`
+  query GetWorkloadResourceUsage(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentName: String
+  ) {
+    astroliftWorkloadResourceUsage(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentName: $environmentName
+    ) {
+      sourcedAt
+      cpu {
+        unit
+        current
+        request
+        limit
+        percentOfRequest
+        percentOfLimit
+      }
+      memory {
+        unit
+        current
+        request
+        limit
+        percentOfRequest
+        percentOfLimit
+      }
+    }
+  }
+`;
