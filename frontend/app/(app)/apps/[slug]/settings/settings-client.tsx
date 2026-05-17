@@ -16,7 +16,6 @@ import {
   PlayIcon,
   PlugIcon,
   RefreshCwIcon,
-  SettingsIcon,
   TimerIcon,
   Trash2Icon,
   UsersIcon,
@@ -177,17 +176,12 @@ export function SettingsClient({ slug }: { slug: string }) {
 
   return (
     <PageShell
-      title={
-        <span className="flex items-center gap-3">
-          <SettingsIcon className="text-muted-foreground size-5" />
-          <span>{t("title")}</span>
-        </span>
-      }
+      title={t("title")}
       description={
-        <span>
+        <span className="text-muted-foreground font-mono text-xs">
           {t.rich("description", {
             slug: () => (
-              <span className="text-foreground font-mono text-xs">{a.slug}</span>
+              <span className="text-foreground">{a.slug}</span>
             ),
           })}
         </span>

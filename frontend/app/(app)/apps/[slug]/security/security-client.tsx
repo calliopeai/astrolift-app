@@ -186,7 +186,11 @@ export function AppSecurityClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title={t("title", { name: a.name })}
-      description={t("description")}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          {t("description", { slug: a.slug })}
+        </span>
+      }
     >
       <AppTabs slug={a.slug} active="security" />
 
