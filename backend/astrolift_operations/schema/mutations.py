@@ -802,7 +802,9 @@ class OperationsMutation:
         Tokens up to 512 chars (FCM / APNs / web-push all fit).
         """
         from astrolift_operations.models import DeviceRegistration
-        from astrolift_operations.notification_dispatch import get_driver
+        from astrolift_operations.notification_dispatch import (
+            default_driver_slug_for_registration,
+        )
         from astrolift_operations.schema.types import device_registration_to_type
 
         request = getattr(info.context, "request", None)
@@ -839,22 +841,18 @@ class OperationsMutation:
         # Bind the registration to the caller's active AstroliftSession
         # row when one exists — the #499 dispatcher uses this to skip
         # echoing back to the device that just signed in.
-        session_key = (
-            getattr(getattr(request, "session", None), "session_key", None) if request else None
-        )
+        session_key = getattr(getattr(request, "session", None), "session_key", None) if request else None
         enrolled_session_id: int | None = None
         if session_key:
             from astrolift_identity.models import AstroliftSession
 
             row = (
-                AstroliftSession.objects.filter(user_id=viewer.pk, session_key=session_key)
-                .only("pk")
-                .first()
+                AstroliftSession.objects.filter(user_id=viewer.pk, session_key=session_key).only("pk").first()
             )
             if row is not None:
                 enrolled_session_id = row.pk
 
-        driver_slug = get_driver().name
+        driver_slug = default_driver_slug_for_registration(organization_id=org_id)
 
         existing = (
             DeviceRegistration.all_objects.filter(user_id=viewer.pk, device_token=token)
