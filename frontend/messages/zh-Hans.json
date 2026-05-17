@@ -306,6 +306,33 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "部署前需要审批",
+        "safer": "更安全",
+        "toggleHint": "触发的部署在审批人签字前停留在“等待审批”状态。请选择团队或特定的用户集合 — 审批人不能自我审批自己推送的部署。",
+        "teamLabel": "审批团队",
+        "teamPlaceholder": "未选择团队",
+        "teamNoneOption": "不选团队 — 改为选择用户",
+        "teamHint": "该团队的任何活跃成员都可以审批。与用户选择器互斥。",
+        "minimumLabel": "所需审批人数",
+        "minimumHintUsers": "根据所选用户:1–{max}。",
+        "minimumHintTeam": "需要的不同审批人数量。至少 1 人。",
+        "usersLabel": "审批用户",
+        "usersPlaceholderTeam": "已选择团队模式 — 清空团队选择即可添加用户。",
+        "usersPlaceholderEmpty": "尚未选择用户。",
+        "userRemove": "移除 {label}",
+        "orphanRemove": "移除孤立审批人 {id}",
+        "orphanSuffix": "(已不是成员)",
+        "search": "按姓名或邮箱搜索组织成员…",
+        "loading": "正在加载组织成员…",
+        "noMembers": "尚无活跃组织成员 — 请先邀请人员。",
+        "noMatch": "没有匹配搜索的成员。",
+        "errorPickAny": "请至少选择一名审批人 — 团队或一名以上用户。",
+        "errorBoth": "请选择团队或特定用户,不能同时选择两者。",
+        "errorMinTooHigh": "最低审批数不能超过所选用户数量。"
+      }
     }
   },
   "settingsIndex": {

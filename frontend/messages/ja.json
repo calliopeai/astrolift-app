@@ -306,6 +306,33 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "デプロイ前に承認を必須にする",
+        "safer": "より安全",
+        "toggleHint": "トリガーされたデプロイは、承認者が承認するまで「承認待ち」状態になります。チーム または 特定のユーザー群のいずれかを選択してください — 承認者は自分がプッシュしたデプロイを自己承認できません。",
+        "teamLabel": "承認チーム",
+        "teamPlaceholder": "チームが未選択",
+        "teamNoneOption": "チームなし — 代わりにユーザーを選択",
+        "teamHint": "このチームのアクティブなメンバーは誰でも承認できます。ユーザーピッカーと排他です。",
+        "minimumLabel": "必要な承認者数",
+        "minimumHintUsers": "ユーザー選択に基づき 1〜{max}。",
+        "minimumHintTeam": "必要な個別承認者の数。最低 1 名。",
+        "usersLabel": "承認ユーザー",
+        "usersPlaceholderTeam": "チームモードが選択されています — ユーザーを追加するにはチーム選択をクリアしてください。",
+        "usersPlaceholderEmpty": "まだユーザーが選択されていません。",
+        "userRemove": "{label} を削除",
+        "orphanRemove": "孤立した承認者 {id} を削除",
+        "orphanSuffix": "(もうメンバーではありません)",
+        "search": "名前またはメールで組織メンバーを検索…",
+        "loading": "組織メンバーを読み込み中…",
+        "noMembers": "アクティブなメンバーがいません — まずは誰かを招待してください。",
+        "noMatch": "検索に一致するメンバーがいません。",
+        "errorPickAny": "少なくとも 1 人の承認者を選択してください — チームまたは 1 人以上のユーザー。",
+        "errorBoth": "チームまたは特定のユーザーのどちらかを選択してください。両方は不可です。",
+        "errorMinTooHigh": "最低承認数は選択ユーザー数を超えられません。"
+      }
     }
   },
   "settingsIndex": {

@@ -327,6 +327,33 @@
         "confirm": "Delete app"
       }
     },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "Require approval before deploying",
+        "safer": "Safer",
+        "toggleHint": "Triggered deploys land in \"pending approval\" until an approver signs off. Pick a team OR a specific set of users — approvers can't self-approve a deploy they pushed.",
+        "teamLabel": "Approver team",
+        "teamPlaceholder": "No team selected",
+        "teamNoneOption": "No team — pick users instead",
+        "teamHint": "Any active member of this team may approve. Mutually exclusive with the user picker.",
+        "minimumLabel": "Required approver count",
+        "minimumHintUsers": "1–{max} based on your user selection.",
+        "minimumHintTeam": "Number of distinct approvers required. At least 1.",
+        "usersLabel": "Approver users",
+        "usersPlaceholderTeam": "Team mode selected — clear the team picker to add users.",
+        "usersPlaceholderEmpty": "No users selected yet.",
+        "userRemove": "Remove {label}",
+        "orphanRemove": "Remove orphaned approver {id}",
+        "orphanSuffix": "(no longer a member)",
+        "search": "Search org members by name or email…",
+        "loading": "Loading org members…",
+        "noMembers": "No active org members yet — invite someone first.",
+        "noMatch": "No members match the search.",
+        "errorPickAny": "Pick at least one approver — a team or one or more users.",
+        "errorBoth": "Pick a team OR specific users, not both.",
+        "errorMinTooHigh": "Minimum approvals cannot exceed the number of selected users."
+      }
+    },
     "deployments": {
       "title": "{name} · Deployments",
       "description": "{slug} · full historical deploy log with filters",
