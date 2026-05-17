@@ -35,6 +35,7 @@ from k8s_native.managed.mysql_operator import MySQLOperatorDriver
 from k8s_native.managed.postgres_cnpg import CNPGPostgresDriver
 from k8s_native.managed.queue_rabbitmq import RabbitMQOperatorDriver
 from k8s_native.managed.redis_operator import RedisOperatorDriver
+from k8s_native.notification_otlp import WebhookSMTPNotificationDriver
 from k8s_native.registry_oci import OCIRegistryDriver
 from k8s_native.secrets_vault import VaultSecretsBackend
 from k8s_native.tls_certmanager import CertManagerDriver
@@ -51,6 +52,7 @@ PLUGIN = ProviderPlugin(
         "secrets": VaultSecretsBackend,
         "identity": ProjectedSaTokenDriver,
         "registry": OCIRegistryDriver,
+        "notification": WebhookSMTPNotificationDriver,
     },
     managed_service_drivers={
         ("postgres", "cnpg"): CNPGPostgresDriver,

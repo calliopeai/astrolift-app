@@ -28,11 +28,16 @@ from astrolift_operations.models import (
     Notification,
     WebhookSubscription,
 )
+from astrolift_operations.notification_dispatch import (
+    register_device,
+    unregister_device,
+)
 from astrolift_operations.schema.types import (
     AlertEventType,
     AlertRuleType,
     AppLogExportType,
     AuditExportType,
+    DeviceRegistrationType,
     NotificationType,
     WebhookSubscriptionType,
     WebhookTestResultType,
@@ -40,6 +45,7 @@ from astrolift_operations.schema.types import (
     alert_rule_to_type,
     app_log_export_to_type,
     audit_export_to_type,
+    device_registration_to_type,
     notification_to_type,
     webhook_to_type,
 )
@@ -117,6 +123,30 @@ class DeleteWebhookSubscriptionInput:
 @strawberry.input
 class MarkNotificationReadInput:
     id: GUID
+
+
+@strawberry.input
+class RegisterAstroliftDeviceInput:
+    """Register a push device for the caller (#490).
+
+    ``token`` is the platform-supplied push token (APNs hex, FCM
+    string, or Web Push endpoint). ``kind`` is the device platform;
+    must be one of ``ios`` / ``android`` / ``web``. ``platformData``
+    is an opaque blob persisted on the registration row for
+    driver-side metadata (e.g. ANH tag list, SNS app ARN hint)."""
+
+    token: str
+    kind: str
+    label: str | None = None
+    platform_data: strawberry.scalars.JSON | None = None
+
+
+@strawberry.input
+class UnregisterAstroliftDeviceInput:
+    """Unregister one of the caller's devices. The device GUID is
+    returned by ``registerAstroliftDevice`` + ``astroliftMyDevices``."""
+
+    device_id: GUID
 
 
 @strawberry.type
@@ -740,6 +770,90 @@ class OperationsMutation:
             read_at=timezone.now()
         )
         return gql_success(_MarkAllReadPayload(marked=marked))
+
+    # ---- Device registration (#490) -------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="notification.device.register")
+    @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
+    def register_astrolift_device(
+        self,
+        info: Info,
+        input: RegisterAstroliftDeviceInput,
+    ) -> MutationResultType[DeviceRegistrationType]:
+        """Register a push device for the caller.
+
+        Idempotent on (user, token): re-registering the same token
+        returns the existing row with the label optionally refreshed.
+        When the org has an active NotificationProfile, the dispatcher
+        also calls the driver's ``register_device`` so the
+        provider-side endpoint exists before any send."""
+        tenant = get_current_tenant()
+        if (
+            tenant is None
+            or tenant.actor_user_id is None
+            or tenant.organization_id is None
+        ):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value, "not authenticated",
+            )
+        kind = (input.kind or "").strip().lower()
+        if kind not in {"ios", "android", "web"}:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "kind must be one of ios | android | web",
+                field="kind",
+            )
+        token = (input.token or "").strip()
+        if not token:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "token is required",
+                field="token",
+            )
+        try:
+            result = register_device(
+                organization_id=tenant.organization_id,
+                user_id=tenant.actor_user_id,
+                device_token=token,
+                platform=kind,
+                label=(input.label or "").strip(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"device registration failed: {exc}",
+            )
+        return gql_success(device_registration_to_type(result.device))
+
+    @strawberry.field
+    @mutation_audit(action="notification.device.unregister")
+    @require_permission(Permission.ORG_UPDATE)
+    @tenant_scoped()
+    def unregister_astrolift_device(
+        self,
+        info: Info,
+        input: UnregisterAstroliftDeviceInput,
+    ) -> MutationResultType[_SoftDeletePayload]:
+        """Revoke a device. Soft-deletes the row + best-effort
+        revokes the provider-side endpoint."""
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value, "not authenticated",
+            )
+        ok = unregister_device(
+            device_guid=str(input.device_id),
+            user_id=tenant.actor_user_id,
+        )
+        if not ok:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, "device not found",
+            )
+        return gql_success(
+            _SoftDeletePayload(id=input.device_id, deleted=True),
+        )
 
     # ---- Alert rules + events (#282) ------------------------------
 
