@@ -342,12 +342,12 @@
         "ariaLabel": "Search apps"
       },
       "filters": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
-        "running": "Running",
-        "failed": "Failed",
-        "inflight": "In-flight",
-        "notDeployed": "Not deployed"
+        "ariaLabel": "상태별 필터",
+        "all": "전체",
+        "ok": "정상",
+        "degraded": "저하됨",
+        "stale": "오래됨",
+        "never_deployed": "배포 안 됨"
       },
       "noMatch": {
         "title": "No apps match the current filter",
@@ -357,6 +357,11 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "count": "{total}개 중 {shown}개 표시",
+      "loadMore": {
+        "label": "더 보기",
+        "loading": "불러오는 중…"
       }
     },
     "tabs": {

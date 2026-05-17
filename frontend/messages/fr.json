@@ -339,11 +339,11 @@
       },
       "filters": {
         "ariaLabel": "Filtrer par statut",
-        "all": "Toutes",
-        "running": "En cours",
-        "failed": "Échouées",
-        "inflight": "En traitement",
-        "notDeployed": "Non déployées"
+        "all": "Tous",
+        "ok": "Sain",
+        "degraded": "Dégradé",
+        "stale": "Obsolète",
+        "never_deployed": "Non déployé"
       },
       "noMatch": {
         "title": "Aucune application ne correspond au filtre actuel",
@@ -353,6 +353,11 @@
       "errorBanner": {
         "title": "Impossible de charger les applications",
         "retry": "Réessayer"
+      },
+      "count": "Affichage de {shown} sur {total}",
+      "loadMore": {
+        "label": "Charger plus",
+        "loading": "Chargement…"
       }
     },
     "tabs": {

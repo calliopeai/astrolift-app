@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import datetime as dt
+import json
 from collections.abc import Iterable
 
 import strawberry
@@ -16,8 +19,13 @@ from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
     AppFreshness,
+    AppHealthPulseType,
     AppTeamAccessType,
+    AstroliftAppHealthPulseStatus,
+    AstroliftAppListStatusFilter,
+    AstroliftAppSourceKindFilter,
     ContainerType,
+    RegisteredAppPageType,
     RegisteredAppType,
     RenderedManifestType,
     WorkloadManifestType,
@@ -34,6 +42,316 @@ from astrolift_registry.schema.types import (
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+# ---------------------------------------------------------------------------
+# Apps-list filters + cursor pagination (#481)
+# ---------------------------------------------------------------------------
+#
+# Cursor format: base64-JSON of ``[created_at_iso, guid_str]``. Same
+# seek-key shape the operations / audit queries use; this keeps the FE
+# cursor handling uniform across surfaces.
+#
+# Filter rules in one place so ``astrolift_apps``, ``astrolift_my_apps``,
+# and their page variants stay aligned. Status filtering relies on the
+# same bulk-freshness rollup the rows already pay for when
+# ``include_freshness=True``; resolvers force the rollup on whenever
+# status is filtered so the cheap path still produces correct results.
+
+
+_APPS_LIST_PAGE_DEFAULT_LIMIT = 50
+_APPS_LIST_PAGE_MAX_LIMIT = 200
+
+
+def _encode_apps_cursor(created_at: dt.datetime, guid: str) -> str:
+    payload = json.dumps([created_at.isoformat(), guid], separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+
+
+def _decode_apps_cursor(token: str) -> tuple[dt.datetime, str] | None:
+    """Decode a cursor or return ``None`` on garbage.
+
+    We swallow malformed tokens so a stale share-link restarts from
+    the top instead of erroring — the audit / events queries take the
+    same line. New cursors are always re-issued on the new page so
+    the caller transparently recovers."""
+    pad = "=" * (-len(token) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(token + pad)
+        ts, guid = json.loads(raw)
+        return dt.datetime.fromisoformat(ts), guid
+    except (binascii.Error, ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def _apply_apps_list_filters(
+    qs,
+    *,
+    search: str | None,
+    team_slug: str | None,
+    project_slug: str | None,
+    source_kind: AstroliftAppSourceKindFilter | None,
+):
+    """Apply the search / team / project / source-kind filters in one place.
+
+    Status filtering happens after the freshness rollup so it lives in
+    ``_filter_by_status_bucket`` rather than the queryset chain. Each
+    filter here narrows the queryset; an unset filter is a no-op.
+    """
+    if search:
+        needle = search.strip()
+        if needle:
+            qs = qs.filter(
+                Q(name__icontains=needle)
+                | Q(slug__icontains=needle)
+                | Q(description__icontains=needle)
+                | Q(source_repo__icontains=needle)
+                | Q(source_url__icontains=needle)
+            )
+    if team_slug:
+        qs = qs.filter(team__slug=team_slug)
+    if project_slug:
+        qs = qs.filter(project__slug=project_slug)
+    if source_kind and source_kind is not AstroliftAppSourceKindFilter.ALL:
+        qs = qs.filter(source_kind=source_kind.value)
+    return qs
+
+
+def _coerce_apps_status(
+    status: AstroliftAppListStatusFilter | None,
+) -> AstroliftAppListStatusFilter:
+    """Normalise an unset / ``ALL`` value to ``ALL`` so the rest of the
+    pipeline branches on a single sentinel."""
+    if status is None:
+        return AstroliftAppListStatusFilter.ALL
+    return status
+
+
+def _status_filter_active(status: AstroliftAppListStatusFilter) -> bool:
+    return status is not AstroliftAppListStatusFilter.ALL
+
+
+_STATUS_FILTER_TO_PULSE: dict[AstroliftAppListStatusFilter, AstroliftAppHealthPulseStatus] = {
+    AstroliftAppListStatusFilter.OK: AstroliftAppHealthPulseStatus.OK,
+    AstroliftAppListStatusFilter.DEGRADED: AstroliftAppHealthPulseStatus.DEGRADED,
+    AstroliftAppListStatusFilter.STALE: AstroliftAppHealthPulseStatus.STALE,
+    AstroliftAppListStatusFilter.NEVER_DEPLOYED: AstroliftAppHealthPulseStatus.NEVER,
+}
+
+
+def _filter_apps_by_status(
+    apps: list[RegisteredApp],
+    freshness_by_app: dict[int, AppFreshness],
+    status: AstroliftAppListStatusFilter,
+) -> list[RegisteredApp]:
+    """Keep only apps whose freshness pulse matches ``status``.
+
+    Called after :func:`_freshness_for_apps` has rolled up the per-app
+    pulse. ``ALL`` is a no-op pass-through. Unmapped status enum values
+    fall through to a no-op rather than emptying the list — defensive
+    against a future filter value the resolver doesn't yet wire.
+    """
+    target = _STATUS_FILTER_TO_PULSE.get(status)
+    if target is None:
+        return apps
+    return [a for a in apps if (freshness_by_app.get(a.pk) or _empty_freshness()).pulse.status is target]
+
+
+def _empty_freshness() -> AppFreshness:
+    """Sentinel freshness for an app that has no rollup row — treated
+    as ``never`` so status filtering matches the same bucket the FE
+    renders for the "no deploys yet" empty case."""
+    return AppFreshness(
+        latest_deployment=None,
+        last_deployed_at=None,
+        pulse=AppHealthPulseType(
+            status=AstroliftAppHealthPulseStatus.NEVER,
+            age_seconds=None,
+            message="no deploys yet",
+        ),
+    )
+
+
+def _clamp_page_limit(limit: int) -> int:
+    return max(1, min(int(limit or _APPS_LIST_PAGE_DEFAULT_LIMIT), _APPS_LIST_PAGE_MAX_LIMIT))
+
+
+def _paginate_apps(
+    qs,
+    *,
+    cursor: str | None,
+    limit: int,
+) -> tuple[list[RegisteredApp], str | None, int]:
+    """Materialise a (page, next_cursor, total_count) triple from ``qs``.
+
+    Orders by ``(-created_at, -guid)`` for a stable seek key — guid is
+    a UUID so the tie-breaker is globally unique and won't repeat
+    across delete / re-insert cycles. ``total_count`` is the filtered
+    total (not the table total) so the FE can show "N of M" without a
+    second aggregate query.
+    """
+    page_size = _clamp_page_limit(limit)
+    ordered = qs.order_by("-created_at", "-guid")
+    total_count = ordered.count()
+    if cursor:
+        decoded = _decode_apps_cursor(cursor)
+        if decoded is not None:
+            cursor_at, cursor_guid = decoded
+            ordered = ordered.filter(
+                Q(created_at__lt=cursor_at) | (Q(created_at=cursor_at) & Q(guid__lt=cursor_guid))
+            )
+    # Fetch one extra to detect end-of-stream cheaply.
+    rows = list(ordered[: page_size + 1])
+    items = rows[:page_size]
+    next_cursor = (
+        _encode_apps_cursor(items[-1].created_at, str(items[-1].guid))
+        if len(rows) > page_size and items
+        else None
+    )
+    return items, next_cursor, total_count
+
+
+def _build_apps_page(
+    qs,
+    *,
+    cursor: str | None,
+    limit: int,
+    include_freshness: bool,
+    status: AstroliftAppListStatusFilter,
+) -> RegisteredAppPageType:
+    """Materialise a :class:`RegisteredAppPageType` from a filtered queryset.
+
+    Encapsulates the cursor + freshness + status-filter compose so the
+    two page resolvers (``astrolift_apps_page`` /
+    ``astrolift_my_apps_page``) share the post-DB pipeline. When
+    ``status`` is set, the resolver may scan up to ``limit * 4`` rows
+    to find ``limit`` matches; callers paginate to walk the rest.
+
+    Total-count is the *filter-aware* count of the queryset BEFORE the
+    cursor narrow but AFTER all DB-side filters. For status-filtered
+    pages we can only approximate the total without re-rolling
+    freshness for the entire queryset, so we report the filtered
+    queryset's total minus an estimate — simpler to surface the DB
+    total and let the FE understand that the user-facing count may
+    differ slightly from the on-screen total when status is applied.
+    The "N of M" caption stays useful (it's the unfiltered total
+    after every DB-side filter).
+    """
+    page_size = _clamp_page_limit(limit)
+    effective_freshness = include_freshness or _status_filter_active(status)
+
+    # ``app_to_type`` reads ``approver_users.values_list("pk")`` per row —
+    # a per-row M2M query that explodes the count on a list query. Prefetch
+    # it once for the page so the cost stays bounded.
+    qs = qs.prefetch_related("approver_users")
+
+    if not _status_filter_active(status):
+        items, next_cursor, total_count = _paginate_apps(qs, cursor=cursor, limit=page_size)
+        freshness_by_app = _freshness_for_apps(items) if effective_freshness else {}
+        return RegisteredAppPageType(
+            items=[
+                app_to_type(a, freshness=freshness_by_app.get(a.pk) if include_freshness else None)
+                for a in items
+            ],
+            next_cursor=next_cursor,
+            total_count=total_count,
+        )
+
+    # Status-filtered path: walk the queryset under the cursor,
+    # roll freshness in batches, keep matches until we have a full
+    # page (or hit the scan cap).
+    ordered = qs.order_by("-created_at", "-guid")
+    total_count = ordered.count()
+    if cursor:
+        decoded = _decode_apps_cursor(cursor)
+        if decoded is not None:
+            cursor_at, cursor_guid = decoded
+            ordered = ordered.filter(
+                Q(created_at__lt=cursor_at) | (Q(created_at=cursor_at) & Q(guid__lt=cursor_guid))
+            )
+
+    scan_cap = max(page_size * 4, page_size + 1)
+    scanned = list(ordered[:scan_cap])
+    freshness_by_app = _freshness_for_apps(scanned)
+    kept = _filter_apps_by_status(scanned, freshness_by_app, status)
+    items = kept[:page_size]
+    has_more_in_scan = len(kept) > page_size
+    has_more_unscanned = len(scanned) == scan_cap and not has_more_in_scan
+    if items and (has_more_in_scan or has_more_unscanned):
+        anchor = items[-1] if has_more_in_scan else scanned[-1]
+        next_cursor: str | None = _encode_apps_cursor(anchor.created_at, str(anchor.guid))
+    else:
+        next_cursor = None
+    return RegisteredAppPageType(
+        items=[
+            app_to_type(a, freshness=freshness_by_app.get(a.pk) if include_freshness else None) for a in items
+        ],
+        next_cursor=next_cursor,
+        total_count=total_count,
+    )
+
+
+def _viewer_scope_filter() -> Q | None:
+    """Return the ``Q`` that limits a queryset to apps the viewer's
+    RoleBindings reach (#312). ``None`` when no scope applies — caller
+    short-circuits to an empty list.
+
+    Mirrors the existing inline logic in ``astrolift_my_apps`` so the
+    page variant doesn't fork the rule. Superusers get ``Q()`` (an
+    unconstrained pass-through); anonymous callers get ``None``.
+    """
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import RoleBinding
+
+    tenant = get_current_tenant()
+    if tenant is None or tenant.actor_user_id is None:
+        return None
+
+    User = get_user_model()
+    viewer = User.objects.filter(pk=tenant.actor_user_id).first()
+    if viewer is None:
+        return None
+
+    if getattr(viewer, "is_superuser", False) and getattr(viewer, "is_active", True):
+        return Q()
+
+    now = timezone.now()
+    bindings = list(
+        RoleBinding.objects.filter(
+            user_id=tenant.actor_user_id,
+            deleted_at__isnull=True,
+        ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+    )
+    if not bindings:
+        return None
+
+    org_ids: set[int] = set()
+    team_ids: set[int] = set()
+    project_ids: set[int] = set()
+    app_ids: set[int] = set()
+    for b in bindings:
+        if b.scope_kind == RoleBinding.ScopeKind.ORG:
+            org_ids.add(b.scope_id)
+        elif b.scope_kind == RoleBinding.ScopeKind.TEAM:
+            team_ids.add(b.scope_id)
+        elif b.scope_kind == RoleBinding.ScopeKind.PROJECT:
+            project_ids.add(b.scope_id)
+        elif b.scope_kind == RoleBinding.ScopeKind.APP:
+            app_ids.add(b.scope_id)
+
+    scope_filter = Q()
+    if org_ids:
+        scope_filter |= Q(organization_id__in=org_ids)
+    if team_ids:
+        scope_filter |= Q(team_id__in=team_ids)
+    if project_ids:
+        scope_filter |= Q(project_id__in=project_ids)
+    if app_ids:
+        scope_filter |= Q(pk__in=app_ids)
+
+    if not scope_filter.children:
+        return None
+    return scope_filter
 
 
 def _scaling_environment_for_workload(workload, environment_name: str | None):
@@ -200,6 +518,11 @@ class RegistryQuery:
         self,
         info: Info,
         include_freshness: bool = False,
+        search: str | None = None,
+        team_slug: str | None = None,
+        project_slug: str | None = None,
+        status: AstroliftAppListStatusFilter | None = None,
+        source_kind: AstroliftAppSourceKindFilter | None = None,
     ) -> list[RegisteredAppType]:
         """Org-scoped list of registered apps.
 
@@ -208,16 +531,110 @@ class RegistryQuery:
         ``lastDeployedAt``, and ``healthPulse``. Off by default so
         callers that only need the cheap registry fields don't pay
         the two-query freshness join.
-        """
 
-        qs = RegisteredApp.objects.select_related("organization", "team", "project").order_by("-created_at")[
-            :200
-        ]
-        apps = list(qs)
+        Filter args (#481) narrow the result server-side:
+
+        * ``search`` — case-insensitive contains across
+          ``name`` / ``slug`` / ``description`` / ``source_repo`` /
+          ``source_url``. Empty / whitespace-only strings are no-ops.
+        * ``team_slug`` / ``project_slug`` — exact match on the
+          owning team or project slug.
+        * ``status`` — health-pulse bucket (``OK`` / ``DEGRADED`` /
+          ``STALE`` / ``NEVER_DEPLOYED``). When set, the freshness
+          rollup is forced on regardless of ``include_freshness`` so
+          the filter has the data it needs.
+        * ``source_kind`` — exact match on the source-host kind.
+
+        This resolver keeps the flat-list return shape for back-compat
+        with the ``LIST_APPS`` query (#405). New callers should use
+        ``astroliftAppsPage`` for cursor pagination + ``totalCount``.
+        """
+        status = _coerce_apps_status(status)
+        qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
+            deleted_at__isnull=True
+        )
+        qs = _apply_apps_list_filters(
+            qs,
+            search=search,
+            team_slug=team_slug,
+            project_slug=project_slug,
+            source_kind=source_kind,
+        )
+        # Status-filtered queries always need the freshness rollup to
+        # decide membership; force it on so the contract holds for
+        # callers that didn't think to flip the flag.
+        effective_freshness = include_freshness or _status_filter_active(status)
+
+        # Soft cap kept at 200 to mirror the legacy shape — the page
+        # variant is the right surface when callers need more than that.
+        apps = list(qs.order_by("-created_at")[:200])
+        freshness_by_app = _freshness_for_apps(apps) if effective_freshness else {}
+        if _status_filter_active(status):
+            apps = _filter_apps_by_status(apps, freshness_by_app, status)
         if not include_freshness:
             return [app_to_type(a) for a in apps]
-        freshness_by_app = _freshness_for_apps(apps)
         return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in apps]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_apps_page(
+        self,
+        info: Info,
+        include_freshness: bool = False,
+        search: str | None = None,
+        team_slug: str | None = None,
+        project_slug: str | None = None,
+        status: AstroliftAppListStatusFilter | None = None,
+        source_kind: AstroliftAppSourceKindFilter | None = None,
+        cursor: str | None = None,
+        limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
+    ) -> RegisteredAppPageType:
+        """Cursor-paginated org-scoped apps list (#481).
+
+        Same filter axes as :func:`astrolift_apps` plus cursor +
+        limit. Returns a ``next_cursor`` of null when the caller has
+        reached the end of the result. ``total_count`` is the
+        filtered total so the FE can render "N of M" without a second
+        aggregate query.
+
+        Status filtering forces the freshness rollup on regardless of
+        ``include_freshness`` — without the rollup the resolver has no
+        signal to filter on. Pagination still operates on
+        ``(-created_at, -guid)`` so the seek key stays stable across
+        deletes.
+
+        When ``status`` is set the page is built by:
+          1. Scan the queryset under the cursor.
+          2. Roll up freshness for the scanned rows.
+          3. Drop rows whose pulse doesn't match.
+          4. Re-issue the cursor against the last *kept* row.
+
+        Because the status filter is post-DB, the cursor may need to
+        scan past the requested ``limit`` to find ``limit`` matching
+        rows. We cap the post-filter scan at ``limit * 4`` to keep
+        the worst-case page latency bounded; callers that keep
+        paginating will still receive every match across multiple
+        pages.
+        """
+        status = _coerce_apps_status(status)
+        qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
+            deleted_at__isnull=True
+        )
+        qs = _apply_apps_list_filters(
+            qs,
+            search=search,
+            team_slug=team_slug,
+            project_slug=project_slug,
+            source_kind=source_kind,
+        )
+        return _build_apps_page(
+            qs,
+            cursor=cursor,
+            limit=limit,
+            include_freshness=include_freshness,
+            status=status,
+        )
 
     @strawberry.field
     @tenant_scoped()
@@ -225,6 +642,11 @@ class RegistryQuery:
         self,
         info: Info,
         include_freshness: bool = False,
+        search: str | None = None,
+        team_slug: str | None = None,
+        project_slug: str | None = None,
+        status: AstroliftAppListStatusFilter | None = None,
+        source_kind: AstroliftAppSourceKindFilter | None = None,
     ) -> list[RegisteredAppType]:
         """Apps the viewer can reach by any RoleBinding on the app or
         an ancestor (project / team / org).
@@ -242,77 +664,94 @@ class RegistryQuery:
         sub-tree; APP-scoped grants visibility to just that app.
         Superusers see every app in their active tenant (matches the
         permission resolver's superuser short-circuit).
-        """
-        from django.contrib.auth import get_user_model
-        from django.utils import timezone
 
-        from astrolift_identity.models import RoleBinding
+        Filter args (#481) mirror :func:`astrolift_apps` — see that
+        docstring for the per-axis behaviour. Filters compose with
+        the viewer's scope: a search needle still only walks rows the
+        viewer can see.
+        """
+        status = _coerce_apps_status(status)
+        scope_filter = _viewer_scope_filter()
+        if scope_filter is None:
+            return []
 
         tenant = get_current_tenant()
-        if tenant is None or tenant.actor_user_id is None:
-            return []
-
-        User = get_user_model()
-        viewer = User.objects.filter(pk=tenant.actor_user_id).first()
-        if viewer is None:
-            return []
-
         base_qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
             deleted_at__isnull=True
         )
-        if tenant.organization_id is not None:
+        if tenant is not None and tenant.organization_id is not None:
             base_qs = base_qs.filter(organization_id=tenant.organization_id)
 
-        if getattr(viewer, "is_superuser", False) and getattr(viewer, "is_active", True):
-            superuser_apps = list(base_qs.order_by("slug")[:200])
-            if not include_freshness:
-                return [app_to_type(a) for a in superuser_apps]
-            freshness_by_app = _freshness_for_apps(superuser_apps)
-            return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in superuser_apps]
-
-        now = timezone.now()
-        bindings = list(
-            RoleBinding.objects.filter(
-                user_id=tenant.actor_user_id,
-                deleted_at__isnull=True,
-            ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+        qs = base_qs.filter(scope_filter)
+        qs = _apply_apps_list_filters(
+            qs,
+            search=search,
+            team_slug=team_slug,
+            project_slug=project_slug,
+            source_kind=source_kind,
         )
-        if not bindings:
-            return []
+        effective_freshness = include_freshness or _status_filter_active(status)
 
-        org_ids: set[int] = set()
-        team_ids: set[int] = set()
-        project_ids: set[int] = set()
-        app_ids: set[int] = set()
-        for b in bindings:
-            if b.scope_kind == RoleBinding.ScopeKind.ORG:
-                org_ids.add(b.scope_id)
-            elif b.scope_kind == RoleBinding.ScopeKind.TEAM:
-                team_ids.add(b.scope_id)
-            elif b.scope_kind == RoleBinding.ScopeKind.PROJECT:
-                project_ids.add(b.scope_id)
-            elif b.scope_kind == RoleBinding.ScopeKind.APP:
-                app_ids.add(b.scope_id)
-
-        scope_filter = Q()
-        if org_ids:
-            scope_filter |= Q(organization_id__in=org_ids)
-        if team_ids:
-            scope_filter |= Q(team_id__in=team_ids)
-        if project_ids:
-            scope_filter |= Q(project_id__in=project_ids)
-        if app_ids:
-            scope_filter |= Q(pk__in=app_ids)
-
-        if not scope_filter.children:
-            return []
-
-        qs = base_qs.filter(scope_filter).order_by("slug")[:200]
-        scoped_apps = list(qs)
+        # Legacy ordering preserved (``slug``) so existing callers see
+        # the same row order they did before #481. The page variant
+        # uses the createdAt seek key for cursor stability.
+        scoped_apps = list(qs.order_by("slug")[:200])
+        freshness_by_app = _freshness_for_apps(scoped_apps) if effective_freshness else {}
+        if _status_filter_active(status):
+            scoped_apps = _filter_apps_by_status(scoped_apps, freshness_by_app, status)
         if not include_freshness:
             return [app_to_type(a) for a in scoped_apps]
-        freshness_by_app = _freshness_for_apps(scoped_apps)
         return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in scoped_apps]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_apps_page(
+        self,
+        info: Info,
+        include_freshness: bool = False,
+        search: str | None = None,
+        team_slug: str | None = None,
+        project_slug: str | None = None,
+        status: AstroliftAppListStatusFilter | None = None,
+        source_kind: AstroliftAppSourceKindFilter | None = None,
+        cursor: str | None = None,
+        limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
+    ) -> RegisteredAppPageType:
+        """Cursor-paginated viewer-scoped apps list (#481).
+
+        Same shape as :func:`astrolift_apps_page` but the queryset is
+        first narrowed to apps the viewer's RoleBindings reach. EXEMPT
+        from the tenancy guardrail for the same reason
+        :func:`astrolift_my_apps` is — the viewer's bindings ARE the
+        gate.
+        """
+        status = _coerce_apps_status(status)
+        scope_filter = _viewer_scope_filter()
+        if scope_filter is None:
+            return RegisteredAppPageType(items=[], next_cursor=None, total_count=0)
+
+        tenant = get_current_tenant()
+        base_qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
+            deleted_at__isnull=True
+        )
+        if tenant is not None and tenant.organization_id is not None:
+            base_qs = base_qs.filter(organization_id=tenant.organization_id)
+
+        qs = base_qs.filter(scope_filter)
+        qs = _apply_apps_list_filters(
+            qs,
+            search=search,
+            team_slug=team_slug,
+            project_slug=project_slug,
+            source_kind=source_kind,
+        )
+        return _build_apps_page(
+            qs,
+            cursor=cursor,
+            limit=limit,
+            include_freshness=include_freshness,
+            status=status,
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

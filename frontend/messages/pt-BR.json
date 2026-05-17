@@ -344,10 +344,10 @@
       "filters": {
         "ariaLabel": "Filtrar por status",
         "all": "Todos",
-        "running": "Em execução",
-        "failed": "Falharam",
-        "inflight": "Em andamento",
-        "notDeployed": "Não implantados"
+        "ok": "Saudável",
+        "degraded": "Degradado",
+        "stale": "Obsoleto",
+        "never_deployed": "Não implantado"
       },
       "noMatch": {
         "title": "Nenhum aplicativo corresponde ao filtro atual",
@@ -357,6 +357,11 @@
       "errorBanner": {
         "title": "Não foi possível carregar os aplicativos",
         "retry": "Tentar novamente"
+      },
+      "count": "Exibindo {shown} de {total}",
+      "loadMore": {
+        "label": "Carregar mais",
+        "loading": "Carregando…"
       }
     },
     "tabs": {

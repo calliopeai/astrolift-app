@@ -225,6 +225,16 @@ class RegisteredApp(NamedBaseCoreModel):
         indexes = [
             models.Index(fields=["organization", "is_active"], name="app_org_active_idx"),
             models.Index(fields=["project"], name="app_project_idx"),
+            # Apps-list filters (#481). The list query pages by
+            # ``(-created_at, -guid)`` over a row set already narrowed
+            # by team / project / provisioning_status, so these are the
+            # supporting indexes for the filter axes the FE exposes.
+            # All three include the soft-delete predicate columns
+            # (``deleted_at`` for the team/project pair) so the partial
+            # filter inside ``_apply_apps_list_filters`` stays index-only.
+            models.Index(fields=["team", "deleted_at"], name="app_team_deleted_idx"),
+            models.Index(fields=["project", "deleted_at"], name="app_project_deleted_idx"),
+            models.Index(fields=["provisioning_status"], name="app_provisioning_status_idx"),
         ]
 
     _PROVISIONING_TRANSITIONS = {

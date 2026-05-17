@@ -74,15 +74,9 @@ export type ApproveByTokenInput = {
   token: Scalars['String']['input'];
 };
 
-export type ApproveSecretChangeInput = {
-  proposalId: Scalars['GUID']['input'];
-  reason: InputMaybe<Scalars['String']['input']>;
-};
-
 export type Appsecretwritepayload = {
   appSlug: Scalars['String']['output'];
   key: Scalars['String']['output'];
-  pendingProposalId?: Maybe<Scalars['GUID']['output']>;
   rawManifestStaged: Scalars['String']['output'];
 };
 
@@ -356,6 +350,13 @@ export type AstroliftAppIdentityBinding = {
   trustPolicySummary: Scalars['String']['output'];
 };
 
+export type AstroliftAppListStatusFilter =
+  | 'ALL'
+  | 'DEGRADED'
+  | 'NEVER_DEPLOYED'
+  | 'OK'
+  | 'STALE';
+
 export type AstroliftAppLogLine = {
   container: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -444,6 +445,14 @@ export type AstroliftAppSettingsLastModified = {
   secrets?: Maybe<Scalars['DateTime']['output']>;
   webhooks?: Maybe<Scalars['DateTime']['output']>;
 };
+
+export type AstroliftAppSourceKindFilter =
+  | 'ALL'
+  | 'BITBUCKET'
+  | 'GITEA'
+  | 'GITHUB'
+  | 'GITLAB'
+  | 'GIT_URL';
 
 export type AstroliftAppSummary = {
   id: Scalars['GUID']['output'];
@@ -1592,6 +1601,7 @@ export type AstroliftRegisteredApp = {
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  viewerPermissions: Array<Scalars['String']['output']>;
   webhookDeploysPauseReason: Scalars['String']['output'];
   webhookDeploysPaused: Scalars['Boolean']['output'];
   webhookDeploysPausedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1602,6 +1612,12 @@ export type AstroliftRegisteredAppMutationResult = {
   data?: Maybe<AstroliftRegisteredApp>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRegisteredAppPage = {
+  items: Array<AstroliftRegisteredApp>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type AstroliftRemoteRepo = {
@@ -1783,41 +1799,6 @@ export type AstroliftSecretBundleMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-export type AstroliftSecretChangeApproval = {
-  approverDisplayName: Scalars['String']['output'];
-  approverUserId: Scalars['String']['output'];
-  decidedAt: Scalars['DateTime']['output'];
-  decision: Scalars['String']['output'];
-  id: Scalars['GUID']['output'];
-  reason: Scalars['String']['output'];
-};
-
-export type AstroliftSecretChangeProposal = {
-  appliedAt?: Maybe<Scalars['DateTime']['output']>;
-  applyError: Scalars['String']['output'];
-  approvals: Array<AstroliftSecretChangeApproval>;
-  approvalsCount: Scalars['Int']['output'];
-  createdAt: Scalars['DateTime']['output'];
-  decidedAt?: Maybe<Scalars['DateTime']['output']>;
-  environmentName: Scalars['String']['output'];
-  expiresAt: Scalars['DateTime']['output'];
-  id: Scalars['GUID']['output'];
-  op: Scalars['String']['output'];
-  payload: Scalars['JSON']['output'];
-  payloadDiff: Scalars['JSON']['output'];
-  proposerDisplayName: Scalars['String']['output'];
-  proposerUserId: Scalars['String']['output'];
-  registeredAppSlug: Scalars['String']['output'];
-  requiredApproverCount: Scalars['Int']['output'];
-  status: Scalars['String']['output'];
-};
-
-export type AstroliftSecretChangeProposalMutationResult = {
-  data?: Maybe<AstroliftSecretChangeProposal>;
-  errors: Array<MutationError>;
-  ok: Scalars['Boolean']['output'];
-};
-
 export type AstroliftSecretEditor = {
   displayName: Scalars['String']['output'];
   id: Scalars['String']['output'];
@@ -1828,6 +1809,21 @@ export type AstroliftSecurityPolicy = {
   blockOnCriticalCves: Scalars['Boolean']['output'];
   blockOnHighCveThreshold?: Maybe<Scalars['Int']['output']>;
   blockOnMissingSignature: Scalars['Boolean']['output'];
+};
+
+/** Install identity + capabilities handshake (#479). Returned by ``astroliftServerInfo``. Callable by unauthenticated clients so multi-install mobile / CLI / SDK callers can pick the right UI and gate commands before login. */
+export type AstroliftServerInfo = {
+  apiVersion: Scalars['String']['output'];
+  authMethods: Array<Scalars['String']['output']>;
+  capabilities: Array<Scalars['String']['output']>;
+  featureFlags: Array<FeatureFlagInfo>;
+  installId: Scalars['String']['output'];
+  installLabel?: Maybe<Scalars['String']['output']>;
+  installSlug: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  /** Current server-side wall clock (UTC). Used by clients to detect clock drift. */
+  serverTime: Scalars['DateTime']['output'];
+  version: Scalars['String']['output'];
 };
 
 export type AstroliftSourceConnection = {
@@ -2177,7 +2173,6 @@ export type AttachSecretBundleInput = {
 export type Attachmentremovedpayload = {
   attachmentId: Scalars['GUID']['output'];
   deleted: Scalars['Boolean']['output'];
-  pendingProposalId?: Maybe<Scalars['GUID']['output']>;
 };
 
 export type AttachmentremovedpayloadMutationResult = {
@@ -2564,6 +2559,13 @@ export type ExtendPreviewTtlInputGql = {
   id: Scalars['GUID']['input'];
 };
 
+/** Runtime feature toggle reported by ``astroliftServerInfo``. */
+export type FeatureFlagInfo = {
+  description?: Maybe<Scalars['String']['output']>;
+  enabled: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+};
+
 export type FileUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
@@ -2763,7 +2765,6 @@ export type Mutation = {
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
-  approveSecretChange: AstroliftSecretChangeProposalMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
   archiveForm: AstroliftFormDefinitionMutationResult;
   assignAstroliftAppToProject: AstroliftRegisteredAppMutationResult;
@@ -2882,7 +2883,6 @@ export type Mutation = {
   profileRequestDeleteUser: Scalars['Boolean']['output'];
   /** Request a password reset email. Requires PROFILE_CHANGE_RESET_PASSWORD_USERS permission to send to other users. */
   profileRequestPwdChange: Scalars['Boolean']['output'];
-  proposeSecretChange: AstroliftSecretChangeProposalMutationResult;
   provisionManagedService: AstroliftManagedServiceMutationResult;
   publishForm: AstroliftFormDefinitionMutationResult;
   pushAstroliftCiSecretsToRepo: AstroliftPushCiSecretsPayloadMutationResult;
@@ -2897,7 +2897,6 @@ export type Mutation = {
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
-  rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
@@ -2984,7 +2983,6 @@ export type Mutation = {
   upsertOrganization: OrganizationMutationResult;
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
-  withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
 
 
@@ -3026,11 +3024,6 @@ export type MutationApproveDeploymentArgs = {
 
 export type MutationApproveDeploymentByTokenArgs = {
   input: ApproveByTokenInput;
-};
-
-
-export type MutationApproveSecretChangeArgs = {
-  input: ApproveSecretChangeInput;
 };
 
 
@@ -3511,11 +3504,6 @@ export type MutationProfileRequestPwdChangeArgs = {
 };
 
 
-export type MutationProposeSecretChangeArgs = {
-  input: ProposeSecretChangeInput;
-};
-
-
 export type MutationProvisionManagedServiceArgs = {
   input: ProvisionManagedServiceInput;
 };
@@ -3583,11 +3571,6 @@ export type MutationRejectDeploymentArgs = {
 
 export type MutationRejectDeploymentByTokenArgs = {
   input: RejectByTokenInput;
-};
-
-
-export type MutationRejectSecretChangeArgs = {
-  input: RejectSecretChangeInput;
 };
 
 
@@ -3993,11 +3976,6 @@ export type MutationUpsertUserArgs = {
   input: UserInput;
 };
 
-
-export type MutationWithdrawSecretChangeArgs = {
-  input: WithdrawSecretChangeInput;
-};
-
 export type MutationError = {
   code: Scalars['String']['output'];
   field?: Maybe<Scalars['String']['output']>;
@@ -4143,17 +4121,6 @@ export type ProfileType = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
-export type ProposeSecretChangeInput = {
-  appSlug: Scalars['String']['input'];
-  attachmentId: InputMaybe<Scalars['GUID']['input']>;
-  bundleSlug: InputMaybe<Scalars['String']['input']>;
-  environmentName: InputMaybe<Scalars['String']['input']>;
-  key: InputMaybe<Scalars['String']['input']>;
-  op: Scalars['String']['input'];
-  prefix: InputMaybe<Scalars['String']['input']>;
-  value: InputMaybe<Scalars['String']['input']>;
-};
-
 export type Providerpluginconfigpayload = {
   organizationScoped: Scalars['Boolean']['output'];
   pluginSlug: Scalars['String']['output'];
@@ -4214,6 +4181,7 @@ export type Query = {
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppPermissions: Array<Scalars['String']['output']>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
@@ -4222,6 +4190,7 @@ export type Query = {
   astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
   astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
+  astroliftAppsPage: AstroliftRegisteredAppPage;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAuditEventsPage: AstroliftAuditEventPage;
   astroliftAuditRetention: AstroliftAuditRetention;
@@ -4256,6 +4225,7 @@ export type Query = {
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
+  astroliftMyAppsPage: AstroliftRegisteredAppPage;
   astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
@@ -4280,8 +4250,8 @@ export type Query = {
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
-  astroliftSecretChangeProposal?: Maybe<AstroliftSecretChangeProposal>;
-  astroliftSecretChangeProposals: Array<AstroliftSecretChangeProposal>;
+  /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
+  astroliftServerInfo: AstroliftServerInfo;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
@@ -4395,6 +4365,11 @@ export type QueryAstroliftAppMetricsArgs = {
 };
 
 
+export type QueryAstroliftAppPermissionsArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftAppPodsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -4442,6 +4417,23 @@ export type QueryAstroliftAppUrlProbeHistoryArgs = {
 
 export type QueryAstroliftAppsArgs = {
   includeFreshness?: Scalars['Boolean']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  includeFreshness?: Scalars['Boolean']['input'];
+  limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -4608,6 +4600,23 @@ export type QueryAstroliftMembersArgs = {
 
 export type QueryAstroliftMyAppsArgs = {
   includeFreshness?: Scalars['Boolean']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMyAppsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  includeFreshness?: Scalars['Boolean']['input'];
+  limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -4660,17 +4669,6 @@ export type QueryAstroliftScheduledJobRunsArgs = {
 
 export type QueryAstroliftSearchableUsersArgs = {
   query: Scalars['String']['input'];
-};
-
-
-export type QueryAstroliftSecretChangeProposalArgs = {
-  id: Scalars['GUID']['input'];
-};
-
-
-export type QueryAstroliftSecretChangeProposalsArgs = {
-  appSlug?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -4916,11 +4914,6 @@ export type RegisterTenantClusterInput = {
 export type RejectByTokenInput = {
   reason: InputMaybe<Scalars['String']['input']>;
   token: Scalars['String']['input'];
-};
-
-export type RejectSecretChangeInput = {
-  proposalId: Scalars['GUID']['input'];
-  reason: Scalars['String']['input'];
 };
 
 export type RemoveAppDomainInput = {
@@ -5381,10 +5374,6 @@ export type WebhookSecretRevealMutationResult = {
   data?: Maybe<WebhookSecretReveal>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
-};
-
-export type WithdrawSecretChangeInput = {
-  proposalId: Scalars['GUID']['input'];
 };
 
 export type WorkflowDefinitionType = {
