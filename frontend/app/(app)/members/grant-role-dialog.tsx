@@ -43,14 +43,26 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roles: AstroliftRole[];
+  // Deep-link grant (#417): pre-populate the user PK so the operator
+  // skips the picker step when the dialog opens from a per-row action
+  // on the members table. The label, when provided, surfaces as a
+  // muted help line next to the locked user input.
+  initialUserId?: string | null;
+  initialUserLabel?: string | null;
 }
 
-export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
+export function GrantRoleDialog({
+  open,
+  onOpenChange,
+  roles,
+  initialUserId = null,
+  initialUserLabel = null,
+}: Props) {
   const { org } = useActiveOrg();
   const teams = useQuery<{ astroliftTeams: AstroliftTeam[] }>(LIST_TEAMS);
   const projects = useQuery<{ astroliftProjects: AstroliftProject[] }>(LIST_PROJECTS);
 
-  const [userId, setUserId] = React.useState("");
+  const [userId, setUserId] = React.useState(initialUserId ?? "");
   const [roleId, setRoleId] = React.useState("");
   const [scopeKind, setScopeKind] = React.useState<ScopeKind>("ORG");
   const [scopeGuid, setScopeGuid] = React.useState("");
@@ -64,14 +76,19 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
     }
   }, [selectedRole]);
 
+  // When the dialog opens for a specific member (deep-link), prefill
+  // the user PK. When the dialog closes, reset everything so the next
+  // open starts fresh.
   React.useEffect(() => {
-    if (!open) {
+    if (open) {
+      setUserId(initialUserId ?? "");
+    } else {
       setUserId("");
       setRoleId("");
       setScopeKind("ORG");
       setScopeGuid("");
     }
-  }, [open]);
+  }, [open, initialUserId]);
 
   const scopeOptions = React.useMemo(() => {
     if (scopeKind === "ORG") {
@@ -126,8 +143,8 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
         <SheetHeader>
           <SheetTitle>Grant role</SheetTitle>
           <SheetDescription>
-            Bind a system role to a user on the chosen scope. The user must exist
-            in the platform already; SCIM provisioning isn&apos;t wired here.
+            Bind a system role to a user on the chosen scope. The user must exist in the platform
+            already; SCIM provisioning isn&apos;t wired here.
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
@@ -140,9 +157,12 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
               placeholder="2"
               required
               type="number"
+              readOnly={initialUserId != null}
             />
             <p className="text-muted-foreground text-xs">
-              Internal Django user pk. Member-search UI lands when SCIM is wired.
+              {initialUserLabel
+                ? `Granting role to ${initialUserLabel}.`
+                : "Internal Django user pk. Member-search UI lands when SCIM is wired."}
             </p>
           </div>
 
@@ -155,7 +175,7 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
               <SelectContent>
                 {roles.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
-                    <span className="font-mono text-xs mr-2">[{r.scopeLevel}]</span>
+                    <span className="mr-2 font-mono text-xs">[{r.scopeLevel}]</span>
                     {r.name} <span className="text-muted-foreground">({r.slug})</span>
                   </SelectItem>
                 ))}

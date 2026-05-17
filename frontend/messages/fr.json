@@ -640,5 +640,20 @@
         "cancel": "Cancel"
       }
     }
+  },
+  "orgMembers": {
+    "searchLabel": "Rechercher des membres",
+    "searchPlaceholder": "Rechercher par nom d'utilisateur ou e-mail…",
+    "lastActiveColumn": "Dernière activité",
+    "actionsColumn": "Actions",
+    "noMatchTitle": "Aucun résultat",
+    "noMatchDescription": "Aucun membre ne correspond à \"{term}\". Essayez un autre terme.",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "inactif",
+    "rolePillTooltipPrefix": "Attribué via {scope}",
+    "sourceTooltipAria": "Attribué via {scope}",
+    "sourceColumn": "Source",
+    "grantRoleRowLabel": "Attribuer un rôle à {name}",
+    "grantRoleRowTooltip": "Attribuer un rôle à {name}"
   }
 }

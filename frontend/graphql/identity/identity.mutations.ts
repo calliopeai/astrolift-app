@@ -355,6 +355,7 @@ export const GRANT_ROLE = gql`
         }
         scopeKind
         scopeId
+        sourceScopeLabel
         grantedAt
       }
     }

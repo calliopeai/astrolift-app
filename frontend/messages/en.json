@@ -2075,5 +2075,20 @@
       "lines": "{count, plural, one {# line} other {# lines}}",
       "truncated": "200 lines shown — open in console for the full tail."
     }
+  },
+  "orgMembers": {
+    "searchLabel": "Search members",
+    "searchPlaceholder": "Search by username or email…",
+    "lastActiveColumn": "Last active",
+    "actionsColumn": "Actions",
+    "noMatchTitle": "No matches",
+    "noMatchDescription": "No members match \"{term}\". Try a different search term.",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "inactive",
+    "rolePillTooltipPrefix": "Granted via {scope}",
+    "sourceTooltipAria": "Granted via {scope}",
+    "sourceColumn": "Source",
+    "grantRoleRowLabel": "Grant role to {name}",
+    "grantRoleRowTooltip": "Grant role to {name}"
   }
 }
