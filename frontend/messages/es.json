@@ -139,7 +139,9 @@
     "backCta": "Atrás",
     "nextCta": "Siguiente",
     "finishCta": "Finalizar configuración",
-    "a11y": { "steps": "Progreso de la incorporación" },
+    "a11y": {
+      "steps": "Progreso de la incorporación"
+    },
     "toast": {
       "success": "Incorporación completada — todo listo.",
       "skipFailed": "No se pudo guardar la omisión. Inténtalo de nuevo.",
@@ -337,11 +339,11 @@
       },
       "filters": {
         "ariaLabel": "Filtrar por estado",
-        "all": "Todas",
-        "running": "En ejecución",
-        "failed": "Fallidas",
-        "inflight": "En curso",
-        "notDeployed": "Sin implementar"
+        "all": "Todos",
+        "ok": "Saludable",
+        "degraded": "Degradado",
+        "stale": "Obsoleto",
+        "never_deployed": "Sin desplegar"
       },
       "noMatch": {
         "title": "Ninguna aplicación coincide con el filtro actual",
@@ -351,6 +353,11 @@
       "errorBanner": {
         "title": "No se pudieron cargar las aplicaciones",
         "retry": "Reintentar"
+      },
+      "count": "Mostrando {shown} de {total}",
+      "loadMore": {
+        "label": "Cargar más",
+        "loading": "Cargando…"
       }
     },
     "tabs": {

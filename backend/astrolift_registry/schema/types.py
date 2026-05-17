@@ -16,6 +16,46 @@ JSON = strawberry.scalars.JSON
 
 
 @strawberry.enum
+class AstroliftAppListStatusFilter(enum.Enum):
+    """Status axis for the apps-list filter pills (#481).
+
+    Mirrors the health-pulse buckets surfaced on each row (#405) plus a
+    synthetic ``never_deployed`` value that matches "no deploys yet"
+    rows. ``all`` is the no-op pass-through; resolver short-circuits
+    the filter entirely when this is chosen.
+
+    Distinct from the raw ``provisioning_status`` axis because the
+    user-facing badge on each card already shows the pulse, not the
+    provision state — keeping the filter taxonomy aligned with what
+    operators see avoids the "I clicked Failed but Foo is missing"
+    surprise where a ready-but-degraded app would be hidden.
+    """
+
+    ALL = "all"
+    OK = "ok"
+    DEGRADED = "degraded"
+    STALE = "stale"
+    NEVER_DEPLOYED = "never_deployed"
+
+
+@strawberry.enum
+class AstroliftAppSourceKindFilter(enum.Enum):
+    """Source-host axis for the apps-list filter (#481).
+
+    Mirrors :class:`RegisteredApp.SourceKind` plus ``all`` for the
+    no-op pass-through. Resolver maps to the row's ``source_kind``
+    string with an exact match.
+    """
+
+    ALL = "all"
+    GITHUB = "github"
+    GITLAB = "gitlab"
+    BITBUCKET = "bitbucket"
+    GITEA = "gitea"
+    GIT_URL = "git_url"
+
+
+@strawberry.enum
 class AstroliftAppHealthPulseStatus(enum.Enum):
     """Coarse freshness signal for the apps list (#405).
 
@@ -640,7 +680,10 @@ def app_to_type(
         webhook_deploys_pause_reason=app.webhook_deploys_pause_reason or "",
         requires_approval=bool(app.requires_approval),
         approver_team_id=(GUID(str(app.approver_team.guid)) if app.approver_team_id else None),
-        approver_user_ids=[str(uid) for uid in app.approver_users.values_list("pk", flat=True)],
+        # ``.all()`` (vs ``.values_list``) uses the prefetch cache when a
+        # caller pre-fetched ``approver_users`` — keeps the apps-list
+        # resolvers (#481) from re-issuing one M2M query per row.
+        approver_user_ids=[str(u.pk) for u in app.approver_users.all()],
         minimum_approvals=int(app.minimum_approvals or 1),
         created_at=app.created_at,
         updated_at=app.updated_at,
@@ -1071,6 +1114,30 @@ class RenderedManifestType:
     error_path: str | None
     error_line: int | None
     error_column: int | None
+
+
+@strawberry.type(name="AstroliftRegisteredAppPage")
+class RegisteredAppPageType:
+    """Cursor-paginated slice of registered apps (#481).
+
+    Replaces the flat-list shape on the new ``astroliftAppsPage`` /
+    ``astroliftMyAppsPage`` queries. ``next_cursor`` is null when the
+    caller has reached the end of the result. ``total_count`` is the
+    filtered total (not the table total) so the FE can render
+    "Showing N of M" without a separate aggregate query.
+
+    Cursor format: base64-JSON of ``[created_at_iso, guid_str]`` over
+    the ``(-created_at, -guid)`` seek key — stable across deletes
+    because the seek key never reuses values (guid is a UUIDv4 / v7
+    so the secondary sort is also globally unique). Garbage cursors
+    decode to ``None`` and restart from the top; we prefer "restart
+    UX" over "hard error" so a stale share-link doesn't strand the
+    operator.
+    """
+
+    items: list[RegisteredAppType]
+    next_cursor: str | None
+    total_count: int
 
 
 def container_to_type(container) -> ContainerType:

@@ -350,6 +350,13 @@ export type AstroliftAppIdentityBinding = {
   trustPolicySummary: Scalars['String']['output'];
 };
 
+export type AstroliftAppListStatusFilter =
+  | 'ALL'
+  | 'DEGRADED'
+  | 'NEVER_DEPLOYED'
+  | 'OK'
+  | 'STALE';
+
 export type AstroliftAppLogLine = {
   container: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -438,6 +445,14 @@ export type AstroliftAppSettingsLastModified = {
   secrets?: Maybe<Scalars['DateTime']['output']>;
   webhooks?: Maybe<Scalars['DateTime']['output']>;
 };
+
+export type AstroliftAppSourceKindFilter =
+  | 'ALL'
+  | 'BITBUCKET'
+  | 'GITEA'
+  | 'GITHUB'
+  | 'GITLAB'
+  | 'GIT_URL';
 
 export type AstroliftAppSummary = {
   id: Scalars['GUID']['output'];
@@ -1597,6 +1612,12 @@ export type AstroliftRegisteredAppMutationResult = {
   data?: Maybe<AstroliftRegisteredApp>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftRegisteredAppPage = {
+  items: Array<AstroliftRegisteredApp>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type AstroliftRemoteRepo = {
@@ -4169,6 +4190,7 @@ export type Query = {
   astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
   astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
+  astroliftAppsPage: AstroliftRegisteredAppPage;
   astroliftAuditEvents: Array<AstroliftAuditEvent>;
   astroliftAuditEventsPage: AstroliftAuditEventPage;
   astroliftAuditRetention: AstroliftAuditRetention;
@@ -4203,6 +4225,7 @@ export type Query = {
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
+  astroliftMyAppsPage: AstroliftRegisteredAppPage;
   astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
@@ -4394,6 +4417,23 @@ export type QueryAstroliftAppUrlProbeHistoryArgs = {
 
 export type QueryAstroliftAppsArgs = {
   includeFreshness?: Scalars['Boolean']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  includeFreshness?: Scalars['Boolean']['input'];
+  limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -4560,6 +4600,23 @@ export type QueryAstroliftMembersArgs = {
 
 export type QueryAstroliftMyAppsArgs = {
   includeFreshness?: Scalars['Boolean']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMyAppsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  includeFreshness?: Scalars['Boolean']['input'];
+  limit?: Scalars['Int']['input'];
+  projectSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
+  status?: InputMaybe<AstroliftAppListStatusFilter>;
+  teamSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 

@@ -340,10 +340,10 @@
       "filters": {
         "ariaLabel": "Nach Status filtern",
         "all": "Alle",
-        "running": "Läuft",
-        "failed": "Fehlgeschlagen",
-        "inflight": "In Bearbeitung",
-        "notDeployed": "Nicht bereitgestellt"
+        "ok": "Gesund",
+        "degraded": "Beeinträchtigt",
+        "stale": "Veraltet",
+        "never_deployed": "Nicht bereitgestellt"
       },
       "noMatch": {
         "title": "Keine Apps passen zum aktuellen Filter",
@@ -353,6 +353,11 @@
       "errorBanner": {
         "title": "Apps konnten nicht geladen werden",
         "retry": "Erneut versuchen"
+      },
+      "count": "{shown} von {total} angezeigt",
+      "loadMore": {
+        "label": "Mehr laden",
+        "loading": "Wird geladen…"
       }
     },
     "tabs": {
