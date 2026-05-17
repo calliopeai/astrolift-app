@@ -71,7 +71,9 @@ def test_rotate_issues_new_secret_and_parks_old(app):
     assert rotated.previous_token_hash == original_hash
     assert rotated.previous_token_expires_at is not None
     assert rotated.last_rotated_at is not None
-    # Default grace period: 1h.
+    # Default grace period matches ``DEFAULT_GRACE_PERIOD_SECONDS``
+    # (24h after #425; was 1h pre-#425). Operators can override via
+    # the ``DEPLOY_TOKEN_ROTATION_GRACE_SECONDS`` Constance entry.
     grace = rotated.previous_token_expires_at - rotated.last_rotated_at
     assert DEFAULT_GRACE_PERIOD_SECONDS - 1 <= grace.total_seconds() <= DEFAULT_GRACE_PERIOD_SECONDS + 1
 

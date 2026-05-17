@@ -3,20 +3,9 @@
 Merges Query and Mutation types from all apps into a single schema.
 Disabled features are automatically excluded via config.features.
 """
+
 import strawberry
 from strawberry_django.optimizer import DjangoOptimizerExtension
-
-from config.features import Feature, is_enabled
-
-# ---------------------------------------------------------------------------
-# Always-on imports (core infrastructure)
-# ---------------------------------------------------------------------------
-import core.schema.mutations as CoreMutations
-import organization.schema as OrganizationSchema
-from core.schema.types.audit import AuditLogQuery
-from core.schema.types.permission_analysis import PermissionAnalysisQuery
-from core.schema.types.user import UserType
-
 
 # ---------------------------------------------------------------------------
 # Feature-gated imports
@@ -31,6 +20,16 @@ import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 import astrolift_scm.schema as AstroliftScmSchema  # noqa: E402
 import astrolift_services.schema as AstroliftServicesSchema  # noqa: E402
 import astrolift_workflows.schema as AstroliftTemporalWorkflowsSchema  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Always-on imports (core infrastructure)
+# ---------------------------------------------------------------------------
+import core.schema.mutations as CoreMutations
+import organization.schema as OrganizationSchema
+from config.features import Feature, is_enabled
+from core.schema.types.audit import AuditLogQuery
+from core.schema.types.permission_analysis import PermissionAnalysisQuery
+from core.schema.types.user import UserType
 
 _query_bases = [
     PermissionAnalysisQuery,
@@ -58,10 +57,12 @@ _mutation_bases = [
     AstroliftScmSchema.ScmMutation,
     AstroliftServicesSchema.ServicesMutation,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsMutation,
+    AstroliftBillingSchema.BillingMutation,
 ]
 
 if is_enabled(Feature.WORKFLOWS):
     import workflows.schema as WorkflowsSchema
+
     _query_bases.append(WorkflowsSchema.Query)
     _mutation_bases.append(WorkflowsSchema.Mutation)
 
@@ -71,7 +72,7 @@ if is_enabled(Feature.WORKFLOWS):
 # ---------------------------------------------------------------------------
 
 Query = strawberry.type(
-    type('Query', tuple(_query_bases), {'__annotations__': {}}),
+    type("Query", tuple(_query_bases), {"__annotations__": {}}),
 )
 
 
@@ -80,7 +81,7 @@ Query = strawberry.type(
 # ---------------------------------------------------------------------------
 
 Mutation = strawberry.type(
-    type('Mutation', tuple(_mutation_bases), {'__annotations__': {}}),
+    type("Mutation", tuple(_mutation_bases), {"__annotations__": {}}),
 )
 
 
@@ -103,6 +104,7 @@ schema = strawberry.Schema(
 # Auth schema (limited -- login only, no auth required)
 # ---------------------------------------------------------------------------
 
+
 @strawberry.type
 class AuthQuery:
     @strawberry.field
@@ -115,6 +117,7 @@ class AuthMutation:
     @strawberry.mutation
     def login(self, info: strawberry.types.Info, username: str, password: str) -> UserType | None:
         from django.contrib.auth import authenticate, login
+
         user = authenticate(username=username, password=password)
         if user is not None:
             login(info.context.request, user)
@@ -124,6 +127,7 @@ class AuthMutation:
     @strawberry.mutation
     def logout(self, info: strawberry.types.Info) -> bool:
         from django.contrib.auth import logout
+
         logout(info.context.request)
         return True
 

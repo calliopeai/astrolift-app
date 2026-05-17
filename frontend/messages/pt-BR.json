@@ -67,74 +67,6 @@
       "sports": "Sports"
     }
   },
-  "overview": {
-    "title": "Visão geral",
-    "description": "Dados de identidade, registro e ciclo de vida desta instalação do Astrolift.",
-    "errorBanner": {
-      "title": "Não foi possível carregar alguns dados"
-    },
-    "tiles": {
-      "teams": {
-        "label": "Times",
-        "emptyCta": "Crie seu primeiro time"
-      },
-      "projects": {
-        "label": "Projetos",
-        "emptyCta": "Crie um projeto"
-      },
-      "apps": {
-        "label": "Apps registrados",
-        "emptyCta": "Registre seu primeiro app"
-      },
-      "deployments": {
-        "label": "Deploys ativos",
-        "emptyCta": "Inicie um deploy"
-      },
-      "costMtd": {
-        "label": "Custo (MTD)",
-        "emptyCta": "Aguardando dados de custo",
-        "vsPrevMonth": "vs mês ant.",
-        "noPrevMonth": "sem mês ant."
-      }
-    },
-    "fleetHealth": {
-      "title": "Saúde da frota",
-      "description": "Composição do status do último deploy para todos os apps registrados.",
-      "healthy": "saudável",
-      "failing": "{count} com falha",
-      "hiccup": "{count, plural, one {# soluço} other {# soluços}}",
-      "empty": "Ainda não há apps registrados. Conecte um repositório em /apps/new para começar.",
-      "tiles": {
-        "running": "Em execução",
-        "recentFailure": "Falha recente",
-        "failing": "Com falha",
-        "noDeploys": "Sem deploys"
-      }
-    },
-    "recentProjects": {
-      "title": "Projetos recentes",
-      "description": "Projetos criados mais recentemente em todos os times.",
-      "emptyTitle": "Ainda não há projetos",
-      "emptyDescription": "Crie um time e um projeto para começar a registrar apps.",
-      "emptyAction": "Gerenciar times"
-    },
-    "activity": {
-      "title": "Atividade",
-      "description": "Eventos de ciclo de vida: deploys, sincronizações de configuração, escalonamento, integração de cluster, rotação de segredos.",
-      "emptyTitle": "Ainda não há atividade",
-      "emptyDescription": "Os eventos aparecem aqui à medida que deploys, mudanças de configuração e operações de cluster acontecem.",
-      "errorTitle": "Não foi possível carregar a atividade",
-      "loadMore": "Carregar mais",
-      "loadingMore": "Carregando…"
-    },
-    "registeredApps": {
-      "title": "Apps registrados",
-      "description": "Repositórios registrados para deploy.",
-      "emptyTitle": "Nenhum app registrado",
-      "emptyDescription": "A superfície do registro de apps chega no próximo marco — quando conectada você poderá registrar um repositório Git e fazer deploy a partir deste card.",
-      "emptyAction": "Abrir registro"
-    }
-  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
@@ -374,22 +306,6 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
-    },
-    "observability": {
-      "scope": {
-        "title": "Escopo das métricas",
-        "environment": "Ambiente",
-        "workload": "Workload",
-        "allWorkloads": "Todos os workloads",
-        "environmentPlaceholder": "Selecione um ambiente",
-        "workloadPlaceholder": "Selecione um workload"
-      },
-      "events": {
-        "warningCount": "{count, plural, =1 {1 aviso} other {# avisos}} na última hora",
-        "warningBadgeLabel": "Aviso",
-        "collapse": "Recolher",
-        "expand": "Expandir"
-      }
     }
   },
   "settingsIndex": {
@@ -542,138 +458,78 @@
         "requestIdSection": "ID da requisição"
       }
     },
-    "approval": {
-      "quorum": {
-        "header": "{received} de {required} aprovações",
-        "remainingBadge": "Faltam {count}",
-        "metBadge": "Quórum atingido",
-        "approvedLabel": "Aprovado por",
-        "approvedEmpty": "Ainda sem aprovações.",
-        "awaitingLabel": "Aguardando",
-        "awaitingEmpty": "Sem aprovadores elegíveis — verifique a política do app."
-      }
+    "events": {
+      "title": "Events",
+      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
+      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
+      "aggregateToggle": "Group repeats",
+      "aggregateBadge": "×{count} similar",
+      "expandLabel": "Expand",
+      "collapseLabel": "Collapse",
+      "sourceLabel": "Source",
+      "emptyTitle": "Quiet feed",
+      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "approvalsQueue": {
-      "title": "Fila de aprovações",
-      "description": "Todos os deploys aguardando aprovação. Selecione linhas para aprovar/rejeitar em lote dentro do mesmo ambiente.",
-      "empty": {
-        "title": "Nada pendente",
-        "description": "Quando um deploy precisar de aprovação, aparecerá aqui."
-      },
-      "selectAllLabel": "Selecionar todos",
-      "selectionStatus": "{selected} de {total} selecionados",
-      "readOnlyHint": "Você pode revisar, mas não aprovar.",
-      "approveLabel": "Aprovar",
-      "rejectLabel": "Rejeitar",
-      "footer": {
-        "selected": "{count, plural, =1 {1 deploy selecionado} other {# deploys selecionados}}",
-        "summary": "Em {envs}.",
-        "crossEnvWarning": "Operações em lote exigem o mesmo app/ambiente — políticas variam por ambiente.",
-        "approveButton": "Aprovar {count}",
-        "rejectButton": "Rejeitar {count}"
-      },
-      "confirmApprove": {
-        "title": "Aprovar {count} deploys?",
-        "description": "Libera {envs}.",
-        "confirm": "Aprovar todos"
-      },
-      "confirmReject": {
-        "title": "Rejeitar {count} deploys?",
-        "description": "Cada deploy em {envs} será marcado como falho.",
-        "reasonLabel": "Motivo da rejeição",
-        "reasonPlaceholder": "Por que este lote está sendo rejeitado?",
-        "reasonRequired": "Motivo obrigatório",
-        "confirm": "Rejeitar todos"
-      },
-      "toasts": {
-        "unexpected": "Ação em lote sem resposta.",
-        "allOk": "{label} com sucesso para {count} deploys.",
-        "allFailed": "{label} falhou para {count} deploys: {message}",
-        "partial": "{label}: {succeeded} com sucesso, {failed} falhos.",
-        "approveFailed": "Aprovação em lote falhou.",
-        "rejectFailed": "Rejeição em lote falhou."
-      },
-      "row": {
-        "selectRowLabel": "Selecionar {app} / {env}",
-        "approvalsCount": "{received}/{required} aprovações",
-        "received": "Recebido {rel}",
-        "review": "Revisar"
-      }
-    }
-  },
-  "jobs": {
-    "title": "Tarefas",
-    "descriptionGlobal": "Execuções de tarefas agendadas e comandos ad-hoc em todas as suas apps.",
-    "descriptionForApp": "Execuções de tarefas agendadas e comandos ad-hoc para {app}.",
-    "tabs": {
-      "scheduled": "Agendadas",
-      "commands": "Comandos"
-    },
-    "scheduled": {
-      "emptyTitle": "Ainda sem execuções de tarefas agendadas",
-      "emptyDescription": "Workloads cronjob aparecem aqui assim que o agendador disparar a primeira execução.",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+    "quotas": {
+      "title": "Quotas",
+      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
+      "emptyTitle": "No quotas configured",
+      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
       "columns": {
-        "app": "App / Env / Workload",
-        "k8sJob": "K8s job",
-        "status": "Status",
-        "duration": "Duração",
-        "started": "Iniciado"
-      }
-    },
-    "commands": {
-      "emptyTitle": "Ainda sem execuções de comando",
-      "emptyDescription": "Comandos ad-hoc invocados contra um workload aparecem aqui. Rode um pela CLI com `astro app run …`.",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "App / Workload",
-        "command": "Comando",
-        "status": "Status",
-        "invokedBy": "Invocado por",
-        "started": "Iniciado"
-      }
-    },
-    "runStatus": {
-      "running": "Em execução",
-      "inProgress": "Em andamento",
-      "succeeded": "Sucesso",
-      "failed": "Falhou",
-      "superseded": "Substituída",
-      "unknown": "Desconhecido",
-      "exitCodeLabel": "saída {code}",
-      "exitCodeTooltip": "Processo encerrou com código {code}"
-    },
-    "concurrency": {
-      "label": {
-        "forbid": "Proibir",
-        "queue": "Enfileirar",
-        "replace": "Substituir"
+        "scope": "Scope",
+        "resource": "Resource",
+        "usage": "Usage",
+        "bar": "Bar",
+        "limits": "Soft / Hard",
+        "actions": "Actions"
       },
-      "tooltip": {
-        "forbid": "Pula o próximo disparo enquanto uma execução está em andamento.",
-        "queue": "Permite que execuções se acumulem — escolha quando cada disparo for independente e curto.",
-        "replace": "Interrompe a execução atual e inicia uma nova."
+      "request": {
+        "buttonRequest": "Request bump",
+        "buttonPending": "Pending request",
+        "title": "Request quota bump",
+        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
+        "factorLabel": "Multiplier",
+        "factor1_5x": "1.5x",
+        "factor2x": "2x",
+        "factor3x": "3x",
+        "factor5x": "5x",
+        "factor10x": "10x",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
+        "reasonHint": "Required. Shows up in the admin notification.",
+        "submit": "Submit request",
+        "submitting": "Submitting…",
+        "cancel": "Cancel",
+        "toastSubmitted": "Quota bump requested",
+        "toastFailed": "Failed to submit request",
+        "pendingBadge": "Pending {factor}x — {reason}"
       }
     },
-    "cron": {
-      "invalid": "Expressão cron inválida",
-      "firesIn": "Dispara em {relative}",
-      "now": "menos de um minuto",
-      "minutes": "{count, plural, one {# minuto} other {# minutos}}",
-      "hours": "{count, plural, one {# hora} other {# horas}}",
-      "days": "{count, plural, one {# dia} other {# dias}}"
-    },
-    "workloadCard": {
-      "title": "Workloads cronjob",
-      "countLabel": "{count, plural, one {# agendado} other {# agendados}}",
-      "openLogs": "Abrir no console"
-    },
-    "output": {
-      "emptyOutput": "Sem saída capturada ainda.",
-      "openInConsole": "Abrir no console",
-      "lines": "{count, plural, one {# linha} other {# linhas}}",
-      "truncated": "200 linhas exibidas — abra o console para o registro completo."
+    "alerts": {
+      "mute": {
+        "menuLabel": "Mute",
+        "preset1h": "Mute for 1 hour",
+        "preset4h": "Mute for 4 hours",
+        "preset24h": "Mute for 24 hours",
+        "presetCustom": "Mute for custom duration…",
+        "unmute": "Unmute now",
+        "badge": "Muted ({remaining} left)",
+        "badgeExpired": "Muted",
+        "showMuted": "Show muted",
+        "hideMuted": "Hide muted",
+        "toastMuted": "Muted {name} for {duration}",
+        "toastUnmuted": "Unmuted {name}",
+        "toastMuteFailed": "Failed to mute rule",
+        "toastUnmuteFailed": "Failed to unmute rule",
+        "customTitle": "Mute {name}",
+        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
+        "durationLabel": "Duration (hours)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Known outage — DB migration in progress",
+        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
+        "submit": "Mute rule",
+        "cancel": "Cancel"
+      }
     }
   }
 }

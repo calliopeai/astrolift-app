@@ -24,6 +24,15 @@ class EventType:
     project_id: str | None
     registered_app_id: str | None
     occurred_at: dt.datetime
+    resource_kind: str
+    """The kind of resource this event is about — e.g. ``app``, ``cluster``,
+    ``workload``, ``managed_service``. Empty string when the emit site
+    didn't stamp one. The frontend turns ``(resource_kind, resource_id)``
+    into a deep link (see #434 scope B)."""
+
+    resource_id: str
+    """The identifier (slug or guid) of the resource named by
+    ``resource_kind``. Empty when unknown."""
 
 
 @strawberry.type(name="AstroliftEventPage")
@@ -33,6 +42,30 @@ class EventPageType:
 
     items: list[EventType]
     next_cursor: str | None
+
+
+@strawberry.type(name="AstroliftAggregatedEvent")
+class AggregatedEventType:
+    """One bucket of repeat-event de-duplication (#434 scope A).
+
+    The aggregator groups raw ``Event`` rows by
+    ``(event_type, resource_kind, resource_id)`` within a sliding
+    window. ``representative`` is the newest event in the bucket and
+    carries the payload the UI surfaces; ``count`` / ``first_at`` /
+    ``last_at`` round out the row so the operator can tell at a glance
+    "this thing fired N times between X and Y".
+
+    A bucket size of 1 (no duplicates in the window) still rolls up so
+    the client can render every row uniformly — the badge just shows
+    ``1`` (or hides when count == 1)."""
+
+    representative: EventType
+    count: int
+    first_at: dt.datetime
+    last_at: dt.datetime
+    event_type: str
+    resource_kind: str
+    resource_id: str
 
 
 @strawberry.type(name="AstroliftActivityItem")
@@ -192,6 +225,8 @@ def event_to_type(e) -> EventType:
         project_id=_maybe_str(e.project_id),
         registered_app_id=_maybe_str(e.registered_app_id),
         occurred_at=e.occurred_at,
+        resource_kind=e.resource_kind or "",
+        resource_id=e.resource_id or "",
     )
 
 
@@ -472,6 +507,20 @@ def notification_to_type(n) -> NotificationType:
     )
 
 
+@strawberry.type(name="AstroliftAlertMute")
+class AlertMuteType:
+    """An active TTL-bounded silence on an AlertRule (#434 scope C).
+
+    ``ttl_until`` is the auto-unmute instant. ``created_by`` is the
+    display label of the user who issued the mute (best-effort —
+    name → email → ``"system"``)."""
+
+    id: GUID
+    ttl_until: dt.datetime
+    reason: str
+    created_by: str
+
+
 @strawberry.type(name="AstroliftAlertRule")
 class AlertRuleType:
     id: GUID
@@ -489,6 +538,11 @@ class AlertRuleType:
     organization_slug: str
     created_at: dt.datetime
     updated_at: dt.datetime
+    active_mute: AlertMuteType | None
+    """The longest-lived non-expired mute on this rule, or ``null`` when
+    not muted. The delivery worker suppresses channel fan-out when this
+    is non-null; the alert still produces an ``AlertEvent`` row so the
+    incident timeline stays intact."""
 
 
 @strawberry.type(name="AstroliftAlertEvent")
@@ -504,6 +558,9 @@ class AlertEventType:
 
 
 def alert_rule_to_type(r) -> AlertRuleType:
+    from astrolift_operations.alert_mute import active_mute_for_rule
+
+    mute = active_mute_for_rule(r)
     return AlertRuleType(
         id=GUID(str(r.guid)),
         name=r.name,
@@ -516,6 +573,16 @@ def alert_rule_to_type(r) -> AlertRuleType:
         organization_slug=r.organization.slug,
         created_at=r.created_at,
         updated_at=r.updated_at,
+        active_mute=alert_mute_to_type(mute) if mute is not None else None,
+    )
+
+
+def alert_mute_to_type(m) -> AlertMuteType:
+    return AlertMuteType(
+        id=GUID(str(m.guid)),
+        ttl_until=m.ttl_until,
+        reason=m.reason or "",
+        created_by=_actor_display(m.muted_by),
     )
 
 

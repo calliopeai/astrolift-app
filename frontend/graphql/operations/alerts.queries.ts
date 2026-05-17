@@ -12,6 +12,12 @@ const ALERT_RULE_FIELDS = `
   organizationSlug
   createdAt
   updatedAt
+  activeMute {
+    id
+    ttlUntil
+    reason
+    createdBy
+  }
 `;
 
 const ALERT_EVENT_FIELDS = `
@@ -93,6 +99,26 @@ export const ACKNOWLEDGE_ALERT_EVENT = gql`
       ok
       errors { code message }
       data { ${ALERT_EVENT_FIELDS} }
+    }
+  }
+`;
+
+export const MUTE_ALERT_RULE = gql`
+  mutation MuteAlertRule($input: MuteAlertRuleInput!) {
+    muteAlertRule(input: $input) {
+      ok
+      errors { code message field }
+      data { ${ALERT_RULE_FIELDS} }
+    }
+  }
+`;
+
+export const UNMUTE_ALERT_RULE = gql`
+  mutation UnmuteAlertRule($input: UnmuteAlertRuleInput!) {
+    unmuteAlertRule(input: $input) {
+      ok
+      errors { code message field }
+      data { ${ALERT_RULE_FIELDS} }
     }
   }
 `;

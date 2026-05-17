@@ -26,6 +26,7 @@ from astrolift_operations.models import (
 )
 from astrolift_operations.schema.types import (
     ActivityPageType,
+    AggregatedEventType,
     AlertEventType,
     AlertRuleType,
     AppMetricsPointType,
@@ -84,6 +85,49 @@ class OperationsQuery:
         if event_type:
             qs = qs.filter(event_type=event_type)
         return [event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ)
+    @tenant_scoped()
+    def astrolift_events_aggregated(
+        self,
+        info: Info,
+        limit: int = 100,
+        event_type: str | None = None,
+        aggregate_window_seconds: int = 300,
+    ) -> list[AggregatedEventType]:
+        """Roll up the raw event stream into ``(event_type,
+        resource_kind, resource_id)`` buckets over a sliding window.
+
+        Why this exists: a flapping pod can emit hundreds of identical
+        ``workload.unhealthy`` events in a minute; the raw stream
+        buries the genuinely new incidents underneath. The aggregator
+        groups consecutive identical emissions so the operator sees
+        ``workload.unhealthy ×42`` as a single row.
+
+        ``aggregate_window_seconds`` is the *bucket break gap*: events
+        within this many seconds of the previous member roll into the
+        same bucket. Crossing the gap opens a new bucket. Default 300s
+        (5 minutes) matches Prometheus' default alert grouping window.
+
+        Bucket boundaries are tracked per ``(event_type, resource_kind,
+        resource_id)`` so unrelated event streams never collide. Events
+        with no ``resource_id`` group by ``event_type`` alone.
+        """
+        capped_limit = max(1, min(limit, 500))
+        # Pull a generous source window so the aggregator has enough
+        # raw rows to fill ``capped_limit`` buckets even when most events
+        # collapse 10:1.
+        scan_cap = min(capped_limit * 50, 10_000)
+        qs = Event.objects.order_by("-occurred_at")
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+        rows = list(qs[:scan_cap])
+        return _aggregate_events(
+            rows,
+            window_seconds=max(1, aggregate_window_seconds),
+            limit=capped_limit,
+        )
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)
@@ -555,6 +599,84 @@ def _lifecycle_event_filter():
     for prefix in _LIFECYCLE_EVENT_PREFIXES:
         q |= Q(event_type__startswith=prefix)
     return q
+
+
+# ---------------------------------------------------------------------------
+# Event aggregation (#434 scope A)
+# ---------------------------------------------------------------------------
+
+
+def _aggregate_events(
+    rows: list,
+    *,
+    window_seconds: int,
+    limit: int,
+) -> list[AggregatedEventType]:
+    """Walk newest→oldest, fold consecutive identical events into
+    buckets, return at most ``limit`` buckets in newest-first order.
+
+    "Consecutive identical" means: same
+    ``(event_type, resource_kind, resource_id)`` key AND the gap from
+    the bucket's oldest member to the new candidate is less than
+    ``window_seconds``. Crossing the gap opens a fresh bucket even
+    when the key matches — that's how we model "the issue cleared and
+    then came back."
+
+    Caller is responsible for tenant-scoping the input queryset; this
+    function is pure aggregation.
+    """
+    if not rows:
+        return []
+
+    buckets: list[dict] = []
+    bucket_by_key: dict[tuple[str, str, str], int] = {}
+
+    for row in rows:
+        key = (
+            row.event_type or "",
+            row.resource_kind or "",
+            row.resource_id or "",
+        )
+        existing_idx = bucket_by_key.get(key)
+        if existing_idx is not None:
+            existing = buckets[existing_idx]
+            # rows arrive newest-first; ``oldest`` shrinks as we add
+            # older members. Gap is between the *current oldest in the
+            # bucket* and the new (older) candidate.
+            gap = (existing["oldest"] - row.occurred_at).total_seconds()
+            if gap < window_seconds:
+                existing["count"] += 1
+                existing["oldest"] = row.occurred_at
+                continue
+        # Open a new bucket either because we've never seen the key,
+        # or because the previous bucket's oldest member is too far
+        # ahead of this candidate (it's a separate incident).
+        bucket_by_key[key] = len(buckets)
+        buckets.append(
+            {
+                "representative": row,
+                "count": 1,
+                "newest": row.occurred_at,
+                "oldest": row.occurred_at,
+                "event_type": key[0],
+                "resource_kind": key[1],
+                "resource_id": key[2],
+            }
+        )
+
+    capped = buckets[:limit]
+    return [
+        AggregatedEventType(
+            representative=event_to_type(b["representative"]),
+            count=b["count"],
+            first_at=b["oldest"],
+            last_at=b["newest"],
+            event_type=b["event_type"],
+            resource_kind=b["resource_kind"],
+            resource_id=b["resource_id"],
+        )
+        for b in capped
+    ]
 
 
 # ---------------------------------------------------------------------------

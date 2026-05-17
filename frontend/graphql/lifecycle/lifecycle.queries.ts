@@ -254,6 +254,8 @@ export const LIST_APP_DEPLOY_TOKENS = gql`
       scopes
       expiresAt
       lastUsedAt
+      lastUsedIp
+      lastUsedAgent
       isRevoked
       lastRotatedAt
       createdAt

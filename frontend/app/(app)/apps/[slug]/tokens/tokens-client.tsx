@@ -1,13 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  CopyIcon,
-  KeyRoundIcon,
-  PlusIcon,
-  RefreshCwIcon,
-  ShieldOffIcon,
-} from "lucide-react";
+import { CopyIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, ShieldOffIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -46,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   CREATE_DEPLOY_TOKEN,
   REVOKE_DEPLOY_TOKEN,
@@ -63,6 +59,11 @@ interface DeployToken {
   scopes: string[];
   expiresAt?: string | null;
   lastUsedAt?: string | null;
+  /** Last client IP that authed with this token. Empty string when never used.
+   *  Populated by the deploy-token middleware (#425). */
+  lastUsedIp: string;
+  /** Last User-Agent that authed with this token. Empty string when never used. */
+  lastUsedAgent: string;
   isRevoked: boolean;
   lastRotatedAt?: string | null;
   registeredAppSlug: string;
@@ -72,13 +73,24 @@ interface DeployToken {
 interface DeployTokenSecretReveal {
   token: DeployToken;
   plaintextSecret: string;
+  /** Grace window (seconds) the previous secret stays valid after rotation.
+   *  ``0`` on creation (no previous secret to honour). Sourced live from the
+   *  backend's ``DEPLOY_TOKEN_ROTATION_GRACE_SECONDS`` Constance entry so the
+   *  rotate-confirm dialog can display the actual operator-set value (#425). */
+  rotationGraceSeconds: number;
 }
+
+/** Default rotation grace surfaced when the backend hasn't replied yet — must
+ *  match the backend Constance default so the *first* dialog open lines up
+ *  with the post-rotate reveal. */
+const ROTATION_GRACE_DEFAULT_SECONDS = 86400;
 
 interface Resp {
   astroliftAppDeployTokens: DeployToken[];
 }
 
 export function AppDeployTokensClient({ slug }: { slug: string }) {
+  const tr = useTranslations("apps.tokens");
   const [createOpen, setCreateOpen] = React.useState(false);
   const [reveal, setReveal] = React.useState<DeployTokenSecretReveal | null>(null);
   const [rotateTarget, setRotateTarget] = React.useState<DeployToken | null>(null);
@@ -115,125 +127,128 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
     }
   }
 
-  async function handleRevoke(t: DeployToken) {
-    const { data } = await revokeToken({ variables: { input: { id: t.id } } });
+  async function handleRevoke(token: DeployToken) {
+    const { data } = await revokeToken({ variables: { input: { id: token.id } } });
     if (data?.revokeDeployToken.ok) {
-      toast.success(`Revoked ${t.name}`);
+      toast.success(tr("revokedToast", { name: token.name }));
     } else {
-      throw new Error(data?.revokeDeployToken.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeDeployToken.errors?.[0]?.message ?? tr("revokeFailed"));
     }
   }
 
   return (
     <PageShell
-      title="Deploy tokens"
+      title={tr("title")}
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          API tokens that CI runners use to push deployments to {slug}.
-          Plaintext is shown once at create/rotate; we store only the hash.
+          {tr("description", { slug })}
         </span>
       }
       actions={
         <Can permission="app.deploy">
           <Button onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-4" />
-            Create token
+            {tr("createToken")}
           </Button>
         </Can>
       }
     >
       <AppTabs slug={slug} active="secrets" />
-      <Card>
-        <CardContent className="p-0">
-          {tokens.loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : list.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<KeyRoundIcon className="size-5" />}
-                title="No deploy tokens yet"
-                description="Create a token to run deployments from CI. The plaintext is shown once on creation."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Last 4</TableHead>
-                  <TableHead>Scopes</TableHead>
-                  <TableHead>Last used</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">
-                      …{t.last4}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {t.scopes.map((s) => (
-                          <Badge key={s} variant="outline" className="font-mono text-[10px]">
-                            {s}
-                          </Badge>
-                        ))}
-                        {t.scopes.length === 0 && (
-                          <span className="text-muted-foreground text-xs">all</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : "never"}
-                    </TableCell>
-                    <TableCell>
-                      {t.isRevoked ? (
-                        <Badge variant="destructive">revoked</Badge>
-                      ) : (
-                        <Badge variant="secondary">active</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {!t.isRevoked && (
-                        <Can permission="app.deploy">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setRotateTarget(t)}
-                            disabled={busy}
-                          >
-                            <RefreshCwIcon className="size-3.5" />
-                            Rotate
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setRevokeTarget(t)}
-                            disabled={busy}
-                          >
-                            <ShieldOffIcon className="size-3.5" />
-                            Revoke
-                          </Button>
-                        </Can>
-                      )}
-                    </TableCell>
+      <TooltipProvider>
+        <Card>
+          <CardContent className="p-0">
+            {tokens.loading && list.length === 0 ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : list.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<KeyRoundIcon className="size-5" />}
+                  title={tr("emptyTitle")}
+                  description={tr("emptyDescription")}
+                />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{tr("columns.name")}</TableHead>
+                    <TableHead>{tr("columns.last4")}</TableHead>
+                    <TableHead>{tr("columns.scopes")}</TableHead>
+                    <TableHead>{tr("columns.lastUsed")}</TableHead>
+                    <TableHead>{tr("columns.expires")}</TableHead>
+                    <TableHead>{tr("columns.state")}</TableHead>
+                    <TableHead className="text-right">{tr("columns.actions")}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {list.map((token) => (
+                    <TableRow key={token.id}>
+                      <TableCell className="font-medium">{token.name}</TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        …{token.last4}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {token.scopes.map((s) => (
+                            <Badge key={s} variant="outline" className="font-mono text-[10px]">
+                              {s}
+                            </Badge>
+                          ))}
+                          {token.scopes.length === 0 && (
+                            <span className="text-muted-foreground text-xs">{tr("allScopes")}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        <LastUsedCell token={token} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {token.expiresAt
+                          ? new Date(token.expiresAt).toLocaleDateString()
+                          : tr("never")}
+                      </TableCell>
+                      <TableCell>
+                        {token.isRevoked ? (
+                          <Badge variant="destructive">{tr("status.revoked")}</Badge>
+                        ) : (
+                          <Badge variant="secondary">{tr("status.active")}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!token.isRevoked && (
+                          <Can permission="app.deploy">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setRotateTarget(token)}
+                              disabled={busy}
+                            >
+                              <RefreshCwIcon className="size-3.5" />
+                              {tr("rotate")}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setRevokeTarget(token)}
+                              disabled={busy}
+                            >
+                              <ShieldOffIcon className="size-3.5" />
+                              {tr("revoke")}
+                            </Button>
+                          </Can>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </TooltipProvider>
 
       <CreateTokenSheet
         open={createOpen}
@@ -250,9 +265,7 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
             }
             return true;
           }
-          toast.error(
-            data?.createDeployToken.errors?.[0]?.message ?? "Create failed",
-          );
+          toast.error(data?.createDeployToken.errors?.[0]?.message ?? tr("createFailed"));
           return false;
         }}
         busy={busy}
@@ -265,9 +278,23 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
         onOpenChange={(next) => {
           if (!next) setRotateTarget(null);
         }}
-        title={rotateTarget ? `Rotate ${rotateTarget.name}?` : "Rotate token?"}
-        description="A fresh plaintext is generated and shown once. The previous secret remains valid for a 24h grace period to let in-flight CI runs finish — use Revoke for an immediate cutover."
-        confirmLabel="Rotate token"
+        title={
+          rotateTarget
+            ? tr("rotateDialog.title", { name: rotateTarget.name })
+            : tr("rotateDialog.fallbackTitle")
+        }
+        description={
+          <div className="space-y-1">
+            <p>
+              {tr("rotateDialog.graceLine", {
+                window: humanizeGrace(ROTATION_GRACE_DEFAULT_SECONDS),
+              })}
+            </p>
+            <p>{tr("rotateDialog.newLine")}</p>
+            <p className="text-muted-foreground text-xs">{tr("rotateDialog.immediateHint")}</p>
+          </div>
+        }
+        confirmLabel={tr("rotateDialog.confirm")}
         onConfirm={async () => {
           if (rotateTarget) await handleRotate(rotateTarget);
         }}
@@ -278,9 +305,13 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
         onOpenChange={(next) => {
           if (!next) setRevokeTarget(null);
         }}
-        title={revokeTarget ? `Revoke ${revokeTarget.name}?` : "Revoke token?"}
-        description="CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap."
-        confirmLabel="Revoke token"
+        title={
+          revokeTarget
+            ? tr("revokeDialog.title", { name: revokeTarget.name })
+            : tr("revokeDialog.fallbackTitle")
+        }
+        description={tr("revokeDialog.description")}
+        confirmLabel={tr("revokeDialog.confirm")}
         destructive
         onConfirm={async () => {
           if (revokeTarget) await handleRevoke(revokeTarget);
@@ -288,6 +319,63 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
       />
     </PageShell>
   );
+}
+
+// ─── LastUsedCell (#425) ────────────────────────────────────────────
+// Displays the relative timestamp the token was last exercised by
+// CI and — on hover — the IP + User-Agent of that caller. Operators
+// investigating a leaked token use this to identify which runner
+// last held it (the row only records the *most recent* use, so the
+// forensic trail is one hop deep but enough to begin an audit).
+
+function LastUsedCell({ token }: { token: DeployToken }) {
+  const tr = useTranslations("apps.tokens.lastUsedCell");
+  if (!token.lastUsedAt) {
+    return <span>—</span>;
+  }
+  const stamp = new Date(token.lastUsedAt).toLocaleString();
+  const hasForensics = Boolean(token.lastUsedIp || token.lastUsedAgent);
+  if (!hasForensics) {
+    return <span>{stamp}</span>;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help underline decoration-dotted underline-offset-2">{stamp}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="max-w-[28rem] space-y-1">
+          {token.lastUsedIp && (
+            <div className="flex gap-2">
+              <span className="text-background/70 font-medium">{tr("ip")}</span>
+              <code className="font-mono break-all">{token.lastUsedIp}</code>
+            </div>
+          )}
+          {token.lastUsedAgent && (
+            <div className="flex gap-2">
+              <span className="text-background/70 font-medium">{tr("agent")}</span>
+              <code className="font-mono break-all">{token.lastUsedAgent}</code>
+            </div>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// Humanize a grace window in seconds → operator-readable text. We
+// only render the largest single unit so the dialog copy stays
+// terse ("~24h" beats "24 hours, 0 minutes"). Edge cases:
+//   < 60s   → "<1m"      (Constance floor is 60s; this is safety net)
+//   < 1h    → "Nm"
+//   < 1d    → "Nh"
+//   >= 1d   → "Nd" (floor)
+function humanizeGrace(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
+  if (seconds < 60) return "<1m";
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
 }
 
 function CreateTokenSheet({
@@ -305,6 +393,8 @@ function CreateTokenSheet({
   }) => Promise<boolean>;
   busy: boolean;
 }) {
+  const tr = useTranslations("apps.tokens.createSheet");
+  const tCommon = useTranslations("apps.common");
   const [name, setName] = React.useState("");
   const [scopes, setScopes] = React.useState("");
   const [expiresIn, setExpiresIn] = React.useState("365");
@@ -321,11 +411,8 @@ function CreateTokenSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Create deploy token</SheetTitle>
-          <SheetDescription>
-            The plaintext secret is shown once on the next screen — copy it
-            into your CI secret store immediately.
-          </SheetDescription>
+          <SheetTitle>{tr("title")}</SheetTitle>
+          <SheetDescription>{tr("description")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -337,7 +424,10 @@ function CreateTokenSheet({
             await onSubmit({
               name: name.trim(),
               scopes: scopes.trim()
-                ? scopes.split(",").map((s) => s.trim()).filter(Boolean)
+                ? scopes
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
                 : null,
               expiresAtIso: expiresAt.toISOString(),
             });
@@ -345,7 +435,7 @@ function CreateTokenSheet({
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="t-name">Name</Label>
+            <Label htmlFor="t-name">{tr("name")}</Label>
             <Input
               id="t-name"
               value={name}
@@ -358,7 +448,7 @@ function CreateTokenSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="t-scopes">Scopes (comma-separated)</Label>
+            <Label htmlFor="t-scopes">{tr("scopes")}</Label>
             <Input
               id="t-scopes"
               value={scopes}
@@ -367,12 +457,10 @@ function CreateTokenSheet({
               spellCheck={false}
               className="font-mono"
             />
-            <p className="text-muted-foreground text-xs">
-              Leave blank for all scopes.
-            </p>
+            <p className="text-muted-foreground text-xs">{tr("scopesHint")}</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="t-expires">Expires in (days)</Label>
+            <Label htmlFor="t-expires">{tr("expires")}</Label>
             <Input
               id="t-expires"
               value={expiresIn}
@@ -385,10 +473,10 @@ function CreateTokenSheet({
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? "Creating…" : "Create token"}
+              {busy ? tr("submitting") : tr("submit")}
             </Button>
           </SheetFooter>
         </form>
@@ -404,22 +492,18 @@ function RevealDialog({
   reveal: DeployTokenSecretReveal | null;
   onOpenChange: () => void;
 }) {
+  const tr = useTranslations("apps.tokens.revealDialog");
   return (
     <AlertDialog open={reveal !== null} onOpenChange={(o) => !o && onOpenChange()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            Token created — copy now
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            This is the only time the plaintext secret will be shown. Paste
-            it into your CI secret store immediately.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{tr("title")}</AlertDialogTitle>
+          <AlertDialogDescription>{tr("description")}</AlertDialogDescription>
         </AlertDialogHeader>
         {reveal && (
           <div className="space-y-3 py-2">
             <div className="text-muted-foreground text-xs">
-              <span className="font-medium">{reveal.token.name}</span> · last 4{" "}
+              <span className="font-medium">{reveal.token.name}</span> · {tr("last4Label")}{" "}
               <code className="bg-muted rounded px-1">{reveal.token.last4}</code>
             </div>
             <div className="bg-muted relative rounded p-3 font-mono text-xs break-all">
@@ -427,20 +511,27 @@ function RevealDialog({
               <Button
                 size="sm"
                 variant="ghost"
-                className="absolute right-1 top-1 h-7"
+                className="absolute top-1 right-1 h-7"
                 onClick={() => {
                   navigator.clipboard.writeText(reveal.plaintextSecret);
-                  toast.success("Copied to clipboard");
+                  toast.success(tr("copied"));
                 }}
               >
                 <CopyIcon className="size-3" />
-                Copy
+                {tr("copy")}
               </Button>
             </div>
+            {reveal.rotationGraceSeconds > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {tr("graceNote", {
+                  window: humanizeGrace(reveal.rotationGraceSeconds),
+                })}
+              </p>
+            )}
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogAction onClick={onOpenChange}>Done</AlertDialogAction>
+          <AlertDialogAction onClick={onOpenChange}>{tr("done")}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

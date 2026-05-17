@@ -67,74 +67,6 @@
       "sports": "Sports"
     }
   },
-  "overview": {
-    "title": "概要",
-    "description": "この Astrolift インストールの ID・レジストリ・ライフサイクル情報。",
-    "errorBanner": {
-      "title": "一部のデータを読み込めませんでした"
-    },
-    "tiles": {
-      "teams": {
-        "label": "チーム",
-        "emptyCta": "最初のチームを作成"
-      },
-      "projects": {
-        "label": "プロジェクト",
-        "emptyCta": "プロジェクトを作成"
-      },
-      "apps": {
-        "label": "登録済みアプリ",
-        "emptyCta": "最初のアプリを登録"
-      },
-      "deployments": {
-        "label": "進行中のデプロイ",
-        "emptyCta": "デプロイを実行"
-      },
-      "costMtd": {
-        "label": "コスト (月初来)",
-        "emptyCta": "コストデータを待機中",
-        "vsPrevMonth": "前月比",
-        "noPrevMonth": "前月実績なし"
-      }
-    },
-    "fleetHealth": {
-      "title": "フリートの状態",
-      "description": "登録済みアプリ全体の直近デプロイ状態のサマリ。",
-      "healthy": "正常",
-      "failing": "{count} 件が失敗中",
-      "hiccup": "{count, plural, one {# 件の不具合} other {# 件の不具合}}",
-      "empty": "登録済みアプリがありません。/apps/new でリポジトリを接続して開始してください。",
-      "tiles": {
-        "running": "実行中",
-        "recentFailure": "直近の失敗",
-        "failing": "失敗中",
-        "noDeploys": "デプロイなし"
-      }
-    },
-    "recentProjects": {
-      "title": "最近のプロジェクト",
-      "description": "すべてのチームで最近作成されたプロジェクト。",
-      "emptyTitle": "プロジェクトがありません",
-      "emptyDescription": "チームとプロジェクトを作成して、アプリの登録を始めましょう。",
-      "emptyAction": "チームを管理"
-    },
-    "activity": {
-      "title": "アクティビティ",
-      "description": "ライフサイクルイベント: デプロイ、設定同期、スケーリング、クラスタ追加、シークレットローテーション。",
-      "emptyTitle": "アクティビティはまだありません",
-      "emptyDescription": "デプロイや設定変更、クラスタ操作が発生するとここに表示されます。",
-      "errorTitle": "アクティビティを読み込めませんでした",
-      "loadMore": "さらに読み込む",
-      "loadingMore": "読み込み中…"
-    },
-    "registeredApps": {
-      "title": "登録済みアプリ",
-      "description": "デプロイ対象として登録されたリポジトリ。",
-      "emptyTitle": "登録されたアプリがありません",
-      "emptyDescription": "アプリレジストリの UI は次のマイルストーンで提供されます。実装後は、このカードから Git リポジトリを登録してデプロイを開始できます。",
-      "emptyAction": "レジストリを開く"
-    }
-  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
@@ -374,22 +306,6 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
-    },
-    "observability": {
-      "scope": {
-        "title": "メトリクスのスコープ",
-        "environment": "環境",
-        "workload": "ワークロード",
-        "allWorkloads": "すべてのワークロード",
-        "environmentPlaceholder": "環境を選択",
-        "workloadPlaceholder": "ワークロードを選択"
-      },
-      "events": {
-        "warningCount": "過去1時間に{count}件の警告",
-        "warningBadgeLabel": "警告",
-        "collapse": "折りたたむ",
-        "expand": "展開する"
-      }
     }
   },
   "settingsIndex": {
@@ -542,138 +458,78 @@
         "requestIdSection": "リクエスト ID"
       }
     },
-    "approval": {
-      "quorum": {
-        "header": "{received} / {required} 承認",
-        "remainingBadge": "あと {count} 件必要",
-        "metBadge": "クォーラム達成",
-        "approvedLabel": "承認者",
-        "approvedEmpty": "まだ承認はありません。",
-        "awaitingLabel": "未承認",
-        "awaitingEmpty": "対象の承認者が見つかりません。アプリのポリシーを確認してください。"
-      }
+    "events": {
+      "title": "Events",
+      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
+      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
+      "aggregateToggle": "Group repeats",
+      "aggregateBadge": "×{count} similar",
+      "expandLabel": "Expand",
+      "collapseLabel": "Collapse",
+      "sourceLabel": "Source",
+      "emptyTitle": "Quiet feed",
+      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "approvalsQueue": {
-      "title": "承認キュー",
-      "description": "承認待ちの全デプロイ。同一環境内で行を選択して一括承認または拒否できます。",
-      "empty": {
-        "title": "保留中なし",
-        "description": "承認が必要なデプロイはここに表示されます。"
-      },
-      "selectAllLabel": "すべて選択",
-      "selectionStatus": "{selected} / {total} 件選択中",
-      "readOnlyHint": "閲覧のみ可能です。",
-      "approveLabel": "承認",
-      "rejectLabel": "拒否",
-      "footer": {
-        "selected": "{count} 件のデプロイを選択中",
-        "summary": "{envs} で実行されます。",
-        "crossEnvWarning": "一括操作には同一アプリ/環境が必要です。ポリシーは環境ごとに異なります。",
-        "approveButton": "{count} 件承認",
-        "rejectButton": "{count} 件拒否"
-      },
-      "confirmApprove": {
-        "title": "{count} 件のデプロイを承認しますか?",
-        "description": "{envs} のロールアウトが再開されます。",
-        "confirm": "すべて承認"
-      },
-      "confirmReject": {
-        "title": "{count} 件のデプロイを拒否しますか?",
-        "description": "{envs} の各デプロイが失敗状態になります。",
-        "reasonLabel": "拒否理由",
-        "reasonPlaceholder": "このバッチを拒否する理由を入力してください。",
-        "reasonRequired": "理由は必須です",
-        "confirm": "すべて拒否"
-      },
-      "toasts": {
-        "unexpected": "一括操作の応答がありません。",
-        "allOk": "{label} が {count} 件で成功しました。",
-        "allFailed": "{label} が {count} 件で失敗: {message}",
-        "partial": "{label}: 成功 {succeeded} 件 / 失敗 {failed} 件",
-        "approveFailed": "一括承認に失敗しました。",
-        "rejectFailed": "一括拒否に失敗しました。"
-      },
-      "row": {
-        "selectRowLabel": "{app} / {env} を選択",
-        "approvalsCount": "{received}/{required} 承認",
-        "received": "受信 {rel}",
-        "review": "確認"
-      }
-    }
-  },
-  "jobs": {
-    "title": "ジョブ",
-    "descriptionGlobal": "全アプリにわたるスケジュールされたジョブ実行とアドホックコマンド実行。",
-    "descriptionForApp": "{app} のスケジュールされたジョブ実行とアドホックコマンド実行。",
-    "tabs": {
-      "scheduled": "スケジュール済み",
-      "commands": "コマンド"
-    },
-    "scheduled": {
-      "emptyTitle": "まだスケジュールされたジョブ実行はありません",
-      "emptyDescription": "Cronjob ワークロードは、スケジューラが最初の実行をトリガーするとここに表示されます。",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+    "quotas": {
+      "title": "Quotas",
+      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
+      "emptyTitle": "No quotas configured",
+      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
       "columns": {
-        "app": "アプリ / 環境 / ワークロード",
-        "k8sJob": "K8s ジョブ",
-        "status": "ステータス",
-        "duration": "実行時間",
-        "started": "開始"
-      }
-    },
-    "commands": {
-      "emptyTitle": "まだコマンド実行はありません",
-      "emptyDescription": "ワークロードに対するアドホックコマンドはここに表示されます。`astro app run …` でCLIから実行してください。",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "アプリ / ワークロード",
-        "command": "コマンド",
-        "status": "ステータス",
-        "invokedBy": "実行者",
-        "started": "開始"
-      }
-    },
-    "runStatus": {
-      "running": "実行中",
-      "inProgress": "進行中",
-      "succeeded": "成功",
-      "failed": "失敗",
-      "superseded": "置換済み",
-      "unknown": "不明",
-      "exitCodeLabel": "終了コード {code}",
-      "exitCodeTooltip": "プロセスは終了コード {code} で終了しました"
-    },
-    "concurrency": {
-      "label": {
-        "forbid": "禁止",
-        "queue": "キュー",
-        "replace": "置換"
+        "scope": "Scope",
+        "resource": "Resource",
+        "usage": "Usage",
+        "bar": "Bar",
+        "limits": "Soft / Hard",
+        "actions": "Actions"
       },
-      "tooltip": {
-        "forbid": "実行中の間、次のスケジュールをスキップします。",
-        "queue": "重複する実行をスタックできます — 各トリガーが独立して短い場合に選択してください。",
-        "replace": "実行中のジョブを停止し、新しいジョブを開始します。"
+      "request": {
+        "buttonRequest": "Request bump",
+        "buttonPending": "Pending request",
+        "title": "Request quota bump",
+        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
+        "factorLabel": "Multiplier",
+        "factor1_5x": "1.5x",
+        "factor2x": "2x",
+        "factor3x": "3x",
+        "factor5x": "5x",
+        "factor10x": "10x",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
+        "reasonHint": "Required. Shows up in the admin notification.",
+        "submit": "Submit request",
+        "submitting": "Submitting…",
+        "cancel": "Cancel",
+        "toastSubmitted": "Quota bump requested",
+        "toastFailed": "Failed to submit request",
+        "pendingBadge": "Pending {factor}x — {reason}"
       }
     },
-    "cron": {
-      "invalid": "無効な cron 式",
-      "firesIn": "{relative}後に実行",
-      "now": "1分未満",
-      "minutes": "{count}分",
-      "hours": "{count}時間",
-      "days": "{count}日"
-    },
-    "workloadCard": {
-      "title": "Cronjob ワークロード",
-      "countLabel": "{count}件スケジュール済み",
-      "openLogs": "コンソールで開く"
-    },
-    "output": {
-      "emptyOutput": "まだ出力がキャプチャされていません。",
-      "openInConsole": "コンソールで開く",
-      "lines": "{count}行",
-      "truncated": "200行表示 — コンソールで全ログを確認できます。"
+    "alerts": {
+      "mute": {
+        "menuLabel": "Mute",
+        "preset1h": "Mute for 1 hour",
+        "preset4h": "Mute for 4 hours",
+        "preset24h": "Mute for 24 hours",
+        "presetCustom": "Mute for custom duration…",
+        "unmute": "Unmute now",
+        "badge": "Muted ({remaining} left)",
+        "badgeExpired": "Muted",
+        "showMuted": "Show muted",
+        "hideMuted": "Hide muted",
+        "toastMuted": "Muted {name} for {duration}",
+        "toastUnmuted": "Unmuted {name}",
+        "toastMuteFailed": "Failed to mute rule",
+        "toastUnmuteFailed": "Failed to unmute rule",
+        "customTitle": "Mute {name}",
+        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
+        "durationLabel": "Duration (hours)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Known outage — DB migration in progress",
+        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
+        "submit": "Mute rule",
+        "cancel": "Cancel"
+      }
     }
   }
 }

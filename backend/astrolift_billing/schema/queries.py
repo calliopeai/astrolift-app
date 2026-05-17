@@ -36,11 +36,10 @@ from django.db.models import Sum
 from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_billing.models import Budget, CostSnapshot, Quota
+from astrolift_billing.models import Budget, CostSnapshot, Quota, QuotaIncreaseRequest
 from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
-
 
 # ---- enums + scalars ------------------------------------------------
 
@@ -64,6 +63,28 @@ class CostWindow(enum.Enum):
 # ---- response types -------------------------------------------------
 
 
+@strawberry.type(name="AstroliftQuotaIncreaseRequest")
+class QuotaIncreaseRequestType:
+    """An operator-initiated quota bump (#434 scope D).
+
+    ``status`` is one of ``pending`` | ``approved`` | ``rejected``.
+    The frontend surfaces a pending request inline with its quota row
+    so the requester can tell "we already asked, awaiting decision"
+    without scanning a separate queue.
+    """
+
+    id: GUID
+    quota_id: GUID
+    requested_factor: float
+    reason: str
+    status: str
+    requested_by_display: str
+    decided_by_display: str | None
+    decided_at: dt.datetime | None
+    decision_note: str
+    created_at: dt.datetime
+
+
 @strawberry.type(name="AstroliftQuota")
 class QuotaType:
     id: GUID
@@ -73,6 +94,11 @@ class QuotaType:
     hard_limit: float
     soft_limit: float
     current_usage: float
+    pending_request: QuotaIncreaseRequestType | None
+    """The active pending :class:`AstroliftQuotaIncreaseRequest` for
+    this quota, or ``null`` when none is in flight. Surfaces inline in
+    the quotas table so the requester sees "request submitted, awaiting
+    approval" without having to scan a separate queue."""
 
 
 @strawberry.type(name="AstroliftBudget")
@@ -188,6 +214,16 @@ class CostAttributionType:
 
 
 def quota_to_type(q) -> QuotaType:
+    pending = (
+        QuotaIncreaseRequest.objects.filter(
+            quota=q,
+            status=QuotaIncreaseRequest.Status.PENDING,
+            deleted_at__isnull=True,
+        )
+        .select_related("requested_by", "decided_by")
+        .order_by("-created_at")
+        .first()
+    )
     return QuotaType(
         id=GUID(str(q.guid)),
         scope_kind=q.scope_kind,
@@ -196,6 +232,40 @@ def quota_to_type(q) -> QuotaType:
         hard_limit=float(q.hard_limit),
         soft_limit=float(q.soft_limit),
         current_usage=float(q.current_usage),
+        pending_request=quota_request_to_type(pending) if pending is not None else None,
+    )
+
+
+def _user_display(user) -> str:
+    """Best-effort display label for a quota-request user. Mirrors
+    the shape in ``shape_activity_item`` so labels read the same
+    across surfaces: full name → email → username → ``"system"``."""
+    if user is None:
+        return "system"
+    first = (getattr(user, "first_name", "") or "").strip()
+    last = (getattr(user, "last_name", "") or "").strip()
+    full = (first + " " + last).strip()
+    if full:
+        return full
+    return (
+        (getattr(user, "email", "") or "").strip()
+        or (getattr(user, "username", "") or "").strip()
+        or "system"
+    )
+
+
+def quota_request_to_type(r) -> QuotaIncreaseRequestType:
+    return QuotaIncreaseRequestType(
+        id=GUID(str(r.guid)),
+        quota_id=GUID(str(r.quota.guid)),
+        requested_factor=float(r.requested_factor),
+        reason=r.reason or "",
+        status=r.status,
+        requested_by_display=_user_display(r.requested_by),
+        decided_by_display=(_user_display(r.decided_by) if r.decided_by_id else None),
+        decided_at=r.decided_at,
+        decision_note=r.decision_note or "",
+        created_at=r.created_at,
     )
 
 
@@ -265,13 +335,9 @@ def _resolve_window(
     if window == CostWindow.H24:
         return _ResolvedWindow(start=today, end=today, label="24h")
     if window == CostWindow.D7:
-        return _ResolvedWindow(
-            start=today - dt.timedelta(days=6), end=today, label="7d"
-        )
+        return _ResolvedWindow(start=today - dt.timedelta(days=6), end=today, label="7d")
     if window == CostWindow.D30:
-        return _ResolvedWindow(
-            start=today - dt.timedelta(days=29), end=today, label="30d"
-        )
+        return _ResolvedWindow(start=today - dt.timedelta(days=29), end=today, label="30d")
     if window == CostWindow.MTD:
         return _ResolvedWindow(start=today.replace(day=1), end=today, label="mtd")
     # Defensive fallback — Strawberry enforces enum membership.
@@ -314,9 +380,7 @@ def _flag_anomalies(
     flags = [False] * len(totals)
     if len(totals) < 4:
         return flags
-    deltas = [
-        totals[i][1] - totals[i - 1][1] for i in range(1, len(totals))
-    ]
+    deltas = [totals[i][1] - totals[i - 1][1] for i in range(1, len(totals))]
     try:
         mean_d = statistics.fmean(deltas)
         sd_d = statistics.pstdev(deltas)
@@ -333,9 +397,7 @@ def _flag_anomalies(
 # ---- forecast -------------------------------------------------------
 
 
-def _linear_regression_slope_intercept(
-    xs: Sequence[float], ys: Sequence[float]
-) -> tuple[float, float]:
+def _linear_regression_slope_intercept(xs: Sequence[float], ys: Sequence[float]) -> tuple[float, float]:
     """Least-squares slope + intercept. Returns (slope, intercept)."""
     n = len(xs)
     if n < 2:
@@ -406,9 +468,7 @@ def _project_month_end(
         mean = statistics.fmean(ys) if ys else 0
         sd = statistics.pstdev(ys) if len(ys) > 1 else 0
         rel_var = (sd / mean) if mean > 0 else math.inf
-        confidence = (
-            ForecastConfidence.HIGH if rel_var < 0.6 else ForecastConfidence.MEDIUM
-        )
+        confidence = ForecastConfidence.HIGH if rel_var < 0.6 else ForecastConfidence.MEDIUM
     return (max(0, projected), confidence)
 
 
@@ -524,9 +584,7 @@ class BillingQuery:
         previous_month_cents = int(prev_qs["total"] or 0)
 
         if previous_month_cents > 0:
-            delta_pct = (
-                (mtd_cents - previous_month_cents) / previous_month_cents * 100.0
-            )
+            delta_pct = (mtd_cents - previous_month_cents) / previous_month_cents * 100.0
         else:
             delta_pct = 0.0
 
@@ -567,9 +625,7 @@ class BillingQuery:
             qs = qs.filter(registered_app__slug=registered_app_slug)
 
         currency = "USD"
-        attributed: dict[
-            tuple[int, str], dict
-        ] = {}  # (binding_id, by) → aggregate row
+        attributed: dict[tuple[int, str], dict] = {}  # (binding_id, by) → aggregate row
         unattributed = 0
         total = 0
         for c in qs:
@@ -602,9 +658,7 @@ class BillingQuery:
             svc = getattr(binding, "managed_service", None) if binding else None
             app = r["app"]
             return CostBindingRowType(
-                managed_service_binding_id=(
-                    str(binding.guid) if binding else None
-                ),
+                managed_service_binding_id=(str(binding.guid) if binding else None),
                 managed_service_id=(str(svc.guid) if svc else None),
                 managed_service_name=(svc.name if svc else None),
                 managed_service_kind=(svc.kind if svc else None),
