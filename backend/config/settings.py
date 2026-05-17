@@ -54,7 +54,7 @@ def env_str(name: str, default: str | None = None) -> str | None:
 
 logger = logging.getLogger(__name__)
 
-VERSION = "0.0.40"
+VERSION = "0.1.0"
 logger.warning(f"Settings Version - Start: {VERSION}")
 
 django.utils.encoding.force_text = force_str  # type: ignore[attr-defined]
