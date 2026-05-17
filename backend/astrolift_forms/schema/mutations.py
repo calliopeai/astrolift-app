@@ -52,9 +52,7 @@ log = logging.getLogger(__name__)
 _NAME_MAX = 128
 _SLUG_MAX = 128
 _PAYLOAD_MAX_BYTES = 256 * 1024  # 256 KiB — well above any sane form, refuses obvious abuse.
-_VALID_SUBMISSION_STATUSES: frozenset[str] = frozenset(
-    {s.value for s in FormSubmission.Status}
-)
+_VALID_SUBMISSION_STATUSES: frozenset[str] = frozenset({s.value for s in FormSubmission.Status})
 
 
 # ---- helpers -------------------------------------------------------
@@ -202,13 +200,9 @@ class FormsMutation:
         if not slug:
             return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
         if len(name) > _NAME_MAX:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, f"name too long (max {_NAME_MAX})", field="name"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, f"name too long (max {_NAME_MAX})", field="name")
         if len(slug) > _SLUG_MAX:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, f"slug too long (max {_SLUG_MAX})", field="slug"
-            )
+            return gql_failure(ErrorCode.VALIDATION.value, f"slug too long (max {_SLUG_MAX})", field="slug")
 
         err = _validate_schema(input.schema)
         if err is not None:

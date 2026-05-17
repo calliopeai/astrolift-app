@@ -1,8 +1,15 @@
 import { gql } from "@apollo/client";
 
+// Backend surface in `backend/astrolift_forms/schema/queries.py` (#453).
+// `status` is a plain string on the wire — Strawberry's enum
+// serialization is NAME-not-value, so keeping it as a string preserves
+// the lowercase literals (`draft` / `published` / `archived`) the FE
+// components rely on.
+
 export const GET_FORM_DEFINITIONS = gql`
   query GetFormDefinitions($status: String) {
     formDefinitions(status: $status) {
+      id
       name
       slug
       description
@@ -21,6 +28,7 @@ export const GET_FORM_DEFINITIONS = gql`
 export const GET_FORM_DEFINITION = gql`
   query GetFormDefinition($slug: String!) {
     formDefinition(slug: $slug) {
+      id
       name
       slug
       description
@@ -43,6 +51,7 @@ export const GET_FORM_DEFINITION = gql`
 export const GET_FORM_SUBMISSIONS = gql`
   query GetFormSubmissions($slug: String!, $status: String) {
     formSubmissions(slug: $slug, status: $status) {
+      id
       payload
       status
       submittedAt
@@ -50,6 +59,8 @@ export const GET_FORM_SUBMISSIONS = gql`
       formName
       formVersion
       formSlug
+      submitterDisplayName
+      submitterEmail
     }
   }
 `;

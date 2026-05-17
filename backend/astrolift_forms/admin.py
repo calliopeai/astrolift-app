@@ -12,7 +12,7 @@ class FormDefinitionAdmin(admin.ModelAdmin):
         "slug",
         "organization",
         "status",
-        "version",
+        "schema_version",
         "form_type",
         "is_public",
         "submission_count_cached",
@@ -20,7 +20,14 @@ class FormDefinitionAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "form_type", "is_public")
     search_fields = ("name", "slug", "description")
-    readonly_fields = ("guid", "submission_count_cached", "published_at", "created_at", "updated_at", "deleted_at")
+    readonly_fields = (
+        "guid",
+        "submission_count_cached",
+        "published_at",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+    )
 
 
 @admin.register(FormSubmission)

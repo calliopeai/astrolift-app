@@ -110,7 +110,4 @@ class FormDefinition(BaseCoreModel):
         ]
 
     def __str__(self) -> str:
-        return (
-            f"FormDefinition({self.organization_id}, {self.slug}, "
-            f"v{self.schema_version}, {self.status})"
-        )
+        return f"FormDefinition({self.organization_id}, {self.slug}, v{self.schema_version}, {self.status})"
