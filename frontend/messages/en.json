@@ -372,6 +372,57 @@
           "recheck": "Click to re-run probe",
           "rechecking": "Re-running probe…"
         }
+      },
+      "reprovision": {
+        "headline": {
+          "failed": "Provisioning failed",
+          "pending": "Provisioning hasn't started",
+          "provisioning": "Provisioning in progress",
+          "ready_missing_registry": "Container registry coordinates are missing",
+          "unknown": "Provisioning needs attention"
+        },
+        "description": {
+          "failed": "Retry to rebuild the registry repo and namespace.",
+          "pending": "Kick it off to bring the app online.",
+          "provisioning": "Sit tight — re-run only if it stalls.",
+          "ready_missing_registry": "Reprovision to rebuild the ECR repo and push role; deploys will silently no-op until then.",
+          "unknown": "Reprovision to recover."
+        },
+        "elapsed": "started {minutes}m ago",
+        "cta": "Reprovision",
+        "confirm": {
+          "title": "Reprovision {slug}?",
+          "description": "Cancels in-flight deploys, deletes the per-workload k8s objects, and re-fires the deploy CI workflow. Existing approvals re-run.",
+          "confirm": "Yes, reprovision"
+        },
+        "toast": {
+          "dispatched": "Reprovision dispatched — deploy workflow is rerunning.",
+          "partial": "Partial recovery: cleanup ran but the deploy dispatch failed ({message})."
+        },
+        "error": {
+          "noResponse": "Reprovision failed: no response from backend.",
+          "generic": "Reprovision failed."
+        }
+      },
+      "configDrift": {
+        "headline": "Config drift detected",
+        "description": "The {env} environment's last deploy doesn't match the current manifest.",
+        "descriptionNoEnv": "The last deploy doesn't match the current manifest.",
+        "cta": "Sync from source",
+        "field": {
+          "manifest_hash": "Manifest hash changed since last deploy",
+          "image_tag": "Image tag diverged from snapshot",
+          "repo_unsynced": "Source repo is ahead of the platform — resync to pick it up",
+          "unknown": "{field} changed"
+        },
+        "toast": {
+          "synced": "Synced from source.",
+          "failed": "Sync from source failed."
+        }
+      },
+      "latestDeploy": {
+        "empty": "No deploys yet — trigger one from the CLI or push to the deploy branch.",
+        "ariaLabel": "Latest deployment: {status}, {when}"
       }
     },
     "wizard": {
@@ -1851,6 +1902,57 @@
         "payloadSection": "Mutation context",
         "redactedNote": "Sensitive values (secrets, tokens, passwords) are redacted before display.",
         "requestIdSection": "Request ID"
+      }
+    },
+    "membersBulk": {
+      "selectAllLabel": "Select all role bindings",
+      "selectRowLabel": "Select binding {role} on {subject}",
+      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
+      "clear": "Clear",
+      "revokeButton": "Revoke {count}",
+      "permissionHint": "You don't have permission to manage members.",
+      "confirm": {
+        "title": "Revoke {count} role binding(s)?",
+        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
+        "confirmLabel": "Revoke {count}"
+      },
+      "toasts": {
+        "allOk": "Revoked {count} role binding(s).",
+        "partial": "Revoked {revoked}, {failed} failed.",
+        "allFailed": "Bulk revoke failed: {message}"
+      }
+    },
+    "teamMembersBulk": {
+      "tabTitle": "Team members",
+      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
+      "loadError": "Couldn't load team members.",
+      "emptyTitle": "No members on this team yet",
+      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "columns": {
+        "user": "User",
+        "lifecycle": "Lifecycle",
+        "joined": "Joined"
+      },
+      "selectAllLabel": "Select all team members",
+      "selectRowLabel": "Select member {user}",
+      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
+      "clear": "Clear",
+      "assignButton": "Assign role to {count}",
+      "permissionHint": "You don't have permission to manage members on this team.",
+      "assignDialog": {
+        "title": "Assign role to {count} member(s)",
+        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
+        "roleLabel": "Team-scoped role",
+        "rolePlaceholder": "Choose a role",
+        "noRoles": "No team-scoped roles available. Create one on /roles first.",
+        "cancel": "Cancel",
+        "confirmLabel": "Assign role"
+      },
+      "toasts": {
+        "allOk": "Assigned role to {count} member(s).",
+        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
+        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
+        "allFailed": "Bulk assign failed: {message}"
       }
     }
   },

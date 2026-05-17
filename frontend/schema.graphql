@@ -206,6 +206,13 @@ type AstroliftAppCertificate {
   renewalStatus: String!
 }
 
+type AstroliftAppConfigDrift {
+  hasDrift: Boolean!
+  fields: [String!]!
+  environmentName: String!
+  lastChecked: DateTime!
+}
+
 type AstroliftAppDeploymentSummary {
   id: GUID!
   status: String!
@@ -359,6 +366,13 @@ type AstroliftAppPod {
   containerStatuses: [AstroliftContainerStatus!]!
 }
 
+type AstroliftAppReprovisionState {
+  needsReprovision: Boolean!
+  state: String!
+  reason: String!
+  elapsedSeconds: Int
+}
+
 type AstroliftAppSecret {
   id: String!
   key: String!
@@ -488,6 +502,19 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftBulkAssignTeamMemberRolesPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  assignedCount: Int!
+  alreadyAssignedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkAssignTeamMemberRolesPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkAssignTeamMemberRolesPayload
+}
+
 type AstroliftBulkDeploymentResultData {
   results: [AstroliftBulkDeploymentResultItem!]!
   succeededCount: Int!
@@ -505,6 +532,25 @@ type AstroliftBulkDeploymentResultItem {
   ok: Boolean!
   errors: [MutationError!]!
   deployment: AstroliftDeployment
+}
+
+type AstroliftBulkOpItemResult {
+  id: GUID!
+  ok: Boolean!
+  alreadyExisted: Boolean!
+  errors: [MutationError!]!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  revokedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkRevokeRoleBindingsPayload
 }
 
 type AstroliftCancelDeregisterPayload {
@@ -1437,6 +1483,8 @@ type AstroliftRegisteredApp {
   latestDeployment: AstroliftAppDeploymentSummary
   lastDeployedAt: DateTime
   healthPulse: AstroliftAppHealthPulse
+  reprovision: AstroliftAppReprovisionState!
+  configDrift: AstroliftAppConfigDrift
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1970,6 +2018,12 @@ input BulkApproveDeploymentsInput {
   reason: String = null
 }
 
+input BulkAssignTeamMemberRolesInput {
+  teamId: GUID!
+  roleId: GUID!
+  memberIds: [GUID!]!
+}
+
 input BulkImportAppSecretsInput {
   appSlug: String!
   dotenvText: String!
@@ -1978,6 +2032,10 @@ input BulkImportAppSecretsInput {
 input BulkRejectDeploymentsInput {
   deploymentIds: [GUID!]!
   reason: String!
+}
+
+input BulkRevokeRoleBindingsInput {
+  bindingIds: [GUID!]!
 }
 
 type Bulkimportpayload {
@@ -2598,6 +2656,8 @@ type Mutation {
   softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   grantRole(input: GrantRoleInput!): AstroliftRoleBindingMutationResult!
   revokeRoleBinding(input: RevokeRoleBindingInput!): SoftdeletepayloadMutationResult!
+  bulkRevokeAstroliftRoleBindings(input: BulkRevokeRoleBindingsInput!): AstroliftBulkRevokeRoleBindingsPayloadMutationResult!
+  bulkAssignAstroliftTeamMemberRoles(input: BulkAssignTeamMemberRolesInput!): AstroliftBulkAssignTeamMemberRolesPayloadMutationResult!
   createRole(input: CreateRoleInput!): AstroliftRoleMutationResult!
   updateRole(input: UpdateRoleInput!): AstroliftRoleMutationResult!
   softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
@@ -2961,6 +3021,7 @@ type Query {
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
   astroliftMembers: [AstroliftMember!]!
+  astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
@@ -2990,7 +3051,7 @@ type Query {
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
-  astroliftApp(slug: String!): AstroliftRegisteredApp
+  astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload

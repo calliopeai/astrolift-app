@@ -231,6 +231,13 @@ export type AstroliftAppCertificate = {
   renewalStatus: Scalars['String']['output'];
 };
 
+export type AstroliftAppConfigDrift = {
+  environmentName: Scalars['String']['output'];
+  fields: Array<Scalars['String']['output']>;
+  hasDrift: Scalars['Boolean']['output'];
+  lastChecked: Scalars['DateTime']['output'];
+};
+
 export type AstroliftAppDeploymentSummary = {
   commitSha: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -383,6 +390,13 @@ export type AstroliftAppPod = {
   workload: Scalars['String']['output'];
 };
 
+export type AstroliftAppReprovisionState = {
+  elapsedSeconds?: Maybe<Scalars['Int']['output']>;
+  needsReprovision: Scalars['Boolean']['output'];
+  reason: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+};
+
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -512,6 +526,19 @@ export type AstroliftBudget = {
   scopeKind: Scalars['String']['output'];
 };
 
+export type AstroliftBulkAssignTeamMemberRolesPayload = {
+  alreadyAssignedCount: Scalars['Int']['output'];
+  assignedCount: Scalars['Int']['output'];
+  failedCount: Scalars['Int']['output'];
+  results: Array<AstroliftBulkOpItemResult>;
+};
+
+export type AstroliftBulkAssignTeamMemberRolesPayloadMutationResult = {
+  data?: Maybe<AstroliftBulkAssignTeamMemberRolesPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftBulkDeploymentResultData = {
   failedCount: Scalars['Int']['output'];
   results: Array<AstroliftBulkDeploymentResultItem>;
@@ -527,6 +554,25 @@ export type AstroliftBulkDeploymentResultDataMutationResult = {
 export type AstroliftBulkDeploymentResultItem = {
   deployment?: Maybe<AstroliftDeployment>;
   deploymentId: Scalars['GUID']['output'];
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBulkOpItemResult = {
+  alreadyExisted: Scalars['Boolean']['output'];
+  errors: Array<MutationError>;
+  id: Scalars['GUID']['output'];
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBulkRevokeRoleBindingsPayload = {
+  failedCount: Scalars['Int']['output'];
+  results: Array<AstroliftBulkOpItemResult>;
+  revokedCount: Scalars['Int']['output'];
+};
+
+export type AstroliftBulkRevokeRoleBindingsPayloadMutationResult = {
+  data?: Maybe<AstroliftBulkRevokeRoleBindingsPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -1408,6 +1454,7 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
 export type AstroliftRegisteredApp = {
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
+  configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
   cronPaused: Scalars['Boolean']['output'];
@@ -1444,6 +1491,7 @@ export type AstroliftRegisteredApp = {
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
+  reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
   securityPolicy: AstroliftSecurityPolicy;
   slug: Scalars['String']['output'];
@@ -1999,6 +2047,12 @@ export type BulkApproveDeploymentsInput = {
   reason: InputMaybe<Scalars['String']['input']>;
 };
 
+export type BulkAssignTeamMemberRolesInput = {
+  memberIds: Array<Scalars['GUID']['input']>;
+  roleId: Scalars['GUID']['input'];
+  teamId: Scalars['GUID']['input'];
+};
+
 export type BulkImportAppSecretsInput = {
   appSlug: Scalars['String']['input'];
   dotenvText: Scalars['String']['input'];
@@ -2007,6 +2061,10 @@ export type BulkImportAppSecretsInput = {
 export type BulkRejectDeploymentsInput = {
   deploymentIds: Array<Scalars['GUID']['input']>;
   reason: Scalars['String']['input'];
+};
+
+export type BulkRevokeRoleBindingsInput = {
+  bindingIds: Array<Scalars['GUID']['input']>;
 };
 
 export type Bulkimportpayload = {
@@ -2500,8 +2558,10 @@ export type Mutation = {
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
+  bulkAssignAstroliftTeamMemberRoles: AstroliftBulkAssignTeamMemberRolesPayloadMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
   bulkRejectDeployments: AstroliftBulkDeploymentResultDataMutationResult;
+  bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   cancelWorkflowInstance: MutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
@@ -2784,6 +2844,11 @@ export type MutationBulkApproveDeploymentsArgs = {
 };
 
 
+export type MutationBulkAssignAstroliftTeamMemberRolesArgs = {
+  input: BulkAssignTeamMemberRolesInput;
+};
+
+
 export type MutationBulkImportAppSecretsArgs = {
   input: BulkImportAppSecretsInput;
 };
@@ -2791,6 +2856,11 @@ export type MutationBulkImportAppSecretsArgs = {
 
 export type MutationBulkRejectDeploymentsArgs = {
   input: BulkRejectDeploymentsInput;
+};
+
+
+export type MutationBulkRevokeAstroliftRoleBindingsArgs = {
+  input: BulkRevokeRoleBindingsInput;
 };
 
 
@@ -3913,6 +3983,7 @@ export type Query = {
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
+  astroliftTeamMembers: Array<AstroliftMember>;
   astroliftTeams: Array<AstroliftTeam>;
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
@@ -3963,6 +4034,7 @@ export type QueryAstroliftAlertRulesArgs = {
 
 
 export type QueryAstroliftAppArgs = {
+  includeDrift?: Scalars['Boolean']['input'];
   slug: Scalars['String']['input'];
 };
 
@@ -4282,6 +4354,11 @@ export type QueryAstroliftSourceFileArgs = {
 
 export type QueryAstroliftSshDeployKeysArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftTeamMembersArgs = {
+  teamId: Scalars['GUID']['input'];
 };
 
 
