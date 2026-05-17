@@ -86,6 +86,12 @@ export type AstroliftPreviewEnvironment = Omit<GeneratedPreviewEnvironment, "sta
   status: PreviewStatus;
 };
 
+// #431 — TTL extension input. Locked to the same {1, 7, 30} set the
+// backend enforces. UI buttons surface 1 and 7; +30d is offered via
+// a dropdown elsewhere so the cheap-looking inline affordance doesn't
+// make it accidentally easy to push a preview to the max ceiling.
+export type PreviewTtlExtendDays = 1 | 7 | 30;
+
 export type AstroliftDeploymentMetrics = GeneratedDeploymentMetrics;
 
 export type AstroliftAppHealthSummary = Omit<
