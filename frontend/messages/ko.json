@@ -167,6 +167,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "설정 섹션",
+      "openMobileNav": "설정 메뉴 열기",
+      "openMobileNavLabel": "섹션",
+      "mobileTitle": "설정 섹션",
+      "mobileDescription": "원하는 설정 영역으로 이동합니다.",
+      "groups": {
+        "organization": "조직",
+        "personal": "개인",
+        "tokens": "토큰"
+      }
+    },
+    "breadcrumb": {
+      "root": "설정"
     }
   },
   "hooks": {
@@ -499,6 +514,9 @@
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
+    "cardMeta": {
+      "modified": "Modified {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -515,6 +533,10 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",

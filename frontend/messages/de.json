@@ -163,6 +163,21 @@
       "light": "Hell",
       "dark": "Dunkel",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "Einstellungsbereiche",
+      "openMobileNav": "Einstellungsmenü öffnen",
+      "openMobileNavLabel": "Bereiche",
+      "mobileTitle": "Einstellungsbereiche",
+      "mobileDescription": "Springen Sie zu einem beliebigen Einstellungsbereich.",
+      "groups": {
+        "organization": "Organisation",
+        "personal": "Persönlich",
+        "tokens": "Tokens"
+      }
+    },
+    "breadcrumb": {
+      "root": "Einstellungen"
     }
   },
   "hooks": {
@@ -495,6 +510,9 @@
   "settingsIndex": {
     "title": "Einstellungen",
     "description": "Konfiguriere Identität, Sicherheit und Oberflächen der Plattform.",
+    "cardMeta": {
+      "modified": "Geändert {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organisation",
@@ -511,6 +529,10 @@
       "policies": {
         "title": "ABAC-Richtlinien",
         "description": "Laufzeitprädikate über RBAC."
+      },
+      "permissions": {
+        "title": "Berechtigungen",
+        "description": "Jede für den aktuellen Nutzer aufgelöste Berechtigung prüfen."
       },
       "profile": {
         "title": "Profil",

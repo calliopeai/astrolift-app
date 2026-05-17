@@ -167,6 +167,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "Seções de configurações",
+      "openMobileNav": "Abrir menu de configurações",
+      "openMobileNavLabel": "Seções",
+      "mobileTitle": "Seções de configurações",
+      "mobileDescription": "Vá direto para qualquer área de configurações.",
+      "groups": {
+        "organization": "Organização",
+        "personal": "Pessoal",
+        "tokens": "Tokens"
+      }
+    },
+    "breadcrumb": {
+      "root": "Configurações"
     }
   },
   "hooks": {
@@ -499,6 +514,9 @@
   "settingsIndex": {
     "title": "Configurações",
     "description": "Configure a identidade, segurança e superfícies da plataforma.",
+    "cardMeta": {
+      "modified": "Modificado {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organização",
@@ -515,6 +533,10 @@
       "policies": {
         "title": "Políticas ABAC",
         "description": "Predicados de runtime sobre o RBAC."
+      },
+      "permissions": {
+        "title": "Permissões",
+        "description": "Inspecione cada permissão resolvida para o usuário atual."
       },
       "profile": {
         "title": "Perfil",
