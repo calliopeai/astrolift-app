@@ -42,6 +42,12 @@ class ApiToken(BaseCoreModel):
     scopes = models.JSONField(default=list, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
+    # Operators forensically trace a leaked token by who used it
+    # last from where. ``GenericIPAddressField`` accepts v4 and v6;
+    # ``last_used_agent`` is truncated at 512 chars so a pathological
+    # UA string can't bloat the row.
+    last_used_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_used_agent = models.CharField(max_length=512, blank=True, default="")
     is_revoked = models.BooleanField(default=False)
 
     class Meta:

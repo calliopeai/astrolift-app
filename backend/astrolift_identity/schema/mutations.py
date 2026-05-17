@@ -981,30 +981,37 @@ class IdentityMutation:
             if team is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
 
-        plaintext, digest, last4 = _make_token_secret()
+        from astrolift_identity.api_tokens import (
+            deadline_from_days,
+            mint_token,
+            normalize_scopes,
+            validate_scopes,
+        )
 
-        expires_at = None
-        if input.expires_in_days:
-            from datetime import timedelta
+        normalized = normalize_scopes(input.scopes)
+        unknown = validate_scopes(normalized)
+        if unknown:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown scope(s): {', '.join(unknown)}",
+                field="scopes",
+            )
 
-            from django.utils import timezone
-
-            expires_at = timezone.now() + timedelta(days=int(input.expires_in_days))
-
+        minted = mint_token()
         token = ApiToken.objects.create(
             user=actor,
             organization=org,
             team=team,
             name=input.name.strip(),
-            token_hash=digest,
-            token_last_4=last4,
-            scopes=list(input.scopes or []),
-            expires_at=expires_at,
+            token_hash=minted.token_hash,
+            token_last_4=minted.last4,
+            scopes=normalized,
+            expires_at=deadline_from_days(input.expires_in_days),
         )
         return gql_success(
             ApiTokenPlaintextType(
                 api_token=api_token_to_type(token),
-                plaintext=plaintext,
+                plaintext=minted.plaintext,
             )
         )
 

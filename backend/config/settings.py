@@ -520,6 +520,13 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
     "django.contrib.auth.middleware.RemoteUserMiddleware",  # Required for Auth0
+    # API token bearer auth (#428): resolves alft_at_… tokens, stamps
+    # last_used_* columns, swaps in the token owner so resolvers see
+    # the correct request.user. Runs after AuthenticationMiddleware
+    # so it can override the anonymous user it just set, and before
+    # CurrentUserMiddleware so the thread-local picks up the
+    # token-authed identity.
+    "astrolift_identity.middleware.ApiTokenAuthMiddleware",
     "core.middleware.current_user.CurrentUserMiddleware",  # Track current user for signals
     "core.middleware.request_id.RequestIdMiddleware",  # ULID + W3C traceparent → contextvar
     "core.middleware.tenant.TenantContextMiddleware",  # Resolve org/team/project, populate TenantContext
