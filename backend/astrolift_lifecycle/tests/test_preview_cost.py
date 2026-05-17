@@ -222,14 +222,21 @@ class _FakeCostDriver:
 
 @pytest.fixture
 def patch_driver(monkeypatch):
-    def _install(driver):
-        from core import app_deploy
+    """Patch the cost-estimator resolver to return ``driver``.
 
-        def _fake(_cluster, capability):
-            assert capability == "cost"
+    The aggregator resolves an estimator via
+    :func:`astrolift_lifecycle.preview_cost.cost_estimator_for_cluster`
+    (which instantiates the right `*CostEstimator` per plugin slug).
+    Tests bypass the per-plugin lookup so they don't need to model
+    boto3 / google-cloud / azure SDK shapes."""
+
+    def _install(driver):
+        from astrolift_lifecycle import preview_cost
+
+        def _fake(_cluster):
             return driver
 
-        monkeypatch.setattr(app_deploy, "driver_for_capability", _fake)
+        monkeypatch.setattr(preview_cost, "cost_estimator_for_cluster", _fake)
 
     return _install
 
@@ -290,3 +297,98 @@ def test_estimate_daily_cost_short_circuits_on_zero_usage():
         aggregate=agg,
     )
     assert daily is None
+
+
+# ---- cost_estimator_for_cluster resolver (#440) ----------------------
+
+
+def _fake_cluster(slug: str, *, provider_config: dict | None = None):
+    """Build a cluster-like object with the attributes the resolver
+    reads. The provider plugin attribute is a SimpleNamespace carrying
+    a ``slug`` field, matching the TenantCluster.provider_plugin FK
+    relationship shape the production code walks."""
+    return SimpleNamespace(
+        slug="some-cluster",
+        region="us-east-1",
+        provider_plugin=SimpleNamespace(slug=slug),
+        provider_config=provider_config or {},
+    )
+
+
+def test_cost_estimator_for_cluster_returns_aws_estimator():
+    """AWS path is wired through boto3, which ships in the backend
+    image; the resolver returns an AWSCostEstimator instance."""
+    from aws.cost import AWSCostEstimator
+
+    from astrolift_lifecycle.preview_cost import cost_estimator_for_cluster
+
+    driver = cost_estimator_for_cluster(_fake_cluster("aws"))
+    assert isinstance(driver, AWSCostEstimator)
+
+
+def test_cost_estimator_for_cluster_handles_gcp():
+    """GCP path either returns a GCPCostEstimator (when
+    `google-cloud-billing` ships in the image) or None (when the
+    SDK isn't installed and the lazy `billing_v1` import fails
+    inside ``GCPCostEstimator.__init__``). Either is correct;
+    what's wrong is raising. The resolver guards the construction
+    with try/except so the preview request always succeeds."""
+    from gcp.cost import GCPCostEstimator
+
+    from astrolift_lifecycle.preview_cost import cost_estimator_for_cluster
+
+    driver = cost_estimator_for_cluster(_fake_cluster("gcp"))
+    # Must not raise; either a real estimator or None.
+    assert driver is None or isinstance(driver, GCPCostEstimator)
+
+
+def test_cost_estimator_for_cluster_handles_azure():
+    """Azure path returns an AzureCostEstimator without touching the
+    SDK at construction — the default HTTP client + VM-size lookup
+    are both lazy."""
+    from azure.cost import AzureCostEstimator
+
+    from astrolift_lifecycle.preview_cost import cost_estimator_for_cluster
+
+    driver = cost_estimator_for_cluster(_fake_cluster("azure"))
+    assert isinstance(driver, AzureCostEstimator)
+
+
+def test_cost_estimator_for_cluster_returns_none_for_k8s_native():
+    """Bare-metal clusters have no cloud-side SKU to ask."""
+    from astrolift_lifecycle.preview_cost import cost_estimator_for_cluster
+
+    assert cost_estimator_for_cluster(_fake_cluster("k8s_native")) is None
+
+
+def test_cost_estimator_for_cluster_returns_none_for_unknown_plugin():
+    from astrolift_lifecycle.preview_cost import cost_estimator_for_cluster
+
+    assert cost_estimator_for_cluster(_fake_cluster("oracle")) is None
+
+
+def test_cost_estimator_for_cluster_returns_none_when_no_plugin():
+    from astrolift_lifecycle.preview_cost import cost_estimator_for_cluster
+
+    cluster = SimpleNamespace(provider_plugin=None, provider_config={})
+    assert cost_estimator_for_cluster(cluster) is None
+
+
+def test_estimate_daily_cost_threads_subscription_id_for_azure(patch_driver):
+    """Azure compute pricing needs the cluster's subscription_id so
+    the default VM-size lookup can talk to ARM. The aggregator must
+    pass it through via ``CostEstimateRequest.config``."""
+    driver = _FakeCostDriver(mode="estimate", monthly_total=30.0)
+    patch_driver(driver)
+    cluster = SimpleNamespace(
+        region="eastus",
+        provider_plugin=SimpleNamespace(slug="azure"),
+        provider_config={"subscription_id": "abc-123"},
+    )
+    agg = PreviewAggregateResources(
+        cpu_cores=0.5,
+        memory_bytes=1024**3,
+        pod_count=2,
+    )
+    estimate_daily_cost_usd(cluster=cluster, aggregate=agg)
+    assert driver.requests[0].config["subscription_id"] == "abc-123"
