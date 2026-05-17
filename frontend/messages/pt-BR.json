@@ -556,6 +556,34 @@
         "warningBadgeLabel": "Aviso",
         "collapse": "Recolher",
         "expand": "Expandir"
+      },
+      "logs": {
+        "export": "Exportar",
+        "exportTitle": "Exportar logs do pod selecionado"
+      },
+      "logExport": {
+        "title": "Exportar logs do aplicativo",
+        "description": "Agrupa o trecho atual de logs do pod {pod} em um arquivo para download. O link é de uso único e expira após o TTL configurado.",
+        "descriptionNoPod": "Selecione um pod primeiro para habilitar a exportação.",
+        "missingPod": "Selecione um pod antes de exportar.",
+        "formatLabel": "Formato",
+        "formatPlaceholder": "Escolha um formato",
+        "formatTxt": "Texto simples (.log)",
+        "formatNdjson": "NDJSON (.ndjson)",
+        "formatCsv": "CSV (.csv)",
+        "sinceLabel": "De (UTC)",
+        "untilLabel": "Até (UTC)",
+        "levelLabel": "Filtro de nível",
+        "levelPlaceholder": "ex.: ERROR",
+        "regexLabel": "Filtro regex",
+        "regexPlaceholder": "ex.: 5\\d{2}",
+        "submitButton": "Exportar",
+        "submittingButton": "Preparando…",
+        "toastStart": "Preparando exportação de logs do aplicativo…",
+        "toastReady": "Exportação pronta — {rows} linhas em {format}",
+        "toastReadyTruncated": "Exportação pronta (truncada) — {rows} linhas em {format}; restrinja os filtros e tente novamente",
+        "toastDownload": "Baixar",
+        "toastFailure": "Falha na exportação"
       }
     },
     "tokens": {

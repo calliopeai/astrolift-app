@@ -478,6 +478,18 @@ CONSTANCE_CONFIG = {
         "the worker from runaway exports while still leaving room for multi-year SOC2 "
         "extracts at the default retention.",
     ),
+    "APP_LOG_EXPORT_DOWNLOAD_TTL_SECONDS": (
+        3600,
+        "How long a generated app-log export download URL stays valid before the token "
+        "expires (default 1h). Lengthen for fleets that need to hand off the URL to a "
+        "vendor / customer auditor; shorten after an incident.",
+    ),
+    "APP_LOG_EXPORT_MAX_LINES": (
+        100000,
+        "Hard cap on the line count a single exportAstroliftAppLogs call will dump. "
+        "Protects the cluster log stream from runaway exports; narrow the time range "
+        "or add a regex filter when an export hits this cap.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -505,6 +517,13 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "AUDIT_RETENTION_DAYS",
             "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS",
             "AUDIT_EXPORT_MAX_ROWS",
+        ),
+        "collapse": False,
+    },
+    "App log export": {
+        "fields": (
+            "APP_LOG_EXPORT_DOWNLOAD_TTL_SECONDS",
+            "APP_LOG_EXPORT_MAX_LINES",
         ),
         "collapse": False,
     },

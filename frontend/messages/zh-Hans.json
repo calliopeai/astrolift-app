@@ -556,6 +556,34 @@
         "warningBadgeLabel": "警告",
         "collapse": "折叠",
         "expand": "展开"
+      },
+      "logs": {
+        "export": "导出",
+        "exportTitle": "导出所选 Pod 的日志"
+      },
+      "logExport": {
+        "title": "导出应用日志",
+        "description": "将 Pod {pod} 的当前日志切片打包成可下载文件。链接为一次性使用,在配置的 TTL 后过期。",
+        "descriptionNoPod": "请先选择一个 Pod 以启用导出。",
+        "missingPod": "导出前请选择一个 Pod。",
+        "formatLabel": "格式",
+        "formatPlaceholder": "选择格式",
+        "formatTxt": "纯文本 (.log)",
+        "formatNdjson": "NDJSON (.ndjson)",
+        "formatCsv": "CSV (.csv)",
+        "sinceLabel": "起始时间 (UTC)",
+        "untilLabel": "结束时间 (UTC)",
+        "levelLabel": "级别过滤",
+        "levelPlaceholder": "例如 ERROR",
+        "regexLabel": "正则过滤",
+        "regexPlaceholder": "例如 5\\d{2}",
+        "submitButton": "导出",
+        "submittingButton": "正在准备…",
+        "toastStart": "正在准备应用日志导出…",
+        "toastReady": "导出就绪 — {rows} 行 ({format})",
+        "toastReadyTruncated": "导出就绪(已截断) — {rows} 行 ({format});请缩小过滤范围后重试",
+        "toastDownload": "下载",
+        "toastFailure": "导出失败"
       }
     },
     "tokens": {

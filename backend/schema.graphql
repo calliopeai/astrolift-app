@@ -326,6 +326,26 @@ type AstroliftAppIdentityBinding {
   lastUsedAt: String
 }
 
+type AstroliftAppLogExport {
+  id: GUID!
+  format: String!
+  status: String!
+  rowCount: Int!
+  byteCount: Int!
+  sha256: String!
+  truncated: Boolean!
+  downloadUrl: String!
+  expiresAt: DateTime!
+  createdAt: DateTime!
+  errorMessage: String!
+}
+
+type AstroliftAppLogExportMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppLogExport
+}
+
 type AstroliftAppLogLine {
   podName: String!
   container: String!
@@ -2487,6 +2507,19 @@ input EnvironmentByIdInput {
   id: GUID!
 }
 
+input ExportAppLogsInput {
+  appSlug: String!
+  format: String!
+  environmentName: String = null
+  workloadSlug: String = null
+  podName: String = null
+  container: String = null
+  since: DateTime = null
+  until: DateTime = null
+  level: String = null
+  regex: String = null
+}
+
 input ExportAuditEventsInput {
   format: String!
   createdAtGte: DateTime = null
@@ -2881,6 +2914,7 @@ type Mutation {
   muteAlertRule(input: MuteAlertRuleInput!): AstroliftAlertRuleMutationResult!
   unmuteAlertRule(input: UnmuteAlertRuleInput!): AstroliftAlertRuleMutationResult!
   exportAuditEvents(input: ExportAuditEventsInput!): AstroliftAuditExportMutationResult!
+  exportAstroliftAppLogs(input: ExportAppLogsInput!): AstroliftAppLogExportMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!

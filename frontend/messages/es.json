@@ -139,7 +139,9 @@
     "backCta": "Atrás",
     "nextCta": "Siguiente",
     "finishCta": "Finalizar configuración",
-    "a11y": { "steps": "Progreso de la incorporación" },
+    "a11y": {
+      "steps": "Progreso de la incorporación"
+    },
     "toast": {
       "success": "Incorporación completada — todo listo.",
       "skipFailed": "No se pudo guardar la omisión. Inténtalo de nuevo.",
@@ -550,6 +552,34 @@
         "warningBadgeLabel": "Advertencia",
         "collapse": "Contraer",
         "expand": "Expandir"
+      },
+      "logs": {
+        "export": "Exportar",
+        "exportTitle": "Exportar registros del pod seleccionado"
+      },
+      "logExport": {
+        "title": "Exportar registros de la aplicación",
+        "description": "Empaqueta el segmento de registro actual del pod {pod} en un archivo descargable. El enlace es de un solo uso y caduca tras el TTL configurado.",
+        "descriptionNoPod": "Selecciona primero un pod para habilitar la exportación.",
+        "missingPod": "Elige un pod antes de exportar.",
+        "formatLabel": "Formato",
+        "formatPlaceholder": "Elige un formato",
+        "formatTxt": "Texto sin formato (.log)",
+        "formatNdjson": "NDJSON (.ndjson)",
+        "formatCsv": "CSV (.csv)",
+        "sinceLabel": "Desde (UTC)",
+        "untilLabel": "Hasta (UTC)",
+        "levelLabel": "Filtro de nivel",
+        "levelPlaceholder": "p. ej. ERROR",
+        "regexLabel": "Filtro regex",
+        "regexPlaceholder": "p. ej. 5\\d{2}",
+        "submitButton": "Exportar",
+        "submittingButton": "Preparando…",
+        "toastStart": "Preparando la exportación de registros…",
+        "toastReady": "Exportación lista: {rows} líneas en {format}",
+        "toastReadyTruncated": "Exportación lista (truncada): {rows} líneas en {format}; restringe los filtros e inténtalo de nuevo",
+        "toastDownload": "Descargar",
+        "toastFailure": "Falló la exportación"
       }
     },
     "tokens": {
