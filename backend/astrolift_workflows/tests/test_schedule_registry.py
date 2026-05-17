@@ -95,9 +95,10 @@ def test_schedule_id_deterministic():
 
 def test_default_schedules_complete():
     """Spec 06 §5 listed 7 schedules; #296 added the cron-deploy
-    dispatcher tick; #365 added the secret-bundle refresh sweep.
-    Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 9
+    dispatcher tick; #365 added the secret-bundle refresh sweep;
+    #498 added the stale-session prune. Lock the count so future
+    additions stay visible in a diff."""
+    assert len(DEFAULT_SCHEDULES) == 10
 
 
 def test_default_schedules_include_all_kinds():
@@ -147,7 +148,7 @@ def test_plan_creates_when_existing_empty():
         existing_ids=frozenset(),
         existing_by_id={},
     )
-    assert len(decisions) == 9
+    assert len(decisions) == 10
     assert all(d.action == "create" for d in decisions)
 
 

@@ -556,24 +556,6 @@
         "warningBadgeLabel": "警告",
         "collapse": "折りたたむ",
         "expand": "展開する"
-      },
-      "logs": {
-        "pressStreamAll": "「Stream」を押してすべてのレプリカを追跡します。",
-        "allReplicas": "すべてのレプリカ",
-        "allReplicasDescription": "このアプリのすべてのレプリカからストリーミング — 各行には送信元 Pod のタグが付けられます。",
-        "historicalDescription": "過去{range}のログ行を表示しています。",
-        "refreshHistorical": "更新",
-        "historicalUnavailableTitle": "このクラスタでは履歴ログを利用できません",
-        "historicalUnavailableHint": "このクラスタにはログ集約バックエンド (Loki / CloudWatch / Stackdriver / Azure Monitor) が設定されていません。リアルタイムで追跡するには Live に戻してください。",
-        "historicalUnavailableEmpty": "このクラスタでは履歴ログクエリを利用できません。リアルタイムで追跡するには Live に戻してください。",
-        "historicalNoResults": "このウィンドウ内に一致するログ行はありません。",
-        "range": {
-          "live": "ライブ",
-          "15m": "過去 15 分",
-          "1h": "過去 1 時間",
-          "6h": "過去 6 時間",
-          "24h": "過去 24 時間"
-        }
       }
     },
     "tokens": {
@@ -1192,19 +1174,62 @@
     "grantRoleRowLabel": "{name} にロールを付与",
     "grantRoleRowTooltip": "{name} にロールを付与"
   },
-  "stepUp": {
-    "title": "本人確認",
-    "description": "この操作には最近の認証が必要です。続行するにはパスワードを確認してください。",
-    "passwordLabel": "パスワード",
-    "cancel": "キャンセル",
-    "confirm": "確認",
-    "elevating": "確認中…",
-    "indicator": "管理者モードは残り {minutes, plural, one {#分} other {#分}} 有効",
-    "deelevateLabel": "管理者モードを今すぐ終了",
-    "errors": {
-      "passwordRequired": "パスワードを入力してください。",
-      "generic": "パスワードを確認できませんでした。もう一度お試しください。",
-      "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
+  "securitySessions": {
+    "title": "アクティブなセッション",
+    "description": "ブラウザ、CLI、モバイルからの現在ログイン中のセッション。1つだけ取り消してそのデバイスをサインアウトできます。",
+    "signOutEverywhere": "すべてからサインアウト",
+    "signingOut": "サインアウト中…",
+    "loadError": "セッションを読み込めませんでした",
+    "noSessions": "アクティブなセッションがありません。",
+    "columns": {
+      "kind": "種類",
+      "label": "ラベル",
+      "status": "状態",
+      "lastSeen": "最終アクセス",
+      "expires": "有効期限",
+      "actions": "操作"
+    },
+    "status": {
+      "current": "このデバイス",
+      "other": "他のデバイス"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "モバイル",
+      "browser_extension": "拡張機能",
+      "api_token": "APIトークン"
+    },
+    "actions": {
+      "revoke": "取り消し"
+    },
+    "confirmRevoke": {
+      "title": "このセッションを取り消しますか？",
+      "description": "セッションは再度サインインが必要です。バインドされたトークンは即座に無効になります。",
+      "confirm": "取り消す"
+    },
+    "confirmSignOutAll": {
+      "title": "他の{count}件のセッションをサインアウトしますか？",
+      "description": "このタブの現在のセッションはそのままです。他のすべてのブラウザタブ、モバイルアプリ、CLIは再度サインインが必要です。",
+      "confirm": "他をサインアウト"
+    },
+    "toasts": {
+      "noOthers": "サインアウトする他のセッションがありません。",
+      "signedOut": "{count}件のセッションからサインアウトしました。",
+      "signOutFailed": "サインアウトに失敗しました",
+      "revoked": "セッションを取り消しました。",
+      "alreadyRevoked": "セッションは既に取り消されています。",
+      "revokeFailed": "取り消しに失敗しました"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "たった今",
+      "sAgo": "{n}秒前",
+      "mAgo": "{n}分前",
+      "hAgo": "{n}時間前",
+      "dAgo": "{n}日前",
+      "moAgo": "{n}ヶ月前",
+      "yAgo": "{n}年前"
     }
   }
 }

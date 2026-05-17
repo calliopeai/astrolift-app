@@ -280,12 +280,93 @@ async def capture_platform_cost_snapshot() -> int:
     return await sync_to_async(_capture_platform_cost_snapshot_sync)()
 
 
+# ---- Stale-session prune (#498) -----------------------------------
+
+
+def _prune_stale_sessions_sync() -> int:
+    """Soft-revoke ``AstroliftSession`` rows past the per-kind stale TTL.
+
+    Per-kind threshold comes from
+    ``STALE_SESSION_TTL_SECONDS_<KIND>`` Constance entries
+    (defaults baked into ``DEFAULT_STALE_SESSION_TTL_SECONDS``).
+    Rows are soft-deleted via ``revoke_session`` so the underlying
+    ``django_session`` row also gets dropped — the cookie fails auth
+    on the next request, not just the GraphQL listing.
+
+    Returns the count of revoked rows so the workflow's result
+    message is honest about how much it pruned.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from astrolift_identity.models import (
+        DEFAULT_STALE_SESSION_TTL_SECONDS,
+        AstroliftSession,
+        ClientKind,
+        RevocationReason,
+    )
+    from astrolift_identity.sessions import revoke_session
+
+    try:
+        from constance import config as constance_config
+    except Exception:  # noqa: BLE001
+        constance_config = None  # type: ignore[assignment]
+
+    revoked = 0
+    now = timezone.now()
+    for kind in ClientKind.values:
+        ttl_seconds = DEFAULT_STALE_SESSION_TTL_SECONDS.get(kind, 30 * 24 * 3600)
+        if constance_config is not None:
+            entry = getattr(constance_config, f"STALE_SESSION_TTL_SECONDS_{kind.upper()}", None)
+            if isinstance(entry, int) and entry > 0:
+                ttl_seconds = entry
+        cutoff = now - timedelta(seconds=ttl_seconds)
+        qs = AstroliftSession.objects.filter(
+            client_kind=kind,
+            last_seen_at__lt=cutoff,
+        )
+        for row in qs.iterator():
+            revoke_session(
+                row=row,
+                actor_user_id=None,
+                reason=RevocationReason.AUTO_STALE,
+            )
+            revoked += 1
+        # Sessions that have never been seen (last_seen_at is NULL)
+        # but are older than the threshold by ``created_at`` are also
+        # stale — covers tokens that were issued + never used.
+        qs_unseen = AstroliftSession.objects.filter(
+            client_kind=kind,
+            last_seen_at__isnull=True,
+            created_at__lt=cutoff,
+        )
+        for row in qs_unseen.iterator():
+            revoke_session(
+                row=row,
+                actor_user_id=None,
+                reason=RevocationReason.AUTO_STALE,
+            )
+            revoked += 1
+    return revoked
+
+
+@activity.defn(name="astrolift.scheduled.prune_stale_sessions")
+async def prune_stale_sessions() -> int:
+    """Soft-revoke AstroliftSession rows past the per-kind stale TTL."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_prune_stale_sessions_sync)()
+
+
 __all__ = [
     "capture_platform_cost_snapshot",
     "detect_drift",
     "gc_stale_previews",
     "poll_scheduled_job_runs",
     "prune_audit_log",
+    "prune_stale_sessions",
     "reconcile_cluster_capabilities",
     "reheal_webhook_subscriptions",
 ]

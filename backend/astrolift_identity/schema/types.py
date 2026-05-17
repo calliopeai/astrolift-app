@@ -500,8 +500,21 @@ def app_to_summary(app) -> AppSummaryType:
 
 @strawberry.type(name="AstroliftActiveSession")
 class ActiveSessionType:
-    """A django_session row for the current viewer.
+    """One AstroliftSession sidecar for the current viewer.
 
+    ``id`` is the GUID of the AstroliftSession row (NOT the
+    underlying django_session key — that never leaves the cookie
+    jar). Operators pass this id to ``revokeAstroliftSession`` to
+    drop a single device.
+
+    ``client_kind`` is one of the lowercase ``ClientKind`` values
+    (``web``, ``cli``, ``mobile``, ``browser_extension``,
+    ``api_token``). FE narrows it into a union.
+
+    ``last_seen_at`` is the heartbeat timestamp the
+    SessionTrackingMiddleware stamps on every authed request
+    (rate-limited to once per minute) plus explicit ``heartbeatSession``
+    pings — drives the "stale CLI" hint on the operator-facing list.
     v1 uses the Django default session store, so ``created_at`` /
     ``last_seen_at`` / ``ip_address`` / ``user_agent`` are null —
     the django_session table doesn't track them. They become
@@ -513,8 +526,10 @@ class ActiveSessionType:
     """
 
     id: str
-    expires_at: dt.datetime
+    expires_at: dt.datetime | None
     is_current: bool
+    client_kind: str
+    label: str
     created_at: dt.datetime | None
     last_seen_at: dt.datetime | None
     ip_address: str | None
@@ -538,6 +553,21 @@ class ElevationStatusType:
     seconds_remaining: int
     method: str | None
     required_for: list[str]
+
+
+def active_session_to_type(row, *, is_current: bool) -> ActiveSessionType:
+    """Adapt an ``AstroliftSession`` row to the GraphQL type."""
+    return ActiveSessionType(
+        id=str(row.guid),
+        expires_at=row.expires_at,
+        is_current=is_current,
+        client_kind=row.client_kind,
+        label=row.label or "",
+        created_at=row.created_at,
+        last_seen_at=row.last_seen_at,
+        ip_address=str(row.last_seen_ip) if row.last_seen_ip else None,
+        user_agent=row.last_seen_agent or None,
+    )
 
 
 def policy_to_type(policy) -> PolicyType:

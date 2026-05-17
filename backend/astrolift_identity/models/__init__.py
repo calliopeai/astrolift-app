@@ -13,10 +13,23 @@ from astrolift_identity.models.policy import Policy
 from astrolift_identity.models.project import Project
 from astrolift_identity.models.role import Role
 from astrolift_identity.models.role_binding import RoleBinding
+from astrolift_identity.models.session import (
+    DEFAULT_MAX_SESSIONS_PER_CLIENT_KIND,
+    DEFAULT_STALE_SESSION_TTL_SECONDS,
+    LAST_SEEN_WRITE_THROTTLE_SECONDS,
+    AstroliftSession,
+    ClientKind,
+    RevocationReason,
+)
 from astrolift_identity.models.team import Team
 
 __all__ = [
+    "DEFAULT_MAX_SESSIONS_PER_CLIENT_KIND",
+    "DEFAULT_STALE_SESSION_TTL_SECONDS",
+    "LAST_SEEN_WRITE_THROTTLE_SECONDS",
     "ApiToken",
+    "AstroliftSession",
+    "ClientKind",
     "DeviceFlowSession",
     "GroupRoleMapping",
     "IdentityProvider",
@@ -27,6 +40,7 @@ __all__ = [
     "OrganizationAllowlistedDomain",
     "Policy",
     "Project",
+    "RevocationReason",
     "Role",
     "RoleBinding",
     "Team",
