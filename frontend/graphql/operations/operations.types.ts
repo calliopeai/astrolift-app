@@ -6,7 +6,9 @@ import type {
   AstroliftAuditEvent as GeneratedAuditEvent,
   AstroliftEvent as GeneratedEvent,
   AstroliftNotification as GeneratedNotification,
+  AstroliftWebhookDelivery as GeneratedWebhookDelivery,
   AstroliftWebhookSubscription as GeneratedWebhookSubscription,
+  AstroliftWebhookTestResult as GeneratedWebhookTestResult,
   AstroliftWorkflowRun as GeneratedWorkflowRun,
   WebhookSecretReveal as GeneratedWebhookSecretReveal,
 } from "@/graphql/__generated__/schema";
@@ -29,7 +31,15 @@ export type AstroliftAuditEvent = Omit<GeneratedAuditEvent, "decision"> & {
   decision: AuditDecision;
 };
 
-export type AstroliftWebhookSubscription = GeneratedWebhookSubscription;
+export type WebhookFormat = "generic" | "slack" | "discord";
+
+export type AstroliftWebhookSubscription = Omit<GeneratedWebhookSubscription, "format"> & {
+  format: WebhookFormat;
+};
+
+export type AstroliftWebhookDelivery = GeneratedWebhookDelivery;
+
+export type AstroliftWebhookTestResult = GeneratedWebhookTestResult;
 
 export type AstroliftNotification = GeneratedNotification;
 

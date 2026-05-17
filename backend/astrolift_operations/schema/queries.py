@@ -19,6 +19,7 @@ from astrolift_operations.models import (
     AuditEvent,
     Event,
     Notification,
+    WebhookDelivery,
     WebhookSubscription,
     WorkflowRun,
 )
@@ -31,6 +32,7 @@ from astrolift_operations.schema.types import (
     EventPageType,
     EventType,
     NotificationType,
+    WebhookDeliveryType,
     WebhookSubscriptionType,
     WorkflowRunType,
     alert_event_to_type,
@@ -38,6 +40,7 @@ from astrolift_operations.schema.types import (
     audit_to_type,
     event_to_type,
     notification_to_type,
+    webhook_delivery_to_type,
     webhook_to_type,
     workflow_run_to_type,
 )
@@ -168,6 +171,41 @@ class OperationsQuery:
         else:
             qs = qs.filter(registered_app__isnull=True)
         return [webhook_to_type(w) for w in qs[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.WEBHOOK_CREATE)
+    @tenant_scoped()
+    def astrolift_webhook_deliveries(
+        self,
+        info: Info,
+        subscription_id: GUID,
+        limit: int = 10,
+    ) -> list[WebhookDeliveryType]:
+        """Last N delivery attempts for a subscription (#426).
+
+        Surfaces real fan-out + operator test-fires together (test
+        rows carry ``is_test=True`` so the UI can dim them). Tenant
+        scoping rides on the subscription's organization — a query
+        for a sibling-org subscription returns an empty list rather
+        than leaking row counts."""
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return []
+        sub = WebhookSubscription.objects.filter(
+            guid=str(subscription_id),
+            organization_id=org_id,
+            deleted_at__isnull=True,
+        ).first()
+        if sub is None:
+            return []
+        capped = max(1, min(int(limit or 10), 100))
+        qs = (
+            WebhookDelivery.objects.filter(subscription=sub)
+            .select_related("subscription")
+            .order_by("-delivered_at")[:capped]
+        )
+        return [webhook_delivery_to_type(d) for d in qs]
 
     @strawberry.field
     @tenant_scoped()
