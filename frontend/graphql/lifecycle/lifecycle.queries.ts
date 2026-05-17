@@ -265,6 +265,45 @@ export const LIST_APP_PODS = gql`
         state
         waitingReason
         terminatedReason
+        kind
+        lastRestartReasons
+        lastRestartAt
+        resources {
+          cpuRequest
+          cpuLimit
+          memoryRequest
+          memoryLimit
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Workload-detail pod-forensics surface (#429). Returns pods bucketed
+ * by their rolled-up status with the expander payload (pod names +
+ * ages + ready) the status grid renders inline. Worst-first
+ * ordering happens server-side so every client agrees on the row
+ * order without re-sorting.
+ */
+export const GET_WORKLOAD_POD_STATUS_BREAKDOWN = gql`
+  query GetWorkloadPodStatusBreakdown(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentName: String
+  ) {
+    astroliftWorkloadPodStatusBreakdown(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentName: $environmentName
+    ) {
+      status
+      count
+      percent
+      pods {
+        name
+        age
+        ready
       }
     }
   }

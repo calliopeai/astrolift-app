@@ -273,6 +273,217 @@ def test_app_pods_skips_pods_when_wrong_tenant(org, app, env, actor, fake_info, 
 
 
 # ---------------------------------------------------------------------------
+# astrolift_workload_pod_status_breakdown (#429)
+# ---------------------------------------------------------------------------
+
+
+def test_workload_status_breakdown_buckets_and_percent(org, app, env, actor, fake_info, permission_resolver):
+    """Two workloads share a namespace; the resolver buckets only the
+    pods whose ``workload`` matches the requested slug, percents
+    against that scoped total, and orders worst-first."""
+    _grant_read_logs(permission_resolver)
+    app.default_tenant_cluster = env.tenant_cluster
+    app.save(update_fields=["default_tenant_cluster"])
+    pods = [
+        _fake_pod(name="web-1", workload="web", status="Running"),
+        _fake_pod(name="web-2", workload="web", status="Running"),
+        _fake_pod(
+            name="web-3",
+            workload="web",
+            status="CrashLoopBackOff",
+            ready=False,
+        ),
+        _fake_pod(name="worker-1", workload="worker", status="Running"),
+    ]
+    _install_pods(pods)
+    try:
+        q = LifecycleQuery()
+        with _tenant_for(org, actor):
+            result = q.astrolift_workload_pod_status_breakdown(
+                fake_info,
+                app_slug=app.slug,
+                workload_slug="web",
+            )
+    finally:
+        reset_pod_backend()
+
+    # Only the three web pods count in the totals.
+    assert sum(b.count for b in result) == 3
+    # Worst-first ordering: CrashLoopBackOff before Running.
+    statuses = [b.status for b in result]
+    assert statuses == ["CrashLoopBackOff", "Running"]
+    crash, running = result
+    assert crash.count == 1
+    assert running.count == 2
+    assert crash.percent == round(100 / 3, 1)
+    assert running.percent == round(200 / 3, 1)
+    # Expander payload carries the pod names.
+    assert [p.name for p in running.pods] == ["web-1", "web-2"]
+    assert crash.pods[0].name == "web-3"
+    assert crash.pods[0].ready is False
+
+
+def test_workload_status_breakdown_returns_empty_when_no_match(
+    org, app, env, actor, fake_info, permission_resolver
+):
+    """Asking for a workload slug that no pod reports yields an empty
+    list — same shape the FE renders as "no pods yet"."""
+    _grant_read_logs(permission_resolver)
+    app.default_tenant_cluster = env.tenant_cluster
+    app.save(update_fields=["default_tenant_cluster"])
+    _install_pods([_fake_pod(name="api-1", workload="api")])
+    try:
+        q = LifecycleQuery()
+        with _tenant_for(org, actor):
+            result = q.astrolift_workload_pod_status_breakdown(
+                fake_info,
+                app_slug=app.slug,
+                workload_slug="web",
+            )
+    finally:
+        reset_pod_backend()
+    assert result == []
+
+
+def test_workload_status_breakdown_denies_without_read_logs(
+    org, app, env, actor, fake_info, permission_resolver
+):
+    """``APP_READ_LOGS`` gates the workload-level surface the same
+    way it gates ``astrolift_app_pods`` — denial raises before any
+    cluster work."""
+    q = LifecycleQuery()
+    with _tenant_for(org, actor), pytest.raises(PermissionDenied):
+        q.astrolift_workload_pod_status_breakdown(
+            fake_info,
+            app_slug=app.slug,
+            workload_slug="web",
+        )
+
+
+def test_workload_status_breakdown_swallows_cluster_errors(
+    org, app, env, actor, fake_info, permission_resolver
+):
+    """Cluster outage → empty list, never a GraphQL exception. Same
+    contract as ``astrolift_app_pods`` so the workload page stays
+    renderable when the apiserver is unreachable."""
+    _grant_read_logs(permission_resolver)
+    app.default_tenant_cluster = env.tenant_cluster
+    app.save(update_fields=["default_tenant_cluster"])
+
+    def _exploding(*, cluster, namespace, app_slug):
+        raise RuntimeError("connection refused")
+
+    install_pod_backend_function(_exploding)
+    try:
+        q = LifecycleQuery()
+        with _tenant_for(org, actor):
+            result = q.astrolift_workload_pod_status_breakdown(
+                fake_info,
+                app_slug=app.slug,
+                workload_slug="web",
+            )
+    finally:
+        reset_pod_backend()
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# ContainerStatusInfo enriched payload (#429): kind / restart reasons /
+# resources
+# ---------------------------------------------------------------------------
+
+
+def test_container_status_carries_kind_resources_and_restart_reasons(
+    org, app, env, actor, fake_info, permission_resolver
+):
+    """Pod resolver echoes the SDK's enriched container payload —
+    init/primary/sidecar classification, per-container resources,
+    and last-restart reasons surface on the GraphQL type so the
+    workload-detail page can render them without a second query."""
+    from _sdk.cluster import ContainerResources
+
+    _grant_read_logs(permission_resolver)
+    app.default_tenant_cluster = env.tenant_cluster
+    app.save(update_fields=["default_tenant_cluster"])
+    pods = [
+        _fake_pod(
+            name="web-flapping",
+            status="Running",
+            container_statuses=[
+                ContainerStatusInfo(
+                    name="migrate",
+                    ready=True,
+                    restart_count=0,
+                    image="ghcr.io/acme/migrate:v1",
+                    state="terminated",
+                    terminated_reason="Completed",
+                    kind="init",
+                    resources=ContainerResources(
+                        cpu_request="50m",
+                        memory_request="64Mi",
+                    ),
+                ),
+                ContainerStatusInfo(
+                    name="web",
+                    ready=True,
+                    restart_count=7,
+                    image="ghcr.io/acme/web:v1",
+                    state="running",
+                    kind="primary",
+                    last_restart_reasons=["OOMKilled", "CrashLoopBackOff"],
+                    last_restart_at=datetime.now(UTC),
+                    resources=ContainerResources(
+                        cpu_request="200m",
+                        cpu_limit="500m",
+                        memory_request="256Mi",
+                        memory_limit="512Mi",
+                    ),
+                ),
+                ContainerStatusInfo(
+                    name="istio-proxy",
+                    ready=True,
+                    restart_count=0,
+                    image="docker.io/istio/proxyv2:1.20",
+                    state="running",
+                    kind="sidecar",
+                    resources=ContainerResources(
+                        cpu_request="100m",
+                        memory_request="128Mi",
+                    ),
+                ),
+            ],
+        ),
+    ]
+    _install_pods(pods)
+    try:
+        q = LifecycleQuery()
+        with _tenant_for(org, actor):
+            result = q.astrolift_app_pods(fake_info, app_slug=app.slug)
+    finally:
+        reset_pod_backend()
+
+    [pod] = result
+    by_name = {c.name: c for c in pod.container_statuses}
+    assert by_name["migrate"].kind == "init"
+    assert by_name["web"].kind == "primary"
+    assert by_name["istio-proxy"].kind == "sidecar"
+
+    web = by_name["web"]
+    assert web.last_restart_reasons == ["OOMKilled", "CrashLoopBackOff"]
+    assert web.last_restart_at is not None
+    assert web.resources.cpu_request == "200m"
+    assert web.resources.cpu_limit == "500m"
+    assert web.resources.memory_request == "256Mi"
+    assert web.resources.memory_limit == "512Mi"
+
+    # Sidecar resources are reported separately, so its budget doesn't
+    # blur into the primary container's.
+    sidecar = by_name["istio-proxy"]
+    assert sidecar.resources.cpu_request == "100m"
+    assert sidecar.resources.memory_request == "128Mi"
+
+
+# ---------------------------------------------------------------------------
 # astrolift_on_app_log subscription
 # ---------------------------------------------------------------------------
 

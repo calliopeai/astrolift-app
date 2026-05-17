@@ -181,6 +181,58 @@
       "security": "Sécurité",
       "members": "Membres",
       "settings": "Paramètres"
+    },
+    "workloadDetail": {
+      "podStatus": {
+        "title": "Pod status",
+        "headerStatus": "Status",
+        "headerCount": "Count",
+        "headerPercent": "% of total",
+        "empty": "No live pods reported. Either the workload hasn't been deployed yet, the runtime cluster is unreachable, or the manifest declared zero replicas.",
+        "podsCount": "{count} pods",
+        "bucketEmpty": "No pod names returned for this bucket.",
+        "notReady": "not ready"
+      },
+      "pods": {
+        "title": "Pods",
+        "empty": "No pods reported for this workload yet.",
+        "columnName": "Name",
+        "columnStatus": "Status",
+        "columnRestarts": "Restarts",
+        "columnNode": "Node",
+        "columnAge": "Age",
+        "flapping": "flapping",
+        "restartReasonsHeading": "Last restart reasons"
+      },
+      "containers": {
+        "init": {
+          "title": "Init containers",
+          "description": "Run to completion before the primary starts. Resource budget excluded from steady-state accounting.",
+          "empty": "No init containers declared."
+        },
+        "primary": {
+          "title": "Primary",
+          "description": "The workload's main container — the row whose name matches the workload slug.",
+          "empty": "No primary container detected. Check the workload's container names."
+        },
+        "sidecars": {
+          "title": "Sidecars",
+          "description": "Auxiliary containers (service meshes, log shippers). Their resources don't roll into the primary's budget.",
+          "empty": "No sidecars detected."
+        },
+        "image": "Image",
+        "cpuReqLimit": "CPU req/limit",
+        "memReqLimit": "Memory req/limit",
+        "restarts": "Restarts",
+        "empty": "This workload has no containers declared in the manifest and no live pods reporting either."
+      },
+      "fqdn": {
+        "label": "In-cluster service",
+        "copyTitle": "Click to copy",
+        "copyToast": "Copied service FQDN to clipboard",
+        "copyError": "Couldn't copy — select the text and copy manually",
+        "unavailable": "FQDN unavailable — the app row is missing an organization."
+      }
     }
   },
   "settingsIndex": {

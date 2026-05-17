@@ -13,6 +13,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -183,7 +184,23 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   // *user-overridden* selection in state; derive the effective
   // pod for the subscription from the pod list so we don't have
   // to setState inside an effect when the list changes.
-  const [pickedPod, setPickedPod] = React.useState<string | null>(null);
+  //
+  // ``?pod=<name>`` deep-links from the workload status grid
+  // (#429) seed the pick once on first paint; afterwards the
+  // operator's explicit pick wins so we don't fight the URL on
+  // every interaction.
+  const searchParams = useSearchParams();
+  const podParam = searchParams?.get("pod") ?? null;
+  const [pickedPod, setPickedPod] = React.useState<string | null>(podParam);
+  React.useEffect(() => {
+    if (podParam && pickedPod == null) {
+      setPickedPod(podParam);
+    }
+    // We intentionally only react to the URL on mount-equivalent
+    // transitions — once the operator picks a row, their pick is
+    // sticky for the rest of the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [podParam]);
   const selectedPod: string | null = React.useMemo(() => {
     if (pickedPod && podRows.some((p) => p.name === pickedPod)) return pickedPod;
     const running = podRows.find((p) => p.status === "Running");
