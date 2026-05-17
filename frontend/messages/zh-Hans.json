@@ -347,6 +347,59 @@
         "toastResumeFailed": "Resume failed.",
         "toastNoResponse": "No response from backend."
       }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "配置失败",
+          "pending": "配置尚未开始",
+          "provisioning": "配置进行中",
+          "ready_missing_registry": "容器镜像仓库坐标缺失",
+          "unknown": "配置需要关注"
+        },
+        "description": {
+          "failed": "重试以重建仓库和命名空间。",
+          "pending": "启动以使应用上线。",
+          "provisioning": "请稍候 — 仅在卡住时才重试。",
+          "ready_missing_registry": "重新配置以重建 ECR 仓库和推送角色；在此之前部署将静默无效。",
+          "unknown": "请重新配置以恢复。"
+        },
+        "elapsed": "{minutes}分钟前启动",
+        "cta": "重新配置",
+        "confirm": {
+          "title": "重新配置 {slug}？",
+          "description": "取消进行中的部署，删除每个工作负载的 k8s 对象，并重新触发部署 CI 工作流。现有的审批将重新执行。",
+          "confirm": "是的，重新配置"
+        },
+        "toast": {
+          "dispatched": "重新配置已派发 — 部署工作流正在重新运行。",
+          "partial": "部分恢复：清理已运行但部署派发失败 ({message})。"
+        },
+        "error": {
+          "noResponse": "重新配置失败：后端无响应。",
+          "generic": "重新配置失败。"
+        }
+      },
+      "configDrift": {
+        "headline": "检测到配置漂移",
+        "description": "{env} 环境的最后一次部署与当前清单不一致。",
+        "descriptionNoEnv": "最后一次部署与当前清单不一致。",
+        "cta": "从源同步",
+        "field": {
+          "manifest_hash": "清单哈希自上次部署以来已更改",
+          "image_tag": "镜像标签与快照不同",
+          "repo_unsynced": "源仓库领先于平台 — 重新同步以应用",
+          "unknown": "{field} 已更改"
+        },
+        "toast": {
+          "synced": "已从源同步。",
+          "failed": "从源同步失败。"
+        }
+      },
+      "latestDeploy": {
+        "empty": "尚无部署 — 从 CLI 触发或推送到部署分支。",
+        "ariaLabel": "最新部署: {status}, {when}"
+      }
     }
   },
   "settingsIndex": {

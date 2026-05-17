@@ -343,6 +343,59 @@
         "toastResumeFailed": "Resume failed.",
         "toastNoResponse": "No response from backend."
       }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "Le provisionnement a échoué",
+          "pending": "Le provisionnement n'a pas commencé",
+          "provisioning": "Provisionnement en cours",
+          "ready_missing_registry": "Coordonnées du registre de conteneurs manquantes",
+          "unknown": "Le provisionnement nécessite votre attention"
+        },
+        "description": {
+          "failed": "Réessayez pour reconstruire le dépôt de registre et l'espace de noms.",
+          "pending": "Lancez-le pour mettre l'application en ligne.",
+          "provisioning": "Patientez — ne relancez que s'il bloque.",
+          "ready_missing_registry": "Reprovisionnez pour reconstruire le dépôt ECR et le rôle de push ; sinon les déploiements ne font rien.",
+          "unknown": "Reprovisionnez pour récupérer."
+        },
+        "elapsed": "démarré il y a {minutes}min",
+        "cta": "Reprovisionner",
+        "confirm": {
+          "title": "Reprovisionner {slug} ?",
+          "description": "Annule les déploiements en cours, supprime les objets k8s par workload et relance le workflow CI de déploiement. Les approbations existantes sont rejouées.",
+          "confirm": "Oui, reprovisionner"
+        },
+        "toast": {
+          "dispatched": "Reprovisionnement déclenché — le workflow de déploiement est relancé.",
+          "partial": "Récupération partielle : le nettoyage a réussi mais l'envoi du déploiement a échoué ({message})."
+        },
+        "error": {
+          "noResponse": "Reprovisionnement échoué : aucune réponse du backend.",
+          "generic": "Reprovisionnement échoué."
+        }
+      },
+      "configDrift": {
+        "headline": "Dérive de configuration détectée",
+        "description": "Le dernier déploiement de l'environnement {env} ne correspond pas au manifeste actuel.",
+        "descriptionNoEnv": "Le dernier déploiement ne correspond pas au manifeste actuel.",
+        "cta": "Synchroniser depuis la source",
+        "field": {
+          "manifest_hash": "Le hash du manifeste a changé depuis le dernier déploiement",
+          "image_tag": "Le tag d'image diffère du snapshot",
+          "repo_unsynced": "Le dépôt source est en avance sur la plateforme — resynchronisez pour le prendre en compte",
+          "unknown": "{field} a changé"
+        },
+        "toast": {
+          "synced": "Synchronisé depuis la source.",
+          "failed": "Échec de la synchronisation depuis la source."
+        }
+      },
+      "latestDeploy": {
+        "empty": "Aucun déploiement pour l'instant — déclenchez-en un via la CLI ou poussez sur la branche de déploiement.",
+        "ariaLabel": "Dernier déploiement : {status}, {when}"
+      }
     }
   },
   "settingsIndex": {

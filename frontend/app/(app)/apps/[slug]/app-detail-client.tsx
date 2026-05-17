@@ -41,6 +41,7 @@ import type {
 
 import { ActivityTimeline } from "./components/activity-timeline";
 import { AppTabs } from "./components/app-tabs";
+import { ConfigDriftBanner } from "./components/config-drift-banner";
 import { ControlsSection } from "./components/controls-section";
 import { DeployActivityStrip } from "./components/deploy-activity-strip";
 import { DeployStrategyCard } from "./components/deploy-strategy-card";
@@ -48,10 +49,12 @@ import { DeployTokenControl } from "./components/deploy-token-control";
 import { DeploymentPanel } from "./components/deployment-panel";
 import { GithubConnectCallout } from "./components/github-connect-callout";
 import { DeregisterPendingBanner } from "./components/deregister-pending-banner";
+import { LatestDeploymentRow } from "./components/latest-deployment-row";
 import { ObservabilitySection } from "./components/observability-section";
 import { PendingDeployments } from "./components/pending-deployments";
 import { QuickLinksGrid } from "./components/quick-links-grid";
 import { RepoBadge } from "./components/repo-badge";
+import { ReprovisionCallout } from "./components/reprovision-callout";
 import { UrlCard } from "./components/url-card";
 
 // ─── status mappings ──────────────────────────────────────────────────────────
@@ -149,7 +152,12 @@ export function AppDetailClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
   const tDetail = useTranslations("apps.detail");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
+  // includeDrift opts the resolver into the config-drift rollup
+  // (#407 C). The overview is the only caller that needs it; sibling
+  // queries that hit GET_APP without the flag keep the cheap shape.
+  const app = useQuery<AppResp>(GET_APP, {
+    variables: { slug, includeDrift: true },
+  });
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug: slug },
   });
@@ -292,13 +300,20 @@ export function AppDetailClient({ slug }: { slug: string }) {
         </div>
       )}
 
+      <ReprovisionCallout appSlug={a.slug} reprovision={a.reprovision} />
+
       <DeployActivityStrip appSlug={a.slug} limit={20} />
+
+      {a.configDrift?.hasDrift ? (
+        <ConfigDriftBanner appSlug={a.slug} drift={a.configDrift} />
+      ) : null}
 
       <UrlCard
         appId={a.id}
         appSlug={a.slug}
         subdomain={a.subdomain}
         primaryWorkloadSlug={wlList.find((w) => w.isPublic)?.slug ?? null}
+        provisioningStatus={a.provisioningStatus}
       />
 
       <DeploymentPanel appSlug={a.slug} />
@@ -342,6 +357,8 @@ export function AppDetailClient({ slug }: { slug: string }) {
       <GithubConnectCallout sourceKind={a.sourceKind} />
 
       <ActivityTimeline appId={a.id} limit={20} />
+
+      <LatestDeploymentRow appSlug={a.slug} />
 
       <QuickLinksGrid appSlug={a.slug} />
 

@@ -343,6 +343,59 @@
         "toastResumeFailed": "Resume failed.",
         "toastNoResponse": "No response from backend."
       }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "El aprovisionamiento ha fallado",
+          "pending": "El aprovisionamiento no ha comenzado",
+          "provisioning": "Aprovisionamiento en curso",
+          "ready_missing_registry": "Faltan las coordenadas del registro de contenedores",
+          "unknown": "El aprovisionamiento requiere atención"
+        },
+        "description": {
+          "failed": "Vuelva a intentarlo para reconstruir el repositorio y el espacio de nombres.",
+          "pending": "Inícielo para poner la aplicación en línea.",
+          "provisioning": "Espere — vuelva a ejecutar solo si se atasca.",
+          "ready_missing_registry": "Reaprovisione para reconstruir el repo de ECR y el rol de push; los despliegues no harán nada hasta entonces.",
+          "unknown": "Reaprovisione para recuperar."
+        },
+        "elapsed": "comenzó hace {minutes}m",
+        "cta": "Reaprovisionar",
+        "confirm": {
+          "title": "¿Reaprovisionar {slug}?",
+          "description": "Cancela los despliegues en curso, elimina los objetos de k8s por workload y vuelve a disparar el workflow de CI de despliegue. Las aprobaciones existentes se ejecutan de nuevo.",
+          "confirm": "Sí, reaprovisionar"
+        },
+        "toast": {
+          "dispatched": "Reaprovisionamiento enviado — el workflow de despliegue se está reejecutando.",
+          "partial": "Recuperación parcial: la limpieza se ejecutó pero falló el envío del despliegue ({message})."
+        },
+        "error": {
+          "noResponse": "Reaprovisionamiento falló: sin respuesta del backend.",
+          "generic": "Reaprovisionamiento falló."
+        }
+      },
+      "configDrift": {
+        "headline": "Deriva de configuración detectada",
+        "description": "El último despliegue del entorno {env} no coincide con el manifiesto actual.",
+        "descriptionNoEnv": "El último despliegue no coincide con el manifiesto actual.",
+        "cta": "Sincronizar desde origen",
+        "field": {
+          "manifest_hash": "El hash del manifiesto cambió desde el último despliegue",
+          "image_tag": "La etiqueta de la imagen difiere del snapshot",
+          "repo_unsynced": "El repo de origen está adelantado a la plataforma — resincronice para alinearlos",
+          "unknown": "{field} ha cambiado"
+        },
+        "toast": {
+          "synced": "Sincronizado desde origen.",
+          "failed": "La sincronización desde origen falló."
+        }
+      },
+      "latestDeploy": {
+        "empty": "Aún no hay despliegues — dispara uno desde la CLI o haz push a la rama de despliegue.",
+        "ariaLabel": "Último despliegue: {status}, {when}"
+      }
     }
   },
   "settingsIndex": {

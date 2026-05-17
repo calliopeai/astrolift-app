@@ -343,6 +343,59 @@
         "toastResumeFailed": "Resume failed.",
         "toastNoResponse": "No response from backend."
       }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "Bereitstellung fehlgeschlagen",
+          "pending": "Bereitstellung hat noch nicht begonnen",
+          "provisioning": "Bereitstellung läuft",
+          "ready_missing_registry": "Container-Registry-Koordinaten fehlen",
+          "unknown": "Bereitstellung erfordert Aufmerksamkeit"
+        },
+        "description": {
+          "failed": "Erneut versuchen, um Registry und Namespace neu aufzubauen.",
+          "pending": "Starten Sie die Bereitstellung, um die App online zu bringen.",
+          "provisioning": "Bitte warten — nur erneut ausführen, wenn es hängt.",
+          "ready_missing_registry": "Neu bereitstellen, um ECR-Repo und Push-Rolle wiederherzustellen; Deployments laufen sonst still leer.",
+          "unknown": "Neu bereitstellen zur Wiederherstellung."
+        },
+        "elapsed": "vor {minutes}m gestartet",
+        "cta": "Neu bereitstellen",
+        "confirm": {
+          "title": "{slug} neu bereitstellen?",
+          "description": "Bricht laufende Deployments ab, löscht die per-Workload-k8s-Objekte und feuert den Deploy-CI-Workflow erneut. Bestehende Freigaben werden neu durchlaufen.",
+          "confirm": "Ja, neu bereitstellen"
+        },
+        "toast": {
+          "dispatched": "Neubereitstellung gestartet — Deploy-Workflow läuft erneut.",
+          "partial": "Teilweiser Erfolg: Bereinigung lief, aber Deploy-Dispatch schlug fehl ({message})."
+        },
+        "error": {
+          "noResponse": "Neubereitstellung fehlgeschlagen: keine Antwort vom Backend.",
+          "generic": "Neubereitstellung fehlgeschlagen."
+        }
+      },
+      "configDrift": {
+        "headline": "Konfigurationsdrift erkannt",
+        "description": "Das letzte Deployment der Umgebung {env} stimmt nicht mit dem aktuellen Manifest überein.",
+        "descriptionNoEnv": "Das letzte Deployment stimmt nicht mit dem aktuellen Manifest überein.",
+        "cta": "Aus Quelle synchronisieren",
+        "field": {
+          "manifest_hash": "Manifest-Hash hat sich seit dem letzten Deployment geändert",
+          "image_tag": "Image-Tag weicht vom Snapshot ab",
+          "repo_unsynced": "Quellrepo ist vor der Plattform — synchronisieren, um es zu übernehmen",
+          "unknown": "{field} hat sich geändert"
+        },
+        "toast": {
+          "synced": "Aus Quelle synchronisiert.",
+          "failed": "Synchronisierung aus Quelle fehlgeschlagen."
+        }
+      },
+      "latestDeploy": {
+        "empty": "Noch keine Deployments — lösen Sie eines über die CLI aus oder pushen Sie in den Deploy-Branch.",
+        "ariaLabel": "Letztes Deployment: {status}, {when}"
+      }
     }
   },
   "settingsIndex": {
