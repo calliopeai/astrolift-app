@@ -189,3 +189,95 @@ def test_builder_rejects_unsafe_environment_name() -> None:
             environment_name='prod"',
             range_seconds=60 * 60,
         )
+
+
+# ----------------------------------------------------------------------
+# workload scoping (#422)
+# ----------------------------------------------------------------------
+
+
+def test_request_rate_query_appends_workload_label() -> None:
+    """A non-null ``workload_slug`` adds a ``workload="..."`` matcher
+    so the Prometheus query narrows from app-roll-up to one workload."""
+    plan = prom_queries.build_request_rate_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+        workload_slug="api",
+    )
+    assert plan.labels == {
+        "app": "hello-world",
+        "environment": "prod",
+        "workload": "api",
+    }
+    # Keys render in sorted order so the diff is predictable.
+    assert plan.promql == (
+        'sum(rate(http_requests_total{app="hello-world",environment="prod",workload="api"}[1m]))'
+    )
+
+
+def test_error_rate_query_with_workload() -> None:
+    plan = prom_queries.build_error_rate_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+        workload_slug="worker",
+    )
+    assert plan.promql == (
+        'sum(rate(http_requests_total{app="hello-world",environment="prod",workload="worker",code=~"5.."}[1m])) '
+        '/ clamp_min(sum(rate(http_requests_total{app="hello-world",environment="prod",workload="worker"}[1m])), 1e-9)'
+    )
+
+
+def test_latency_quantile_with_workload() -> None:
+    plan = prom_queries.build_latency_quantile_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+        quantile=0.99,
+        workload_slug="api",
+    )
+    assert plan.promql == (
+        "histogram_quantile(0.99, "
+        "sum by (le)(rate(http_request_duration_seconds_bucket"
+        '{app="hello-world",environment="prod",workload="api"}[1m])))'
+    )
+
+
+def test_cpu_saturation_with_workload() -> None:
+    plan = prom_queries.build_cpu_saturation_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+        workload_slug="scheduler",
+    )
+    assert plan.promql == (
+        'sum(rate(container_cpu_usage_seconds_total{app="hello-world",environment="prod",workload="scheduler"}[1m])) '
+        "/ clamp_min(sum(kube_pod_container_resource_limits"
+        '{app="hello-world",environment="prod",workload="scheduler",resource="cpu"}), 1e-9)'
+    )
+
+
+def test_status_code_breakdown_with_workload() -> None:
+    plan = prom_queries.build_status_code_breakdown_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        range_seconds=60 * 60,
+        workload_slug="api",
+    )
+    assert plan.promql == (
+        "sum by (code) (rate(http_requests_total"
+        '{app="hello-world",environment="prod",workload="api"}[1m]))'
+    )
+
+
+def test_builder_rejects_unsafe_workload_slug() -> None:
+    """The workload slug rides the same sanitizer as the app + env
+    labels — a quote / backslash can't break out of the matcher."""
+    with pytest.raises(PrometheusQueryError):
+        prom_queries.build_request_rate_query(
+            app_slug="hello-world",
+            environment_name="prod",
+            range_seconds=60 * 60,
+            workload_slug='api"; delete from workloads; --',
+        )

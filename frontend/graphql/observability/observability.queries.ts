@@ -19,11 +19,13 @@ export const GET_APP_GOLDEN_SIGNALS = gql`
   query GetAppGoldenSignals(
     $appSlug: String!
     $environmentName: String
+    $workloadSlug: String
     $rangeSeconds: Int
   ) {
     astroliftAppGoldenSignals(
       appSlug: $appSlug
       environmentName: $environmentName
+      workloadSlug: $workloadSlug
       rangeSeconds: $rangeSeconds
     ) {
       name
@@ -41,11 +43,13 @@ export const GET_APP_STATUS_CODE_BREAKDOWN = gql`
   query GetAppStatusCodeBreakdown(
     $appSlug: String!
     $environmentName: String
+    $workloadSlug: String
     $rangeSeconds: Int
   ) {
     astroliftAppStatusCodeBreakdown(
       appSlug: $appSlug
       environmentName: $environmentName
+      workloadSlug: $workloadSlug
       rangeSeconds: $rangeSeconds
     ) {
       rangeSeconds

@@ -36,13 +36,7 @@ import {
 
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   GET_APP_GOLDEN_SIGNALS,
@@ -79,37 +73,40 @@ export interface GoldenSignalsPanelProps {
   /** Optional — when set, scopes the queries to one environment's
    *  cluster. When omitted, the backend picks the alphabetically-first
    *  environment for the app. */
-  environmentName?: string;
+  environmentName?: string | null;
+  /** Optional — when set, narrows the PromQL to one workload via the
+   *  ``workload="<slug>"`` label. Omit to roll every workload up
+   *  (pre-#422 default). */
+  workloadSlug?: string | null;
 }
 
 export function GoldenSignalsPanel({
   appSlug,
   environmentName,
+  workloadSlug,
 }: GoldenSignalsPanelProps) {
   const [range, setRange] = React.useState<TimeRangeKey>(DEFAULT_TIME_RANGE);
   const rangeSeconds =
-    TIME_RANGE_OPTIONS.find((o) => o.key === range)?.seconds ??
-    TIME_RANGE_OPTIONS[1].seconds;
+    TIME_RANGE_OPTIONS.find((o) => o.key === range)?.seconds ?? TIME_RANGE_OPTIONS[1].seconds;
 
   const signals = useQuery<GoldenSignalsResp>(GET_APP_GOLDEN_SIGNALS, {
     variables: {
       appSlug,
       environmentName: environmentName ?? null,
+      workloadSlug: workloadSlug ?? null,
       rangeSeconds,
     },
     fetchPolicy: "cache-and-network",
   });
-  const statusBreakdown = useQuery<StatusBreakdownResp>(
-    GET_APP_STATUS_CODE_BREAKDOWN,
-    {
-      variables: {
-        appSlug,
-        environmentName: environmentName ?? null,
-        rangeSeconds,
-      },
-      fetchPolicy: "cache-and-network",
-    }
-  );
+  const statusBreakdown = useQuery<StatusBreakdownResp>(GET_APP_STATUS_CODE_BREAKDOWN, {
+    variables: {
+      appSlug,
+      environmentName: environmentName ?? null,
+      workloadSlug: workloadSlug ?? null,
+      rangeSeconds,
+    },
+    fetchPolicy: "cache-and-network",
+  });
 
   // Pick out the individual signals from the backend's flat list so
   // the rest of the render is a simple grid of cards. Latency rolls up
@@ -130,8 +127,8 @@ export function GoldenSignalsPanel({
         <div>
           <h3 className="text-base font-medium">Golden signals</h3>
           <p className="text-muted-foreground text-xs">
-            Traffic, errors, latency, and saturation pulled live from the
-            cluster&apos;s Prometheus stack.
+            Traffic, errors, latency, and saturation pulled live from the cluster&apos;s Prometheus
+            stack.
           </p>
         </div>
         <TimeRangePicker value={range} onChange={setRange} />
@@ -214,13 +211,7 @@ interface SignalCardProps {
   lineColor: string;
 }
 
-function SignalCard({
-  title,
-  description,
-  signal,
-  loading,
-  lineColor,
-}: SignalCardProps) {
+function SignalCard({ title, description, signal, loading, lineColor }: SignalCardProps) {
   const samples = signal?.samples ?? [];
   const unit = signal?.unit ?? "";
   const promql = signal?.promql ?? "";
@@ -300,9 +291,7 @@ function LatencyCard({ p50, p90, p99, loading }: LatencyCardProps) {
         <CardTitle className="flex items-center gap-2 text-sm">
           <ChartSplineIcon className="size-4" /> Latency
         </CardTitle>
-        <CardDescription className="text-xs">
-          p50, p90, p99 request latency.
-        </CardDescription>
+        <CardDescription className="text-xs">p50, p90, p99 request latency.</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -400,8 +389,8 @@ function StatusCodeCard({ breakdown, loading }: StatusCodeCardProps) {
           <ChartSplineIcon className="size-4" /> Status-code breakdown
         </CardTitle>
         <CardDescription className="text-xs">
-          Stacked request rate by HTTP status class. Hover for the top
-          individual codes in each class.
+          Stacked request rate by HTTP status class. Hover for the top individual codes in each
+          class.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -523,9 +512,7 @@ function mergeStatusRows(series: AstroliftStatusCodeSeries[]): StatusRow[] {
       row[s.codeClass] = point.value;
     }
   }
-  return Array.from(tsIndex.values()).sort((a, b) =>
-    String(a._key).localeCompare(String(b._key))
-  );
+  return Array.from(tsIndex.values()).sort((a, b) => String(a._key).localeCompare(String(b._key)));
 }
 
 function formatTickTs(ts: string): string {

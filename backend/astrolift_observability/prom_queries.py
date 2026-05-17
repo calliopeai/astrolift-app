@@ -112,17 +112,24 @@ def _build_labels(
     *,
     app_slug: str,
     environment_name: str | None,
+    workload_slug: str | None = None,
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    """Build the label-matcher dict for ``app_slug`` (+ env).
+    """Build the label-matcher dict for ``app_slug`` (+ env + workload).
 
-    Both inputs are sanitized via the same allow-list the operations
+    All inputs are sanitized via the same allow-list the operations
     Prometheus client uses — a caller can't smuggle in a quote or a
     backslash that would break out of the PromQL label match.
+
+    ``workload_slug`` narrows the metric stream to a single workload
+    (api / worker / scheduler / ...). When omitted the query rolls up
+    every workload under the app — current pre-#422 behavior.
     """
     labels: dict[str, str] = {"app": sanitize_label_value(app_slug)}
     if environment_name:
         labels["environment"] = sanitize_label_value(environment_name)
+    if workload_slug:
+        labels["workload"] = sanitize_label_value(workload_slug)
     if extra:
         for k, v in extra.items():
             # The label *value* is sanitized; the *key* must be a
@@ -163,12 +170,17 @@ def build_request_rate_query(
     app_slug: str,
     environment_name: str | None,
     range_seconds: int,
+    workload_slug: str | None = None,
 ) -> QueryPlan:
     """Traffic — requests / second.
 
     ``sum(rate(http_requests_total{app=...}[<w>]))``
     """
-    labels = _build_labels(app_slug=app_slug, environment_name=environment_name)
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
     rate_window = pick_rate_window(range_seconds)
     expr = f"sum(rate(http_requests_total{_render_label_match(labels)}[{rate_window}]))"
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
@@ -179,6 +191,7 @@ def build_error_rate_query(
     app_slug: str,
     environment_name: str | None,
     range_seconds: int,
+    workload_slug: str | None = None,
 ) -> QueryPlan:
     """Errors — 5xx rate / total rate.
 
@@ -189,7 +202,11 @@ def build_error_rate_query(
     ``"NaN"`` which the existing client coerces to ``0.0`` but only
     after a parse failure — cleaner to clamp at the query layer).
     """
-    labels = _build_labels(app_slug=app_slug, environment_name=environment_name)
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
     rate_window = pick_rate_window(range_seconds)
     base_match = _render_label_match(labels)
     err_match = _render_label_match_with_extra(labels, 'code=~"5.."')
@@ -206,6 +223,7 @@ def build_latency_quantile_query(
     environment_name: str | None,
     range_seconds: int,
     quantile: float,
+    workload_slug: str | None = None,
 ) -> QueryPlan:
     """Latency — histogram_quantile over the request-latency bucket
     histogram.
@@ -214,7 +232,11 @@ def build_latency_quantile_query(
     """
     if not 0.0 < quantile < 1.0:
         raise ValueError(f"quantile must be in (0, 1); got {quantile}")
-    labels = _build_labels(app_slug=app_slug, environment_name=environment_name)
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
     rate_window = pick_rate_window(range_seconds)
     match = _render_label_match(labels)
     expr = (
@@ -229,6 +251,7 @@ def build_cpu_saturation_query(
     app_slug: str,
     environment_name: str | None,
     range_seconds: int,
+    workload_slug: str | None = None,
 ) -> QueryPlan:
     """Saturation — actual CPU vs. requested limit.
 
@@ -239,7 +262,11 @@ def build_cpu_saturation_query(
     comes from kube-state-metrics which the bootstrap recipe already
     installs.
     """
-    labels = _build_labels(app_slug=app_slug, environment_name=environment_name)
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
     rate_window = pick_rate_window(range_seconds)
     usage_match = _render_label_match(labels)
     limits_match = _render_label_match_with_extra(labels, 'resource="cpu"')
@@ -255,6 +282,7 @@ def build_status_code_breakdown_query(
     app_slug: str,
     environment_name: str | None,
     range_seconds: int,
+    workload_slug: str | None = None,
 ) -> QueryPlan:
     """Per-status-code stacked time-series.
 
@@ -263,7 +291,11 @@ def build_status_code_breakdown_query(
     The resolver groups the returned matrix into 2xx / 3xx / 4xx / 5xx
     classes plus a top-5 individual-code list for tooltip use.
     """
-    labels = _build_labels(app_slug=app_slug, environment_name=environment_name)
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
     rate_window = pick_rate_window(range_seconds)
     match = _render_label_match(labels)
     expr = f"sum by (code) (rate(http_requests_total{match}[{rate_window}]))"
