@@ -149,7 +149,28 @@
         "action": "Register your first app"
       },
       "branchLabel": "branch",
-      "open": "Open"
+      "open": "Open",
+      "search": {
+        "placeholder": "Search by name, slug, or repo…",
+        "ariaLabel": "Search apps"
+      },
+      "filters": {
+        "ariaLabel": "Filter by status",
+        "all": "All",
+        "running": "Running",
+        "failed": "Failed",
+        "inflight": "In-flight",
+        "notDeployed": "Not deployed"
+      },
+      "noMatch": {
+        "title": "No apps match the current filter",
+        "description": "Try a different search term or switch back to All.",
+        "clear": "Clear filters"
+      },
+      "errorBanner": {
+        "title": "Couldn't load apps",
+        "retry": "Retry"
+      }
     },
     "tabs": {
       "ariaLabel": "App sections",

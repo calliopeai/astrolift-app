@@ -145,7 +145,28 @@
         "action": "Registra tu primera aplicación"
       },
       "branchLabel": "rama",
-      "open": "Abrir"
+      "open": "Abrir",
+      "search": {
+        "placeholder": "Buscar por nombre, slug o repositorio…",
+        "ariaLabel": "Buscar aplicaciones"
+      },
+      "filters": {
+        "ariaLabel": "Filtrar por estado",
+        "all": "Todas",
+        "running": "En ejecución",
+        "failed": "Fallidas",
+        "inflight": "En curso",
+        "notDeployed": "Sin implementar"
+      },
+      "noMatch": {
+        "title": "Ninguna aplicación coincide con el filtro actual",
+        "description": "Prueba un término diferente o vuelve a Todas.",
+        "clear": "Limpiar filtros"
+      },
+      "errorBanner": {
+        "title": "No se pudieron cargar las aplicaciones",
+        "retry": "Reintentar"
+      }
     },
     "tabs": {
       "ariaLabel": "Secciones de la aplicación",

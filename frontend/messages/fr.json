@@ -145,7 +145,28 @@
         "action": "Enregistrer votre première application"
       },
       "branchLabel": "branche",
-      "open": "Ouvrir"
+      "open": "Ouvrir",
+      "search": {
+        "placeholder": "Rechercher par nom, slug ou dépôt…",
+        "ariaLabel": "Rechercher des applications"
+      },
+      "filters": {
+        "ariaLabel": "Filtrer par statut",
+        "all": "Toutes",
+        "running": "En cours",
+        "failed": "Échouées",
+        "inflight": "En traitement",
+        "notDeployed": "Non déployées"
+      },
+      "noMatch": {
+        "title": "Aucune application ne correspond au filtre actuel",
+        "description": "Essayez un autre terme ou revenez à Toutes.",
+        "clear": "Effacer les filtres"
+      },
+      "errorBanner": {
+        "title": "Impossible de charger les applications",
+        "retry": "Réessayer"
+      }
     },
     "tabs": {
       "ariaLabel": "Sections de l'application",
