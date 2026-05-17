@@ -9,6 +9,7 @@ The actual values live in the secrets backend (Vault / SecretsManager
 
 from __future__ import annotations
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from core.models.base import BaseCoreModel, NamedBaseCoreModel
@@ -28,6 +29,27 @@ class SecretBundle(NamedBaseCoreModel):
         on_delete=models.SET_NULL,
     )
     backend_ref = models.CharField(max_length=512)
+
+    # ---- Bundle key reflector (#441) ------------------------------
+    # Bundle values live in the platform secrets backend (Vault /
+    # SecretsManager / GSM / KeyVault); the platform never persists
+    # those values.  We do persist the *key names* so the operator UI
+    # can answer "how many keys does this bundle project?" without an
+    # on-read round-trip to the secrets backend per attachment.
+    #
+    # Refreshed by:
+    # - ``refresh_bundle_known_keys`` activity (fires on every
+    #   ``RotateSecretBundleWorkflow`` + ``SecretBundleScheduledRefreshWorkflow``
+    #   pass; same activity boundary as the materialise step)
+    # - lazy on-read when ``last_key_enum_at`` is older than 1 h
+    #   (resolver-side; see ``astrolift_services.bundle_keys``)
+    # - explicit ``setBundleSecret`` writes (when that mutation lands)
+    last_known_keys = ArrayField(
+        base_field=models.CharField(max_length=255),
+        default=list,
+        blank=True,
+    )
+    last_key_enum_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         constraints = [

@@ -1683,6 +1683,8 @@ type AstroliftSecretBundle {
   organizationSlug: String!
   teamSlug: String
   createdAt: DateTime!
+  keyCount: Int!
+  lastKnownKeysAt: DateTime
 }
 
 type AstroliftSecretBundleMutationResult {
