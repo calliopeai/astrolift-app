@@ -156,6 +156,10 @@ export function SecretsClient({ slug }: { slug: string }) {
   >({});
   // editingId: which row is in inline-edit mode (must be revealed first).
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  // revealingId: which row's reveal mutation is currently in flight.
+  // Tracked locally because Apollo's useMutation result doesn't expose
+  // the in-flight input variables in a typed way across SDK versions.
+  const [revealingId, setRevealingId] = React.useState<string | null>(null);
 
   const variables = {
     appSlug: slug,
@@ -219,7 +223,7 @@ export function SecretsClient({ slug }: { slug: string }) {
     refetchQueries: refetch,
     awaitRefetchQueries: true,
   });
-  const [revealSecret, revealState] = useMutation<{
+  const [revealSecret] = useMutation<{
     revealAppSecret: MutationResult<RevealedSecretData>;
   }>(REVEAL_APP_SECRET);
 
@@ -278,6 +282,7 @@ export function SecretsClient({ slug }: { slug: string }) {
       if (editingId === s.id) setEditingId(null);
       return;
     }
+    setRevealingId(s.id);
     try {
       const { data } = await revealSecret({
         variables: { input: { appSlug: slug, secretId: s.id } },
@@ -296,6 +301,8 @@ export function SecretsClient({ slug }: { slug: string }) {
       }
     } catch (err) {
       toast.error((err as Error).message ?? t("reveal.failed"));
+    } finally {
+      setRevealingId(null);
     }
   }
 
@@ -426,13 +433,7 @@ export function SecretsClient({ slug }: { slug: string }) {
                       onSave={(value) => handleInlineSave(s, value)}
                       onRequestDelete={() => requestDelete(s)}
                       busy={busy}
-                      revealing={
-                        revealState.loading &&
-                        revealState.variables !== undefined &&
-                        (
-                          revealState.variables as {
-                            input?: { secretId?: string };
-                          }
+                      revealing={revealingId === s.id}
                         ).input?.secretId === s.id
                       }
                     />
