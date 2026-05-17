@@ -126,9 +126,7 @@ export function ConfirmDialogWithReason({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description != null && (
-            <AlertDialogDescription>{description}</AlertDialogDescription>
-          )}
+          {description != null && <AlertDialogDescription>{description}</AlertDialogDescription>}
         </AlertDialogHeader>
         <div className="grid gap-2">
           <Label htmlFor="confirm-reason">{reasonLabel}</Label>
@@ -146,11 +144,7 @@ export function ConfirmDialogWithReason({
             aria-describedby={error ? "confirm-reason-error" : undefined}
           />
           {error && (
-            <p
-              id="confirm-reason-error"
-              className="text-destructive text-xs"
-              role="alert"
-            >
+            <p id="confirm-reason-error" className="text-destructive text-xs" role="alert">
               {error}
             </p>
           )}

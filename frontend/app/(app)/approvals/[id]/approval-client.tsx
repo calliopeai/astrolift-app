@@ -27,10 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  APPROVE_DEPLOYMENT,
-  REJECT_DEPLOYMENT,
-} from "@/graphql/lifecycle/lifecycle.mutations";
+import { APPROVE_DEPLOYMENT, REJECT_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import {
   GET_DEPLOYMENT,
   GET_DEPLOYMENT_APPROVAL_HISTORY,
@@ -56,10 +53,7 @@ interface ApprovalHistoryResp {
   astroliftDeploymentApprovalHistory: AstroliftDeploymentApprovalHistoryEntry[];
 }
 
-const statusToDot: Record<
-  DeploymentStatus,
-  "ok" | "warn" | "error" | "muted" | "pending"
-> = {
+const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
   pending_approval: "warn",
   pending: "warn",
   deploying: "pending",
@@ -117,12 +111,9 @@ export function ApprovalClient({ id }: { id: string }) {
 
   if (!d) {
     return (
-      <PageShell
-        title={t("notFoundTitle")}
-        description={t("notFoundDescription")}
-      >
+      <PageShell title={t("notFoundTitle")} description={t("notFoundDescription")}>
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
+          <CardContent className="text-muted-foreground p-6 text-sm">
             {t("expired")}{" "}
             <Link href="/deployments" className="underline">
               {t("deploymentsList")}
@@ -136,8 +127,7 @@ export function ApprovalClient({ id }: { id: string }) {
 
   const isSelfTrigger = d.triggeredByMe === true;
   const needsApproval =
-    d.status === "pending_approval" &&
-    d.approvalsReceived < d.approvalsRequired;
+    d.status === "pending_approval" && d.approvalsReceived < d.approvalsRequired;
   const alreadyDecided =
     d.status === "deploying" ||
     d.status === "running" ||
@@ -175,12 +165,9 @@ export function ApprovalClient({ id }: { id: string }) {
   }
 
   return (
-    <PageShell
-      title={t("title")}
-      description={`${d.registeredAppSlug} → ${d.environmentName}`}
-    >
+    <PageShell title={t("title")} description={`${d.registeredAppSlug} → ${d.environmentName}`}>
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex flex-wrap items-center gap-3">
@@ -197,29 +184,15 @@ export function ApprovalClient({ id }: { id: string }) {
                 <Badge variant="outline" className="font-mono">
                   {d.triggerKind}
                 </Badge>
-                {isSelfTrigger && (
-                  <SelfTriggerBadge label={t("selfTriggerBadge")} />
-                )}
+                {isSelfTrigger && <SelfTriggerBadge label={t("selfTriggerBadge")} />}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                 <Field label={t("fields.imageTag")} mono value={d.imageTag || "—"} />
-                <Field
-                  label={t("fields.imageDigest")}
-                  mono
-                  value={d.imageDigest || "—"}
-                />
-                <Field
-                  label={t("fields.clusterRevision")}
-                  mono
-                  value={d.clusterRevision || "—"}
-                />
-                <Field
-                  label={t("fields.workload")}
-                  mono
-                  value={d.workloadSlug || "—"}
-                />
+                <Field label={t("fields.imageDigest")} mono value={d.imageDigest || "—"} />
+                <Field label={t("fields.clusterRevision")} mono value={d.clusterRevision || "—"} />
+                <Field label={t("fields.workload")} mono value={d.workloadSlug || "—"} />
                 <Field label={t("fields.created")} value={formatTime(d.createdAt)} />
                 <Field label={t("fields.started")} value={formatTime(d.startedAt)} />
               </dl>
@@ -227,8 +200,8 @@ export function ApprovalClient({ id }: { id: string }) {
               <CommitProvenance deployment={d} t={t} />
 
               {d.abortedReason && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <div className="text-destructive flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
+                <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3 text-sm">
+                  <div className="text-destructive flex items-center gap-2 text-xs font-medium tracking-wide uppercase">
                     <XCircleIcon className="size-3.5" /> {t("rejectedReasonLabel")}
                   </div>
                   <p className="mt-1 whitespace-pre-wrap">{d.abortedReason}</p>
@@ -236,7 +209,7 @@ export function ApprovalClient({ id }: { id: string }) {
               )}
 
               {needsApproval ? (
-                <div className="bg-amber-100 border border-amber-300 rounded-md p-4 text-sm dark:bg-amber-950/40 dark:border-amber-900/60">
+                <div className="rounded-md border border-amber-300 bg-amber-100 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
                   <div className="flex items-center gap-2 font-medium">
                     <ClockIcon className="size-4" /> {t("awaiting")}
                   </div>
@@ -247,13 +220,9 @@ export function ApprovalClient({ id }: { id: string }) {
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {!canApprovePermission ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("missingPermission")}
-                      </p>
+                      <p className="text-muted-foreground text-xs">{t("missingPermission")}</p>
                     ) : isSelfTrigger ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("selfTriggerHelp")}
-                      </p>
+                      <p className="text-muted-foreground text-xs">{t("selfTriggerHelp")}</p>
                     ) : (
                       <>
                         <Can permission="app.approve_deploy">
@@ -285,7 +254,7 @@ export function ApprovalClient({ id }: { id: string }) {
                   </div>
                 </div>
               ) : alreadyDecided ? (
-                <div className="bg-green-100 border border-green-300 rounded-md p-4 text-sm dark:bg-green-950/40 dark:border-green-900/60">
+                <div className="rounded-md border border-green-300 bg-green-100 p-4 text-sm dark:border-green-900/60 dark:bg-green-950/40">
                   <div className="flex items-center gap-2 font-medium">
                     <CheckCircle2Icon className="size-4" /> {t("alreadyApproved")}
                   </div>
@@ -297,7 +266,7 @@ export function ApprovalClient({ id }: { id: string }) {
                   </Button>
                 </div>
               ) : failed ? (
-                <div className="bg-red-100 border border-red-300 rounded-md p-4 text-sm dark:bg-red-950/40 dark:border-red-900/60">
+                <div className="rounded-md border border-red-300 bg-red-100 p-4 text-sm dark:border-red-900/60 dark:bg-red-950/40">
                   <div className="flex items-center gap-2 font-medium">
                     <XCircleIcon className="size-4" /> {t("failed")}
                   </div>
@@ -356,7 +325,7 @@ function SelfTriggerBadge({ label }: { label: string }) {
   return (
     <span
       data-slot="badge"
-      className="h-5 inline-flex items-center gap-1 rounded-4xl border border-amber-400/60 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-700/60"
+      className="inline-flex h-5 items-center gap-1 rounded-4xl border border-amber-400/60 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
     >
       <AlertTriangleIcon className="size-3" />
       {label}
@@ -378,29 +347,21 @@ function CommitProvenance({
   const [expanded, setExpanded] = React.useState(false);
 
   const hasCommitInfo =
-    !!deployment.commitSha ||
-    !!deployment.commitMessage ||
-    !!deployment.commitAuthor;
+    !!deployment.commitSha || !!deployment.commitMessage || !!deployment.commitAuthor;
   if (!hasCommitInfo) return null;
 
   const lines = (deployment.commitMessage || "").split(/\r?\n/);
   const truncatable = lines.length > COMMIT_PREVIEW_DEFAULT_LINES;
-  const visibleLines = expanded
-    ? lines
-    : lines.slice(0, COMMIT_PREVIEW_DEFAULT_LINES);
+  const visibleLines = expanded ? lines : lines.slice(0, COMMIT_PREVIEW_DEFAULT_LINES);
 
-  const shortSha = deployment.commitSha
-    ? deployment.commitSha.slice(0, 7)
-    : "";
+  const shortSha = deployment.commitSha ? deployment.commitSha.slice(0, 7) : "";
   const commitUrl = buildCommitUrl(deployment.repoUrl, deployment.commitSha);
 
   return (
-    <div className="rounded-md border bg-muted/30 p-3 text-sm">
+    <div className="bg-muted/30 rounded-md border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <GitCommitIcon className="size-3.5" />
-        {shortSha && (
-          <code className="font-mono text-xs">{shortSha}</code>
-        )}
+        {shortSha && <code className="font-mono text-xs">{shortSha}</code>}
         {deployment.branch && (
           <Badge variant="outline" className="text-[10px]">
             {deployment.branch}
@@ -451,9 +412,7 @@ function CommitProvenance({
           )}
         </>
       ) : (
-        <p className="text-muted-foreground mt-2 text-xs italic">
-          {t("commit.noMessage")}
-        </p>
+        <p className="text-muted-foreground mt-2 text-xs italic">{t("commit.noMessage")}</p>
       )}
     </div>
   );
@@ -477,17 +436,14 @@ function ApprovalHistoryPanel({
   t: ReturnType<typeof useTranslations>;
 }) {
   const [open, setOpen] = React.useState(true);
-  const { data, loading } = useQuery<ApprovalHistoryResp>(
-    GET_DEPLOYMENT_APPROVAL_HISTORY,
-    {
-      variables: { deploymentId },
-      fetchPolicy: "cache-and-network",
-    }
-  );
+  const { data, loading } = useQuery<ApprovalHistoryResp>(GET_DEPLOYMENT_APPROVAL_HISTORY, {
+    variables: { deploymentId },
+    fetchPolicy: "cache-and-network",
+  });
   const entries = data?.astroliftDeploymentApprovalHistory ?? [];
 
   return (
-    <Card className="lg:sticky lg:top-4 self-start">
+    <Card className="self-start lg:sticky lg:top-4">
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
           <span className="inline-flex items-center gap-2">
@@ -501,11 +457,7 @@ function ApprovalHistoryPanel({
             aria-expanded={open}
             aria-controls="approval-history-panel"
           >
-            {open ? (
-              <ChevronUpIcon className="size-4" />
-            ) : (
-              <ChevronDownIcon className="size-4" />
-            )}
+            {open ? <ChevronUpIcon className="size-4" /> : <ChevronDownIcon className="size-4" />}
           </Button>
         </CardTitle>
       </CardHeader>
@@ -514,9 +466,7 @@ function ApprovalHistoryPanel({
           {loading && entries.length === 0 ? (
             <Skeleton className="h-16 w-full" />
           ) : entries.length === 0 ? (
-            <p className="text-muted-foreground text-xs">
-              {t("history.empty")}
-            </p>
+            <p className="text-muted-foreground text-xs">{t("history.empty")}</p>
           ) : (
             <ul className="space-y-3">
               {entries.map((entry) => (
@@ -555,9 +505,7 @@ function HistoryEntry({
         <p className="text-muted-foreground text-[11px]">
           {new Date(entry.occurredAt).toLocaleString()}
         </p>
-        {entry.reason && (
-          <p className="mt-1 whitespace-pre-wrap text-xs">{entry.reason}</p>
-        )}
+        {entry.reason && <p className="mt-1 text-xs whitespace-pre-wrap">{entry.reason}</p>}
       </div>
     </li>
   );
@@ -586,10 +534,7 @@ interface ToneCss {
 }
 
 function decisionTone(action: string, decision: string): ToneCss {
-  if (
-    action === "deployment.approve" ||
-    action === "deployment.approve_by_token"
-  ) {
+  if (action === "deployment.approve" || action === "deployment.approve_by_token") {
     return { border: "rgb(34 197 94 / 0.5)", icon: "rgb(34 197 94)" };
   }
   if (
@@ -606,10 +551,7 @@ function decisionTone(action: string, decision: string): ToneCss {
 }
 
 function decisionIcon(action: string) {
-  if (
-    action === "deployment.approve" ||
-    action === "deployment.approve_by_token"
-  ) {
+  if (action === "deployment.approve" || action === "deployment.approve_by_token") {
     return CheckCircle2Icon;
   }
   if (
@@ -622,20 +564,10 @@ function decisionIcon(action: string) {
   return ClockIcon;
 }
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
+function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-muted-foreground text-xs uppercase tracking-wide">
-        {label}
-      </dt>
+      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
       <dd className={mono ? "font-mono text-sm" : "text-sm"}>{value}</dd>
     </div>
   );
