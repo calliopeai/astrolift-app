@@ -35,6 +35,8 @@ import type {
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
 }
@@ -113,8 +115,14 @@ export function AppMembersClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title={t("title")}
-      description={t("description", { slug: a.slug })}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          {t("description", { slug: a.slug })}
+        </span>
+      }
     >
+      <AppTabs slug={a.slug} active="members" />
+
       <Card>
         <CardContent className="p-4">
           <p className="text-muted-foreground text-xs uppercase tracking-wide">

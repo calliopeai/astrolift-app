@@ -59,6 +59,8 @@ import {
   LIST_APP_SECRET_BUNDLE_ATTACHMENTS,
 } from "@/graphql/services/services.queries";
 
+import { AppTabs } from "../components/app-tabs";
+
 const ALL_ENVS = "__all__";
 
 interface AppSecret {
@@ -175,7 +177,11 @@ export function SecretsClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title={t("title")}
-      description={t("description", { slug })}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          {t("description", { slug })}
+        </span>
+      }
       actions={
         <>
           <Can permission="app.deploy">
@@ -193,6 +199,8 @@ export function SecretsClient({ slug }: { slug: string }) {
         </>
       }
     >
+      <AppTabs slug={slug} active="secrets" />
+
       <div className="flex flex-wrap items-center gap-2">
         <Label className="text-xs uppercase tracking-wide text-muted-foreground">
           {t("environment")}

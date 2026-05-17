@@ -62,6 +62,8 @@ import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.type
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface RequiredDnsRecord {
   kind: string;
   name: string;
@@ -240,7 +242,11 @@ export function AppDomainsClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title={t("title")}
-      description={t("description", { slug })}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          {t("description", { slug })}
+        </span>
+      }
       actions={
         <>
           <Button asChild size="sm" variant="outline">
@@ -258,6 +264,8 @@ export function AppDomainsClient({ slug }: { slug: string }) {
         </>
       }
     >
+      <AppTabs slug={slug} active="domains" />
+
       <div className="space-y-4">
         {envList.length > 0 && (
           <div className="space-y-3">

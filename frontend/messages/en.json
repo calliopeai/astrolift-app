@@ -490,7 +490,7 @@
     },
     "security": {
       "title": "{name} · Security",
-      "description": "Supply-chain status for the latest build: image signing, vulnerability scan, SBOM, and the deploy-gating policy that decides when a build is safe to roll out.",
+      "description": "Supply-chain status for {slug}: image signing, vulnerability scan, SBOM, and the deploy-gating policy that decides when a build is safe to roll out.",
       "loadingTitle": "Security",
       "backendPending": {
         "title": "Backend wiring pending",
