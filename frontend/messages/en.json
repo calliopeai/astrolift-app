@@ -633,7 +633,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "Export",
+        "exportTitle": "Export logs for the selected pod"
       },
       "events": {
         "title": "Recent platform events",
@@ -653,6 +655,30 @@
         "allWorkloads": "All workloads",
         "environmentPlaceholder": "Select an environment",
         "workloadPlaceholder": "Select a workload"
+      },
+      "logExport": {
+        "title": "Export app logs",
+        "description": "Bundle the current log slice for pod {pod} into a downloadable file. The link is single-use and expires after the configured TTL.",
+        "descriptionNoPod": "Select a pod first to enable export.",
+        "missingPod": "Pick a pod before exporting.",
+        "formatLabel": "Format",
+        "formatPlaceholder": "Pick a format",
+        "formatTxt": "Raw text (.log)",
+        "formatNdjson": "NDJSON (.ndjson)",
+        "formatCsv": "CSV (.csv)",
+        "sinceLabel": "From (UTC)",
+        "untilLabel": "Until (UTC)",
+        "levelLabel": "Level filter",
+        "levelPlaceholder": "e.g. ERROR",
+        "regexLabel": "Regex filter",
+        "regexPlaceholder": "e.g. 5\\d{2}",
+        "submitButton": "Export",
+        "submittingButton": "Preparing…",
+        "toastStart": "Preparing app log export…",
+        "toastReady": "Export ready — {rows} {format} lines",
+        "toastReadyTruncated": "Export ready (truncated) — {rows} {format} lines; narrow filters and retry to capture more",
+        "toastDownload": "Download",
+        "toastFailure": "Export failed"
       }
     },
     "console": {

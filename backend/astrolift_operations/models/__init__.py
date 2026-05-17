@@ -1,5 +1,6 @@
 from astrolift_operations.models.alert import AlertEvent, AlertRule
 from astrolift_operations.models.alert_mute import AlertMute
+from astrolift_operations.models.app_log_export import AppLogExport
 from astrolift_operations.models.audit_event import AuditEvent
 from astrolift_operations.models.audit_export import AuditExport
 from astrolift_operations.models.event import Event
@@ -13,6 +14,7 @@ __all__ = [
     "AlertEvent",
     "AlertMute",
     "AlertRule",
+    "AppLogExport",
     "AuditEvent",
     "AuditExport",
     "Event",

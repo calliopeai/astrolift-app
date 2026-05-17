@@ -8,6 +8,8 @@ export { WorkloadIdentityCard } from "./WorkloadIdentityCard";
 export { GoldenSignalsPanel } from "./GoldenSignalsPanel";
 export { LogViewer, classifyLogLevel } from "./LogViewer";
 export type { LogLevel, LogLevelFilter, LogViewerProps } from "./LogViewer";
+export { AppLogExportDialog } from "./AppLogExportDialog";
+export type { AppLogExportDialogProps } from "./AppLogExportDialog";
 export { PodEventsPanel, classifyEvent, countRecentWarnings } from "./PodEventsPanel";
 export type { PodEventRow, PodEventsPanelProps } from "./PodEventsPanel";
 export { MetricScopePicker } from "./MetricScopePicker";

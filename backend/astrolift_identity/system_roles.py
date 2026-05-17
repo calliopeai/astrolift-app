@@ -26,6 +26,10 @@ _READ_ALL = (
     # Auditors need to download the log for compliance reviews — issue
     # #433 makes the audit surface usable for SOC2 / similar audits.
     Permission.AUDIT_LOG_EXPORT,
+    # App-log export (#483) — compliance + vendor-handoff bundle.
+    # Auditors need the runtime log slice to pair with the audit log
+    # for SOC2 evidence pulls; same gating shape as audit export.
+    Permission.APP_LOG_EXPORT,
     # Forms surface (#453): readers see form definitions + their
     # submissions in the operator UI. Submit lives on a dedicated
     # role grant (see ``team_viewer`` / ``team_developer`` below) so
@@ -37,6 +41,10 @@ _DEPLOY_OPS = (
     Permission.APP_DEPLOY,
     Permission.APP_ROLLBACK,
     Permission.APP_READ_LOGS,
+    # App log export (#483) — SREs running an incident handoff or
+    # vendor support ticket need to ship the runtime log slice; same
+    # gating shape as the read-logs surface.
+    Permission.APP_LOG_EXPORT,
     Permission.APP_READ_METRICS,
     Permission.SECRET_READ,
     Permission.SECRET_WRITE,
@@ -220,6 +228,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         (
             Permission.APP_READ,
             Permission.APP_READ_LOGS,
+            Permission.APP_LOG_EXPORT,
             Permission.APP_READ_METRICS,
             Permission.SECRET_READ,
             Permission.SECRET_WRITE,

@@ -4,6 +4,7 @@ import { useQuery, useSubscription } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
+  DownloadIcon,
   PauseIcon,
   PlayIcon,
   TerminalIcon,
@@ -16,6 +17,7 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import {
+  AppLogExportDialog,
   DnsRecordsCard,
   GoldenSignalsPanel,
   LogViewer,
@@ -243,6 +245,10 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
   const [streaming, setStreaming] = React.useState(false);
   const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
+  // App-log export modal — opens from the log-viewer card header.
+  // Hands the currently-selected pod/container through so the
+  // operator never has to retype them. (#483)
+  const [exportOpen, setExportOpen] = React.useState(false);
   // Container list derived from the selected pod's containerStatuses.
   const podContainers: string[] = React.useMemo(() => {
     const pod = podRows.find((p) => p.name === selectedPod);
@@ -477,6 +483,15 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             </Button>
             <Button
               size="sm"
+              variant="outline"
+              onClick={() => setExportOpen(true)}
+              disabled={!selectedPod}
+              title={t("logs.exportTitle")}
+            >
+              <DownloadIcon className="size-3" /> {t("logs.export")}
+            </Button>
+            <Button
+              size="sm"
               variant={streaming ? "outline" : "default"}
               onClick={() => setStreaming((s) => !s)}
               disabled={!selectedPod}
@@ -526,6 +541,17 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
       {/* ─── #422 platform events panel — auto-expands on warnings ─── */}
       <PodEventsPanel appEvents={appEvents} loading={events.loading} />
+
+      {/* ─── #483 app-log export modal — compliance + vendor handoff ─── */}
+      <AppLogExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        appSlug={a.slug}
+        podName={selectedPod}
+        container={selectedContainer}
+        environmentName={scopedEnv}
+        workloadSlug={scopedWorkload}
+      />
     </PageShell>
   );
 }

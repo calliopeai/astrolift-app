@@ -561,6 +561,34 @@
         "warningBadgeLabel": "警告",
         "collapse": "折りたたむ",
         "expand": "展開する"
+      },
+      "logs": {
+        "export": "エクスポート",
+        "exportTitle": "選択した Pod のログをエクスポート"
+      },
+      "logExport": {
+        "title": "アプリのログをエクスポート",
+        "description": "Pod {pod} の現在のログをダウンロード可能なファイルにまとめます。リンクは1回のみ使用でき、設定された TTL の後に期限切れになります。",
+        "descriptionNoPod": "エクスポートを有効にするには、まず Pod を選択してください。",
+        "missingPod": "エクスポート前に Pod を選択してください。",
+        "formatLabel": "形式",
+        "formatPlaceholder": "形式を選択",
+        "formatTxt": "テキスト (.log)",
+        "formatNdjson": "NDJSON (.ndjson)",
+        "formatCsv": "CSV (.csv)",
+        "sinceLabel": "開始 (UTC)",
+        "untilLabel": "終了 (UTC)",
+        "levelLabel": "レベルフィルター",
+        "levelPlaceholder": "例: ERROR",
+        "regexLabel": "正規表現フィルター",
+        "regexPlaceholder": "例: 5\\d{2}",
+        "submitButton": "エクスポート",
+        "submittingButton": "準備中…",
+        "toastStart": "アプリログのエクスポートを準備中…",
+        "toastReady": "エクスポート完了 — {rows} 行 ({format})",
+        "toastReadyTruncated": "エクスポート完了 (切り詰め) — {rows} 行 ({format})。フィルターを絞り込んで再試行してください",
+        "toastDownload": "ダウンロード",
+        "toastFailure": "エクスポートに失敗しました"
       }
     },
     "tokens": {
