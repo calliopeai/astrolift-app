@@ -1601,6 +1601,7 @@ export type AstroliftRegisteredApp = {
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  viewerPermissions: Array<Scalars['String']['output']>;
   webhookDeploysPauseReason: Scalars['String']['output'];
   webhookDeploysPaused: Scalars['Boolean']['output'];
   webhookDeploysPausedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -1808,6 +1809,21 @@ export type AstroliftSecurityPolicy = {
   blockOnCriticalCves: Scalars['Boolean']['output'];
   blockOnHighCveThreshold?: Maybe<Scalars['Int']['output']>;
   blockOnMissingSignature: Scalars['Boolean']['output'];
+};
+
+/** Install identity + capabilities handshake (#479). Returned by ``astroliftServerInfo``. Callable by unauthenticated clients so multi-install mobile / CLI / SDK callers can pick the right UI and gate commands before login. */
+export type AstroliftServerInfo = {
+  apiVersion: Scalars['String']['output'];
+  authMethods: Array<Scalars['String']['output']>;
+  capabilities: Array<Scalars['String']['output']>;
+  featureFlags: Array<FeatureFlagInfo>;
+  installId: Scalars['String']['output'];
+  installLabel?: Maybe<Scalars['String']['output']>;
+  installSlug: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  /** Current server-side wall clock (UTC). Used by clients to detect clock drift. */
+  serverTime: Scalars['DateTime']['output'];
+  version: Scalars['String']['output'];
 };
 
 export type AstroliftSourceConnection = {
@@ -2541,6 +2557,13 @@ export type ExportAuditEventsInput = {
 export type ExtendPreviewTtlInputGql = {
   days: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
+};
+
+/** Runtime feature toggle reported by ``astroliftServerInfo``. */
+export type FeatureFlagInfo = {
+  description?: Maybe<Scalars['String']['output']>;
+  enabled: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
 };
 
 export type FileUploadResult = {
@@ -4158,6 +4181,7 @@ export type Query = {
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppPermissions: Array<Scalars['String']['output']>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
@@ -4226,6 +4250,8 @@ export type Query = {
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
+  /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
+  astroliftServerInfo: AstroliftServerInfo;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
@@ -4336,6 +4362,11 @@ export type QueryAstroliftAppIdentityBindingArgs = {
 export type QueryAstroliftAppMetricsArgs = {
   appSlug: Scalars['String']['input'];
   timeRange?: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppPermissionsArgs = {
+  appSlug: Scalars['String']['input'];
 };
 
 

@@ -1583,6 +1583,7 @@ type AstroliftRegisteredApp {
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
   settingsLastModified: AstroliftAppSettingsLastModified
+  viewerPermissions: [String!]!
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1786,6 +1787,26 @@ type AstroliftSecurityPolicy {
   blockOnCriticalCves: Boolean!
   blockOnMissingSignature: Boolean!
   blockOnHighCveThreshold: Int
+}
+
+"""
+Install identity + capabilities handshake (#479). Returned by ``astroliftServerInfo``. Callable by unauthenticated clients so multi-install mobile / CLI / SDK callers can pick the right UI and gate commands before login.
+"""
+type AstroliftServerInfo {
+  version: String!
+  apiVersion: String!
+  installId: String!
+  installSlug: String!
+  installLabel: String
+  region: String
+
+  """
+  Current server-side wall clock (UTC). Used by clients to detect clock drift.
+  """
+  serverTime: DateTime!
+  capabilities: [String!]!
+  featureFlags: [FeatureFlagInfo!]!
+  authMethods: [String!]!
 }
 
 type AstroliftSourceConnection {
@@ -2524,6 +2545,13 @@ input ExtendPreviewTtlInputGql {
   days: Int!
 }
 
+"""Runtime feature toggle reported by ``astroliftServerInfo``."""
+type FeatureFlagInfo {
+  key: String!
+  enabled: Boolean!
+  description: String
+}
+
 type FileUploadResult {
   preSignedUrl: String
   publicUrl: String
@@ -3213,6 +3241,11 @@ type Query {
 
   """Query mutation audit logs. Admin only."""
   auditLogs(operation: String = null, userId: String = null, limit: Int! = 50): [AuditLogEntry!]!
+
+  """
+  Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in.
+  """
+  astroliftServerInfo: AstroliftServerInfo!
   organization(id: ID!): OrganizationType
   organizations(query: String = null): [OrganizationType!]!
   members: [OrganizationMemberType!]!
@@ -3258,6 +3291,7 @@ type Query {
   astroliftMyApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftMyAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
   astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
+  astroliftAppPermissions(appSlug: String!): [String!]!
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload

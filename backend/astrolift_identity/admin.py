@@ -13,6 +13,7 @@ from django.contrib import admin
 
 from astrolift_identity.models import (
     ApiToken,
+    DeviceFlowSession,
     GroupRoleMapping,
     IdentityProvider,
     Invitation,
@@ -128,6 +129,34 @@ class ApiTokenAdmin(_TenantAdminMixin, admin.ModelAdmin):
     list_filter = ("is_revoked",)
     search_fields = ("name", "user__username", "user__email")
     readonly_fields = ("guid", "created_at", "updated_at", "version", "token_hash")
+
+
+@admin.register(DeviceFlowSession)
+class DeviceFlowSessionAdmin(_TenantAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "client_label",
+        "client_kind",
+        "state",
+        "approved_user",
+        "organization",
+        "expires_at",
+        "consumed_at",
+    )
+    list_filter = ("state", "client_kind")
+    search_fields = (
+        "client_label",
+        "session_guid",
+        "approved_user__email",
+        "approved_user__username",
+    )
+    readonly_fields = (
+        "guid",
+        "session_guid",
+        "created_at",
+        "updated_at",
+        "version",
+        "refresh_token_hash",
+    )
 
 
 @admin.register(Policy)
