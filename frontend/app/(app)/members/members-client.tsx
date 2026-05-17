@@ -69,6 +69,7 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
 import { InvitationExpiryBadge } from "./invitation-expiry";
@@ -105,6 +106,13 @@ const STALE_THRESHOLD_DAYS = 90;
 
 export function MembersClient() {
   const t = useTranslations("orgMembers");
+  // Bulk-revoke (#416) lives in its own i18n namespace so the team-
+  // member bulk surface can reuse a sibling key set without
+  // overloading orgMembers.
+  const tBulk = useTranslations("lists.membersBulk");
+  const perms = useMyPermissions();
+  const canManageMembers = perms.can("org.manage_members");
+
   const [open, setOpen] = React.useState(false);
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<RevokeTarget | null>(null);
@@ -113,6 +121,11 @@ export function MembersClient() {
   // The dialog calls onOpenChange(false) on submit/cancel, which clears
   // this back to null via the wrapper handler below.
   const [grantForMember, setGrantForMember] = React.useState<AstroliftMember | null>(null);
+
+  // Bulk-revoke selection state (#416). A Set of binding GUIDs the
+  // operator has checked; cleared on success so the footer disappears.
+  const [selectedBindings, setSelectedBindings] = React.useState<Set<string>>(() => new Set());
+  const [confirmBulkRevoke, setConfirmBulkRevoke] = React.useState(false);
 
   // A. Search affordance. 200ms debounce matches the issue spec; the
   // debounced value is what the query keys off, so typing fast doesn't
@@ -146,7 +159,7 @@ export function MembersClient() {
   const [bulkRevoke, { loading: bulkRevoking }] = useMutation<{
     bulkRevokeAstroliftRoleBindings: MutationResult<AstroliftBulkRevokeRoleBindingsPayload>;
   }>(BULK_REVOKE_ROLE_BINDINGS, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    refetchQueries: [{ query: LIST_ROLE_BINDINGS }, { query: LIST_MEMBERS }],
     awaitRefetchQueries: true,
   });
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
@@ -265,8 +278,8 @@ export function MembersClient() {
   // rendered as a bare badge ("TEAM" / "PROJECT") that operators
   // read as a role name; surface the actual team / project name
   // alongside.
-  const teamById = new Map(teamList.map((t) => [t.id, t]));
-  const projectById = new Map(projectList.map((p) => [p.id, p]));
+  const teamById = new Map(teamList.map((team) => [team.id, team]));
+  const projectById = new Map(projectList.map((project) => [project.id, project]));
   function scopeLabel(m: AstroliftMember): string {
     if (m.scopeKind === "TEAM") {
       return teamById.get(m.scopeId)?.slug ?? "—";
@@ -281,7 +294,7 @@ export function MembersClient() {
     return "—";
   }
 
-  // Group bindings by user for the role-binding tab.
+  // Group bindings by user for the People-row role pills.
   const bindingsByUser = new Map<string, AstroliftRoleBinding[]>();
   for (const b of bindingList) {
     if (!b.user) continue;
@@ -291,73 +304,113 @@ export function MembersClient() {
   }
 
   const hasActiveSearch = debouncedSearch.trim().length > 0;
+  const invitationList = invitations.data?.astroliftInvitations ?? [];
 
   return (
-    <PageShell
-      title="Members"
-      description="Users with access to this organization, plus the role bindings that grant their permissions."
-      actions={
-        <div className="flex items-center gap-2">
-          <Can permission="org.manage_members">
-            <Button variant="outline" onClick={() => setInviteOpen(true)}>
-              <MailIcon className="size-4" />
-              Invite
-            </Button>
-          </Can>
-          <Can permission="org.manage_members">
-            <Button onClick={() => setOpen(true)} disabled={roles.loading}>
-              <UserPlusIcon className="size-4" />
-              Grant role
-            </Button>
-          </Can>
-        </div>
-      }
-    >
-      <Card>
-        <CardHeader>
-          <CardTitle>People</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {members.loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : memberList.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<UsersIcon className="size-5" />}
-                title="No members"
-                description="Members appear here once role bindings are granted to users."
+    <TooltipProvider>
+      <PageShell
+        title="Members"
+        description="Users with access to this organization, plus the role bindings that grant their permissions."
+        actions={
+          <div className="flex items-center gap-2">
+            <Can permission="org.manage_members">
+              <Button variant="outline" onClick={() => setInviteOpen(true)}>
+                <MailIcon className="size-4" />
+                Invite
+              </Button>
+            </Can>
+            <Can permission="org.manage_members">
+              <Button onClick={() => setOpen(true)} disabled={roles.loading}>
+                <UserPlusIcon className="size-4" />
+                Grant role
+              </Button>
+            </Can>
+          </div>
+        }
+      >
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>People</CardTitle>
+            <div className="relative w-full sm:w-72">
+              <SearchIcon
+                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder={t("searchPlaceholder")}
+                aria-label={t("searchLabel")}
+                className="pl-8"
               />
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead>Lifecycle</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="w-12 text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {memberList.map((m) => {
-                  const userBindings = bindingsByUser.get(m.user.id) ?? [];
-                  const alreadyAnonymized = m.lifecycle === "anonymized";
-                  return (
-                    <TableRow key={m.id} id={`u-${m.user.id}`}>
-                      <TableCell>
-                        <div className="font-medium">{m.user.username}</div>
-                        <div className="text-muted-foreground text-xs">{m.user.email}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col items-start gap-1">
-                          <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
-                            {m.scopeKind}
-                          </Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            {members.loading && memberList.length === 0 ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : memberList.length === 0 ? (
+              <div className="p-6">
+                {hasActiveSearch ? (
+                  <EmptyState
+                    icon={<SearchIcon className="size-5" />}
+                    title={t("noMatchTitle")}
+                    description={t("noMatchDescription", { term: debouncedSearch.trim() })}
+                  />
+                ) : (
+                  <EmptyState
+                    icon={<UsersIcon className="size-5" />}
+                    title="No members"
+                    description="Members appear here once role bindings are granted to users."
+                  />
+                )}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Scope</TableHead>
+                    <TableHead>Roles</TableHead>
+                    <TableHead>{t("lastActiveColumn")}</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead className="w-12 text-right">{t("actionsColumn")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {memberList.map((m) => {
+                    const userBindings = bindingsByUser.get(m.user.id) ?? [];
+                    const alreadyAnonymized = m.lifecycle === "anonymized";
+                    return (
+                      <TableRow key={m.id} id={`u-${m.user.id}`}>
+                        <TableCell>
+                          <div className="font-medium">{m.user.username}</div>
+                          <div className="text-muted-foreground text-xs">{m.user.email}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
+                              {m.scopeKind}
+                            </Badge>
+                            <span className="text-muted-foreground text-xs">{scopeLabel(m)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {userBindings.length === 0 ? (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {userBindings.map((b) => (
+                                <RoleSourcePill key={b.id} binding={b} />
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <LastActiveCell value={m.lastActiveAt} />
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {m.joinedAt
@@ -437,6 +490,21 @@ export function MembersClient() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canManageMembers && (
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          aria-label={tBulk("selectAllLabel")}
+                          checked={
+                            bindingList.length > 0 &&
+                            bindingList.every((b) => selectedBindings.has(b.id))
+                          }
+                          onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
+                          className="size-4"
+                          disabled={bulkRevoking}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Subject</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>{t("sourceColumn")}</TableHead>
@@ -447,6 +515,21 @@ export function MembersClient() {
                 <TableBody>
                   {bindingList.map((b) => (
                     <TableRow key={b.id}>
+                      {canManageMembers && (
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            aria-label={tBulk("selectRowLabel", {
+                              role: b.role.slug,
+                              subject: b.user?.username ?? `group:${b.groupExternalId}`,
+                            })}
+                            checked={selectedBindings.has(b.id)}
+                            onChange={() => toggleBinding(b.id)}
+                            className="size-4"
+                            disabled={bulkRevoking}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         {b.user ? (
                           <>
@@ -494,210 +577,8 @@ export function MembersClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            disabled={alreadyAnonymized}
-                            onClick={() => openAnonymizeDialog(m)}
-                            aria-label={`Anonymize ${m.user.username}`}
-                            title={
-                              alreadyAnonymized
-                                ? "Already anonymized"
-                                : "Anonymize user data (GDPR right-to-delete)"
-                            }
-                          >
-                            <UserMinusIcon className="size-4" />
-                          </Button>
-                        </Can>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>Role bindings</CardTitle>
-          <span className="text-muted-foreground text-xs">
-            {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
-          </span>
-        </CardHeader>
-        <CardContent className="p-0">
-          {bindings.loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : bindingList.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<ShieldIcon className="size-5" />}
-                title="No role bindings"
-                description="Grant a system role to a user to give them access to the platform."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {canManageMembers && (
-                    <TableHead className="w-10">
-                      <input
-                        type="checkbox"
-                        aria-label={tBulk("selectAllLabel")}
-                        checked={
-                          bindingList.length > 0 &&
-                          bindingList.every((b) => selectedBindings.has(b.id))
-                        }
-                        onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
-                        className="size-4"
-                      />
-                    </TableHead>
-                  )}
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Granted</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bindingList.map((b) => (
-                  <TableRow key={b.id}>
-                    {canManageMembers && (
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          aria-label={tBulk("selectRowLabel", {
-                            role: b.role.slug,
-                            subject: b.user?.username ?? `group:${b.groupExternalId}`,
-                          })}
-                          checked={selectedBindings.has(b.id)}
-                          onChange={() => toggleBinding(b.id)}
-                          className="size-4"
-                          disabled={bulkRevoking}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      {b.user ? (
-                        <>
-                          <div className="font-medium">{b.user.username}</div>
-                          <div className="text-muted-foreground text-xs">{b.user.email}</div>
-                        </>
-                      ) : (
-                        <div className="font-mono text-xs">group:{b.groupExternalId}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{b.role.name}</div>
-                      <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
-                        {b.scopeKind}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(b.grantedAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Can permission="org.manage_members">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
-                          disabled={revoking || bulkRevoking}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Revoke</span>
-                        </Button>
-                      </Can>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Invitations</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {invitations.loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : (invitations.data?.astroliftInvitations ?? []).length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<MailIcon className="size-5" />}
-                title="No invitations"
-                description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Invited by</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(invitations.data?.astroliftInvitations ?? []).map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell className="font-medium">{inv.email}</TableCell>
-                    <TableCell>
-                      {inv.roleSlug ? (
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {inv.roleSlug}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={inv.status === "pending" ? "default" : "secondary"}
-                        className="capitalize"
-                      >
-                        {inv.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {inv.status === "pending" ? (
-                        <InvitationExpiryBadge expiresAt={inv.expiresAt} />
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          {new Date(inv.expiresAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <InviterCell invitation={inv} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {inv.status === "pending" && (
-                        <Can permission="org.manage_members">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              setRevokeTarget({
-                                kind: "invitation",
-                                invitation: inv,
-                              })
-                            }
-                            disabled={revokingInvite}
+                            onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
+                            disabled={revoking || bulkRevoking}
                           >
                             <Trash2Icon className="size-4" />
                             <span className="sr-only">Revoke</span>
@@ -721,7 +602,7 @@ export function MembersClient() {
               <div className="space-y-2 p-6">
                 <Skeleton className="h-12 w-full" />
               </div>
-            ) : (invitations.data?.astroliftInvitations ?? []).length === 0 ? (
+            ) : invitationList.length === 0 ? (
               <div className="p-6">
                 <EmptyState
                   icon={<MailIcon className="size-5" />}
@@ -742,7 +623,7 @@ export function MembersClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(invitations.data?.astroliftInvitations ?? []).map((inv) => (
+                  {invitationList.map((inv) => (
                     <TableRow key={inv.id}>
                       <TableCell className="font-medium">{inv.email}</TableCell>
                       <TableCell>
@@ -762,11 +643,17 @@ export function MembersClient() {
                           {inv.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(inv.expiresAt).toLocaleString()}
+                      <TableCell>
+                        {inv.status === "pending" ? (
+                          <InvitationExpiryBadge expiresAt={inv.expiresAt} />
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            {new Date(inv.expiresAt).toLocaleDateString()}
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {inv.invitedByUsername ?? "—"}
+                      <TableCell>
+                        <InviterCell invitation={inv} />
                       </TableCell>
                       <TableCell className="text-right">
                         {inv.status === "pending" && (
@@ -796,87 +683,59 @@ export function MembersClient() {
           </CardContent>
         </Card>
 
-      {canManageMembers && selectedBindings.size > 0 && (
-        // Sticky bulk action bar — surfaces only while a selection is
-        // live. Mirrors the approvals-queue footer so the muscle memory
-        // ("checkbox → sticky bar → confirm") transfers across pages.
-        <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
-          <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium">
-              {tBulk("selected", { count: selectedBindings.size })}
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button
-                variant="ghost"
-                onClick={() => setSelectedBindings(new Set())}
-                disabled={bulkRevoking}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                {tBulk("clear")}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => setConfirmBulkRevoke(true)}
-                disabled={bulkRevoking}
-                className="min-h-11 w-full sm:w-auto"
-              >
-                <Trash2Icon className="size-4" />
-                {tBulk("revokeButton", { count: selectedBindings.size })}
-              </Button>
+        {canManageMembers && selectedBindings.size > 0 && (
+          // Sticky bulk action bar — surfaces only while a selection is
+          // live. Mirrors the approvals-queue footer so the muscle memory
+          // ("checkbox → sticky bar → confirm") transfers across pages.
+          <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
+            <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium">
+                {tBulk("selected", { count: selectedBindings.size })}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => setSelectedBindings(new Set())}
+                  disabled={bulkRevoking}
+                  className="min-h-11 w-full sm:w-auto"
+                >
+                  {tBulk("clear")}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => setConfirmBulkRevoke(true)}
+                  disabled={bulkRevoking}
+                  className="min-h-11 w-full sm:w-auto"
+                >
+                  <Trash2Icon className="size-4" />
+                  {tBulk("revokeButton", { count: selectedBindings.size })}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <ConfirmDialog
-        open={confirmBulkRevoke}
-        onOpenChange={setConfirmBulkRevoke}
-        title={tBulk("confirm.title", { count: selectedBindings.size })}
-        description={tBulk("confirm.description")}
-        confirmLabel={tBulk("confirm.confirmLabel", { count: selectedBindings.size })}
-        destructive
-        onConfirm={handleBulkRevoke}
-      />
-
-      <GrantRoleDialog
-        open={open}
-        onOpenChange={setOpen}
-        roles={roles.data?.astroliftRoles ?? []}
-      />
-      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
-
-      <ConfirmDialog
-        open={revokeTarget !== null}
-        onOpenChange={(next) => {
-          if (!next) setRevokeTarget(null);
-        }}
-        title={
-          revokeTarget?.kind === "invitation"
-            ? `Revoke invitation for ${revokeTarget.invitation.email}?`
-            : revokeTarget?.kind === "binding"
-              ? `Revoke ${revokeTarget.binding.role.slug} from ${revokeTarget.binding.user?.username ?? revokeTarget.binding.groupExternalId}?`
-              : "Revoke?"
-        }
-        description={
-          revokeTarget?.kind === "invitation"
-            ? "The pending invitation link stops working immediately. You can re-send a fresh invitation if needed."
-            : "The user loses the permissions this role granted. Other role bindings, if any, remain in effect."
-        }
-        confirmLabel="Revoke"
-        destructive
-        onConfirm={async () => {
-          if (!revokeTarget) return;
-          if (revokeTarget.kind === "invitation") {
-            await handleRevokeInvite(revokeTarget.invitation);
-          } else {
-            await handleRevoke(revokeTarget.binding);
-          }
+        <ConfirmDialog
+          open={confirmBulkRevoke}
+          onOpenChange={setConfirmBulkRevoke}
+          title={tBulk("confirm.title", { count: selectedBindings.size })}
+          description={tBulk("confirm.description")}
+          confirmLabel={tBulk("confirm.confirmLabel", { count: selectedBindings.size })}
+          destructive
+          onConfirm={handleBulkRevoke}
         />
-        <InviteDialog
-          open={inviteOpen}
-          onOpenChange={setInviteOpen}
+
+        <GrantRoleDialog
+          open={open || grantForMember !== null}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) setGrantForMember(null);
+          }}
           roles={roles.data?.astroliftRoles ?? []}
+          initialUserId={grantForMember?.user.id ?? null}
+          initialUserLabel={grantForMember?.user.username ?? null}
         />
+        <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 
         <ConfirmDialog
           open={revokeTarget !== null}
@@ -927,9 +786,10 @@ export function MembersClient() {
 /* ---- helper components ---------------------------------------------- */
 
 /**
- * Role pill with no source-scope tooltip (the cell shows the role
- * code; the source tooltip lives next to the scope badge in the
- * role-bindings table). Keeps the People-row pill cheap and uniform.
+ * Role pill with a hover tooltip when the binding's source scope label
+ * is present. Mirrors the role-bindings table's info-icon affordance so
+ * the operator can confirm "why does this user have this role" from
+ * either surface without a second click.
  */
 function RoleSourcePill({ binding }: { binding: AstroliftRoleBinding }) {
   const t = useTranslations("orgMembers");
