@@ -23,6 +23,7 @@ from astrolift_identity.schema.mutations import (
     IdentityMutation,
     SetActiveIdentityProviderInput,
     SoftDeleteByGuidInput,
+    UpdateIdentityProviderInput,
     _validate_idp_config,
 )
 from core.permissions import Permission
@@ -221,3 +222,119 @@ def test_soft_delete_inactive_provider_succeeds(org, fake_info, permission_resol
         )
         result = mut.soft_delete_identity_provider(fake_info, input=SoftDeleteByGuidInput(id=b.data.id))
     assert result.ok, result.errors
+
+
+# ---------------------------------------------------------------------------
+# Activation audit fields (#467)
+# ---------------------------------------------------------------------------
+
+
+def _operator(email: str = "switcher@astrolift.dev"):
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    user, _ = User.objects.get_or_create(email=email, defaults={"username": email.split("@")[0]})
+    return user
+
+
+def test_set_active_stamps_activated_at_and_last_switched_by(org, fake_info, permission_resolver):
+    """set_active stamps both audit columns atomically with the binding flip."""
+    _grant(permission_resolver)
+    actor = _operator()
+    mut = IdentityMutation()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        a = mut.create_identity_provider(
+            fake_info,
+            input=CreateIdentityProviderInput(kind="local", display_name="a", set_active=True),
+        )
+    row = IdentityProvider.objects.get(guid=str(a.data.id))
+    assert row.activated_at is not None
+    assert row.last_switched_by_id == actor.id
+    # Type response carries the username so the FE doesn't need a
+    # second user lookup.
+    assert a.data.last_switched_by_username == actor.get_username()
+    assert a.data.activated_at == row.activated_at
+
+
+def test_set_active_on_existing_idp_stamps_fields(org, fake_info, permission_resolver):
+    """Promoting a previously-inactive IdP stamps both fields."""
+    _grant(permission_resolver)
+    actor = _operator()
+    mut = IdentityMutation()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        mut.create_identity_provider(
+            fake_info,
+            input=CreateIdentityProviderInput(kind="local", display_name="a", set_active=True),
+        )
+        b = mut.create_identity_provider(
+            fake_info,
+            input=CreateIdentityProviderInput(kind="local", display_name="b"),
+        )
+        # b was created without set_active, so its audit columns are null.
+        b_row = IdentityProvider.objects.get(guid=str(b.data.id))
+        assert b_row.activated_at is None
+        assert b_row.last_switched_by_id is None
+
+        switched = mut.set_active_identity_provider(
+            fake_info, input=SetActiveIdentityProviderInput(id=b.data.id)
+        )
+    assert switched.ok, switched.errors
+    b_row.refresh_from_db()
+    assert b_row.activated_at is not None
+    assert b_row.last_switched_by_id == actor.id
+
+
+def test_config_edit_leaves_activation_fields_untouched(org, fake_info, permission_resolver):
+    """Editing an active IdP's config must not move ``activated_at``."""
+    _grant(permission_resolver)
+    actor = _operator()
+    other = _operator(email="another@astrolift.dev")
+    mut = IdentityMutation()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        created = mut.create_identity_provider(
+            fake_info,
+            input=CreateIdentityProviderInput(
+                kind="oidc",
+                display_name="oidc-primary",
+                oidc_discovery_url="https://example.com/.well-known",
+                client_id="abc",
+                set_active=True,
+            ),
+        )
+    row = IdentityProvider.objects.get(guid=str(created.data.id))
+    activated_when = row.activated_at
+    switcher_id = row.last_switched_by_id
+    assert activated_when is not None
+
+    # A different operator edits the discovery URL. ``activated_at`` and
+    # ``last_switched_by`` must NOT change — that's reserved for the
+    # set_active path.
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=other.id)):
+        upd = mut.update_identity_provider(
+            fake_info,
+            input=UpdateIdentityProviderInput(
+                id=created.data.id,
+                oidc_discovery_url="https://example.com/v2/.well-known",
+            ),
+        )
+    assert upd.ok, upd.errors
+    row.refresh_from_db()
+    assert row.activated_at == activated_when
+    assert row.last_switched_by_id == switcher_id  # still the original switcher
+    assert row.oidc_discovery_url == "https://example.com/v2/.well-known"
+
+
+def test_set_active_with_no_actor_leaves_switcher_null(org, fake_info, permission_resolver):
+    """Anonymous / system-context set_active leaves ``last_switched_by`` null
+    but still stamps ``activated_at``."""
+    _grant(permission_resolver)
+    mut = IdentityMutation()
+    with tenant_context(TenantContext(organization_id=org.id)):  # no actor_user_id
+        result = mut.create_identity_provider(
+            fake_info,
+            input=CreateIdentityProviderInput(kind="local", display_name="a", set_active=True),
+        )
+    row = IdentityProvider.objects.get(guid=str(result.data.id))
+    assert row.activated_at is not None
+    assert row.last_switched_by_id is None
+    assert result.data.last_switched_by_username is None

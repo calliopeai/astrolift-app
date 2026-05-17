@@ -292,9 +292,20 @@ class IdentityProviderType:
     is_active: bool
     created_at: dt.datetime
     updated_at: dt.datetime
+    # When this IdP was last bound as the org's active provider. Distinct
+    # from ``updated_at`` so the FE's "active since" caption doesn't tick
+    # forward every time the discovery URL is edited. Null on legacy rows
+    # that were active before the field was introduced (#467).
+    activated_at: dt.datetime | None
+    # Username of the operator who last flipped this IdP to active (#467).
+    # Null when the IdP has never been switched (e.g. created with
+    # ``set_active=False`` and never promoted) or when the actor user
+    # has since been deleted (FK on_delete=SET_NULL).
+    last_switched_by_username: str | None
 
 
 def identity_provider_to_type(idp, *, is_active: bool = False) -> IdentityProviderType:
+    switcher = idp.last_switched_by if idp.last_switched_by_id else None
     return IdentityProviderType(
         id=GUID(str(idp.guid)),
         organization_slug=idp.organization.slug,
@@ -308,6 +319,8 @@ def identity_provider_to_type(idp, *, is_active: bool = False) -> IdentityProvid
         is_active=is_active,
         created_at=idp.created_at,
         updated_at=idp.updated_at,
+        activated_at=idp.activated_at,
+        last_switched_by_username=switcher.get_username() if switcher is not None else None,
     )
 
 
@@ -327,6 +340,12 @@ class PolicyType:
     created_at: dt.datetime
     updated_at: dt.datetime
     deleted_at: dt.datetime | None
+    # Lifecycle attribution sourced from ``Tracking.created_by`` /
+    # ``updated_by`` (#466). Null when the FK is null (legacy rows
+    # written before the mutation started stamping the actor) or when
+    # the referenced user has since been deleted (FK SET_NULL).
+    created_by_username: str | None
+    updated_by_username: str | None
 
 
 @strawberry.type(name="AstroliftInvitation")
@@ -494,6 +513,8 @@ class ActiveSessionType:
 
 
 def policy_to_type(policy) -> PolicyType:
+    creator = policy.created_by if policy.created_by_id else None
+    updater = policy.updated_by if policy.updated_by_id else None
     return PolicyType(
         id=GUID(str(policy.guid)),
         slug=policy.slug,
@@ -509,6 +530,8 @@ def policy_to_type(policy) -> PolicyType:
         created_at=policy.created_at,
         updated_at=policy.updated_at,
         deleted_at=policy.deleted_at,
+        created_by_username=creator.get_username() if creator is not None else None,
+        updated_by_username=updater.get_username() if updater is not None else None,
     )
 
 

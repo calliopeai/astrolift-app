@@ -1024,6 +1024,8 @@ type AstroliftIdentityProvider {
   isActive: Boolean!
   createdAt: DateTime!
   updatedAt: DateTime!
+  activatedAt: DateTime
+  lastSwitchedByUsername: String
 }
 
 type AstroliftIdentityProviderMutationResult {
@@ -1197,6 +1199,7 @@ type AstroliftMember {
   lifecycle: String!
   joinedAt: DateTime
   lastSeenAt: DateTime
+  lastActiveAt: DateTime
   createdAt: DateTime!
   deletedAt: DateTime
 }
@@ -1313,6 +1316,8 @@ type AstroliftPolicy {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+  createdByUsername: String
+  updatedByUsername: String
 }
 
 type AstroliftPolicyMutationResult {
@@ -1561,6 +1566,7 @@ type AstroliftRoleBinding {
   role: AstroliftRole!
   scopeKind: String!
   scopeId: String!
+  sourceScopeLabel: String!
   grantedAt: DateTime!
   expiresAt: DateTime
   inherits: Boolean!
@@ -3079,7 +3085,7 @@ type Query {
   astroliftTeams: [AstroliftTeam!]!
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
-  astroliftMembers: [AstroliftMember!]!
+  astroliftMembers(search: String = null): [AstroliftMember!]!
   astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!

@@ -1428,6 +1428,12 @@ class IdentityMutation:
                 field="slug",
             )
 
+        # Stamp the creator / updater off the active tenant context so
+        # the policies table (#415) can render a Created-by column
+        # without a follow-up audit-log join. Both columns are set to
+        # the same actor at create time — first edit will rotate
+        # ``updated_by`` only.
+        actor = _actor()
         policy = Policy.objects.create(
             organization=org,
             name=input.name.strip(),
@@ -1440,6 +1446,8 @@ class IdentityMutation:
             resource_pattern=input.resource_pattern or {},
             conditions=input.conditions or [],
             actor_pattern=input.actor_pattern or {},
+            created_by=actor,
+            updated_by=actor,
         )
         return gql_success(policy_to_type(policy))
 
@@ -1464,6 +1472,10 @@ class IdentityMutation:
             new_value = getattr(input, field)
             if new_value is not None:
                 setattr(policy, field, new_value)
+        # Rotate the updater so the "last modified by" column on the
+        # policies table reflects this edit even if the creator was
+        # someone else (#466).
+        policy.updated_by = _actor()
         policy.save()
         return gql_success(policy_to_type(policy))
 
@@ -1509,23 +1521,43 @@ class IdentityMutation:
         if validated is not None:
             return validated
 
-        idp = IdentityProvider.objects.create(
-            organization=org,
-            kind=input.kind,
-            display_name=(input.display_name or "").strip(),
-            config=input.config or {},
-            metadata_url=input.metadata_url or "",
-            oidc_discovery_url=input.oidc_discovery_url or "",
-            client_id=input.client_id or "",
-            client_secret_ref=input.client_secret_ref or "",
-            is_default=False,
-        )
+        from django.db import transaction
+        from django.utils import timezone
 
+        actor = _actor()
         is_active = False
-        if input.set_active:
-            org.identity_provider_id = idp.pk
-            org.save(update_fields=["identity_provider", "updated_at", "version"])
-            is_active = True
+        with transaction.atomic():
+            idp = IdentityProvider.objects.create(
+                organization=org,
+                kind=input.kind,
+                display_name=(input.display_name or "").strip(),
+                config=input.config or {},
+                metadata_url=input.metadata_url or "",
+                oidc_discovery_url=input.oidc_discovery_url or "",
+                client_id=input.client_id or "",
+                client_secret_ref=input.client_secret_ref or "",
+                is_default=False,
+            )
+
+            if input.set_active:
+                # Stamp the audit columns atomically with the org
+                # binding flip — if either side fails the whole switch
+                # rolls back. ``activated_at`` is distinct from
+                # ``updated_at`` so subsequent config edits don't
+                # tick the FE's "active since" caption forward (#467).
+                idp.activated_at = timezone.now()
+                idp.last_switched_by = actor
+                idp.save(
+                    update_fields=[
+                        "activated_at",
+                        "last_switched_by",
+                        "updated_at",
+                        "version",
+                    ]
+                )
+                org.identity_provider_id = idp.pk
+                org.save(update_fields=["identity_provider", "updated_at", "version"])
+                is_active = True
 
         return gql_success(identity_provider_to_type(idp, is_active=is_active))
 
@@ -1566,12 +1598,34 @@ class IdentityMutation:
     def set_active_identity_provider(
         self, info: Info, input: SetActiveIdentityProviderInput
     ) -> MutationResultType[IdentityProviderType]:
+        from django.db import transaction
+        from django.utils import timezone
+
         idp = IdentityProvider.objects.select_related("organization").filter(guid=str(input.id)).first()
         if idp is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "identity provider not found")
         org = idp.organization
-        org.identity_provider_id = idp.pk
-        org.save(update_fields=["identity_provider", "updated_at", "version"])
+        actor = _actor()
+
+        # Stamp the audit fields and the org binding inside one
+        # transaction so the "active since {date}" + "by {user}"
+        # caption on the settings page (#415) never desyncs from the
+        # actual binding. ``activated_at`` is set unconditionally so
+        # re-promoting a previously-active IdP rolls the caption
+        # forward to the new activation moment, not the original one.
+        with transaction.atomic():
+            idp.activated_at = timezone.now()
+            idp.last_switched_by = actor
+            idp.save(
+                update_fields=[
+                    "activated_at",
+                    "last_switched_by",
+                    "updated_at",
+                    "version",
+                ]
+            )
+            org.identity_provider_id = idp.pk
+            org.save(update_fields=["identity_provider", "updated_at", "version"])
         return gql_success(identity_provider_to_type(idp, is_active=True))
 
     @strawberry.field
