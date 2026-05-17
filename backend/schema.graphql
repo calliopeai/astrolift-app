@@ -368,6 +368,35 @@ type AstroliftAuditEvent {
   targetSlug: String!
   requestId: String!
   data: JSON!
+  before: JSON
+  after: JSON
+}
+
+type AstroliftAuditEventPage {
+  items: [AstroliftAuditEvent!]!
+  nextCursor: String
+  totalCount: Int
+}
+
+type AstroliftAuditExport {
+  id: GUID!
+  format: String!
+  rowCount: Int!
+  byteCount: Int!
+  sha256: String!
+  downloadUrl: String!
+  expiresAt: DateTime!
+  createdAt: DateTime!
+}
+
+type AstroliftAuditExportMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAuditExport
+}
+
+type AstroliftAuditRetention {
+  days: Int!
 }
 
 type AstroliftBudget {
@@ -547,15 +576,50 @@ type AstroliftContainerStatus {
   resources: AstroliftContainerResources!
 }
 
+type AstroliftCostAttribution {
+  attributedRows: [AstroliftCostBindingRow!]!
+  unattributedCents: Int!
+  totalCents: Int!
+  currency: String!
+}
+
+type AstroliftCostBindingRow {
+  managedServiceBindingId: String
+  managedServiceId: String
+  managedServiceName: String
+  managedServiceKind: String
+  registeredAppSlug: String
+  by: String!
+  amountCents: Int!
+  currency: String!
+}
+
+type AstroliftCostForecast {
+  mtdCents: Int!
+  previousMonthCents: Int!
+  deltaPct: Float!
+  projectedMonthlyCents: Int!
+  confidence: ForecastConfidence!
+  currency: String!
+}
+
 type AstroliftCostSnapshot {
   id: GUID!
   projectId: String
   registeredAppId: String
+  managedServiceBindingId: String
   takenAt: Date!
   by: String!
   amountCents: Int!
   currency: String!
   source: String!
+}
+
+type AstroliftCostTrendPoint {
+  date: Date!
+  amountCents: Int!
+  currency: String!
+  isAnomaly: Boolean!
 }
 
 type AstroliftDeployToken {
@@ -1621,6 +1685,13 @@ input ConnectUserSourceProviderInput {
   providerConfigId: GUID!
 }
 
+enum CostWindow {
+  H24
+  D7
+  D30
+  MTD
+}
+
 input CreateAlertRuleInput {
   name: String!
   target: String!
@@ -1876,6 +1947,15 @@ input EnvironmentByIdInput {
   id: GUID!
 }
 
+input ExportAuditEventsInput {
+  format: String!
+  createdAtGte: DateTime = null
+  createdAtLte: DateTime = null
+  action: String = null
+  decision: String = null
+  actorId: String = null
+}
+
 input ExtendPreviewTtlInputGql {
   id: GUID!
   days: Int!
@@ -1891,6 +1971,12 @@ input ForceRedeployInput {
   appSlug: String!
   environmentName: String = null
   confirmSlug: String!
+}
+
+enum ForecastConfidence {
+  LOW
+  MEDIUM
+  HIGH
 }
 
 """UUID v7 — the platform's external identifier."""
@@ -2219,6 +2305,7 @@ type Mutation {
   updateAlertRule(input: UpdateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   deleteAlertRule(input: DeleteAlertRuleInput!): AlertruledeletedpayloadMutationResult!
   acknowledgeAlertEvent(input: AcknowledgeAlertEventInput!): AstroliftAlertEventMutationResult!
+  exportAuditEvents(input: ExportAuditEventsInput!): AstroliftAuditExportMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
@@ -2524,7 +2611,9 @@ type Query {
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftEvents(limit: Int! = 100, eventType: String = null): [AstroliftEvent!]!
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!
-  astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null): [AstroliftAuditEvent!]!
+  astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null): [AstroliftAuditEvent!]!
+  astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false): AstroliftAuditEventPage!
+  astroliftAuditRetention: AstroliftAuditRetention!
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]!
@@ -2571,7 +2660,10 @@ type Query {
   astroliftClusterWorkloadHealth(clusterId: GUID!): [AstroliftClusterWorkloadHealth!]!
   astroliftQuotas: [AstroliftQuota!]!
   astroliftBudgets: [AstroliftBudget!]!
-  astroliftCostSnapshots(days: Int! = 30, limit: Int! = 200): [AstroliftCostSnapshot!]!
+  astroliftCostSnapshots(days: Int = null, window: CostWindow = null, limit: Int! = 200): [AstroliftCostSnapshot!]!
+  astroliftCostTrend(window: CostWindow = null, days: Int = null): [AstroliftCostTrendPoint!]!
+  astroliftCostForecast: AstroliftCostForecast!
+  astroliftCostByBinding(window: CostWindow = null, days: Int = null, registeredAppSlug: String = null): AstroliftCostAttribution!
   astroliftSourceConnections: [AstroliftSourceConnection!]!
   astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
