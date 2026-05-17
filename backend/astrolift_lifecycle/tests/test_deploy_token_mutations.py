@@ -44,7 +44,11 @@ def test_create_returns_zero_grace_no_previous_secret(org, app, actor, fake_info
         )
     assert result.ok, result.errors
     assert result.data.rotation_grace_seconds == 0
-    assert result.data.plaintext_secret.startswith("alfdt_")
+    # #449: mint must use the canonical ``alft_dt_`` prefix that
+    # ``verify_token`` / ``DeployTokenAuthMiddleware`` recognise; the
+    # pre-#449 ``alfdt_`` prefix is verifier-rejected outside the
+    # legacy-acceptance grace.
+    assert result.data.plaintext_secret.startswith("alft_dt_")
 
 
 def test_rotate_returns_default_grace(org, app, actor, fake_info, permission_resolver):

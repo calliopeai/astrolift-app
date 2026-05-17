@@ -32,8 +32,8 @@ from collections.abc import Callable
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from astrolift_lifecycle.deploy_tokens import (
-    PLAINTEXT_PREFIX,
     client_ip_from_request,
+    is_acceptable_prefix,
     touch_deploy_token,
     user_agent_from_request,
     verify_token,
@@ -48,8 +48,10 @@ class DeployTokenAuthMiddleware:
     * No ``Authorization: Bearer …`` header → noop, request flows on
       with whatever the session / api-token middleware already
       resolved.
-    * Header present but token prefix isn't ``alft_dt_`` → noop;
-      another scheme (api token, OIDC, SCIM) will handle it.
+    * Header present but token prefix isn't a recognised deploy-token
+      shape (``alft_dt_`` canonical, or ``alfdt_`` legacy while the
+      ``DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED`` Constance flag is on) →
+      noop; another scheme (api token, OIDC, SCIM) will handle it.
     * Prefix matches but verification fails (unknown / revoked /
       expired / outside rotation grace) → return ``401`` so the
       caller doesn't accidentally hit the next middleware with a
@@ -63,7 +65,7 @@ class DeployTokenAuthMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         bearer = _bearer_from_request(request)
-        if bearer and bearer.startswith(PLAINTEXT_PREFIX):
+        if bearer and is_acceptable_prefix(bearer):
             token = verify_token(bearer)
             if token is None:
                 return _unauthorized()
