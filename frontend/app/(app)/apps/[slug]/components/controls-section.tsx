@@ -5,6 +5,7 @@ import {
   HammerIcon,
   Loader2Icon,
   MinusIcon,
+  MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
@@ -12,18 +13,23 @@ import {
   RocketIcon,
   RotateCwIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Can } from "@/components/Can";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   PAUSE_ENVIRONMENT,
   RESTART_WORKLOAD,
@@ -92,90 +98,73 @@ interface Props {
 }
 
 /**
- * Live operational controls. Pause/resume is per-environment so the
- * operator can freeze prod during an incident without losing the ability
- * to ship to staging. Manual deploy reuses the latest known image tag for
- * the chosen env — when none exists, the trigger label still says "Deploy"
- * and the backend will reject with PRECONDITION_FAILED.
+ * Live operational controls (#402). One row per environment; each row
+ * carries the env-level toggles (pause/resume, deploy now, rebuild &
+ * deploy) AND the inline workload-ops list (rolling restart + replica
+ * scale) for that env. The standalone workload-ops panel that used to
+ * sit below the env grid is gone — operators triaging the prod row
+ * no longer have to scroll past dev/stg to reach its workloads.
+ *
+ * Workloads aren't env-scoped in the schema today (LIST_WORKLOADS is
+ * app-scoped; the same Deployment definition fans out across envs), so
+ * each env card renders the same set of workload rows. The actions
+ * themselves are scoped per-env in the confirmation copy — a rolling
+ * restart in the prod row names "prod" explicitly so the operator can't
+ * misread which env they're touching. If/when the backend grows a
+ * per-env workload query the data plane catches up without a UX shift.
  */
 export function ControlsSection({ appSlug, deployBranch }: Props) {
+  const t = useTranslations("apps.settings.controls");
   const { data, loading } = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
   });
   const envs = data?.astroliftEnvironments ?? [];
 
-  return (
-    <section className="rounded-lg border p-5">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold">Controls</h2>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Live operational toggles. Take effect immediately — no CI roundtrip.
-        </p>
-      </div>
-
-      {loading && envs.length === 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      ) : envs.length === 0 ? (
-        <p className="text-muted-foreground text-xs italic">
-          No environments yet — sync the manifest to populate this section.
-        </p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {envs.map((env) => (
-            <EnvironmentRow key={env.id} env={env} appSlug={appSlug} deployBranch={deployBranch} />
-          ))}
-        </div>
-      )}
-
-      <WorkloadOpsPanel appSlug={appSlug} />
-    </section>
-  );
-}
-
-/**
- * Per-workload incident-response controls (#388): rolling restart +
- * replica scale. Rendered below the per-env controls because these
- * operate on the running Deployment directly, independent of any
- * deploy state — appropriate when the operator wants to recycle pods
- * or react to a traffic spike without spinning up a fresh deploy.
- */
-function WorkloadOpsPanel({ appSlug }: { appSlug: string }) {
-  const { data, loading } = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
+  // The workload list is shared across env rows (one query, one source
+  // of truth). Each env card reads from this collection so we don't
+  // multiply the network call by env count. Refetches after a per-env
+  // workload op converge every row at once.
+  const workloadsQuery = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
   });
-  // Deployment-kind workloads only — Jobs/CronJobs don't have
-  // `spec.replicas` and a rolling-restart is meaningless for them.
-  const workloads = (data?.astroliftWorkloads ?? []).filter((w) => w.kind === "deployment");
+  const workloads = (workloadsQuery.data?.astroliftWorkloads ?? []).filter(
+    // Deployment-kind workloads only — Jobs/CronJobs don't have
+    // `spec.replicas` and a rolling-restart is meaningless for them.
+    (w) => w.kind === "deployment"
+  );
+  const workloadsLoading = workloadsQuery.loading && workloads.length === 0;
 
   return (
-    <div className="mt-5 border-t pt-4">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold">Workload ops</h3>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Rolling restart and replica scale on the running Deployment. No image change.
-        </p>
+    <section className="rounded-lg border p-5">
+      <div className="mb-4">
+        <h2 className="text-base font-semibold">{t("title")}</h2>
+        <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
       </div>
-      {loading && workloads.length === 0 ? (
-        <div className="grid gap-2">
-          <Skeleton className="h-16 w-full" />
+
+      {loading && envs.length === 0 ? (
+        <div className="grid gap-3">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
         </div>
-      ) : workloads.length === 0 ? (
-        <p className="text-muted-foreground text-xs italic">
-          No Deployment workloads yet — sync the manifest to populate this section.
-        </p>
+      ) : envs.length === 0 ? (
+        <p className="text-muted-foreground text-xs italic">{t("emptyEnvs")}</p>
       ) : (
-        <div className="grid gap-2">
-          {workloads.map((w) => (
-            <WorkloadRow key={w.id} workload={w} appSlug={appSlug} />
+        <div className="grid gap-3">
+          {envs.map((env) => (
+            <EnvironmentRow
+              key={env.id}
+              env={env}
+              appSlug={appSlug}
+              deployBranch={deployBranch}
+              workloads={workloads}
+              workloadsLoading={workloadsLoading}
+            />
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -183,11 +172,16 @@ function EnvironmentRow({
   env,
   appSlug,
   deployBranch,
+  workloads,
+  workloadsLoading,
 }: {
   env: AstroliftAppEnvironment;
   appSlug: string;
   deployBranch: string;
+  workloads: AstroliftWorkload[];
+  workloadsLoading: boolean;
 }) {
+  const t = useTranslations("apps.settings.controls");
   const [pause, { loading: pausing }] = useMutation<PauseResp>(PAUSE_ENVIRONMENT, {
     refetchQueries: [{ query: LIST_ENVIRONMENTS, variables: { appSlug } }],
     awaitRefetchQueries: true,
@@ -206,7 +200,7 @@ function EnvironmentRow({
       // that on its way through); the deployment list will refresh on
       // its own when the workflow lands a startDeployment. Refetching
       // here would be empty churn.
-    },
+    }
   );
   const [imageTag, setImageTag] = useState("");
 
@@ -219,9 +213,13 @@ function EnvironmentRow({
       ? (res.data as ResumeResp | null | undefined)?.resumeEnvironment
       : (res.data as PauseResp | null | undefined)?.pauseEnvironment;
     if (result?.ok) {
-      toast.success(env.deploysPaused ? "Deploys resumed." : "Deploys paused.");
+      toast.success(
+        env.deploysPaused
+          ? t("toastDeploysResumed", { env: env.name })
+          : t("toastDeploysPaused", { env: env.name })
+      );
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Action failed.");
+      toast.error(result?.errors?.[0]?.message ?? t("toastActionFailed"));
     }
   }
 
@@ -239,10 +237,10 @@ function EnvironmentRow({
       },
     });
     if (data?.startDeployment.ok) {
-      toast.success(`Deploy started for ${env.name} · ${tag}.`);
+      toast.success(t("toastDeployStarted", { env: env.name, tag }));
       setImageTag("");
     } else {
-      toast.error(data?.startDeployment.errors?.[0]?.message ?? "Deploy failed.");
+      toast.error(data?.startDeployment.errors?.[0]?.message ?? t("toastDeployFailed"));
     }
   }
 
@@ -258,24 +256,24 @@ function EnvironmentRow({
     const payload = data?.triggerAstroliftDeployWorkflow;
     if (payload?.ok && payload.data?.runUrl) {
       const runUrl = payload.data.runUrl;
-      toast.success("CI workflow dispatched.", {
-        description: `Branch: ${payload.data.dispatchedBranch}`,
+      toast.success(t("toastCiDispatched"), {
+        description: t("toastCiBranch", { branch: payload.data.dispatchedBranch }),
         action: {
-          label: "Open run →",
+          label: t("toastCiOpenRun"),
           onClick: () => window.open(runUrl, "_blank", "noopener,noreferrer"),
         },
       });
     } else if (payload?.ok) {
       // Defensive: ok=true without a runUrl is a backend contract
       // violation, but don't break the operator's session over it.
-      toast.success("CI workflow dispatched.");
+      toast.success(t("toastCiDispatched"));
     } else {
-      toast.error(payload?.errors?.[0]?.message ?? "Rebuild & deploy failed.");
+      toast.error(payload?.errors?.[0]?.message ?? t("toastRebuildFailed"));
     }
   }
 
   return (
-    <div className="bg-card flex flex-col gap-3 rounded-md border p-4">
+    <div className="bg-card flex flex-col gap-4 rounded-md border p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium capitalize">{env.name}</span>
@@ -285,12 +283,12 @@ function EnvironmentRow({
               className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
             >
               <PauseIcon className="size-3" />
-              Paused
+              {t("paused")}
             </Badge>
           ) : (
             <Badge variant="outline" className="text-muted-foreground">
               <PlayIcon className="size-3" />
-              Active
+              {t("active")}
             </Badge>
           )}
         </div>
@@ -308,18 +306,18 @@ function EnvironmentRow({
             ) : (
               <PauseIcon className="size-3.5" />
             )}
-            {env.deploysPaused ? "Resume" : "Pause"}
+            {env.deploysPaused ? t("resume") : t("pause")}
           </Button>
         </Can>
       </div>
 
       <Can permission="app.deploy">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             type="text"
             value={imageTag}
             onChange={(e) => setImageTag(e.target.value)}
-            placeholder="image tag (latest)"
+            placeholder={t("imageTagPlaceholder")}
             className="border-input bg-background flex-1 rounded-md border px-2 py-1 font-mono text-xs"
           />
           <Button
@@ -327,11 +325,7 @@ function EnvironmentRow({
             variant="outline"
             onClick={handleDeploy}
             disabled={deploying || env.deploysPaused}
-            title={
-              env.deploysPaused
-                ? "Resume deploys first."
-                : "Deploys an existing image tag. Use 'Rebuild & deploy' to rebuild from source."
-            }
+            title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipDeployNow")}
             className="gap-1.5"
           >
             {deploying ? (
@@ -339,18 +333,14 @@ function EnvironmentRow({
             ) : (
               <RocketIcon className="size-3.5" />
             )}
-            Deploy now
+            {t("deployNow")}
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleRebuildAndDeploy}
             disabled={rebuilding || env.deploysPaused}
-            title={
-              env.deploysPaused
-                ? "Resume deploys first."
-                : "Rebuilds the image from main and runs the deploy end-to-end. Use 'Deploy now' if you want to redeploy an existing image tag."
-            }
+            title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipRebuildAndDeploy")}
             className="gap-1.5"
           >
             {rebuilding ? (
@@ -358,7 +348,7 @@ function EnvironmentRow({
             ) : (
               <RefreshCwIcon className="size-3.5" />
             )}
-            Rebuild &amp; deploy
+            {t("rebuildAndDeploy")}
           </Button>
         </div>
       </Can>
@@ -366,21 +356,74 @@ function EnvironmentRow({
       {env.requiredApprovals > 0 && (
         <p className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
           <HammerIcon className="size-3" />
-          Requires {env.requiredApprovals} approval{env.requiredApprovals === 1 ? "" : "s"}
-          before rollout
+          {t("approvalsRequired", { count: env.requiredApprovals })}
         </p>
+      )}
+
+      <EnvWorkloads
+        envName={env.name}
+        appSlug={appSlug}
+        workloads={workloads}
+        loading={workloadsLoading}
+      />
+    </div>
+  );
+}
+
+/**
+ * Per-env workload-ops list (#402). Renders the rolling-restart +
+ * replica scale rows nested inside an EnvironmentRow. Workload list
+ * is shared across env rows today (see ControlsSection note); the
+ * env-scoped confirmation copy still gives the operator unambiguous
+ * intent at the action moment.
+ */
+function EnvWorkloads({
+  envName,
+  appSlug,
+  workloads,
+  loading,
+}: {
+  envName: string;
+  appSlug: string;
+  workloads: AstroliftWorkload[];
+  loading: boolean;
+}) {
+  const t = useTranslations("apps.settings.controls");
+  return (
+    <div className="border-t pt-3">
+      <p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-wide uppercase">
+        {t("workloadsHeader")}
+      </p>
+      {loading ? (
+        <Skeleton className="h-14 w-full" />
+      ) : workloads.length === 0 ? (
+        <p className="text-muted-foreground text-xs italic">{t("workloadsEmpty")}</p>
+      ) : (
+        <div className="grid gap-2">
+          {workloads.map((w) => (
+            <WorkloadRow
+              key={`${envName}-${w.id}`}
+              envName={envName}
+              workload={w}
+              appSlug={appSlug}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
 /**
- * One row in the workload-ops panel: a rolling-restart button and an
- * adjustable replica counter (− / N / + / Apply) per workload. The
- * counter is locally controlled so the operator can stage a value
+ * One row in the per-env workload-ops list: a rolling-restart button
+ * and an adjustable replica counter (− / N / + / Apply) per workload.
+ * The counter is locally controlled so the operator can stage a value
  * before applying it; Apply is what actually fires the scale mutation.
- * On success we refetch the workloads query so the displayed ready/
- * desired counts converge.
+ *
+ * On `< sm` viewports the action cluster collapses into a kebab
+ * `DropdownMenu` (pattern from #412 `clusters-client.tsx`) — same
+ * actions, half the row height. The counter stays inline on desktop;
+ * mobile users open the dropdown to access decrease/increase/apply.
  *
  * The platform clamps replicas server-side (0 ≤ replicas ≤ min(20,
  * env.max_replicas)); the FE doesn't shadow that policy because env
@@ -389,19 +432,19 @@ function EnvironmentRow({
  * Apply lands.
  */
 function WorkloadRow({
+  envName,
   workload,
   appSlug,
 }: {
+  envName: string;
   workload: AstroliftWorkload;
   appSlug: string;
 }) {
-  const [restart, { loading: restarting }] = useMutation<RestartWorkloadResp>(
-    RESTART_WORKLOAD,
-    {
-      refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
-      awaitRefetchQueries: true,
-    },
-  );
+  const t = useTranslations("apps.settings.controls");
+  const [restart, { loading: restarting }] = useMutation<RestartWorkloadResp>(RESTART_WORKLOAD, {
+    refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
+    awaitRefetchQueries: true,
+  });
   const [scale, { loading: scaling }] = useMutation<ScaleWorkloadResp>(SCALE_WORKLOAD, {
     refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
     awaitRefetchQueries: true,
@@ -423,19 +466,15 @@ function WorkloadRow({
   const HARD_LOWER = 0;
 
   async function handleRestart() {
-    if (
-      !window.confirm(
-        `Restart all replicas of ${workload.name}? Pods roll one-by-one — long-running connections drain.`,
-      )
-    ) {
+    if (!window.confirm(t("confirmRestart", { workload: workload.name, env: envName }))) {
       return;
     }
     const { data } = await restart({ variables: { input: { workloadId: workload.id } } });
     const payload = data?.restartAstroliftWorkload;
     if (payload?.ok) {
-      toast.success(`Rolling restart issued for ${workload.name}.`);
+      toast.success(t("toastRestartIssued", { workload: workload.name, env: envName }));
     } else {
-      toast.error(payload?.errors?.[0]?.message ?? "Rolling restart failed.");
+      toast.error(payload?.errors?.[0]?.message ?? t("toastRestartFailed"));
     }
   }
 
@@ -446,26 +485,31 @@ function WorkloadRow({
     const payload = data?.scaleAstroliftWorkload;
     if (payload?.ok) {
       const desired = payload.data?.desiredReplicas ?? pending;
-      toast.success(`${workload.name} scaled to ${desired} replica${desired === 1 ? "" : "s"}.`);
+      toast.success(t("toastScaled", { workload: workload.name, env: envName, count: desired }));
     } else {
-      toast.error(payload?.errors?.[0]?.message ?? "Scale failed.");
+      toast.error(payload?.errors?.[0]?.message ?? t("toastScaleFailed"));
       // Revert local pending so the displayed counter matches reality
       // on validation failure.
       setPending(initial);
     }
   }
 
+  const busy = scaling || restarting;
+
   return (
-    <div className="bg-card flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-background flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm font-medium">{workload.name}</span>
         <Badge variant="outline" className="text-muted-foreground font-mono text-[10px]">
           {workload.slug}
         </Badge>
-        <span className="text-muted-foreground text-xs">{initial}/{initial} ready</span>
+        <span className="text-muted-foreground text-xs">
+          {t("readyCount", { ready: initial, desired: initial })}
+        </span>
       </div>
       <Can permission="app.deploy">
-        <div className="flex items-center gap-2">
+        {/* Desktop: inline counter + Apply + Rolling restart. */}
+        <div className="hidden items-center gap-2 sm:flex">
           <div className="flex items-center rounded-md border">
             <Button
               size="sm"
@@ -473,7 +517,7 @@ function WorkloadRow({
               className="size-7 rounded-none p-0"
               onClick={() => setPending((v) => Math.max(HARD_LOWER, v - 1))}
               disabled={scaling || pending <= HARD_LOWER}
-              aria-label="Decrease replicas"
+              aria-label={t("ariaDecrease")}
             >
               <MinusIcon className="size-3.5" />
             </Button>
@@ -486,7 +530,7 @@ function WorkloadRow({
               className="size-7 rounded-none p-0"
               onClick={() => setPending((v) => Math.min(HARD_UPPER, v + 1))}
               disabled={scaling || pending >= HARD_UPPER}
-              aria-label="Increase replicas"
+              aria-label={t("ariaIncrease")}
             >
               <PlusIcon className="size-3.5" />
             </Button>
@@ -499,7 +543,7 @@ function WorkloadRow({
             className="gap-1.5"
           >
             {scaling ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
-            Apply
+            {t("apply")}
           </Button>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -515,14 +559,80 @@ function WorkloadRow({
                 ) : (
                   <RotateCwIcon className="size-3.5" />
                 )}
-                Rolling restart
+                {t("rollingRestart")}
               </Button>
             </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              Recycle pods without changing the image — drains long-running connections,
-              propagates sidecar updates.
-            </TooltipContent>
+            <TooltipContent className="max-w-xs">{t("rollingRestartTooltip")}</TooltipContent>
           </Tooltip>
+        </div>
+
+        {/* Mobile: kebab dropdown carrying the same actions. Pattern
+            mirrors clusters-client.tsx renderRowMenu from #412 — keeps
+            env rows compact when stacked single-column. */}
+        <div className="flex items-center justify-end gap-2 sm:hidden">
+          <span className="border-input rounded-md border px-2 py-1 font-mono text-xs tabular-nums">
+            {pending}
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-9"
+                disabled={busy}
+                aria-label={t("ariaWorkloadActions", { workload: workload.name })}
+              >
+                {busy ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <MoreHorizontalIcon className="size-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="text-[11px] font-normal">
+                {t("dropdownLabel", { workload: workload.name, env: envName })}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setPending((v) => Math.max(HARD_LOWER, v - 1));
+                }}
+                disabled={scaling || pending <= HARD_LOWER}
+              >
+                <MinusIcon className="size-4" />
+                {t("decreaseReplica")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setPending((v) => Math.min(HARD_UPPER, v + 1));
+                }}
+                disabled={scaling || pending >= HARD_UPPER}
+              >
+                <PlusIcon className="size-4" />
+                {t("increaseReplica")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void handleApply()} disabled={scaling || !dirty}>
+                {scaling ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <RocketIcon className="size-4" />
+                )}
+                {t("applyScale", { count: pending })}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => void handleRestart()} disabled={restarting}>
+                {restarting ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <RotateCwIcon className="size-4" />
+                )}
+                {t("rollingRestart")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </Can>
     </div>
