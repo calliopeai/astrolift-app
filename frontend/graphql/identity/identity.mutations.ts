@@ -174,6 +174,40 @@ export const LOGOUT_ALL_SESSIONS = gql`
   }
 `;
 
+export const REVOKE_ASTROLIFT_SESSION = gql`
+  mutation RevokeAstroliftSession($input: RevokeAstroliftSessionInput!) {
+    revokeAstroliftSession(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        revoked
+      }
+    }
+  }
+`;
+
+export const HEARTBEAT_SESSION = gql`
+  mutation HeartbeatSession {
+    heartbeatSession {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        lastSeenAt
+      }
+    }
+  }
+`;
+
 export const CREATE_POLICY = gql`
   mutation CreatePolicy($input: CreatePolicyInput!) {
     createPolicy(input: $input) {

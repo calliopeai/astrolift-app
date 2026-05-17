@@ -92,6 +92,7 @@ import { AppTabs } from "../components/app-tabs";
 import { AssignProjectCard } from "../components/assign-project-card";
 import { CiSetupSection } from "../components/ci-setup-section";
 import { ControlsSection } from "../components/controls-section";
+import { DeployStrategyCard } from "../components/deploy-strategy-card";
 import {
   DeregisterPendingBanner,
   recordDeregisterPending,
@@ -139,9 +140,13 @@ interface LinkSection {
  *  staleness of the section's primary resource rather than the whole
  *  app's ``updatedAt``. */
 const LINK_SECTIONS: LinkSection[] = [
+  // #400: Deploy strategy now renders as an inline DeployStrategyCard
+  // (badge + edit affordance) above this list; the "Edit manifest TOML"
+  // route is preserved as its own link card so operators can still drop
+  // into the full TOML editor for advanced changes.
   {
-    key: "deploy-strategy",
-    i18nKey: "deployStrategy",
+    key: "manifest",
+    i18nKey: "manifestEditor",
     href: (s) => `/apps/${s}/config`,
     icon: FileCodeIcon,
     lastModifiedKey: "deployStrategy",
@@ -273,6 +278,12 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <ManagedServicesSummaryCard appSlug={a.slug} />
 
+      {/* Inline deploy-strategy badge + edit affordance (#400). Replaces
+          the link-card to /config for the strategy itself — the manifest
+          editor is still reachable via the "Edit manifest TOML" card in
+          the LINK_SECTIONS list below for advanced edits. */}
+      <DeployStrategyCard app={a} />
+
       <div className="flex flex-col gap-3">
         {LINK_SECTIONS.map((s) => {
           // Per-section "Modified N ago" (#454). Each card pulls its
@@ -291,14 +302,18 @@ export function SettingsClient({ slug }: { slug: string }) {
               lastModifiedAt={sectionLastModified}
             />
           );
-          // CI-setup section slots between Deploy strategy and Deploy
-          // tokens (#382). Hidden when the app has no source repo —
-          // there's nothing to wire up to until registration captures
-          // one. Sibling-friendly: appending a fragment under the
-          // deploy-strategy row, no surrounding reformatting.
-          if (s.key === "deploy-strategy" && a.sourceRepo) {
+          // CI-setup section slots between the manifest-editor link
+          // and Deploy tokens (#382). Hidden when the app has no source
+          // repo — there's nothing to wire up to until registration
+          // captures one. Sibling-friendly: appending a fragment under
+          // the manifest row, no surrounding reformatting.
+          // (#400 renamed the section key from "deploy-strategy" →
+          // "manifest" when the inline DeployStrategyCard moved above
+          // the link list; the CI block still anchors to the same
+          // visual slot.)
+          if (s.key === "manifest" && a.sourceRepo) {
             return (
-              <React.Fragment key="deploy-strategy-with-ci">
+              <React.Fragment key="manifest-with-ci">
                 {card}
                 <CiSetupSection
                   appSlug={a.slug}
@@ -312,12 +327,12 @@ export function SettingsClient({ slug }: { slug: string }) {
           }
           // Apps without a source repo still benefit from the force-
           // redeploy card — the cancel + delete steps don't depend on
-          // the CI pipeline. Slot it directly under deploy-strategy
+          // the CI pipeline. Slot it directly under the manifest row
           // when the CI block is hidden so the visual hierarchy
           // matches the with-repo path.
-          if (s.key === "deploy-strategy" && !a.sourceRepo) {
+          if (s.key === "manifest" && !a.sourceRepo) {
             return (
-              <React.Fragment key="deploy-strategy-with-force-redeploy">
+              <React.Fragment key="manifest-with-force-redeploy">
                 {card}
                 <ForceRedeploySection appSlug={a.slug} />
               </React.Fragment>

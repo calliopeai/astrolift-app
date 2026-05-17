@@ -69,6 +69,18 @@ EXEMPT: dict[str, str] = {
         "self-service: revokes the caller's own sessions; tenant context "
         "is irrelevant — a session is bound to a user, not an org"
     ),
+    "IdentityMutation.revoke_astrolift_session": (
+        "self-service OR cross-tenant org-admin: callers can revoke their "
+        "own sessions regardless of active org (you can sign out a stale "
+        "phone before re-entering a tenant context). Org-admin revoke "
+        "uses the active tenant for the org-membership check inline; the "
+        "decorator can't gate it because the permitted path branches on "
+        "is-owner-vs-is-org-admin at resolver entry."
+    ),
+    "IdentityMutation.heartbeat_session": (
+        "self-service: a session is bound to a user, not an org; the "
+        "ping is the caller asserting their own liveness"
+    ),
     "IdentityMutation.elevate_admin_session": (
         "#487 step-up auth: elevates the caller's own session timer; "
         "tenant context is irrelevant — elevation is session-scoped, "

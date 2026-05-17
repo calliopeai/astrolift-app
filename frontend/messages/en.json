@@ -421,6 +421,41 @@
       "backToApps": "Back to apps",
       "cancel": "Cancel"
     },
+    "deployStrategy": {
+      "eyebrow": "Deploy strategy",
+      "edit": "Edit",
+      "previewEnvironments": "Preview environments",
+      "previewEnvironmentsHelp": "Spin up an ephemeral environment per pull request.",
+      "sheetTitle": "Edit deploy strategy",
+      "sheetDescription": "Changes apply to the next deploy. In-flight rollouts complete on the previous strategy.",
+      "triggerModeLabel": "Trigger mode",
+      "cronExpressionLabel": "Cron expression",
+      "cronExpressionHelp": "Five fields (minute hour day month weekday). The backend rejects malformed expressions.",
+      "deployBranchLabel": "Deploy branch",
+      "deployBranchHelp": "Default branch from the repo is <branch></branch>.",
+      "cancel": "Cancel",
+      "save": "Save strategy",
+      "toastSaved": "Deploy strategy updated.",
+      "toastFailed": "Update failed.",
+      "modes": {
+        "auto_on_push": {
+          "label": "Auto on push",
+          "hint": "Any push to the deploy branch fans out a deploy."
+        },
+        "manual": {
+          "label": "Manual only",
+          "hint": "Deploys only when triggered from the UI or CLI."
+        },
+        "external_ci": {
+          "label": "External CI",
+          "hint": "Your CI calls Astrolift with a deploy token. No webhook."
+        },
+        "cron": {
+          "label": "Cron schedule",
+          "hint": "Deploys run on a recurring schedule defined by the cron expression."
+        }
+      }
+    },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
       "searchAriaLabel": "Search log buffer",
@@ -653,25 +688,9 @@
         "stream": "Stream",
         "waiting": "Waiting for the first line…",
         "pressStream": "Press \"Stream\" to start tailing.",
-        "pressStreamAll": "Press \"Stream\" to start tailing every replica.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI",
-        "allReplicas": "All replicas",
-        "allReplicasDescription": "Streaming from every replica of this app — each line is tagged with its source pod.",
-        "historicalDescription": "Showing log lines from the last {range}.",
-        "refreshHistorical": "Refresh",
-        "historicalUnavailableTitle": "Historical logs are unavailable on this cluster",
-        "historicalUnavailableHint": "This cluster has no log-aggregator backend wired (Loki / CloudWatch / Stackdriver / Azure Monitor). Switch back to Live to tail in real time.",
-        "historicalUnavailableEmpty": "Historical log queries aren't available on this cluster. Switch back to Live to tail in real time.",
-        "historicalNoResults": "No log lines matched within this window.",
-        "range": {
-          "live": "Live",
-          "15m": "Last 15 minutes",
-          "1h": "Last hour",
-          "6h": "Last 6 hours",
-          "24h": "Last 24 hours"
-        }
+        "installCli": "Install the CLI"
       },
       "events": {
         "title": "Recent platform events",
@@ -1228,9 +1247,9 @@
         "toastNoResponse": "No response from backend."
       },
       "links": {
-        "deployStrategy": {
-          "title": "Deploy strategy",
-          "description": "Edit the manifest TOML — image build, environments, triggers, approvals, and rollout strategy."
+        "manifestEditor": {
+          "title": "Edit manifest TOML",
+          "description": "Open the full astrolift.toml editor — image build, environments, triggers, approvals, and rollout strategy."
         },
         "deployTokens": {
           "title": "Deploy tokens",
@@ -2401,19 +2420,62 @@
     "grantRoleRowLabel": "Grant role to {name}",
     "grantRoleRowTooltip": "Grant role to {name}"
   },
-  "stepUp": {
-    "title": "Confirm it's you",
-    "description": "This action requires recent authentication. Confirm your password to continue.",
-    "passwordLabel": "Password",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "elevating": "Confirming…",
-    "indicator": "Admin elevated for {minutes, plural, one {# more minute} other {# more minutes}}",
-    "deelevateLabel": "End admin elevation now",
-    "errors": {
-      "passwordRequired": "Password is required.",
-      "generic": "Couldn't confirm your password. Try again.",
-      "network": "Couldn't reach the server. Check your connection and try again."
+  "securitySessions": {
+    "title": "Active sessions",
+    "description": "Browser, CLI, and mobile sessions currently signed in as you. Revoke a single one to drop just that device.",
+    "signOutEverywhere": "Sign out everywhere",
+    "signingOut": "Signing out…",
+    "loadError": "Couldn't load sessions",
+    "noSessions": "No active sessions found.",
+    "columns": {
+      "kind": "Kind",
+      "label": "Label",
+      "status": "Status",
+      "lastSeen": "Last seen",
+      "expires": "Expires",
+      "actions": "Actions"
+    },
+    "status": {
+      "current": "this device",
+      "other": "other device"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Mobile",
+      "browser_extension": "Extension",
+      "api_token": "API token"
+    },
+    "actions": {
+      "revoke": "Revoke"
+    },
+    "confirmRevoke": {
+      "title": "Revoke this session?",
+      "description": "The session will need to sign in again. Tokens bound to it stop working immediately.",
+      "confirm": "Revoke"
+    },
+    "confirmSignOutAll": {
+      "title": "Sign out of {count} other session{count, plural, one {} other {s}}?",
+      "description": "Your current session in this tab stays signed in. Every other browser tab, mobile app, and CLI you've authenticated will need to log in again.",
+      "confirm": "Sign out everywhere else"
+    },
+    "toasts": {
+      "noOthers": "No other sessions to sign out.",
+      "signedOut": "Signed out of {count} session(s).",
+      "signOutFailed": "Sign-out failed",
+      "revoked": "Session revoked.",
+      "alreadyRevoked": "Session was already revoked.",
+      "revokeFailed": "Revoke failed"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "just now",
+      "sAgo": "{n}s ago",
+      "mAgo": "{n}m ago",
+      "hAgo": "{n}h ago",
+      "dAgo": "{n}d ago",
+      "moAgo": "{n}mo ago",
+      "yAgo": "{n}y ago"
     }
   }
 }

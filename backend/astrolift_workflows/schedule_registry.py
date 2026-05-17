@@ -81,6 +81,15 @@ class ScheduleKind(StrEnum):
     operator-fired ``rotateSecretBundle`` is the path that
     restarts consumers (#365)."""
 
+    PRUNE_STALE_SESSIONS = "prune_stale_sessions"
+    """Every 1 hr — soft-revokes ``AstroliftSession`` rows whose
+    ``last_seen_at`` is older than the per-kind staleness threshold
+    (``STALE_SESSION_TTL_SECONDS_<KIND>`` Constance entries). Hygiene
+    for stale CLI tokens, abandoned phones, dead browser-extension
+    installs. Hardened to never touch the currently-active set
+    because ``last_seen_at`` is bumped by the session middleware on
+    every authed request (#498)."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -208,6 +217,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.SECRET_BUNDLE_REFRESH,
         ),
         description="Re-apply active SecretBundles hourly (#365)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.PRUNE_STALE_SESSIONS,
+        workflow_name="PruneStaleSessionsWorkflow",
+        interval_seconds=60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.PRUNE_STALE_SESSIONS,
+        ),
+        description="Soft-revoke stale AstroliftSession rows (#498)",
     ),
 )
 
