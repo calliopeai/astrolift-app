@@ -49,10 +49,36 @@ export type PreviewStatus = "building" | "running" | "failed" | "torn_down";
 
 export type AstroliftAppEnvironment = GeneratedAppEnvironment;
 
-export type AstroliftDeployment = Omit<GeneratedDeployment, "status" | "triggerKind"> & {
-  status: DeploymentStatus;
-  triggerKind: TriggerKind;
-};
+// #419 — approval decision-context fields are added to the backend
+// `AstroliftDeployment` type in the same commit; this facade pre-
+// declares them so the FE typechecks before `make codegen` has been
+// run. Once codegen regenerates `GeneratedDeployment` they collapse
+// into a no-op merge.
+export interface DeploymentApprovalContextFields {
+  commitMessage: string;
+  commitAuthor: string;
+  repoUrl: string;
+  abortedReason: string;
+  triggeredByUserId: string | null;
+  triggeredByMe: boolean;
+}
+
+export type AstroliftDeployment = Omit<GeneratedDeployment, "status" | "triggerKind"> &
+  DeploymentApprovalContextFields & {
+    status: DeploymentStatus;
+    triggerKind: TriggerKind;
+  };
+
+export interface AstroliftDeploymentApprovalHistoryEntry {
+  id: string;
+  action: string;
+  decision: string;
+  actorKind: string;
+  actorId: string;
+  actorDisplay: string;
+  occurredAt: string;
+  reason: string;
+}
 
 export type AstroliftDeploymentLogEntry = GeneratedDeploymentLogEntry;
 
@@ -98,9 +124,48 @@ export type PodSurfaceStatus =
 
 export type LogStreamKind = "stdout" | "stderr";
 
-export type AstroliftContainerStatus = GeneratedContainerStatus;
+// #429 — container kind classification for the workload-detail Init /
+// Primary / Sidecar split. Anything outside the known set falls
+// through to ``primary`` so the UI never has to handle an undefined
+// case.
+export type ContainerKind = "init" | "primary" | "sidecar";
 
-export type AstroliftAppPod = GeneratedAppPod;
+export interface AstroliftContainerResources {
+  cpuRequest: string;
+  cpuLimit: string;
+  memoryRequest: string;
+  memoryLimit: string;
+}
+
+// Manual extension over the generated type: ``kind`` / restart
+// history / per-container resources arrived with #429 and the
+// codegen run is wired into the merge commit, so the manual type
+// holds the contract until the schema gets refreshed.
+export type AstroliftContainerStatus = GeneratedContainerStatus & {
+  kind: ContainerKind;
+  lastRestartReasons: string[];
+  lastRestartAt: string | null;
+  resources: AstroliftContainerResources;
+};
+
+export type AstroliftAppPod = Omit<GeneratedAppPod, "containerStatuses"> & {
+  containerStatuses: AstroliftContainerStatus[];
+};
+
+// #429 — pod status grid on the workload detail page. Each bucket
+// is one row of the grid; ``pods`` is the expander payload.
+export interface AstroliftWorkloadPodSummary {
+  name: string;
+  age: string | null;
+  ready: boolean;
+}
+
+export interface AstroliftWorkloadPodStatusBucket {
+  status: string;
+  count: number;
+  percent: number;
+  pods: AstroliftWorkloadPodSummary[];
+}
 
 export type AstroliftAppLogLine = Omit<GeneratedAppLogLine, "stream"> & {
   stream: LogStreamKind;

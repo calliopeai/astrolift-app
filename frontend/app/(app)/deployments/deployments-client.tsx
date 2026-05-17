@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/table";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import {
   ABORT_DEPLOYMENT,
   APPROVE_DEPLOYMENT,
@@ -191,12 +192,16 @@ export function DeploymentsClient() {
     { kind: ActionKind; deployment: AstroliftDeployment } | null
   >(null);
 
-  async function runAction(kind: ActionKind, d: AstroliftDeployment) {
+  async function runAction(kind: ActionKind, d: AstroliftDeployment, reason?: string) {
     if (kind === "approve") {
       const { data } = await approve({ variables: { input: { id: d.id } } });
       reportResult("approveDeployment", data?.approveDeployment);
     } else if (kind === "abort") {
-      const { data } = await abort({ variables: { input: { id: d.id } } });
+      // abort/reject now require a non-empty reason at the backend
+      // boundary (#419). Routed through ConfirmDialogWithReason below.
+      const { data } = await abort({
+        variables: { input: { id: d.id, reason: reason ?? "" } },
+      });
       reportResult("abortDeployment", data?.abortDeployment);
     } else if (kind === "rollback") {
       const { data } = await rollback({ variables: { input: { id: d.id } } });
@@ -450,22 +455,61 @@ export function DeploymentsClient() {
       <StartDeploymentDialog open={openCreate} onOpenChange={setOpenCreate} />
 
       <ConfirmDialog
-        open={pendingAction !== null}
+        open={pendingAction !== null && pendingAction.kind !== "abort"}
         onOpenChange={(next) => {
           if (!next) setPendingAction(null);
         }}
         title={
-          pendingAction ? ACTION_COPY[pendingAction.kind].title(pendingAction.deployment) : ""
+          pendingAction && pendingAction.kind !== "abort"
+            ? ACTION_COPY[pendingAction.kind].title(pendingAction.deployment)
+            : ""
         }
         description={
-          pendingAction
+          pendingAction && pendingAction.kind !== "abort"
             ? ACTION_COPY[pendingAction.kind].description(pendingAction.deployment)
             : ""
         }
-        confirmLabel={pendingAction ? ACTION_COPY[pendingAction.kind].confirmLabel : "Confirm"}
-        destructive={pendingAction ? ACTION_COPY[pendingAction.kind].destructive : false}
+        confirmLabel={
+          pendingAction && pendingAction.kind !== "abort"
+            ? ACTION_COPY[pendingAction.kind].confirmLabel
+            : "Confirm"
+        }
+        destructive={
+          pendingAction && pendingAction.kind !== "abort"
+            ? ACTION_COPY[pendingAction.kind].destructive
+            : false
+        }
         onConfirm={async () => {
-          if (pendingAction) await runAction(pendingAction.kind, pendingAction.deployment);
+          if (pendingAction && pendingAction.kind !== "abort") {
+            await runAction(pendingAction.kind, pendingAction.deployment);
+          }
+        }}
+      />
+
+      <ConfirmDialogWithReason
+        open={pendingAction?.kind === "abort"}
+        onOpenChange={(next) => {
+          if (!next) setPendingAction(null);
+        }}
+        title={
+          pendingAction?.kind === "abort"
+            ? ACTION_COPY.abort.title(pendingAction.deployment)
+            : ""
+        }
+        description={
+          pendingAction?.kind === "abort"
+            ? ACTION_COPY.abort.description(pendingAction.deployment)
+            : ""
+        }
+        reasonLabel={t("confirm.abortReasonLabel")}
+        reasonPlaceholder={t("confirm.abortReasonPlaceholder")}
+        reasonRequiredError={t("confirm.reasonRequired")}
+        confirmLabel={t("confirm.abortConfirm")}
+        destructive
+        onConfirm={async (reason) => {
+          if (pendingAction?.kind === "abort") {
+            await runAction("abort", pendingAction.deployment, reason);
+          }
         }}
       />
     </PageShell>

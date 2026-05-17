@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -123,11 +124,11 @@ function PendingRow({
     }
   }
 
-  async function handleReject() {
+  async function handleReject(reason: string) {
     setBusy("reject");
     try {
       const { data } = await abort({
-        variables: { input: { id: deployment.id } },
+        variables: { input: { id: deployment.id, reason } },
       });
       if (data?.abortDeployment?.ok) {
         toast.success("Deployment rejected.");
@@ -198,11 +199,13 @@ function PendingRow({
         onConfirm={handleApprove}
       />
 
-      <ConfirmDialog
+      <ConfirmDialogWithReason
         open={confirmReject}
         onOpenChange={setConfirmReject}
         title={`Reject ${shortTag}?`}
         description="The pending deployment is aborted. CI must re-trigger to create a fresh deployment for review."
+        reasonLabel="Reason for rejection"
+        reasonPlaceholder="Why is this deploy being rejected? Stored on the audit log + history sidebar."
         confirmLabel="Reject"
         destructive
         onConfirm={handleReject}
