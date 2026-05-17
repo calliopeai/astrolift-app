@@ -342,7 +342,58 @@ export const LIST_INVITATIONS = gql`
       expiresAt
       acceptedAt
       invitedByUsername
+      invitedByUserId
+      invitedByDisplayName
+      invitedByEmail
+      invitedByAvatarUrl
       createdAt
+    }
+  }
+`;
+
+/**
+ * Two-source de-dupe lookup the InviteDialog runs as the operator
+ * types an email (#418). Returns existing org members AND pending
+ * invitations matching the query; the FE narrows by ``matchKind`` to
+ * render the right CTA ('grant role' vs. 'resend / cancel + reinvite').
+ * Permission: ``org.manage_members``. Empty / whitespace query yields
+ * an empty list — the FE debounces 300ms before issuing it so a fast
+ * typist doesn't trigger a flurry of queries per keystroke.
+ */
+export const SEARCHABLE_USERS = gql`
+  query SearchableUsers($query: String!) {
+    astroliftSearchableUsers(query: $query) {
+      matchKind
+      email
+      displayLabel
+      avatarUrl
+      userId
+      invitationId
+      invitationStatus
+      expiresAt
+    }
+  }
+`;
+
+/**
+ * Roles the active operator may grant on an invitation (#418). The
+ * server filters by subset-of-effective-permissions so the FE can
+ * skip rendering roles that would just be rejected at use time.
+ * Returns an empty list when the operator holds no effective perms;
+ * the InviteDialog disables with an explainer in that case. Django
+ * superusers see every role.
+ * Permission: ``org.manage_members``.
+ */
+export const LIST_ROLES_I_CAN_GRANT = gql`
+  query ListRolesICanGrant {
+    astroliftRolesICanGrant {
+      id
+      slug
+      name
+      description
+      scopeLevel
+      permissions
+      isSystem
     }
   }
 `;

@@ -26,10 +26,9 @@ interface OrganizationsResp {
  * a future customer asks. See #269.
  */
 export function useActiveOrg() {
-  const { data, loading, error } = useQuery<OrganizationsResp>(
-    LIST_ORGANIZATIONS,
-    { fetchPolicy: "cache-first" },
-  );
+  const { data, loading, error } = useQuery<OrganizationsResp>(LIST_ORGANIZATIONS, {
+    fetchPolicy: "cache-first",
+  });
   const org = data?.astroliftOrganizations[0] ?? null;
 
   React.useEffect(() => {

@@ -485,28 +485,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "Wird geprüft…",
-        "unknown": "Nicht geprüft",
-        "ariaLabel": "URL-Status: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "Nicht erreichbar",
-        "tooltip": {
-          "title": "Letzte Prüfungen",
-          "empty": "Noch kein Prüfverlauf.",
-          "uptime": "{ok}/{total} ok · Ø {avgMs}ms",
-          "now": "jetzt",
-          "secondsAgo": "vor {seconds}s",
-          "minutesAgo": "vor {minutes}m",
-          "hoursAgo": "vor {hours}h",
-          "recheck": "Zum erneuten Prüfen klicken",
-          "rechecking": "Erneut prüfen…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "Bereitstellung fehlgeschlagen",
@@ -897,6 +875,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "läuft ab in {days}T {hours}Std",
+      "hours": "läuft ab in {hours}Std {minutes}Min",
+      "minutes": "läuft ab in {minutes}Min",
+      "expired": "abgelaufen"
+    },
+    "inviteDialog": {
+      "title": "Mitglied einladen",
+      "description": "Stellt ein einmaliges Einladungstoken aus, im Ruhezustand gehasht. Der Klartext wird genau einmal hier angezeigt — über euren üblichen Kanal teilen.",
+      "form": {
+        "email": "E-Mail",
+        "emailPlaceholder": "neuesmitglied@deinefirma.com",
+        "emailHint": "Die Annahme erfordert, dass die Konto-E-Mail des Benutzers übereinstimmt.",
+        "role": "Rolle (optional)",
+        "rolePlaceholder": "Keine Rolle — nur Annahme",
+        "roleHint": "Du kannst gewähren: {list}",
+        "roleHintGeneric": "Wenn gewählt, wird beim Annehmen ein RoleBinding erstellt.",
+        "noGrantableRoles": "Du hast keine Berechtigung, irgendeine Rolle zu gewähren. Bitte einen Org-Admin, deinen Zugriff zu erweitern.",
+        "expiresInDays": "Läuft ab in (Tage)",
+        "issue": "Einladung ausstellen"
+      },
+      "search": {
+        "loading": "Suche nach bestehenden Mitgliedern und Einladungen…",
+        "alreadyMember": "Bereits Mitglied",
+        "alreadyMemberHint": "Nutze Rolle gewähren auf der Mitgliederseite, um den Zugriff zu erweitern.",
+        "invitationExists": "Einladung bereits gesendet",
+        "invitationHint": "Oben abbrechen reaktiviert das Formular zur erneuten Einladung.",
+        "cancelAndReinvite": "Abbrechen und neu einladen"
+      },
+      "reveal": {
+        "saveTitle": "Speichere diesen Link jetzt",
+        "saveDescription": "Das Token ist in der DB gehasht — nach Schließen dieses Dialogs gibt es keine Möglichkeit, den Klartext wiederherzustellen.",
+        "recipient": "Empfänger",
+        "expiresIn": "Läuft ab",
+        "acceptLink": "Annahmelink",
+        "expHint": "Der ?exp= Parameter ist ein Client-Hinweis; der Server prüft die Ablaufzeit weiterhin beim Annehmen.",
+        "copy": "Kopieren",
+        "done": "Fertig"
+      },
+      "toasts": {
+        "emailRequired": "E-Mail ist erforderlich",
+        "invitationExists": "Für diese E-Mail existiert bereits eine Einladung — abbrechen oder andere Adresse wählen.",
+        "created": "Einladung erstellt — Link unten teilen",
+        "failed": "Einladung fehlgeschlagen",
+        "cancelledForReinvite": "Bestehende Einladung abgebrochen — du kannst neu einladen.",
+        "cancelFailed": "Abbruch fehlgeschlagen — aktualisieren und erneut versuchen.",
+        "linkCopied": "Annahmelink kopiert",
+        "copyFailed": "Kopieren fehlgeschlagen — manuell auswählen und kopieren"
       }
     }
   },

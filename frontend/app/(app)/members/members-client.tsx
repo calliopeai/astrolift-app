@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,7 @@ import type {
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
+import { InvitationExpiryBadge } from "./invitation-expiry";
 import { InviteDialog } from "./invite-dialog";
 
 interface MembersResp {
@@ -274,7 +276,7 @@ export function MembersClient() {
       actions={
         <div className="flex items-center gap-2">
           <Can permission="org.manage_members">
-            <Button variant="outline" onClick={() => setInviteOpen(true)} disabled={roles.loading}>
+            <Button variant="outline" onClick={() => setInviteOpen(true)}>
               <MailIcon className="size-4" />
               Invite
             </Button>
@@ -323,7 +325,7 @@ export function MembersClient() {
                   const userBindings = bindingsByUser.get(m.user.id) ?? [];
                   const alreadyAnonymized = m.lifecycle === "anonymized";
                   return (
-                    <TableRow key={m.id}>
+                    <TableRow key={m.id} id={`u-${m.user.id}`}>
                       <TableCell>
                         <div className="font-medium">{m.user.username}</div>
                         <div className="text-muted-foreground text-xs">{m.user.email}</div>
@@ -543,11 +545,17 @@ export function MembersClient() {
                         {inv.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(inv.expiresAt).toLocaleString()}
+                    <TableCell>
+                      {inv.status === "pending" ? (
+                        <InvitationExpiryBadge expiresAt={inv.expiresAt} />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          {new Date(inv.expiresAt).toLocaleDateString()}
+                        </span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {inv.invitedByUsername ?? "—"}
+                    <TableCell>
+                      <InviterCell invitation={inv} />
                     </TableCell>
                     <TableCell className="text-right">
                       {inv.status === "pending" && (
@@ -624,11 +632,7 @@ export function MembersClient() {
         onOpenChange={setOpen}
         roles={roles.data?.astroliftRoles ?? []}
       />
-      <InviteDialog
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
-        roles={roles.data?.astroliftRoles ?? []}
-      />
+      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 
       <ConfirmDialog
         open={revokeTarget !== null}
@@ -672,6 +676,49 @@ export function MembersClient() {
         }}
       />
     </PageShell>
+  );
+}
+
+/**
+ * Render the "invited by" cell on the invitation row (#418).
+ * Falls back to the username (legacy backend) when the richer
+ * attribution fields aren't populated yet — keeps the column useful
+ * for invitations created before the enrichment landed. When a user
+ * id is present, the display name links to the inviter's row in the
+ * members list (filtered via the user-id hash anchor so the row
+ * scrolls into view).
+ */
+function InviterCell({ invitation }: { invitation: AstroliftInvitation }) {
+  const display = invitation.invitedByDisplayName ?? invitation.invitedByUsername ?? null;
+  if (display === null) {
+    return <span className="text-muted-foreground text-sm">—</span>;
+  }
+  const avatarUrl = invitation.invitedByAvatarUrl ?? "";
+  const email = invitation.invitedByEmail ?? "";
+  const userId = invitation.invitedByUserId ?? null;
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar size="sm">
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={display} /> : null}
+        <AvatarFallback>{display.slice(0, 1).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-col">
+        {userId ? (
+          <a
+            href={`/members#u-${userId}`}
+            className="text-foreground truncate text-sm font-medium hover:underline"
+            title={email || display}
+          >
+            {display}
+          </a>
+        ) : (
+          <span className="text-foreground truncate text-sm font-medium" title={email || display}>
+            {display}
+          </span>
+        )}
+        {email ? <span className="text-muted-foreground truncate text-xs">{email}</span> : null}
+      </div>
+    </div>
   );
 }
 

@@ -489,28 +489,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "확인 중…",
-        "unknown": "미확인",
-        "ariaLabel": "URL 상태: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "도달 불가",
-        "tooltip": {
-          "title": "최근 프로브",
-          "empty": "프로브 기록이 아직 없습니다.",
-          "uptime": "{ok}/{total} 정상 · 평균 {avgMs}ms",
-          "now": "방금",
-          "secondsAgo": "{seconds}초 전",
-          "minutesAgo": "{minutes}분 전",
-          "hoursAgo": "{hours}시간 전",
-          "recheck": "다시 프로브하려면 클릭",
-          "rechecking": "다시 프로브 중…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "프로비저닝 실패",
@@ -901,6 +879,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "{days}일 {hours}시간 남음",
+      "hours": "{hours}시간 {minutes}분 남음",
+      "minutes": "{minutes}분 남음",
+      "expired": "만료됨"
+    },
+    "inviteDialog": {
+      "title": "구성원 초대",
+      "description": "저장 시 해시되는 일회용 초대 토큰을 발급합니다. 평문은 이 화면에서 한 번만 표시됩니다 — 평소 채널로 공유하세요.",
+      "form": {
+        "email": "이메일",
+        "emailPlaceholder": "newmember@yourcorp.com",
+        "emailHint": "수락하려면 사용자 계정의 이메일이 일치해야 합니다.",
+        "role": "역할 (선택)",
+        "rolePlaceholder": "역할 없음 — 수락만",
+        "roleHint": "부여 가능: {list}",
+        "roleHintGeneric": "선택하면 수락 시 RoleBinding이 생성됩니다.",
+        "noGrantableRoles": "부여할 권한이 없습니다. 조직 관리자에게 권한 확장을 요청하세요.",
+        "expiresInDays": "만료 (일)",
+        "issue": "초대 발급"
+      },
+      "search": {
+        "loading": "기존 구성원과 초대를 확인 중…",
+        "alreadyMember": "이미 구성원",
+        "alreadyMemberHint": "구성원 페이지의 역할 부여로 접근 권한을 확장하세요.",
+        "invitationExists": "이미 초대 전송됨",
+        "invitationHint": "위에서 취소하면 폼이 다시 활성화됩니다.",
+        "cancelAndReinvite": "취소하고 다시 초대"
+      },
+      "reveal": {
+        "saveTitle": "지금 링크 저장",
+        "saveDescription": "토큰은 DB에서 해시됩니다 — 이 대화상자를 닫으면 평문을 복구할 수 없습니다.",
+        "recipient": "수신자",
+        "expiresIn": "만료",
+        "acceptLink": "수락 링크",
+        "expHint": "?exp= 매개변수는 클라이언트 힌트입니다; 서버는 수락 시 만료를 엄격히 확인합니다.",
+        "copy": "복사",
+        "done": "완료"
+      },
+      "toasts": {
+        "emailRequired": "이메일이 필요합니다",
+        "invitationExists": "해당 이메일에 이미 초대가 있습니다 — 먼저 취소하거나 다른 주소를 선택하세요.",
+        "created": "초대 생성됨 — 아래 링크 공유",
+        "failed": "초대 실패",
+        "cancelledForReinvite": "기존 초대를 취소했습니다 — 다시 초대할 수 있습니다.",
+        "cancelFailed": "취소 실패 — 새로고침 후 재시도하세요.",
+        "linkCopied": "수락 링크 복사됨",
+        "copyFailed": "복사 실패 — 수동으로 선택하여 복사하세요"
       }
     }
   },

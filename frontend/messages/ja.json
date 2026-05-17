@@ -489,28 +489,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "確認中…",
-        "unknown": "未確認",
-        "ariaLabel": "URL ヘルス: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "到達不能",
-        "tooltip": {
-          "title": "最近のチェック",
-          "empty": "プローブ履歴はまだありません。",
-          "uptime": "{ok}/{total} 正常 · 平均 {avgMs}ms",
-          "now": "たった今",
-          "secondsAgo": "{seconds} 秒前",
-          "minutesAgo": "{minutes} 分前",
-          "hoursAgo": "{hours} 時間前",
-          "recheck": "クリックして再プローブ",
-          "rechecking": "再プローブ中…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "プロビジョニングに失敗しました",
@@ -901,6 +879,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "残り {days}日 {hours}時間",
+      "hours": "残り {hours}時間 {minutes}分",
+      "minutes": "残り {minutes}分",
+      "expired": "期限切れ"
+    },
+    "inviteDialog": {
+      "title": "メンバーを招待",
+      "description": "ハッシュ化された使い切りの招待トークンを発行します。平文はこの画面で一度だけ表示されます — 通常のチャネルで共有してください。",
+      "form": {
+        "email": "メール",
+        "emailPlaceholder": "newmember@yourcorp.com",
+        "emailHint": "受諾にはユーザーのアカウントメールが一致する必要があります。",
+        "role": "ロール (任意)",
+        "rolePlaceholder": "ロールなし — 受諾のみ",
+        "roleHint": "付与可能: {list}",
+        "roleHintGeneric": "選択すると、招待受諾時に RoleBinding が作成されます。",
+        "noGrantableRoles": "いずれのロールも付与する権限がありません。組織管理者に権限拡張を依頼してください。",
+        "expiresInDays": "有効期限 (日)",
+        "issue": "招待を発行"
+      },
+      "search": {
+        "loading": "既存メンバーと招待を検索中…",
+        "alreadyMember": "既にメンバーです",
+        "alreadyMemberHint": "メンバーページの「ロールを付与」で権限を引き上げてください。",
+        "invitationExists": "招待を送信済み",
+        "invitationHint": "上の取消で再招待が可能になります。",
+        "cancelAndReinvite": "取消して再招待"
+      },
+      "reveal": {
+        "saveTitle": "今すぐリンクを保存",
+        "saveDescription": "トークンはDB内でハッシュ化されています — ダイアログを閉じると平文は復元できません。",
+        "recipient": "受信者",
+        "expiresIn": "有効期限",
+        "acceptLink": "受諾リンク",
+        "expHint": "?exp= はクライアント側のヒントです; サーバーは受諾時に有効期限を厳格に確認します。",
+        "copy": "コピー",
+        "done": "完了"
+      },
+      "toasts": {
+        "emailRequired": "メールは必須です",
+        "invitationExists": "そのメールには既に招待があります — 先に取消するか別アドレスを選んでください。",
+        "created": "招待を作成しました — 下のリンクを共有してください",
+        "failed": "招待に失敗しました",
+        "cancelledForReinvite": "既存の招待を取消しました — 再招待できます。",
+        "cancelFailed": "取消に失敗しました — 更新してやり直してください。",
+        "linkCopied": "受諾リンクをコピーしました",
+        "copyFailed": "コピー失敗 — 手動で選択してコピーしてください"
       }
     }
   },

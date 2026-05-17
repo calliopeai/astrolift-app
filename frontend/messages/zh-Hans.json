@@ -489,28 +489,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "检查中…",
-        "unknown": "未检查",
-        "ariaLabel": "URL 状态:{status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "无法访问",
-        "tooltip": {
-          "title": "最近探测",
-          "empty": "尚无探测历史。",
-          "uptime": "{ok}/{total} 正常 · 平均 {avgMs}ms",
-          "now": "刚刚",
-          "secondsAgo": "{seconds} 秒前",
-          "minutesAgo": "{minutes} 分钟前",
-          "hoursAgo": "{hours} 小时前",
-          "recheck": "点击重新探测",
-          "rechecking": "重新探测中…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "配置失败",
@@ -901,6 +879,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "剩余 {days}天 {hours}小时",
+      "hours": "剩余 {hours}小时 {minutes}分钟",
+      "minutes": "剩余 {minutes}分钟",
+      "expired": "已过期"
+    },
+    "inviteDialog": {
+      "title": "邀请成员",
+      "description": "签发一次性、静态哈希的邀请令牌。明文仅在此屏幕显示一次 — 通过你的常用渠道分享。",
+      "form": {
+        "email": "邮箱",
+        "emailPlaceholder": "newmember@yourcorp.com",
+        "emailHint": "接受需要用户账户邮箱与之匹配。",
+        "role": "角色 (可选)",
+        "rolePlaceholder": "无角色 — 仅接受",
+        "roleHint": "你可以授予: {list}",
+        "roleHintGeneric": "若选择,在邀请被接受时会创建 RoleBinding。",
+        "noGrantableRoles": "你没有权限授予任何角色。请联系组织管理员扩展你的权限。",
+        "expiresInDays": "有效期 (天)",
+        "issue": "签发邀请"
+      },
+      "search": {
+        "loading": "正在查找现有成员和邀请…",
+        "alreadyMember": "已是成员",
+        "alreadyMemberHint": "使用成员页的「授予角色」来扩展其访问。",
+        "invitationExists": "已发送邀请",
+        "invitationHint": "取消后表单将重新启用以便重新邀请。",
+        "cancelAndReinvite": "取消并重新邀请"
+      },
+      "reveal": {
+        "saveTitle": "现在保存此链接",
+        "saveDescription": "令牌在数据库中已哈希 — 关闭此对话框后无法恢复明文。",
+        "recipient": "接收人",
+        "expiresIn": "过期",
+        "acceptLink": "接受链接",
+        "expHint": "?exp= 参数是客户端提示;服务器仍会在接受时严格检查过期时间。",
+        "copy": "复制",
+        "done": "完成"
+      },
+      "toasts": {
+        "emailRequired": "邮箱必填",
+        "invitationExists": "该邮箱已有邀请 — 请先取消或换一个地址。",
+        "created": "邀请已创建 — 分享下方链接",
+        "failed": "邀请失败",
+        "cancelledForReinvite": "已取消现有邀请 — 你可以重新邀请。",
+        "cancelFailed": "取消失败 — 刷新并重试。",
+        "linkCopied": "接受链接已复制",
+        "copyFailed": "复制失败 — 手动选择并复制"
       }
     }
   },

@@ -126,8 +126,8 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
         <SheetHeader>
           <SheetTitle>Grant role</SheetTitle>
           <SheetDescription>
-            Bind a system role to a user on the chosen scope. The user must exist
-            in the platform already; SCIM provisioning isn&apos;t wired here.
+            Bind a system role to a user on the chosen scope. The user must exist in the platform
+            already; SCIM provisioning isn&apos;t wired here.
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
@@ -155,7 +155,7 @@ export function GrantRoleDialog({ open, onOpenChange, roles }: Props) {
               <SelectContent>
                 {roles.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
-                    <span className="font-mono text-xs mr-2">[{r.scopeLevel}]</span>
+                    <span className="mr-2 font-mono text-xs">[{r.scopeLevel}]</span>
                     {r.name} <span className="text-muted-foreground">({r.slug})</span>
                   </SelectItem>
                 ))}

@@ -485,28 +485,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "Vérification…",
-        "unknown": "Non vérifié",
-        "ariaLabel": "État de l'URL : {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "Inaccessible",
-        "tooltip": {
-          "title": "Sondes récentes",
-          "empty": "Aucun historique de sonde.",
-          "uptime": "{ok}/{total} ok · moy. {avgMs}ms",
-          "now": "à l'instant",
-          "secondsAgo": "il y a {seconds}s",
-          "minutesAgo": "il y a {minutes}m",
-          "hoursAgo": "il y a {hours}h",
-          "recheck": "Cliquer pour relancer la sonde",
-          "rechecking": "Nouvelle sonde…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "Le provisionnement a échoué",
@@ -897,6 +875,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "expire dans {days}j {hours}h",
+      "hours": "expire dans {hours}h {minutes}min",
+      "minutes": "expire dans {minutes}min",
+      "expired": "expirée"
+    },
+    "inviteDialog": {
+      "title": "Inviter un membre",
+      "description": "Émet un jeton d'invitation à usage unique, haché au repos. Le texte clair n'est affiché qu'une seule fois ici — partagez-le par votre canal habituel.",
+      "form": {
+        "email": "E-mail",
+        "emailPlaceholder": "nouveau@votreentreprise.com",
+        "emailHint": "L'acceptation exige que l'e-mail du compte utilisateur corresponde.",
+        "role": "Rôle (optionnel)",
+        "rolePlaceholder": "Aucun rôle — acceptation seule",
+        "roleHint": "Vous pouvez accorder : {list}",
+        "roleHintGeneric": "Si choisi, un RoleBinding est créé quand l'invitation est acceptée.",
+        "noGrantableRoles": "Vous n'avez pas la permission d'accorder un rôle. Demandez à un administrateur de l'organisation d'élargir votre accès.",
+        "expiresInDays": "Expire dans (jours)",
+        "issue": "Émettre l'invitation"
+      },
+      "search": {
+        "loading": "Recherche des membres et invitations existants…",
+        "alreadyMember": "Déjà membre",
+        "alreadyMemberHint": "Utilisez Accorder un rôle sur la page Membres pour étendre son accès.",
+        "invitationExists": "Invitation déjà envoyée",
+        "invitationHint": "Annuler ci-dessus réactive le formulaire pour réinviter avec d'autres options.",
+        "cancelAndReinvite": "Annuler et réinviter"
+      },
+      "reveal": {
+        "saveTitle": "Enregistrez ce lien maintenant",
+        "saveDescription": "Le jeton est haché en base — une fois ce dialogue fermé, le texte clair ne peut être récupéré.",
+        "recipient": "Destinataire",
+        "expiresIn": "Expire",
+        "acceptLink": "Lien d'acceptation",
+        "expHint": "Le paramètre ?exp= est un indice côté client ; le serveur vérifie toujours l'expiration à l'acceptation.",
+        "copy": "Copier",
+        "done": "Terminé"
+      },
+      "toasts": {
+        "emailRequired": "L'e-mail est requis",
+        "invitationExists": "Une invitation existe déjà pour cet e-mail — annulez-la ou choisissez une autre adresse.",
+        "created": "Invitation créée — partagez le lien ci-dessous",
+        "failed": "Échec de l'invitation",
+        "cancelledForReinvite": "Invitation existante annulée — vous pouvez réinviter.",
+        "cancelFailed": "Échec de l'annulation — actualisez et réessayez.",
+        "linkCopied": "Lien d'acceptation copié",
+        "copyFailed": "Échec de la copie — sélectionnez et copiez manuellement"
       }
     }
   },

@@ -1882,6 +1882,56 @@
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
       }
+    },
+    "invitationExpiry": {
+      "days": "expires in {days}d {hours}h",
+      "hours": "expires in {hours}h {minutes}m",
+      "minutes": "expires in {minutes}m",
+      "expired": "expired"
+    },
+    "inviteDialog": {
+      "title": "Invite member",
+      "description": "Issues a one-time, hashed-at-rest invitation token. The plaintext is shown exactly once on this screen — share it with the recipient through your usual channel.",
+      "form": {
+        "email": "Email",
+        "emailPlaceholder": "newmember@yourcorp.com",
+        "emailHint": "Acceptance requires the user's account email to match.",
+        "role": "Role (optional)",
+        "rolePlaceholder": "No role — accept-only",
+        "roleHint": "You can grant: {list}",
+        "roleHintGeneric": "If chosen, a RoleBinding is created when the invite is accepted.",
+        "noGrantableRoles": "You don't have permission to grant any role. Ask an org admin to extend your access first.",
+        "expiresInDays": "Expires in (days)",
+        "issue": "Issue invitation"
+      },
+      "search": {
+        "loading": "Checking for existing members and invitations…",
+        "alreadyMember": "Already a member",
+        "alreadyMemberHint": "Use Grant role on the members page to upgrade their access instead.",
+        "invitationExists": "Invitation already sent",
+        "invitationHint": "Cancelling above re-enables the form so you can re-invite with new options.",
+        "cancelAndReinvite": "Cancel and re-invite"
+      },
+      "reveal": {
+        "saveTitle": "Save this link now",
+        "saveDescription": "The token is hashed in the database — once you close this dialog there is no way to recover the plaintext.",
+        "recipient": "Recipient",
+        "expiresIn": "Expires",
+        "acceptLink": "Accept link",
+        "expHint": "The ?exp= parameter is a client-side hint; the server still checks expiry on accept.",
+        "copy": "Copy",
+        "done": "Done"
+      },
+      "toasts": {
+        "emailRequired": "Email is required",
+        "invitationExists": "An invitation already exists for that email — cancel it first or pick a different address.",
+        "created": "Invitation created — share the link below",
+        "failed": "Invite failed",
+        "cancelledForReinvite": "Existing invitation cancelled — you can now re-invite.",
+        "cancelFailed": "Cancel failed — refresh and try again.",
+        "linkCopied": "Accept link copied",
+        "copyFailed": "Copy failed — select and copy manually"
+      }
     }
   },
   "settingsIndex": {

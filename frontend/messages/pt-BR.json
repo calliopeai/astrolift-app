@@ -489,28 +489,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "Verificando…",
-        "unknown": "Não verificado",
-        "ariaLabel": "Saúde da URL: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "Inacessível",
-        "tooltip": {
-          "title": "Verificações recentes",
-          "empty": "Sem histórico de verificações ainda.",
-          "uptime": "{ok}/{total} ok · média {avgMs}ms",
-          "now": "agora",
-          "secondsAgo": "há {seconds}s",
-          "minutesAgo": "há {minutes}m",
-          "hoursAgo": "há {hours}h",
-          "recheck": "Clique para repetir a verificação",
-          "rechecking": "Verificando novamente…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "Provisionamento falhou",
@@ -901,6 +879,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "expira em {days}d {hours}h",
+      "hours": "expira em {hours}h {minutes}min",
+      "minutes": "expira em {minutes}min",
+      "expired": "expirado"
+    },
+    "inviteDialog": {
+      "title": "Convidar membro",
+      "description": "Emite um token de convite de uso único, com hash no repouso. O texto puro é exibido apenas uma vez aqui — compartilhe pelo seu canal habitual.",
+      "form": {
+        "email": "E-mail",
+        "emailPlaceholder": "novomembro@suaempresa.com",
+        "emailHint": "A aceitação requer que o e-mail da conta do usuário coincida.",
+        "role": "Função (opcional)",
+        "rolePlaceholder": "Sem função — apenas aceitação",
+        "roleHint": "Você pode conceder: {list}",
+        "roleHintGeneric": "Se escolhida, um RoleBinding é criado ao aceitar o convite.",
+        "noGrantableRoles": "Você não tem permissão para conceder nenhuma função. Peça a um admin da org para ampliar seu acesso.",
+        "expiresInDays": "Expira em (dias)",
+        "issue": "Emitir convite"
+      },
+      "search": {
+        "loading": "Verificando membros e convites existentes…",
+        "alreadyMember": "Já é membro",
+        "alreadyMemberHint": "Use Conceder função na página de membros para ampliar o acesso.",
+        "invitationExists": "Convite já enviado",
+        "invitationHint": "Cancelar acima reativa o formulário para reconvidar.",
+        "cancelAndReinvite": "Cancelar e reconvidar"
+      },
+      "reveal": {
+        "saveTitle": "Salve este link agora",
+        "saveDescription": "O token está com hash no banco — após fechar este diálogo não há como recuperar o texto puro.",
+        "recipient": "Destinatário",
+        "expiresIn": "Expira",
+        "acceptLink": "Link de aceitação",
+        "expHint": "O parâmetro ?exp= é uma dica do cliente; o servidor ainda verifica a expiração ao aceitar.",
+        "copy": "Copiar",
+        "done": "Concluído"
+      },
+      "toasts": {
+        "emailRequired": "E-mail é obrigatório",
+        "invitationExists": "Já existe um convite para esse e-mail — cancele primeiro ou escolha outro endereço.",
+        "created": "Convite criado — compartilhe o link abaixo",
+        "failed": "Falha no convite",
+        "cancelledForReinvite": "Convite existente cancelado — você pode reconvidar.",
+        "cancelFailed": "Falha no cancelamento — atualize e tente novamente.",
+        "linkCopied": "Link de aceitação copiado",
+        "copyFailed": "Falha ao copiar — selecione e copie manualmente"
       }
     }
   },

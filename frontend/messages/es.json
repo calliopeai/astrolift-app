@@ -485,28 +485,6 @@
       }
     },
     "detail": {
-      "urlHealth": {
-        "checking": "Comprobando…",
-        "unknown": "Sin comprobar",
-        "ariaLabel": "Estado de la URL: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "Inaccesible",
-        "tooltip": {
-          "title": "Comprobaciones recientes",
-          "empty": "Aún no hay historial de comprobaciones.",
-          "uptime": "{ok}/{total} ok · media {avgMs}ms",
-          "now": "ahora",
-          "secondsAgo": "hace {seconds}s",
-          "minutesAgo": "hace {minutes}m",
-          "hoursAgo": "hace {hours}h",
-          "recheck": "Haz clic para volver a comprobar",
-          "rechecking": "Comprobando de nuevo…"
-        }
-      }
-    },
-    "detail": {
       "reprovision": {
         "headline": {
           "failed": "El aprovisionamiento ha fallado",
@@ -897,6 +875,56 @@
         "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
         "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
         "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "expira en {days}d {hours}h",
+      "hours": "expira en {hours}h {minutes}m",
+      "minutes": "expira en {minutes}m",
+      "expired": "expirada"
+    },
+    "inviteDialog": {
+      "title": "Invitar miembro",
+      "description": "Emite un token de invitación de un solo uso, almacenado como hash. El texto plano se muestra exactamente una vez aquí — compártelo por tu canal habitual.",
+      "form": {
+        "email": "Correo electrónico",
+        "emailPlaceholder": "nuevomiembro@tuempresa.com",
+        "emailHint": "La aceptación requiere que el correo de la cuenta del usuario coincida.",
+        "role": "Rol (opcional)",
+        "rolePlaceholder": "Sin rol — solo aceptación",
+        "roleHint": "Puedes conceder: {list}",
+        "roleHintGeneric": "Si se elige, se crea un RoleBinding al aceptar la invitación.",
+        "noGrantableRoles": "No tienes permiso para conceder ningún rol. Pide a un administrador que amplíe tu acceso primero.",
+        "expiresInDays": "Expira en (días)",
+        "issue": "Emitir invitación"
+      },
+      "search": {
+        "loading": "Buscando miembros e invitaciones existentes…",
+        "alreadyMember": "Ya es miembro",
+        "alreadyMemberHint": "Usa Conceder rol en la página de miembros para subir su acceso.",
+        "invitationExists": "Invitación ya enviada",
+        "invitationHint": "Cancelar arriba vuelve a habilitar el formulario para invitar de nuevo.",
+        "cancelAndReinvite": "Cancelar y reinvitar"
+      },
+      "reveal": {
+        "saveTitle": "Guarda este enlace ahora",
+        "saveDescription": "El token está en hash en la base de datos — al cerrar este diálogo no hay forma de recuperar el texto plano.",
+        "recipient": "Destinatario",
+        "expiresIn": "Expira",
+        "acceptLink": "Enlace de aceptación",
+        "expHint": "El parámetro ?exp= es solo una pista del cliente; el servidor sigue verificando la expiración al aceptar.",
+        "copy": "Copiar",
+        "done": "Listo"
+      },
+      "toasts": {
+        "emailRequired": "El correo es obligatorio",
+        "invitationExists": "Ya existe una invitación para ese correo — cancélala primero o elige otra dirección.",
+        "created": "Invitación creada — comparte el enlace debajo",
+        "failed": "Falló la invitación",
+        "cancelledForReinvite": "Invitación existente cancelada — ya puedes reinvitar.",
+        "cancelFailed": "Falló la cancelación — actualiza y vuelve a intentar.",
+        "linkCopied": "Enlace de aceptación copiado",
+        "copyFailed": "Falló la copia — selecciona y copia manualmente"
       }
     }
   },

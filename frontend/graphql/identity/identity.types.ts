@@ -28,6 +28,7 @@ import type {
   AstroliftProject as GeneratedProject,
   AstroliftRole as GeneratedRole,
   AstroliftRoleBinding as GeneratedRoleBinding,
+  AstroliftSearchableUser as GeneratedSearchableUser,
   AstroliftTeam as GeneratedTeam,
   AstroliftUser as GeneratedUser,
   MutationError as GeneratedMutationError,
@@ -129,6 +130,17 @@ export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 export type AstroliftInvitation = Omit<GeneratedInvitation, "scopeKind" | "status"> & {
   scopeKind: ScopeKind;
   status: InvitationStatus;
+};
+
+/**
+ * Row in the invite-flow de-dupe search (#418). ``matchKind`` is a
+ * narrow string union the FE uses to switch which CTA renders (grant
+ * role to this user vs. resend / cancel the pending invitation).
+ */
+export type InvitationSearchMatchKind = "MEMBER" | "INVITATION";
+
+export type AstroliftSearchableUser = Omit<GeneratedSearchableUser, "matchKind"> & {
+  matchKind: InvitationSearchMatchKind;
 };
 
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
