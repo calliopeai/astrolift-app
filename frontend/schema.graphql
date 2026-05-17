@@ -416,6 +416,15 @@ type AstroliftAppTeamAccessMutationResult {
   data: AstroliftAppTeamAccess
 }
 
+type AstroliftAppUrlHealth {
+  url: String!
+  status: String!
+  statusCode: Int
+  latencyMs: Int
+  lastChecked: DateTime!
+  message: String!
+}
+
 type AstroliftApproverUser {
   id: String!
   email: String!
@@ -479,6 +488,19 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftBulkAssignTeamMemberRolesPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  assignedCount: Int!
+  alreadyAssignedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkAssignTeamMemberRolesPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkAssignTeamMemberRolesPayload
+}
+
 type AstroliftBulkDeploymentResultData {
   results: [AstroliftBulkDeploymentResultItem!]!
   succeededCount: Int!
@@ -496,6 +518,25 @@ type AstroliftBulkDeploymentResultItem {
   ok: Boolean!
   errors: [MutationError!]!
   deployment: AstroliftDeployment
+}
+
+type AstroliftBulkOpItemResult {
+  id: GUID!
+  ok: Boolean!
+  alreadyExisted: Boolean!
+  errors: [MutationError!]!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  revokedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkRevokeRoleBindingsPayload
 }
 
 type AstroliftCancelDeregisterPayload {
@@ -1898,6 +1939,12 @@ input BulkApproveDeploymentsInput {
   reason: String = null
 }
 
+input BulkAssignTeamMemberRolesInput {
+  teamId: GUID!
+  roleId: GUID!
+  memberIds: [GUID!]!
+}
+
 input BulkImportAppSecretsInput {
   appSlug: String!
   dotenvText: String!
@@ -1906,6 +1953,10 @@ input BulkImportAppSecretsInput {
 input BulkRejectDeploymentsInput {
   deploymentIds: [GUID!]!
   reason: String!
+}
+
+input BulkRevokeRoleBindingsInput {
+  bindingIds: [GUID!]!
 }
 
 type Bulkimportpayload {
@@ -2526,6 +2577,8 @@ type Mutation {
   softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   grantRole(input: GrantRoleInput!): AstroliftRoleBindingMutationResult!
   revokeRoleBinding(input: RevokeRoleBindingInput!): SoftdeletepayloadMutationResult!
+  bulkRevokeAstroliftRoleBindings(input: BulkRevokeRoleBindingsInput!): AstroliftBulkRevokeRoleBindingsPayloadMutationResult!
+  bulkAssignAstroliftTeamMemberRoles(input: BulkAssignTeamMemberRolesInput!): AstroliftBulkAssignTeamMemberRolesPayloadMutationResult!
   createRole(input: CreateRoleInput!): AstroliftRoleMutationResult!
   updateRole(input: UpdateRoleInput!): AstroliftRoleMutationResult!
   softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
@@ -2887,6 +2940,7 @@ type Query {
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
   astroliftMembers: [AstroliftMember!]!
+  astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
@@ -2968,6 +3022,8 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
+  astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance

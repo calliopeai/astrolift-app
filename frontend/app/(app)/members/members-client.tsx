@@ -10,6 +10,7 @@ import {
   UserPlusIcon,
   UsersIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -39,7 +40,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { REVOKE_INVITATION, REVOKE_ROLE_BINDING } from "@/graphql/identity/identity.mutations";
+import {
+  BULK_REVOKE_ROLE_BINDINGS,
+  REVOKE_INVITATION,
+  REVOKE_ROLE_BINDING,
+} from "@/graphql/identity/identity.mutations";
 import {
   LIST_INVITATIONS,
   LIST_MEMBERS,
@@ -49,6 +54,7 @@ import {
   LIST_TEAMS,
 } from "@/graphql/identity/identity.queries";
 import type {
+  AstroliftBulkRevokeRoleBindingsPayload,
   AstroliftInvitation,
   AstroliftMember,
   AstroliftProject,
@@ -57,6 +63,7 @@ import type {
   AstroliftTeam,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
 import { InviteDialog } from "./invite-dialog";
@@ -89,6 +96,13 @@ export function MembersClient() {
   const [open, setOpen] = React.useState(false);
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<RevokeTarget | null>(null);
+  // Bulk-revoke selection state (#416). A Set of binding GUIDs the
+  // operator has checked; cleared on success so the footer disappears.
+  const [selectedBindings, setSelectedBindings] = React.useState<Set<string>>(() => new Set());
+  const [confirmBulkRevoke, setConfirmBulkRevoke] = React.useState(false);
+  const tBulk = useTranslations("lists.membersBulk");
+  const perms = useMyPermissions();
+  const canManageMembers = perms.can("org.manage_members");
   const members = useQuery<MembersResp>(LIST_MEMBERS);
   const bindings = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
@@ -103,6 +117,12 @@ export function MembersClient() {
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_ROLE_BINDING, {
+    refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
+    awaitRefetchQueries: true,
+  });
+  const [bulkRevoke, { loading: bulkRevoking }] = useMutation<{
+    bulkRevokeAstroliftRoleBindings: MutationResult<AstroliftBulkRevokeRoleBindingsPayload>;
+  }>(BULK_REVOKE_ROLE_BINDINGS, {
     refetchQueries: [{ query: LIST_ROLE_BINDINGS }],
     awaitRefetchQueries: true,
   });
@@ -133,6 +153,56 @@ export function MembersClient() {
     }
   }
 
+  function toggleBinding(id: string) {
+    setSelectedBindings((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllBindings(visibleIds: string[]) {
+    setSelectedBindings((prev) => {
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      if (allSelected) return new Set();
+      return new Set(visibleIds);
+    });
+  }
+
+  async function handleBulkRevoke() {
+    const ids = Array.from(selectedBindings);
+    if (ids.length === 0) return;
+    try {
+      const { data } = await bulkRevoke({
+        variables: { input: { bindingIds: ids } },
+      });
+      const env = data?.bulkRevokeAstroliftRoleBindings;
+      if (!env?.ok || !env.data) {
+        toast.error(
+          tBulk("toasts.allFailed", {
+            message: env?.errors?.[0]?.message ?? "unknown error",
+          })
+        );
+        return;
+      }
+      const { revokedCount, failedCount } = env.data;
+      if (failedCount === 0) {
+        toast.success(tBulk("toasts.allOk", { count: revokedCount }));
+      } else {
+        toast.warning(
+          tBulk("toasts.partial", {
+            revoked: revokedCount,
+            failed: failedCount,
+          })
+        );
+      }
+      setSelectedBindings(new Set());
+    } finally {
+      setConfirmBulkRevoke(false);
+    }
+  }
+
   // Right-to-delete (GDPR) — anonymize a user's PII while preserving
   // audit-log structural records. The backend mutation tracked in #312
   // is not on main yet; the affordance ships gated + disabled so the
@@ -150,7 +220,7 @@ export function MembersClient() {
   async function handleAnonymize(_m: AstroliftMember) {
     if (!ANONYMIZE_BACKEND_READY) {
       throw new Error(
-        "anonymizeUser mutation not on main yet — tracked in #312. Re-enable once the backend wiring lands.",
+        "anonymizeUser mutation not on main yet — tracked in #312. Re-enable once the backend wiring lands."
       );
     }
     // Wiring placeholder. When #312 lands:
@@ -341,6 +411,20 @@ export function MembersClient() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {canManageMembers && (
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={tBulk("selectAllLabel")}
+                        checked={
+                          bindingList.length > 0 &&
+                          bindingList.every((b) => selectedBindings.has(b.id))
+                        }
+                        onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
+                        className="size-4"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>Subject</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Scope</TableHead>
@@ -351,6 +435,21 @@ export function MembersClient() {
               <TableBody>
                 {bindingList.map((b) => (
                   <TableRow key={b.id}>
+                    {canManageMembers && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          aria-label={tBulk("selectRowLabel", {
+                            role: b.role.slug,
+                            subject: b.user?.username ?? `group:${b.groupExternalId}`,
+                          })}
+                          checked={selectedBindings.has(b.id)}
+                          onChange={() => toggleBinding(b.id)}
+                          className="size-4"
+                          disabled={bulkRevoking}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       {b.user ? (
                         <>
@@ -379,7 +478,7 @@ export function MembersClient() {
                           size="sm"
                           variant="ghost"
                           onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
-                          disabled={revoking}
+                          disabled={revoking || bulkRevoking}
                         >
                           <Trash2Icon className="size-4" />
                           <span className="sr-only">Revoke</span>
@@ -478,6 +577,48 @@ export function MembersClient() {
         </CardContent>
       </Card>
 
+      {canManageMembers && selectedBindings.size > 0 && (
+        // Sticky bulk action bar — surfaces only while a selection is
+        // live. Mirrors the approvals-queue footer so the muscle memory
+        // ("checkbox → sticky bar → confirm") transfers across pages.
+        <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
+          <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium">
+              {tBulk("selected", { count: selectedBindings.size })}
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedBindings(new Set())}
+                disabled={bulkRevoking}
+                className="min-h-11 w-full sm:w-auto"
+              >
+                {tBulk("clear")}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setConfirmBulkRevoke(true)}
+                disabled={bulkRevoking}
+                className="min-h-11 w-full sm:w-auto"
+              >
+                <Trash2Icon className="size-4" />
+                {tBulk("revokeButton", { count: selectedBindings.size })}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmBulkRevoke}
+        onOpenChange={setConfirmBulkRevoke}
+        title={tBulk("confirm.title", { count: selectedBindings.size })}
+        description={tBulk("confirm.description")}
+        confirmLabel={tBulk("confirm.confirmLabel", { count: selectedBindings.size })}
+        destructive
+        onConfirm={handleBulkRevoke}
+      />
+
       <GrantRoleDialog
         open={open}
         onOpenChange={setOpen}
@@ -573,8 +714,7 @@ function AnonymizeUserDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : "Anonymize failed";
+      const message = err instanceof Error && err.message ? err.message : "Anonymize failed";
       toast.error(message);
     } finally {
       setPending(false);
@@ -598,17 +738,17 @@ function AnonymizeUserDialog({
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               {!backendReady && (
-                <div className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-2 rounded-md border p-3 text-xs">
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
                   <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
                   <div>
                     <p className="font-medium">Backend wiring pending</p>
                     <p className="mt-0.5">
                       The Anonymize button is disabled until the
-                      <code className="bg-amber-500/10 mx-1 rounded px-1 font-mono">
+                      <code className="mx-1 rounded bg-amber-500/10 px-1 font-mono">
                         anonymizeUser
                       </code>
-                      mutation lands. The flow, copy, and double-confirm
-                      below are reviewable; tracking under{" "}
+                      mutation lands. The flow, copy, and double-confirm below are reviewable;
+                      tracking under{" "}
                       <a
                         href="https://github.com/calliopeai/astrolift-app/issues/312"
                         target="_blank"
@@ -624,16 +764,17 @@ function AnonymizeUserDialog({
               )}
 
               <div>
-                <p className="text-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+                <p className="text-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
                   This will scrub
                 </p>
                 <ul className="text-muted-foreground list-disc space-y-0.5 pl-5 text-xs">
                   <li>
-                    <code className="bg-muted rounded px-1 font-mono">email</code>{" "}
-                    → SHA-256 hash, not reversible
+                    <code className="bg-muted rounded px-1 font-mono">email</code> → SHA-256 hash,
+                    not reversible
                   </li>
                   <li>
-                    First and last name → <code className="bg-muted rounded px-1 font-mono">[redacted]</code>
+                    First and last name →{" "}
+                    <code className="bg-muted rounded px-1 font-mono">[redacted]</code>
                   </li>
                   <li>Username → deterministic placeholder bound to the user ID</li>
                   <li>Phone, avatar URL → removed</li>
@@ -642,25 +783,25 @@ function AnonymizeUserDialog({
               </div>
 
               <div>
-                <p className="text-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+                <p className="text-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
                   This preserves
                 </p>
                 <ul className="text-muted-foreground list-disc space-y-0.5 pl-5 text-xs">
                   <li>
-                    Audit-log structural records (timestamps, action types,
-                    affected resources)
+                    Audit-log structural records (timestamps, action types, affected resources)
                   </li>
                   <li>FK relationships from past actions — referential integrity stays intact</li>
                   <li>
-                    Member <code className="bg-muted rounded px-1 font-mono">lifecycle</code>{" "}
-                    flips to <code className="bg-muted rounded px-1 font-mono">anonymized</code>; role bindings are revoked
+                    Member <code className="bg-muted rounded px-1 font-mono">lifecycle</code> flips
+                    to <code className="bg-muted rounded px-1 font-mono">anonymized</code>; role
+                    bindings are revoked
                   </li>
                 </ul>
               </div>
 
               <p className="text-destructive font-medium">
-                <strong>This action is irreversible.</strong> Re-running it on the same user
-                is a no-op; the original PII cannot be restored.
+                <strong>This action is irreversible.</strong> Re-running it on the same user is a
+                no-op; the original PII cannot be restored.
               </p>
 
               <label className="flex items-start gap-2 rounded-md border p-3 text-sm">

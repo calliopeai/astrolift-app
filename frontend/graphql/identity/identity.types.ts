@@ -170,3 +170,26 @@ export interface AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: string;
   disconnectedId: string | null;
 }
+
+/** Per-id outcome row for a bulk identity mutation. */
+export interface AstroliftBulkOpItemResult {
+  id: AstroliftGuid;
+  ok: boolean;
+  alreadyExisted: boolean;
+  errors: MutationError[];
+}
+
+/** Payload of `bulkRevokeAstroliftRoleBindings`. */
+export interface AstroliftBulkRevokeRoleBindingsPayload {
+  results: AstroliftBulkOpItemResult[];
+  revokedCount: number;
+  failedCount: number;
+}
+
+/** Payload of `bulkAssignAstroliftTeamMemberRoles`. */
+export interface AstroliftBulkAssignTeamMemberRolesPayload {
+  results: AstroliftBulkOpItemResult[];
+  assignedCount: number;
+  alreadyAssignedCount: number;
+  failedCount: number;
+}
