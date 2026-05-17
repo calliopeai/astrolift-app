@@ -567,6 +567,14 @@ class ActiveSessionType:
     user_agent: str | None
     elevated_until: dt.datetime | None = None
     elevation_method: str | None = None
+    # #496 — device attestation state. ``attestation_kind`` is one of
+    # ``none | ios_appattest | android_play_integrity``;
+    # ``attestation_trust_level`` is one of
+    # ``not_attested | genuine | unknown | failed``. ``attested_at``
+    # is the last successful verification timestamp.
+    attestation_kind: str = "none"
+    attestation_trust_level: str = "not_attested"
+    attested_at: dt.datetime | None = None
 
 
 @strawberry.type(name="AstroliftElevationStatus")
@@ -598,6 +606,9 @@ def active_session_to_type(row, *, is_current: bool) -> ActiveSessionType:
         last_seen_at=row.last_seen_at,
         ip_address=str(row.last_seen_ip) if row.last_seen_ip else None,
         user_agent=row.last_seen_agent or None,
+        attestation_kind=row.attestation_kind,
+        attestation_trust_level=row.attestation_trust_level,
+        attested_at=row.attestation_verified_at,
     )
 
 

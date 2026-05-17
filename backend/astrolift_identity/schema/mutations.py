@@ -348,6 +348,9 @@ class _RevokeAstroliftSessionPayload:
 class _HeartbeatSessionPayload:
     id: GUID
     last_seen_at: dt.datetime | None
+
+
+@strawberry.input
 class ElevateAdminSessionInput:
     """Step-up auth input (#487, spec 27 §4.1).
 
@@ -416,6 +419,79 @@ class _DeelevatePayload:
     """
 
     previously_elevated: bool
+
+
+# ---- Device attestation (#496) ----------------------------------------
+
+
+@strawberry.input
+class RequestAttestationChallengeInput:
+    """Ask the platform for a one-shot attestation nonce.
+
+    ``kind`` is ``ios_appattest | android_play_integrity``. The nonce
+    that comes back is bound to the (viewer, kind) pair — re-using
+    it on the wrong kind or for a different user fails the
+    challenge-consume check at submission time.
+    """
+
+    kind: str
+
+
+@strawberry.type(name="AstroliftAttestationChallengePayload")
+class _AttestationChallengePayload:
+    """Server-issued attestation challenge.
+
+    ``challenge`` is the nonce the client must include in its
+    attestation/integrity blob. ``expires_at`` is the absolute UTC
+    deadline after which the verifier will reject submissions.
+    """
+
+    challenge: str
+    expires_at: dt.datetime
+    kind: str
+
+
+@strawberry.input
+class AttestSessionInput:
+    """Submit an iOS App Attest / Android Play Integrity blob (#496).
+
+    Exactly one of ``attestation_object`` (iOS) and ``integrity_token``
+    (Android) is required; ``key_id`` is iOS-only.
+    """
+
+    kind: str
+    challenge: str
+    attestation_object: str | None = None
+    key_id: str | None = None
+    integrity_token: str | None = None
+
+
+@strawberry.type(name="AstroliftAttestationResult")
+class _AttestationResult:
+    """Outcome of an attestSession / assertSession call.
+
+    ``trust_level`` is the value persisted on the session row
+    (``genuine`` on success; ``failed`` on a rejected verification).
+    ``attested_at`` is the timestamp of the latest verification.
+    """
+
+    trust_level: str
+    kind: str
+    attested_at: dt.datetime | None
+    reason: str | None = None
+
+
+@strawberry.input
+class AssertSessionInput:
+    """Submit a periodic iOS App Attest assertion against an attested session.
+
+    iOS-only — Android Play Integrity is per-token + has no long-lived
+    signing key, so re-attestation goes through ``attestSession``
+    again.
+    """
+
+    assertion: str
+    challenge: str
 
 
 @strawberry.type
@@ -2258,6 +2334,153 @@ class IdentityMutation:
         was_elevated = get_status(session).elevated
         deelevate(session)
         return gql_success(_DeelevatePayload(previously_elevated=was_elevated))
+
+    # ---- Device attestation (#496) ---------------------------------
+    #
+    # ``requestAttestationChallenge`` issues a server-side nonce the
+    # mobile SDK incorporates into its App Attest / Play Integrity
+    # blob. ``attestSession`` consumes the nonce + verifies the blob
+    # against Apple / Google and persists the outcome on the session
+    # sidecar. ``assertSession`` (iOS only) periodically re-checks the
+    # attested key + bumps the monotonic counter so a replayed
+    # assertion is rejected.
+    #
+    # All three are self-only — every authed user attests their own
+    # sessions; no permission gate. The verifier rejects on its own
+    # if the install hasn't configured IOS_APP_ID / ANDROID_PACKAGE_NAME.
+
+    @strawberry.field
+    @mutation_audit(action="auth.attestation.challenge_issued")
+    def request_attestation_challenge(
+        self, info: Info, input: RequestAttestationChallengeInput
+    ) -> MutationResultType[_AttestationChallengePayload]:
+        from astrolift_identity.attestation import AttestationError
+        from astrolift_identity.attestation.service import issue_challenge
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        try:
+            row = issue_challenge(user=viewer, kind=input.kind)
+        except AttestationError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, exc.message, field="kind")
+        return gql_success(
+            _AttestationChallengePayload(
+                challenge=row.nonce,
+                expires_at=row.expires_at,
+                kind=row.kind,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="auth.attestation.submitted")
+    def attest_session(
+        self, info: Info, input: AttestSessionInput
+    ) -> MutationResultType[_AttestationResult]:
+        from astrolift_identity.attestation import AttestationError
+        from astrolift_identity.attestation.service import attest_session
+        from astrolift_identity.models import AstroliftSession
+        from astrolift_identity.sessions import record_session
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        # Bind to the current session sidecar. record_session() find-
+        # or-creates the row if the middleware hasn't yet — happens on
+        # the first request of a newly issued session.
+        row = record_session(request)
+        if row is None:
+            current_key = getattr(getattr(request, "session", None), "session_key", None)
+            if current_key:
+                row = AstroliftSession.objects.filter(
+                    session_key=current_key, user=viewer
+                ).first()
+        if row is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "no active session to attest",
+            )
+
+        try:
+            attest_session(
+                session=row,
+                kind=input.kind,
+                challenge=input.challenge,
+                attestation_object=input.attestation_object,
+                key_id=input.key_id,
+                integrity_token=input.integrity_token,
+            )
+        except AttestationError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"{exc.reason_code}: {exc.message}",
+                field="attestationObject",
+            )
+
+        row.refresh_from_db()
+        return gql_success(
+            _AttestationResult(
+                trust_level=row.attestation_trust_level,
+                kind=row.attestation_kind,
+                attested_at=row.attestation_verified_at,
+                reason=None,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="auth.attestation.asserted")
+    def assert_session(
+        self, info: Info, input: AssertSessionInput
+    ) -> MutationResultType[_AttestationResult]:
+        from astrolift_identity.attestation import AttestationError
+        from astrolift_identity.attestation.service import assert_session
+        from astrolift_identity.models import AstroliftSession
+        from astrolift_identity.sessions import record_session
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        row = record_session(request)
+        if row is None:
+            current_key = getattr(getattr(request, "session", None), "session_key", None)
+            if current_key:
+                row = AstroliftSession.objects.filter(
+                    session_key=current_key, user=viewer
+                ).first()
+        if row is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "no active session to assert",
+            )
+
+        try:
+            assert_session(
+                session=row,
+                challenge=input.challenge,
+                assertion=input.assertion,
+            )
+        except AttestationError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"{exc.reason_code}: {exc.message}",
+                field="assertion",
+            )
+
+        row.refresh_from_db()
+        return gql_success(
+            _AttestationResult(
+                trust_level=row.attestation_trust_level,
+                kind=row.attestation_kind,
+                attested_at=row.attestation_verified_at,
+                reason=None,
+            )
+        )
 
 
 def _validate_idp_config(input) -> MutationResultType | None:
