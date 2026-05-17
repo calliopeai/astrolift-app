@@ -8,7 +8,16 @@ from typing import Any, Protocol
 
 @dataclass(frozen=True)
 class ProvisionSpec:
-    """Normalized request to provision a managed service."""
+    """Normalized request to provision a managed service.
+
+    ``binding_id`` and ``managed_service_id`` carry the platform GUIDs
+    the cost collector joins on. Drivers stamp them onto the cloud-
+    side resource as ``astrolift.io/binding`` /
+    ``astrolift.io/managed_service_id`` (per-cloud serialization
+    handled in each driver's tag helper). Both default to empty so
+    older call sites continue to compile; populated specs flow through
+    from the workflow layer once #432 wiring lands.
+    """
 
     organization_id: str
     organization_slug: str
@@ -23,6 +32,8 @@ class ProvisionSpec:
     desired_extensions: list[str] = field(default_factory=list)
     tags: dict[str, str] = field(default_factory=dict)
     isolation: str = "shared"  # shared | dedicated
+    binding_id: str = ""
+    managed_service_id: str = ""
 
 
 @dataclass(frozen=True)

@@ -54,7 +54,10 @@ def tags_for(spec: ProvisionSpec) -> list[dict[str, str]]:
     console + apply tag-based budgets / IAM policies.
 
     Per memory: universal native cloud tagging schema with
-    ``astrolift.io/*`` namespace.
+    ``astrolift.io/*`` namespace. Includes ``astrolift.io/binding``
+    and ``astrolift.io/managed_service_id`` when the spec carries
+    them (#438) — these are the keys the cost collector joins on
+    in the billing API to write per-binding ``CostSnapshot`` rows.
     """
     base = {
         "astrolift.io/managed-by": "platform",
@@ -64,6 +67,10 @@ def tags_for(spec: ProvisionSpec) -> list[dict[str, str]]:
         "astrolift.io/cluster": spec.tenant_cluster_id,
         "astrolift.io/isolation": spec.isolation,
     }
+    if spec.binding_id:
+        base["astrolift.io/binding"] = spec.binding_id
+    if spec.managed_service_id:
+        base["astrolift.io/managed_service_id"] = spec.managed_service_id
     base.update({
         f"astrolift.io/extra/{k}": v
         for k, v in (spec.tags or {}).items()
