@@ -29,7 +29,6 @@ from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
 from aws.ingress_alb import ALBIngressDriver
-from aws.managed.dynamodb import DynamoDBDriver
 from aws.managed.email_ses import AmazonSESDriver
 from aws.managed.model_endpoint_bedrock import AmazonBedrockDriver
 from aws.managed.mysql_rds import RDSMySQLDriver
@@ -37,9 +36,10 @@ from aws.managed.object_store_s3 import S3Driver
 from aws.managed.postgres_rds import RDSPostgresDriver
 from aws.managed.queue_sqs import SQSDriver
 from aws.managed.redis_elasticache import ElastiCacheRedisDriver
-from aws.managed.vector_opensearch import OpenSearchVectorDriver
 from aws.managed.search_opensearch import OpenSearchSearchDriver
 from aws.managed.timeseries_timestream import TimestreamDriver
+from aws.managed.vector_opensearch import OpenSearchVectorDriver
+from aws.notification_sns import SNSNotificationDriver
 from aws.registry_ecr import ECRDriver
 from aws.secrets import AWSSecretsBackend
 from aws.tls_acm import ACMDriver
@@ -57,6 +57,7 @@ PLUGIN = ProviderPlugin(
         "tls": ACMDriver,
         "cluster": EKSClusterDriver,
         "ingress": ALBIngressDriver,
+        "notification": SNSNotificationDriver,
     },
     managed_service_drivers={
         # #35 + #351 + #352 — high-traffic kinds (web app + queue +
@@ -89,8 +90,7 @@ PLUGIN = ProviderPlugin(
             "cluster_oidc_issuer": {
                 "type": "string",
                 "description": (
-                    "EKS cluster's OIDC issuer URL (without https://). "
-                    "Required for IRSA workload identity."
+                    "EKS cluster's OIDC issuer URL (without https://). Required for IRSA workload identity."
                 ),
             },
             "ecr_image_tag_mutability": {
@@ -98,8 +98,7 @@ PLUGIN = ProviderPlugin(
                 "enum": ["IMMUTABLE", "MUTABLE"],
                 "default": "IMMUTABLE",
                 "description": (
-                    "ECR tag mutability. IMMUTABLE prevents tag "
-                    "overwrites and is recommended for production."
+                    "ECR tag mutability. IMMUTABLE prevents tag overwrites and is recommended for production."
                 ),
             },
             "ecr_image_scanning_enabled": {
@@ -132,10 +131,7 @@ PLUGIN = ProviderPlugin(
             "irsa_role_path": {
                 "type": "string",
                 "default": "/astrolift/",
-                "description": (
-                    "IAM role path for platform-created roles. "
-                    "Helps operators apply tag-based budgets."
-                ),
+                "description": ("IAM role path for platform-created roles. Helps operators apply tag-based budgets."),
             },
         },
     },

@@ -38,6 +38,7 @@ from gcp.managed.redis_memorystore import MemorystoreRedisDriver
 from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
 from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
 from gcp.managed.vector_vertex import VertexMatchingEngineDriver
+from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
 from gcp.tls_managed import GCPManagedCertDriver
@@ -53,6 +54,7 @@ PLUGIN = ProviderPlugin(
         "tls": GCPManagedCertDriver,
         "cluster": GKEClusterDriver,
         "ingress": GCPIngressDriver,
+        "notification": FCMNotificationDriver,
     },
     managed_service_drivers={
         ("object_store", "gcs"): GCSDriver,
@@ -81,23 +83,15 @@ PLUGIN = ProviderPlugin(
             },
             "zone": {
                 "type": "string",
-                "description": (
-                    "Default GCP zone (e.g. us-central1-a). "
-                    "Required for zonal GKE clusters."
-                ),
+                "description": ("Default GCP zone (e.g. us-central1-a). Required for zonal GKE clusters."),
             },
             "cluster_oidc_issuer": {
                 "type": "string",
-                "description": (
-                    "GKE cluster's workload identity pool URL."
-                ),
+                "description": ("GKE cluster's workload identity pool URL."),
             },
             "artifact_registry_repo": {
                 "type": "string",
-                "description": (
-                    "Pre-created Artifact Registry repository ID. "
-                    "Driver will auto-create if missing."
-                ),
+                "description": ("Pre-created Artifact Registry repository ID. Driver will auto-create if missing."),
             },
             "ingress_variant": {
                 "type": "string",
@@ -107,16 +101,11 @@ PLUGIN = ProviderPlugin(
             "managed_cert_name_prefix": {
                 "type": "string",
                 "default": "astrolift",
-                "description": (
-                    "Prefix for GCP-managed SslCertificate resources."
-                ),
+                "description": ("Prefix for GCP-managed SslCertificate resources."),
             },
             "kms_key": {
                 "type": "string",
-                "description": (
-                    "Optional CMEK KMS key resource for Secret Manager "
-                    "+ Artifact Registry encryption."
-                ),
+                "description": ("Optional CMEK KMS key resource for Secret Manager + Artifact Registry encryption."),
             },
             "bucket_name_prefix": {
                 "type": "string",
