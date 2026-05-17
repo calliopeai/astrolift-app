@@ -1,25 +1,43 @@
 """
-Tests for the notification dispatch pipeline (#476 + #499).
+Tests for the notification dispatch pipeline (#476 + #499 + #519).
 
-Real Postgres for model writes + a swappable in-memory driver for
-the outbound send path. Exercises:
+Real Postgres for model writes + an SDK-shaped in-memory driver
+(``tests/fixtures/notification_driver.MemoryNotificationDriver``)
+for the outbound send path. After #519 the dispatcher targets the
+canonical ``_sdk.notification.NotificationDriver`` protocol; the
+fixture installs through a test-only override hook
+(``set_driver_override_for_tests``).
 
-* Event subscriber wiring — every ``Event.emit`` flows through the
+Exercises:
+
+* Event subscriber wiring -- every ``Event.emit`` flows through the
   dispatcher after the persistent ``Event`` row is written.
-* Per-event templates (deploy/secret/alert/cluster/app/session).
+* Per-event templates (deploy / secret / alert / cluster / app / session).
 * Per-user opt-out via ``NotificationPreference``.
-* Stale-token auto-soft-delete on a ``"stale"`` driver result.
+* SDK ``invalid_token`` -> auto-soft-delete the device row.
 * Dispatcher excludes the just-issued session's own enrolled device
   for ``auth.session.created`` (#499).
 * GraphQL mutations + queries for register / revoke / list /
   preference set.
+* #519: dispatcher routes through ``PushTarget`` + the canonical
+  ``NotificationPayload``; no ``MemoryNotificationDriver`` import
+  in production code; driver resolution falls back to ``no_driver``
+  audit when neither override nor ``NotificationProfile`` exists.
 """
 
 from __future__ import annotations
 
+import importlib
+import inspect
+import pathlib
 import uuid
 
 import pytest
+from _sdk.notification import (
+    DevicePlatform,
+    NotificationPayload,
+    PushTarget,
+)
 from django.contrib.auth import get_user_model
 
 import core.events as _events_mod
@@ -28,13 +46,17 @@ from astrolift_operations.models import (
     AuditEvent,
     DeviceRegistration,
     NotificationPreference,
+    NotificationProfile,
 )
 from astrolift_operations.notification_dispatch import (
-    MemoryNotificationDriver,
+    NOTIFICATION_TEMPLATES,
+    _build_driver_from_profile,
+    default_driver_slug_for_registration,
     dispatch_event,
     emit_session_created_event,
-    get_driver,
-    register_driver,
+    resolve_driver_for_recipient,
+    set_driver_override_for_tests,
+    unset_driver_override_for_tests,
 )
 from astrolift_operations.schema.mutations import (
     OperationsMutation,
@@ -43,6 +65,9 @@ from astrolift_operations.schema.mutations import (
     SetNotificationPreferenceInput,
 )
 from astrolift_operations.schema.queries import OperationsQuery
+from astrolift_operations.tests.fixtures.notification_driver import (
+    MemoryNotificationDriver,
+)
 from core.events import (
     Event as EventEmitter,
 )
@@ -69,13 +94,12 @@ def _no_opensearch(monkeypatch):
 
 @pytest.fixture
 def fake_driver():
-    """Install a fresh MemoryNotificationDriver for the duration of
-    the test, restore the previous one on teardown."""
-    previous = get_driver()
+    """Install a fresh SDK-shaped fake driver as the dispatcher's
+    override for the duration of the test, clear on teardown."""
     driver = MemoryNotificationDriver()
-    register_driver(driver)
+    set_driver_override_for_tests(driver)
     yield driver
-    register_driver(previous)
+    unset_driver_override_for_tests()
 
 
 @pytest.fixture
@@ -119,6 +143,7 @@ def _device(
     label: str = "",
     enrolled_session=None,
     organization=None,
+    driver: str = "memory",
 ) -> DeviceRegistration:
     token = token or f"tok-{uuid.uuid4().hex}"
     return DeviceRegistration.objects.create(
@@ -126,7 +151,7 @@ def _device(
         device_token=token,
         platform=platform,
         label=label,
-        driver="memory",
+        driver=driver,
         enrolled_session=enrolled_session,
         organization=organization,
     )
@@ -157,16 +182,20 @@ def test_event_emit_invokes_dispatcher_after_writer(fake_driver, ensure_dispatch
         )
 
     assert len(fake_driver.sent) == 1
-    _token, platform, payload = fake_driver.sent[0]
+    _registration_id, platform, payload = fake_driver.sent[0]
     assert platform == "ios"
-    assert payload.event_type == "deploy.approved"
     assert payload.title.startswith("Deploy")
     assert "demo" in payload.body
     assert payload.action_url == "astrolift://deployments/d-123"
+    # SDK payload carries the event_type via ``category`` and via
+    # the ``data`` blob (the dispatcher emits both so the FCM ``data``
+    # path stays addressable).
+    assert payload.category == "deploy.approved"
+    assert payload.data["event_type"] == "deploy.approved"
 
 
 def test_no_template_skips_dispatch(fake_driver, ensure_dispatcher_subscribed):
-    """Unknown event types are silently ignored — the platform
+    """Unknown event types are silently ignored -- the platform
     emits dozens of low-signal events the dispatcher must not
     pretend to handle."""
     user = _user()
@@ -339,7 +368,7 @@ def test_opt_out_suppresses_push_and_audits_skip(fake_driver, ensure_dispatcher_
 
 
 def test_default_off_for_cli_session_created(fake_driver, ensure_dispatcher_subscribed):
-    """Per #499 §E — CLI sessions default OFF to avoid CI noise."""
+    """Per #499 §E -- CLI sessions default OFF to avoid CI noise."""
     user = _user()
     org = _org()
     _member(user, org)
@@ -347,7 +376,7 @@ def test_default_off_for_cli_session_created(fake_driver, ensure_dispatcher_subs
 
     emit_session_created_event(
         user_id=user.pk,
-        session_pk=1,  # synthetic — no real session row for this branch
+        session_pk=1,  # synthetic -- no real session row for this branch
         session_guid="s-cli",
         client_kind="cli",
         ip_address=None,
@@ -382,12 +411,15 @@ def test_default_on_for_mobile_session_created(fake_driver, ensure_dispatcher_su
 # ---- stale token soft-delete ----------------------------------------
 
 
-def test_stale_token_marks_row_stale_and_soft_deletes(fake_driver, ensure_dispatcher_subscribed):
+def test_invalid_token_marks_row_stale_and_soft_deletes(fake_driver, ensure_dispatcher_subscribed):
+    """SDK ``invalid_token`` status -> dispatcher marks the device
+    row stale + soft-deletes (the SDK Protocol contract says this
+    status is the only one that drops the device row)."""
     user = _user()
     org = _org()
     _member(user, org)
     device = _device(user=user, label="dead-phone", token="dead-token")
-    fake_driver.force_stale.add("dead-token")
+    fake_driver.force_invalid_token.add("dead-token")
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
         EventEmitter.emit(
@@ -400,29 +432,15 @@ def test_stale_token_marks_row_stale_and_soft_deletes(fake_driver, ensure_dispat
     assert device.deleted_at is not None
 
 
-def test_dropped_token_marks_row_stale(fake_driver, ensure_dispatcher_subscribed):
+def test_failed_send_does_not_mark_stale(fake_driver, ensure_dispatcher_subscribed):
+    """A generic ``failed`` status (provider 5xx, bad payload etc.)
+    is audit-only -- the dispatcher does NOT drop the device because
+    the next send might succeed."""
     user = _user()
     org = _org()
     _member(user, org)
-    device = _device(user=user, token="bad-token")
-    fake_driver.force_drop.add("bad-token")
-
-    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
-        EventEmitter.emit(
-            "deploy.approved",
-            {"deployment_guid": "d-1", "triggerer_user_id": user.pk},
-        )
-
-    device.refresh_from_db()
-    assert device.stale_at is not None
-
-
-def test_retry_does_not_mark_stale(fake_driver, ensure_dispatcher_subscribed):
-    user = _user()
-    org = _org()
-    _member(user, org)
-    device = _device(user=user, token="retry-token")
-    fake_driver.force_retry.add("retry-token")
+    device = _device(user=user, token="failing-token")
+    fake_driver.force_failed.add("failing-token")
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
         EventEmitter.emit(
@@ -435,12 +453,369 @@ def test_retry_does_not_mark_stale(fake_driver, ensure_dispatcher_subscribed):
     assert device.deleted_at is None
 
 
+def test_rate_limited_does_not_mark_stale(fake_driver, ensure_dispatcher_subscribed):
+    """``rate_limited`` is a transient signal; the dispatcher logs
+    it but does not retry inline + does not drop the device."""
+    user = _user()
+    org = _org()
+    _member(user, org)
+    device = _device(user=user, token="hot-token")
+    fake_driver.force_rate_limited.add("hot-token")
+
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
+        EventEmitter.emit(
+            "deploy.approved",
+            {"deployment_guid": "d-1", "triggerer_user_id": user.pk},
+        )
+
+    device.refresh_from_db()
+    assert device.stale_at is None
+    assert device.deleted_at is None
+
+
+# ---- #519: SDK-shaped routing ---------------------------------------
+
+
+def test_dispatcher_emits_pushtarget_with_sdk_platform(fake_driver, ensure_dispatcher_subscribed):
+    """The dispatcher must call ``driver.send`` with a ``PushTarget``
+    + a canonical ``NotificationPayload`` (no local Protocol)."""
+
+    captured: list[tuple] = []
+    original_send = fake_driver.send
+
+    def spy_send(*, target, payload):
+        captured.append((target, payload))
+        return original_send(target=target, payload=payload)
+
+    fake_driver.send = spy_send  # type: ignore[method-assign]
+
+    user = _user()
+    org = _org()
+    _member(user, org)
+    _device(user=user, platform="android", token="andro-1")
+
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
+        EventEmitter.emit(
+            "deploy.approved",
+            {"deployment_guid": "d-1", "triggerer_user_id": user.pk},
+        )
+
+    assert len(captured) == 1
+    target, payload = captured[0]
+    assert isinstance(target, PushTarget)
+    assert target.platform == DevicePlatform.ANDROID
+    assert target.registration_id == "andro-1"
+    assert isinstance(payload, NotificationPayload)
+    assert payload.title.startswith("Deploy")
+
+
+def test_web_push_platform_maps_to_sdk_web(fake_driver, ensure_dispatcher_subscribed):
+    """The DB platform ``web_push`` maps to the SDK enum's ``WEB``
+    member (the platforms aren't named identically)."""
+    user = _user()
+    org = _org()
+    _member(user, org)
+    _device(user=user, platform="web_push", token="webp-1")
+
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
+        EventEmitter.emit(
+            "deploy.approved",
+            {"deployment_guid": "d-1", "triggerer_user_id": user.pk},
+        )
+
+    assert len(fake_driver.sent) == 1
+    registration_id, platform_str, _payload = fake_driver.sent[0]
+    assert registration_id == "webp-1"
+    assert platform_str == "web"
+
+
+# ---- #519: no production-side MemoryNotificationDriver -------------
+
+
+def test_memory_driver_is_only_in_test_fixtures():
+    """The MemoryNotificationDriver must NOT live anywhere under
+    ``astrolift_operations/`` except ``tests/fixtures/``. #519's
+    reconcile pulled it out of production code; this is a guard
+    against a future regression that re-introduces a non-SDK
+    fallback driver in the dispatcher path."""
+    ops_root = pathlib.Path(
+        importlib.import_module("astrolift_operations").__file__,
+    ).parent
+
+    for py_file in ops_root.rglob("*.py"):
+        rel = py_file.relative_to(ops_root)
+        # tests/fixtures is the canonical home for the fixture; the
+        # test module itself is allowed to import + use it. Both are
+        # test-tree paths, not production.
+        if rel.parts and rel.parts[0] == "tests":
+            continue
+        text = py_file.read_text(encoding="utf-8")
+        assert "MemoryNotificationDriver" not in text, (
+            f"{rel} mentions MemoryNotificationDriver; production code "
+            "must not reference the in-memory driver after #519. Use "
+            "tests/fixtures/notification_driver.py instead."
+        )
+
+
+def test_dispatcher_module_does_not_define_local_notification_driver_protocol():
+    """The pre-#519 local ``NotificationDriver`` Protocol must be
+    gone -- the dispatcher consumes the canonical SDK Protocol."""
+    from astrolift_operations import notification_dispatch
+
+    proto = notification_dispatch.NotificationDriver
+    assert proto.__module__ == "_sdk.notification", (
+        f"NotificationDriver must come from _sdk.notification; got {proto.__module__!r}"
+    )
+
+
+def test_dispatcher_module_does_not_define_local_notification_payload():
+    """Same shape rule for ``NotificationPayload`` -- the dispatcher
+    re-exports the SDK type, doesn't define its own."""
+    from astrolift_operations import notification_dispatch
+
+    payload_cls = notification_dispatch.NotificationPayload
+    assert payload_cls.__module__ == "_sdk.notification"
+
+
+# ---- #519: driver resolution from NotificationProfile ---------------
+
+
+def test_no_driver_no_profile_audits_and_drops(ensure_dispatcher_subscribed):
+    """With neither a test override nor an active NotificationProfile
+    the dispatcher writes a ``no_driver`` audit row and drops the
+    send -- no fallback to a memory driver in production."""
+    # Explicitly clear any override left by an earlier test run.
+    unset_driver_override_for_tests()
+
+    user = _user()
+    org = _org()
+    _member(user, org)
+    _device(user=user)
+
+    AuditEvent.objects.all().delete()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
+        EventEmitter.emit(
+            "deploy.approved",
+            {"deployment_guid": "d-1", "triggerer_user_id": user.pk},
+        )
+
+    audits = list(AuditEvent.objects.filter(action="notification.push").values_list("data", flat=True))
+    assert any(a.get("status") == "no_driver" for a in audits)
+
+
+def test_resolve_driver_for_recipient_uses_active_profile(monkeypatch):
+    """``resolve_driver_for_recipient`` builds the right per-cloud
+    driver from the org's active ``NotificationProfile`` row."""
+    unset_driver_override_for_tests()
+    org = _org()
+    NotificationProfile.objects.create(
+        organization=org,
+        driver="aws_sns",
+        config={
+            "region": "us-west-2",
+            "platform_applications": {
+                "ios": "arn:aws:sns:us-west-2:111:app/APNS/ios",
+                "android": "arn:aws:sns:us-west-2:111:app/GCM/android",
+            },
+        },
+    )
+
+    # Stub out boto3 so the SNS driver constructor doesn't try to
+    # talk to AWS during import.
+    built: list = []
+
+    class _Stub:
+        name = "aws_sns"
+
+    def fake_build(*, driver_slug, config):
+        built.append((driver_slug, config))
+        return _Stub()
+
+    monkeypatch.setattr(
+        "astrolift_operations.notification_dispatch._build_driver_from_profile",
+        fake_build,
+    )
+    driver = resolve_driver_for_recipient(user_id=1, organization_id=org.id)
+    assert driver is not None
+    assert driver.name == "aws_sns"
+    assert built == [
+        (
+            "aws_sns",
+            {
+                "region": "us-west-2",
+                "platform_applications": {
+                    "ios": "arn:aws:sns:us-west-2:111:app/APNS/ios",
+                    "android": "arn:aws:sns:us-west-2:111:app/GCM/android",
+                },
+            },
+        )
+    ]
+
+
+def test_resolve_driver_for_recipient_test_override_short_circuits():
+    """The test override beats the NotificationProfile lookup -- a
+    test fixture installed on top of a profile-configured org must
+    intercept the send."""
+    org = _org()
+    NotificationProfile.objects.create(
+        organization=org,
+        driver="aws_sns",
+        config={"region": "us-west-2", "platform_applications": {"ios": "x"}},
+    )
+    fixture = MemoryNotificationDriver()
+    set_driver_override_for_tests(fixture)
+    try:
+        driver = resolve_driver_for_recipient(user_id=1, organization_id=org.id)
+        assert driver is fixture
+    finally:
+        unset_driver_override_for_tests()
+
+
+def test_resolve_driver_for_recipient_returns_none_when_unconfigured():
+    """No override + no profile -> ``None`` (caller audits ``no_driver``)."""
+    unset_driver_override_for_tests()
+    assert resolve_driver_for_recipient(user_id=1, organization_id=None) is None
+    org = _org()
+    assert resolve_driver_for_recipient(user_id=1, organization_id=org.id) is None
+
+
+def test_resolve_driver_swallows_build_failure_and_returns_none(monkeypatch):
+    """A bad NotificationProfile config (e.g. an unknown driver
+    slug) must not raise into the dispatcher -- the resolver
+    returns ``None`` so the caller audits ``no_driver``."""
+    unset_driver_override_for_tests()
+    org = _org()
+    NotificationProfile.objects.create(
+        organization=org,
+        driver="bogus_driver",  # not in the per-slug factory
+        config={},
+    )
+    assert resolve_driver_for_recipient(user_id=1, organization_id=org.id) is None
+
+
+# ---- _build_driver_from_profile per-slug factory --------------------
+
+
+def test_build_driver_unknown_slug_raises():
+    with pytest.raises(ValueError, match="unknown notification driver"):
+        _build_driver_from_profile(driver_slug="nope", config={})
+
+
+def test_build_driver_aws_sns_builds_real_driver_class():
+    """The AWS branch builds an actual ``SNSNotificationDriver``
+    instance -- the dispatcher then routes ``driver.send`` into
+    the canonical per-cloud impl."""
+    from aws.notification_sns import SNSNotificationDriver
+
+    # Provide a no-op SNS client so the constructor doesn't try to
+    # mint a boto3 client in CI.
+    class _NoopSNS:
+        def create_platform_endpoint(self, **kw):
+            return {"EndpointArn": "arn:fake"}
+
+        def delete_endpoint(self, **kw):
+            return None
+
+        def publish(self, **kw):
+            return {"MessageId": "fake"}
+
+    # The factory does not accept an injected client; cover the
+    # branch with monkeypatch on boto3.client to avoid the env dep.
+    import sys
+
+    fake_boto3 = type("_FakeBoto3", (), {"client": staticmethod(lambda *_a, **_kw: _NoopSNS())})()
+    sys.modules.setdefault("boto3", fake_boto3)
+
+    driver = _build_driver_from_profile(
+        driver_slug="aws_sns",
+        config={
+            "region": "us-west-2",
+            "platform_applications": {
+                "ios": "arn:aws:sns:us-west-2:1:app/APNS/x",
+            },
+        },
+    )
+    assert isinstance(driver, SNSNotificationDriver)
+    assert driver.name == "aws_sns"
+
+
+def test_build_driver_otlp_webhook_builds_real_driver_class():
+    from k8s_native.notification_otlp import WebhookSMTPNotificationDriver
+
+    driver = _build_driver_from_profile(
+        driver_slug="otlp_webhook",
+        config={
+            "channels": ["webhook"],
+            "default_webhook_url": "https://example.invalid/notify",
+        },
+    )
+    assert isinstance(driver, WebhookSMTPNotificationDriver)
+    assert driver.name == "otlp_webhook"
+
+
+def test_build_driver_multiplexer_recursively_builds_children():
+    from _sdk.notification import MultiplexerNotificationDriver
+
+    driver = _build_driver_from_profile(
+        driver_slug="multiplexer",
+        config={
+            "primary": {
+                "driver": "otlp_webhook",
+                "config": {"default_webhook_url": "https://x/y"},
+            },
+            "secondaries": [
+                {
+                    "driver": "otlp_webhook",
+                    "config": {"default_webhook_url": "https://a/b"},
+                },
+            ],
+        },
+    )
+    assert isinstance(driver, MultiplexerNotificationDriver)
+
+
+# ---- driver-slug stamp on registration ------------------------------
+
+
+def test_default_driver_slug_from_active_profile():
+    """``register_mobile_device`` stamps the device row with the
+    install's active driver slug -- the dispatcher later refuses
+    to send through a row whose slug doesn't match the install's
+    active driver."""
+    unset_driver_override_for_tests()
+    org = _org()
+    NotificationProfile.objects.create(
+        organization=org,
+        driver="gcp_fcm",
+        config={"project_id": "demo"},
+    )
+    slug = default_driver_slug_for_registration(organization_id=org.id)
+    assert slug == "gcp_fcm"
+
+
+def test_default_driver_slug_test_override_stamps_memory():
+    fixture = MemoryNotificationDriver()
+    set_driver_override_for_tests(fixture)
+    try:
+        slug = default_driver_slug_for_registration(organization_id=None)
+        assert slug == "memory"
+    finally:
+        unset_driver_override_for_tests()
+
+
+def test_default_driver_slug_unconfigured_when_no_profile():
+    unset_driver_override_for_tests()
+    org = _org()
+    slug = default_driver_slug_for_registration(organization_id=org.id)
+    assert slug == "unconfigured"
+
+
 # ---- #499 session-create excludes own device ------------------------
 
 
 def test_session_created_skips_enrolled_device(fake_driver, ensure_dispatcher_subscribed):
     """The just-issued session's own device must NOT receive its
-    own 'new sign-in' push — that's spam to the device the user is
+    own 'new sign-in' push -- that's spam to the device the user is
     actively holding."""
     user = _user()
     org = _org()
@@ -483,10 +858,10 @@ def test_session_created_skips_enrolled_device(fake_driver, ensure_dispatcher_su
 
 
 def test_session_created_no_other_devices_silent(fake_driver, ensure_dispatcher_subscribed):
-    """Per #499 — silently skip if the user has 0 other devices.
+    """Per #499 -- silently skip if the user has 0 other devices.
     The device the user is currently signing in on is excluded;
     if it's their only device the dispatcher emits no push (and
-    an email-fallback could fire separately — out of scope here)."""
+    an email-fallback could fire separately -- out of scope here)."""
     user = _user()
     org = _org()
     _member(user, org)
@@ -536,6 +911,29 @@ def test_each_dispatch_writes_audit_event(fake_driver, ensure_dispatcher_subscri
     assert row.decision == "ALLOW"
     assert row.data["status"] == "delivered"
     assert row.data["event_type"] == "deploy.approved"
+    # #519: audit carries the driver name so an operator can tell
+    # which provider delivered (or skipped) a given push.
+    assert row.data["driver"] == "memory"
+
+
+def test_invalid_token_audit_is_deny(fake_driver, ensure_dispatcher_subscribed):
+    user = _user()
+    org = _org()
+    _member(user, org)
+    _device(user=user, token="bad")
+    fake_driver.force_invalid_token.add("bad")
+
+    AuditEvent.objects.all().delete()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
+        EventEmitter.emit(
+            "deploy.approved",
+            {"deployment_guid": "d-1", "triggerer_user_id": user.pk},
+        )
+
+    row = AuditEvent.objects.filter(action="notification.push").first()
+    assert row is not None
+    assert row.decision == "DENY"
+    assert row.data["status"] == "invalid_token"
 
 
 # ---- GraphQL surface ------------------------------------------------
@@ -573,6 +971,30 @@ def test_register_mobile_device_creates_row(fake_driver):
     assert DeviceRegistration.objects.filter(user=user).count() == 1
 
 
+def test_register_mobile_device_stamps_driver_from_profile():
+    """When an org has an active ``NotificationProfile``, the new
+    device row carries that driver slug -- no test override here."""
+    unset_driver_override_for_tests()
+    user = _user()
+    org = _org()
+    _member(user, org)
+    NotificationProfile.objects.create(
+        organization=org,
+        driver="aws_sns",
+        config={"region": "us-west-2", "platform_applications": {"ios": "x"}},
+    )
+
+    info = _FakeInfo(_FakeRequest(user))
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
+        result = OperationsMutation().register_mobile_device(
+            info=info,
+            input=RegisterMobileDeviceInput(device_token="t-1", platform="ios", label="x"),
+        )
+    assert result.ok is True
+    row = DeviceRegistration.objects.get(user=user)
+    assert row.driver == "aws_sns"
+
+
 def test_register_mobile_device_re_register_resurrects_row(fake_driver):
     user = _user()
     info = _FakeInfo(_FakeRequest(user))
@@ -594,7 +1016,7 @@ def test_register_mobile_device_re_register_resurrects_row(fake_driver):
     assert row.stale_at is None
     assert row.deleted_at is None
     assert row.label == "second"
-    # Still exactly one row — the resurrect didn't insert a duplicate.
+    # Still exactly one row -- the resurrect didn't insert a duplicate.
     assert DeviceRegistration.all_objects.filter(user=user).count() == 1
 
 
@@ -768,7 +1190,7 @@ def test_my_notification_preferences_overlays_explicit_row():
 
 def test_payload_strings_are_truncated(fake_driver, ensure_dispatcher_subscribed):
     """A pathological emit payload must not produce an over-size
-    push — both APNs and FCM cap at ~4 KiB total."""
+    push -- both APNs and FCM cap at ~4 KiB total."""
     user = _user()
     org = _org()
     _member(user, org)
@@ -791,3 +1213,52 @@ def test_payload_strings_are_truncated(fake_driver, ensure_dispatcher_subscribed
     assert len(payload.body) <= 240
     # Action URL goes through the same truncation cap.
     assert len(payload.action_url) <= 240
+
+
+# ---- template catalog completeness ---------------------------------
+
+
+def test_all_pre_519_templates_still_in_catalog():
+    """Regression guard: every event template that shipped pre-#519
+    must remain in ``NOTIFICATION_TEMPLATES`` so a future
+    reconciliation can't silently drop a fan-out kind."""
+    expected = {
+        "deploy.approved",
+        "deploy.rejected",
+        "deploy.failed",
+        "secret.revealed",
+        "alert.fired",
+        "cluster.bootstrap_failed",
+        "app.deregister_pending",
+        "auth.session.created",
+    }
+    assert expected <= set(NOTIFICATION_TEMPLATES.keys())
+
+
+# ---- SDK protocol compliance of the test fixture --------------------
+
+
+def test_memory_driver_implements_sdk_protocol():
+    """The fixture must satisfy the SDK ``NotificationDriver``
+    Protocol -- if a sibling agent reshapes the Protocol the test
+    suite catches the drift before the dispatcher does.
+
+    The SDK Protocol is not ``@runtime_checkable`` (mypy enforces
+    conformance at lint time), so we do structural checks here:
+    every required method must be present, and ``send``'s keyword
+    signature must keep ``target`` + ``payload`` since the
+    dispatcher's call shape depends on it.
+    """
+    fixture = MemoryNotificationDriver()
+    # Every required Protocol method must be callable.
+    for method in ("register_device", "revoke_device", "send", "send_bulk", "healthcheck"):
+        assert callable(getattr(fixture, method)), f"fixture is missing required Protocol method {method!r}"
+    # The ``name`` attribute is the registry identifier.
+    assert isinstance(fixture.name, str) and fixture.name
+    # ``send`` and ``send_bulk`` keep their kw-only signature so the
+    # dispatcher's ``driver.send(target=..., payload=...)`` call
+    # signature stays load-bearing.
+    sig = inspect.signature(fixture.send)
+    assert {"target", "payload"} <= set(sig.parameters)
+    bulk_sig = inspect.signature(fixture.send_bulk)
+    assert {"targets", "payload"} <= set(bulk_sig.parameters)
