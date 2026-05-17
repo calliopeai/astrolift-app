@@ -276,6 +276,37 @@ def api_token_to_type(token) -> ApiTokenType:
     )
 
 
+@strawberry.type(name="AstroliftEnrollmentQrPayload")
+class EnrollmentQrPayloadType:
+    """Return shape for ``generateInstallEnrollmentQr`` (#494).
+
+    The mutation hands the operator everything needed to render the
+    QR + a fallback URL:
+
+    * ``qr_payload`` — opaque base64-encoded JSON the mobile QR
+      scanner decodes. Contains the install URL, label, enrollment
+      token, and expiry per the spec.
+    * ``qr_svg`` — server-rendered SVG markup. The FE renders this
+      directly so we don't need a client-side QR library (which
+      would mean a new npm dep on every install). Contains no
+      JavaScript; safe to embed via ``dangerouslySetInnerHTML``.
+    * ``verification_uri`` — human-readable URL the operator can
+      paste on the device as a fallback if the QR is unreadable.
+    * ``session_id`` + ``session_guid`` — identifies the row that
+      will be flipped to ``consumed`` when the mobile redeems the
+      QR, so the FE's listing UI can refetch on a successful pair.
+    * ``expires_at`` — when the enrollment token lapses; FE drives
+      a countdown + auto-refresh from this.
+    """
+
+    qr_payload: str
+    qr_svg: str
+    verification_uri: str
+    session_id: str
+    session_guid: GUID
+    expires_at: dt.datetime
+
+
 @strawberry.type(name="AstroliftIdentityProvider")
 class IdentityProviderType:
     """One configured identity provider (Auth0 / OIDC / Cognito / local / …).

@@ -47,10 +47,17 @@ class DeviceFlowSession(BaseCoreModel):
     STATE_DENIED = "denied"
     STATE_CONSUMED = "consumed"
     STATE_EXPIRED = "expired"
+    # Mobile enrollment (#494): the operator's web session already
+    # vouched for this row at generation time, so the row skips
+    # ``pending`` → ``approved`` and lands at ``pre_approved`` waiting
+    # for the mobile to redeem the QR. The redemption transitions
+    # straight to ``consumed`` like the browser-approved path.
+    STATE_PRE_APPROVED = "pre_approved"
 
     STATE_CHOICES = (
         (STATE_PENDING, "pending"),
         (STATE_APPROVED, "approved"),
+        (STATE_PRE_APPROVED, "pre_approved"),
         (STATE_DENIED, "denied"),
         (STATE_CONSUMED, "consumed"),
         (STATE_EXPIRED, "expired"),
@@ -141,12 +148,55 @@ class DeviceFlowSession(BaseCoreModel):
     # minted it).
     access_token_expires_at = models.DateTimeField(null=True, blank=True)
 
+    # ---- mobile QR enrollment (#494) -----------------------------------
+    # SHA-256 of an ``alft_enroll_…`` token the operator generated via
+    # ``generateInstallEnrollmentQr``. Mobile presents the plaintext on
+    # ``/api/cli/v1/auth/start`` and the row short-circuits the browser
+    # approval step — the operator's web session is the proof, the
+    # enrollment token is the handoff. Single-use: cleared on first
+    # consumption.
+    enrollment_token_hash = models.CharField(max_length=128, blank=True, default="", db_index=True)
+    enrollment_token_last_4 = models.CharField(max_length=4, blank=True, default="")
+    enrollment_token_expires_at = models.DateTimeField(null=True, blank=True)
+    # When the enrollment token was burned by the mobile client. NULL
+    # means the QR is still claimable; non-NULL means terminal for the
+    # enrollment side regardless of session state.
+    enrollment_consumed_at = models.DateTimeField(null=True, blank=True)
+    # Operator-supplied label that distinguishes this enrollment in
+    # ``astroliftMyEnrollments`` listings ("Sarah's iPhone"). Falls back
+    # to "" when the operator left it blank.
+    enrollment_label = models.CharField(max_length=128, blank=True, default="")
+    # Discriminator: did this row originate as a browser-approved CLI
+    # flow (``STATE_PENDING`` at /start) or a pre-approved mobile
+    # enrollment (``STATE_PRE_APPROVED`` at generation time)? Lets the
+    # audit + listings UIs filter without joining a second table.
+    ORIGIN_DEVICE_FLOW = "device_flow"
+    ORIGIN_ENROLLMENT = "enrollment"
+    ORIGIN_CHOICES = (
+        (ORIGIN_DEVICE_FLOW, "device_flow"),
+        (ORIGIN_ENROLLMENT, "enrollment"),
+    )
+    origin = models.CharField(
+        max_length=16,
+        choices=ORIGIN_CHOICES,
+        default=ORIGIN_DEVICE_FLOW,
+        db_index=True,
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["state", "expires_at"], name="dfs_state_exp_idx"),
             models.Index(
                 fields=["approved_user", "state"],
                 name="dfs_user_state_idx",
+            ),
+            # Cap concurrent unexpired enrollments per operator (#494).
+            # The rate-limiter query is "how many pre_approved rows
+            # does this user own past `now`?" — covered by this
+            # composite.
+            models.Index(
+                fields=["approved_user", "origin", "state"],
+                name="dfs_user_origin_state_idx",
             ),
         ]
         verbose_name = "Device-flow session"

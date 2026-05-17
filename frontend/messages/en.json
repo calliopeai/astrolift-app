@@ -286,6 +286,33 @@
     },
     "breadcrumb": {
       "root": "Settings"
+    },
+    "security": {
+      "devices": {
+        "title": "Mobile devices",
+        "description": "Pair the Astrolift mobile app to this install by scanning a QR code — no URL typing on the phone.",
+        "buttonPair": "Pair new device",
+        "dialogTitle": "Pair a mobile device",
+        "dialogDescription": "Generate a one-time QR code, then scan it with the Astrolift mobile app to enrol this install.",
+        "labelLabel": "Device label (optional)",
+        "labelPlaceholder": "Sarah's iPhone",
+        "labelHelp": "Shown next to the issued credential so you can tell devices apart later.",
+        "buttonCancel": "Cancel",
+        "buttonGenerate": "Generate QR",
+        "buttonGenerating": "Generating…",
+        "buttonRegenerate": "New QR",
+        "buttonDone": "Done",
+        "buttonCopyPayload": "Copy payload",
+        "qrAriaLabel": "Install enrollment QR code",
+        "expiresIn": "Expires in {time}",
+        "expiredLabel": "QR expired — generate a new one",
+        "sessionIdLabel": "Session ID",
+        "verificationUriLabel": "Verification URL",
+        "verificationUriHelp": "If the QR doesn't scan, type this URL on your device.",
+        "toastGenerateFailed": "Couldn't generate QR — try again.",
+        "toastUriCopied": "Verification URL copied",
+        "toastPayloadCopied": "Payload copied"
+      }
     }
   },
   "hooks": {
