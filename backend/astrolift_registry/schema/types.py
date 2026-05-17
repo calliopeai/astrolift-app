@@ -180,6 +180,16 @@ class WorkloadType:
     storage_class: str
     storage_size: str
     registered_app_slug: str
+    # The DNS name in-cluster callers use to reach this workload's
+    # ClusterIP Service — ``<workloadSlug>.<namespace>.svc.cluster.local``
+    # (#429). Same shape kubernetes' default DNS surfaces; the
+    # ``namespace`` half mirrors ``namespace_for_app`` (explicit
+    # ``app.k8s_namespace`` override → renderer default
+    # ``<org>-<app>``). Empty string when neither the workload nor
+    # the app has enough state to compute one (e.g. an app row
+    # without an organization, which only happens in malformed
+    # fixtures).
+    in_cluster_service_fqdn: str
 
 
 @strawberry.type(name="AstroliftContainer")
@@ -276,6 +286,33 @@ def _security_policy_to_type(app) -> SecurityPolicyType:
     )
 
 
+def _namespace_for_workload(workload) -> str:
+    """Resolve the namespace for ``workload.registered_app``.
+
+    Mirrors :func:`core.cluster_observability.namespace_for_app`
+    (explicit row-level override → renderer default
+    ``<orgSlug>-<appSlug>``) but stays local to avoid pulling
+    ``core.cluster_observability`` (and its driver-registry imports)
+    into the registry schema module."""
+    app = workload.registered_app
+    explicit = (getattr(app, "k8s_namespace", "") or "").strip()
+    if explicit:
+        return explicit
+    org_slug = (getattr(getattr(app, "organization", None), "slug", "") or "").strip()
+    if not org_slug:
+        return ""
+    return f"{org_slug}-{app.slug}"
+
+
+def _in_cluster_service_fqdn(workload) -> str:
+    """``<workloadSlug>.<namespace>.svc.cluster.local`` — empty when
+    we can't build a namespace half (no org on the app, etc.)."""
+    namespace = _namespace_for_workload(workload)
+    if not namespace or not workload.slug:
+        return ""
+    return f"{workload.slug}.{namespace}.svc.cluster.local"
+
+
 def workload_to_type(workload) -> WorkloadType:
     return WorkloadType(
         id=GUID(str(workload.guid)),
@@ -295,6 +332,7 @@ def workload_to_type(workload) -> WorkloadType:
         storage_class=workload.storage_class or "",
         storage_size=workload.storage_size or "",
         registered_app_slug=workload.registered_app.slug,
+        in_cluster_service_fqdn=_in_cluster_service_fqdn(workload),
     )
 
 

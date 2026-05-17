@@ -52,6 +52,15 @@ export type AstroliftRegisteredApp = Omit<
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {
   kind: WorkloadKind;
+  /**
+   * In-cluster DNS name for the workload's ClusterIP Service —
+   * ``<slug>.<namespace>.svc.cluster.local`` (#429). Populated by
+   * the backend; empty string when the namespace half can't be
+   * computed (e.g. orphan app rows). Codegen will pick this up on
+   * the next ``make codegen`` run; the manual entry keeps the
+   * workload detail page typesafe until then.
+   */
+  inClusterServiceFqdn: string;
 };
 
 export type AstroliftContainer = Omit<GeneratedContainer, "healthcheckKind"> & {

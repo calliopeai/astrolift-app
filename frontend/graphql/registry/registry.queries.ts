@@ -129,6 +129,7 @@ export const GET_WORKLOAD = gql`
       storageClass
       storageSize
       registeredAppSlug
+      inClusterServiceFqdn
     }
   }
 `;
