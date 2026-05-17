@@ -15,6 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
+import { cn } from "@/lib/utils";
 
 import type { WizardState } from "../wizard-client";
 
@@ -118,19 +119,34 @@ export function AppDetailsStep({ state, setState, setValid }: Props) {
                 slugTouched: true,
               }))
             }
-            placeholder="api-gateway"
+            placeholder="lowercase, hyphens, 1-40 chars"
             className="font-mono text-xs"
+            maxLength={40}
             required
           />
-          {state.slug && !slugValid ? (
-            <p className="text-destructive text-xs">
-              Lowercase letters, digits, and hyphens only (max 40 chars).
-            </p>
-          ) : (
-            <p className="text-muted-foreground text-xs">
-              URL-safe identifier. Auto-derived from the name — override to taste.
-            </p>
-          )}
+          <div className="flex items-start justify-between gap-2">
+            {state.slug && !slugValid ? (
+              <p className="text-destructive text-xs">
+                Lowercase letters, digits, and hyphens only (max 40 chars).
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                URL-safe identifier. Auto-derived from the name — override to taste.
+              </p>
+            )}
+            <span
+              className={cn(
+                "shrink-0 text-[10px] tabular-nums",
+                state.slug.length >= 40
+                  ? "text-destructive"
+                  : state.slug.length >= 32
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-muted-foreground"
+              )}
+            >
+              {state.slug.length}/40
+            </span>
+          </div>
         </div>
       </div>
 

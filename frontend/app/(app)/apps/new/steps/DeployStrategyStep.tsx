@@ -1,6 +1,14 @@
 "use client";
 
-import { ClockIcon, HandIcon, ShieldCheckIcon, ZapIcon } from "lucide-react";
+import {
+  ClockIcon,
+  CoffeeIcon,
+  HandIcon,
+  PauseIcon,
+  RocketIcon,
+  ShieldCheckIcon,
+  ZapIcon,
+} from "lucide-react";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,13 +16,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-import type { WizardState, WizardTriggerMode } from "../wizard-client";
+import type { DeployTiming, WizardState, WizardTriggerMode } from "../wizard-client";
 
 interface Props {
   state: WizardState;
   setState: React.Dispatch<React.SetStateAction<WizardState>>;
   setValid: (valid: boolean) => void;
 }
+
+const DEPLOY_TIMINGS: Array<{
+  value: DeployTiming;
+  label: string;
+  description: string;
+  icon: typeof RocketIcon;
+}> = [
+  {
+    value: "now",
+    label: "Deploy now",
+    description: "Pick a trigger and kick off the first deploy as soon as registration completes.",
+    icon: RocketIcon,
+  },
+  {
+    value: "later",
+    label: "Configure, deploy later",
+    description: "Lock in trigger and approval settings now; first deploy runs on the next event.",
+    icon: PauseIcon,
+  },
+  {
+    value: "skip",
+    label: "Skip — configure later",
+    description: "Just register the app. Set up triggers, approvals, and deploys from the app page.",
+    icon: CoffeeIcon,
+  },
+];
 
 const TRIGGER_MODES: Array<{
   value: WizardTriggerMode;
@@ -61,10 +95,15 @@ function naturalCronHint(expr: string): string {
 
 export function DeployStrategyStep({ state, setState, setValid }: Props) {
   // Validity:
+  //   - skip: always valid (operator finishes config from the app page)
   //   - auto_on_push: deploy_branch required
   //   - cron: cron expression must be 5-field
   //   - manual: always valid
   React.useEffect(() => {
+    if (state.deployTiming === "skip") {
+      setValid(true);
+      return;
+    }
     let ok = true;
     if (state.triggerMode === "auto_on_push") {
       ok = state.deployBranch.trim().length > 0;
@@ -73,31 +112,69 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
       ok = CRON_FIELD.test(state.cronExpression.trim());
     }
     setValid(ok);
-  }, [state.triggerMode, state.deployBranch, state.cronExpression, setValid]);
+  }, [
+    state.deployTiming,
+    state.triggerMode,
+    state.deployBranch,
+    state.cronExpression,
+    setValid,
+  ]);
+
+  const showTriggerConfig = state.deployTiming !== "skip";
 
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="font-medium">Trigger mode</h3>
-          <p className="text-muted-foreground text-xs">What event causes a deploy to run?</p>
+          <h3 className="font-medium">When should this app deploy?</h3>
+          <p className="text-muted-foreground text-xs">
+            Pick a path for first deploy. You can change strategy later from the app page.
+          </p>
         </div>
         <div className="grid gap-2 md:grid-cols-3">
-          {TRIGGER_MODES.map((opt) => (
+          {DEPLOY_TIMINGS.map((opt) => (
             <OptionCard
               key={opt.value}
-              selected={state.triggerMode === opt.value}
-              onClick={() => setState((s) => ({ ...s, triggerMode: opt.value }))}
+              selected={state.deployTiming === opt.value}
+              onClick={() =>
+                setState((s) => ({
+                  ...s,
+                  deployTiming: opt.value,
+                  // Mirror the side-effect toggle so review-step status matches.
+                  triggerFirstDeploy: opt.value === "now",
+                }))
+              }
               icon={opt.icon}
               label={opt.label}
               description={opt.description}
-              badge={opt.comingSoon ? "Coming soon" : undefined}
             />
           ))}
         </div>
       </section>
 
-      {state.triggerMode === "auto_on_push" && (
+      {showTriggerConfig && (
+        <section className="flex flex-col gap-3">
+          <div>
+            <h3 className="font-medium">Trigger mode</h3>
+            <p className="text-muted-foreground text-xs">What event causes a deploy to run?</p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            {TRIGGER_MODES.map((opt) => (
+              <OptionCard
+                key={opt.value}
+                selected={state.triggerMode === opt.value}
+                onClick={() => setState((s) => ({ ...s, triggerMode: opt.value }))}
+                icon={opt.icon}
+                label={opt.label}
+                description={opt.description}
+                badge={opt.comingSoon ? "Coming soon" : undefined}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {showTriggerConfig && state.triggerMode === "auto_on_push" && (
         <section className="flex flex-col gap-3 rounded-md border p-4">
           <div className="space-y-2">
             <Label htmlFor="deploy-branch">Deploy branch</Label>
@@ -116,7 +193,7 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
         </section>
       )}
 
-      {state.triggerMode === "cron" && (
+      {showTriggerConfig && state.triggerMode === "cron" && (
         <section className="flex flex-col gap-3 rounded-md border p-4">
           <div className="space-y-2">
             <Label htmlFor="cron-expression">Cron expression</Label>
@@ -134,6 +211,7 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
         </section>
       )}
 
+      {showTriggerConfig && (
       <section className="flex flex-col gap-3 rounded-md border p-4">
         <label className="flex items-start gap-3">
           <input
@@ -202,6 +280,14 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
           </div>
         )}
       </section>
+      )}
+
+      {!showTriggerConfig && (
+        <section className="bg-muted/30 text-muted-foreground rounded-md border border-dashed p-4 text-xs">
+          Trigger mode and approval gates are skipped for now. Once registration
+          completes you can wire those up from the app&apos;s Settings tab.
+        </section>
+      )}
     </div>
   );
 }
