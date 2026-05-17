@@ -19,6 +19,7 @@
   "user": {
     "account": "Account",
     "notifications": "Notifications",
+    "rerunOnboarding": "重新运行引导",
     "logout": "Log out"
   },
   "language": {
@@ -133,6 +134,109 @@
       "emptyTitle": "无已注册应用",
       "emptyDescription": "应用注册表界面将在下一个里程碑上线 —— 一旦接通,你可以从此卡片注册 Git 仓库并发起部署。",
       "emptyAction": "打开注册表"
+    }
+  },
+  "onboarding": {
+    "title": "Welcome to Astrolift",
+    "description": "Four quick steps to land your first app on the platform.",
+    "skipCta": "Skip for now",
+    "backCta": "Back",
+    "nextCta": "Next",
+    "finishCta": "Finish setup",
+    "a11y": {
+      "steps": "Onboarding progress"
+    },
+    "toast": {
+      "success": "Onboarding complete — you're all set.",
+      "skipFailed": "Couldn't save your skip. Try again.",
+      "teamFailed": "Couldn't create the team. Pick a different name or slug.",
+      "projectFailed": "Couldn't create the project. Pick a different name or slug.",
+      "appWarning": "Team and project created, but the app couldn't be registered. You can add it later from the apps page.",
+      "submitFailed": "Something went wrong while finishing setup."
+    },
+    "welcome": {
+      "greeting": "Let's start with a team.",
+      "description": "Teams own projects and apps. You'll add more later from the Teams page.",
+      "teamNameLabel": "Team name",
+      "teamNamePlaceholder": "e.g. Platform engineering",
+      "teamSlugLabel": "Team slug",
+      "teamSlugPlaceholder": "e.g. platform-eng",
+      "teamSlugHelp": "Lowercase letters, digits, and hyphens. Used in URLs and the CLI."
+    },
+    "project": {
+      "greeting": "Add a project under {team}.",
+      "description": "Projects group related apps inside a team.",
+      "projectNameLabel": "Project name",
+      "projectNamePlaceholder": "e.g. Web platform",
+      "projectSlugLabel": "Project slug",
+      "projectSlugPlaceholder": "e.g. web-platform",
+      "projectDescriptionLabel": "Description (optional)",
+      "projectDescriptionPlaceholder": "What does this project do?"
+    },
+    "repo": {
+      "greeting": "Connect a Git repository.",
+      "description": "Pick a repo to register as the first app in this project. You can skip this and add an app later.",
+      "connectionLabel": "Source connection",
+      "connectionPlaceholder": "Pick a connection",
+      "repoLabel": "Repository",
+      "repoPlaceholder": "Pick a repository",
+      "repoHelp": "Only repositories you have access to via this connection are listed.",
+      "repoFetchError": "Couldn't load repositories ({code}). You can skip this step.",
+      "archivedSuffix": "archived",
+      "defaultBranchLabel": "Default branch",
+      "optionalNote": "This step is optional. Skip to create the team and project without registering an app.",
+      "noConnectionsTitle": "No source providers configured yet.",
+      "noConnectionsDescription": "Connect GitHub, GitLab, or another provider to register apps from this wizard.",
+      "connectCta": "Connect a provider",
+      "skipNote": "You can also skip this and configure a source provider later."
+    },
+    "strategy": {
+      "title": "Pick a deploy strategy",
+      "description": "How should new versions roll out by default? You can tune this per-environment later.",
+      "summaryTitle": "Review",
+      "summary": {
+        "team": "Team",
+        "project": "Project",
+        "repo": "Repository",
+        "repoSkipped": "Skipped — add later",
+        "strategy": "Strategy"
+      },
+      "intentNote": "This sets the default for new apps in this project. The astrolift.toml manifest is the source of truth — you can edit it from the app's config page.",
+      "options": {
+        "rolling": {
+          "label": "Rolling",
+          "description": "Replace pods one by one. Lowest risk for stateless services."
+        },
+        "blue-green": {
+          "label": "Blue / green",
+          "description": "Stand up the new version alongside the old, then flip traffic."
+        },
+        "canary": {
+          "label": "Canary",
+          "description": "Send a small slice of traffic to the new version, then expand."
+        }
+      }
+    },
+    "tour": {
+      "progress": "Step {current} of {total}",
+      "dontShowAgain": "Don't show again",
+      "skipCta": "Skip",
+      "nextCta": "Next",
+      "finishCta": "Got it",
+      "steps": {
+        "apps-tile": {
+          "title": "Your apps live here",
+          "description": "This tile counts every app registered on the platform. Click through to see the full list."
+        },
+        "apps-nav": {
+          "title": "Register apps to start deploying",
+          "description": "Connect a Git repo to register a new app and roll your first deployment."
+        },
+        "clusters-nav": {
+          "title": "Add a cluster to deploy to",
+          "description": "Apps deploy to clusters you've onboarded. Bring in your first cluster from this page."
+        }
+      }
     }
   },
   "dataTable": {

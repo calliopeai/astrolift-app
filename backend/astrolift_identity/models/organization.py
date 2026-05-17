@@ -75,6 +75,15 @@ class Organization(NamedBaseCoreModel):
     # sync, so we surface them as read-only with a tooltip.
     allow_user_profile_edit = models.BooleanField(default=True)
 
+    # Flipped non-null by the first-run wizard once the operator
+    # either completes or explicitly skips the guided setup. The FE
+    # opens the wizard on first dashboard render when this is null
+    # AND the user has zero team memberships; once set, the wizard
+    # is opt-in only (re-launchable from the user menu). Set on the
+    # *organization* rather than the user so an operator who joins
+    # an already-bootstrapped org doesn't get prompted to redo it.
+    onboarding_completed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

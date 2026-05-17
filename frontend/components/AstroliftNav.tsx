@@ -33,11 +33,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -45,10 +41,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  type PermissionCheck,
-  useMyPermissions,
-} from "@/lib/permissions/use-my-permissions";
+import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 const COLLAPSED_KEY = "astrolift.nav.collapsed.v1";
 
@@ -62,6 +55,14 @@ interface NavItem {
    * Settings, which itself routes deeper into per-section guards).
    */
   permission?: PermissionCheck;
+  /**
+   * Opt-in marker the first-run spotlight tour (#452) reads via
+   * ``document.querySelector`` to anchor a popover. The string is
+   * applied verbatim as a ``data-onboarding-tour`` attribute on the
+   * rendered <Link>. Items without a marker get no attribute and
+   * are invisible to the tour.
+   */
+  tourTarget?: string;
 }
 
 interface NavSection {
@@ -147,6 +148,7 @@ const sections: NavSection[] = [
         href: "/clusters",
         icon: <LayersIcon />,
         permission: { anyOf: ["cluster.register", "provider_plugin.read"] },
+        tourTarget: "clusters-nav",
       },
       {
         label: "Domains",
@@ -245,9 +247,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Account",
-    items: [
-      { label: "Settings", href: "/settings", icon: <Settings2Icon /> },
-    ],
+    items: [{ label: "Settings", href: "/settings", icon: <Settings2Icon /> }],
   },
 ];
 
@@ -278,9 +278,7 @@ export function AstroliftNav() {
 
   // Collapsed sections persist in localStorage so refreshes keep
   // the layout the operator chose. Default: every section open.
-  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>(
-    {},
-  );
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   React.useEffect(() => {
     setCollapsed(loadCollapsedState());
   }, []);
@@ -303,7 +301,7 @@ export function AstroliftNav() {
             // sidebar doesn't visibly shrink-and-grow on every refresh.
             // Once the cache is warm, the filter takes effect.
             loading ||
-            can(item.permission),
+            can(item.permission)
         );
         if (visibleItems.length === 0) return null;
 
@@ -322,7 +320,7 @@ export function AstroliftNav() {
           >
             <SidebarGroup>
               <SidebarGroupLabel asChild>
-                <CollapsibleTrigger className="group/section flex w-full items-center justify-between hover:text-sidebar-foreground">
+                <CollapsibleTrigger className="group/section hover:text-sidebar-foreground flex w-full items-center justify-between">
                   <span>{section.label}</span>
                   <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
                 </CollapsibleTrigger>
@@ -332,16 +330,11 @@ export function AstroliftNav() {
                   {visibleItems.map((item) => {
                     const active =
                       pathname === item.href ||
-                      (item.href !== "/" &&
-                        pathname.startsWith(item.href + "/"));
+                      (item.href !== "/" && pathname.startsWith(item.href + "/"));
                     return (
                       <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={active}
-                          tooltip={item.label}
-                        >
-                          <Link href={item.href}>
+                        <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                          <Link href={item.href} data-onboarding-tour={item.tourTarget}>
                             {item.icon}
                             <span>{item.label}</span>
                           </Link>

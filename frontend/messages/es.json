@@ -19,6 +19,7 @@
   "user": {
     "account": "Cuenta",
     "notifications": "Notificaciones",
+    "rerunOnboarding": "Volver a ejecutar la incorporación",
     "logout": "Cerrar sesión"
   },
   "language": {
@@ -129,6 +130,107 @@
       "emptyTitle": "No hay apps registradas",
       "emptyDescription": "La superficie del registro de apps llega en el próximo hito — una vez conectada podrás registrar un repo de Git y desplegar desde esta tarjeta.",
       "emptyAction": "Abrir registro"
+    }
+  },
+  "onboarding": {
+    "title": "Bienvenido a Astrolift",
+    "description": "Cuatro pasos rápidos para llevar tu primera app a la plataforma.",
+    "skipCta": "Omitir por ahora",
+    "backCta": "Atrás",
+    "nextCta": "Siguiente",
+    "finishCta": "Finalizar configuración",
+    "a11y": { "steps": "Progreso de la incorporación" },
+    "toast": {
+      "success": "Incorporación completada — todo listo.",
+      "skipFailed": "No se pudo guardar la omisión. Inténtalo de nuevo.",
+      "teamFailed": "No se pudo crear el equipo. Elige otro nombre o slug.",
+      "projectFailed": "No se pudo crear el proyecto. Elige otro nombre o slug.",
+      "appWarning": "Equipo y proyecto creados, pero la app no se pudo registrar. Puedes añadirla más tarde desde la página de apps.",
+      "submitFailed": "Algo salió mal al finalizar la configuración."
+    },
+    "welcome": {
+      "greeting": "Empecemos por un equipo.",
+      "description": "Los equipos son dueños de proyectos y apps. Podrás añadir más desde la página Equipos.",
+      "teamNameLabel": "Nombre del equipo",
+      "teamNamePlaceholder": "p.ej. Ingeniería de plataforma",
+      "teamSlugLabel": "Slug del equipo",
+      "teamSlugPlaceholder": "p.ej. platform-eng",
+      "teamSlugHelp": "Letras minúsculas, dígitos y guiones. Se usa en URLs y en la CLI."
+    },
+    "project": {
+      "greeting": "Añade un proyecto en {team}.",
+      "description": "Los proyectos agrupan apps relacionadas dentro de un equipo.",
+      "projectNameLabel": "Nombre del proyecto",
+      "projectNamePlaceholder": "p.ej. Plataforma web",
+      "projectSlugLabel": "Slug del proyecto",
+      "projectSlugPlaceholder": "p.ej. web-platform",
+      "projectDescriptionLabel": "Descripción (opcional)",
+      "projectDescriptionPlaceholder": "¿Qué hace este proyecto?"
+    },
+    "repo": {
+      "greeting": "Conecta un repositorio Git.",
+      "description": "Elige un repositorio para registrar como primera app del proyecto. Puedes omitir y añadir una app más tarde.",
+      "connectionLabel": "Conexión de origen",
+      "connectionPlaceholder": "Elige una conexión",
+      "repoLabel": "Repositorio",
+      "repoPlaceholder": "Elige un repositorio",
+      "repoHelp": "Sólo se listan los repositorios accesibles con esta conexión.",
+      "repoFetchError": "No se pudieron cargar los repositorios ({code}). Puedes omitir este paso.",
+      "archivedSuffix": "archivado",
+      "defaultBranchLabel": "Rama por defecto",
+      "optionalNote": "Este paso es opcional. Omítelo para crear el equipo y el proyecto sin registrar una app.",
+      "noConnectionsTitle": "Aún no hay proveedores de origen configurados.",
+      "noConnectionsDescription": "Conecta GitHub, GitLab u otro proveedor para registrar apps desde este asistente.",
+      "connectCta": "Conectar un proveedor",
+      "skipNote": "También puedes omitir esto y configurar un proveedor más tarde."
+    },
+    "strategy": {
+      "title": "Elige una estrategia de despliegue",
+      "description": "¿Cómo deberían publicarse las nuevas versiones por defecto? Puedes ajustarlo por entorno más adelante.",
+      "summaryTitle": "Resumen",
+      "summary": {
+        "team": "Equipo",
+        "project": "Proyecto",
+        "repo": "Repositorio",
+        "repoSkipped": "Omitido — añadir después",
+        "strategy": "Estrategia"
+      },
+      "intentNote": "Esto define el valor por defecto para nuevas apps. El manifiesto astrolift.toml es la fuente de verdad; puedes editarlo desde la página de configuración de la app.",
+      "options": {
+        "rolling": {
+          "label": "Rolling",
+          "description": "Reemplaza pods uno a uno. Menor riesgo para servicios sin estado."
+        },
+        "blue-green": {
+          "label": "Azul/Verde",
+          "description": "Levanta la nueva versión junto a la antigua y cambia el tráfico."
+        },
+        "canary": {
+          "label": "Canary",
+          "description": "Envía una porción pequeña de tráfico a la nueva versión y luego amplía."
+        }
+      }
+    },
+    "tour": {
+      "progress": "Paso {current} de {total}",
+      "dontShowAgain": "No mostrar de nuevo",
+      "skipCta": "Omitir",
+      "nextCta": "Siguiente",
+      "finishCta": "Entendido",
+      "steps": {
+        "apps-tile": {
+          "title": "Tus apps están aquí",
+          "description": "Esta ficha cuenta cada app registrada en la plataforma. Haz clic para ver la lista completa."
+        },
+        "apps-nav": {
+          "title": "Registra apps para empezar a desplegar",
+          "description": "Conecta un repo de Git para registrar una app nueva y lanzar tu primer despliegue."
+        },
+        "clusters-nav": {
+          "title": "Añade un clúster para desplegar",
+          "description": "Las apps se despliegan en los clústeres que has incorporado. Trae tu primer clúster desde esta página."
+        }
+      }
     }
   },
   "dataTable": {

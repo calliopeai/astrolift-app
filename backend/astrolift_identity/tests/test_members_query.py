@@ -88,6 +88,7 @@ def _backfill_audit_event(
             ],
         )
 
+
 pytestmark = pytest.mark.django_db
 
 
@@ -118,9 +119,7 @@ def info(actor):
 
 def _add_member(org, *, username, email, first_name="", last_name=""):
     User = get_user_model()
-    user = User.objects.create(
-        username=username, email=email, first_name=first_name, last_name=last_name
-    )
+    user = User.objects.create(username=username, email=email, first_name=first_name, last_name=last_name)
     Member.objects.create(
         user=user,
         scope_kind=Member.ScopeKind.ORG,
@@ -215,9 +214,7 @@ def test_role_binding_source_scope_label_org_team_project_app(actor, info, permi
     permission_resolver.grant(Permission.ORG_MANAGE_MEMBERS)
     org = Organization.objects.create(name="Acme", slug="acme-417-sources")
     team = Team.objects.create(organization=org, slug="payments", name="Payments")
-    project = Project.objects.create(
-        organization=org, team=team, slug="web", name="Web project"
-    )
+    project = Project.objects.create(organization=org, team=team, slug="web", name="Web project")
     app = RegisteredApp.objects.create(
         organization=org, team=team, project=project, slug="web-api", name="Web API"
     )
@@ -237,9 +234,7 @@ def test_role_binding_source_scope_label_org_team_project_app(actor, info, permi
     )
     RoleBinding.objects.create(user=user, role=role_org, scope_kind="ORG", scope_id=org.id)
     RoleBinding.objects.create(user=user, role=role_team, scope_kind="TEAM", scope_id=team.id)
-    RoleBinding.objects.create(
-        user=user, role=role_project, scope_kind="PROJECT", scope_id=project.id
-    )
+    RoleBinding.objects.create(user=user, role=role_project, scope_kind="PROJECT", scope_id=project.id)
     RoleBinding.objects.create(user=user, role=role_app, scope_kind="APP", scope_id=app.id)
 
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
@@ -252,9 +247,7 @@ def test_role_binding_source_scope_label_org_team_project_app(actor, info, permi
     assert by_scope["APP"] == "app web-api"
 
 
-def test_role_binding_source_scope_label_falls_back_on_missing_scope(
-    actor, info, permission_resolver
-):
+def test_role_binding_source_scope_label_falls_back_on_missing_scope(actor, info, permission_resolver):
     """If the referenced scope row vanished (soft-deleted, migrated away),
     the label still resolves to a non-empty fallback so the FE never
     sees an empty string."""

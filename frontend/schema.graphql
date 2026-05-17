@@ -1201,6 +1201,17 @@ type AstroliftManagedServiceTestEmailResultMutationResult {
   data: AstroliftManagedServiceTestEmailResult
 }
 
+type AstroliftMarkOnboardingCompletePayload {
+  organization: AstroliftOrganization!
+  alreadyCompleted: Boolean!
+}
+
+type AstroliftMarkOnboardingCompletePayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftMarkOnboardingCompletePayload
+}
+
 type AstroliftMember {
   id: GUID!
   user: AstroliftUser!
@@ -1286,6 +1297,7 @@ type AstroliftOrganization {
   previewMaxActiveDefault: Int!
   logRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
+  onboardingCompletedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
@@ -2587,6 +2599,10 @@ input MarkNotificationReadInput {
   id: GUID!
 }
 
+input MarkOnboardingCompleteInput {
+  skip: Boolean! = false
+}
+
 type Markallreadpayload {
   marked: Int!
 }
@@ -2755,6 +2771,7 @@ type Mutation {
   setActiveIdentityProvider(input: SetActiveIdentityProviderInput!): AstroliftIdentityProviderMutationResult!
   softDeleteIdentityProvider(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   updateMyProfile(input: UpdateMyProfileInput!): AstroliftMyProfileMutationResult!
+  markOnboardingComplete(input: MarkOnboardingCompleteInput!): AstroliftMarkOnboardingCompletePayloadMutationResult!
   logoutAllSessions(input: LogoutAllSessionsInput!): AstroliftLogoutAllSessionsPayloadMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   updateApp(input: UpdateAppInput!): AstroliftRegisteredAppMutationResult!

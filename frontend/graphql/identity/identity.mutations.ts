@@ -135,6 +135,28 @@ export const UPDATE_MY_PROFILE = gql`
   }
 `;
 
+export const MARK_ONBOARDING_COMPLETE = gql`
+  mutation MarkOnboardingComplete($input: MarkOnboardingCompleteInput!) {
+    markOnboardingComplete(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        alreadyCompleted
+        organization {
+          id
+          slug
+          name
+          onboardingCompletedAt
+        }
+      }
+    }
+  }
+`;
+
 export const LOGOUT_ALL_SESSIONS = gql`
   mutation LogoutAllSessions($input: LogoutAllSessionsInput!) {
     logoutAllSessions(input: $input) {
