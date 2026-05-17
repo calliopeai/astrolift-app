@@ -17,5 +17,5 @@ rsync -av --delete \
 
 Then update `SOURCE_COMMIT` below and commit.
 
-- **SOURCE_COMMIT**: `81a8db8`
+- **SOURCE_COMMIT**: `21055c6` (partial — only `aws/cost.py`, `gcp/cost.py`, `azure/cost.py` synced for #440)
 - **Upstream repo**: `git@github.com:calliopeai/astrolift-providers.git`

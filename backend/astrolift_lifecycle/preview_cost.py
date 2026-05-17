@@ -183,6 +183,74 @@ _COMPUTE_KIND = "compute"
 _COMPUTE_VARIANT = "node_hour"
 
 
+def cost_estimator_for_cluster(cluster: Any) -> Any | None:
+    """Resolve the live-pricing CostEstimator for ``cluster``.
+
+    Cost is not a registered ``drivers[<role>]`` capability on the
+    upstream ProviderPlugin manifest — the estimators live in
+    ``aws.cost`` / ``gcp.cost`` / ``azure.cost`` as separate classes
+    with their own ``*CostConfig``. So instead of going through
+    ``driver_for_capability`` (which routes through ``_config_for``
+    and only knows about cluster/managed-service configs), this
+    helper instantiates the right estimator directly based on the
+    plugin slug, reading the row's ``provider_config`` for the
+    fields each cost driver needs.
+
+    Returns ``None`` for plugins without a live-pricing path
+    (``k8s_native`` — bare metal has no cloud-side SKU to ask),
+    for any provisional row where the plugin slug is empty, and
+    for any import error (e.g. boto3 missing in a stripped image).
+    Callers branch on ``None`` to render 'Cost unavailable' rather
+    than fabricating a number.
+    """
+    plugin_slug = ""
+    try:
+        provider_plugin = getattr(cluster, "provider_plugin", None)
+        if provider_plugin is not None:
+            plugin_slug = getattr(provider_plugin, "slug", "") or ""
+    except Exception:  # noqa: BLE001
+        return None
+    if not plugin_slug:
+        return None
+
+    provider_config: dict[str, Any] = getattr(cluster, "provider_config", {}) or {}
+
+    if plugin_slug == "aws":
+        try:
+            from aws.cost import AWSCostConfig, AWSCostEstimator
+        except ImportError:
+            return None
+        try:
+            return AWSCostEstimator(config=AWSCostConfig())
+        except Exception:  # noqa: BLE001
+            return None
+    if plugin_slug == "gcp":
+        try:
+            from gcp.cost import GCPCostConfig, GCPCostEstimator
+        except ImportError:
+            return None
+        try:
+            return GCPCostEstimator(config=GCPCostConfig())
+        except Exception:  # noqa: BLE001
+            return None
+    if plugin_slug == "azure":
+        try:
+            from azure.cost import AzureCostConfig, AzureCostEstimator
+        except ImportError:
+            return None
+        # The default Azure VM-size lookup needs a subscription_id;
+        # the request layer threads it through via CostEstimateRequest
+        # .config['subscription_id'] when present on the row.
+        try:
+            return AzureCostEstimator(config=AzureCostConfig())
+        except Exception:  # noqa: BLE001
+            return None
+    # k8s_native + unknown plugins -> no live pricing path; the UI
+    # renders 'Cost unavailable'.
+    _ = provider_config
+    return None
+
+
 def estimate_daily_cost_usd(
     *,
     cluster: Any,
@@ -204,19 +272,9 @@ def estimate_daily_cost_usd(
     would erode operator trust in the column."""
     if aggregate.cpu_cores <= 0 and aggregate.memory_bytes <= 0:
         return None
-    try:
-        # Lazy-imported because the cost-driver capability is wired
-        # behind the same plugin-registry indirection the rest of the
-        # observability surface uses; importing eagerly drags the
-        # cluster + driver machinery into every preview_cost import.
-        from core.app_deploy import AppDeployError, driver_for_capability
-    except ImportError:
-        return None
-    try:
-        driver = driver_for_capability(cluster, "cost")
-    except AppDeployError:
-        return None
-    except Exception:  # noqa: BLE001 — provider registry can raise many
+
+    driver = cost_estimator_for_cluster(cluster)
+    if driver is None:
         return None
 
     try:
@@ -227,17 +285,26 @@ def estimate_daily_cost_usd(
     except ImportError:
         return None
 
+    # Per-plugin extra request config: Azure's compute pricing needs
+    # the subscription_id so the default VM-size lookup can talk to
+    # ARM. Other plugins ignore extras.
+    request_config: dict[str, str] = {}
+    provider_config: dict[str, Any] = getattr(cluster, "provider_config", {}) or {}
+    sub_id = provider_config.get("subscription_id")
+    if sub_id:
+        request_config["subscription_id"] = str(sub_id)
+
     request = CostEstimateRequest(
         kind=_COMPUTE_KIND,
         variant=_COMPUTE_VARIANT,
         region=region or getattr(cluster, "region", "") or "",
         size="custom",
-        config={},
+        config=request_config,
         expected_usage={
             "cpu_cores": aggregate.cpu_cores,
             "memory_gib": aggregate.memory_bytes / (1024.0**3),
-            # 24h × 30 days ≈ 720 hours/month — drivers translate this
-            # to per-hour SKU pricing internally.
+            # 24h * 30 days ~= 720 hours/month — drivers translate
+            # this to per-hour SKU pricing internally.
             "hours_per_month": 720.0,
         },
     )
@@ -256,6 +323,6 @@ def estimate_daily_cost_usd(
     if monthly <= 0.0:
         return None
     # 30-day month — matches the AWS Pricing API convention (720h)
-    # so the daily ↔ monthly arithmetic stays consistent end-to-end.
+    # so the daily / monthly arithmetic stays consistent end-to-end.
     daily = monthly / 30.0
     return round(daily, 2)
