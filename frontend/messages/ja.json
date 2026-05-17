@@ -1173,5 +1173,20 @@
     "sourceColumn": "ソース",
     "grantRoleRowLabel": "{name} にロールを付与",
     "grantRoleRowTooltip": "{name} にロールを付与"
+  },
+  "stepUp": {
+    "title": "本人確認",
+    "description": "この操作には最近の認証が必要です。続行するにはパスワードを確認してください。",
+    "passwordLabel": "パスワード",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "elevating": "確認中…",
+    "indicator": "管理者モードは残り {minutes, plural, one {#分} other {#分}} 有効",
+    "deelevateLabel": "管理者モードを今すぐ終了",
+    "errors": {
+      "passwordRequired": "パスワードを入力してください。",
+      "generic": "パスワードを確認できませんでした。もう一度お試しください。",
+      "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
+    }
   }
 }

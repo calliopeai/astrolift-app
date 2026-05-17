@@ -10,6 +10,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project, Team
+from astrolift_identity.step_up import requires_elevation
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import AppTeamAccess, RegisteredApp
 from astrolift_registry.schema.types import (
@@ -1633,6 +1634,7 @@ class RegistryMutation:
 
     @strawberry.field
     @mutation_audit(action="app.webhook_deploys.pause")
+    @requires_elevation(action_label="app.webhook_deploys.pause")
     @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
     def pause_astrolift_app_webhook_deploys(

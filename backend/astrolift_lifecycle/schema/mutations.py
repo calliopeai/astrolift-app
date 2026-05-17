@@ -33,6 +33,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_graphql.errors import MutationErrorType
+from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.approval import mint_magic_link
 from astrolift_lifecycle.models import (
     AppEnvironment,
@@ -2265,6 +2266,7 @@ class LifecycleMutation:
 
     @strawberry.field
     @mutation_audit(action="app.deploy_token.rotate")
+    @requires_elevation(action_label="app.deploy_token.rotate")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def rotate_deploy_token(
@@ -2327,6 +2329,7 @@ class LifecycleMutation:
 
     @strawberry.field
     @mutation_audit(action="app.deploy_token.revoke")
+    @requires_elevation(action_label="app.deploy_token.revoke")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def revoke_deploy_token(
@@ -3005,6 +3008,7 @@ class LifecycleMutation:
 
     @strawberry.field
     @mutation_audit(action="app.deregister")
+    @requires_elevation(action_label="app.deregister")
     @require_permission(Permission.APP_DELETE)
     @tenant_scoped()
     def deregister_astrolift_app(
@@ -3186,6 +3190,7 @@ class LifecycleMutation:
             else None
         ),
     )
+    @requires_elevation(action_label="app.force_redeploy")
     @require_permission(Permission.APP_DEPLOY, Permission.APP_UPDATE)
     @tenant_scoped()
     def force_astrolift_redeploy(

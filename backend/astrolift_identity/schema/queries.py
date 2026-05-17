@@ -35,6 +35,7 @@ from astrolift_identity.schema.types import (
     ActiveSessionType,
     ApiTokenType,
     ApproverUserType,
+    ElevationStatusType,
     IdentityProviderType,
     InvitationType,
     MemberType,
@@ -821,6 +822,12 @@ class IdentityQuery:
         if viewer is None or not viewer.is_authenticated:
             return []
 
+        from astrolift_identity.session_elevation import (
+            SESSION_KEY_ELEVATED_UNTIL,
+            SESSION_KEY_ELEVATION_METHOD,
+            _parse_iso,
+        )
+
         current_key = getattr(getattr(request, "session", None), "session_key", None)
         viewer_pk = str(viewer.pk)
         now = timezone.now()
@@ -833,6 +840,14 @@ class IdentityQuery:
                 continue
             if str(data.get("_auth_user_id", "")) != viewer_pk:
                 continue
+            elevated_until = _parse_iso(data.get(SESSION_KEY_ELEVATED_UNTIL))
+            # Lapsed elevations aren't surfaced as "elevated" — the
+            # client should treat them as None so the indicator goes
+            # away the moment the timer runs out without waiting for
+            # a deelevate mutation.
+            if elevated_until is not None and elevated_until <= now:
+                elevated_until = None
+            method = data.get(SESSION_KEY_ELEVATION_METHOD) if elevated_until else None
             # Return only the last 8 chars of the session key as a
             # display-safe identifier. The full key never leaves the
             # cookie jar; logout_all_sessions doesn't need it.
@@ -845,9 +860,50 @@ class IdentityQuery:
                     last_seen_at=None,
                     ip_address=None,
                     user_agent=None,
+                    elevated_until=elevated_until,
+                    elevation_method=method if isinstance(method, str) else None,
                 )
             )
         return out
+
+    @strawberry.field
+    def astrolift_elevation_status(self, info: Info) -> ElevationStatusType:
+        """Snapshot of the current session's step-up elevation (#487).
+
+        Self-only — every authed user sees their own session's
+        elevation, no permission gate. Unauthenticated callers get a
+        deny-shaped envelope (``elevated=False``, ``required_for=[]``)
+        rather than an exception so the FE can render the indicator
+        in a logged-out shell without a try/catch.
+        """
+        from astrolift_identity.session_elevation import get_status
+        from astrolift_identity.step_up import list_gated_resolvers
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated or session is None:
+            return ElevationStatusType(
+                elevated=False,
+                elevated_until=None,
+                seconds_remaining=0,
+                method=None,
+                required_for=[],
+            )
+
+        status = get_status(session)
+        # ``list_gated_resolvers`` walks the live schema so the FE's
+        # ``required_for`` reflects exactly what the backend gates —
+        # operators that bolt new sensitive mutations on a fork get
+        # them announced automatically once they decorate.
+        gated = [p.resolver.split(".", 1)[-1] for p in list_gated_resolvers()]
+        return ElevationStatusType(
+            elevated=status.elevated,
+            elevated_until=status.elevated_until,
+            seconds_remaining=status.seconds_remaining,
+            method=status.method,
+            required_for=gated,
+        )
 
 
 def _active_idp_pk() -> int | None:

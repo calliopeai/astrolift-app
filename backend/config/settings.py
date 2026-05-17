@@ -478,6 +478,20 @@ CONSTANCE_CONFIG = {
         "the worker from runaway exports while still leaving room for multi-year SOC2 "
         "extracts at the default retention.",
     ),
+    "STEP_UP_AUTH_TTL_SECONDS": (
+        900,
+        "Default elevation window (in seconds) granted by elevateAdminSession. After "
+        "this window expires every @requires_elevation mutation re-prompts for the "
+        "step-up credential. Default 900s (15 min) matches the spec 27 §4.1 ceiling "
+        "and SOC2 / SOX fresh-auth expectations. The mutation accepts a per-call "
+        "ttlSeconds override capped at STEP_UP_AUTH_MAX_TTL_SECONDS.",
+    ),
+    "STEP_UP_AUTH_MAX_TTL_SECONDS": (
+        900,
+        "Hard cap on the per-call ttlSeconds an elevateAdminSession request can ask "
+        "for. The spec ceiling is 15 minutes; a longer-lived elevation defeats the "
+        "purpose of step-up auth. Anything above this is silently clamped.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -505,6 +519,13 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "AUDIT_RETENTION_DAYS",
             "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS",
             "AUDIT_EXPORT_MAX_ROWS",
+        ),
+        "collapse": False,
+    },
+    "Step-up auth": {
+        "fields": (
+            "STEP_UP_AUTH_TTL_SECONDS",
+            "STEP_UP_AUTH_MAX_TTL_SECONDS",
         ),
         "collapse": False,
     },

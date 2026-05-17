@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { ElevationIndicator } from "@/components/ElevationIndicator";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import {
   Breadcrumb,
@@ -53,6 +54,7 @@ export const PageHeader = () => {
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+        <ElevationIndicator />
         <NotificationsBell />
       </div>
     </header>
