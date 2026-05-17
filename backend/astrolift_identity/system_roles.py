@@ -26,6 +26,11 @@ _READ_ALL = (
     # Auditors need to download the log for compliance reviews — issue
     # #433 makes the audit surface usable for SOC2 / similar audits.
     Permission.AUDIT_LOG_EXPORT,
+    # Forms surface (#453): readers see form definitions + their
+    # submissions in the operator UI. Submit lives on a dedicated
+    # role grant (see ``team_viewer`` / ``team_developer`` below) so
+    # auditors don't accidentally submit on a published form.
+    Permission.FORM_READ,
 )
 
 _DEPLOY_OPS = (
@@ -125,25 +130,33 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "team_developer",
         "TEAM",
         "Team Developer",
-        "Read team resources; deploy + rollback + secrets on team apps.",
+        "Read team resources; deploy + rollback + secrets on team apps; submit forms.",
         (
             Permission.TEAM_READ,
             Permission.PROJECT_READ,
             Permission.APP_READ,
             *_DEPLOY_OPS,
+            # Forms #453: developers can submit on the team's forms.
+            Permission.FORM_READ,
+            Permission.FORM_SUBMIT,
         ),
     ),
     (
         "team_viewer",
         "TEAM",
         "Team Viewer",
-        "Read-only access to team resources.",
+        "Read-only access to team resources; can read + submit forms.",
         (
             Permission.TEAM_READ,
             Permission.PROJECT_READ,
             Permission.APP_READ,
             Permission.APP_READ_LOGS,
             Permission.APP_READ_METRICS,
+            # Forms #453: every org member should be able to read and
+            # submit a published form (e.g. surveys, intake) even when
+            # they have no write access to anything else.
+            Permission.FORM_READ,
+            Permission.FORM_SUBMIT,
         ),
     ),
     (
