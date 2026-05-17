@@ -472,6 +472,28 @@
           "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
         }
       }
+    },
+    "detail": {
+      "urlHealth": {
+        "checking": "확인 중…",
+        "unknown": "미확인",
+        "ariaLabel": "URL 상태: {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "도달 불가",
+        "tooltip": {
+          "title": "최근 프로브",
+          "empty": "프로브 기록이 아직 없습니다.",
+          "uptime": "{ok}/{total} 정상 · 평균 {avgMs}ms",
+          "now": "방금",
+          "secondsAgo": "{seconds}초 전",
+          "minutesAgo": "{minutes}분 전",
+          "hoursAgo": "{hours}시간 전",
+          "recheck": "다시 프로브하려면 클릭",
+          "rechecking": "다시 프로브 중…"
+        }
+      }
     }
   },
   "settingsIndex": {

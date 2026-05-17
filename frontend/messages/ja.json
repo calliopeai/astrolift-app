@@ -472,6 +472,28 @@
           "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
         }
       }
+    },
+    "detail": {
+      "urlHealth": {
+        "checking": "確認中…",
+        "unknown": "未確認",
+        "ariaLabel": "URL ヘルス: {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "到達不能",
+        "tooltip": {
+          "title": "最近のチェック",
+          "empty": "プローブ履歴はまだありません。",
+          "uptime": "{ok}/{total} 正常 · 平均 {avgMs}ms",
+          "now": "たった今",
+          "secondsAgo": "{seconds} 秒前",
+          "minutesAgo": "{minutes} 分前",
+          "hoursAgo": "{hours} 時間前",
+          "recheck": "クリックして再プローブ",
+          "rechecking": "再プローブ中…"
+        }
+      }
     }
   },
   "settingsIndex": {

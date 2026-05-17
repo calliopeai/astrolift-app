@@ -472,6 +472,28 @@
           "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
         }
       }
+    },
+    "detail": {
+      "urlHealth": {
+        "checking": "检查中…",
+        "unknown": "未检查",
+        "ariaLabel": "URL 状态:{status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "无法访问",
+        "tooltip": {
+          "title": "最近探测",
+          "empty": "尚无探测历史。",
+          "uptime": "{ok}/{total} 正常 · 平均 {avgMs}ms",
+          "now": "刚刚",
+          "secondsAgo": "{seconds} 秒前",
+          "minutesAgo": "{minutes} 分钟前",
+          "hoursAgo": "{hours} 小时前",
+          "recheck": "点击重新探测",
+          "rechecking": "重新探测中…"
+        }
+      }
     }
   },
   "settingsIndex": {

@@ -468,6 +468,28 @@
           "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
         }
       }
+    },
+    "detail": {
+      "urlHealth": {
+        "checking": "Vérification…",
+        "unknown": "Non vérifié",
+        "ariaLabel": "État de l'URL : {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "Inaccessible",
+        "tooltip": {
+          "title": "Sondes récentes",
+          "empty": "Aucun historique de sonde.",
+          "uptime": "{ok}/{total} ok · moy. {avgMs}ms",
+          "now": "à l'instant",
+          "secondsAgo": "il y a {seconds}s",
+          "minutesAgo": "il y a {minutes}m",
+          "hoursAgo": "il y a {hours}h",
+          "recheck": "Cliquer pour relancer la sonde",
+          "rechecking": "Nouvelle sonde…"
+        }
+      }
     }
   },
   "settingsIndex": {
