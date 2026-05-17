@@ -146,6 +146,13 @@ def tags_for(spec: ProvisionSpec) -> dict[str, str]:
         "astrolift.io/cluster": spec.tenant_cluster_id,
         "astrolift.io/isolation": spec.isolation,
     }
+    # Per-binding cost-attribution keys (#438). Azure allows the
+    # slash + dot form so keys stay identical to the canonical
+    # platform schema.
+    if spec.binding_id:
+        base["astrolift.io/binding"] = spec.binding_id
+    if spec.managed_service_id:
+        base["astrolift.io/managed_service_id"] = spec.managed_service_id
     base.update({
         f"astrolift.io/extra/{k}": v
         for k, v in (spec.tags or {}).items()

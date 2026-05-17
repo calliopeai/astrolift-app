@@ -215,6 +215,26 @@ def test_provision_tags_db_instance(
     assert tag_map.get("astrolift.io/environment") == "prod"
 
 
+def test_provision_stamps_binding_and_managed_service_ids(
+    driver: RDSPostgresDriver, rds_client,
+) -> None:
+    """#438: cost collector joins on astrolift.io/binding +
+    astrolift.io/managed_service_id. Both must land on the cloud-side
+    object when populated on the ProvisionSpec."""
+    binding_guid = "11111111-2222-3333-4444-555555555555"
+    msvc_guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    result = driver.provision(
+        _spec(binding_id=binding_guid, managed_service_id=msvc_guid),
+    )
+    _, instance_id = parse_handle(result.handle)
+    tag_resp = rds_client.list_tags_for_resource(
+        ResourceName=_arn_for(rds_client, instance_id),
+    )
+    tag_map = {t["Key"]: t["Value"] for t in tag_resp["TagList"]}
+    assert tag_map.get("astrolift.io/binding") == binding_guid
+    assert tag_map.get("astrolift.io/managed_service_id") == msvc_guid
+
+
 # ---- update -----------------------------------------------------
 
 

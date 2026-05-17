@@ -558,6 +558,13 @@ def _labels_for(spec: ProvisionSpec) -> dict[str, str]:
         "astrolift-cluster": _sanitize(spec.tenant_cluster_id),
         "astrolift-isolation": _sanitize(spec.isolation),
     }
+    # Per-binding cost-attribution keys (#438). GCP labels are
+    # lowercase + [a-z0-9_-], so the dotted/slash form
+    # ``astrolift.io/binding`` becomes ``astrolift-binding``.
+    if spec.binding_id:
+        base["astrolift-binding"] = _sanitize(spec.binding_id)
+    if spec.managed_service_id:
+        base["astrolift-managed-service-id"] = _sanitize(spec.managed_service_id)
     for k, v in (spec.tags or {}).items():
         base[f"astrolift-extra-{_sanitize(k)}"] = _sanitize(str(v))
     return base

@@ -102,13 +102,20 @@ class GCSDriver(ManagedServiceDriver):
                 bucket.versioning_enabled = True
                 bucket.patch()
             # Apply labels (GCS uses lowercase k=v with dashes,
-            # not the AWS Tag shape)
-            bucket.labels = {
+            # not the AWS Tag shape). #438: stamp per-binding +
+            # managed-service ids so the cost collector can join
+            # against billing-API tag breakdowns.
+            labels: dict[str, str] = {
                 "astrolift-io-managed-by": "platform",
                 "astrolift-io-organization": spec.organization_slug,
                 "astrolift-io-app": spec.app_slug,
                 "astrolift-io-environment": spec.environment_name,
             }
+            if spec.binding_id:
+                labels["astrolift-io-binding"] = spec.binding_id
+            if spec.managed_service_id:
+                labels["astrolift-io-managed-service-id"] = spec.managed_service_id
+            bucket.labels = labels
             bucket.patch()
         except Exception as exc:  # noqa: BLE001
             return ProvisionResult(
