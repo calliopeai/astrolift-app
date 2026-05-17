@@ -314,6 +314,33 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "Exiger une approbation avant le déploiement",
+        "safer": "Plus sûr",
+        "toggleHint": "Les déploiements déclenchés restent en attente d’approbation jusqu’à validation par un approbateur. Choisissez une équipe OU un ensemble spécifique d’utilisateurs — les approbateurs ne peuvent pas auto-approuver un déploiement qu’ils ont poussé.",
+        "teamLabel": "Équipe d’approbation",
+        "teamPlaceholder": "Aucune équipe sélectionnée",
+        "teamNoneOption": "Aucune équipe — sélectionnez plutôt des utilisateurs",
+        "teamHint": "Tout membre actif de cette équipe peut approuver. Mutuellement exclusif avec le sélecteur d’utilisateurs.",
+        "minimumLabel": "Nombre d’approbateurs requis",
+        "minimumHintUsers": "1–{max} selon votre sélection d’utilisateurs.",
+        "minimumHintTeam": "Nombre d’approbateurs distincts requis. Au moins 1.",
+        "usersLabel": "Utilisateurs approbateurs",
+        "usersPlaceholderTeam": "Mode équipe sélectionné — videz le sélecteur d’équipe pour ajouter des utilisateurs.",
+        "usersPlaceholderEmpty": "Aucun utilisateur sélectionné pour l’instant.",
+        "userRemove": "Retirer {label}",
+        "orphanRemove": "Retirer l’approbateur orphelin {id}",
+        "orphanSuffix": "(plus membre)",
+        "search": "Rechercher des membres par nom ou e-mail…",
+        "loading": "Chargement des membres de l’organisation…",
+        "noMembers": "Aucun membre actif — invitez quelqu’un d’abord.",
+        "noMatch": "Aucun membre ne correspond à la recherche.",
+        "errorPickAny": "Sélectionnez au moins un approbateur — une équipe ou un ou plusieurs utilisateurs.",
+        "errorBoth": "Choisissez une équipe OU des utilisateurs spécifiques, pas les deux.",
+        "errorMinTooHigh": "Le nombre minimum d’approbations ne peut pas dépasser le nombre d’utilisateurs sélectionnés."
+      }
     }
   },
   "settingsIndex": {

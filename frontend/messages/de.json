@@ -314,6 +314,33 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "wizard": {
+      "approval": {
+        "toggleLabel": "Genehmigung vor dem Deploy erforderlich",
+        "safer": "Sicherer",
+        "toggleHint": "Ausgelöste Deploys landen im Status „warten auf Genehmigung“, bis ein Genehmiger zustimmt. Wähle ein Team ODER eine bestimmte Nutzergruppe — Genehmiger können einen Deploy, den sie selbst gepusht haben, nicht freigeben.",
+        "teamLabel": "Genehmigungsteam",
+        "teamPlaceholder": "Kein Team ausgewählt",
+        "teamNoneOption": "Kein Team — stattdessen Nutzer auswählen",
+        "teamHint": "Jedes aktive Mitglied dieses Teams kann genehmigen. Schließt die Nutzerauswahl aus.",
+        "minimumLabel": "Erforderliche Anzahl Genehmiger",
+        "minimumHintUsers": "1–{max} basierend auf deiner Nutzerauswahl.",
+        "minimumHintTeam": "Anzahl der erforderlichen unterschiedlichen Genehmiger. Mindestens 1.",
+        "usersLabel": "Genehmigende Nutzer",
+        "usersPlaceholderTeam": "Team-Modus aktiv — Teamauswahl löschen, um Nutzer hinzuzufügen.",
+        "usersPlaceholderEmpty": "Noch keine Nutzer ausgewählt.",
+        "userRemove": "{label} entfernen",
+        "orphanRemove": "Verwaisten Genehmiger {id} entfernen",
+        "orphanSuffix": "(kein Mitglied mehr)",
+        "search": "Org-Mitglieder nach Name oder E-Mail suchen…",
+        "loading": "Org-Mitglieder werden geladen…",
+        "noMembers": "Noch keine aktiven Org-Mitglieder — lade zuerst jemanden ein.",
+        "noMatch": "Keine Mitglieder entsprechen der Suche.",
+        "errorPickAny": "Wähle mindestens einen Genehmiger — ein Team oder einen oder mehrere Nutzer.",
+        "errorBoth": "Wähle ein Team ODER bestimmte Nutzer, nicht beides.",
+        "errorMinTooHigh": "Mindestgenehmigungen dürfen die Anzahl der ausgewählten Nutzer nicht überschreiten."
+      }
     }
   },
   "settingsIndex": {

@@ -66,6 +66,17 @@ function canPushCiWorkflow(state: WizardState): boolean {
   return CI_PUSHABLE_KINDS.has(state.connectionKind);
 }
 
+function describeApprovalPolicy(state: WizardState): string {
+  if (!state.requiresApproval) return "Not required";
+  if (state.approverTeamId) {
+    return `Team approval — ${state.minimumApprovals} required`;
+  }
+  if (state.approverUserIds.length > 0) {
+    return `${state.minimumApprovals} of ${state.approverUserIds.length} selected user(s)`;
+  }
+  return "Required — no approvers selected (fix on step 4)";
+}
+
 function ciWorkflowPathFor(sourceKind: WizardState["sourceKind"]): string {
   if (sourceKind === "gitlab") return ".gitlab-ci.yml";
   return ".github/workflows/astrolift-deploy.yml";
@@ -138,8 +149,7 @@ export function ReviewSubmitStep({
               : [
                   {
                     label: "Deploy timing",
-                    value:
-                      DEPLOY_TIMING_LABELS[state.deployTiming] ?? state.deployTiming,
+                    value: DEPLOY_TIMING_LABELS[state.deployTiming] ?? state.deployTiming,
                   },
                   {
                     label: "Trigger",
@@ -161,7 +171,7 @@ export function ReviewSubmitStep({
                     : []),
                   {
                     label: "Approval gate",
-                    value: state.requiresApproval ? "Required" : "Not required",
+                    value: describeApprovalPolicy(state),
                   },
                 ]
           }
@@ -312,7 +322,7 @@ function SummaryCard({
             variant="ghost"
             size="sm"
             onClick={() => onJump(stepIdx)}
-            className="text-muted-foreground hover:text-foreground -mr-2 -mt-1 h-7 gap-1 px-2 text-xs"
+            className="text-muted-foreground hover:text-foreground -mt-1 -mr-2 h-7 gap-1 px-2 text-xs"
             aria-label={`Edit ${title}`}
           >
             <EditIcon className="size-3" />
