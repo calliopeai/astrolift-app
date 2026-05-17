@@ -23,13 +23,18 @@ the SDK.
 
 from __future__ import annotations
 
+import contextlib
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from _sdk.cost import (
+    BillingActualLineItem,
+    BillingActualsResult,
+    BillingActualsUnavailable,
     CostEstimate,
     CostEstimateRequest,
     CostEstimateUnavailable,
@@ -37,6 +42,12 @@ from _sdk.cost import (
     CostLineItem,
     CostResult,
 )
+
+log = logging.getLogger(__name__)
+
+# Tag key on Azure resources. Azure keeps the platform tag verbatim
+# (mixed case + slash allowed) per ``core.cloud_tags.to_azure``.
+AZURE_BINDING_TAG_KEY = "astrolift.io/binding"
 
 
 # Azure service / product names per managed-service kind/variant.
@@ -127,7 +138,7 @@ class AzureCostEstimator(CostEstimator):
                     "currencyCode": request.currency,
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return CostEstimateUnavailable(
                 request=request,
                 reason="api_error",
@@ -226,7 +237,7 @@ class AzureCostEstimator(CostEstimator):
                 odata_filter=odata_filter,
                 currency=request.currency,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return CostEstimateUnavailable(
                 request=request,
                 reason="api_error",
@@ -398,7 +409,7 @@ class AzureCostEstimator(CostEstimator):
             return None
         try:
             sizes = lookup(region)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
         if ttl > 0:
@@ -551,9 +562,9 @@ def _default_vm_size_lookup(
 
 class _DefaultHttp:
     def get(self, url: str, *, params: dict[str, Any] | None = None) -> Any:
+        import json
         from urllib.parse import urlencode
         from urllib.request import Request, urlopen
-        import json
 
         full = url
         if params:
@@ -570,3 +581,215 @@ class _Response:
 
     def json(self) -> Any:
         return self.body
+
+
+# ---- billing actuals (#502) ---------------------------------------
+
+
+@dataclass(frozen=True)
+class AzureBillingActualsConfig:
+    """Per-cloud config for the actuals client. ``cost_mgmt_client``
+    is an injectable ``azure.mgmt.costmanagement.CostManagementClient``
+    wrapper — tests substitute a fake. ``scope`` is the Cost
+    Management API scope string (e.g.
+    ``subscriptions/{sub_id}`` or
+    ``providers/Microsoft.Billing/billingAccounts/{billing_account_id}``).
+    """
+
+    cost_mgmt_client: Any | None = None
+    scope: str = ""
+
+
+class AzureBillingActuals:
+    """Reads actual Azure spend grouped by the
+    ``astrolift.io/binding`` tag via the Cost Management Query API.
+
+    Cost Management's ``Query`` endpoint accepts a ``Dimensions``
+    grouping on tag names; the query returns one row per tag value
+    with the summed cost in the account's currency. Resources missing
+    the tag are emitted under an empty-string binding bucket.
+
+    Returns :class:`BillingActualsUnavailable` when the scope isn't
+    configured (operator hasn't supplied a subscription id) or when
+    the Cost Management API rejects the request — the collector
+    logs and moves on so one misconfigured tenant doesn't stall the
+    whole snapshot.
+    """
+
+    def __init__(self, *, config: AzureBillingActualsConfig) -> None:
+        self._config = config
+        if not config.scope:
+            self._client: Any | None = None
+            self._unavailable_reason: tuple[str, str] | None = (
+                "not_enabled",
+                (
+                    "Azure cost actuals not configured — set "
+                    "AzureBillingActualsConfig.scope to a Cost Management "
+                    "scope string (e.g. 'subscriptions/<sub-id>')."
+                ),
+            )
+            return
+        self._unavailable_reason = None
+        if config.cost_mgmt_client is not None:
+            self._client = config.cost_mgmt_client
+        else:
+            from azure.identity import DefaultAzureCredential
+            from azure.mgmt.costmanagement import CostManagementClient
+
+            credential = DefaultAzureCredential()
+            self._client = CostManagementClient(credential=credential)
+
+    def query_actuals_by_binding(
+        self,
+        *,
+        start: date,
+        end: date,
+        currency: str = "USD",
+    ) -> BillingActualsResult:
+        if start >= end:
+            return BillingActualsUnavailable(
+                reason="api_error",
+                message=f"start={start} must be before end={end}",
+            )
+        if self._unavailable_reason is not None:
+            reason, message = self._unavailable_reason
+            return BillingActualsUnavailable(reason=reason, message=message)
+        # Cost Management Query body. The shape matches the REST API
+        # docs; the SDK accepts the same dict on `parameters=`.
+        query_definition = {
+            "type": "ActualCost",
+            "timeframe": "Custom",
+            "timePeriod": {
+                "from": f"{start.isoformat()}T00:00:00+00:00",
+                "to": f"{end.isoformat()}T00:00:00+00:00",
+            },
+            "dataset": {
+                "granularity": "None",
+                "aggregation": {
+                    "totalCost": {"name": "Cost", "function": "Sum"},
+                },
+                "grouping": [
+                    {"type": "TagKey", "name": AZURE_BINDING_TAG_KEY},
+                ],
+            },
+        }
+        try:
+            response = self._client.query.usage(
+                scope=self._config.scope,
+                parameters=query_definition,
+            )
+        except Exception as exc:
+            msg = str(exc)
+            if "not authorized" in msg.lower() or "unauthorized" in msg.lower() or "forbidden" in msg.lower():
+                return BillingActualsUnavailable(
+                    reason="unauthenticated",
+                    message=(f"Cost Management Query denied for scope {self._config.scope!r}. Underlying: {exc}"),
+                )
+            return BillingActualsUnavailable(
+                reason="api_error",
+                message=f"Cost Management Query failed: {exc}",
+            )
+
+        rows = _azure_query_rows(response)
+        columns = _azure_query_columns(response)
+        cost_idx, tag_idx, currency_idx = _azure_column_indices(columns)
+        if cost_idx is None or tag_idx is None:
+            return BillingActualsUnavailable(
+                reason="api_error",
+                message=(f"Cost Management Query response shape unexpected — columns={columns!r}"),
+            )
+
+        totals: dict[tuple[str, str], int] = {}
+        for row in rows:
+            try:
+                amount = float(row[cost_idx] or 0.0)
+            except (TypeError, ValueError, IndexError):
+                continue
+            if amount <= 0:
+                continue
+            try:
+                raw_tag = row[tag_idx]
+            except IndexError:
+                raw_tag = ""
+            binding_guid = _azure_normalize_tag_value(raw_tag)
+            row_currency = currency
+            if currency_idx is not None:
+                with contextlib.suppress(IndexError):
+                    row_currency = row[currency_idx] or currency
+            if currency and row_currency and row_currency != currency:
+                continue
+            cents = round(amount * 100)
+            key = (binding_guid, row_currency)
+            totals[key] = totals.get(key, 0) + cents
+
+        return [
+            BillingActualLineItem(
+                binding_guid=binding,
+                amount_cents=cents,
+                currency=row_currency,
+                provider="azure",
+                service="",
+            )
+            for (binding, row_currency), cents in totals.items()
+        ]
+
+
+def _azure_query_rows(response: Any) -> list[list[Any]]:
+    if response is None:
+        return []
+    rows = getattr(response, "rows", None)
+    if rows is None and isinstance(response, dict):
+        rows = (response.get("properties") or {}).get("rows")
+    return list(rows or [])
+
+
+def _azure_query_columns(response: Any) -> list[dict[str, str]]:
+    if response is None:
+        return []
+    columns = getattr(response, "columns", None)
+    if columns is None and isinstance(response, dict):
+        columns = (response.get("properties") or {}).get("columns")
+    out: list[dict[str, str]] = []
+    for col in columns or []:
+        if isinstance(col, dict):
+            out.append({"name": str(col.get("name", "")), "type": str(col.get("type", ""))})
+        else:
+            out.append(
+                {
+                    "name": str(getattr(col, "name", "") or ""),
+                    "type": str(getattr(col, "type", "") or ""),
+                }
+            )
+    return out
+
+
+def _azure_column_indices(
+    columns: list[dict[str, str]],
+) -> tuple[int | None, int | None, int | None]:
+    """Return (cost_idx, tag_value_idx, currency_idx). Cost Management
+    response columns vary by API version — the names we look for are
+    ``Cost`` / the requested tag name / ``Currency``. Tag values can
+    be exposed under ``TagValue`` or the literal tag name."""
+    cost_idx = tag_idx = currency_idx = None
+    for i, col in enumerate(columns):
+        name_lower = col["name"].lower()
+        if cost_idx is None and name_lower in {"cost", "costusd", "totalcost"}:
+            cost_idx = i
+        elif tag_idx is None and (
+            name_lower == AZURE_BINDING_TAG_KEY.lower()
+            or name_lower == "tagvalue"
+            or AZURE_BINDING_TAG_KEY.lower() in name_lower
+        ):
+            tag_idx = i
+        elif currency_idx is None and name_lower == "currency":
+            currency_idx = i
+    return cost_idx, tag_idx, currency_idx
+
+
+def _azure_normalize_tag_value(raw: Any) -> str:
+    """Cost Management quotes tag values with extra ``"`` and may
+    return ``None`` for the untagged bucket. Normalize."""
+    if raw is None:
+        return ""
+    value = str(raw)
+    return value.strip().strip('"')
