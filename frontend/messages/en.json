@@ -167,6 +167,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "Settings sections",
+      "openMobileNav": "Open settings menu",
+      "openMobileNavLabel": "Sections",
+      "mobileTitle": "Settings sections",
+      "mobileDescription": "Jump to any settings area.",
+      "groups": {
+        "organization": "Organization",
+        "personal": "Personal",
+        "tokens": "Tokens"
+      }
+    },
+    "breadcrumb": {
+      "root": "Settings"
     }
   },
   "hooks": {
@@ -1723,6 +1738,9 @@
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
+    "cardMeta": {
+      "modified": "Modified {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -1739,6 +1757,10 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",

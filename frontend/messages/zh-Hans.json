@@ -99,6 +99,21 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "nav": {
+      "ariaLabel": "设置分区",
+      "openMobileNav": "打开设置菜单",
+      "openMobileNavLabel": "分区",
+      "mobileTitle": "设置分区",
+      "mobileDescription": "跳转到任意设置区域。",
+      "groups": {
+        "organization": "组织",
+        "personal": "个人",
+        "tokens": "令牌"
+      }
+    },
+    "breadcrumb": {
+      "root": "设置"
     }
   },
   "hooks": {
@@ -350,6 +365,9 @@
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
+    "cardMeta": {
+      "modified": "Modified {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -366,6 +384,10 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",

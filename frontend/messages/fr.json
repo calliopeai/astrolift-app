@@ -95,6 +95,21 @@
       "light": "Clair",
       "dark": "Sombre",
       "system": "Système"
+    },
+    "nav": {
+      "ariaLabel": "Sections des paramètres",
+      "openMobileNav": "Ouvrir le menu des paramètres",
+      "openMobileNavLabel": "Sections",
+      "mobileTitle": "Sections des paramètres",
+      "mobileDescription": "Passez à n'importe quelle zone de paramètres.",
+      "groups": {
+        "organization": "Organisation",
+        "personal": "Personnel",
+        "tokens": "Jetons"
+      }
+    },
+    "breadcrumb": {
+      "root": "Paramètres"
     }
   },
   "hooks": {
@@ -346,6 +361,9 @@
   "settingsIndex": {
     "title": "Paramètres",
     "description": "Configurez l'identité, la sécurité et les surfaces de la plateforme.",
+    "cardMeta": {
+      "modified": "Modifié {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organisation",
@@ -362,6 +380,10 @@
       "policies": {
         "title": "Politiques ABAC",
         "description": "Prédicats d'exécution superposés au RBAC."
+      },
+      "permissions": {
+        "title": "Permissions",
+        "description": "Inspectez chaque permission résolue pour l'utilisateur actuel."
       },
       "profile": {
         "title": "Profil",
