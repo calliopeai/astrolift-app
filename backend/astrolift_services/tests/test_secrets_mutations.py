@@ -1,10 +1,11 @@
-"""Tests for the app-secrets GraphQL mutations (#279)."""
+"""Tests for the app-secrets GraphQL mutations (#279, #424)."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -17,17 +18,41 @@ from astrolift_services.schema.mutations import (
     BulkImportAppSecretsInput,
     DeleteAppSecretInput,
     DetachSecretBundleInput,
+    RevealAppSecretInput,
     ServicesMutation,
     SetAppSecretInput,
 )
+from astrolift_services.schema.queries import ServicesQuery
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
 
 
-def _info():
-    return SimpleNamespace(context=SimpleNamespace(user=None, request=None))
+def _info(user=None, ip: str | None = None):
+    """Build a minimal Strawberry-like Info shim.
+
+    When ``user`` is given the resolver's `_actor_user` helper resolves
+    it the same way it would in prod; `ip` populates the X-Forwarded-For
+    header so reveal-disclosure audit rows capture the source."""
+
+    if user is None:
+        request = SimpleNamespace(user=None, META={})
+    else:
+        meta = {}
+        if ip:
+            meta["HTTP_X_FORWARDED_FOR"] = ip
+        request = SimpleNamespace(user=user, META=meta)
+    return SimpleNamespace(context=SimpleNamespace(user=user, request=request))
+
+
+def _make_user(username: str = "reveal-test"):
+    User = get_user_model()
+    user, _ = User.objects.get_or_create(
+        username=username,
+        defaults={"email": f"{username}@example.com", "first_name": "Op", "last_name": "Erator"},
+    )
+    return user
 
 
 _BASE_TOML = """\
@@ -368,3 +393,240 @@ def test_detach_secret_bundle_soft_deletes(permission_resolver):
     assert result.ok
     ref.refresh_from_db()
     assert ref.deleted_at is not None
+
+
+# ---- #424: revealAppSecret ---------------------------------------
+
+
+def test_reveal_app_secret_returns_literal_plaintext(permission_resolver):
+    org, app, env, _ = _scaffold()
+    user = _make_user("revealer")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.SECRET_READ)
+
+    with _ctx(org):
+        ServicesMutation().set_app_secret(
+            _info(user=user),
+            input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="topsecret"),
+        )
+        result = ServicesMutation().reveal_app_secret(
+            _info(user=user, ip="203.0.113.7"),
+            input=RevealAppSecretInput(
+                app_slug=app.slug,
+                secret_id=f"literal:{env.name}:API_KEY",
+            ),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.value == "topsecret"
+    assert result.data.key == "API_KEY"
+    assert result.data.environment_name == env.name
+    assert result.data.revealed_at is not None
+
+
+def test_reveal_app_secret_requires_secret_read(permission_resolver):
+    org, app, env, _ = _scaffold()
+    user = _make_user("noperms")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    # SECRET_READ intentionally not granted
+
+    with _ctx(org):
+        ServicesMutation().set_app_secret(
+            _info(user=user),
+            input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="x"),
+        )
+        result = ServicesMutation().reveal_app_secret(
+            _info(user=user),
+            input=RevealAppSecretInput(
+                app_slug=app.slug,
+                secret_id=f"literal:{env.name}:API_KEY",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+
+
+def test_reveal_app_secret_rejects_bundle_source(permission_resolver):
+    org, app, env, _ = _scaffold()
+    user = _make_user("rev2")
+    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.SECRET_READ)
+
+    with _ctx(org):
+        result = ServicesMutation().reveal_app_secret(
+            _info(user=user),
+            input=RevealAppSecretInput(
+                app_slug=app.slug,
+                secret_id=f"bundle:{env.name}:stripe-prod",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+
+
+def test_reveal_app_secret_missing_key_not_found(permission_resolver):
+    org, app, env, _ = _scaffold()
+    user = _make_user("rev3")
+    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.SECRET_READ)
+
+    with _ctx(org):
+        result = ServicesMutation().reveal_app_secret(
+            _info(user=user),
+            input=RevealAppSecretInput(
+                app_slug=app.slug,
+                secret_id=f"literal:{env.name}:NEVER_SET",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
+def test_reveal_app_secret_validates_id_shape(permission_resolver):
+    org, app, _, _ = _scaffold()
+    user = _make_user("rev4")
+    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.SECRET_READ)
+
+    with _ctx(org):
+        result = ServicesMutation().reveal_app_secret(
+            _info(user=user),
+            input=RevealAppSecretInput(
+                app_slug=app.slug,
+                secret_id="not-a-valid-id",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+
+
+def test_reveal_app_secret_emits_disclosure_audit_with_ip(monkeypatch, permission_resolver):
+    org, app, env, _ = _scaffold()
+    user = _make_user("auditor")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+    permission_resolver.grant(Permission.SECRET_READ)
+
+    captured = []
+
+    from core import mutations as core_mutations
+
+    original = core_mutations._audit_writer
+    core_mutations.register_audit_writer(lambda entry: captured.append(entry))
+    try:
+        with _ctx(org):
+            ServicesMutation().set_app_secret(
+                _info(user=user),
+                input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="v"),
+            )
+            ServicesMutation().reveal_app_secret(
+                _info(user=user, ip="198.51.100.42"),
+                input=RevealAppSecretInput(
+                    app_slug=app.slug,
+                    secret_id=f"literal:{env.name}:API_KEY",
+                ),
+            )
+    finally:
+        core_mutations.register_audit_writer(original)
+
+    disclosures = [e for e in captured if e.action == "app.secret.reveal.disclosure"]
+    assert len(disclosures) == 1
+    assert disclosures[0].extra["client_ip"] == "198.51.100.42"
+    assert disclosures[0].extra["key"] == "API_KEY"
+    assert disclosures[0].extra["app_slug"] == app.slug
+
+
+# ---- #424: lastEditedBy + attachment metadata --------------------
+
+
+def test_set_app_secret_sets_updated_by(permission_resolver):
+    org, app, _, _ = _scaffold()
+    user = _make_user("setter")
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        ServicesMutation().set_app_secret(
+            _info(user=user),
+            input=SetAppSecretInput(app_slug=app.slug, key="K", value="v"),
+        )
+
+    app.refresh_from_db()
+    assert app.updated_by_id == user.pk
+
+
+def test_app_secrets_query_surfaces_last_edited_by(permission_resolver):
+    org, app, env, _ = _scaffold()
+    user = _make_user("editor")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+
+    with _ctx(org):
+        ServicesMutation().set_app_secret(
+            _info(user=user),
+            input=SetAppSecretInput(app_slug=app.slug, key="API_KEY", value="x"),
+        )
+        rows = ServicesQuery().astrolift_app_secrets(
+            _info(user=user),
+            app_slug=app.slug,
+            environment_name=env.name,
+        )
+
+    literal_rows = [r for r in rows if r.source == "literal" and r.key == "API_KEY"]
+    assert len(literal_rows) == 1
+    editor = literal_rows[0].last_edited_by
+    assert editor is not None
+    assert editor.username == "editor"
+
+
+def test_attachment_query_surfaces_team_count_order(permission_resolver):
+    org, app, env, bundle = _scaffold()
+    user = _make_user("attacher")
+    permission_resolver.grant(Permission.APP_UPDATE)
+    permission_resolver.grant(Permission.APP_READ)
+
+    # Create a second bundle so we can assert merge-order numbering.
+    bundle_b = SecretBundle.objects.create(
+        organization=org,
+        team=bundle.team,
+        slug="prod-extras",
+        name="Prod Extras",
+        backend_ref="vault:/acme/prod-extras",
+    )
+    with _ctx(org):
+        ServicesMutation().attach_secret_bundle(
+            _info(user=user),
+            input=AttachSecretBundleInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                bundle_slug=bundle.slug,
+                prefix="A_",
+            ),
+        )
+        ServicesMutation().attach_secret_bundle(
+            _info(user=user),
+            input=AttachSecretBundleInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                bundle_slug=bundle_b.slug,
+                prefix="B_",
+            ),
+        )
+        rows = ServicesQuery().astrolift_app_secret_bundle_attachments(
+            _info(user=user),
+            app_slug=app.slug,
+            environment_name=env.name,
+        )
+
+    assert [r.bundle_slug for r in rows] == ["prod-secrets", "prod-extras"]
+    assert [r.merge_order for r in rows] == [0, 1]
+    assert rows[0].team_slug == bundle.team.slug
+    assert rows[0].attached_at is not None
+    # key_count is 0 today (backend gap — values live in the secrets backend);
+    # the UI surfaces '?' when count is 0.
+    assert rows[0].key_count == 0
