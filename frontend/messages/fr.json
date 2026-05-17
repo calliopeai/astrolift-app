@@ -557,6 +557,34 @@
         "warningBadgeLabel": "Avertissement",
         "collapse": "Réduire",
         "expand": "Développer"
+      },
+      "logs": {
+        "export": "Exporter",
+        "exportTitle": "Exporter les journaux du pod sélectionné"
+      },
+      "logExport": {
+        "title": "Exporter les journaux de l'application",
+        "description": "Regroupe la tranche actuelle de journaux du pod {pod} dans un fichier téléchargeable. Le lien est à usage unique et expire après le TTL configuré.",
+        "descriptionNoPod": "Sélectionnez d'abord un pod pour activer l'export.",
+        "missingPod": "Choisissez un pod avant d'exporter.",
+        "formatLabel": "Format",
+        "formatPlaceholder": "Choisir un format",
+        "formatTxt": "Texte brut (.log)",
+        "formatNdjson": "NDJSON (.ndjson)",
+        "formatCsv": "CSV (.csv)",
+        "sinceLabel": "Du (UTC)",
+        "untilLabel": "Au (UTC)",
+        "levelLabel": "Filtre de niveau",
+        "levelPlaceholder": "ex. ERROR",
+        "regexLabel": "Filtre regex",
+        "regexPlaceholder": "ex. 5\\d{2}",
+        "submitButton": "Exporter",
+        "submittingButton": "Préparation…",
+        "toastStart": "Préparation de l'export des journaux…",
+        "toastReady": "Export prêt — {rows} lignes {format}",
+        "toastReadyTruncated": "Export prêt (tronqué) — {rows} lignes {format}; restreignez les filtres et réessayez",
+        "toastDownload": "Télécharger",
+        "toastFailure": "Échec de l'export"
       }
     },
     "tokens": {
