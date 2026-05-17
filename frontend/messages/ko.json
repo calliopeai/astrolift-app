@@ -681,6 +681,125 @@
         "received": "수신 {rel}",
         "review": "검토"
       }
+    },
+    "deployments": {
+      "title": "배포",
+      "description": "모든 앱과 환경에 걸친 모든 롤아웃 시도. 행을 클릭하면 워크플로 타임라인, 렌더링된 매니페스트, 로그를 확인할 수 있습니다.",
+      "start": "배포 시작",
+      "filterApp": "앱 슬러그로 필터…",
+      "counts": "{total} 중 {filtered}",
+      "emptyTitle": "아직 배포가 없습니다",
+      "emptyDescription": "앱을 등록하고 /apps/[slug]/deploy 에서 배포를 실행하세요. 워크플로가 시작되면 여기에 표시됩니다.",
+      "openApps": "앱 열기",
+      "approvalsCount": "{received}/{required} 승인",
+      "rowAriaLabel": "배포 {app} → {env}. Enter 키로 열기.",
+      "columns": {
+        "appEnv": "앱 / 환경",
+        "image": "이미지",
+        "trigger": "트리거",
+        "status": "상태",
+        "duration": "기간",
+        "started": "시작",
+        "actions": "작업"
+      },
+      "pills": {
+        "ariaLabel": "상태로 필터",
+        "all": "전체",
+        "active": "활성",
+        "running": "실행 중",
+        "failed": "실패"
+      },
+      "actions": {
+        "label": "작업",
+        "more": "더 많은 작업",
+        "approve": "승인",
+        "abort": "취소",
+        "rollback": "롤백",
+        "redeploy": "재배포",
+        "viewLogs": "상세 / 로그 보기",
+        "viewCommit": "커밋 보기",
+        "copyGuid": "배포 ID 복사",
+        "copyOk": "배포 ID가 복사되었습니다.",
+        "copyFail": "클립보드에 복사할 수 없습니다."
+      },
+      "statusOptions": {
+        "all": "모든 상태",
+        "pending_approval": "승인 대기 중",
+        "pending": "대기 중",
+        "deploying": "배포 중",
+        "redeploying": "재배포 중",
+        "running": "실행 중",
+        "failed": "실패",
+        "rolled_back": "롤백됨",
+        "superseded": "대체됨"
+      },
+      "envWorkload": "환경 {env} · 워크로드 {workload}",
+      "envOnly": "환경 {env}",
+      "confirm": {
+        "approveTitle": "{tag} 배포를 승인하시겠습니까?",
+        "approveDescription": "{app}/{env}에 대한 롤아웃을 차단 해제합니다. 워크플로가 즉시 재개됩니다.",
+        "approveConfirm": "승인",
+        "abortTitle": "{app}/{env}의 진행 중 배포를 취소하시겠습니까?",
+        "abortDescription": "Temporal 워크플로에 취소를 신호합니다. 배포가 실패로 표시됩니다. 클러스터에 이미 적용된 변경 사항은 유지됩니다 — Astrolift는 취소 시 자동 롤백하지 않습니다.",
+        "abortConfirm": "배포 취소",
+        "abortReasonLabel": "취소 사유",
+        "abortReasonPlaceholder": "이 배포를 왜 취소합니까? 감사 로그와 기록 사이드바에 보존됩니다.",
+        "reasonRequired": "사유 필수",
+        "rollbackTitle": "{app}/{env}를 이전 리비전으로 롤백하시겠습니까?",
+        "rollbackDescription": "이전 실행 중 리비전을 가리키는 새 롤백 배포를 만듭니다. 현재 리비전은 대체됨이 됩니다.",
+        "rollbackConfirm": "롤백",
+        "redeployTitle": "{tag}을(를) {app}/{env}에 재배포하시겠습니까?",
+        "redeployDescription": "동일한 이미지로 새 배포를 실행합니다. 일시적 실패 후 재시도하거나 업데이트된 구성을 가져올 때 유용합니다.",
+        "redeployConfirm": "재배포"
+      },
+      "bulk": {
+        "selectAllLabel": "보이는 모든 배포 선택",
+        "selectRowLabel": "{app} / {env} 선택",
+        "selected": "{count, plural, =1 {1개 배포 선택됨} other {#개 배포 선택됨}}",
+        "summary": "{envs}에서.",
+        "mixedWarning": "선택에 진행 중과 종료 상태가 혼합되어 있습니다 — 선택이 균일해질 때까지 일괄 작업이 비활성화됩니다.",
+        "clear": "지우기",
+        "cancelButton": "{count}개 취소",
+        "redeployButton": "{count}개 재배포",
+        "confirmCancel": {
+          "title": "진행 중인 {count}개 배포를 취소하시겠습니까?",
+          "description": "각 Temporal 워크플로에 취소를 신호합니다. 선택한 모든 배포를 실패로 표시합니다. 이미 적용된 클러스터 상태는 유지됩니다. {envs}에 영향을 미칩니다.",
+          "reasonLabel": "취소 사유",
+          "reasonPlaceholder": "이 배포들을 왜 취소합니까? 감사 로그와 기록 사이드바에 보존됩니다.",
+          "confirm": "배포 취소"
+        },
+        "confirmRedeploy": {
+          "title": "{count}개 배포를 재배포하시겠습니까?",
+          "description": "선택한 각 행을 동일한 이미지 태그로 새 배포로 실행합니다. {envs}에 영향을 미칩니다.",
+          "confirm": "모두 재배포"
+        },
+        "toasts": {
+          "abortLabel": "취소",
+          "redeployLabel": "재배포",
+          "allOk": "{label} 성공: {count}개 배포.",
+          "allFailed": "{label} 실패: {count}개 배포: {message}",
+          "partial": "{label}: 성공 {succeeded}개, 실패 {failed}개."
+        }
+      },
+      "startSheet": {
+        "title": "배포 시작",
+        "description": "Temporal에 새 롤아웃을 제출합니다. 환경이 승인을 요구하면 배포는 pending_approval로 등록되며 충분한 승인자가 서명할 때까지 워크플로는 시작되지 않습니다.",
+        "appLabel": "앱",
+        "appPlaceholder": "앱 선택",
+        "envLabel": "환경",
+        "envPlaceholder": "환경 선택",
+        "tagLabel": "이미지 태그",
+        "tagPlaceholder": "v1.4.2 또는 sha-abc123",
+        "digestLabel": "이미지 다이제스트 (선택 사항)",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "설정 시 이 다이제스트가 워크플로에 의해 매니페스트로 렌더링됩니다 — 보장된 불변 대상.",
+        "triggerLabel": "트리거",
+        "approvalsSuffix": "{count}개 승인",
+        "paused": "일시 중지됨",
+        "cancel": "취소",
+        "submit": "배포 시작",
+        "submitting": "시작 중…"
+      }
     }
   },
   "jobs": {

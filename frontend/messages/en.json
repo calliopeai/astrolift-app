@@ -1106,14 +1106,58 @@
         "trigger": "Trigger",
         "status": "Status",
         "duration": "Duration",
-        "started": "Started"
+        "started": "Started",
+        "actions": "Actions"
+      },
+      "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
+      "pills": {
+        "ariaLabel": "Filter by status",
+        "all": "All",
+        "active": "Active",
+        "running": "Running",
+        "failed": "Failed"
       },
       "actions": {
         "label": "Actions",
+        "more": "More actions",
         "approve": "Approve",
-        "abort": "Abort",
+        "abort": "Cancel",
         "rollback": "Rollback",
-        "redeploy": "Redeploy"
+        "redeploy": "Redeploy",
+        "viewLogs": "View detail / logs",
+        "viewCommit": "View commit",
+        "copyGuid": "Copy deployment ID",
+        "copyOk": "Deployment ID copied.",
+        "copyFail": "Couldn't copy to clipboard."
+      },
+      "bulk": {
+        "selectAllLabel": "Select all visible deployments",
+        "selectRowLabel": "Select {app} / {env}",
+        "selected": "{count, plural, =1 {1 deployment selected} other {# deployments selected}}",
+        "summary": "In {envs}.",
+        "mixedWarning": "Selection mixes in-flight and terminal states — bulk actions are disabled until the set is uniform.",
+        "clear": "Clear",
+        "cancelButton": "Cancel {count}",
+        "redeployButton": "Redeploy {count}",
+        "confirmCancel": {
+          "title": "Cancel {count} in-flight deployments?",
+          "description": "Signals each Temporal workflow to cancel. Marks all selected deployments failed. Cluster state already applied stays in place. Affects {envs}.",
+          "reasonLabel": "Reason for cancel",
+          "reasonPlaceholder": "Why are these deploys being cancelled? Persists on the audit log + history sidebar.",
+          "confirm": "Cancel deployments"
+        },
+        "confirmRedeploy": {
+          "title": "Redeploy {count} deployments?",
+          "description": "Spawns a fresh deployment for each selected row with the same image tag. Affects {envs}.",
+          "confirm": "Redeploy all"
+        },
+        "toasts": {
+          "abortLabel": "Cancel",
+          "redeployLabel": "Redeploy",
+          "allOk": "{label} succeeded for {count} deployments.",
+          "allFailed": "{label} failed for {count} deployments: {message}",
+          "partial": "{label}: {succeeded} succeeded, {failed} failed."
+        }
       },
       "statusOptions": {
         "all": "All statuses",
