@@ -12,6 +12,8 @@ the permission check.
 
 from __future__ import annotations
 
+import datetime as dt
+
 import strawberry
 from strawberry.types import Info
 
@@ -193,9 +195,61 @@ class IdentityQuery:
     @strawberry.field
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
-    def astrolift_members(self, info: Info) -> list[MemberType]:
-        qs = Member.objects.select_related("user").order_by("-created_at")[:500]
-        return [member_to_type(m) for m in qs]
+    def astrolift_members(self, info: Info, search: str | None = None) -> list[MemberType]:
+        """Org-member listing with discoverability affordances.
+
+        ``search`` filters case-insensitively across username, email,
+        first_name, and last_name. The filter runs at the DB layer so
+        big orgs don't pull 500 rows just to grep them client-side.
+
+        ``last_active_at`` is computed per-member as the most recent
+        ``AuditEvent.occurred_at`` where the actor matches this member's
+        user, scoped to the current organization. Resolved in one
+        aggregate query so the field doesn't fan out N+1 on member count.
+        """
+        from django.db.models import Max, Q
+
+        from astrolift_operations.models.audit_event import AuditEvent
+        from core.tenancy import get_current_tenant
+
+        qs = Member.objects.select_related("user").order_by("-created_at")
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(
+                Q(user__username__icontains=term)
+                | Q(user__email__icontains=term)
+                | Q(user__first_name__icontains=term)
+                | Q(user__last_name__icontains=term)
+            )
+        members = list(qs[:500])
+        if not members:
+            return []
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        user_ids = [m.user_id for m in members if m.user_id is not None]
+        last_active_by_user_id: dict[int, dt.datetime] = {}
+        if user_ids and org_id is not None:
+            actor_id_strs = [str(uid) for uid in user_ids]
+            ae_rows = (
+                AuditEvent.objects.filter(
+                    organization_id=org_id,
+                    actor_kind="user",
+                    actor_id__in=actor_id_strs,
+                )
+                .values("actor_id")
+                .annotate(last_at=Max("occurred_at"))
+            )
+            for row in ae_rows:
+                try:
+                    last_active_by_user_id[int(row["actor_id"])] = row["last_at"]
+                except (TypeError, ValueError):
+                    continue
+
+        return [
+            member_to_type(m, last_active_at=last_active_by_user_id.get(m.user_id))
+            for m in members
+        ]
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
@@ -322,8 +376,23 @@ class IdentityQuery:
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def astrolift_role_bindings(self, info: Info) -> list[RoleBindingType]:
-        qs = RoleBinding.objects.select_related("user", "role").order_by("-granted_at")[:500]
-        return [role_binding_to_type(rb) for rb in qs]
+        """Org-wide role bindings with human-readable source-scope labels.
+
+        Each binding's (scope_kind, scope_id) pair is resolved to a
+        label like ``"team payments"`` or ``"app web-api"`` so the FE
+        can render the role-source tooltip without a parallel
+        teams / projects / apps round-trip. Scope rows are loaded in
+        one batch per kind to keep this O(scope-kinds) rather than
+        O(bindings).
+        """
+        qs = list(
+            RoleBinding.objects.select_related("user", "role").order_by("-granted_at")[:500]
+        )
+        labels = _resolve_source_scope_labels(qs)
+        return [
+            role_binding_to_type(rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), ""))
+            for rb in qs
+        ]
 
     @strawberry.field
     @require_permission(Permission.API_TOKEN_CREATE)
@@ -554,3 +623,60 @@ def _active_idp_pk() -> int | None:
     if org_id is None:
         return None
     return Organization.objects.filter(pk=org_id).values_list("identity_provider_id", flat=True).first()
+
+
+def _resolve_source_scope_labels(bindings) -> dict[tuple[str, int], str]:
+    """Build a `(scope_kind, scope_id) -> label` map for a binding set.
+
+    Returns labels like:
+      * ORG     -> "organization <slug>"
+      * TEAM    -> "team <slug>"
+      * PROJECT -> "project <team-slug>/<project-slug>"
+      * APP     -> "app <slug>"
+
+    Falls back to a bare scope-kind label when a referenced row is
+    missing (soft-deleted or migrated away) so the FE never sees an
+    empty string. One batch per scope-kind keeps the round-trip count
+    bounded regardless of how many bindings come in.
+    """
+    grouped: dict[str, set[int]] = {}
+    for rb in bindings:
+        try:
+            sid = int(rb.scope_id)
+        except (TypeError, ValueError):
+            continue
+        grouped.setdefault(rb.scope_kind, set()).add(sid)
+
+    labels: dict[tuple[str, int], str] = {}
+
+    if "ORG" in grouped:
+        for row in Organization.objects.filter(pk__in=grouped["ORG"]).values("pk", "slug"):
+            labels[("ORG", row["pk"])] = f"organization {row['slug']}"
+    if "TEAM" in grouped:
+        for row in Team.objects.filter(pk__in=grouped["TEAM"]).values("pk", "slug"):
+            labels[("TEAM", row["pk"])] = f"team {row['slug']}"
+    if "PROJECT" in grouped:
+        for row in (
+            Project.objects.filter(pk__in=grouped["PROJECT"])
+            .select_related("team")
+            .values("pk", "slug", "team__slug")
+        ):
+            labels[("PROJECT", row["pk"])] = f"project {row['team__slug']}/{row['slug']}"
+    if "APP" in grouped:
+        from astrolift_registry.models import RegisteredApp
+
+        for row in RegisteredApp.objects.filter(pk__in=grouped["APP"]).values("pk", "slug"):
+            labels[("APP", row["pk"])] = f"app {row['slug']}"
+
+    # Fill in fallbacks for any scope row that didn't resolve (deleted
+    # or absent). Iterate the bindings rather than the grouped sets so
+    # we preserve the original scope_id integer type that came in.
+    for rb in bindings:
+        try:
+            sid = int(rb.scope_id)
+        except (TypeError, ValueError):
+            continue
+        key = (rb.scope_kind, sid)
+        if key not in labels:
+            labels[key] = rb.scope_kind.lower()
+    return labels

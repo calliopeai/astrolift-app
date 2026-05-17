@@ -1214,6 +1214,7 @@ export type AstroliftMember = {
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   joinedAt?: Maybe<Scalars['DateTime']['output']>;
+  lastActiveAt?: Maybe<Scalars['DateTime']['output']>;
   lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
   lifecycle: Scalars['String']['output'];
   scopeId: Scalars['String']['output'];
@@ -1583,6 +1584,7 @@ export type AstroliftRoleBinding = {
   role: AstroliftRole;
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
+  sourceScopeLabel: Scalars['String']['output'];
   user?: Maybe<AstroliftUser>;
 };
 
@@ -4289,6 +4291,11 @@ export type QueryAstroliftManagedServiceQueueDepthArgs = {
 export type QueryAstroliftManagedServicesArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMembersArgs = {
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
