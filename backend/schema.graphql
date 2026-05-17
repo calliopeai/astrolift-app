@@ -1706,6 +1706,36 @@ type AstroliftWebhookTestResultMutationResult {
   data: AstroliftWebhookTestResult
 }
 
+type AstroliftWorkflowHistoryEvent {
+  eventType: String!
+  timestamp: String!
+  payload: JSON!
+  retryCount: Int!
+  decision: String!
+}
+
+type AstroliftWorkflowInstance {
+  workflowId: String!
+  workflowType: String!
+  runId: String!
+  status: String!
+  startedAt: String!
+  closedAt: String!
+  durationSeconds: Float
+  taskQueue: String!
+  triggeredBy: String!
+}
+
+type AstroliftWorkflowInstanceDetail {
+  instance: AstroliftWorkflowInstance!
+  history: [AstroliftWorkflowHistoryEvent!]!
+}
+
+type AstroliftWorkflowInstancePage {
+  items: [AstroliftWorkflowInstance!]!
+  nextCursor: String
+}
+
 type AstroliftWorkflowRun {
   id: GUID!
   workflowKind: String!
@@ -2573,6 +2603,9 @@ type Mutation {
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
+  cancelWorkflowInstance(workflowId: String!): MutationResult!
+  terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
+  signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -2885,6 +2918,9 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
+  astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
+  astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
