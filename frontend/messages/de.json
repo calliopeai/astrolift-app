@@ -595,6 +595,125 @@
         "received": "Erhalten {rel}",
         "review": "Prüfen"
       }
+    },
+    "deployments": {
+      "title": "Bereitstellungen",
+      "description": "Jeder Rollout-Versuch über alle Apps und Umgebungen. Klicken Sie auf eine Zeile, um die Workflow-Timeline, gerenderte Manifeste und Logs zu sehen.",
+      "start": "Bereitstellung starten",
+      "filterApp": "Nach App-Slug filtern…",
+      "counts": "{filtered} von {total}",
+      "emptyTitle": "Noch keine Bereitstellungen",
+      "emptyDescription": "Registrieren Sie eine App und starten Sie eine Bereitstellung aus /apps/[slug]/deploy. Bereitstellungen erscheinen hier, sobald der Workflow beginnt.",
+      "openApps": "Apps öffnen",
+      "approvalsCount": "{received}/{required} Genehmigungen",
+      "rowAriaLabel": "Bereitstellung {app} → {env}. Eingabetaste zum Öffnen.",
+      "columns": {
+        "appEnv": "App / Umgebung",
+        "image": "Image",
+        "trigger": "Trigger",
+        "status": "Status",
+        "duration": "Dauer",
+        "started": "Gestartet",
+        "actions": "Aktionen"
+      },
+      "pills": {
+        "ariaLabel": "Nach Status filtern",
+        "all": "Alle",
+        "active": "Aktiv",
+        "running": "Laufend",
+        "failed": "Fehlgeschlagen"
+      },
+      "actions": {
+        "label": "Aktionen",
+        "more": "Weitere Aktionen",
+        "approve": "Genehmigen",
+        "abort": "Abbrechen",
+        "rollback": "Rollback",
+        "redeploy": "Erneut bereitstellen",
+        "viewLogs": "Details / Logs ansehen",
+        "viewCommit": "Commit ansehen",
+        "copyGuid": "Bereitstellungs-ID kopieren",
+        "copyOk": "Bereitstellungs-ID kopiert.",
+        "copyFail": "Konnte nicht in die Zwischenablage kopieren."
+      },
+      "statusOptions": {
+        "all": "Alle Status",
+        "pending_approval": "Genehmigung ausstehend",
+        "pending": "Ausstehend",
+        "deploying": "Wird bereitgestellt",
+        "redeploying": "Wird erneut bereitgestellt",
+        "running": "Läuft",
+        "failed": "Fehlgeschlagen",
+        "rolled_back": "Zurückgerollt",
+        "superseded": "Ersetzt"
+      },
+      "envWorkload": "Umgebung {env} · Workload {workload}",
+      "envOnly": "Umgebung {env}",
+      "confirm": {
+        "approveTitle": "Bereitstellung von {tag} genehmigen?",
+        "approveDescription": "Gibt das Rollout zu {app}/{env} frei. Der Workflow wird sofort fortgesetzt.",
+        "approveConfirm": "Genehmigen",
+        "abortTitle": "Laufende Bereitstellung von {app}/{env} abbrechen?",
+        "abortDescription": "Signalisiert dem Temporal-Workflow den Abbruch. Die Bereitstellung wird als fehlgeschlagen markiert. Bereits zum Cluster ausgerollte Änderungen bleiben — Astrolift macht beim Abbruch kein automatisches Rollback.",
+        "abortConfirm": "Bereitstellung abbrechen",
+        "abortReasonLabel": "Grund für den Abbruch",
+        "abortReasonPlaceholder": "Warum wird diese Bereitstellung abgebrochen? Bleibt im Audit-Log + Verlaufsleiste erhalten.",
+        "reasonRequired": "Grund erforderlich",
+        "rollbackTitle": "{app}/{env} auf die vorherige Revision zurückrollen?",
+        "rollbackDescription": "Erstellt eine neue Rollback-Bereitstellung, die auf die zuvor laufende Revision verweist. Die aktuelle Revision wird ersetzt.",
+        "rollbackConfirm": "Rollback",
+        "redeployTitle": "{tag} erneut zu {app}/{env} bereitstellen?",
+        "redeployDescription": "Startet eine neue Bereitstellung mit demselben Image. Nützlich bei einem vorübergehenden Fehler oder zur Übernahme aktualisierter Konfiguration.",
+        "redeployConfirm": "Erneut bereitstellen"
+      },
+      "bulk": {
+        "selectAllLabel": "Alle sichtbaren Bereitstellungen auswählen",
+        "selectRowLabel": "{app} / {env} auswählen",
+        "selected": "{count, plural, =1 {1 Bereitstellung ausgewählt} other {# Bereitstellungen ausgewählt}}",
+        "summary": "In {envs}.",
+        "mixedWarning": "Auswahl mischt laufende und abgeschlossene Status — Massenaktionen sind deaktiviert, bis die Auswahl einheitlich ist.",
+        "clear": "Zurücksetzen",
+        "cancelButton": "{count} abbrechen",
+        "redeployButton": "{count} erneut bereitstellen",
+        "confirmCancel": {
+          "title": "{count} laufende Bereitstellungen abbrechen?",
+          "description": "Signalisiert jedem Temporal-Workflow den Abbruch. Markiert alle ausgewählten Bereitstellungen als fehlgeschlagen. Bereits angewendeter Cluster-Status bleibt. Betrifft {envs}.",
+          "reasonLabel": "Grund für den Abbruch",
+          "reasonPlaceholder": "Warum werden diese Bereitstellungen abgebrochen? Bleibt im Audit-Log + Verlaufsleiste erhalten.",
+          "confirm": "Bereitstellungen abbrechen"
+        },
+        "confirmRedeploy": {
+          "title": "{count} Bereitstellungen erneut bereitstellen?",
+          "description": "Startet für jede ausgewählte Zeile eine neue Bereitstellung mit demselben Image-Tag. Betrifft {envs}.",
+          "confirm": "Alle erneut bereitstellen"
+        },
+        "toasts": {
+          "abortLabel": "Abbrechen",
+          "redeployLabel": "Erneut bereitstellen",
+          "allOk": "{label} erfolgreich für {count} Bereitstellungen.",
+          "allFailed": "{label} fehlgeschlagen für {count} Bereitstellungen: {message}",
+          "partial": "{label}: {succeeded} erfolgreich, {failed} fehlgeschlagen."
+        }
+      },
+      "startSheet": {
+        "title": "Bereitstellung starten",
+        "description": "Sendet einen neuen Rollout an Temporal. Wenn die Umgebung Genehmigungen erfordert, landet die Bereitstellung als pending_approval und der Workflow startet erst, wenn genügend Genehmiger zugestimmt haben.",
+        "appLabel": "App",
+        "appPlaceholder": "App auswählen",
+        "envLabel": "Umgebung",
+        "envPlaceholder": "Umgebung auswählen",
+        "tagLabel": "Image-Tag",
+        "tagPlaceholder": "v1.4.2 oder sha-abc123",
+        "digestLabel": "Image-Digest (optional)",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "Wenn gesetzt, wird dieser Digest in das Manifest gerendert — garantiert unveränderbares Ziel.",
+        "triggerLabel": "Trigger",
+        "approvalsSuffix": "{count} Genehmigung(en)",
+        "paused": "pausiert",
+        "cancel": "Abbrechen",
+        "submit": "Bereitstellung starten",
+        "submitting": "Wird gestartet…"
+      }
     }
   },
   "jobs": {

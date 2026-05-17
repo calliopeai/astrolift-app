@@ -595,6 +595,125 @@
         "received": "Reçu {rel}",
         "review": "Examiner"
       }
+    },
+    "deployments": {
+      "title": "Déploiements",
+      "description": "Chaque tentative de déploiement à travers toutes les apps et environnements. Cliquez sur une ligne pour voir la chronologie du workflow, les manifestes rendus et les logs.",
+      "start": "Démarrer le déploiement",
+      "filterApp": "Filtrer par slug d'app…",
+      "counts": "{filtered} sur {total}",
+      "emptyTitle": "Pas encore de déploiements",
+      "emptyDescription": "Enregistrez une app et lancez un déploiement depuis /apps/[slug]/deploy. Les déploiements apparaissent ici dès le démarrage du workflow.",
+      "openApps": "Ouvrir les apps",
+      "approvalsCount": "{received}/{required} approbations",
+      "rowAriaLabel": "Déploiement {app} → {env}. Appuyez sur Entrée pour ouvrir.",
+      "columns": {
+        "appEnv": "App / Env",
+        "image": "Image",
+        "trigger": "Déclencheur",
+        "status": "Statut",
+        "duration": "Durée",
+        "started": "Démarré",
+        "actions": "Actions"
+      },
+      "pills": {
+        "ariaLabel": "Filtrer par statut",
+        "all": "Tous",
+        "active": "Actifs",
+        "running": "En cours",
+        "failed": "Échoués"
+      },
+      "actions": {
+        "label": "Actions",
+        "more": "Plus d'actions",
+        "approve": "Approuver",
+        "abort": "Annuler",
+        "rollback": "Rollback",
+        "redeploy": "Redéployer",
+        "viewLogs": "Voir détail / logs",
+        "viewCommit": "Voir le commit",
+        "copyGuid": "Copier l'ID du déploiement",
+        "copyOk": "ID du déploiement copié.",
+        "copyFail": "Impossible de copier dans le presse-papiers."
+      },
+      "statusOptions": {
+        "all": "Tous les statuts",
+        "pending_approval": "Approbation en attente",
+        "pending": "En attente",
+        "deploying": "Déploiement en cours",
+        "redeploying": "Redéploiement en cours",
+        "running": "En cours d'exécution",
+        "failed": "Échoué",
+        "rolled_back": "Rollback effectué",
+        "superseded": "Remplacé"
+      },
+      "envWorkload": "env {env} · workload {workload}",
+      "envOnly": "env {env}",
+      "confirm": {
+        "approveTitle": "Approuver le déploiement de {tag} ?",
+        "approveDescription": "Débloque le rollout vers {app}/{env}. Le workflow reprend immédiatement.",
+        "approveConfirm": "Approuver",
+        "abortTitle": "Annuler le déploiement en cours de {app}/{env} ?",
+        "abortDescription": "Signale au workflow Temporal d'annuler. Le déploiement est marqué comme échoué. Les changements déjà appliqués au cluster restent — Astrolift ne fait pas de rollback automatique à l'annulation.",
+        "abortConfirm": "Annuler le déploiement",
+        "abortReasonLabel": "Raison de l'annulation",
+        "abortReasonPlaceholder": "Pourquoi ce déploiement est-il annulé ? Conservé dans le log d'audit + barre d'historique.",
+        "reasonRequired": "Raison requise",
+        "rollbackTitle": "Faire un rollback de {app}/{env} vers la révision précédente ?",
+        "rollbackDescription": "Crée un nouveau déploiement de rollback pointant vers la révision en cours précédente. La révision actuelle devient remplacée.",
+        "rollbackConfirm": "Rollback",
+        "redeployTitle": "Redéployer {tag} vers {app}/{env} ?",
+        "redeployDescription": "Lance un nouveau déploiement avec la même image. Utile pour réessayer après un échec transitoire ou récupérer une config mise à jour.",
+        "redeployConfirm": "Redéployer"
+      },
+      "bulk": {
+        "selectAllLabel": "Sélectionner tous les déploiements visibles",
+        "selectRowLabel": "Sélectionner {app} / {env}",
+        "selected": "{count, plural, =1 {1 déploiement sélectionné} other {# déploiements sélectionnés}}",
+        "summary": "Dans {envs}.",
+        "mixedWarning": "La sélection mélange des statuts en cours et terminaux — les actions groupées sont désactivées tant que la sélection n'est pas uniforme.",
+        "clear": "Effacer",
+        "cancelButton": "Annuler {count}",
+        "redeployButton": "Redéployer {count}",
+        "confirmCancel": {
+          "title": "Annuler {count} déploiements en cours ?",
+          "description": "Signale à chaque workflow Temporal d'annuler. Marque tous les déploiements sélectionnés comme échoués. L'état du cluster déjà appliqué reste. Affecte {envs}.",
+          "reasonLabel": "Raison de l'annulation",
+          "reasonPlaceholder": "Pourquoi ces déploiements sont-ils annulés ? Conservé dans le log d'audit + barre d'historique.",
+          "confirm": "Annuler les déploiements"
+        },
+        "confirmRedeploy": {
+          "title": "Redéployer {count} déploiements ?",
+          "description": "Lance un nouveau déploiement pour chaque ligne sélectionnée avec le même tag d'image. Affecte {envs}.",
+          "confirm": "Tout redéployer"
+        },
+        "toasts": {
+          "abortLabel": "Annuler",
+          "redeployLabel": "Redéployer",
+          "allOk": "{label} réussi pour {count} déploiements.",
+          "allFailed": "{label} a échoué pour {count} déploiements : {message}",
+          "partial": "{label} : {succeeded} réussis, {failed} échoués."
+        }
+      },
+      "startSheet": {
+        "title": "Démarrer le déploiement",
+        "description": "Soumet un nouveau rollout à Temporal. Si l'environnement requiert des approbations, le déploiement atterrit en pending_approval et le workflow ne démarre que lorsque suffisamment d'approbateurs ont signé.",
+        "appLabel": "App",
+        "appPlaceholder": "Choisir une app",
+        "envLabel": "Environnement",
+        "envPlaceholder": "Choisir un environnement",
+        "tagLabel": "Tag d'image",
+        "tagPlaceholder": "v1.4.2 ou sha-abc123",
+        "digestLabel": "Digest d'image (optionnel)",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "Quand défini, ce digest est ce que le workflow rend dans le manifeste — cible immuable garantie.",
+        "triggerLabel": "Déclencheur",
+        "approvalsSuffix": "{count} approbation(s)",
+        "paused": "en pause",
+        "cancel": "Annuler",
+        "submit": "Démarrer le déploiement",
+        "submitting": "Démarrage…"
+      }
     }
   },
   "jobs": {

@@ -599,6 +599,125 @@
         "received": "受信 {rel}",
         "review": "確認"
       }
+    },
+    "deployments": {
+      "title": "デプロイメント",
+      "description": "すべてのアプリと環境にわたるすべてのロールアウト試行。行をクリックすると、ワークフローのタイムライン、レンダリングされたマニフェスト、ログが表示されます。",
+      "start": "デプロイメントを開始",
+      "filterApp": "アプリのスラグでフィルター…",
+      "counts": "{total} 件中 {filtered} 件",
+      "emptyTitle": "デプロイメントがまだありません",
+      "emptyDescription": "アプリを登録して /apps/[slug]/deploy からデプロイメントを実行してください。ワークフローが開始するとここに表示されます。",
+      "openApps": "アプリを開く",
+      "approvalsCount": "{received}/{required} 承認",
+      "rowAriaLabel": "デプロイメント {app} → {env}。Enter キーで開きます。",
+      "columns": {
+        "appEnv": "アプリ / 環境",
+        "image": "イメージ",
+        "trigger": "トリガー",
+        "status": "ステータス",
+        "duration": "時間",
+        "started": "開始日時",
+        "actions": "アクション"
+      },
+      "pills": {
+        "ariaLabel": "ステータスでフィルター",
+        "all": "すべて",
+        "active": "進行中",
+        "running": "実行中",
+        "failed": "失敗"
+      },
+      "actions": {
+        "label": "アクション",
+        "more": "他のアクション",
+        "approve": "承認",
+        "abort": "キャンセル",
+        "rollback": "ロールバック",
+        "redeploy": "再デプロイ",
+        "viewLogs": "詳細 / ログを見る",
+        "viewCommit": "コミットを見る",
+        "copyGuid": "デプロイメントIDをコピー",
+        "copyOk": "デプロイメントIDをコピーしました。",
+        "copyFail": "クリップボードにコピーできませんでした。"
+      },
+      "statusOptions": {
+        "all": "すべてのステータス",
+        "pending_approval": "承認待ち",
+        "pending": "保留中",
+        "deploying": "デプロイ中",
+        "redeploying": "再デプロイ中",
+        "running": "実行中",
+        "failed": "失敗",
+        "rolled_back": "ロールバック済み",
+        "superseded": "置換済み"
+      },
+      "envWorkload": "環境 {env} · ワークロード {workload}",
+      "envOnly": "環境 {env}",
+      "confirm": {
+        "approveTitle": "{tag} のデプロイを承認しますか？",
+        "approveDescription": "{app}/{env} へのロールアウトをブロック解除します。ワークフローはすぐに再開されます。",
+        "approveConfirm": "承認",
+        "abortTitle": "{app}/{env} の進行中デプロイをキャンセルしますか？",
+        "abortDescription": "Temporal ワークフローにキャンセルを通知します。デプロイメントは失敗としてマークされます。クラスタにすでに適用された変更は残ります — Astrolift はキャンセル時に自動ロールバックしません。",
+        "abortConfirm": "デプロイをキャンセル",
+        "abortReasonLabel": "キャンセル理由",
+        "abortReasonPlaceholder": "なぜこのデプロイをキャンセルしますか？監査ログと履歴サイドバーに保存されます。",
+        "reasonRequired": "理由が必要です",
+        "rollbackTitle": "{app}/{env} を前のリビジョンにロールバックしますか？",
+        "rollbackDescription": "前の実行中リビジョンを指す新しいロールバックデプロイメントを作成します。現在のリビジョンは置換済みになります。",
+        "rollbackConfirm": "ロールバック",
+        "redeployTitle": "{tag} を {app}/{env} に再デプロイしますか？",
+        "redeployDescription": "同じイメージで新しいデプロイメントを起動します。一時的な失敗後のリトライや更新された設定の取得に便利です。",
+        "redeployConfirm": "再デプロイ"
+      },
+      "bulk": {
+        "selectAllLabel": "表示中のすべてのデプロイメントを選択",
+        "selectRowLabel": "{app} / {env} を選択",
+        "selected": "{count, plural, =1 {1 件のデプロイメントを選択} other {# 件のデプロイメントを選択}}",
+        "summary": "{envs} 内。",
+        "mixedWarning": "選択に進行中と終了済みのステータスが混在しています — 一括アクションは選択が均一になるまで無効です。",
+        "clear": "クリア",
+        "cancelButton": "{count} 件をキャンセル",
+        "redeployButton": "{count} 件を再デプロイ",
+        "confirmCancel": {
+          "title": "{count} 件の進行中デプロイメントをキャンセルしますか？",
+          "description": "各 Temporal ワークフローにキャンセルを通知します。選択したすべてを失敗としてマークします。すでに適用されたクラスタ状態は残ります。{envs} に影響します。",
+          "reasonLabel": "キャンセル理由",
+          "reasonPlaceholder": "なぜこれらのデプロイをキャンセルしますか？監査ログと履歴サイドバーに保存されます。",
+          "confirm": "デプロイメントをキャンセル"
+        },
+        "confirmRedeploy": {
+          "title": "{count} 件のデプロイメントを再デプロイしますか？",
+          "description": "選択した各行を同じイメージタグで新しいデプロイメントとして起動します。{envs} に影響します。",
+          "confirm": "すべて再デプロイ"
+        },
+        "toasts": {
+          "abortLabel": "キャンセル",
+          "redeployLabel": "再デプロイ",
+          "allOk": "{label} 成功： {count} 件のデプロイメント。",
+          "allFailed": "{label} 失敗： {count} 件のデプロイメント： {message}",
+          "partial": "{label}： 成功 {succeeded} 件、失敗 {failed} 件。"
+        }
+      },
+      "startSheet": {
+        "title": "デプロイメントを開始",
+        "description": "Temporal に新しいロールアウトを送信します。環境が承認を必要とする場合、デプロイメントは pending_approval として作成され、十分な承認者がサインオフするまでワークフローは開始しません。",
+        "appLabel": "アプリ",
+        "appPlaceholder": "アプリを選択",
+        "envLabel": "環境",
+        "envPlaceholder": "環境を選択",
+        "tagLabel": "イメージタグ",
+        "tagPlaceholder": "v1.4.2 または sha-abc123",
+        "digestLabel": "イメージダイジェスト（任意）",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "設定すると、このダイジェストがワークフローによってマニフェストにレンダリングされます — 不変ターゲットが保証されます。",
+        "triggerLabel": "トリガー",
+        "approvalsSuffix": "{count} 件の承認",
+        "paused": "一時停止",
+        "cancel": "キャンセル",
+        "submit": "デプロイメントを開始",
+        "submitting": "開始中…"
+      }
     }
   },
   "jobs": {

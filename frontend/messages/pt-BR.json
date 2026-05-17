@@ -599,6 +599,125 @@
         "received": "Recebido {rel}",
         "review": "Revisar"
       }
+    },
+    "deployments": {
+      "title": "Implantações",
+      "description": "Cada tentativa de implantação em todas as apps e ambientes. Clique em uma linha para ver a linha do tempo do workflow, manifestos renderizados e logs.",
+      "start": "Iniciar implantação",
+      "filterApp": "Filtrar por slug do app…",
+      "counts": "{filtered} de {total}",
+      "emptyTitle": "Ainda sem implantações",
+      "emptyDescription": "Registre um app e dispare uma implantação em /apps/[slug]/deploy. As implantações aparecem aqui assim que o workflow inicia.",
+      "openApps": "Abrir apps",
+      "approvalsCount": "{received}/{required} aprovações",
+      "rowAriaLabel": "Implantação {app} → {env}. Pressione Enter para abrir.",
+      "columns": {
+        "appEnv": "App / Ambiente",
+        "image": "Imagem",
+        "trigger": "Gatilho",
+        "status": "Status",
+        "duration": "Duração",
+        "started": "Iniciado",
+        "actions": "Ações"
+      },
+      "pills": {
+        "ariaLabel": "Filtrar por status",
+        "all": "Todos",
+        "active": "Ativos",
+        "running": "Em execução",
+        "failed": "Falhos"
+      },
+      "actions": {
+        "label": "Ações",
+        "more": "Mais ações",
+        "approve": "Aprovar",
+        "abort": "Cancelar",
+        "rollback": "Reverter",
+        "redeploy": "Reimplantar",
+        "viewLogs": "Ver detalhe / logs",
+        "viewCommit": "Ver commit",
+        "copyGuid": "Copiar ID da implantação",
+        "copyOk": "ID da implantação copiada.",
+        "copyFail": "Não foi possível copiar para a área de transferência."
+      },
+      "statusOptions": {
+        "all": "Todos os status",
+        "pending_approval": "Aprovação pendente",
+        "pending": "Pendente",
+        "deploying": "Implantando",
+        "redeploying": "Reimplantando",
+        "running": "Em execução",
+        "failed": "Falhou",
+        "rolled_back": "Revertida",
+        "superseded": "Substituída"
+      },
+      "envWorkload": "ambiente {env} · workload {workload}",
+      "envOnly": "ambiente {env}",
+      "confirm": {
+        "approveTitle": "Aprovar implantação de {tag}?",
+        "approveDescription": "Desbloqueia o rollout para {app}/{env}. O workflow retoma imediatamente.",
+        "approveConfirm": "Aprovar",
+        "abortTitle": "Cancelar implantação em curso de {app}/{env}?",
+        "abortDescription": "Sinaliza ao workflow do Temporal para cancelar. A implantação é marcada como falha. As mudanças já aplicadas ao cluster permanecem — Astrolift não faz rollback automático no cancelamento.",
+        "abortConfirm": "Cancelar implantação",
+        "abortReasonLabel": "Motivo do cancelamento",
+        "abortReasonPlaceholder": "Por que esta implantação está sendo cancelada? Persiste no log de auditoria + barra de histórico.",
+        "reasonRequired": "Motivo obrigatório",
+        "rollbackTitle": "Reverter {app}/{env} para a revisão anterior?",
+        "rollbackDescription": "Cria uma nova implantação de rollback apontando para a revisão em execução anterior. A revisão atual passa a ser substituída.",
+        "rollbackConfirm": "Reverter",
+        "redeployTitle": "Reimplantar {tag} em {app}/{env}?",
+        "redeployDescription": "Lança uma nova implantação com a mesma imagem. Útil para tentar novamente após uma falha transitória ou capturar configuração atualizada.",
+        "redeployConfirm": "Reimplantar"
+      },
+      "bulk": {
+        "selectAllLabel": "Selecionar todas as implantações visíveis",
+        "selectRowLabel": "Selecionar {app} / {env}",
+        "selected": "{count, plural, =1 {1 implantação selecionada} other {# implantações selecionadas}}",
+        "summary": "Em {envs}.",
+        "mixedWarning": "A seleção mistura status em curso e terminais — ações em lote ficam desativadas até a seleção ficar uniforme.",
+        "clear": "Limpar",
+        "cancelButton": "Cancelar {count}",
+        "redeployButton": "Reimplantar {count}",
+        "confirmCancel": {
+          "title": "Cancelar {count} implantações em curso?",
+          "description": "Sinaliza a cada workflow do Temporal para cancelar. Marca todas as selecionadas como falhas. O estado do cluster já aplicado permanece. Afeta {envs}.",
+          "reasonLabel": "Motivo do cancelamento",
+          "reasonPlaceholder": "Por que essas implantações estão sendo canceladas? Persiste no log de auditoria + barra de histórico.",
+          "confirm": "Cancelar implantações"
+        },
+        "confirmRedeploy": {
+          "title": "Reimplantar {count} implantações?",
+          "description": "Lança uma nova implantação para cada linha selecionada com a mesma tag de imagem. Afeta {envs}.",
+          "confirm": "Reimplantar todas"
+        },
+        "toasts": {
+          "abortLabel": "Cancelar",
+          "redeployLabel": "Reimplantar",
+          "allOk": "{label} com sucesso para {count} implantações.",
+          "allFailed": "{label} falhou para {count} implantações: {message}",
+          "partial": "{label}: {succeeded} com sucesso, {failed} falhas."
+        }
+      },
+      "startSheet": {
+        "title": "Iniciar implantação",
+        "description": "Envia um novo rollout ao Temporal. Se o ambiente exigir aprovações, a implantação fica como pending_approval e o workflow só inicia quando aprovadores suficientes assinarem.",
+        "appLabel": "App",
+        "appPlaceholder": "Escolha um app",
+        "envLabel": "Ambiente",
+        "envPlaceholder": "Escolha um ambiente",
+        "tagLabel": "Tag da imagem",
+        "tagPlaceholder": "v1.4.2 ou sha-abc123",
+        "digestLabel": "Digest da imagem (opcional)",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "Quando definido, este digest é o que o workflow renderiza no manifesto — alvo garantidamente imutável.",
+        "triggerLabel": "Gatilho",
+        "approvalsSuffix": "{count} aprovação(ões)",
+        "paused": "pausado",
+        "cancel": "Cancelar",
+        "submit": "Iniciar implantação",
+        "submitting": "Iniciando…"
+      }
     }
   },
   "jobs": {
