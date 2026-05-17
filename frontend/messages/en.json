@@ -337,6 +337,26 @@
         "title": "Delete {slug}?",
         "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
         "confirm": "Delete app"
+      },
+      "urlHealth": {
+        "checking": "Checking…",
+        "unknown": "Unchecked",
+        "ariaLabel": "URL health: {status}",
+        "ok": "{latency}ms",
+        "degraded": "{statusCode} · {latency}ms",
+        "down": "{reason}",
+        "downNoReason": "Unreachable",
+        "tooltip": {
+          "title": "Recent probes",
+          "empty": "No probe history yet.",
+          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
+          "now": "now",
+          "secondsAgo": "{seconds}s ago",
+          "minutesAgo": "{minutes}m ago",
+          "hoursAgo": "{hours}h ago",
+          "recheck": "Click to re-run probe",
+          "rechecking": "Re-running probe…"
+        }
       }
     },
     "wizard": {

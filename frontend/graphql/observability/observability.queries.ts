@@ -64,3 +64,32 @@ export const GET_APP_STATUS_CODE_BREAKDOWN = gql`
     }
   }
 `;
+
+// Live HTTP health probe (#406). Backend issues a sync GET, classifies
+// (ok/degraded/down) by status code + latency, and caches the result
+// per (app, url) for 30s. `forceRefresh: true` skips the cache for the
+// click-to-recheck affordance on the pill.
+const APP_URL_HEALTH_FIELDS = `
+  url
+  status
+  statusCode
+  latencyMs
+  lastChecked
+  message
+`;
+
+export const GET_APP_URL_HEALTH = gql`
+  query GetAppUrlHealth($appSlug: String!, $url: String!, $forceRefresh: Boolean! = false) {
+    astroliftAppUrlHealth(appSlug: $appSlug, url: $url, forceRefresh: $forceRefresh) {
+      ${APP_URL_HEALTH_FIELDS}
+    }
+  }
+`;
+
+export const GET_APP_URL_PROBE_HISTORY = gql`
+  query GetAppUrlProbeHistory($appSlug: String!, $url: String!, $limit: Int! = 5) {
+    astroliftAppUrlProbeHistory(appSlug: $appSlug, url: $url, limit: $limit) {
+      ${APP_URL_HEALTH_FIELDS}
+    }
+  }
+`;
