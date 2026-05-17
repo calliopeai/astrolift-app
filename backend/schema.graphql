@@ -1068,13 +1068,12 @@ type AstroliftDeregisterPreviewSourceWebhook {
 
 type AstroliftDeviceRegistration {
   id: GUID!
-  userId: String!
   platform: String!
   label: String!
-  driverName: String!
-  registrationId: String!
-  lastUsedAt: DateTime
-  createdAt: DateTime!
+  tokenLast4: String!
+  driver: String!
+  registeredAt: DateTime!
+  lastSeenAt: DateTime
 }
 
 type AstroliftDeviceRegistrationMutationResult {
@@ -1255,6 +1254,7 @@ type AstroliftIdentityProvider {
   updatedAt: DateTime!
   activatedAt: DateTime
   lastSwitchedByUsername: String
+  version: Int!
 }
 
 type AstroliftIdentityProviderMutationResult {
@@ -1505,6 +1505,19 @@ type AstroliftNotificationMutationResult {
   data: AstroliftNotification
 }
 
+type AstroliftNotificationPreference {
+  id: GUID
+  channel: String!
+  eventKind: String!
+  enabled: Boolean!
+}
+
+type AstroliftNotificationPreferenceMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftNotificationPreference
+}
+
 type AstroliftOrganization {
   id: GUID!
   slug: String!
@@ -1559,6 +1572,7 @@ type AstroliftPolicy {
   deletedAt: DateTime
   createdByUsername: String
   updatedByUsername: String
+  version: Int!
 }
 
 type AstroliftPolicyMutationResult {
@@ -1727,6 +1741,7 @@ type AstroliftRegisteredApp {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+  version: Int!
   lastResyncAt: DateTime
   sourceWebhookInstalledAt: DateTime
   securityPolicy: AstroliftSecurityPolicy!
@@ -2179,6 +2194,7 @@ type AstroliftWebhookSubscription {
   failureCount: Int!
   secretRotatedAt: DateTime
   createdAt: DateTime!
+  version: Int!
 }
 
 type AstroliftWebhookSubscriptionMutationResult {
@@ -3165,8 +3181,9 @@ type Mutation {
   testNotificationChannel(input: TestNotificationInput!): AstroliftNotificationMutationResult!
   markNotificationRead(input: MarkNotificationReadInput!): AstroliftNotificationMutationResult!
   markAllNotificationsRead: MarkallreadpayloadMutationResult!
-  registerAstroliftDevice(input: RegisterAstroliftDeviceInput!): AstroliftDeviceRegistrationMutationResult!
-  unregisterAstroliftDevice(input: UnregisterAstroliftDeviceInput!): SoftdeletepayloadMutationResult!
+  registerMobileDevice(input: RegisterMobileDeviceInput!): AstroliftDeviceRegistrationMutationResult!
+  revokeMobileDevice(input: RevokeMobileDeviceInput!): RevokemobiledevicepayloadMutationResult!
+  setNotificationPreference(input: SetNotificationPreferenceInput!): AstroliftNotificationPreferenceMutationResult!
   createAlertRule(input: CreateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   updateAlertRule(input: UpdateAlertRuleInput!): AstroliftAlertRuleMutationResult!
   deleteAlertRule(input: DeleteAlertRuleInput!): AlertruledeletedpayloadMutationResult!
@@ -3289,6 +3306,8 @@ type MutationError {
   message: String!
   field: String
   requiresAttestation: Boolean
+  currentVersion: Int
+  requestedVersion: Int
 }
 
 """Standard mutation result with ok flag and validation errors."""
@@ -3542,6 +3561,8 @@ type Query {
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]!
   astroliftWebhookDeliveries(subscriptionId: GUID!, limit: Int! = 10): [AstroliftWebhookDelivery!]!
   astroliftMyNotifications(unreadOnly: Boolean! = false, limit: Int! = 50): [AstroliftNotification!]!
+  astroliftMyMobileDevices: [AstroliftDeviceRegistration!]!
+  astroliftMyNotificationPreferences(channel: String = null): [AstroliftNotificationPreference!]!
   astroliftMyDevices: [AstroliftDeviceRegistration!]!
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
@@ -3676,11 +3697,10 @@ input RegisterAppInput {
   manifestRaw: String = null
 }
 
-input RegisterAstroliftDeviceInput {
-  token: String!
-  kind: String!
+input RegisterMobileDeviceInput {
+  deviceToken: String!
+  platform: String!
   label: String = null
-  platformData: JSON = null
 }
 
 input RegisterTenantClusterInput {
@@ -3785,6 +3805,10 @@ input RevokeInvitationInput {
   id: GUID!
 }
 
+input RevokeMobileDeviceInput {
+  id: GUID!
+}
+
 input RevokeRoleBindingInput {
   id: GUID!
 }
@@ -3792,6 +3816,17 @@ input RevokeRoleBindingInput {
 input RevokeTeamAccessInput {
   appId: GUID!
   teamId: GUID!
+}
+
+type Revokemobiledevicepayload {
+  id: GUID!
+  revoked: Boolean!
+}
+
+type RevokemobiledevicepayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Revokemobiledevicepayload
 }
 
 input RotateDeployTokenInput {
@@ -3836,11 +3871,18 @@ input SetAppSecretInput {
   appSlug: String!
   key: String!
   value: String!
+  ifMatchVersion: Int = null
 }
 
 input SetAppSubdomainInput {
   id: GUID!
   subdomain: String!
+}
+
+input SetNotificationPreferenceInput {
+  channel: String!
+  eventKind: String!
+  enabled: Boolean!
 }
 
 type SharedDirectoryType {
@@ -3953,10 +3995,6 @@ input UnmuteAlertRuleInput {
   ruleId: GUID!
 }
 
-input UnregisterAstroliftDeviceInput {
-  deviceId: GUID!
-}
-
 input UnregisterTenantClusterInput {
   id: GUID!
 }
@@ -3987,6 +4025,7 @@ input UpdateAppInput {
   approverUserIds: [String!] = null
   minimumApprovals: Int = null
   cronPaused: Boolean = null
+  ifMatchVersion: Int = null
 }
 
 input UpdateIdentityProviderInput {
@@ -3997,6 +4036,7 @@ input UpdateIdentityProviderInput {
   oidcDiscoveryUrl: String = null
   clientId: String = null
   clientSecretRef: String = null
+  ifMatchVersion: Int = null
 }
 
 input UpdateManagedDomainInput {
@@ -4040,6 +4080,7 @@ input UpdatePolicyInput {
   resourcePattern: JSON = null
   conditions: JSON = null
   actorPattern: JSON = null
+  ifMatchVersion: Int = null
 }
 
 input UpdateProjectInput {
@@ -4090,6 +4131,7 @@ input UpdateWebhookSubscriptionInput {
   events: [String!] = null
   isActive: Boolean = null
   format: String = null
+  ifMatchVersion: Int = null
 }
 
 input UploadCustomDomainCertificateInput {

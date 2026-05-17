@@ -338,6 +338,10 @@ class IdentityProviderType:
     # ``set_active=False`` and never promoted) or when the actor user
     # has since been deleted (FK on_delete=SET_NULL).
     last_switched_by_username: str | None
+    # Optimistic-concurrency version (#497) — pass back as
+    # ``ifMatchVersion`` on ``updateAstroliftIdentityProvider`` to
+    # detect concurrent edits.
+    version: int
 
 
 def identity_provider_to_type(idp, *, is_active: bool = False) -> IdentityProviderType:
@@ -357,6 +361,7 @@ def identity_provider_to_type(idp, *, is_active: bool = False) -> IdentityProvid
         updated_at=idp.updated_at,
         activated_at=idp.activated_at,
         last_switched_by_username=switcher.get_username() if switcher is not None else None,
+        version=int(idp.version or 0),
     )
 
 
@@ -382,6 +387,10 @@ class PolicyType:
     # the referenced user has since been deleted (FK SET_NULL).
     created_by_username: str | None
     updated_by_username: str | None
+    # Optimistic-concurrency version (#497) — pass back as
+    # ``ifMatchVersion`` on ``updateAstroliftPolicy`` to detect a
+    # concurrent edit.
+    version: int
 
 
 @strawberry.type(name="AstroliftInvitation")
@@ -632,6 +641,7 @@ def policy_to_type(policy) -> PolicyType:
         deleted_at=policy.deleted_at,
         created_by_username=creator.get_username() if creator is not None else None,
         updated_by_username=updater.get_username() if updater is not None else None,
+        version=int(policy.version or 0),
     )
 
 

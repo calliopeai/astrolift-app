@@ -259,6 +259,7 @@ export const LIST_POLICIES = gql`
       deletedAt
       createdByUsername
       updatedByUsername
+      version
     }
   }
 `;
@@ -278,6 +279,7 @@ const IDP_FIELDS = `
   updatedAt
   activatedAt
   lastSwitchedByUsername
+  version
 `;
 
 export const LIST_IDENTITY_PROVIDERS = gql`

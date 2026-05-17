@@ -170,6 +170,7 @@ export const LIST_WEBHOOKS = gql`
       failureCount
       secretRotatedAt
       createdAt
+      version
     }
   }
 `;

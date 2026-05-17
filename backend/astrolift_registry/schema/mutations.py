@@ -21,6 +21,7 @@ from astrolift_registry.schema.types import (
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
+from core.optimistic import check_version_match as _check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -84,6 +85,11 @@ class UpdateAppInput:
     # touching ``trigger_mode``. Pausing keeps the cron expression
     # intact so resume re-enables fire-on-schedule immediately.
     cron_paused: bool | None = None
+    # Optimistic-concurrency gate (#497). Null = skip the check
+    # (back-compat). When present, the resolver compares against
+    # ``RegisteredApp.version`` and returns ``VERSION_MISMATCH`` if
+    # the persisted row has moved on.
+    if_match_version: int | None = None
 
 
 @strawberry.input
@@ -735,6 +741,14 @@ class RegistryMutation:
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        # #497 — optimistic-concurrency gate. Refuse to apply changes
+        # when the caller's cached ``ifMatchVersion`` is stale; the FE
+        # then refetches and re-prompts the operator instead of
+        # silently overwriting a concurrent edit.
+        mismatch = _check_version_match(app, if_match_version=input.if_match_version, kind="App")
+        if mismatch is not None:
+            return mismatch
 
         # Resolve the effective post-update trigger_mode + cron_expression
         # together so we can enforce the 'cron mode requires expression'

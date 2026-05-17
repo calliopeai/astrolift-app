@@ -53,6 +53,7 @@ const APP_FIELDS = `
   createdAt
   updatedAt
   deletedAt
+  version
 `;
 
 /**

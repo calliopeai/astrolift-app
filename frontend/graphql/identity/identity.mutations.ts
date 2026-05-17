@@ -236,6 +236,9 @@ export const UPDATE_POLICY = gql`
       errors {
         code
         message
+        field
+        currentVersion
+        requestedVersion
       }
       data {
         id
@@ -244,6 +247,7 @@ export const UPDATE_POLICY = gql`
         effect
         actionPattern
         conditions
+        version
       }
     }
   }
@@ -295,6 +299,8 @@ export const UPDATE_IDENTITY_PROVIDER = gql`
         code
         message
         field
+        currentVersion
+        requestedVersion
       }
       data {
         id
@@ -304,6 +310,7 @@ export const UPDATE_IDENTITY_PROVIDER = gql`
         oidcDiscoveryUrl
         metadataUrl
         isActive
+        version
       }
     }
   }
