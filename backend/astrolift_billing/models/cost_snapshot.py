@@ -49,6 +49,13 @@ class CostSnapshot(AppendOnlyMixin, models.Model):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    managed_service_binding = models.ForeignKey(
+        "astrolift_services.ManagedServiceBinding",
+        related_name="cost_snapshots",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     taken_at = models.DateField(db_index=True)
     by = models.CharField(max_length=32, choices=CostBy.choices)
     amount_cents = models.BigIntegerField()
@@ -61,7 +68,24 @@ class CostSnapshot(AppendOnlyMixin, models.Model):
                 fields=["organization", "-taken_at", "by"],
                 name="cost_org_date_kind_idx",
             ),
+            models.Index(
+                fields=["organization", "managed_service_binding", "-taken_at"],
+                name="cost_org_binding_date_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "organization",
+                    "registered_app",
+                    "managed_service_binding",
+                    "by",
+                    "taken_at",
+                    "source",
+                ],
+                name="cost_snapshot_unique_per_day_scope",
+            ),
         ]
 
     def __str__(self) -> str:
-        return f"CostSnapshot {self.guid} {self.by} {self.amount}{self.currency}"
+        return f"CostSnapshot {self.guid} {self.by} {self.amount_cents}c {self.currency}"
