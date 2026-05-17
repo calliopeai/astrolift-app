@@ -45,7 +45,10 @@ interface Resp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
 
-export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
+export function EnvironmentsClient({
+  appSlug,
+  tabs,
+}: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const t = useTranslations("lists.environments");
   const { can } = useMyPermissions();
   const variables = { appSlug: appSlug ?? null };
@@ -85,9 +88,16 @@ export function EnvironmentsClient({ appSlug }: { appSlug?: string } = {}) {
     <PageShell
       title={t("title")}
       description={
-        appSlug ? t("descriptionForApp", { slug: appSlug }) : t("description")
+        appSlug ? (
+          <span className="text-muted-foreground font-mono text-xs">
+            {t("descriptionForApp", { slug: appSlug })}
+          </span>
+        ) : (
+          t("description")
+        )
       }
     >
+      {tabs}
       <Card>
         <CardContent className="p-0">
           {loading && list.length === 0 ? (

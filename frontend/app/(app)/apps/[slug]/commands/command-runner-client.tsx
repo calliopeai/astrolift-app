@@ -26,6 +26,8 @@ import type {
   AstroliftWorkload,
 } from "@/graphql/registry/registry.types";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
 }
@@ -204,8 +206,15 @@ export function CommandRunnerClient({ slug }: { slug: string }) {
   return (
     <PageShell
       title="Run command"
-      description={`Open a one-shot exec session against a container in ${slug}. Each invocation runs sh -c <command> in the chosen container; stdout + stderr stream live below.`}
+      description={
+        <span className="text-muted-foreground font-mono text-xs">
+          Open a one-shot exec session against a container in {slug}. Each
+          invocation runs sh -c &lt;command&gt; in the chosen container; stdout +
+          stderr stream live below.
+        </span>
+      }
     >
+      <AppTabs slug={slug} active="deployments" />
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">

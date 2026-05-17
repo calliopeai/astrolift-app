@@ -3,6 +3,8 @@ import { PreloadQuery } from "@/lib/apollo";
 
 import { WebhooksClient } from "@/app/(app)/webhooks/webhooks-client";
 
+import { AppTabs } from "../components/app-tabs";
+
 export const metadata = { title: "Webhooks · App · Astrolift" };
 
 export default async function AppWebhooksPage({
@@ -13,7 +15,10 @@ export default async function AppWebhooksPage({
   const { slug } = await params;
   return (
     <PreloadQuery query={LIST_WEBHOOKS} variables={{ appSlug: slug }}>
-      <WebhooksClient appSlug={slug} />
+      <WebhooksClient
+        appSlug={slug}
+        tabs={<AppTabs slug={slug} active="settings" />}
+      />
     </PreloadQuery>
   );
 }

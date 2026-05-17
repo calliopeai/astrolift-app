@@ -42,6 +42,8 @@ import type {
 } from "@/graphql/registry/registry.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { AppTabs } from "../components/app-tabs";
+
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
 }
@@ -415,12 +417,12 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
     <PageShell
       title={t("title", { name: a.name })}
       description={
-        <span className="flex flex-wrap items-center gap-2">
-          <span>{a.manifestPath} on {a.deployBranch}</span>
-          <Badge variant={syncBadge.tone}>{tSync(syncBadge.key)}</Badge>
-          <span className="text-muted-foreground text-xs">
-            {t("updated", { at: fmt.formatRelativeTime(a.updatedAt) })}
+        <span className="text-muted-foreground flex flex-wrap items-center gap-2 font-mono text-xs">
+          <span>
+            {a.manifestPath} on {a.deployBranch}
           </span>
+          <Badge variant={syncBadge.tone}>{tSync(syncBadge.key)}</Badge>
+          <span>{t("updated", { at: fmt.formatRelativeTime(a.updatedAt) })}</span>
         </span>
       }
       actions={
@@ -448,6 +450,7 @@ export function ConfigEditorClient({ slug }: { slug: string }) {
         </>
       }
     >
+      <AppTabs slug={a.slug} active="settings" />
       {conflict && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
