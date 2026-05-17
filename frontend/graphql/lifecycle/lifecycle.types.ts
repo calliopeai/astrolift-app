@@ -22,9 +22,12 @@ import type {
   AstroliftAppIdentityBinding as GeneratedAppIdentityBinding,
   AstroliftAppLogLine as GeneratedAppLogLine,
   AstroliftAppPod as GeneratedAppPod,
+  AstroliftBulkDeploymentResultData as GeneratedBulkDeploymentResultData,
+  AstroliftBulkDeploymentResultItem as GeneratedBulkDeploymentResultItem,
   AstroliftCommandRun as GeneratedCommandRun,
   AstroliftContainerStatus as GeneratedContainerStatus,
   AstroliftDeployment as GeneratedDeployment,
+  AstroliftDeploymentApprover as GeneratedDeploymentApprover,
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
   AstroliftPreviewEnvironment as GeneratedPreviewEnvironment,
@@ -68,6 +71,15 @@ export type AstroliftDeployment = Omit<GeneratedDeployment, "status" | "triggerK
     status: DeploymentStatus;
     triggerKind: TriggerKind;
   };
+
+// #420 — quorum widget surface: who already approved, who we're
+// waiting on, and the magic-link mailto: nudge per awaiting approver.
+// Exported as the generated type so codegen drift is loud (TS will
+// flag a member rename instead of silently passing the wrong shape).
+export type AstroliftDeploymentApprover = GeneratedDeploymentApprover;
+
+export type AstroliftBulkDeploymentResultItem = GeneratedBulkDeploymentResultItem;
+export type AstroliftBulkDeploymentResultData = GeneratedBulkDeploymentResultData;
 
 export interface AstroliftDeploymentApprovalHistoryEntry {
   id: string;

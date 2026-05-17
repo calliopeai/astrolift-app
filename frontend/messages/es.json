@@ -453,6 +453,64 @@
         "redactedNote": "Los valores sensibles (secretos, tokens, contraseñas) se ocultan antes de mostrarlos.",
         "requestIdSection": "ID de solicitud"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} de {required} aprobaciones",
+        "remainingBadge": "Faltan {count}",
+        "metBadge": "Quórum alcanzado",
+        "approvedLabel": "Aprobado por",
+        "approvedEmpty": "Aún nadie ha aprobado.",
+        "awaitingLabel": "Pendiente",
+        "awaitingEmpty": "No hay aprobadores elegibles — revise la política de la app."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Cola de aprobaciones",
+      "description": "Todos los despliegues que esperan firma. Seleccione filas para aprobar o rechazar en bloque dentro de un mismo entorno.",
+      "empty": {
+        "title": "Nada pendiente",
+        "description": "Cuando un despliegue requiere firma, aparece aquí."
+      },
+      "selectAllLabel": "Seleccionar todos",
+      "selectionStatus": "{selected} de {total} seleccionados",
+      "readOnlyHint": "Puede revisar pero no aprobar.",
+      "approveLabel": "Aprobar",
+      "rejectLabel": "Rechazar",
+      "footer": {
+        "selected": "{count, plural, =1 {1 despliegue seleccionado} other {# despliegues seleccionados}}",
+        "summary": "En {envs}.",
+        "crossEnvWarning": "La aprobación en bloque requiere la misma app/entorno — las políticas varían por entorno.",
+        "approveButton": "Aprobar {count}",
+        "rejectButton": "Rechazar {count}"
+      },
+      "confirmApprove": {
+        "title": "¿Aprobar {count} despliegues?",
+        "description": "Desbloquea {envs}.",
+        "confirm": "Aprobar todos"
+      },
+      "confirmReject": {
+        "title": "¿Rechazar {count} despliegues?",
+        "description": "Cada despliegue en {envs} pasará a fallido.",
+        "reasonLabel": "Motivo del rechazo",
+        "reasonPlaceholder": "¿Por qué se rechaza este lote?",
+        "reasonRequired": "Motivo requerido",
+        "confirm": "Rechazar todos"
+      },
+      "toasts": {
+        "unexpected": "La acción en bloque no devolvió respuesta.",
+        "allOk": "{label} con éxito para {count} despliegues.",
+        "allFailed": "{label} falló para {count} despliegues: {message}",
+        "partial": "{label}: {succeeded} con éxito, {failed} fallidos.",
+        "approveFailed": "Aprobación en bloque fallida.",
+        "rejectFailed": "Rechazo en bloque fallido."
+      },
+      "row": {
+        "selectRowLabel": "Seleccionar {app} / {env}",
+        "approvalsCount": "{received}/{required} aprobaciones",
+        "received": "Recibido {rel}",
+        "review": "Revisar"
+      }
     }
   }
 }

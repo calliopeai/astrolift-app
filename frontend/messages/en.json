@@ -1137,6 +1137,62 @@
         "reasonPlaceholder": "Why is this deploy being rejected? Persists on the audit log + history sidebar.",
         "reasonRequired": "Reason required",
         "confirm": "Reject deployment"
+      },
+      "quorum": {
+        "header": "{received} of {required} approvals",
+        "remainingBadge": "{count} more needed",
+        "metBadge": "Quorum met",
+        "approvedLabel": "Approved by",
+        "approvedEmpty": "Nobody has approved yet.",
+        "awaitingLabel": "Awaiting",
+        "awaitingEmpty": "No eligible approvers found — check the app's approver policy."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Approvals queue",
+      "description": "Every deploy waiting on a sign-off. Select rows to bulk approve or reject within a single environment.",
+      "empty": {
+        "title": "Nothing pending",
+        "description": "When a deploy needs a sign-off it lands here. Wire up an app's approver policy from its Settings page."
+      },
+      "selectAllLabel": "Select all pending",
+      "selectionStatus": "{selected} of {total} selected",
+      "readOnlyHint": "You can review but not approve — ask an org admin for app.approve_deploy.",
+      "approveLabel": "Approve",
+      "rejectLabel": "Reject",
+      "footer": {
+        "selected": "{count, plural, =1 {1 deploy selected} other {# deploys selected}}",
+        "summary": "Across {envs}.",
+        "crossEnvWarning": "Bulk approval requires all selections to share the same app/environment — approver policies vary by env.",
+        "approveButton": "Approve {count}",
+        "rejectButton": "Reject {count}"
+      },
+      "confirmApprove": {
+        "title": "Approve {count} deploys?",
+        "description": "Unblocks {envs}. Each workflow resumes immediately. Self-approved deploys are skipped automatically.",
+        "confirm": "Approve all"
+      },
+      "confirmReject": {
+        "title": "Reject {count} deploys?",
+        "description": "Each deploy in {envs} moves to failed. CI must re-trigger to retry.",
+        "reasonLabel": "Reason for rejection (recorded per deploy)",
+        "reasonPlaceholder": "Why is this batch being rejected?",
+        "reasonRequired": "Reason required",
+        "confirm": "Reject all"
+      },
+      "toasts": {
+        "unexpected": "Bulk action returned no payload.",
+        "allOk": "{label} succeeded for {count} deploys.",
+        "allFailed": "{label} failed for {count} deploys: {message}",
+        "partial": "{label}: {succeeded} succeeded, {failed} failed.",
+        "approveFailed": "Bulk approve failed.",
+        "rejectFailed": "Bulk reject failed."
+      },
+      "row": {
+        "selectRowLabel": "Select {app} / {env}",
+        "approvalsCount": "{received}/{required} approvals",
+        "received": "Received {rel}",
+        "review": "Review"
       }
     },
     "alerts": {

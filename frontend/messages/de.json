@@ -453,6 +453,64 @@
         "redactedNote": "Sensible Werte (Geheimnisse, Tokens, Passwörter) werden vor der Anzeige maskiert.",
         "requestIdSection": "Anfrage-ID"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} von {required} Freigaben",
+        "remainingBadge": "{count} weitere benötigt",
+        "metBadge": "Quorum erreicht",
+        "approvedLabel": "Freigegeben von",
+        "approvedEmpty": "Noch keine Freigabe.",
+        "awaitingLabel": "Ausstehend",
+        "awaitingEmpty": "Keine berechtigten Freigebenden gefunden — prüfen Sie die App-Richtlinie."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Freigabe-Warteschlange",
+      "description": "Alle Deploys, die auf eine Freigabe warten. Wählen Sie Zeilen für Bulk-Aktionen innerhalb einer Umgebung.",
+      "empty": {
+        "title": "Nichts wartet",
+        "description": "Wenn ein Deploy eine Freigabe braucht, landet er hier."
+      },
+      "selectAllLabel": "Alle auswählen",
+      "selectionStatus": "{selected} von {total} ausgewählt",
+      "readOnlyHint": "Sie können einsehen, aber nicht freigeben.",
+      "approveLabel": "Freigeben",
+      "rejectLabel": "Ablehnen",
+      "footer": {
+        "selected": "{count, plural, =1 {1 Deploy ausgewählt} other {# Deploys ausgewählt}}",
+        "summary": "In {envs}.",
+        "crossEnvWarning": "Bulk-Freigabe erfordert dieselbe App/Umgebung — Richtlinien unterscheiden sich pro Umgebung.",
+        "approveButton": "{count} freigeben",
+        "rejectButton": "{count} ablehnen"
+      },
+      "confirmApprove": {
+        "title": "{count} Deploys freigeben?",
+        "description": "Entsperrt {envs}.",
+        "confirm": "Alle freigeben"
+      },
+      "confirmReject": {
+        "title": "{count} Deploys ablehnen?",
+        "description": "Jeder Deploy in {envs} wird als fehlgeschlagen markiert.",
+        "reasonLabel": "Ablehnungsgrund",
+        "reasonPlaceholder": "Warum wird dieser Batch abgelehnt?",
+        "reasonRequired": "Grund erforderlich",
+        "confirm": "Alle ablehnen"
+      },
+      "toasts": {
+        "unexpected": "Bulk-Aktion lieferte keine Antwort.",
+        "allOk": "{label} erfolgreich für {count} Deploys.",
+        "allFailed": "{label} fehlgeschlagen für {count} Deploys: {message}",
+        "partial": "{label}: {succeeded} erfolgreich, {failed} fehlgeschlagen.",
+        "approveFailed": "Bulk-Freigabe fehlgeschlagen.",
+        "rejectFailed": "Bulk-Ablehnung fehlgeschlagen."
+      },
+      "row": {
+        "selectRowLabel": "{app} / {env} auswählen",
+        "approvalsCount": "{received}/{required} Freigaben",
+        "received": "Erhalten {rel}",
+        "review": "Prüfen"
+      }
     }
   }
 }

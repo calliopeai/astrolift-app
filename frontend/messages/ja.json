@@ -457,6 +457,64 @@
         "redactedNote": "機密情報 (シークレット、トークン、パスワード) は表示前にマスクされます。",
         "requestIdSection": "リクエスト ID"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} / {required} 承認",
+        "remainingBadge": "あと {count} 件必要",
+        "metBadge": "クォーラム達成",
+        "approvedLabel": "承認者",
+        "approvedEmpty": "まだ承認はありません。",
+        "awaitingLabel": "未承認",
+        "awaitingEmpty": "対象の承認者が見つかりません。アプリのポリシーを確認してください。"
+      }
+    },
+    "approvalsQueue": {
+      "title": "承認キュー",
+      "description": "承認待ちの全デプロイ。同一環境内で行を選択して一括承認または拒否できます。",
+      "empty": {
+        "title": "保留中なし",
+        "description": "承認が必要なデプロイはここに表示されます。"
+      },
+      "selectAllLabel": "すべて選択",
+      "selectionStatus": "{selected} / {total} 件選択中",
+      "readOnlyHint": "閲覧のみ可能です。",
+      "approveLabel": "承認",
+      "rejectLabel": "拒否",
+      "footer": {
+        "selected": "{count} 件のデプロイを選択中",
+        "summary": "{envs} で実行されます。",
+        "crossEnvWarning": "一括操作には同一アプリ/環境が必要です。ポリシーは環境ごとに異なります。",
+        "approveButton": "{count} 件承認",
+        "rejectButton": "{count} 件拒否"
+      },
+      "confirmApprove": {
+        "title": "{count} 件のデプロイを承認しますか?",
+        "description": "{envs} のロールアウトが再開されます。",
+        "confirm": "すべて承認"
+      },
+      "confirmReject": {
+        "title": "{count} 件のデプロイを拒否しますか?",
+        "description": "{envs} の各デプロイが失敗状態になります。",
+        "reasonLabel": "拒否理由",
+        "reasonPlaceholder": "このバッチを拒否する理由を入力してください。",
+        "reasonRequired": "理由は必須です",
+        "confirm": "すべて拒否"
+      },
+      "toasts": {
+        "unexpected": "一括操作の応答がありません。",
+        "allOk": "{label} が {count} 件で成功しました。",
+        "allFailed": "{label} が {count} 件で失敗: {message}",
+        "partial": "{label}: 成功 {succeeded} 件 / 失敗 {failed} 件",
+        "approveFailed": "一括承認に失敗しました。",
+        "rejectFailed": "一括拒否に失敗しました。"
+      },
+      "row": {
+        "selectRowLabel": "{app} / {env} を選択",
+        "approvalsCount": "{received}/{required} 承認",
+        "received": "受信 {rel}",
+        "review": "確認"
+      }
     }
   }
 }
