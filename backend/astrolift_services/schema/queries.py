@@ -37,19 +37,18 @@ def _secret_id(*, source: str, key: str, env: str) -> str:
 
 
 def _bundle_key_count(bundle) -> int:
-    """Best-effort count of keys the bundle is expected to project.
+    """Count of keys the bundle is expected to project (#441).
 
-    Bundle values themselves live in the platform secrets backend.
-    Until the SecretsBackend client surfaces the materialized key set,
-    we infer from the manifest's declared envelope when known; 0
-    otherwise — the UI shows '?' in that case so operators know the
-    count is unavailable rather than a confirmed zero.
+    Backed by ``SecretBundle.last_known_keys`` -- a snapshot the
+    rotation activity refreshes on every materialise, plus a lazy
+    on-read refresh when the cache is older than 1 h.  When the cache
+    has never been populated (newly created bundle, scheduled refresh
+    hasn't run yet, secrets backend unreachable) returns 0 and the UI
+    shows '?' to signal "unknown" rather than "confirmed zero".
     """
-    # The bundle stores a backend_ref like `vault:/acme/prod` —
-    # nothing platform-side enumerates the key set without a live
-    # secrets-backend round-trip. Return 0 until #424 backend gap
-    # ticket lands the cluster-side reflector.
-    return 0
+    from astrolift_services.bundle_keys import known_key_count
+
+    return known_key_count(bundle)
 
 
 def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:

@@ -109,11 +109,19 @@ def _materialize_secret_manifest(
     prefix: str,
     namespace: str,
     secrets_backend,
+    bundle=None,
 ) -> dict[str, Any]:
     """Pull values from the SecretsBackend + shape them into the same
     k8s Secret dict ``update_secrets`` emits at deploy time. Keeps the
     two materialization paths byte-identical so rotated values match
-    what a fresh deploy would produce."""
+    what a fresh deploy would produce.
+
+    Side effect (#441): when ``bundle`` is supplied, refresh
+    ``SecretBundle.last_known_keys`` from the just-fetched payload.
+    Doing it here keeps the cache aligned with whatever the rotation
+    workflow actually materialised, without a second backend call.
+    """
+    from astrolift_services.bundle_keys import _set_known_keys
     from core.app_deploy import AppDeployError
 
     kvs = secrets_backend.get(bundle_backend_ref)
@@ -122,6 +130,16 @@ def _materialize_secret_manifest(
             f"secret bundle {bundle_slug!r} backend_ref "
             f"{bundle_backend_ref!r} not found in secrets backend",
         )
+    if bundle is not None:
+        try:
+            _set_known_keys(bundle, list(kvs.keys()))
+        except Exception:  # noqa: BLE001 — cache mis-write must not block rotate
+            log.warning(
+                "key-count cache update failed for bundle %s -- rotation "
+                "continues; UI keyCount will lag until next refresh",
+                bundle.guid,
+                exc_info=True,
+            )
     data: dict[str, str] = {}
     for k, v in kvs.items():
         full_key = f"{prefix}{k}" if prefix else k
@@ -153,6 +171,7 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_registry.models import RegisteredApp
+    from astrolift_services.models import SecretBundle
     from core.app_deploy import (
         AppDeployError,
         driver_for_capability,
@@ -170,12 +189,19 @@ def _refresh_in_cluster_sync(target: dict[str, Any]) -> dict[str, Any]:
     cluster_driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
     secrets_backend = driver_for_capability(cluster, "secrets")
+    # #441: hand the bundle row to the materialiser so the
+    # last-known-keys cache is refreshed off the same fetch.
+    bundle = SecretBundle.all_objects.filter(
+        backend_ref=target["bundle_backend_ref"],
+        slug=target["bundle_slug"],
+    ).first()
     manifest = _materialize_secret_manifest(
         bundle_slug=target["bundle_slug"],
         bundle_backend_ref=target["bundle_backend_ref"],
         prefix=target["prefix"],
         namespace=namespace,
         secrets_backend=secrets_backend,
+        bundle=bundle,
     )
     result = cluster_driver.apply_manifests(ctx.slug, namespace, [manifest])
     if not result.ok:
