@@ -38,10 +38,16 @@ export const LIST_DEPLOYMENTS = gql`
       durationSeconds
       createdAt
       commitSha
+      commitMessage
+      commitAuthor
       branch
       ciActorKind
       ciProvider
       ciRunUrl
+      repoUrl
+      abortedReason
+      triggeredByUserId
+      triggeredByMe
     }
   }
 `;
@@ -68,9 +74,30 @@ export const GET_DEPLOYMENT = gql`
       createdAt
       ciActorKind
       commitSha
+      commitMessage
+      commitAuthor
       branch
       ciRunUrl
       ciProvider
+      repoUrl
+      abortedReason
+      triggeredByUserId
+      triggeredByMe
+    }
+  }
+`;
+
+export const GET_DEPLOYMENT_APPROVAL_HISTORY = gql`
+  query GetDeploymentApprovalHistory($deploymentId: String!) {
+    astroliftDeploymentApprovalHistory(deploymentId: $deploymentId) {
+      id
+      action
+      decision
+      actorKind
+      actorId
+      actorDisplay
+      occurredAt
+      reason
     }
   }
 `;

@@ -149,6 +149,17 @@ const DEPLOYMENT_FIELDS = `
   endedAt
   durationSeconds
   createdAt
+  commitSha
+  commitMessage
+  commitAuthor
+  branch
+  ciActorKind
+  ciRunUrl
+  ciProvider
+  repoUrl
+  abortedReason
+  triggeredByUserId
+  triggeredByMe
 `;
 
 export const START_DEPLOYMENT = gql`
@@ -183,12 +194,29 @@ export const APPROVE_DEPLOYMENT = gql`
 `;
 
 export const ABORT_DEPLOYMENT = gql`
-  mutation AbortDeployment($input: DeploymentByIdInput!) {
+  mutation AbortDeployment($input: AbortDeploymentInput!) {
     abortDeployment(input: $input) {
       ok
       errors {
         code
         message
+        field
+      }
+      data {
+        ${DEPLOYMENT_FIELDS}
+      }
+    }
+  }
+`;
+
+export const REJECT_DEPLOYMENT = gql`
+  mutation RejectDeployment($input: AbortDeploymentInput!) {
+    rejectDeployment(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
       }
       data {
         ${DEPLOYMENT_FIELDS}
