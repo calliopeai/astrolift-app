@@ -34,6 +34,13 @@ class DeployToken(BaseCoreModel):
     )
     expires_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
+    # Forensic columns (#425). Populated on every successful
+    # ``alft_dt_`` bearer auth by the deploy-token middleware so an
+    # operator investigating a leaked token can correlate it with the
+    # last CI runner / IP that used it. Mirrors the ApiToken
+    # last_used_ip / last_used_agent fields from #428.
+    last_used_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_used_agent = models.CharField(max_length=512, blank=True, default="")
     is_revoked = models.BooleanField(default=False)
 
     # Rotation grace window (#143). When ``rotate_deploy_token``
