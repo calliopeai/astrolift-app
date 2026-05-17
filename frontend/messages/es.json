@@ -550,6 +550,24 @@
         "warningBadgeLabel": "Advertencia",
         "collapse": "Contraer",
         "expand": "Expandir"
+      },
+      "logs": {
+        "pressStreamAll": "Pulsa «Stream» para tailear todas las réplicas.",
+        "allReplicas": "Todas las réplicas",
+        "allReplicasDescription": "Transmitiendo desde cada réplica de esta app — cada línea está etiquetada con su pod de origen.",
+        "historicalDescription": "Mostrando líneas de log de los últimos {range}.",
+        "refreshHistorical": "Actualizar",
+        "historicalUnavailableTitle": "Los logs históricos no están disponibles en este clúster",
+        "historicalUnavailableHint": "Este clúster no tiene un backend agregador de logs configurado (Loki / CloudWatch / Stackdriver / Azure Monitor). Vuelve a En vivo para tailear en tiempo real.",
+        "historicalUnavailableEmpty": "Las consultas de logs históricos no están disponibles en este clúster. Vuelve a En vivo para tailear en tiempo real.",
+        "historicalNoResults": "Ninguna línea de log coincide en esta ventana.",
+        "range": {
+          "live": "En vivo",
+          "15m": "Últimos 15 minutos",
+          "1h": "Última hora",
+          "6h": "Últimas 6 horas",
+          "24h": "Últimas 24 horas"
+        }
       }
     },
     "tokens": {

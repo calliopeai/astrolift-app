@@ -624,9 +624,25 @@
         "stream": "Stream",
         "waiting": "Waiting for the first line…",
         "pressStream": "Press \"Stream\" to start tailing.",
+        "pressStreamAll": "Press \"Stream\" to start tailing every replica.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "allReplicas": "All replicas",
+        "allReplicasDescription": "Streaming from every replica of this app — each line is tagged with its source pod.",
+        "historicalDescription": "Showing log lines from the last {range}.",
+        "refreshHistorical": "Refresh",
+        "historicalUnavailableTitle": "Historical logs are unavailable on this cluster",
+        "historicalUnavailableHint": "This cluster has no log-aggregator backend wired (Loki / CloudWatch / Stackdriver / Azure Monitor). Switch back to Live to tail in real time.",
+        "historicalUnavailableEmpty": "Historical log queries aren't available on this cluster. Switch back to Live to tail in real time.",
+        "historicalNoResults": "No log lines matched within this window.",
+        "range": {
+          "live": "Live",
+          "15m": "Last 15 minutes",
+          "1h": "Last hour",
+          "6h": "Last 6 hours",
+          "24h": "Last 24 hours"
+        }
       },
       "events": {
         "title": "Recent platform events",

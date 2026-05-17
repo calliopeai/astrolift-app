@@ -334,6 +334,23 @@ type AstroliftAppLogLine {
   stream: String!
 }
 
+type AstroliftAppLogPage {
+  items: [AstroliftAppLogQueryLine!]!
+  nextCursor: String!
+  reachedRetention: Boolean!
+  historicalAvailable: Boolean!
+  totalCount: Int!
+}
+
+type AstroliftAppLogQueryLine {
+  podName: String!
+  container: String!
+  timestamp: String!
+  message: String!
+  level: String!
+  stream: String!
+}
+
 type AstroliftAppMetrics {
   appSlug: String!
   timeRange: String!
@@ -3291,6 +3308,7 @@ type Query {
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
+  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
@@ -3555,6 +3573,7 @@ type Subscription {
   notificationReceived: String!
   formSubmissionReceived(slug: String!): String!
   astroliftOnAppLog(appSlug: String!, podName: String!, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100): AstroliftAppLogLine!
+  astroliftOnAppLogs(appSlug: String!, environmentName: String = null, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100): AstroliftAppLogLine!
 }
 
 type SwitchUserResult {

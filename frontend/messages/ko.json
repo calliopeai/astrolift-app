@@ -556,6 +556,24 @@
         "warningBadgeLabel": "경고",
         "collapse": "접기",
         "expand": "펼치기"
+      },
+      "logs": {
+        "pressStreamAll": "모든 복제본을 추적하려면 “Stream”을 누르세요.",
+        "allReplicas": "모든 복제본",
+        "allReplicasDescription": "이 앱의 모든 복제본에서 스트리밍 중 — 각 줄에는 출처 Pod가 표시됩니다.",
+        "historicalDescription": "지난 {range}의 로그 줄을 표시합니다.",
+        "refreshHistorical": "새로고침",
+        "historicalUnavailableTitle": "이 클러스터에서는 기록 로그를 사용할 수 없습니다",
+        "historicalUnavailableHint": "이 클러스터에는 로그 수집 백엔드 (Loki / CloudWatch / Stackdriver / Azure Monitor)가 구성되어 있지 않습니다. 실시간 추적을 위해 Live로 돌아가세요.",
+        "historicalUnavailableEmpty": "이 클러스터에서는 기록 로그 쿼리를 사용할 수 없습니다. 실시간 추적을 위해 Live로 돌아가세요.",
+        "historicalNoResults": "이 윈도우 내에서 일치하는 로그 줄이 없습니다.",
+        "range": {
+          "live": "실시간",
+          "15m": "최근 15분",
+          "1h": "최근 1시간",
+          "6h": "최근 6시간",
+          "24h": "최근 24시간"
+        }
       }
     },
     "tokens": {

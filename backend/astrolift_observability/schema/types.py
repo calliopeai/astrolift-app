@@ -120,6 +120,77 @@ class WorkloadResourceUsage:
     sourced_at: dt.datetime
 
 
+# ---- #482 — historical / aggregated log access -------------------
+#
+# Two surfaces:
+#   * The plural live subscription reuses ``AstroliftAppLogLine`` from
+#     the lifecycle schema (one shape for every log line on the wire,
+#     live or historical).
+#   * The historical query returns a ``AstroliftAppLogPage`` — items +
+#     cursor + retention flag + the "this cluster has no aggregator
+#     wired" flag (``historicalAvailable``) so the FE can render the
+#     right empty state.
+
+
+@strawberry.type(name="AstroliftAppLogQueryLine")
+class AppLogLine:
+    """One log line from the historical query (#482).
+
+    Distinct from ``AstroliftAppLogLine`` (the live subscription type)
+    because the historical query also carries a heuristic ``level``
+    derived from the line text (or the structured-log ``level`` label
+    when the backend reports it) so the FE doesn't have to re-classify
+    server-side filtered results.
+    """
+
+    pod_name: str
+    container: str
+    timestamp: str
+    """ISO-8601 timestamp string. Strings rather than ``datetime`` so
+    nanosecond-precision values from Loki survive the round-trip."""
+
+    message: str
+    level: str
+    """Heuristic level: ``error`` | ``warn`` | ``info`` | ``debug`` |
+    ``other``. ``other`` when no structured label and no heuristic
+    keyword matched."""
+
+    stream: str
+    """``stdout`` / ``stderr`` (best-effort — most aggregators report
+    everything as ``stdout``)."""
+
+
+@strawberry.type(name="AstroliftAppLogPage")
+class AppLogPage:
+    """One page of historical log lines for an app/env (#482).
+
+    ``items`` is the page contents (oldest-first). ``next_cursor`` is
+    opaque to the FE — pass it back unchanged to fetch the next page;
+    empty string means end-of-window.
+
+    ``reached_retention`` is true when the requested ``since`` predates
+    the backend's configured retention — the page may still carry items
+    (the visible slice) but the FE badges it with "earlier lines were
+    discarded by the log backend."
+
+    ``historical_available`` is false when the cluster has no
+    log-aggregator driver configured. The FE distinguishes that case
+    from "no lines in window" by switching the empty state to
+    "live tail only on this cluster."
+
+    ``total_count`` is best-effort — backends that can't compute it
+    return -1; the FE treats negative as "unknown" and shows the
+    page-size count instead. Loki returns -1 today; CloudWatch /
+    Stackdriver can hand back exact counts when their query APIs do.
+    """
+
+    items: list[AppLogLine]
+    next_cursor: str
+    reached_retention: bool
+    historical_available: bool
+    total_count: int
+
+
 @strawberry.type(name="AstroliftAppUrlHealth")
 class AppUrlHealth:
     """One probe result for an app URL (#406).
