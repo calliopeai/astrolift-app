@@ -515,6 +515,14 @@ class ActiveSessionType:
     SessionTrackingMiddleware stamps on every authed request
     (rate-limited to once per minute) plus explicit ``heartbeatSession``
     pings — drives the "stale CLI" hint on the operator-facing list.
+    v1 uses the Django default session store, so ``created_at`` /
+    ``last_seen_at`` / ``ip_address`` / ``user_agent`` are null —
+    the django_session table doesn't track them. They become
+    populated once a ``SessionMetadata`` model + middleware lands.
+
+    #487 adds ``elevated_until`` so the FE can render the
+    "Admin elevated for N more minutes" nav indicator without a
+    second round-trip.
     """
 
     id: str
@@ -526,6 +534,25 @@ class ActiveSessionType:
     last_seen_at: dt.datetime | None
     ip_address: str | None
     user_agent: str | None
+    elevated_until: dt.datetime | None = None
+    elevation_method: str | None = None
+
+
+@strawberry.type(name="AstroliftElevationStatus")
+class ElevationStatusType:
+    """Snapshot of the current session's step-up elevation (#487).
+
+    ``required_for`` enumerates the gql operation names that the
+    backend will gate behind a fresh elevation — the FE uses it to
+    pre-prompt instead of waiting for the first STEP_UP_REQUIRED
+    envelope after the user already clicked Save.
+    """
+
+    elevated: bool
+    elevated_until: dt.datetime | None
+    seconds_remaining: int
+    method: str | None
+    required_for: list[str]
 
 
 def active_session_to_type(row, *, is_current: bool) -> ActiveSessionType:

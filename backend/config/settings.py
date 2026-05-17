@@ -512,6 +512,20 @@ CONSTANCE_CONFIG = {
         "API-token session stale threshold (seconds). Default 180 days; raise for "
         "long-lived programmatic clients that legitimately sit idle for quarters.",
     ),
+    "STEP_UP_AUTH_TTL_SECONDS": (
+        900,
+        "Default elevation window (in seconds) granted by elevateAdminSession. After "
+        "this window expires every @requires_elevation mutation re-prompts for the "
+        "step-up credential. Default 900s (15 min) matches the spec 27 §4.1 ceiling "
+        "and SOC2 / SOX fresh-auth expectations. The mutation accepts a per-call "
+        "ttlSeconds override capped at STEP_UP_AUTH_MAX_TTL_SECONDS.",
+    ),
+    "STEP_UP_AUTH_MAX_TTL_SECONDS": (
+        900,
+        "Hard cap on the per-call ttlSeconds an elevateAdminSession request can ask "
+        "for. The spec ceiling is 15 minutes; a longer-lived elevation defeats the "
+        "purpose of step-up auth. Anything above this is silently clamped.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -550,6 +564,13 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "STALE_SESSION_TTL_SECONDS_MOBILE",
             "STALE_SESSION_TTL_SECONDS_BROWSER_EXTENSION",
             "STALE_SESSION_TTL_SECONDS_API_TOKEN",
+        ),
+        "collapse": False,
+    },
+    "Step-up auth": {
+        "fields": (
+            "STEP_UP_AUTH_TTL_SECONDS",
+            "STEP_UP_AUTH_MAX_TTL_SECONDS",
         ),
         "collapse": False,
     },

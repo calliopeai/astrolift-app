@@ -17,6 +17,10 @@ from django.contrib import admin
 from django.urls import path, re_path
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView
+from astrolift_identity.urls import (
+    api_urlpatterns as identity_api_urls,
+    app_urlpatterns as identity_app_urls,
+)
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
 
@@ -58,6 +62,10 @@ urls = [
     # Token-gated audit-log export downloads (#433). Lives off the
     # operations app so the route stays close to the model it serves.
     path("", include("astrolift_operations.urls")),
+    # CLI / mobile device-flow approval page (#475). Mounted under
+    # /app/ so auth1's @login_required redirects unauth'd browsers
+    # into the IdP just like every other operator surface.
+    *identity_app_urls,
     path("test/open_telemetry/", test_open_telemetry, name="test-open-telemetry"),
 ]
 
@@ -69,6 +77,11 @@ urlpatterns = [
     path(base, include(urls)),
     # Auth1 Login
     path(f"{base}auth1/", include(Auth1SessionWorkflow.urls())),
+    # CLI / mobile device-flow REST surface (#475). Mounted at the
+    # project root (NOT under /app/) so the wire URLs the CLI ships
+    # against — POST /api/cli/v1/auth/{start,complete,refresh} —
+    # work without rewriting the consumer.
+    *identity_api_urls,
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),

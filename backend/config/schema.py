@@ -30,11 +30,13 @@ import organization.schema as OrganizationSchema
 from config.features import Feature, is_enabled
 from core.schema.types.audit import AuditLogQuery
 from core.schema.types.permission_analysis import PermissionAnalysisQuery
+from core.schema.types.server_info import AstroliftServerInfoQuery
 from core.schema.types.user import UserType
 
 _query_bases = [
     PermissionAnalysisQuery,
     AuditLogQuery,
+    AstroliftServerInfoQuery,
     OrganizationSchema.Query,
     AstroliftIdentitySchema.IdentityQuery,
     AstroliftOperationsSchema.OperationsQuery,
@@ -45,6 +47,7 @@ _query_bases = [
     AstroliftScmSchema.ScmQuery,
     AstroliftServicesSchema.ServicesQuery,
     AstroliftObservabilitySchema.GoldenSignalsQuery,
+    AstroliftObservabilitySchema.LogHistoryQuery,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
     AstroliftFormsSchema.FormsQuery,
 ]

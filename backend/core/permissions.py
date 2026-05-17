@@ -62,6 +62,7 @@ class Permission(enum.StrEnum):
     SECRET_READ = "secret.read"
     SECRET_WRITE = "secret.write"
     SECRET_LIST = "secret.list"
+    SECRET_APPROVE = "secret.approve"
 
     # --- Managed services -----------------------------------------
     MANAGED_SERVICE_CREATE = "managed_service.create"
@@ -83,6 +84,7 @@ class Permission(enum.StrEnum):
     # --- Audit / Billing -------------------------------------------
     AUDIT_LOG_READ = "audit_log.read"
     AUDIT_LOG_EXPORT = "audit_log.export"
+    APP_LOG_EXPORT = "app.log_export"
     BILLING_READ = "billing.read"
     BILLING_UPDATE = "billing.update"
 

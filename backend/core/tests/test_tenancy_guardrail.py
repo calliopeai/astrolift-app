@@ -73,6 +73,25 @@ EXEMPT: dict[str, str] = {
         "self-service: a session is bound to a user, not an org; the "
         "ping is the caller asserting their own liveness"
     ),
+    "IdentityMutation.elevate_admin_session": (
+        "#487 step-up auth: elevates the caller's own session timer; "
+        "tenant context is irrelevant — elevation is session-scoped, "
+        "not org-scoped. The credential verifier IS the gate; "
+        "@require_permission would need a special 'can elevate' "
+        "permission that every authed user trivially has."
+    ),
+    "IdentityMutation.deelevate_admin_session": (
+        "#487 step-up auth: the 'log me out of admin' counterpart to "
+        "elevate_admin_session — self-service, tenant-orthogonal, no "
+        "permission gate (every authed user can drop their own "
+        "elevation)."
+    ),
+    "IdentityQuery.astrolift_elevation_status": (
+        "#487 step-up auth: returns the caller's own session elevation "
+        "snapshot. Self-service, tenant-orthogonal — drives the nav "
+        "indicator that has to render before any tenant context is "
+        "picked (e.g. on the org switcher itself)."
+    ),
     "IdentityMutation.set_active_organization": (
         "the act of selecting a tenant context cannot itself be tenant-scoped"
     ),
@@ -97,6 +116,18 @@ EXEMPT: dict[str, str] = {
     "RegistryQuery.astrolift_my_apps": (
         "self-service: returns apps the caller can reach via their own RoleBindings"
         " (any scope from app up to org). Permission visibility IS the gate."
+    ),
+    "RegistryQuery.astrolift_my_apps_page": (
+        "self-service: cursor-paginated companion to astrolift_my_apps (#481)."
+        " Same rationale — the viewer's RoleBindings are the gate; filter args"
+        " (search/status/team/project) compose on top of that scope filter."
+    ),
+    "RegistryQuery.astrolift_app_permissions": (
+        "self-service: returns the caller's own effective permission slugs on "
+        "one app, computed via the same RoleBinding scope traversal the "
+        "@require_permission decorator uses (#478). No data leaks past what "
+        "the caller already has — the resolver hides apps in other tenants "
+        "and returns [] when there is no binding."
     ),
     "RegistryQuery.astrolift_platform_api_url": (
         "platform-level value (the install's PLATFORM_API_URL) surfaced to the "

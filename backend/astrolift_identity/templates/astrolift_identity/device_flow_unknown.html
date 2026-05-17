@@ -1,0 +1,25 @@
+{% load i18n %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unknown device session — Astrolift</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: #0b1623; color: #f3f6fb; margin: 0; padding: 2rem; }
+    .card { max-width: 28rem; margin: 4rem auto; background: #142235;
+            border-radius: 12px; padding: 2rem; border: 1px solid #1f3550;
+            text-align: center; }
+    .icon { font-size: 3rem; color: #ef5350; margin-bottom: 0.5rem; line-height: 1; }
+    h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+    p { color: #c0d1ea; margin: 0 0 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#9888;</div>
+    <h1>{% trans "Unknown authorization request" %}</h1>
+    <p>{% trans "We don't recognize this device session. The link may be mistyped or the session may have been deleted. Re-run the login command on your device to start fresh." %}</p>
+  </div>
+</body>
+</html>

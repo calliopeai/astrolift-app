@@ -69,8 +69,9 @@ from astrolift_identity.schema.types import (
     role_to_type,
     team_to_type,
 )
+from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode, mutation_audit
+from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -328,6 +329,20 @@ class _RevokeAstroliftSessionPayload:
 class _HeartbeatSessionPayload:
     id: GUID
     last_seen_at: dt.datetime | None
+class ElevateAdminSessionInput:
+    """Step-up auth input (#487, spec 27 §4.1).
+
+    ``method`` is one of ``password | otp | webauthn | magic_link``.
+    ``credential`` is the raw value the operator presented (password
+    string, OTP code, WebAuthn assertion serialized as JSON, magic-
+    link token). Per-call ``ttl_seconds`` is clamped server-side at
+    ``STEP_UP_AUTH_MAX_TTL_SECONDS``; omit to use the operator-
+    configurable default.
+    """
+
+    method: str
+    credential: str
+    ttl_seconds: int | None = None
 
 
 @strawberry.input
@@ -354,6 +369,34 @@ class _MarkOnboardingCompletePayload:
 class _LogoutAllSessionsPayload:
     revoked_count: int
     kept_current: bool
+
+
+@strawberry.type(name="AstroliftElevatePayload")
+class _ElevatePayload:
+    """Result of a successful elevateAdminSession call.
+
+    ``elevated_until`` is the absolute UTC timestamp at which the
+    elevation lapses; the FE renders ``seconds_remaining`` as a
+    countdown next to the "Admin elevated" nav indicator.
+    ``method`` echoes back which credential was accepted so the FE
+    can show "elevated via WebAuthn" on the session info popover.
+    """
+
+    elevated_until: dt.datetime
+    seconds_remaining: int
+    method: str
+
+
+@strawberry.type(name="AstroliftDeelevatePayload")
+class _DeelevatePayload:
+    """Result of deelevateAdminSession — the session is now un-elevated.
+
+    Carries ``previously_elevated`` so the audit row + UI can
+    distinguish "operator clicked log-me-out-of-admin while elevated"
+    from "operator clicked it while already un-elevated" (a no-op).
+    """
+
+    previously_elevated: bool
 
 
 @strawberry.type
@@ -587,6 +630,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.grant")
+    @requires_elevation(action_label="role_binding.grant")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def grant_role(self, info: Info, input: GrantRoleInput) -> MutationResultType[RoleBindingType]:
@@ -646,6 +690,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.revoke")
+    @requires_elevation(action_label="role_binding.revoke")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def revoke_role_binding(
@@ -671,6 +716,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_revoke")
+    @requires_elevation(action_label="role_binding.bulk_revoke")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
     def bulk_revoke_astrolift_role_bindings(
@@ -781,6 +827,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_assign_team")
+    @requires_elevation(action_label="role_binding.bulk_assign_team")
     @require_permission(Permission.TEAM_MANAGE_MEMBERS)
     @tenant_scoped()
     def bulk_assign_astrolift_team_member_roles(
@@ -1544,6 +1591,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.create")
+    @requires_elevation(action_label="identity_provider.create")
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def create_identity_provider(
@@ -1611,6 +1659,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.update")
+    @requires_elevation(action_label="identity_provider.update")
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def update_identity_provider(
@@ -1641,6 +1690,7 @@ class IdentityMutation:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.set_active")
+    @requires_elevation(action_label="identity_provider.set_active")
     @require_permission(Permission.ORG_UPDATE)
     @tenant_scoped()
     def set_active_identity_provider(
@@ -1985,6 +2035,121 @@ class IdentityMutation:
                 last_seen_at=row.last_seen_at,
             )
         )
+
+    # ---- Step-up auth (#487, spec 27 §4.1) ---------------------------
+    #
+    # ``elevateAdminSession`` flips a server-side timer on the current
+    # session so sensitive mutations (secret writes, role grants,
+    # force-redeploys, app deregistration) can run. The decorator
+    # ``@requires_elevation`` on those mutations re-checks the timer
+    # on every call; lapsed → deny envelope → FE re-prompts.
+    #
+    # Self-only — every authed user can elevate their own session;
+    # no permission gate. The credential verifier (default: password
+    # against the Django User row, swappable via
+    # ``register_credential_verifier``) is what gates access. A
+    # session with no underlying user (token-auth path) cannot
+    # elevate and gets the same VALIDATION envelope as wrong creds.
+
+    @strawberry.field
+    @mutation_audit(action="auth.elevate_admin")
+    def elevate_admin_session(
+        self, info: Info, input: ElevateAdminSessionInput
+    ) -> MutationResultType[_ElevatePayload]:
+        from astrolift_identity.session_elevation import (
+            KNOWN_METHODS,
+            elevate,
+            verify_credential,
+        )
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        if session is None:
+            # Token-authed callers (API tokens) don't carry a session
+            # bag; step-up is browser-session only by design. They
+            # surface a typed error so the FE can hide the modal for
+            # those callers.
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "step-up auth requires a browser session",
+            )
+
+        method = (input.method or "").strip().lower()
+        if method not in KNOWN_METHODS:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown method {input.method!r}",
+                field="method",
+            )
+        if not input.credential:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "credential is required",
+                field="credential",
+            )
+        if not verify_credential(viewer, method, input.credential):
+            # Audit the failed attempt so security review can spot
+            # brute-force probes; bare-bones AuditEntry beats relying
+            # on @mutation_audit's success/failure split because we
+            # want a distinct ``auth.elevate_admin.failed`` row.
+            tenant = get_current_tenant()
+            try:
+                emit_audit(
+                    AuditEntry(
+                        actor_user_id=tenant.actor_user_id if tenant else viewer.pk,
+                        organization_id=tenant.organization_id if tenant else None,
+                        action="auth.elevate_admin.failed",
+                        decision="DENY",
+                        target_kind="user",
+                        target_id=viewer.pk,
+                        duration_ms=0,
+                        permissions=(),
+                        error_code=ErrorCode.PERMISSION_DENIED.value,
+                        error_message="invalid credential for step-up",
+                        extra={"method": method},
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                import logging as _log
+
+                _log.getLogger(__name__).exception("elevate_admin_session: failed-attempt audit emit raised")
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "invalid credential",
+                field="credential",
+            )
+
+        status = elevate(session, method=method, ttl_seconds=input.ttl_seconds)
+        return gql_success(
+            _ElevatePayload(
+                elevated_until=status.elevated_until,  # type: ignore[arg-type]
+                seconds_remaining=status.seconds_remaining,
+                method=method,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="auth.deelevate_admin")
+    def deelevate_admin_session(self, info: Info) -> MutationResultType[_DeelevatePayload]:
+        from astrolift_identity.session_elevation import deelevate, get_status
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        if session is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "step-up auth requires a browser session",
+            )
+
+        was_elevated = get_status(session).elevated
+        deelevate(session)
+        return gql_success(_DeelevatePayload(previously_elevated=was_elevated))
 
 
 def _validate_idp_config(input) -> MutationResultType | None:

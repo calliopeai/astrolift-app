@@ -5,6 +5,7 @@
 import type {
   AstroliftActivityItem as GeneratedActivityItem,
   AstroliftActivityPage as GeneratedActivityPage,
+  AstroliftAppLogExport as GeneratedAppLogExport,
   AstroliftAuditEvent as GeneratedAuditEvent,
   AstroliftAuditEventPage as GeneratedAuditEventPage,
   AstroliftAuditExport as GeneratedAuditExport,
@@ -53,6 +54,15 @@ export type AstroliftAuditExport = Omit<GeneratedAuditExport, "format"> & {
 };
 
 export type AstroliftAuditRetention = GeneratedAuditRetention;
+
+export type AppLogExportFormat = "csv" | "ndjson" | "txt";
+
+export type AppLogExportStatus = "ready" | "expired" | "failed";
+
+export type AstroliftAppLogExport = Omit<GeneratedAppLogExport, "format" | "status"> & {
+  format: AppLogExportFormat;
+  status: AppLogExportStatus;
+};
 
 export type WebhookFormat = "generic" | "slack" | "discord";
 
