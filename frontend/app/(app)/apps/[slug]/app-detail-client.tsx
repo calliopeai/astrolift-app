@@ -49,6 +49,9 @@ import { DeploymentPanel } from "./components/deployment-panel";
 import { GithubConnectCallout } from "./components/github-connect-callout";
 import { ObservabilitySection } from "./components/observability-section";
 import { PendingDeployments } from "./components/pending-deployments";
+import { QuickLinksGrid } from "./components/quick-links-grid";
+import { RepoBadge } from "./components/repo-badge";
+import { UrlCard } from "./components/url-card";
 
 // ─── status mappings ──────────────────────────────────────────────────────────
 
@@ -221,12 +224,12 @@ export function AppDetailClient({ slug }: { slug: string }) {
       description={
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground font-mono text-xs">{a.slug}</span>
-          {a.sourceRepo && (
-            <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
-              <GitBranchIcon className="size-3" />
-              {a.sourceRepo}
-            </Badge>
-          )}
+          <RepoBadge
+            sourceKind={a.sourceKind}
+            sourceUrl={a.sourceUrl}
+            sourceRepo={a.sourceRepo}
+            branch={a.deployBranch || a.defaultBranch}
+          />
           <Badge variant="outline" className="text-[10px]">
             {sourceLabel}
           </Badge>
@@ -286,6 +289,13 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
       <DeployActivityStrip appSlug={a.slug} limit={20} />
 
+      <UrlCard
+        appId={a.id}
+        appSlug={a.slug}
+        subdomain={a.subdomain}
+        primaryWorkloadSlug={wlList.find((w) => w.isPublic)?.slug ?? null}
+      />
+
       <DeploymentPanel appSlug={a.slug} />
 
       <Card>
@@ -327,6 +337,8 @@ export function AppDetailClient({ slug }: { slug: string }) {
       <GithubConnectCallout sourceKind={a.sourceKind} />
 
       <ActivityTimeline appId={a.id} limit={20} />
+
+      <QuickLinksGrid appSlug={a.slug} />
 
       <ConfirmDialog
         open={confirmOpen}
