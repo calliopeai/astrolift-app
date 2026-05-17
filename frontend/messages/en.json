@@ -143,7 +143,9 @@
     "backCta": "Back",
     "nextCta": "Next",
     "finishCta": "Finish setup",
-    "a11y": { "steps": "Onboarding progress" },
+    "a11y": {
+      "steps": "Onboarding progress"
+    },
     "toast": {
       "success": "Onboarding complete — you're all set.",
       "skipFailed": "Couldn't save your skip. Try again.",
@@ -342,10 +344,10 @@
       "filters": {
         "ariaLabel": "Filter by status",
         "all": "All",
-        "running": "Running",
-        "failed": "Failed",
-        "inflight": "In-flight",
-        "notDeployed": "Not deployed"
+        "ok": "Healthy",
+        "degraded": "Degraded",
+        "stale": "Stale",
+        "never_deployed": "Not deployed"
       },
       "noMatch": {
         "title": "No apps match the current filter",
@@ -367,6 +369,11 @@
           "STALE": "No recent deploys",
           "NEVER": "Never deployed"
         }
+      },
+      "count": "Showing {shown} of {total}",
+      "loadMore": {
+        "label": "Load more",
+        "loading": "Loading…"
       }
     },
     "tabs": {

@@ -342,12 +342,12 @@
         "ariaLabel": "Search apps"
       },
       "filters": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
-        "running": "Running",
-        "failed": "Failed",
-        "inflight": "In-flight",
-        "notDeployed": "Not deployed"
+        "ariaLabel": "按状态筛选",
+        "all": "全部",
+        "ok": "健康",
+        "degraded": "降级",
+        "stale": "过期",
+        "never_deployed": "未部署"
       },
       "noMatch": {
         "title": "No apps match the current filter",
@@ -357,6 +357,11 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "count": "显示 {total} 个中的 {shown} 个",
+      "loadMore": {
+        "label": "加载更多",
+        "loading": "加载中…"
       }
     },
     "tabs": {
