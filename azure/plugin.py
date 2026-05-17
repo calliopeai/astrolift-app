@@ -56,6 +56,7 @@ from azure.managed.queue_servicebus import (
 from azure.managed.search_aisearch import AzureAISearchFullTextDriver
 from azure.managed.timeseries_monitor import AzureMonitorPrometheusDriver
 from azure.managed.vector_search import AzureAISearchVectorDriver
+from azure.notification_anh import AzureNotificationHubsDriver
 from azure.registry_acr import ACRDriver
 from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
@@ -71,6 +72,7 @@ PLUGIN = ProviderPlugin(
         "tls": AzureAppGatewayTlsDriver,
         "cluster": AKSClusterDriver,
         "ingress": AzureAppGatewayIngressDriver,
+        "notification": AzureNotificationHubsDriver,
     },
     managed_service_drivers={
         ("object_store", "blob"): BlobStorageDriver,
@@ -101,7 +103,7 @@ PLUGIN = ProviderPlugin(
             },
             "resource_group": {
                 "type": "string",
-                "description": ("Default resource group for platform-managed " "resources."),
+                "description": ("Default resource group for platform-managed resources."),
             },
             "location": {
                 "type": "string",
@@ -110,9 +112,7 @@ PLUGIN = ProviderPlugin(
             },
             "cluster_oidc_issuer": {
                 "type": "string",
-                "description": (
-                    "AKS cluster OIDC issuer URL. Required for " "Workload Identity federated credentials."
-                ),
+                "description": ("AKS cluster OIDC issuer URL. Required for Workload Identity federated credentials."),
             },
             "registry_name": {
                 "type": "string",
@@ -120,15 +120,15 @@ PLUGIN = ProviderPlugin(
             },
             "vault_url": {
                 "type": "string",
-                "description": ("Key Vault URL " "(https://<name>.vault.azure.net)."),
+                "description": ("Key Vault URL (https://<name>.vault.azure.net)."),
             },
             "storage_account": {
                 "type": "string",
-                "description": ("Storage account name for object_store " "managed-service binding."),
+                "description": ("Storage account name for object_store managed-service binding."),
             },
             "servicebus_namespace": {
                 "type": "string",
-                "description": ("Service Bus namespace name for queue " "managed-service binding."),
+                "description": ("Service Bus namespace name for queue managed-service binding."),
             },
             "ingress_variant": {
                 "type": "string",
@@ -137,11 +137,11 @@ PLUGIN = ProviderPlugin(
             },
             "appgw_id": {
                 "type": "string",
-                "description": ("Application Gateway resource ID — required " "when ingress_variant=agic."),
+                "description": ("Application Gateway resource ID — required when ingress_variant=agic."),
             },
             "akv_secret_id_for_tls": {
                 "type": "string",
-                "description": ("Key Vault secret ID for the TLS cert (PFX). " "AGIC reads this via SSL profile."),
+                "description": ("Key Vault secret ID for the TLS cert (PFX). AGIC reads this via SSL profile."),
             },
         },
     },
