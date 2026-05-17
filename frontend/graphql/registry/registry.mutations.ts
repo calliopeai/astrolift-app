@@ -18,6 +18,10 @@ export const REGISTER_APP = gql`
         manifestPath
         teamSlug
         projectSlug
+        requiresApproval
+        approverTeamId
+        approverUserIds
+        minimumApprovals
       }
     }
   }

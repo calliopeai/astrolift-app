@@ -440,6 +440,13 @@ export type AstroliftAppTeamAccessMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftApproverUser = {
+  avatarUrl: Scalars['String']['output'];
+  displayName: Scalars['String']['output'];
+  email: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+};
+
 export type AstroliftAuditEvent = {
   action: Scalars['String']['output'];
   actorDisplay: Scalars['String']['output'];
@@ -3798,6 +3805,7 @@ export type Query = {
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
+  astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
@@ -4107,6 +4115,11 @@ export type QueryAstroliftMyAppsArgs = {
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftOrgMembersForApprovalPickerArgs = {
+  orgSlug: Scalars['String']['input'];
 };
 
 

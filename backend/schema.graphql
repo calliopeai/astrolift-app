@@ -416,6 +416,13 @@ type AstroliftAppTeamAccessMutationResult {
   data: AstroliftAppTeamAccess
 }
 
+type AstroliftApproverUser {
+  id: String!
+  email: String!
+  displayName: String!
+  avatarUrl: String!
+}
+
 type AstroliftAuditEvent {
   id: GUID!
   organizationId: String
@@ -2880,6 +2887,7 @@ type Query {
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
   astroliftMembers: [AstroliftMember!]!
+  astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
   astroliftRoleBindings: [AstroliftRoleBinding!]!

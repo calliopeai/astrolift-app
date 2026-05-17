@@ -85,6 +85,7 @@ import {
 } from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { formatRelativeAge } from "@/lib/format";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AppTabs } from "../components/app-tabs";
@@ -805,27 +806,6 @@ function SettingsLinkCard({
       </Card>
     </Link>
   );
-}
-
-/**
- * Format an ISO timestamp as a human-friendly relative age
- * (``5m ago`` / ``3h ago`` / ``2d ago``). Falls back to the absolute
- * date once the delta exceeds 30 days so the cue stays useful for
- * dormant config sections. Caller is responsible for the empty / null
- * check — this helper assumes a real timestamp arrived.
- */
-function formatRelativeAge(iso: string): string {
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return "";
-  const seconds = Math.max(0, (Date.now() - then) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(then).toLocaleDateString();
 }
 
 // ─── force redeploy recovery (#389) ───────────────────────────────────────────

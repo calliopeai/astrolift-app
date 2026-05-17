@@ -23,6 +23,8 @@ import type { MutationResult } from "@/graphql/identity/identity.types";
 import { SET_APP_SUBDOMAIN } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 
+import { UrlHealthBadge } from "./url-health-badge";
+
 interface Props {
   appId: string;
   appSlug: string;
@@ -34,6 +36,11 @@ interface Props {
   /** First public workload slug — used to render the primary host. */
   primaryWorkloadSlug: string | null;
 }
+
+// Primary URL probe is gated on a deployed public workload — the
+// subdomain alone has no live origin to probe (DNS may resolve, but
+// nothing serves traffic). Showing a probe badge against a
+// non-deployed host would always read as "down" and panic operators.
 
 interface SetSubdomainResp {
   setAppSubdomain: MutationResult<{ id: string; slug: string; subdomain: string }>;
@@ -149,6 +156,9 @@ export function UrlCard({ appId, appSlug, subdomain, primaryWorkloadSlug }: Prop
             {fullHost}
             <ExternalLinkIcon className="size-3.5" />
           </a>
+          {primaryWorkloadSlug ? (
+            <UrlHealthBadge appSlug={appSlug} url={`https://${fullHost}/`} />
+          ) : null}
           <Button
             type="button"
             size="sm"
