@@ -10,6 +10,7 @@ import {
   ServerCogIcon,
   ZapIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -30,30 +31,13 @@ import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, TriggerMode } from "@/graphql/registry/registry.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
-const MODE_META: Record<
-  TriggerMode,
-  { label: string; icon: React.ComponentType<{ className?: string }>; hint: string }
-> = {
-  auto_on_push: {
-    label: "Auto on push",
-    icon: ZapIcon,
-    hint: "Any push to the deploy branch fans out a deploy.",
-  },
-  manual: {
-    label: "Manual only",
-    icon: HandIcon,
-    hint: "Deploys only when triggered from the UI or CLI.",
-  },
-  external_ci: {
-    label: "External CI",
-    icon: ServerCogIcon,
-    hint: "Your CI calls Astrolift with a deploy token. No webhook.",
-  },
-  cron: {
-    label: "Cron schedule",
-    icon: ClockIcon,
-    hint: "Deploys run on a recurring schedule defined by the cron expression.",
-  },
+// Per-mode icon mapping. Labels + hints come from the i18n bundle so
+// every locale renders consistently; the icon is purely presentational.
+const MODE_ICONS: Record<TriggerMode, React.ComponentType<{ className?: string }>> = {
+  auto_on_push: ZapIcon,
+  manual: HandIcon,
+  external_ci: ServerCogIcon,
+  cron: ClockIcon,
 };
 
 interface UpdateResp {
@@ -72,21 +56,22 @@ interface Props {
  * Controls section below.
  */
 export function DeployStrategyCard({ app }: Props) {
+  const t = useTranslations("apps.deployStrategy");
   const [open, setOpen] = useState(false);
-  const meta = MODE_META[app.triggerMode] ?? MODE_META.manual;
-  const Icon = meta.icon;
+  const mode: TriggerMode = (app.triggerMode as TriggerMode) || "manual";
+  const Icon = MODE_ICONS[mode] ?? MODE_ICONS.manual;
 
   return (
     <section className="rounded-lg border p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-            Deploy strategy
+            {t("eyebrow")}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="gap-1.5 py-1">
               <Icon className="size-3.5 text-[var(--brand-primary)]" />
-              <span className="font-medium">{meta.label}</span>
+              <span className="font-medium">{t(`modes.${mode}.label`)}</span>
             </Badge>
             <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
               <GitBranchIcon className="size-3" />
@@ -94,16 +79,16 @@ export function DeployStrategyCard({ app }: Props) {
             </Badge>
             {app.previewEnabled && (
               <Badge variant="outline" className="text-[10px]">
-                Preview environments
+                {t("previewEnvironments")}
               </Badge>
             )}
           </div>
-          <p className="text-muted-foreground mt-2 max-w-xl text-xs">{meta.hint}</p>
+          <p className="text-muted-foreground mt-2 max-w-xl text-xs">{t(`modes.${mode}.hint`)}</p>
         </div>
         <Can permission="app.update">
           <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
             <PencilIcon className="size-3.5" />
-            Edit
+            {t("edit")}
           </Button>
         </Can>
       </div>
@@ -122,6 +107,7 @@ function EditStrategySheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
+  const t = useTranslations("apps.deployStrategy");
   const [triggerMode, setTriggerMode] = useState<TriggerMode>(app.triggerMode);
   const [deployBranch, setDeployBranch] = useState(app.deployBranch || app.defaultBranch);
   const [previewEnabled, setPreviewEnabled] = useState(app.previewEnabled);
@@ -143,16 +129,15 @@ function EditStrategySheet({
           // The backend ignores cron_expression unless mode == 'cron',
           // and requires it when mode == 'cron'. Send the trimmed value
           // straight through; validation lives server-side.
-          cronExpression:
-            triggerMode === "cron" ? cronExpression.trim() : null,
+          cronExpression: triggerMode === "cron" ? cronExpression.trim() : null,
         },
       },
     });
     if (data?.updateApp.ok) {
-      toast.success("Deploy strategy updated.");
+      toast.success(t("toastSaved"));
       onOpenChange(false);
     } else {
-      toast.error(data?.updateApp.errors?.[0]?.message ?? "Update failed.");
+      toast.error(data?.updateApp.errors?.[0]?.message ?? t("toastFailed"));
     }
   }
 
@@ -160,30 +145,28 @@ function EditStrategySheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-4 sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Edit deploy strategy</SheetTitle>
-          <SheetDescription>
-            Changes apply to the next deploy. In-flight rollouts complete on the previous strategy.
-          </SheetDescription>
+          <SheetTitle>{t("sheetTitle")}</SheetTitle>
+          <SheetDescription>{t("sheetDescription")}</SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-4 px-4">
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-muted-foreground text-xs">Trigger mode</span>
+            <span className="text-muted-foreground text-xs">{t("triggerModeLabel")}</span>
             <select
               value={triggerMode}
               onChange={(e) => setTriggerMode(e.target.value as TriggerMode)}
               className="border-input bg-background rounded-md border px-2 py-2 text-sm"
             >
-              <option value="auto_on_push">Auto on push</option>
-              <option value="cron">Cron schedule</option>
-              <option value="manual">Manual only</option>
-              <option value="external_ci">External CI</option>
+              <option value="auto_on_push">{t("modes.auto_on_push.label")}</option>
+              <option value="cron">{t("modes.cron.label")}</option>
+              <option value="manual">{t("modes.manual.label")}</option>
+              <option value="external_ci">{t("modes.external_ci.label")}</option>
             </select>
           </label>
 
           {triggerMode === "cron" && (
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">Cron expression</span>
+              <span className="text-muted-foreground text-xs">{t("cronExpressionLabel")}</span>
               <input
                 type="text"
                 value={cronExpression}
@@ -191,15 +174,12 @@ function EditStrategySheet({
                 placeholder="0 6 * * *"
                 className="border-input bg-background rounded-md border px-2 py-2 font-mono text-sm"
               />
-              <span className="text-muted-foreground text-[11px]">
-                Five fields (minute hour day month weekday). The backend rejects malformed
-                expressions.
-              </span>
+              <span className="text-muted-foreground text-[11px]">{t("cronExpressionHelp")}</span>
             </label>
           )}
 
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-muted-foreground text-xs">Deploy branch</span>
+            <span className="text-muted-foreground text-xs">{t("deployBranchLabel")}</span>
             <input
               type="text"
               value={deployBranch}
@@ -208,8 +188,9 @@ function EditStrategySheet({
               className="border-input bg-background rounded-md border px-2 py-2 font-mono text-sm"
             />
             <span className="text-muted-foreground text-[11px]">
-              Default branch from the repo is{" "}
-              <span className="font-mono">{app.defaultBranch || "main"}</span>.
+              {t.rich("deployBranchHelp", {
+                branch: () => <span className="font-mono">{app.defaultBranch || "main"}</span>,
+              })}
             </span>
           </label>
 
@@ -221,10 +202,8 @@ function EditStrategySheet({
               className="mt-0.5 size-4"
             />
             <span>
-              <span className="font-medium">Preview environments</span>
-              <span className="text-muted-foreground block text-xs">
-                Spin up an ephemeral environment per pull request.
-              </span>
+              <span className="font-medium">{t("previewEnvironments")}</span>
+              <span className="text-muted-foreground block text-xs">{t("previewEnvironmentsHelp")}</span>
             </span>
           </label>
         </div>
@@ -232,12 +211,12 @@ function EditStrategySheet({
         <SheetFooter className="flex flex-row justify-end gap-2 border-t px-4 pt-3">
           <SheetClose asChild>
             <Button variant="outline" size="sm" disabled={loading}>
-              Cancel
+              {t("cancel")}
             </Button>
           </SheetClose>
           <Button size="sm" onClick={handleSave} disabled={loading}>
             {loading && <Loader2Icon className="size-3.5 animate-spin" />}
-            Save strategy
+            {t("save")}
           </Button>
         </SheetFooter>
       </SheetContent>

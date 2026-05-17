@@ -1,4 +1,13 @@
-"""Cost estimation protocol (#78).
+"""Cost estimation + billing-actuals protocols (#78 + #502).
+
+Two distinct capabilities live here:
+
+* :class:`CostEstimator` — pre-provision price preview, queries the
+  cloud's pricing API for SKU rates. Required: live API only.
+* :class:`BillingActualsClient` — *post*-provision actual spend,
+  queries the cloud's billing / cost-management API for line items
+  grouped by the platform's ``astrolift.io/binding`` tag. Powers the
+  per-binding cost snapshot collection job (#502).
 
 CostEstimator is an OPTIONAL driver-side capability: a managed-service
 or cluster driver may implement it to surface a pre-provision price
@@ -35,7 +44,10 @@ preview. Aggregation lives in astrolift-app, not here.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from datetime import date
 
 
 @dataclass(frozen=True)
@@ -133,10 +145,97 @@ class CostEstimator(Protocol):
     """
 
     def estimate(
-        self, request: CostEstimateRequest,
+        self,
+        request: CostEstimateRequest,
     ) -> CostResult: ...
 
     def supported(self, *, kind: str, variant: str) -> bool:
         """Quick check: does this driver have a pricing-API path
         for (kind, variant)? Cheap call — must not hit the network."""
         ...
+
+
+# ---- billing actuals (#502) ----------------------------------------
+
+
+@dataclass(frozen=True)
+class BillingActualLineItem:
+    """One billing-API row keyed back to a platform binding.
+
+    ``binding_guid`` is the value of the ``astrolift.io/binding`` tag
+    on the cloud resource that incurred the cost. Empty string when
+    the cloud resource carries no binding tag (operator-managed or
+    shared resources) — the cost-collector writes those rows with a
+    NULL ``CostSnapshot.managed_service_binding_id`` so they roll up
+    under the "Shared / untagged" bucket.
+
+    ``amount_cents`` is integer cents in ``currency``. Drivers MUST
+    convert from the billing-API's float USD to integer cents before
+    handing back — the snapshot model stores cents and silently
+    truncating mid-pipeline loses sub-cent precision.
+
+    ``provider`` and ``service`` are best-effort provenance strings
+    (``"aws-rds"`` / ``"PostgreSQL"`` etc.) so the cost panel can
+    surface "which cloud / which service" alongside the binding name.
+    Drivers leave them empty when the billing API doesn't carry the
+    detail.
+    """
+
+    binding_guid: str
+    amount_cents: int
+    currency: str = "USD"
+    provider: str = ""
+    service: str = ""
+
+
+@dataclass(frozen=True)
+class BillingActualsUnavailable:
+    """Returned when the actuals query can't run (credentials missing,
+    billing API unreachable, account not enabled for cost export). The
+    collector logs + skips the provider rather than failing the whole
+    snapshot — partial data is more useful than no data on a multi-
+    cloud install where one cloud's billing is unreachable.
+    """
+
+    reason: str
+    """One of: 'unauthenticated' | 'api_error' | 'not_enabled' |
+    'unsupported'. Free-text detail in ``message``."""
+
+    message: str = ""
+
+
+BillingActualsResult = list[BillingActualLineItem] | BillingActualsUnavailable
+
+
+class BillingActualsClient(Protocol):
+    """Optional driver capability — surface *actual* spend grouped by
+    the platform's ``astrolift.io/binding`` tag.
+
+    Drivers MUST query the live cloud billing / cost-management API.
+    No hard-coded amounts, no caching beyond the per-call response.
+
+    Implementations should:
+    1. Issue a single API call covering the requested ``[start, end]``
+       window with a tag/label group-by on ``astrolift.io/binding``
+       (per cloud's serialization).
+    2. Sum line items per binding tag value and return one
+       :class:`BillingActualLineItem` per (binding_guid, currency)
+       pair. Rows whose tag is missing or empty are emitted with
+       ``binding_guid=""`` — the collector buckets those under
+       "Shared / untagged".
+    3. Return :class:`BillingActualsUnavailable` on any failure mode
+       rather than raising — the collector logs and moves on so one
+       broken cloud doesn't fail the snapshot for the others.
+
+    Date semantics: ``start`` is inclusive, ``end`` is exclusive. The
+    typical caller asks for "yesterday's spend" with
+    ``start=today-1, end=today``.
+    """
+
+    def query_actuals_by_binding(
+        self,
+        *,
+        start: date,
+        end: date,
+        currency: str = "USD",
+    ) -> BillingActualsResult: ...
