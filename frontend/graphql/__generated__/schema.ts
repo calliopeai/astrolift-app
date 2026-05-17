@@ -1074,6 +1074,10 @@ export type AstroliftInvitation = {
   email: Scalars['String']['output'];
   expiresAt: Scalars['DateTime']['output'];
   id: Scalars['GUID']['output'];
+  invitedByAvatarUrl?: Maybe<Scalars['String']['output']>;
+  invitedByDisplayName?: Maybe<Scalars['String']['output']>;
+  invitedByEmail?: Maybe<Scalars['String']['output']>;
+  invitedByUserId?: Maybe<Scalars['String']['output']>;
   invitedByUsername?: Maybe<Scalars['String']['output']>;
   roleSlug?: Maybe<Scalars['String']['output']>;
   scopeId: Scalars['String']['output'];
@@ -1601,6 +1605,17 @@ export type AstroliftScmWebhookSecretRevealMutationResult = {
   data?: Maybe<AstroliftScmWebhookSecretReveal>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSearchableUser = {
+  avatarUrl: Scalars['String']['output'];
+  displayLabel: Scalars['String']['output'];
+  email: Scalars['String']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  invitationId?: Maybe<Scalars['GUID']['output']>;
+  invitationStatus?: Maybe<Scalars['String']['output']>;
+  matchKind: Scalars['String']['output'];
+  userId?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftSecretBundle = {
@@ -3901,7 +3916,9 @@ export type Query = {
   astroliftRenderedManifest?: Maybe<AstroliftRenderedManifest>;
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
   astroliftRoles: Array<AstroliftRole>;
+  astroliftRolesICanGrant: Array<AstroliftRole>;
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
+  astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceFile: AstroliftSourceFile;
@@ -4253,6 +4270,11 @@ export type QueryAstroliftScheduledJobRunsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftSearchableUsersArgs = {
+  query: Scalars['String']['input'];
 };
 
 

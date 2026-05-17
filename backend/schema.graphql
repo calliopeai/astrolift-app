@@ -1054,6 +1054,10 @@ type AstroliftInvitation {
   expiresAt: DateTime!
   acceptedAt: DateTime
   invitedByUsername: String
+  invitedByUserId: String
+  invitedByDisplayName: String
+  invitedByEmail: String
+  invitedByAvatarUrl: String
   createdAt: DateTime!
 }
 
@@ -1577,6 +1581,17 @@ type AstroliftScmWebhookSecretRevealMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftScmWebhookSecretReveal
+}
+
+type AstroliftSearchableUser {
+  matchKind: String!
+  email: String!
+  displayLabel: String!
+  avatarUrl: String!
+  userId: String
+  invitationId: GUID
+  invitationStatus: String
+  expiresAt: DateTime
 }
 
 type AstroliftSecretBundle {
@@ -2960,6 +2975,8 @@ type Query {
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
+  astroliftSearchableUsers(query: String!): [AstroliftSearchableUser!]!
+  astroliftRolesICanGrant: [AstroliftRole!]!
   astroliftRoleBindings: [AstroliftRoleBinding!]!
   astroliftApiTokens: [AstroliftApiToken!]!
   astroliftPolicies: [AstroliftPolicy!]!
