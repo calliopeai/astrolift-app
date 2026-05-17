@@ -113,6 +113,11 @@ from _sdk.instrumentation import (
     compose_instrumentation,
     inject_sidecar,
 )
+from _sdk.log_stream import (
+    HistoricalLogsUnavailable,
+    LogLine,
+    LogPage,
+)
 from _sdk.managed_service_kinds import (
     KINDS,
     KindCatalog,
@@ -169,6 +174,7 @@ __all__ = [
     "EncryptionPolicy",
     "EventDriver",
     "ExtensionEntry",
+    "HistoricalLogsUnavailable",
     "HstsPolicy",
     "IdentityChain",
     "IdentityHop",
@@ -176,6 +182,8 @@ __all__ = [
     "IngressDriver",
     "IngressTracingConfig",
     "KindCatalog",
+    "LogLine",
+    "LogPage",
     "LogStreamDriver",
     "ManagedServiceDriver",
     "ManagedServiceEntry",

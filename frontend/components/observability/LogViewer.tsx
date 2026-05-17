@@ -112,6 +112,13 @@ export interface LogViewerProps {
   bufferLimit?: number;
   /** Pixel height for the log pane. */
   className?: string;
+  /**
+   * #482 — render a per-line pod badge in front of the message. Used
+   * by the "All replicas" aggregated view so the operator can tell
+   * which replica logged each line at a glance. Default false keeps
+   * the existing single-pod tail's tight line format.
+   */
+  showPodBadge?: boolean;
 }
 
 const LOG_PANE_BASE =
@@ -188,6 +195,27 @@ function segmentLine(
   return { segments, matchCount: n };
 }
 
+// #482 — stable hash → palette index so the same pod always gets the
+// same badge color across renders without us tracking assignments in
+// state. djb2 hash + modulo. The palette is intentionally small (six
+// hues) so adjacent replicas stay visually distinct on small fleets.
+const POD_BADGE_PALETTE = [
+  "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  "border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+] as const;
+
+function podBadgeClass(podName: string): string {
+  let hash = 5381;
+  for (let i = 0; i < podName.length; i += 1) {
+    hash = ((hash << 5) + hash + podName.charCodeAt(i)) | 0;
+  }
+  return POD_BADGE_PALETTE[Math.abs(hash) % POD_BADGE_PALETTE.length];
+}
+
 export function LogViewer({
   lines,
   appSlug,
@@ -200,6 +228,7 @@ export function LogViewer({
   emptyHint,
   bufferLimit,
   className,
+  showPodBadge,
 }: LogViewerProps) {
   const t = useTranslations("apps.logViewer");
 
@@ -598,6 +627,22 @@ export function LogViewer({
             // newline in user selection / copy. Block-level <div>
             // already breaks lines visually.
             <div key={idx} data-level={row.level}>
+              {showPodBadge && row.line.podName ? (
+                <span
+                  className={cn(
+                    "mr-1.5 inline-block rounded border px-1 py-px align-middle text-[10px] leading-none",
+                    podBadgeClass(row.line.podName)
+                  )}
+                  title={row.line.podName}
+                >
+                  {/* Short the pod name to its last 14 chars — replica
+                      hashes live at the tail and that's the disambiguating
+                      part. Full name lives in the title attr. */}
+                  {row.line.podName.length > 14
+                    ? `…${row.line.podName.slice(-14)}`
+                    : row.line.podName}
+                </span>
+              ) : null}
               {segments.map((seg, sidx) =>
                 seg.matchIndex === null ? (
                   <span key={sidx}>{seg.text}</span>

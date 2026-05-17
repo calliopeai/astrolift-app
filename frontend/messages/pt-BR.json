@@ -556,6 +556,24 @@
         "warningBadgeLabel": "Aviso",
         "collapse": "Recolher",
         "expand": "Expandir"
+      },
+      "logs": {
+        "pressStreamAll": "Pressione “Stream” para acompanhar todas as réplicas.",
+        "allReplicas": "Todas as réplicas",
+        "allReplicasDescription": "Transmitindo de todas as réplicas deste app — cada linha tem o pod de origem marcado.",
+        "historicalDescription": "Mostrando linhas de log dos últimos {range}.",
+        "refreshHistorical": "Atualizar",
+        "historicalUnavailableTitle": "Logs históricos não estão disponíveis neste cluster",
+        "historicalUnavailableHint": "Este cluster não tem um backend agregador de logs configurado (Loki / CloudWatch / Stackdriver / Azure Monitor). Volte para Ao vivo para acompanhar em tempo real.",
+        "historicalUnavailableEmpty": "Consultas de logs históricos não estão disponíveis neste cluster. Volte para Ao vivo para acompanhar em tempo real.",
+        "historicalNoResults": "Nenhuma linha de log corresponde nesta janela.",
+        "range": {
+          "live": "Ao vivo",
+          "15m": "Últimos 15 minutos",
+          "1h": "Última hora",
+          "6h": "Últimas 6 horas",
+          "24h": "Últimas 24 horas"
+        }
       }
     },
     "tokens": {

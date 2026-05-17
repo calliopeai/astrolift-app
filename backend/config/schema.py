@@ -47,6 +47,7 @@ _query_bases = [
     AstroliftScmSchema.ScmQuery,
     AstroliftServicesSchema.ServicesQuery,
     AstroliftObservabilitySchema.GoldenSignalsQuery,
+    AstroliftObservabilitySchema.LogHistoryQuery,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
     AstroliftFormsSchema.FormsQuery,
 ]

@@ -132,3 +132,56 @@ export const GET_WORKLOAD_RESOURCE_USAGE = gql`
     }
   }
 `;
+
+/**
+ * Historical (time-range) log query (#482).
+ *
+ * Used when the operator picks a time range instead of "Live tail".
+ * Hits the cluster's wired log-aggregator backend (Loki / CloudWatch
+ * / Stackdriver / Azure Monitor). Falls back to an empty page with
+ * `historicalAvailable: false` when the cluster has no aggregator
+ * configured — the LogViewer renders the "live tail only" badge in
+ * that case.
+ *
+ * `cursor` is opaque to the FE; pass the previous page's
+ * `nextCursor` back unchanged to fetch the next slice. Empty
+ * `nextCursor` means end-of-window.
+ */
+export const GET_APP_LOGS = gql`
+  query GetAppLogs(
+    $appSlug: String!
+    $since: DateTime!
+    $until: DateTime!
+    $environmentName: String
+    $workloadSlug: String
+    $level: String
+    $search: String
+    $limit: Int! = 500
+    $cursor: String
+  ) {
+    astroliftAppLogs(
+      appSlug: $appSlug
+      since: $since
+      until: $until
+      environmentName: $environmentName
+      workloadSlug: $workloadSlug
+      level: $level
+      search: $search
+      limit: $limit
+      cursor: $cursor
+    ) {
+      nextCursor
+      reachedRetention
+      historicalAvailable
+      totalCount
+      items {
+        podName
+        container
+        timestamp
+        message
+        level
+        stream
+      }
+    }
+  }
+`;

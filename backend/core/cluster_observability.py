@@ -24,6 +24,7 @@ contract stays narrow.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
@@ -295,3 +296,192 @@ def stream_app_logs(
         tail_lines=tail_lines,
         follow=follow,
     )
+
+
+# ---- Multi-pod fan-out (#482) ------------------------------------
+#
+# Fan N per-pod streams into one merged async generator. Each line
+# is tagged with its source pod so the consumer can identify which
+# replica produced it.
+#
+# Implementation notes:
+#   * One ``asyncio.Task`` per pod drains its stream into a shared
+#     ``asyncio.Queue``. The yield-loop reads from the queue and
+#     forwards to the caller.
+#   * Pod-discovery refresh runs every ``refresh_interval_seconds``
+#     so replicas that come up mid-stream get auto-subscribed; the
+#     refresh is cooperative — we only ADD streams, never replace
+#     existing ones, so a flapping pod doesn't get its tail
+#     re-fetched on every cycle.
+#   * Per-pod errors are isolated: a bad pod's task records the
+#     error and exits; the other pods keep streaming. This matches
+#     the resolver-layer contract that one broken replica should
+#     not kill the whole tail.
+#   * Cancellation: when the consumer drops, the outer generator's
+#     ``aclose()`` cancels every child task and drains the queue.
+#     Each child task wraps its inner ``async for`` in a
+#     try/finally with ``aclose()`` so the kubelet socket releases
+#     even when the task is cancelled mid-yield.
+
+_REFRESH_INTERVAL_SECONDS_DEFAULT = 10.0
+_MAX_PODS_DEFAULT = 50
+
+
+async def stream_app_logs_multi(
+    *,
+    cluster: TenantCluster,
+    namespace: str,
+    app_slug: str,
+    workload_slug: str | None = None,
+    container: str | None = None,
+    tail_lines: int = 100,
+    follow: bool = True,
+    refresh_interval_seconds: float = _REFRESH_INTERVAL_SECONDS_DEFAULT,
+    max_pods: int = _MAX_PODS_DEFAULT,
+) -> AsyncIterator[Any]:
+    """Stream log lines from every pod of ``app_slug`` (filtered to
+    ``workload_slug`` when given) as one merged async iterator.
+
+    Each yielded line is a ``PodLogLine`` carrying ``pod_name`` so the
+    UI can group / colorize per replica. New pods that appear during
+    the subscription are auto-subscribed every
+    ``refresh_interval_seconds`` (default 10s). ``max_pods`` caps the
+    fan-out so a runaway scale-up can't exhaust the connection pool.
+
+    ``follow=False`` runs a one-shot tail of every current pod and
+    completes after the last per-pod stream drains — useful for a
+    snapshot view without a long-lived WebSocket.
+
+    Errors from a single pod's stream are logged and the pod's task
+    exits silently; sibling pods keep streaming. Cancellation of the
+    outer generator tears down every child task so kubelet sockets
+    release back to the pool.
+    """
+    queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=1024)
+    sentinel = object()
+    # Track pods we've already subscribed to so the refresh loop only
+    # opens streams for new replicas — re-subscribing an existing pod
+    # would double-emit the tail-replay.
+    subscribed: set[str] = set()
+    children: dict[str, asyncio.Task] = {}
+
+    async def _pump_one(pod_name: str) -> None:
+        """Drain one pod's stream into the shared queue."""
+        try:
+            inner = stream_app_logs(
+                cluster=cluster,
+                namespace=namespace,
+                pod_name=pod_name,
+                container=container,
+                tail_lines=tail_lines,
+                follow=follow,
+            )
+        except Exception:
+            logger.exception(
+                "stream_app_logs_multi: failed to open stream for pod %s",
+                pod_name,
+            )
+            return
+        try:
+            async for line in inner:
+                await queue.put(line)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "stream_app_logs_multi: pod %s stream raised; tearing down its task",
+                pod_name,
+            )
+        finally:
+            try:
+                await inner.aclose()
+            except Exception:
+                logger.exception(
+                    "stream_app_logs_multi: aclose failed for pod %s",
+                    pod_name,
+                )
+
+    def _discover_pods() -> list[str]:
+        try:
+            pods = list_app_pods(
+                cluster=cluster,
+                namespace=namespace,
+                app_slug=app_slug,
+            )
+        except Exception:
+            logger.exception(
+                "stream_app_logs_multi: pod discovery failed for app %s",
+                app_slug,
+            )
+            return []
+        names: list[str] = []
+        for pod in pods:
+            name = getattr(pod, "name", "")
+            if not name:
+                continue
+            if workload_slug:
+                pod_workload = getattr(pod, "workload", "") or ""
+                if pod_workload != workload_slug:
+                    continue
+            names.append(name)
+            if len(names) >= max_pods:
+                break
+        return names
+
+    async def _refresh_loop() -> None:
+        """Periodically discover new pods + subscribe them."""
+        while True:
+            await asyncio.sleep(refresh_interval_seconds)
+            new_pods = [p for p in _discover_pods() if p not in subscribed]
+            for pod_name in new_pods:
+                subscribed.add(pod_name)
+                children[pod_name] = asyncio.create_task(_pump_one(pod_name))
+
+    # Open initial subscriptions synchronously so the first lines
+    # arrive promptly.
+    initial_pods = _discover_pods()
+    if not initial_pods:
+        # No pods to tail — yield nothing and finish; the subscription
+        # layer surfaces an empty stream rather than an error.
+        return
+    for pod_name in initial_pods:
+        subscribed.add(pod_name)
+        children[pod_name] = asyncio.create_task(_pump_one(pod_name))
+
+    refresh_task: asyncio.Task | None = None
+    if follow:
+        refresh_task = asyncio.create_task(_refresh_loop())
+
+    async def _finalize_when_done() -> None:
+        """In non-follow mode, sentinel the queue once every child
+        finishes so the consumer loop terminates."""
+        await asyncio.gather(*children.values(), return_exceptions=True)
+        await queue.put(sentinel)
+
+    completion_task: asyncio.Task | None = None
+    if not follow:
+        completion_task = asyncio.create_task(_finalize_when_done())
+
+    try:
+        while True:
+            item = await queue.get()
+            if item is sentinel:
+                return
+            yield item
+    finally:
+        # Tear down every child task + drain the queue so producer
+        # tasks awaiting ``queue.put`` don't block forever.
+        if refresh_task is not None:
+            refresh_task.cancel()
+        if completion_task is not None:
+            completion_task.cancel()
+        for task in children.values():
+            task.cancel()
+        # Wait for cancellation to propagate so per-pod finally
+        # blocks (aclose) get a chance to run. Swallow the
+        # CancelledError each task raises.
+        await asyncio.gather(
+            *children.values(),
+            *(t for t in (refresh_task, completion_task) if t is not None),
+            return_exceptions=True,
+        )

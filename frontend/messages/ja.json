@@ -556,6 +556,24 @@
         "warningBadgeLabel": "警告",
         "collapse": "折りたたむ",
         "expand": "展開する"
+      },
+      "logs": {
+        "pressStreamAll": "「Stream」を押してすべてのレプリカを追跡します。",
+        "allReplicas": "すべてのレプリカ",
+        "allReplicasDescription": "このアプリのすべてのレプリカからストリーミング — 各行には送信元 Pod のタグが付けられます。",
+        "historicalDescription": "過去{range}のログ行を表示しています。",
+        "refreshHistorical": "更新",
+        "historicalUnavailableTitle": "このクラスタでは履歴ログを利用できません",
+        "historicalUnavailableHint": "このクラスタにはログ集約バックエンド (Loki / CloudWatch / Stackdriver / Azure Monitor) が設定されていません。リアルタイムで追跡するには Live に戻してください。",
+        "historicalUnavailableEmpty": "このクラスタでは履歴ログクエリを利用できません。リアルタイムで追跡するには Live に戻してください。",
+        "historicalNoResults": "このウィンドウ内に一致するログ行はありません。",
+        "range": {
+          "live": "ライブ",
+          "15m": "過去 15 分",
+          "1h": "過去 1 時間",
+          "6h": "過去 6 時間",
+          "24h": "過去 24 時間"
+        }
       }
     },
     "tokens": {

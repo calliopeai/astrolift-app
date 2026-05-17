@@ -164,3 +164,123 @@ class LifecycleSubscription:
                 )
         finally:
             await inner.aclose()
+
+    @strawberry.subscription
+    async def astrolift_on_app_logs(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        workload_slug: str | None = None,
+        container: str | None = None,
+        follow: bool = True,
+        tail_lines: int = 100,
+    ) -> AsyncGenerator[AppLogLineType, None]:
+        """Multi-pod plural log subscription (#482).
+
+        Streams log lines from every replica of ``app_slug`` (filtered
+        to ``workload_slug`` when given) over a single WebSocket. Each
+        line carries its source ``pod_name`` so the FE can colorize +
+        group per replica.
+
+        New pods that appear during the subscription are auto-tailed.
+        This is the mobile / aggregate-view answer to the question
+        "show me what's happening across all replicas right now"
+        without forcing the operator to know which pod to pick first.
+
+        Permission gate, tenant-resolution, and cluster lookup mirror
+        the per-pod ``astrolift_on_app_log`` subscription — same
+        contract, just a different shape of inner stream.
+        """
+        from asgiref.sync import sync_to_async
+
+        from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_registry.models import RegisteredApp
+        from core.cluster_observability import (
+            namespace_for_app,
+            stream_app_logs_multi,
+        )
+        from core.permissions import (
+            Permission,
+            PermissionDenied,
+            check_permission,
+        )
+        from core.tenancy import (
+            TenantContext,
+            get_current_tenant,
+            set_current_tenant,
+        )
+
+        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
+        if ws_tenant is not None:
+            set_current_tenant(ws_tenant)
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return
+
+        try:
+            check_permission(Permission.APP_READ_LOGS)
+        except PermissionDenied:
+            return
+
+        def _resolve():
+            app = (
+                RegisteredApp.objects.select_related(
+                    "organization", "default_tenant_cluster"
+                )
+                .filter(
+                    slug=app_slug,
+                    organization_id=org_id,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if app is None:
+                return None
+            cluster = None
+            if environment_name:
+                env = (
+                    AppEnvironment.objects.select_related("tenant_cluster")
+                    .filter(
+                        registered_app=app,
+                        name=environment_name,
+                        deleted_at__isnull=True,
+                    )
+                    .first()
+                )
+                if env and env.tenant_cluster_id:
+                    cluster = env.tenant_cluster
+            if cluster is None:
+                cluster = app.default_tenant_cluster
+            if cluster is None or not getattr(cluster, "is_active", True):
+                return None
+            namespace = namespace_for_app(app)
+            return app, cluster, namespace
+
+        resolved = await sync_to_async(_resolve)()
+        if resolved is None:
+            return
+        app, cluster, namespace = resolved
+
+        inner = stream_app_logs_multi(
+            cluster=cluster,
+            namespace=namespace,
+            app_slug=app.slug,
+            workload_slug=workload_slug,
+            container=container,
+            tail_lines=tail_lines,
+            follow=follow,
+        )
+        try:
+            async for line in inner:
+                yield AppLogLineType(
+                    pod_name=line.pod_name,
+                    container=line.container,
+                    timestamp=line.timestamp,
+                    message=line.message,
+                    stream=line.stream,
+                )
+        finally:
+            await inner.aclose()

@@ -365,6 +365,23 @@ export type AstroliftAppLogLine = {
   timestamp: Scalars['DateTime']['output'];
 };
 
+export type AstroliftAppLogPage = {
+  historicalAvailable: Scalars['Boolean']['output'];
+  items: Array<AstroliftAppLogQueryLine>;
+  nextCursor: Scalars['String']['output'];
+  reachedRetention: Scalars['Boolean']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAppLogQueryLine = {
+  container: Scalars['String']['output'];
+  level: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  stream: Scalars['String']['output'];
+  timestamp: Scalars['String']['output'];
+};
+
 export type AstroliftAppMetrics = {
   appSlug: Scalars['String']['output'];
   deployCount: Scalars['Int']['output'];
@@ -4180,6 +4197,7 @@ export type Query = {
   astroliftAppGoldenSignals: Array<AstroliftAppGoldenSignal>;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
+  astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
   astroliftAppPermissions: Array<Scalars['String']['output']>;
   astroliftAppPods: Array<AstroliftAppPod>;
@@ -4356,6 +4374,19 @@ export type QueryAstroliftAppGoldenSignalsArgs = {
 export type QueryAstroliftAppIdentityBindingArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppLogsArgs = {
+  appSlug: Scalars['String']['input'];
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  level?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  since: Scalars['DateTime']['input'];
+  until: Scalars['DateTime']['input'];
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -5096,6 +5127,7 @@ export type StartWorkflowResult = {
 export type Subscription = {
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
   astroliftOnAppLog: AstroliftAppLogLine;
+  astroliftOnAppLogs: AstroliftAppLogLine;
   formSubmissionReceived: Scalars['String']['output'];
   notificationReceived: Scalars['String']['output'];
 };
@@ -5111,6 +5143,16 @@ export type SubscriptionAstroliftOnAppLogArgs = {
   container?: InputMaybe<Scalars['String']['input']>;
   follow?: Scalars['Boolean']['input'];
   podName: Scalars['String']['input'];
+  tailLines?: Scalars['Int']['input'];
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionAstroliftOnAppLogsArgs = {
+  appSlug: Scalars['String']['input'];
+  container?: InputMaybe<Scalars['String']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  follow?: Scalars['Boolean']['input'];
   tailLines?: Scalars['Int']['input'];
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
