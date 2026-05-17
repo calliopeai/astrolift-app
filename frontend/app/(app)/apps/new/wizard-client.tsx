@@ -14,10 +14,7 @@ import type {
   TriggerMode,
 } from "@/graphql/registry/registry.types";
 import { PUSH_CI_WORKFLOW } from "@/graphql/scm/scm.mutations";
-import type {
-  AstroliftPushCiWorkflowResult,
-  ScmConnectionKind,
-} from "@/graphql/scm/scm.types";
+import type { AstroliftPushCiWorkflowResult, ScmConnectionKind } from "@/graphql/scm/scm.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import { WizardShell, type WizardStep } from "./components/WizardShell";
@@ -105,6 +102,10 @@ export interface WizardState {
   requiresApproval: boolean;
   approverUserIds: string[];
   approverTeamId: string;
+  // Required approver count (#410). Maps to the backend's
+  // ``minimumApprovals``. Bounded by the user-picker size when the
+  // policy gates on a user set; bounded at >= 1 always.
+  minimumApprovals: number;
 
   // Step 5
   pushCiWorkflow: boolean;
@@ -138,6 +139,7 @@ export function initialWizardState(): WizardState {
     requiresApproval: false,
     approverUserIds: [],
     approverTeamId: "",
+    minimumApprovals: 1,
     pushCiWorkflow: false,
     triggerFirstDeploy: true,
   };
@@ -293,6 +295,19 @@ export function WizardClient() {
 
     try {
       update("register", { status: "running" });
+      // Approval policy (#410) is only sent when the deploy-strategy
+      // step is active *and* the operator turned the gate on. "skip"
+      // timing intentionally drops the policy so a first-time operator
+      // can finish registration without committing to one — the
+      // app-detail Settings tab is the canonical place to wire it up
+      // post-registration.
+      const approvalActive = state.deployTiming !== "skip" && state.requiresApproval;
+      const requiresApproval = approvalActive;
+      const approverUserIds = approvalActive ? state.approverUserIds : null;
+      const approverTeamId =
+        approvalActive && state.approverTeamId !== "" ? state.approverTeamId : null;
+      const minimumApprovals = approvalActive ? Math.max(1, state.minimumApprovals) : null;
+
       const { data } = await registerApp({
         variables: {
           input: {
@@ -315,6 +330,10 @@ export function WizardClient() {
               state.deployTiming !== "skip" && state.triggerMode === "cron"
                 ? state.cronExpression.trim()
                 : null,
+            requiresApproval,
+            approverUserIds,
+            approverTeamId,
+            minimumApprovals,
           },
         },
       });

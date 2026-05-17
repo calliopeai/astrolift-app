@@ -43,35 +43,44 @@ interface ClusterTabsProps {
  */
 export function ClusterTabs({ slug, active }: ClusterTabsProps) {
   const pathname = usePathname() ?? "";
-  const activeKey: TabKey =
-    active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
+  const activeKey: TabKey = active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
 
   return (
-    <nav
-      aria-label="Cluster tabs"
-      className="border-border -mx-6 flex gap-1 overflow-x-auto border-b px-6"
-    >
-      {TABS.map((tab) => {
-        const isActive = activeKey === tab.key;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href(slug)}
-            aria-current={isActive ? "page" : undefined}
-            className={cn(
-              "relative shrink-0 px-3 py-2.5 text-sm font-medium transition-colors",
-              isActive
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {tab.label}
-            {isActive && (
-              <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
-            )}
-          </Link>
-        );
-      })}
-    </nav>
+    // The wrapper handles the right-edge gradient fade — a small,
+    // theme-aware "there's more to the right" affordance when the
+    // tab strip overflows on narrow screens. The fade sits over the
+    // scroll area via pointer-events-none so taps still hit the tab
+    // underneath. Snap behavior on the inner nav keeps tab edges
+    // aligned to the viewport when the operator swipes.
+    <div className="relative -mx-6">
+      <nav
+        aria-label="Cluster tabs"
+        className="border-border flex snap-x snap-mandatory gap-1 overflow-x-auto border-b px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {TABS.map((tab) => {
+          const isActive = activeKey === tab.key;
+          return (
+            <Link
+              key={tab.key}
+              href={tab.href(slug)}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "relative shrink-0 snap-start px-3 py-2.5 text-sm font-medium transition-colors",
+                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+              {isActive && (
+                <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-[var(--brand-primary)]" />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+      <div
+        aria-hidden
+        className="from-background pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent"
+      />
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import type {
   AstroliftActiveSession as GeneratedActiveSession,
   AstroliftApiToken as GeneratedApiToken,
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
+  AstroliftApproverUser as GeneratedApproverUser,
   AstroliftAppSummary as GeneratedAppSummary,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
   AstroliftInvitation as GeneratedInvitation,
@@ -57,10 +58,7 @@ export type AstroliftTeam = Omit<GeneratedTeam, "organization"> & {
   organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
 };
 
-export type AstroliftProject = Omit<
-  GeneratedProject,
-  "organization" | "team"
-> & {
+export type AstroliftProject = Omit<GeneratedProject, "organization" | "team"> & {
   organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
   team: Pick<AstroliftTeam, "id" | "slug" | "name">;
 };
@@ -70,11 +68,7 @@ export type AstroliftProject = Omit<
  * backend (pending/provisioning/ready/failed). The schema exposes it
  * as a free `String!` so narrow it here for switch exhaustiveness.
  */
-export type AstroliftAppStatus =
-  | "pending"
-  | "provisioning"
-  | "ready"
-  | "failed";
+export type AstroliftAppStatus = "pending" | "provisioning" | "ready" | "failed";
 
 export type AstroliftAppSummary = Omit<GeneratedAppSummary, "status"> & {
   status: AstroliftAppStatus;
@@ -99,6 +93,14 @@ export interface AstroliftNavTree {
 
 export type AstroliftUser = GeneratedUser;
 
+/**
+ * Row shape used by the approval-policy picker (#410) — surfaces
+ * display_name + avatar_url so the picker can render an identifiable
+ * chip without a follow-up lookup. Backed by
+ * `astroliftOrgMembersForApprovalPicker(orgSlug)`.
+ */
+export type AstroliftApproverUser = GeneratedApproverUser;
+
 export type AstroliftRole = Omit<GeneratedRole, "scopeLevel"> & {
   scopeLevel: ScopeKind;
 };
@@ -111,18 +113,12 @@ export type AstroliftRoleBinding = Omit<GeneratedRoleBinding, "scopeKind"> & {
   scopeKind: ScopeKind;
 };
 
-export type AstroliftPolicy = Omit<
-  GeneratedPolicy,
-  "scopeLevel" | "effect"
-> & {
+export type AstroliftPolicy = Omit<GeneratedPolicy, "scopeLevel" | "effect"> & {
   scopeLevel: ScopeKind;
   effect: PolicyEffect;
 };
 
-export type AstroliftIdentityProvider = Omit<
-  GeneratedIdentityProvider,
-  "kind"
-> & {
+export type AstroliftIdentityProvider = Omit<GeneratedIdentityProvider, "kind"> & {
   kind: IdpKind;
 };
 
@@ -130,18 +126,14 @@ export type AstroliftApiToken = GeneratedApiToken;
 
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 
-export type AstroliftInvitation = Omit<
-  GeneratedInvitation,
-  "scopeKind" | "status"
-> & {
+export type AstroliftInvitation = Omit<GeneratedInvitation, "scopeKind" | "status"> & {
   scopeKind: ScopeKind;
   status: InvitationStatus;
 };
 
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
 
-export type AstroliftOrganizationAllowlistedDomain =
-  GeneratedOrganizationAllowlistedDomain;
+export type AstroliftOrganizationAllowlistedDomain = GeneratedOrganizationAllowlistedDomain;
 
 export type AstroliftActiveSession = GeneratedActiveSession;
 

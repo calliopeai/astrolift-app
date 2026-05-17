@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@apollo/client/react";
 import {
   ClockIcon,
   CoffeeIcon,
@@ -9,14 +10,22 @@ import {
   ShieldCheckIcon,
   ZapIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
+import type { AstroliftProject } from "@/graphql/identity/identity.types";
 import { cn } from "@/lib/utils";
 
+import { ApproverSelector } from "../components/ApproverSelector";
 import type { DeployTiming, WizardState, WizardTriggerMode } from "../wizard-client";
+
+interface ProjectsResponse {
+  astroliftProjects: AstroliftProject[];
+}
 
 interface Props {
   state: WizardState;
@@ -45,7 +54,8 @@ const DEPLOY_TIMINGS: Array<{
   {
     value: "skip",
     label: "Skip — configure later",
-    description: "Just register the app. Set up triggers, approvals, and deploys from the app page.",
+    description:
+      "Just register the app. Set up triggers, approvals, and deploys from the app page.",
     icon: CoffeeIcon,
   },
 ];
@@ -94,11 +104,26 @@ function naturalCronHint(expr: string): string {
 }
 
 export function DeployStrategyStep({ state, setState, setValid }: Props) {
+  const t = useTranslations("apps.wizard.approval");
+  // Resolve the org slug from the picked project — the approver
+  // picker is org-scoped so the user list mirrors the project's org.
+  const projectsQuery = useQuery<ProjectsResponse>(LIST_PROJECTS, {
+    fetchPolicy: "cache-first",
+  });
+  const orgSlug = React.useMemo(() => {
+    const projects = projectsQuery.data?.astroliftProjects ?? [];
+    const picked = projects.find((p) => p.id === state.projectId);
+    return picked?.organization?.slug ?? "";
+  }, [projectsQuery.data, state.projectId]);
+
+  const [approverPickerValid, setApproverPickerValid] = React.useState(true);
+
   // Validity:
   //   - skip: always valid (operator finishes config from the app page)
   //   - auto_on_push: deploy_branch required
   //   - cron: cron expression must be 5-field
   //   - manual: always valid
+  //   - approval gate (when on): approver picker reports its own validity
   React.useEffect(() => {
     if (state.deployTiming === "skip") {
       setValid(true);
@@ -111,12 +136,17 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
     if (state.triggerMode === "cron") {
       ok = CRON_FIELD.test(state.cronExpression.trim());
     }
+    if (state.requiresApproval && !approverPickerValid) {
+      ok = false;
+    }
     setValid(ok);
   }, [
     state.deployTiming,
     state.triggerMode,
     state.deployBranch,
     state.cronExpression,
+    state.requiresApproval,
+    approverPickerValid,
     setValid,
   ]);
 
@@ -212,80 +242,59 @@ export function DeployStrategyStep({ state, setState, setValid }: Props) {
       )}
 
       {showTriggerConfig && (
-      <section className="flex flex-col gap-3 rounded-md border p-4">
-        <label className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={state.requiresApproval}
-            onChange={(e) =>
-              setState((s) => ({
-                ...s,
-                requiresApproval: e.target.checked,
-                approverUserIds: e.target.checked ? s.approverUserIds : [],
-                approverTeamId: e.target.checked ? s.approverTeamId : "",
-              }))
-            }
-          />
-          <div className="flex-1">
-            <span className="inline-flex items-center gap-2 font-medium">
-              Require approval before deploying
-              <Badge variant="secondary" className="gap-1 text-xs">
-                <ShieldCheckIcon className="size-3" /> Safer
-              </Badge>
-              <Badge variant="outline" className="text-[10px]">
-                Coming soon
-              </Badge>
-            </span>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Triggered deploys sit in a &ldquo;pending approval&rdquo; state until an approver
-              acks. The backend mutation for approvers isn&apos;t wired yet — your selection is
-              captured for the follow-up.
-            </p>
-          </div>
-        </label>
+        <section className="flex flex-col gap-3 rounded-md border p-4">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={state.requiresApproval}
+              onChange={(e) =>
+                setState((s) => ({
+                  ...s,
+                  requiresApproval: e.target.checked,
+                  approverUserIds: e.target.checked ? s.approverUserIds : [],
+                  approverTeamId: e.target.checked ? s.approverTeamId : "",
+                  minimumApprovals: e.target.checked ? Math.max(1, s.minimumApprovals) : 1,
+                }))
+              }
+            />
+            <div className="flex-1">
+              <span className="inline-flex items-center gap-2 font-medium">
+                {t("toggleLabel")}
+                <Badge variant="secondary" className="gap-1 text-xs">
+                  <ShieldCheckIcon className="size-3" /> {t("safer")}
+                </Badge>
+              </span>
+              <p className="text-muted-foreground mt-1 text-xs">{t("toggleHint")}</p>
+            </div>
+          </label>
 
-        {state.requiresApproval && (
-          <div className="grid gap-3 pl-7 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="approver-team">Approver team (optional)</Label>
-              <Input
-                id="approver-team"
-                value={state.approverTeamId}
-                onChange={(e) => setState((s) => ({ ...s, approverTeamId: e.target.value }))}
-                placeholder="team-id"
-                className="font-mono text-xs"
-                disabled
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="approver-users">Approver users (comma-separated)</Label>
-              <Input
-                id="approver-users"
-                value={state.approverUserIds.join(", ")}
-                onChange={(e) =>
-                  setState((s) => ({
-                    ...s,
-                    approverUserIds: e.target.value
-                      .split(",")
-                      .map((v) => v.trim())
-                      .filter(Boolean),
-                  }))
-                }
-                placeholder="user-id-1, user-id-2"
-                className="font-mono text-xs"
-                disabled
-              />
-            </div>
-          </div>
-        )}
-      </section>
+          {state.requiresApproval && (
+            <ApproverSelector
+              orgSlug={orgSlug}
+              value={{
+                approverUserIds: state.approverUserIds,
+                approverTeamId: state.approverTeamId,
+                minimumApprovals: state.minimumApprovals,
+              }}
+              onChange={(next) =>
+                setState((s) => ({
+                  ...s,
+                  approverUserIds: next.approverUserIds,
+                  approverTeamId: next.approverTeamId,
+                  minimumApprovals: next.minimumApprovals,
+                }))
+              }
+              onValidityChange={setApproverPickerValid}
+            />
+          )}
+        </section>
       )}
 
       {!showTriggerConfig && (
         <section className="bg-muted/30 text-muted-foreground rounded-md border border-dashed p-4 text-xs">
-          Trigger mode and approval gates are skipped for now. Once registration
-          completes you can wire those up from the app&apos;s Settings tab.
+          Trigger mode and approval gates are skipped for now. Once registration completes you can
+          wire those up from the app&apos;s Settings tab.
         </section>
       )}
     </div>

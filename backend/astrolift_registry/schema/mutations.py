@@ -407,6 +407,61 @@ def _resolve_approval_inputs(
     return resolved, None
 
 
+def _validate_effective_approval_policy(
+    *,
+    requires_approval: bool,
+    effective_team,
+    effective_user_ids: tuple[int, ...] | list[int] | set[int],
+    effective_minimum_approvals: int,
+):
+    """Cross-field validation of the resolved approval policy (#410).
+
+    Distinct from ``_resolve_approval_inputs`` which validates each
+    incoming field on its own. This gate runs over the *post-update*
+    effective state so the rules are equivalent on register_app and
+    update_app whether the caller passed every field or only a delta.
+
+    Rules:
+      - When ``requires_approval`` is True, the policy must name at
+        least one approver path — users OR team. Empty approver_users
+        AND no team would fail-open on the caller side (any deploy
+        would need any user with ``app.approve_deploy``), which is the
+        documented behavior of the resolver but a bad default to land
+        from the wizard — the operator clearly wanted a specific
+        approver set.
+      - Users and team are mutually exclusive on the picker: a single
+        policy can't gate on both "this team's members" and "these
+        specific users". Two approver paths in one app makes the
+        approval-counting math ambiguous; pick one.
+      - When approver_users is non-empty, ``minimumApprovals`` may not
+        exceed the user count — otherwise the gate would never satisfy.
+    """
+    if not requires_approval:
+        return None
+
+    users_set = bool(effective_user_ids)
+    team_set = effective_team is not None
+    if not users_set and not team_set:
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "requireApproval is on but no approvers selected — pick a team or one or more users",
+            field="approverUserIds",
+        )
+    if users_set and team_set:
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "approverTeamId and approverUserIds are mutually exclusive — pick a team OR specific users",
+            field="approverTeamId",
+        )
+    if users_set and effective_minimum_approvals > len(list(effective_user_ids)):
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "minimumApprovals cannot exceed the number of approver users",
+            field="minimumApprovals",
+        )
+    return None
+
+
 @strawberry.input
 class AssignAppToProjectInput:
     """Re-assign an app to a project, or unassign it (#391).
@@ -594,6 +649,23 @@ class RegistryMutation:
         if err is not None:
             return err
 
+        eff_requires_approval = (
+            bool(approval["requires_approval"]) if approval["requires_approval"] is not None else False
+        )
+        eff_team = approval["team"]
+        eff_user_ids = approval["user_ids"] or ()
+        eff_minimum_approvals = (
+            approval["minimum_approvals"] if approval["minimum_approvals"] is not None else 1
+        )
+        cross_err = _validate_effective_approval_policy(
+            requires_approval=eff_requires_approval,
+            effective_team=eff_team,
+            effective_user_ids=eff_user_ids,
+            effective_minimum_approvals=eff_minimum_approvals,
+        )
+        if cross_err is not None:
+            return cross_err
+
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
@@ -673,6 +745,37 @@ class RegistryMutation:
         )
         if err is not None:
             return err
+
+        # Compute the effective post-update approval policy and run the
+        # cross-field validator. Any field the caller didn't touch falls
+        # back to the persisted value so an UPDATE call that only flips
+        # one knob is still validated against the *whole* policy shape.
+        eff_requires_approval = (
+            bool(approval["requires_approval"])
+            if approval["requires_approval"] is not None
+            else bool(app.requires_approval)
+        )
+        if approval["team_provided"]:
+            eff_team = approval["team"]
+        else:
+            eff_team = app.approver_team
+        if approval["user_ids"] is not None:
+            eff_user_ids = approval["user_ids"]
+        else:
+            eff_user_ids = tuple(app.approver_users.values_list("pk", flat=True))
+        eff_minimum_approvals = (
+            approval["minimum_approvals"]
+            if approval["minimum_approvals"] is not None
+            else app.minimum_approvals
+        )
+        cross_err = _validate_effective_approval_policy(
+            requires_approval=eff_requires_approval,
+            effective_team=eff_team,
+            effective_user_ids=eff_user_ids,
+            effective_minimum_approvals=eff_minimum_approvals,
+        )
+        if cross_err is not None:
+            return cross_err
 
         for field in (
             "name",
