@@ -33,12 +33,6 @@ from typing import Any
 
 from temporalio import activity
 
-# Module-level re-exports so test fixtures can monkeypatch the driver
-# resolvers cleanly. The underlying functions are private to
-# ``core.cluster_management``; re-binding here means a test can swap
-# them out without reaching into another package's internals.
-from core.cluster_management import _context_for_cluster, _driver_for_cluster
-
 # Module-level re-export of the dispatch service so the same
 # monkeypatch surface covers the CI-redispatch step. The redirection
 # costs nothing at runtime and keeps the test fixtures aligned with
@@ -47,6 +41,12 @@ from astrolift_scm.services.workflows import (
     WorkflowDispatchError,
     dispatch_astrolift_ci_workflow,
 )
+
+# Module-level re-exports so test fixtures can monkeypatch the driver
+# resolvers cleanly. The underlying functions are private to
+# ``core.cluster_management``; re-binding here means a test can swap
+# them out without reaching into another package's internals.
+from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
 log = logging.getLogger("astrolift_workflows.activities.force_redeploy")
 

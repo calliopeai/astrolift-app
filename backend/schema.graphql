@@ -1,3 +1,8 @@
+input AbortDeploymentInput {
+  id: GUID!
+  reason: String!
+}
+
 input AcceptInvitationInput {
   token: String!
 }
@@ -516,6 +521,13 @@ type AstroliftContainer {
   workloadSlug: String!
 }
 
+type AstroliftContainerResources {
+  cpuRequest: String!
+  cpuLimit: String!
+  memoryRequest: String!
+  memoryLimit: String!
+}
+
 type AstroliftContainerStatus {
   name: String!
   ready: Boolean!
@@ -524,6 +536,10 @@ type AstroliftContainerStatus {
   state: String!
   waitingReason: String!
   terminatedReason: String!
+  kind: String!
+  lastRestartReasons: [String!]!
+  lastRestartAt: DateTime
+  resources: AstroliftContainerResources!
 }
 
 type AstroliftCostSnapshot {
@@ -573,6 +589,23 @@ type AstroliftDeployment {
   branch: String!
   ciRunUrl: String!
   ciProvider: String!
+  commitMessage: String!
+  commitAuthor: String!
+  repoUrl: String!
+  abortedReason: String!
+  triggeredByUserId: String
+  triggeredByMe: Boolean!
+}
+
+type AstroliftDeploymentApprovalHistoryEntry {
+  id: GUID!
+  action: String!
+  decision: String!
+  actorKind: String!
+  actorId: String!
+  actorDisplay: String!
+  occurredAt: DateTime!
+  reason: String!
 }
 
 type AstroliftDeploymentLifecycleEvent {
@@ -1419,6 +1452,7 @@ type AstroliftWorkload {
   storageClass: String!
   storageSize: String!
   registeredAppSlug: String!
+  inClusterServiceFqdn: String!
 }
 
 type AstroliftWorkloadOpPayload {
@@ -1432,6 +1466,19 @@ type AstroliftWorkloadOpPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftWorkloadOpPayload
+}
+
+type AstroliftWorkloadPodStatusBucket {
+  status: String!
+  count: Int!
+  percent: Float!
+  pods: [AstroliftWorkloadPodSummary!]!
+}
+
+type AstroliftWorkloadPodSummary {
+  name: String!
+  age: DateTime
+  ready: Boolean!
 }
 
 input AttachSecretBundleInput {
@@ -2139,10 +2186,10 @@ type Mutation {
   configureProviderPlugin(input: ConfigureProviderPluginInput!): ProviderpluginconfigpayloadMutationResult!
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
-  rejectDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  rejectDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeploymentByToken(input: ApproveByTokenInput!): AstroliftDeploymentMutationResult!
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
-  abortDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  abortDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
   rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
@@ -2449,6 +2496,7 @@ type Query {
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
   astroliftDeployment(id: String!): AstroliftDeployment
+  astroliftDeploymentApprovalHistory(deploymentId: String!): [AstroliftDeploymentApprovalHistoryEntry!]!
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
   astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]!
   astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]!
@@ -2457,6 +2505,7 @@ type Query {
   astroliftAppHealthSummary: [AstroliftAppHealthSummary!]!
   astroliftAppDomains(appSlug: String!): [AstroliftAppDomain!]!
   astroliftAppPods(appSlug: String!, environmentName: String = null): [AstroliftAppPod!]!
+  astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]!
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): [AstroliftAppDnsRecord!]!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): [AstroliftAppCertificate!]!
@@ -2700,6 +2749,8 @@ input StartDeploymentInput {
   branch: String = null
   ciRunUrl: String = null
   ciProvider: String = null
+  commitMessage: String = null
+  commitAuthor: String = null
 }
 
 type StartWorkflowResult {

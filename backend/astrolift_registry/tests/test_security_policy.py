@@ -217,7 +217,7 @@ def test_update_security_policy_denied_without_permission():
 
 
 def test_supply_chain_blocked_payload_serialises_full_shape():
-    blocked_at = dt.datetime(2026, 5, 16, 12, 30, 45, tzinfo=dt.timezone.utc)
+    blocked_at = dt.datetime(2026, 5, 16, 12, 30, 45, tzinfo=dt.UTC)
     payload = SupplyChainBlockedPayload(
         app_slug="hello-app",
         deployment_guid="11111111-2222-3333-4444-555555555555",
@@ -250,7 +250,7 @@ def test_supply_chain_blocked_payload_allows_missing_cve_summary():
         reason="missing_signature",
         cve_summary=None,
         signature_required=True,
-        blocked_at=dt.datetime(2026, 5, 16, 0, 0, 0, tzinfo=dt.timezone.utc),
+        blocked_at=dt.datetime(2026, 5, 16, 0, 0, 0, tzinfo=dt.UTC),
     )
 
     out = payload.as_payload()
@@ -267,5 +267,5 @@ def test_supply_chain_blocked_payload_rejects_unknown_reason():
             reason="not-a-real-reason",
             cve_summary=None,
             signature_required=False,
-            blocked_at=dt.datetime(2026, 5, 16, 0, 0, 0, tzinfo=dt.timezone.utc),
+            blocked_at=dt.datetime(2026, 5, 16, 0, 0, 0, tzinfo=dt.UTC),
         )
