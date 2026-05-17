@@ -6,6 +6,7 @@ import {
   CheckCircleIcon,
   LayersIcon,
   Loader2Icon,
+  MoreHorizontalIcon,
   PlayIcon,
   PlusIcon,
   RefreshCcwIcon,
@@ -22,6 +23,12 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -31,11 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
   LIST_CLUSTERS,
@@ -66,7 +69,11 @@ function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: st
   // state so the operator can fix without leaving the list.
   const presentation: Record<
     Lifecycle,
-    { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: React.ReactNode }
+    {
+      label: string;
+      variant: "default" | "secondary" | "outline" | "destructive";
+      icon: React.ReactNode;
+    }
   > = {
     registered: {
       label: "Registered",
@@ -102,9 +109,7 @@ function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: st
         <TooltipTrigger asChild>
           <span>{badge}</span>
         </TooltipTrigger>
-        <TooltipContent className="max-w-sm whitespace-pre-wrap text-xs">
-          {error}
-        </TooltipContent>
+        <TooltipContent className="max-w-sm text-xs whitespace-pre-wrap">{error}</TooltipContent>
       </Tooltip>
     );
   }
@@ -177,13 +182,106 @@ export function ClustersClient() {
     });
     if (data?.refreshClusterManagement.ok) {
       toast.success(
-        forcePreflight
-          ? `Refreshing ${c.slug} (full preflight)`
-          : `Refreshing ${c.slug}`
+        forcePreflight ? `Refreshing ${c.slug} (full preflight)` : `Refreshing ${c.slug}`
       );
     } else {
       toast.error(data?.refreshClusterManagement.errors?.[0]?.message ?? "Failed");
     }
+  }
+
+  // Action descriptors. Each lifecycle resolves to one primary action
+  // (managing has none — workflow is in flight). Reused by both the
+  // md:+ inline button and the <md dropdown so the operator gets the
+  // same affordances regardless of viewport.
+  interface PrimaryAction {
+    label: string;
+    icon: React.ReactNode;
+    onSelect: () => void;
+    disabled?: boolean;
+    variant?: "default" | "outline";
+  }
+
+  function primaryAction(c: AstroliftTenantCluster): PrimaryAction | null {
+    const lifecycle = c.lifecycle as Lifecycle;
+    if (lifecycle === "managing") return null;
+    if (lifecycle === "managed") {
+      return {
+        label: "Refresh setup",
+        icon: <RefreshCcwIcon className="size-4" />,
+        onSelect: () => handleRefresh(c, false),
+        disabled: refreshing,
+        variant: "outline",
+      };
+    }
+    if (lifecycle === "error") {
+      return {
+        label: "Retry",
+        icon: <PlayIcon className="size-4" />,
+        onSelect: () => handleBring(c),
+        disabled: bringing,
+        variant: "outline",
+      };
+    }
+    return {
+      label: "Bring into management",
+      icon: <PlayIcon className="size-4" />,
+      onSelect: () => handleBring(c),
+      disabled: bringing,
+      variant: "default",
+    };
+  }
+
+  // Compact mobile-only action menu — below md: the desktop button
+  // row would wrap awkwardly. The dropdown stacks the lifecycle-
+  // appropriate primary action above Unregister and reuses the same
+  // handler closures so behavior is identical. The trigger is a single
+  // 3-dot icon button (44px tap target via size="icon" + size-9) so it
+  // doesn't compete with the lifecycle badge for row real estate.
+  function renderRowMenu(c: AstroliftTenantCluster) {
+    const lifecycle = c.lifecycle as Lifecycle;
+    const action = primaryAction(c);
+    const busy = bringing || refreshing || deleting;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9"
+            disabled={lifecycle === "managing" && !action}
+          >
+            <MoreHorizontalIcon className="size-4" />
+            <span className="sr-only">Cluster actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {lifecycle === "managing" && (
+            <DropdownMenuItem disabled>
+              <Loader2Icon className="size-4 animate-spin" />
+              Setup in progress…
+            </DropdownMenuItem>
+          )}
+          {action && (
+            <Can permission="cluster.manage">
+              <DropdownMenuItem onSelect={action.onSelect} disabled={action.disabled || busy}>
+                {action.icon}
+                {action.label}
+              </DropdownMenuItem>
+            </Can>
+          )}
+          <Can permission="cluster.unregister">
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setUnregisterTarget(c)}
+              disabled={busy}
+            >
+              <Trash2Icon className="size-4" />
+              Unregister
+            </DropdownMenuItem>
+          </Can>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   }
 
   function renderActionButton(c: AstroliftTenantCluster) {
@@ -196,42 +294,18 @@ export function ClustersClient() {
         </Button>
       );
     }
-    if (lifecycle === "managed") {
-      return (
-        <Can permission="cluster.manage">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleRefresh(c, false)}
-            disabled={refreshing}
-          >
-            <RefreshCcwIcon className="size-4" />
-            Refresh setup
-          </Button>
-        </Can>
-      );
-    }
-    if (lifecycle === "error") {
-      return (
-        <Can permission="cluster.manage">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleBring(c)}
-            disabled={bringing}
-          >
-            <PlayIcon className="size-4" />
-            Retry
-          </Button>
-        </Can>
-      );
-    }
-    // registered (default)
+    const action = primaryAction(c);
+    if (!action) return null;
     return (
       <Can permission="cluster.manage">
-        <Button size="sm" onClick={() => handleBring(c)} disabled={bringing}>
-          <PlayIcon className="size-4" />
-          Bring into management
+        <Button
+          size="sm"
+          variant={action.variant === "outline" ? "outline" : undefined}
+          onClick={action.onSelect}
+          disabled={action.disabled}
+        >
+          {action.icon}
+          {action.label}
         </Button>
       </Can>
     );
@@ -253,9 +327,52 @@ export function ClustersClient() {
       <Card>
         <CardContent className="p-0">
           {loading && list.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead></TableHead>
+                  <TableHead>Cluster</TableHead>
+                  <TableHead>Lifecycle</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Region</TableHead>
+                  <TableHead>Ingress</TableHead>
+                  <TableHead>Last probe</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={`skel-${i}`}>
+                    <TableCell className="w-8">
+                      <Skeleton className="size-2.5 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="mb-1 h-4 w-32" />
+                      <Skeleton className="h-3 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-3 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-3 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-3 w-28" />
+                    </TableCell>
+                    <TableCell className="flex items-center justify-end gap-2 text-right">
+                      <Skeleton className="h-8 w-24" />
+                      <Skeleton className="size-8" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : list.length === 0 ? (
             <div className="p-6">
               <EmptyState
@@ -306,19 +423,24 @@ export function ClustersClient() {
                         ? new Date(c.capabilitiesProbedAt).toLocaleString()
                         : "never"}
                     </TableCell>
-                    <TableCell className="flex items-center justify-end gap-2 text-right">
-                      {renderActionButton(c)}
-                      <Can permission="cluster.unregister">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setUnregisterTarget(c)}
-                          disabled={deleting}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Unregister</span>
-                        </Button>
-                      </Can>
+                    <TableCell className="text-right">
+                      <div className="hidden items-center justify-end gap-2 md:flex">
+                        {renderActionButton(c)}
+                        <Can permission="cluster.unregister">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setUnregisterTarget(c)}
+                            disabled={deleting}
+                          >
+                            <Trash2Icon className="size-4" />
+                            <span className="sr-only">Unregister</span>
+                          </Button>
+                        </Can>
+                      </div>
+                      <div className="flex items-center justify-end md:hidden">
+                        {renderRowMenu(c)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
