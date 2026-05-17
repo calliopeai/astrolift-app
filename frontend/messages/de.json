@@ -145,7 +145,28 @@
         "action": "Erste App registrieren"
       },
       "branchLabel": "Branch",
-      "open": "Öffnen"
+      "open": "Öffnen",
+      "search": {
+        "placeholder": "Nach Name, Slug oder Repo suchen…",
+        "ariaLabel": "Apps durchsuchen"
+      },
+      "filters": {
+        "ariaLabel": "Nach Status filtern",
+        "all": "Alle",
+        "running": "Läuft",
+        "failed": "Fehlgeschlagen",
+        "inflight": "In Bearbeitung",
+        "notDeployed": "Nicht bereitgestellt"
+      },
+      "noMatch": {
+        "title": "Keine Apps passen zum aktuellen Filter",
+        "description": "Versuche einen anderen Suchbegriff oder wechsle zurück zu Alle.",
+        "clear": "Filter zurücksetzen"
+      },
+      "errorBanner": {
+        "title": "Apps konnten nicht geladen werden",
+        "retry": "Erneut versuchen"
+      }
     },
     "tabs": {
       "ariaLabel": "App-Bereiche",

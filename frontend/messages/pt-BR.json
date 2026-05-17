@@ -149,7 +149,28 @@
         "action": "Registrar seu primeiro aplicativo"
       },
       "branchLabel": "branch",
-      "open": "Abrir"
+      "open": "Abrir",
+      "search": {
+        "placeholder": "Buscar por nome, slug ou repositório…",
+        "ariaLabel": "Buscar aplicativos"
+      },
+      "filters": {
+        "ariaLabel": "Filtrar por status",
+        "all": "Todos",
+        "running": "Em execução",
+        "failed": "Falharam",
+        "inflight": "Em andamento",
+        "notDeployed": "Não implantados"
+      },
+      "noMatch": {
+        "title": "Nenhum aplicativo corresponde ao filtro atual",
+        "description": "Tente outro termo ou volte para Todos.",
+        "clear": "Limpar filtros"
+      },
+      "errorBanner": {
+        "title": "Não foi possível carregar os aplicativos",
+        "retry": "Tentar novamente"
+      }
     },
     "tabs": {
       "ariaLabel": "Seções do aplicativo",
