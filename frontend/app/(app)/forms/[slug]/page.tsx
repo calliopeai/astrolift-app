@@ -1,22 +1,43 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Loader2Icon, SendIcon, PenLineIcon } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { Loader2Icon, PenLineIcon, SendIcon } from "lucide-react";
+import { toast } from "sonner";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useFormDefinition, useFormSubmissions, usePublishForm, useArchiveForm } from "@/graphql/forms/forms.hooks";
-import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import {
+  useArchiveForm,
+  useFormDefinition,
+  useFormSubmissions,
+  usePublishForm,
+} from "@/graphql/forms/forms.hooks";
+
+import { formStatusBadgeProps } from "../status-badge";
+import { FormPreviewTab } from "./preview-tab";
+import { FormSubmissionsTab } from "./submissions-tab";
+
+type Tab = "overview" | "preview" | "submissions";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "preview", label: "Preview" },
+  { key: "submissions", label: "Submissions" },
+];
 
 export default function FormDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [tab, setTab] = useState<Tab>("overview");
   const { form, loading, error } = useFormDefinition(slug);
   const { submissions, loading: subsLoading } = useFormSubmissions(slug);
   const [publishForm] = usePublishForm();
   const [archiveForm] = useArchiveForm();
 
-  if (loading) {
+  if (loading && !form) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <Loader2Icon className="text-muted-foreground h-6 w-6 animate-spin" />
@@ -52,7 +73,9 @@ export default function FormDetailPage() {
     }
   };
 
-  const schemaProperties = (form.schema as Record<string, unknown>)?.properties as Record<string, unknown> | undefined;
+  const schemaProperties = (form.schema as Record<string, unknown>)?.properties as
+    | Record<string, unknown>
+    | undefined;
   const fieldCount = schemaProperties ? Object.keys(schemaProperties).length : 0;
 
   return (
@@ -61,9 +84,7 @@ export default function FormDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">{form.name}</h1>
-            <Badge variant={form.status === "published" ? "default" : "secondary"}>
-              {form.status}
-            </Badge>
+            <Badge {...formStatusBadgeProps(form.status)}>{form.status}</Badge>
             <span className="text-muted-foreground text-sm">v{form.version}</span>
           </div>
           <p className="text-muted-foreground mt-1 text-sm">{form.description}</p>
@@ -82,12 +103,69 @@ export default function FormDetailPage() {
             </Button>
           )}
           {form.status === "published" && (
-            <Button variant="outline" onClick={handleArchive}>Archive</Button>
+            <Button variant="outline" onClick={handleArchive}>
+              Archive
+            </Button>
           )}
         </div>
       </div>
       <Separator />
 
+      <nav className="border-b">
+        <ul className="flex gap-1">
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <li key={t.key}>
+                <button
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "border-b-2 px-4 py-2 text-sm transition-colors",
+                    active
+                      ? "border-primary text-foreground"
+                      : "text-muted-foreground hover:text-foreground border-transparent",
+                  )}
+                >
+                  {t.label}
+                  {t.key === "submissions" && form.submissionCount > 0 && (
+                    <span className="bg-muted text-muted-foreground ml-2 rounded-full px-2 py-0.5 text-xs">
+                      {form.submissionCount}
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {tab === "overview" && (
+        <FormOverview form={form} fieldCount={fieldCount} />
+      )}
+      {tab === "preview" && (
+        <FormPreviewTab schema={(form.schema as Record<string, unknown>) ?? {}} />
+      )}
+      {tab === "submissions" && (
+        <FormSubmissionsTab submissions={submissions} loading={subsLoading} />
+      )}
+    </div>
+  );
+}
+
+function FormOverview({
+  form,
+  fieldCount,
+}: {
+  form: {
+    submissionCount: number;
+    publishedAt: string | null;
+    schema: Record<string, unknown>;
+  };
+  fieldCount: number;
+}) {
+  return (
+    <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Fields</h3>
@@ -100,7 +178,9 @@ export default function FormDetailPage() {
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Published</h3>
           <p className="text-muted-foreground text-sm">
-            {form.publishedAt ? new Date(form.publishedAt).toLocaleDateString() : "Not yet"}
+            {form.publishedAt
+              ? new Date(form.publishedAt).toLocaleDateString()
+              : "Not yet"}
           </p>
         </div>
       </div>
@@ -110,29 +190,6 @@ export default function FormDetailPage() {
         <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 text-sm">
           {JSON.stringify(form.schema, null, 2)}
         </pre>
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Submissions ({submissions.length})</h2>
-        {subsLoading ? (
-          <Loader2Icon className="text-muted-foreground h-4 w-4 animate-spin" />
-        ) : submissions.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No submissions yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {submissions.map((sub, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                <pre className="text-xs">{JSON.stringify(sub.payload, null, 2)}</pre>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant="outline">{sub.status}</Badge>
-                  <span className="text-muted-foreground text-xs">
-                    {new Date(sub.submittedAt).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
