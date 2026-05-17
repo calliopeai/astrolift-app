@@ -340,6 +340,17 @@ class InvitationType:
     expires_at: dt.datetime
     accepted_at: dt.datetime | None
     invited_by_username: str | None
+    # Richer inviter projection (#418). The username field is retained
+    # for back-compat with the existing FE column; new surfaces should
+    # prefer the trio below so the invitation row can render the same
+    # avatar + display name shape used everywhere else identities show
+    # up (member list, approval picker). ``invited_by_user_id`` stays a
+    # plain string mirror of ``UserType.id`` so the FE can deep-link to
+    # the inviter's profile without an extra round-trip.
+    invited_by_user_id: str | None
+    invited_by_display_name: str | None
+    invited_by_email: str | None
+    invited_by_avatar_url: str | None
     created_at: dt.datetime
 
 
@@ -355,7 +366,22 @@ class InvitationCreatedType:
     accept_url_path: str
 
 
-def invitation_to_type(inv) -> InvitationType:
+def invitation_to_type(inv, *, userinfo_by_user_id: dict[int, object] | None = None) -> InvitationType:
+    """Map an Invitation row to its GraphQL projection.
+
+    ``userinfo_by_user_id`` is an optional pre-fetched mapping of
+    Auth0 ``UserInfo`` rows keyed by ``internal_user_id``. Pass it in
+    from a list resolver to avoid N+1; for one-off calls (mutations
+    returning a single invitation) it can be omitted and the avatar
+    field falls back to empty — the inviter is still rendered by
+    name, just without the picture.
+    """
+    inviter = inv.invited_by if inv.invited_by_id else None
+    inviter_userinfo = (
+        userinfo_by_user_id.get(inviter.pk)
+        if (inviter is not None and userinfo_by_user_id is not None)
+        else None
+    )
     return InvitationType(
         id=GUID(str(inv.guid)),
         email=inv.email,
@@ -365,7 +391,17 @@ def invitation_to_type(inv) -> InvitationType:
         status=inv.status,
         expires_at=inv.expires_at,
         accepted_at=inv.accepted_at,
-        invited_by_username=inv.invited_by.username if inv.invited_by_id else None,
+        invited_by_username=inviter.username if inviter is not None else None,
+        invited_by_user_id=str(inviter.pk) if inviter is not None else None,
+        invited_by_display_name=(
+            _resolve_display_name(inviter, userinfo=inviter_userinfo) if inviter is not None else None
+        ),
+        invited_by_email=(inviter.email or "") if inviter is not None else None,
+        invited_by_avatar_url=(
+            (getattr(inviter_userinfo, "picture", "") or "") if inviter_userinfo is not None else ""
+        )
+        if inviter is not None
+        else None,
         created_at=inv.created_at,
     )
 
@@ -530,3 +566,38 @@ def approver_user_to_type(user, *, userinfo=None) -> ApproverUserType:
         display_name=_resolve_display_name(user, userinfo=userinfo),
         avatar_url=((getattr(userinfo, "picture", "") or "") if userinfo is not None else ""),
     )
+
+
+# ---- Invite-flow polish types (#418) -----------------------------------
+#
+# Search rows the InviteDialog uses to detect a duplicate before letting
+# the operator dispatch the create_invitation mutation. The two match
+# kinds share one type because the UI needs to render them together in
+# one combobox (with a small badge differentiating); a single resolver
+# returning one shape keeps the FE rendering simple.
+
+
+@strawberry.type(name="AstroliftSearchableUser")
+class SearchableUserType:
+    """One row in the invite-dialog's de-dupe search (#418).
+
+    ``match_kind`` is ``MEMBER`` for an existing active org member or
+    ``INVITATION`` for a pending invitation already issued at the org
+    scope. The two cases share this shape so the FE renders them in a
+    single combobox. ``user_id`` is populated only for MEMBER rows
+    (invitations don't yet have a user account). ``invitation_id`` /
+    ``expires_at`` / ``status`` are populated only for INVITATION rows;
+    the FE narrows by ``match_kind`` to pick which CTA to show
+    ('Grant role to this user' vs. 'Resend / Cancel and re-invite').
+    """
+
+    match_kind: str  # "MEMBER" | "INVITATION"
+    email: str
+    display_label: str
+    avatar_url: str
+    # Member-only
+    user_id: str | None
+    # Invitation-only
+    invitation_id: GUID | None
+    invitation_status: str | None
+    expires_at: dt.datetime | None

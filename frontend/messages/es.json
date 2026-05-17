@@ -63,6 +63,74 @@
       "sports": "Deportes"
     }
   },
+  "overview": {
+    "title": "Resumen",
+    "description": "Datos de identidad, registro y ciclo de vida de esta instalación de Astrolift.",
+    "errorBanner": {
+      "title": "No se pudieron cargar algunos datos"
+    },
+    "tiles": {
+      "teams": {
+        "label": "Equipos",
+        "emptyCta": "Crea tu primer equipo"
+      },
+      "projects": {
+        "label": "Proyectos",
+        "emptyCta": "Crea un proyecto"
+      },
+      "apps": {
+        "label": "Apps registradas",
+        "emptyCta": "Registra tu primera app"
+      },
+      "deployments": {
+        "label": "Despliegues activos",
+        "emptyCta": "Inicia un despliegue"
+      },
+      "costMtd": {
+        "label": "Coste (MTD)",
+        "emptyCta": "Esperando datos de coste",
+        "vsPrevMonth": "vs mes ant.",
+        "noPrevMonth": "sin mes ant."
+      }
+    },
+    "fleetHealth": {
+      "title": "Salud de la flota",
+      "description": "Compuesto del último estado de despliegue en todas las apps registradas.",
+      "healthy": "saludable",
+      "failing": "{count} con fallos",
+      "hiccup": "{count, plural, one {# fallo} other {# fallos}}",
+      "empty": "Aún no hay apps registradas. Conecta un repo en /apps/new para empezar.",
+      "tiles": {
+        "running": "En ejecución",
+        "recentFailure": "Fallo reciente",
+        "failing": "Con fallos",
+        "noDeploys": "Sin despliegues"
+      }
+    },
+    "recentProjects": {
+      "title": "Proyectos recientes",
+      "description": "Proyectos creados más recientemente en todos los equipos.",
+      "emptyTitle": "Aún no hay proyectos",
+      "emptyDescription": "Crea un equipo y un proyecto para empezar a registrar apps.",
+      "emptyAction": "Administrar equipos"
+    },
+    "activity": {
+      "title": "Actividad",
+      "description": "Eventos del ciclo de vida: despliegues, sincronizaciones de configuración, escalado, alta de clústeres, rotación de secretos.",
+      "emptyTitle": "Aún no hay actividad",
+      "emptyDescription": "Los eventos aparecerán aquí a medida que ocurran despliegues, cambios de configuración y operaciones de clúster.",
+      "errorTitle": "No se pudo cargar la actividad",
+      "loadMore": "Cargar más",
+      "loadingMore": "Cargando…"
+    },
+    "registeredApps": {
+      "title": "Apps registradas",
+      "description": "Repositorios registrados para despliegue.",
+      "emptyTitle": "No hay apps registradas",
+      "emptyDescription": "La superficie del registro de apps llega en el próximo hito — una vez conectada podrás registrar un repo de Git y desplegar desde esta tarjeta.",
+      "emptyAction": "Abrir registro"
+    }
+  },
   "dataTable": {
     "search": "Buscar…",
     "filters": "Filtros",
@@ -95,6 +163,21 @@
       "light": "Claro",
       "dark": "Oscuro",
       "system": "Sistema"
+    },
+    "nav": {
+      "ariaLabel": "Secciones de configuración",
+      "openMobileNav": "Abrir menú de configuración",
+      "openMobileNavLabel": "Secciones",
+      "mobileTitle": "Secciones de configuración",
+      "mobileDescription": "Salta a cualquier área de configuración.",
+      "groups": {
+        "organization": "Organización",
+        "personal": "Personal",
+        "tokens": "Tokens"
+      }
+    },
+    "breadcrumb": {
+      "root": "Configuración"
     }
   },
   "hooks": {
@@ -166,63 +249,6 @@
       "errorBanner": {
         "title": "No se pudieron cargar las aplicaciones",
         "retry": "Reintentar"
-      },
-      "freshness": {
-        "lastDeployed": "Última implementación {when}",
-        "viewFailed": "Ver implementación fallida",
-        "stale": "obsoleta",
-        "never": "sin implementaciones",
-        "status": {
-          "OK": "Saludable",
-          "DEGRADED": "Última implementación fallida",
-          "STALE": "Sin implementaciones recientes",
-          "NEVER": "Nunca implementada"
-        }
-      }
-    },
-    "settings": {
-      "controls": {
-        "title": "Controles",
-        "description": "Conmutadores operativos en vivo. Surten efecto de inmediato — sin ida y vuelta por CI.",
-        "emptyEnvs": "Aún no hay entornos — sincroniza el manifiesto para poblar esta sección.",
-        "paused": "Pausado",
-        "active": "Activo",
-        "pause": "Pausar",
-        "resume": "Reanudar",
-        "deployNow": "Desplegar ahora",
-        "rebuildAndDeploy": "Reconstruir y desplegar",
-        "imageTagPlaceholder": "etiqueta de imagen (latest)",
-        "tooltipResumeFirst": "Reanuda los despliegues primero.",
-        "tooltipDeployNow": "Despliega una etiqueta de imagen existente. Usa «Reconstruir y desplegar» para reconstruir desde el código.",
-        "tooltipRebuildAndDeploy": "Reconstruye la imagen desde main y ejecuta el despliegue de extremo a extremo. Usa «Desplegar ahora» si quieres redesplegar una etiqueta existente.",
-        "approvalsRequired": "{count, plural, one {Requiere # aprobación antes del despliegue} other {Requiere # aprobaciones antes del despliegue}}",
-        "workloadsHeader": "Cargas de trabajo",
-        "workloadsEmpty": "Aún no hay cargas de trabajo de tipo Deployment — sincroniza el manifiesto para poblar esta sección.",
-        "readyCount": "{ready}/{desired} listas",
-        "apply": "Aplicar",
-        "applyScale": "Aplicar escalado ({count})",
-        "decreaseReplica": "Disminuir réplicas",
-        "increaseReplica": "Aumentar réplicas",
-        "rollingRestart": "Reinicio rotativo",
-        "rollingRestartTooltip": "Recicla los pods sin cambiar la imagen — drena conexiones de larga duración y propaga actualizaciones de sidecar.",
-        "ariaDecrease": "Disminuir réplicas",
-        "ariaIncrease": "Aumentar réplicas",
-        "ariaWorkloadActions": "Acciones de carga de trabajo para {workload}",
-        "dropdownLabel": "{workload} · {env}",
-        "confirmRestart": "¿Reiniciar todas las réplicas de {workload} en {env}? Los pods rotan uno a uno — se drenan las conexiones de larga duración.",
-        "toastDeploysPaused": "Despliegues pausados para {env}.",
-        "toastDeploysResumed": "Despliegues reanudados para {env}.",
-        "toastDeployStarted": "Despliegue iniciado para {env} · {tag}.",
-        "toastDeployFailed": "Despliegue fallido.",
-        "toastActionFailed": "Acción fallida.",
-        "toastCiDispatched": "Flujo de CI lanzado.",
-        "toastCiBranch": "Rama: {branch}",
-        "toastCiOpenRun": "Abrir ejecución →",
-        "toastRebuildFailed": "Reconstruir y desplegar falló.",
-        "toastRestartIssued": "Reinicio rotativo emitido para {workload} en {env}.",
-        "toastRestartFailed": "Reinicio rotativo fallido.",
-        "toastScaled": "{workload} en {env} escalado a {count, plural, one {# réplica} other {# réplicas}}.",
-        "toastScaleFailed": "Escalado fallido."
       }
     },
     "tabs": {
@@ -360,127 +386,168 @@
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     },
-    "settings": {
-      "webhookDeploys": {
-        "title": "Webhook deploys",
-        "description": "App-global pause for CI / push / scheduled deploys. Manual deploys from the UI or CLI keep working so you can still ship a fix.",
-        "paused": "Paused",
-        "live": "Live",
-        "pause": "Pause webhook deploys",
-        "resume": "Resume webhook deploys",
-        "scopeNoteLive": "Webhook-fired deploys (push, CI, scheduled) accept normally. Pausing stops all three; manual deploys remain available.",
-        "scopeNotePaused": "Webhook-fired deploys refused. Manual deploys, rollbacks, promotions, and teardown remain available.",
-        "pausedBy": "Paused by <who></who> · <when></when>",
-        "reasonPrefix": "Reason:",
-        "noReason": "No reason recorded.",
-        "unknownActor": "unknown",
-        "unknownTime": "just now",
-        "confirmTitle": "Pause webhook deploys for this app?",
-        "confirmDescription": "Future deploys from CI, push events, and cron will be refused until you resume. Manual deploys from the UI or CLI continue to work.",
-        "reasonLabel": "Reason (optional)",
-        "reasonPlaceholder": "e.g. CI is misfiring, holding until the upstream pipeline is fixed",
-        "reasonHelp": "Recorded on the audit log and shown on this page until the pause is lifted. Up to 512 characters.",
-        "confirmButton": "Pause webhook deploys",
-        "cancel": "Cancel",
-        "toastPaused": "Webhook deploys paused.",
-        "toastResumed": "Webhook deploys resumed.",
-        "toastPauseFailed": "Pause failed.",
-        "toastResumeFailed": "Resume failed.",
-        "toastNoResponse": "No response from backend."
+    "observability": {
+      "scope": {
+        "title": "Ámbito de métricas",
+        "environment": "Entorno",
+        "workload": "Carga de trabajo",
+        "allWorkloads": "Todas las cargas de trabajo",
+        "environmentPlaceholder": "Selecciona un entorno",
+        "workloadPlaceholder": "Selecciona una carga de trabajo"
       },
-      "managedServicesSummary": {
-        "title": "Managed services",
-        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
-        "openAll": "Open all",
-        "viewDetail": "View detail",
-        "actionsLabel": "Quick actions",
-        "statusTooltip": "{kind} · status: {status}",
-        "statusFailed": "failed",
-        "lastAction": "{action} · {when}",
-        "actionLabels": {
-          "connection.reveal": "Connection revealed",
-          "test_email.send": "Test email sent"
+      "events": {
+        "warningCount": "{count, plural, =1 {1 advertencia} other {# advertencias}} en la última hora",
+        "warningBadgeLabel": "Advertencia",
+        "collapse": "Contraer",
+        "expand": "Expandir"
+      }
+    },
+    "tokens": {
+      "title": "Deploy tokens",
+      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
+      "createToken": "Create token",
+      "emptyTitle": "No deploy tokens yet",
+      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "allScopes": "all",
+      "never": "never",
+      "createFailed": "Create failed",
+      "revokeFailed": "Revoke failed",
+      "revokedToast": "Revoked {name}",
+      "columns": {
+        "name": "Name",
+        "last4": "Last 4",
+        "scopes": "Scopes",
+        "lastUsed": "Last used",
+        "expires": "Expires",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "active",
+        "revoked": "revoked"
+      },
+      "lastUsedCell": {
+        "ip": "IP",
+        "agent": "Agent"
+      },
+      "createSheet": {
+        "title": "Create deploy token",
+        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
+        "name": "Name",
+        "scopes": "Scopes (comma-separated)",
+        "scopesHint": "Leave blank for all scopes.",
+        "expires": "Expires in (days)",
+        "submit": "Create token",
+        "submitting": "Creating…"
+      },
+      "revealDialog": {
+        "title": "Token created — copy now",
+        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
+        "last4Label": "last 4",
+        "copy": "Copy",
+        "copied": "Copied to clipboard",
+        "done": "Done",
+        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+      },
+      "rotateDialog": {
+        "title": "Rotate {name}?",
+        "fallbackTitle": "Rotate token?",
+        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
+        "newLine": "New token issued now.",
+        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
+        "confirm": "Rotate token"
+      },
+      "revokeDialog": {
+        "title": "Revoke {name}?",
+        "fallbackTitle": "Revoke token?",
+        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
+        "confirm": "Revoke token"
+      }
+    },
+    "domains": {
+      "addSheet": {
+        "byoTitle": "Bring your own certificate",
+        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
+        "methodLabels": {
+          "dns_txt": "DNS-TXT (default)",
+          "http_01": "HTTP-01",
+          "dns_01": "DNS-01",
+          "byo_cert": "Bring your own certificate"
         },
-        "actions": {
-          "connection.reveal": "View connection details",
-          "objects.list": "List recent objects",
-          "email.send": "Send test email",
-          "queue.depth": "View queue depth"
-        },
-        "revealDialog": {
-          "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
-          "secretRefLabel": "Secrets backend reference",
-          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
-          "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
-          "copy": "Copy",
-          "copied": "Copied to clipboard.",
-          "copyFailed": "Couldn't copy — select the text and copy manually.",
-          "close": "Close",
-          "loading": "Loading…",
-          "noResponse": "No response from backend.",
-          "failed": "Reveal failed."
-        },
-        "sendEmailDialog": {
-          "title": "Send test email · {name}",
-          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
-          "recipientLabel": "Recipient",
-          "subjectLabel": "Subject (optional)",
-          "subjectPlaceholder": "[Astrolift] Test email",
-          "bodyLabel": "Body (optional)",
-          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
-          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
-          "send": "Send test",
-          "cancel": "Cancel",
-          "sent": "Sent to {recipient} via {transport}.",
-          "noResponse": "No response from backend.",
-          "noPayload": "Send returned no payload.",
-          "failed": "Test send failed."
-        },
-        "objectsDialog": {
-          "title": "Recent objects · {name}",
-          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
-          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
-          "cacheAge": "Snapshot is {age} old.",
-          "noCacheAge": "Cache age not recorded yet.",
-          "truncated": "more available — open the full managed-services page.",
-          "refresh": "Refresh",
-          "close": "Close"
-        },
-        "depthDialog": {
-          "title": "Queue depth · {name}",
-          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
-          "depth": "Backlog",
-          "inFlight": "In-flight",
-          "sampledAt": "Sampled {when}.",
-          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
-          "loading": "Loading…",
-          "refresh": "Refresh",
-          "close": "Close"
+        "methodHints": {
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
+          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
+          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
         }
+      }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "El aprovisionamiento ha fallado",
+          "pending": "El aprovisionamiento no ha comenzado",
+          "provisioning": "Aprovisionamiento en curso",
+          "ready_missing_registry": "Faltan las coordenadas del registro de contenedores",
+          "unknown": "El aprovisionamiento requiere atención"
+        },
+        "description": {
+          "failed": "Vuelva a intentarlo para reconstruir el repositorio y el espacio de nombres.",
+          "pending": "Inícielo para poner la aplicación en línea.",
+          "provisioning": "Espere — vuelva a ejecutar solo si se atasca.",
+          "ready_missing_registry": "Reaprovisione para reconstruir el repo de ECR y el rol de push; los despliegues no harán nada hasta entonces.",
+          "unknown": "Reaprovisione para recuperar."
+        },
+        "elapsed": "comenzó hace {minutes}m",
+        "cta": "Reaprovisionar",
+        "confirm": {
+          "title": "¿Reaprovisionar {slug}?",
+          "description": "Cancela los despliegues en curso, elimina los objetos de k8s por workload y vuelve a disparar el workflow de CI de despliegue. Las aprobaciones existentes se ejecutan de nuevo.",
+          "confirm": "Sí, reaprovisionar"
+        },
+        "toast": {
+          "dispatched": "Reaprovisionamiento enviado — el workflow de despliegue se está reejecutando.",
+          "partial": "Recuperación parcial: la limpieza se ejecutó pero falló el envío del despliegue ({message})."
+        },
+        "error": {
+          "noResponse": "Reaprovisionamiento falló: sin respuesta del backend.",
+          "generic": "Reaprovisionamiento falló."
+        }
+      },
+      "configDrift": {
+        "headline": "Deriva de configuración detectada",
+        "description": "El último despliegue del entorno {env} no coincide con el manifiesto actual.",
+        "descriptionNoEnv": "El último despliegue no coincide con el manifiesto actual.",
+        "cta": "Sincronizar desde origen",
+        "field": {
+          "manifest_hash": "El hash del manifiesto cambió desde el último despliegue",
+          "image_tag": "La etiqueta de la imagen difiere del snapshot",
+          "repo_unsynced": "El repo de origen está adelantado a la plataforma — resincronice para alinearlos",
+          "unknown": "{field} ha cambiado"
+        },
+        "toast": {
+          "synced": "Sincronizado desde origen.",
+          "failed": "La sincronización desde origen falló."
+        }
+      },
+      "latestDeploy": {
+        "empty": "Aún no hay despliegues — dispara uno desde la CLI o haz push a la rama de despliegue.",
+        "ariaLabel": "Último despliegue: {status}, {when}"
       }
     }
   },
   "settingsIndex": {
     "title": "Ajustes",
     "description": "Configura la identidad, seguridad y superficies de la plataforma.",
+    "cardMeta": {
+      "modified": "Modificado {when}"
+    },
     "sections": {
       "organization": {
         "title": "Organización",
         "description": "Nombre visible, sitio web, predeterminados de retención."
-      },
-      "members": {
-        "title": "Miembros",
-        "description": "Miembros de la organización, invitaciones y asignaciones de rol."
-      },
-      "teams": {
-        "title": "Equipos",
-        "description": "Agrupa miembros para compartir la propiedad de apps y proyectos."
-      },
-      "projects": {
-        "title": "Proyectos",
-        "description": "Agrupaciones lógicas de apps pertenecientes a equipos."
       },
       "identityProvider": {
         "title": "Proveedor de identidad",
@@ -493,6 +560,10 @@
       "policies": {
         "title": "Políticas ABAC",
         "description": "Predicados en tiempo de ejecución sobre RBAC."
+      },
+      "permissions": {
+        "title": "Permisos",
+        "description": "Inspecciona cada permiso resuelto para el usuario actual."
       },
       "profile": {
         "title": "Perfil",
@@ -624,6 +695,64 @@
         "requestIdSection": "ID de solicitud"
       }
     },
+    "approval": {
+      "quorum": {
+        "header": "{received} de {required} aprobaciones",
+        "remainingBadge": "Faltan {count}",
+        "metBadge": "Quórum alcanzado",
+        "approvedLabel": "Aprobado por",
+        "approvedEmpty": "Aún nadie ha aprobado.",
+        "awaitingLabel": "Pendiente",
+        "awaitingEmpty": "No hay aprobadores elegibles — revise la política de la app."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Cola de aprobaciones",
+      "description": "Todos los despliegues que esperan firma. Seleccione filas para aprobar o rechazar en bloque dentro de un mismo entorno.",
+      "empty": {
+        "title": "Nada pendiente",
+        "description": "Cuando un despliegue requiere firma, aparece aquí."
+      },
+      "selectAllLabel": "Seleccionar todos",
+      "selectionStatus": "{selected} de {total} seleccionados",
+      "readOnlyHint": "Puede revisar pero no aprobar.",
+      "approveLabel": "Aprobar",
+      "rejectLabel": "Rechazar",
+      "footer": {
+        "selected": "{count, plural, =1 {1 despliegue seleccionado} other {# despliegues seleccionados}}",
+        "summary": "En {envs}.",
+        "crossEnvWarning": "La aprobación en bloque requiere la misma app/entorno — las políticas varían por entorno.",
+        "approveButton": "Aprobar {count}",
+        "rejectButton": "Rechazar {count}"
+      },
+      "confirmApprove": {
+        "title": "¿Aprobar {count} despliegues?",
+        "description": "Desbloquea {envs}.",
+        "confirm": "Aprobar todos"
+      },
+      "confirmReject": {
+        "title": "¿Rechazar {count} despliegues?",
+        "description": "Cada despliegue en {envs} pasará a fallido.",
+        "reasonLabel": "Motivo del rechazo",
+        "reasonPlaceholder": "¿Por qué se rechaza este lote?",
+        "reasonRequired": "Motivo requerido",
+        "confirm": "Rechazar todos"
+      },
+      "toasts": {
+        "unexpected": "La acción en bloque no devolvió respuesta.",
+        "allOk": "{label} con éxito para {count} despliegues.",
+        "allFailed": "{label} falló para {count} despliegues: {message}",
+        "partial": "{label}: {succeeded} con éxito, {failed} fallidos.",
+        "approveFailed": "Aprobación en bloque fallida.",
+        "rejectFailed": "Rechazo en bloque fallido."
+      },
+      "row": {
+        "selectRowLabel": "Seleccionar {app} / {env}",
+        "approvalsCount": "{received}/{required} aprobaciones",
+        "received": "Recibido {rel}",
+        "review": "Revisar"
+      }
+    },
     "events": {
       "title": "Events",
       "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
@@ -696,21 +825,182 @@
         "submit": "Mute rule",
         "cancel": "Cancel"
       }
+    },
+    "membersBulk": {
+      "selectAllLabel": "Select all role bindings",
+      "selectRowLabel": "Select binding {role} on {subject}",
+      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
+      "clear": "Clear",
+      "revokeButton": "Revoke {count}",
+      "permissionHint": "You don't have permission to manage members.",
+      "confirm": {
+        "title": "Revoke {count} role binding(s)?",
+        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
+        "confirmLabel": "Revoke {count}"
+      },
+      "toasts": {
+        "allOk": "Revoked {count} role binding(s).",
+        "partial": "Revoked {revoked}, {failed} failed.",
+        "allFailed": "Bulk revoke failed: {message}"
+      }
+    },
+    "teamMembersBulk": {
+      "tabTitle": "Team members",
+      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
+      "loadError": "Couldn't load team members.",
+      "emptyTitle": "No members on this team yet",
+      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "columns": {
+        "user": "User",
+        "lifecycle": "Lifecycle",
+        "joined": "Joined"
+      },
+      "selectAllLabel": "Select all team members",
+      "selectRowLabel": "Select member {user}",
+      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
+      "clear": "Clear",
+      "assignButton": "Assign role to {count}",
+      "permissionHint": "You don't have permission to manage members on this team.",
+      "assignDialog": {
+        "title": "Assign role to {count} member(s)",
+        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
+        "roleLabel": "Team-scoped role",
+        "rolePlaceholder": "Choose a role",
+        "noRoles": "No team-scoped roles available. Create one on /roles first.",
+        "cancel": "Cancel",
+        "confirmLabel": "Assign role"
+      },
+      "toasts": {
+        "allOk": "Assigned role to {count} member(s).",
+        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
+        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
+        "allFailed": "Bulk assign failed: {message}"
+      }
+    },
+    "invitationExpiry": {
+      "days": "expira en {days}d {hours}h",
+      "hours": "expira en {hours}h {minutes}m",
+      "minutes": "expira en {minutes}m",
+      "expired": "expirada"
+    },
+    "inviteDialog": {
+      "title": "Invitar miembro",
+      "description": "Emite un token de invitación de un solo uso, almacenado como hash. El texto plano se muestra exactamente una vez aquí — compártelo por tu canal habitual.",
+      "form": {
+        "email": "Correo electrónico",
+        "emailPlaceholder": "nuevomiembro@tuempresa.com",
+        "emailHint": "La aceptación requiere que el correo de la cuenta del usuario coincida.",
+        "role": "Rol (opcional)",
+        "rolePlaceholder": "Sin rol — solo aceptación",
+        "roleHint": "Puedes conceder: {list}",
+        "roleHintGeneric": "Si se elige, se crea un RoleBinding al aceptar la invitación.",
+        "noGrantableRoles": "No tienes permiso para conceder ningún rol. Pide a un administrador que amplíe tu acceso primero.",
+        "expiresInDays": "Expira en (días)",
+        "issue": "Emitir invitación"
+      },
+      "search": {
+        "loading": "Buscando miembros e invitaciones existentes…",
+        "alreadyMember": "Ya es miembro",
+        "alreadyMemberHint": "Usa Conceder rol en la página de miembros para subir su acceso.",
+        "invitationExists": "Invitación ya enviada",
+        "invitationHint": "Cancelar arriba vuelve a habilitar el formulario para invitar de nuevo.",
+        "cancelAndReinvite": "Cancelar y reinvitar"
+      },
+      "reveal": {
+        "saveTitle": "Guarda este enlace ahora",
+        "saveDescription": "El token está en hash en la base de datos — al cerrar este diálogo no hay forma de recuperar el texto plano.",
+        "recipient": "Destinatario",
+        "expiresIn": "Expira",
+        "acceptLink": "Enlace de aceptación",
+        "expHint": "El parámetro ?exp= es solo una pista del cliente; el servidor sigue verificando la expiración al aceptar.",
+        "copy": "Copiar",
+        "done": "Listo"
+      },
+      "toasts": {
+        "emailRequired": "El correo es obligatorio",
+        "invitationExists": "Ya existe una invitación para ese correo — cancélala primero o elige otra dirección.",
+        "created": "Invitación creada — comparte el enlace debajo",
+        "failed": "Falló la invitación",
+        "cancelledForReinvite": "Invitación existente cancelada — ya puedes reinvitar.",
+        "cancelFailed": "Falló la cancelación — actualiza y vuelve a intentar.",
+        "linkCopied": "Enlace de aceptación copiado",
+        "copyFailed": "Falló la copia — selecciona y copia manualmente"
+      }
     }
   },
-  "orgMembers": {
-    "searchLabel": "Buscar miembros",
-    "searchPlaceholder": "Buscar por nombre de usuario o correo…",
-    "lastActiveColumn": "Última actividad",
-    "actionsColumn": "Acciones",
-    "noMatchTitle": "Sin coincidencias",
-    "noMatchDescription": "Ningún miembro coincide con \"{term}\". Prueba con otro término de búsqueda.",
-    "lastActiveNever": "—",
-    "lastActiveInactive": "inactivo",
-    "rolePillTooltipPrefix": "Otorgado a través de {scope}",
-    "sourceTooltipAria": "Otorgado a través de {scope}",
-    "sourceColumn": "Origen",
-    "grantRoleRowLabel": "Otorgar rol a {name}",
-    "grantRoleRowTooltip": "Otorgar rol a {name}"
+  "jobs": {
+    "title": "Trabajos",
+    "descriptionGlobal": "Ejecuciones de trabajos programados y comandos ad-hoc en todas tus apps.",
+    "descriptionForApp": "Ejecuciones de trabajos programados y comandos ad-hoc para {app}.",
+    "tabs": {
+      "scheduled": "Programados",
+      "commands": "Comandos"
+    },
+    "scheduled": {
+      "emptyTitle": "Aún no hay ejecuciones de trabajos programados",
+      "emptyDescription": "Los workloads cronjob aparecen aquí cuando el planificador dispara su primera ejecución.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Estado",
+        "duration": "Duración",
+        "started": "Iniciado"
+      }
+    },
+    "commands": {
+      "emptyTitle": "Aún no hay ejecuciones de comandos",
+      "emptyDescription": "Los comandos ad-hoc invocados contra un workload aparecen aquí. Ejecuta uno desde la CLI con `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Comando",
+        "status": "Estado",
+        "invokedBy": "Invocado por",
+        "started": "Iniciado"
+      }
+    },
+    "runStatus": {
+      "running": "En ejecución",
+      "inProgress": "En progreso",
+      "succeeded": "Exitoso",
+      "failed": "Fallido",
+      "superseded": "Reemplazado",
+      "unknown": "Desconocido",
+      "exitCodeLabel": "salida {code}",
+      "exitCodeTooltip": "El proceso salió con código {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Prohibir",
+        "queue": "Encolar",
+        "replace": "Reemplazar"
+      },
+      "tooltip": {
+        "forbid": "Salta el próximo disparo mientras una ejecución está en curso.",
+        "queue": "Permite que las ejecuciones se acumulen — elige esto cuando cada disparo es independiente y corto.",
+        "replace": "Detiene la ejecución en curso y comienza una nueva."
+      }
+    },
+    "cron": {
+      "invalid": "Expresión cron inválida",
+      "firesIn": "Se ejecuta en {relative}",
+      "now": "menos de un minuto",
+      "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+      "hours": "{count, plural, one {# hora} other {# horas}}",
+      "days": "{count, plural, one {# día} other {# días}}"
+    },
+    "workloadCard": {
+      "title": "Workloads cronjob",
+      "countLabel": "{count, plural, one {# programado} other {# programados}}",
+      "openLogs": "Abrir en consola"
+    },
+    "output": {
+      "emptyOutput": "Aún no hay salida capturada.",
+      "openInConsole": "Abrir en consola",
+      "lines": "{count, plural, one {# línea} other {# líneas}}",
+      "truncated": "Mostradas 200 líneas — abre la consola para ver el rastro completo."
+    }
   }
 }

@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,7 @@ import type {
 import { useDebounce } from "@/hooks/use-debounce";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
+import { InvitationExpiryBadge } from "./invitation-expiry";
 import { InviteDialog } from "./invite-dialog";
 
 interface MembersResp {
@@ -291,111 +293,70 @@ export function MembersClient() {
   const hasActiveSearch = debouncedSearch.trim().length > 0;
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <PageShell
-        title="Members"
-        description="Users with access to this organization, plus the role bindings that grant their permissions."
-        actions={
-          <div className="flex items-center gap-2">
-            <Can permission="org.manage_members">
-              <Button
-                variant="outline"
-                onClick={() => setInviteOpen(true)}
-                disabled={roles.loading}
-              >
-                <MailIcon className="size-4" />
-                Invite
-              </Button>
-            </Can>
-            <Can permission="org.manage_members">
-              <Button onClick={() => setOpen(true)} disabled={roles.loading}>
-                <UserPlusIcon className="size-4" />
-                Grant role
-              </Button>
-            </Can>
-          </div>
-        }
-      >
-        <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>People</CardTitle>
-            <div className="relative w-full sm:max-w-xs">
-              <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-              <Input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder={t("searchPlaceholder")}
-                className="pl-8"
-                aria-label={t("searchLabel")}
+    <PageShell
+      title="Members"
+      description="Users with access to this organization, plus the role bindings that grant their permissions."
+      actions={
+        <div className="flex items-center gap-2">
+          <Can permission="org.manage_members">
+            <Button variant="outline" onClick={() => setInviteOpen(true)}>
+              <MailIcon className="size-4" />
+              Invite
+            </Button>
+          </Can>
+          <Can permission="org.manage_members">
+            <Button onClick={() => setOpen(true)} disabled={roles.loading}>
+              <UserPlusIcon className="size-4" />
+              Grant role
+            </Button>
+          </Can>
+        </div>
+      }
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>People</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {members.loading ? (
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : memberList.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<UsersIcon className="size-5" />}
+                title="No members"
+                description="Members appear here once role bindings are granted to users."
               />
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {members.loading && memberList.length === 0 ? (
-              <div className="space-y-2 p-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : memberList.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<UsersIcon className="size-5" />}
-                  title={hasActiveSearch ? t("noMatchTitle") : "No members"}
-                  description={
-                    hasActiveSearch
-                      ? t("noMatchDescription", { term: debouncedSearch.trim() })
-                      : "Members appear here once role bindings are granted to users."
-                  }
-                />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Scope</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>{t("lastActiveColumn")}</TableHead>
-                    <TableHead>Lifecycle</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="w-20 text-right">{t("actionsColumn")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {memberList.map((m) => {
-                    const userBindings = bindingsByUser.get(m.user.id) ?? [];
-                    const alreadyAnonymized = m.lifecycle === "anonymized";
-                    return (
-                      <TableRow key={m.id}>
-                        <TableCell>
-                          <div className="font-medium">{m.user.username}</div>
-                          <div className="text-muted-foreground text-xs">{m.user.email}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col items-start gap-1">
-                            <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
-                              {m.scopeKind}
-                            </Badge>
-                            <span className="text-muted-foreground font-mono text-[10px]">
-                              {scopeLabel(m)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {userBindings.length === 0 ? (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            ) : (
-                              userBindings.map((b) => <RoleSourcePill key={b.id} binding={b} />)
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <LastActiveCell value={m.lastActiveAt} />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={m.isActive ? "default" : "secondary"}>
-                            {m.lifecycle}
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead>Lifecycle</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="w-12 text-right"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {memberList.map((m) => {
+                  const userBindings = bindingsByUser.get(m.user.id) ?? [];
+                  const alreadyAnonymized = m.lifecycle === "anonymized";
+                  return (
+                    <TableRow key={m.id} id={`u-${m.user.id}`}>
+                      <TableCell>
+                        <div className="font-medium">{m.user.username}</div>
+                        <div className="text-muted-foreground text-xs">{m.user.email}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
+                            {m.scopeKind}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
@@ -533,8 +494,210 @@ export function MembersClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
-                            disabled={revoking}
+                            disabled={alreadyAnonymized}
+                            onClick={() => openAnonymizeDialog(m)}
+                            aria-label={`Anonymize ${m.user.username}`}
+                            title={
+                              alreadyAnonymized
+                                ? "Already anonymized"
+                                : "Anonymize user data (GDPR right-to-delete)"
+                            }
+                          >
+                            <UserMinusIcon className="size-4" />
+                          </Button>
+                        </Can>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>Role bindings</CardTitle>
+          <span className="text-muted-foreground text-xs">
+            {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
+          </span>
+        </CardHeader>
+        <CardContent className="p-0">
+          {bindings.loading ? (
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : bindingList.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<ShieldIcon className="size-5" />}
+                title="No role bindings"
+                description="Grant a system role to a user to give them access to the platform."
+              />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canManageMembers && (
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={tBulk("selectAllLabel")}
+                        checked={
+                          bindingList.length > 0 &&
+                          bindingList.every((b) => selectedBindings.has(b.id))
+                        }
+                        onChange={() => toggleAllBindings(bindingList.map((b) => b.id))}
+                        className="size-4"
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Granted</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bindingList.map((b) => (
+                  <TableRow key={b.id}>
+                    {canManageMembers && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          aria-label={tBulk("selectRowLabel", {
+                            role: b.role.slug,
+                            subject: b.user?.username ?? `group:${b.groupExternalId}`,
+                          })}
+                          checked={selectedBindings.has(b.id)}
+                          onChange={() => toggleBinding(b.id)}
+                          className="size-4"
+                          disabled={bulkRevoking}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      {b.user ? (
+                        <>
+                          <div className="font-medium">{b.user.username}</div>
+                          <div className="text-muted-foreground text-xs">{b.user.email}</div>
+                        </>
+                      ) : (
+                        <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{b.role.name}</div>
+                      <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
+                        {b.scopeKind}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(b.grantedAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Can permission="org.manage_members">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRevokeTarget({ kind: "binding", binding: b })}
+                          disabled={revoking || bulkRevoking}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Revoke</span>
+                        </Button>
+                      </Can>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Invitations</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {invitations.loading ? (
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : (invitations.data?.astroliftInvitations ?? []).length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<MailIcon className="size-5" />}
+                title="No invitations"
+                description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
+              />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Invited by</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(invitations.data?.astroliftInvitations ?? []).map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.email}</TableCell>
+                    <TableCell>
+                      {inv.roleSlug ? (
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {inv.roleSlug}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={inv.status === "pending" ? "default" : "secondary"}
+                        className="capitalize"
+                      >
+                        {inv.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {inv.status === "pending" ? (
+                        <InvitationExpiryBadge expiresAt={inv.expiresAt} />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          {new Date(inv.expiresAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <InviterCell invitation={inv} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {inv.status === "pending" && (
+                        <Can permission="org.manage_members">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setRevokeTarget({
+                                kind: "invitation",
+                                invitation: inv,
+                              })
+                            }
+                            disabled={revokingInvite}
                           >
                             <Trash2Icon className="size-4" />
                             <span className="sr-only">Revoke</span>
@@ -633,20 +796,80 @@ export function MembersClient() {
           </CardContent>
         </Card>
 
-        <GrantRoleDialog
-          open={open}
-          onOpenChange={setOpen}
-          roles={roles.data?.astroliftRoles ?? []}
-        />
-        <GrantRoleDialog
-          open={grantForMember !== null}
-          onOpenChange={(next) => {
-            if (!next) setGrantForMember(null);
-          }}
-          roles={roles.data?.astroliftRoles ?? []}
-          initialUserId={grantForMember?.user.id ?? null}
-          initialUserLabel={
-            grantForMember ? `${grantForMember.user.username} (${grantForMember.user.email})` : null
+      {canManageMembers && selectedBindings.size > 0 && (
+        // Sticky bulk action bar — surfaces only while a selection is
+        // live. Mirrors the approvals-queue footer so the muscle memory
+        // ("checkbox → sticky bar → confirm") transfers across pages.
+        <div className="bg-background pointer-events-auto fixed inset-x-0 bottom-0 z-30 border-t shadow-lg">
+          <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium">
+              {tBulk("selected", { count: selectedBindings.size })}
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedBindings(new Set())}
+                disabled={bulkRevoking}
+                className="min-h-11 w-full sm:w-auto"
+              >
+                {tBulk("clear")}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setConfirmBulkRevoke(true)}
+                disabled={bulkRevoking}
+                className="min-h-11 w-full sm:w-auto"
+              >
+                <Trash2Icon className="size-4" />
+                {tBulk("revokeButton", { count: selectedBindings.size })}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmBulkRevoke}
+        onOpenChange={setConfirmBulkRevoke}
+        title={tBulk("confirm.title", { count: selectedBindings.size })}
+        description={tBulk("confirm.description")}
+        confirmLabel={tBulk("confirm.confirmLabel", { count: selectedBindings.size })}
+        destructive
+        onConfirm={handleBulkRevoke}
+      />
+
+      <GrantRoleDialog
+        open={open}
+        onOpenChange={setOpen}
+        roles={roles.data?.astroliftRoles ?? []}
+      />
+      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setRevokeTarget(null);
+        }}
+        title={
+          revokeTarget?.kind === "invitation"
+            ? `Revoke invitation for ${revokeTarget.invitation.email}?`
+            : revokeTarget?.kind === "binding"
+              ? `Revoke ${revokeTarget.binding.role.slug} from ${revokeTarget.binding.user?.username ?? revokeTarget.binding.groupExternalId}?`
+              : "Revoke?"
+        }
+        description={
+          revokeTarget?.kind === "invitation"
+            ? "The pending invitation link stops working immediately. You can re-send a fresh invitation if needed."
+            : "The user loses the permissions this role granted. Other role bindings, if any, remain in effect."
+        }
+        confirmLabel="Revoke"
+        destructive
+        onConfirm={async () => {
+          if (!revokeTarget) return;
+          if (revokeTarget.kind === "invitation") {
+            await handleRevokeInvite(revokeTarget.invitation);
+          } else {
+            await handleRevoke(revokeTarget.binding);
           }
         />
         <InviteDialog
@@ -791,6 +1014,49 @@ function LastActiveCell({ value }: { value: string | null | undefined }) {
           {t("lastActiveInactive")}
         </Badge>
       )}
+    </div>
+  );
+}
+
+/**
+ * Render the "invited by" cell on the invitation row (#418).
+ * Falls back to the username (legacy backend) when the richer
+ * attribution fields aren't populated yet — keeps the column useful
+ * for invitations created before the enrichment landed. When a user
+ * id is present, the display name links to the inviter's row in the
+ * members list (filtered via the user-id hash anchor so the row
+ * scrolls into view).
+ */
+function InviterCell({ invitation }: { invitation: AstroliftInvitation }) {
+  const display = invitation.invitedByDisplayName ?? invitation.invitedByUsername ?? null;
+  if (display === null) {
+    return <span className="text-muted-foreground text-sm">—</span>;
+  }
+  const avatarUrl = invitation.invitedByAvatarUrl ?? "";
+  const email = invitation.invitedByEmail ?? "";
+  const userId = invitation.invitedByUserId ?? null;
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar size="sm">
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={display} /> : null}
+        <AvatarFallback>{display.slice(0, 1).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-col">
+        {userId ? (
+          <a
+            href={`/members#u-${userId}`}
+            className="text-foreground truncate text-sm font-medium hover:underline"
+            title={email || display}
+          >
+            {display}
+          </a>
+        ) : (
+          <span className="text-foreground truncate text-sm font-medium" title={email || display}>
+            {display}
+          </span>
+        )}
+        {email ? <span className="text-muted-foreground truncate text-xs">{email}</span> : null}
+      </div>
     </div>
   );
 }
