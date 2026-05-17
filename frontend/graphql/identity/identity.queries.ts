@@ -20,6 +20,7 @@ export const LIST_ORGANIZATIONS = gql`
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
+      onboardingCompletedAt
       createdAt
       updatedAt
       deletedAt
@@ -124,9 +125,32 @@ export const GET_ORGANIZATION = gql`
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
+      onboardingCompletedAt
       createdAt
       updatedAt
       deletedAt
+    }
+  }
+`;
+
+/**
+ * Lightweight query the dashboard issues to decide whether to
+ * auto-open the onboarding wizard (#452). Returns only the bits the
+ * decision needs: the org's onboardingCompletedAt + the count of
+ * team memberships (zero teams + null timestamp → auto-open).
+ * Picks up the active org from the tenant context middleware, so no
+ * slug variable is needed.
+ */
+export const GET_ONBOARDING_STATE = gql`
+  query GetOnboardingState {
+    astroliftOrganizations {
+      id
+      slug
+      name
+      onboardingCompletedAt
+    }
+    astroliftTeams {
+      id
     }
   }
 `;

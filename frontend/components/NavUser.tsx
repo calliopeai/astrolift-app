@@ -29,6 +29,7 @@ import {
   ChevronsUpDownIcon,
   LockIcon,
   LogOutIcon,
+  SparklesIcon,
   ZapIcon,
   AlertTriangleIcon,
   InfoIcon,
@@ -51,10 +52,9 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
   const t = useTranslations("user");
   const { isMobile } = useSidebar();
   const { user } = useMe();
-  const { data: profileData, loading: profileLoading } = useQuery<MyProfileResp>(
-    GET_MY_PROFILE,
-    { fetchPolicy: "cache-first" },
-  );
+  const { data: profileData, loading: profileLoading } = useQuery<MyProfileResp>(GET_MY_PROFILE, {
+    fetchPolicy: "cache-first",
+  });
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -70,13 +70,14 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
   const email = profile?.email ?? "";
   const username = profile?.username ?? user?.profile?.username ?? "";
   const avatar = "";
-  const initials = fullName
-    .split(/\s+/)
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "U";
+  const initials =
+    fullName
+      .split(/\s+/)
+      .map((part) => part[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
 
   const handleLogout = () => {
     setSentryUser(null);
@@ -133,6 +134,12 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
                 <DropdownMenuItem onSelect={() => setNotificationsOpen(true)}>
                   <BellIcon />
                   {t("notifications")}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard?onboarding=1">
+                    <SparklesIcon />
+                    {t("rerunOnboarding")}
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
