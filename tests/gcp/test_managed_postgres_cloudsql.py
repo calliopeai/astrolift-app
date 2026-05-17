@@ -201,6 +201,23 @@ def test_provision_deletion_protection_default_on(driver):
     assert inst.settings["deletionProtectionEnabled"] is True
 
 
+def test_provision_stamps_binding_and_managed_service_labels(driver):
+    """#438: cost collector joins on astrolift-binding +
+    astrolift-managed-service-id (GCP label-safe form: lowercase,
+    [a-z0-9_-]). Both must land on the instance's userLabels when
+    populated on the ProvisionSpec."""
+    binding_guid = "11111111-2222-3333-4444-555555555555"
+    msvc_guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    result = driver.provision(
+        _spec(binding_id=binding_guid, managed_service_id=msvc_guid),
+    )
+    instance_id = _parse_handle(result.handle)
+    inst = driver._sql.instances[instance_id]  # type: ignore[attr-defined]
+    labels = inst.settings["userLabels"]
+    assert labels["astrolift-binding"] == binding_guid
+    assert labels["astrolift-managed-service-id"] == msvc_guid
+
+
 def test_provision_rolls_back_secret_on_failure():
     class RaisingSql:
         def get(self, **_):

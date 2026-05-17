@@ -306,6 +306,13 @@ def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
         "astrolift_io_cluster": spec.tenant_cluster_id,
         "astrolift_io_isolation": spec.isolation,
     }
+    # Per-binding cost-attribution keys (#438). Blob container
+    # metadata rejects dots + slashes, so the underscore form
+    # mirrors the existing scheme on this driver.
+    if spec.binding_id:
+        base["astrolift_io_binding"] = spec.binding_id
+    if spec.managed_service_id:
+        base["astrolift_io_managed_service_id"] = spec.managed_service_id
     for k, v in (spec.tags or {}).items():
         sanitized = "".join(c if c.isalnum() else "_" for c in k)
         base[f"astrolift_io_extra_{sanitized}"] = str(v)

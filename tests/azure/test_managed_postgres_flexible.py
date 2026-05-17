@@ -339,6 +339,23 @@ def test_provision_tags_server_with_astrolift_namespace(
     assert tags["astrolift.io/environment"] == "prod"
 
 
+def test_provision_stamps_binding_and_managed_service_ids(
+    driver: AzurePostgresFlexibleDriver,
+    mgmt: FakeMgmtClient,
+) -> None:
+    """#438: cost collector joins on astrolift.io/binding +
+    astrolift.io/managed_service_id. Both must land on the cloud-side
+    object when populated on the ProvisionSpec."""
+    binding_guid = "11111111-2222-3333-4444-555555555555"
+    msvc_guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    driver.provision(
+        _spec(binding_id=binding_guid, managed_service_id=msvc_guid),
+    )
+    tags = mgmt.servers_obj.create_calls[0]["parameters"]["tags"]
+    assert tags["astrolift.io/binding"] == binding_guid
+    assert tags["astrolift.io/managed_service_id"] == msvc_guid
+
+
 def test_provision_without_keyvault_returns_error() -> None:
     d = AzurePostgresFlexibleDriver(
         config=AzurePostgresConfig(
