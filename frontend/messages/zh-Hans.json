@@ -556,6 +556,24 @@
         "warningBadgeLabel": "警告",
         "collapse": "折叠",
         "expand": "展开"
+      },
+      "logs": {
+        "pressStreamAll": "按下「Stream」开始追踪所有副本。",
+        "allReplicas": "所有副本",
+        "allReplicasDescription": "正在从此应用的每个副本流式传输 — 每行都标记了源 Pod。",
+        "historicalDescription": "正在显示过去 {range} 的日志行。",
+        "refreshHistorical": "刷新",
+        "historicalUnavailableTitle": "此集群不支持历史日志",
+        "historicalUnavailableHint": "此集群没有配置日志聚合后端 (Loki / CloudWatch / Stackdriver / Azure Monitor)。切换回实时以进行实时追踪。",
+        "historicalUnavailableEmpty": "此集群不支持历史日志查询。切换回实时以进行实时追踪。",
+        "historicalNoResults": "此时间窗口内没有匹配的日志行。",
+        "range": {
+          "live": "实时",
+          "15m": "最近 15 分钟",
+          "1h": "最近 1 小时",
+          "6h": "最近 6 小时",
+          "24h": "最近 24 小时"
+        }
       }
     },
     "tokens": {

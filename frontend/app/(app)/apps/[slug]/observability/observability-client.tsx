@@ -1,10 +1,10 @@
 "use client";
 
-import { useQuery, useSubscription } from "@apollo/client/react";
+import { useLazyQuery, useQuery, useSubscription } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
-  DownloadIcon,
+  HistoryIcon,
   PauseIcon,
   PlayIcon,
   TerminalIcon,
@@ -17,7 +17,6 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import {
-  AppLogExportDialog,
   DnsRecordsCard,
   GoldenSignalsPanel,
   LogViewer,
@@ -30,6 +29,13 @@ import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -40,9 +46,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
-import { ON_APP_LOG } from "@/graphql/lifecycle/lifecycle.subscriptions";
+import { ON_APP_LOG, ON_APP_LOGS } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
+import { GET_APP_LOGS } from "@/graphql/observability/observability.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
@@ -72,6 +79,39 @@ interface PodsResp {
 interface LogResp {
   astroliftOnAppLog: AstroliftAppLogLine;
 }
+
+// #482 — multi-pod aggregated subscription. Same line shape as the
+// per-pod stream; the line's podName is what tells the operator which
+// replica produced it.
+interface LogsResp {
+  astroliftOnAppLogs: AstroliftAppLogLine;
+}
+
+// #482 — historical page query. `historicalAvailable: false` means the
+// cluster has no log-aggregator wired — the UI shows the "live tail
+// only" empty state in that case.
+interface HistoricalLogsResp {
+  astroliftAppLogs: {
+    items: AstroliftAppLogLine[];
+    nextCursor: string;
+    reachedRetention: boolean;
+    historicalAvailable: boolean;
+    totalCount: number;
+  };
+}
+
+// Built-in time-range presets for the historical picker — match the
+// shape the golden-signals scope picker uses so operators see a
+// consistent set of windows across both surfaces.
+const HISTORICAL_RANGES = [
+  { value: "live", seconds: 0 },
+  { value: "15m", seconds: 15 * 60 },
+  { value: "1h", seconds: 60 * 60 },
+  { value: "6h", seconds: 6 * 60 * 60 },
+  { value: "24h", seconds: 24 * 60 * 60 },
+] as const;
+
+type HistoricalRangeValue = (typeof HISTORICAL_RANGES)[number]["value"];
 
 // Live cluster surface — pods refetch periodically as a safety net
 // against missed subscription events (the deploy.lifecycle stream
@@ -245,10 +285,6 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
   const [streaming, setStreaming] = React.useState(false);
   const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
-  // App-log export modal — opens from the log-viewer card header.
-  // Hands the currently-selected pod/container through so the
-  // operator never has to retype them. (#483)
-  const [exportOpen, setExportOpen] = React.useState(false);
   // Container list derived from the selected pod's containerStatuses.
   const podContainers: string[] = React.useMemo(() => {
     const pod = podRows.find((p) => p.name === selectedPod);
@@ -282,9 +318,25 @@ export function ObservabilityClient({ slug }: { slug: string }) {
     if (logBuffer.length !== 0) setLogBuffer([]);
   }
 
-  // Live log subscription — only opens while ``streaming`` is true
-  // and we have a pod to tail. ``skip`` prevents an Apollo socket
-  // from opening on initial render and on Pause.
+  // #482 — "All replicas" toggle. Default ON so the mobile / quick-look
+  // path is the multi-pod aggregate; the existing per-pod tail stays
+  // one toggle away for advanced operators who want to focus on a
+  // specific replica. The toggle is local — no URL persistence —
+  // because it's a viewer-mode preference, not a deep-linkable filter.
+  const [allReplicas, setAllReplicas] = React.useState(true);
+
+  // #482 — historical time-range picker. "live" keeps the streaming
+  // path; any other value swaps to the paginated `astroliftAppLogs`
+  // query against the cluster's log-aggregator backend.
+  const [historicalRange, setHistoricalRange] =
+    React.useState<HistoricalRangeValue>("live");
+  const isHistorical = historicalRange !== "live";
+
+  // Live per-pod log subscription — only opens while ``streaming`` is
+  // true, an individual pod is picked (not "all replicas"), and the
+  // operator hasn't switched into a historical window. ``skip``
+  // prevents an Apollo socket from opening on initial render and on
+  // Pause / mode-switch.
   useSubscription<LogResp>(ON_APP_LOG, {
     variables: {
       appSlug: slug,
@@ -293,7 +345,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       follow: true,
       tailLines: DEFAULT_TAIL_LINES,
     },
-    skip: !streaming || !selectedPod,
+    skip: !streaming || !selectedPod || allReplicas || isHistorical,
     onData: ({ data }) => {
       const line = data.data?.astroliftOnAppLog;
       if (!line) return;
@@ -304,6 +356,110 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       });
     },
   });
+
+  // #482 — multi-pod aggregated subscription. Activates when the
+  // "All replicas" toggle is on AND we're streaming AND not in
+  // historical mode. Reuses the same buffer + cap so the LogViewer
+  // renders the same way regardless of source.
+  useSubscription<LogsResp>(ON_APP_LOGS, {
+    variables: {
+      appSlug: slug,
+      environmentName: scopedEnv ?? null,
+      workloadSlug: scopedWorkload ?? null,
+      container: selectedContainer ?? null,
+      follow: true,
+      tailLines: DEFAULT_TAIL_LINES,
+    },
+    skip: !streaming || !allReplicas || isHistorical,
+    onData: ({ data }) => {
+      const line = data.data?.astroliftOnAppLogs;
+      if (!line) return;
+      setLogBuffer((prev) => {
+        const next = [...prev, line];
+        return next.length > LOG_BUFFER_LIMIT ? next.slice(-LOG_BUFFER_LIMIT) : next;
+      });
+    },
+  });
+
+  // #482 — historical paginated query. Lazy + manual trigger so we
+  // don't fan a request out the moment the operator opens the page;
+  // the picker / refresh button is the entry point.
+  const [historicalUnavailable, setHistoricalUnavailable] = React.useState(false);
+  const [fetchHistorical, historicalState] = useLazyQuery<HistoricalLogsResp>(
+    GET_APP_LOGS,
+    { fetchPolicy: "no-cache" }
+  );
+
+  // Apollo's useLazyQuery types data as DeepPartial<TData>; we
+  // coerce out once the top-level field is non-null + treat it as
+  // the structured response (the resolver returns the page object
+  // whole, not field-by-field, so the partial type is a runtime
+  // mismatch with the wire shape).
+  //
+  // We use the during-render state-reset pattern (mirrors the
+  // ``prevStreamKey`` block above) instead of a useEffect so React's
+  // synchronous-setState-in-effect lint rule stays clean.
+  const historicalDataToken = historicalState.data ? historicalState.data : null;
+  const [prevHistoricalDataToken, setPrevHistoricalDataToken] =
+    React.useState<typeof historicalDataToken>(null);
+  if (prevHistoricalDataToken !== historicalDataToken) {
+    setPrevHistoricalDataToken(historicalDataToken);
+    if (historicalDataToken) {
+      const page = historicalDataToken.astroliftAppLogs as
+        | HistoricalLogsResp["astroliftAppLogs"]
+        | undefined;
+      if (page) {
+        const unavailable = !page.historicalAvailable;
+        if (historicalUnavailable !== unavailable) {
+          setHistoricalUnavailable(unavailable);
+        }
+        // Replace the buffer wholesale — historical pages aren't
+        // appended, they replace the live-tail content for the
+        // duration of the historical-mode view.
+        setLogBuffer(unavailable ? [] : page.items);
+      }
+    }
+  }
+
+  const runHistoricalQuery = React.useCallback(
+    (range: HistoricalRangeValue) => {
+      const def = HISTORICAL_RANGES.find((r) => r.value === range);
+      if (!def || def.seconds === 0) return;
+      const until = new Date();
+      const since = new Date(until.getTime() - def.seconds * 1000);
+      // Pass variables to the lazy fn itself — passing them in the
+      // hook options doesn't trigger a refetch and Apollo v4's
+      // useLazyQuery wants the call-site variables.
+      void fetchHistorical({
+        variables: {
+          appSlug: slug,
+          since: since.toISOString(),
+          until: until.toISOString(),
+          environmentName: scopedEnv,
+          workloadSlug: scopedWorkload,
+          limit: LOG_BUFFER_LIMIT,
+        },
+      });
+    },
+    [fetchHistorical, slug, scopedEnv, scopedWorkload]
+  );
+
+  // Fire one historical query when the operator switches into a
+  // time-range mode (or when the env / workload scope changes while
+  // in historical mode). Live mode owns its own subscription path.
+  const historicalKey = `${historicalRange}::${scopedEnv ?? ""}::${scopedWorkload ?? ""}`;
+  const [prevHistoricalKey, setPrevHistoricalKey] = React.useState(historicalKey);
+  if (prevHistoricalKey !== historicalKey) {
+    setPrevHistoricalKey(historicalKey);
+    if (isHistorical) {
+      // Clear before fetching so old live-tail content doesn't bleed
+      // into the historical render while the request is in flight.
+      setLogBuffer([]);
+      runHistoricalQuery(historicalRange);
+    } else {
+      setHistoricalUnavailable(false);
+    }
+  }
 
   if (app.loading && !a) {
     return (
@@ -459,7 +615,11 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               <TerminalIcon className="size-4" /> {t("logs.title")}
             </CardTitle>
             <CardDescription>
-              {selectedPod ? (
+              {isHistorical ? (
+                t("logs.historicalDescription", { range: historicalRange })
+              ) : allReplicas ? (
+                t("logs.allReplicasDescription")
+              ) : selectedPod ? (
                 <>
                   {t("logs.streaming")}{" "}
                   <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
@@ -472,7 +632,39 @@ export function ObservabilityClient({ slug }: { slug: string }) {
               )}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* #482 — aggregated-vs-per-pod toggle. Disabled in
+                historical mode because the historical query always
+                runs against the whole replica set. */}
+            <Button
+              size="sm"
+              variant={allReplicas ? "default" : "outline"}
+              onClick={() => setAllReplicas((v) => !v)}
+              disabled={isHistorical}
+              aria-pressed={allReplicas}
+            >
+              <BoxIcon className="size-3" /> {t("logs.allReplicas")}
+            </Button>
+
+            {/* #482 — time-range picker. "Live" keeps the streaming
+                path; any other value swaps to the paginated query. */}
+            <Select
+              value={historicalRange}
+              onValueChange={(v) => setHistoricalRange(v as HistoricalRangeValue)}
+            >
+              <SelectTrigger size="sm" className="font-mono text-xs">
+                <HistoryIcon className="size-3" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HISTORICAL_RANGES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {t(`logs.range.${r.value}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               size="sm"
               variant="outline"
@@ -481,48 +673,77 @@ export function ObservabilityClient({ slug }: { slug: string }) {
             >
               <Trash2Icon className="size-3" /> {t("logs.clear")}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setExportOpen(true)}
-              disabled={!selectedPod}
-              title={t("logs.exportTitle")}
-            >
-              <DownloadIcon className="size-3" /> {t("logs.export")}
-            </Button>
-            <Button
-              size="sm"
-              variant={streaming ? "outline" : "default"}
-              onClick={() => setStreaming((s) => !s)}
-              disabled={!selectedPod}
-            >
-              {streaming ? (
-                <>
-                  <PauseIcon className="size-3" /> {t("logs.pause")}
-                </>
-              ) : (
-                <>
-                  <PlayIcon className="size-3" /> {t("logs.stream")}
-                </>
-              )}
-            </Button>
+
+            {/* Live-mode stream/pause; historical mode shows a
+                refetch button instead. */}
+            {isHistorical ? (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => runHistoricalQuery(historicalRange)}
+                disabled={historicalState.loading}
+              >
+                <HistoryIcon className="size-3" /> {t("logs.refreshHistorical")}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant={streaming ? "outline" : "default"}
+                onClick={() => setStreaming((s) => !s)}
+                disabled={!allReplicas && !selectedPod}
+              >
+                {streaming ? (
+                  <>
+                    <PauseIcon className="size-3" /> {t("logs.pause")}
+                  </>
+                ) : (
+                  <>
+                    <PlayIcon className="size-3" /> {t("logs.stream")}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
+          {/* Historical-mode badge — surfaces "live tail only on this
+              cluster" when the aggregator backend isn't configured.
+              We render before the LogViewer so the operator sees the
+              reason for the empty pane immediately. */}
+          {isHistorical && historicalUnavailable ? (
+            <div className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 mb-3 flex items-start gap-2 rounded-md border p-2 text-xs">
+              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
+              <div>
+                <p className="font-medium">{t("logs.historicalUnavailableTitle")}</p>
+                <p className="text-muted-foreground">{t("logs.historicalUnavailableHint")}</p>
+              </div>
+            </div>
+          ) : null}
           <LogViewer
             lines={logBuffer}
             appSlug={a.slug}
-            podName={selectedPod}
-            containers={podContainers}
-            selectedContainer={selectedContainer}
-            onContainerChange={setPickedContainer}
+            environmentName={scopedEnv}
+            podName={allReplicas || isHistorical ? null : selectedPod}
+            containers={allReplicas || isHistorical ? [] : podContainers}
+            selectedContainer={allReplicas || isHistorical ? null : selectedContainer}
+            onContainerChange={allReplicas || isHistorical ? undefined : setPickedContainer}
             bufferLimit={LOG_BUFFER_LIMIT}
+            showPodBadge={allReplicas || isHistorical}
+            loading={isHistorical && historicalState.loading}
             emptyHint={
-              streaming
-                ? t("logs.waiting")
-                : selectedPod
-                  ? t("logs.pressStream")
-                  : t("logs.pickPod")
+              isHistorical
+                ? historicalUnavailable
+                  ? t("logs.historicalUnavailableEmpty")
+                  : historicalState.loading
+                    ? t("logs.waiting")
+                    : t("logs.historicalNoResults")
+                : streaming
+                  ? t("logs.waiting")
+                  : allReplicas
+                    ? t("logs.pressStreamAll")
+                    : selectedPod
+                      ? t("logs.pressStream")
+                      : t("logs.pickPod")
             }
           />
           <p className="text-muted-foreground mt-2 text-xs">
@@ -541,17 +762,6 @@ export function ObservabilityClient({ slug }: { slug: string }) {
 
       {/* ─── #422 platform events panel — auto-expands on warnings ─── */}
       <PodEventsPanel appEvents={appEvents} loading={events.loading} />
-
-      {/* ─── #483 app-log export modal — compliance + vendor handoff ─── */}
-      <AppLogExportDialog
-        open={exportOpen}
-        onOpenChange={setExportOpen}
-        appSlug={a.slug}
-        podName={selectedPod}
-        container={selectedContainer}
-        environmentName={scopedEnv}
-        workloadSlug={scopedWorkload}
-      />
     </PageShell>
   );
 }
