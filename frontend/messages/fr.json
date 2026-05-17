@@ -1169,5 +1169,63 @@
     "sourceColumn": "Source",
     "grantRoleRowLabel": "Attribuer un rôle à {name}",
     "grantRoleRowTooltip": "Attribuer un rôle à {name}"
+  },
+  "securitySessions": {
+    "title": "Sessions actives",
+    "description": "Sessions navigateur, CLI et mobile actuellement connectées sous votre identité. Révoquez-en une seule pour déconnecter cet appareil.",
+    "signOutEverywhere": "Se déconnecter partout",
+    "signingOut": "Déconnexion…",
+    "loadError": "Impossible de charger les sessions",
+    "noSessions": "Aucune session active.",
+    "columns": {
+      "kind": "Type",
+      "label": "Étiquette",
+      "status": "État",
+      "lastSeen": "Vue récemment",
+      "expires": "Expire",
+      "actions": "Actions"
+    },
+    "status": {
+      "current": "cet appareil",
+      "other": "autre appareil"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Mobile",
+      "browser_extension": "Extension",
+      "api_token": "Token API"
+    },
+    "actions": {
+      "revoke": "Révoquer"
+    },
+    "confirmRevoke": {
+      "title": "Révoquer cette session ?",
+      "description": "La session devra se reconnecter. Les tokens associés cesseront immédiatement de fonctionner.",
+      "confirm": "Révoquer"
+    },
+    "confirmSignOutAll": {
+      "title": "Déconnecter {count} autre{count, plural, one {} other {s}} session{count, plural, one {} other {s}} ?",
+      "description": "Votre session actuelle dans cet onglet reste active. Tous les autres onglets, apps mobiles et CLI devront se reconnecter.",
+      "confirm": "Se déconnecter ailleurs"
+    },
+    "toasts": {
+      "noOthers": "Aucune autre session à déconnecter.",
+      "signedOut": "Déconnexion de {count} session(s).",
+      "signOutFailed": "Échec de la déconnexion",
+      "revoked": "Session révoquée.",
+      "alreadyRevoked": "Session déjà révoquée.",
+      "revokeFailed": "Échec de la révocation"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "à l'instant",
+      "sAgo": "il y a {n}s",
+      "mAgo": "il y a {n}m",
+      "hAgo": "il y a {n}h",
+      "dAgo": "il y a {n}j",
+      "moAgo": "il y a {n}mois",
+      "yAgo": "il y a {n}a"
+    }
   }
 }

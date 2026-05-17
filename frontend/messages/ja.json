@@ -1173,5 +1173,63 @@
     "sourceColumn": "ソース",
     "grantRoleRowLabel": "{name} にロールを付与",
     "grantRoleRowTooltip": "{name} にロールを付与"
+  },
+  "securitySessions": {
+    "title": "アクティブなセッション",
+    "description": "ブラウザ、CLI、モバイルからの現在ログイン中のセッション。1つだけ取り消してそのデバイスをサインアウトできます。",
+    "signOutEverywhere": "すべてからサインアウト",
+    "signingOut": "サインアウト中…",
+    "loadError": "セッションを読み込めませんでした",
+    "noSessions": "アクティブなセッションがありません。",
+    "columns": {
+      "kind": "種類",
+      "label": "ラベル",
+      "status": "状態",
+      "lastSeen": "最終アクセス",
+      "expires": "有効期限",
+      "actions": "操作"
+    },
+    "status": {
+      "current": "このデバイス",
+      "other": "他のデバイス"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "モバイル",
+      "browser_extension": "拡張機能",
+      "api_token": "APIトークン"
+    },
+    "actions": {
+      "revoke": "取り消し"
+    },
+    "confirmRevoke": {
+      "title": "このセッションを取り消しますか？",
+      "description": "セッションは再度サインインが必要です。バインドされたトークンは即座に無効になります。",
+      "confirm": "取り消す"
+    },
+    "confirmSignOutAll": {
+      "title": "他の{count}件のセッションをサインアウトしますか？",
+      "description": "このタブの現在のセッションはそのままです。他のすべてのブラウザタブ、モバイルアプリ、CLIは再度サインインが必要です。",
+      "confirm": "他をサインアウト"
+    },
+    "toasts": {
+      "noOthers": "サインアウトする他のセッションがありません。",
+      "signedOut": "{count}件のセッションからサインアウトしました。",
+      "signOutFailed": "サインアウトに失敗しました",
+      "revoked": "セッションを取り消しました。",
+      "alreadyRevoked": "セッションは既に取り消されています。",
+      "revokeFailed": "取り消しに失敗しました"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "たった今",
+      "sAgo": "{n}秒前",
+      "mAgo": "{n}分前",
+      "hAgo": "{n}時間前",
+      "dAgo": "{n}日前",
+      "moAgo": "{n}ヶ月前",
+      "yAgo": "{n}年前"
+    }
   }
 }

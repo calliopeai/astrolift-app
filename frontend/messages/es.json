@@ -139,7 +139,9 @@
     "backCta": "Atrás",
     "nextCta": "Siguiente",
     "finishCta": "Finalizar configuración",
-    "a11y": { "steps": "Progreso de la incorporación" },
+    "a11y": {
+      "steps": "Progreso de la incorporación"
+    },
     "toast": {
       "success": "Incorporación completada — todo listo.",
       "skipFailed": "No se pudo guardar la omisión. Inténtalo de nuevo.",
@@ -1167,5 +1169,63 @@
     "sourceColumn": "Origen",
     "grantRoleRowLabel": "Otorgar rol a {name}",
     "grantRoleRowTooltip": "Otorgar rol a {name}"
+  },
+  "securitySessions": {
+    "title": "Sesiones activas",
+    "description": "Sesiones de navegador, CLI y móvil iniciadas como tú. Revoca solo una para desconectar ese dispositivo.",
+    "signOutEverywhere": "Cerrar sesión en todas partes",
+    "signingOut": "Cerrando sesión…",
+    "loadError": "No se pudieron cargar las sesiones",
+    "noSessions": "No se encontraron sesiones activas.",
+    "columns": {
+      "kind": "Tipo",
+      "label": "Etiqueta",
+      "status": "Estado",
+      "lastSeen": "Visto por última vez",
+      "expires": "Expira",
+      "actions": "Acciones"
+    },
+    "status": {
+      "current": "este dispositivo",
+      "other": "otro dispositivo"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Móvil",
+      "browser_extension": "Extensión",
+      "api_token": "Token API"
+    },
+    "actions": {
+      "revoke": "Revocar"
+    },
+    "confirmRevoke": {
+      "title": "¿Revocar esta sesión?",
+      "description": "La sesión tendrá que iniciar sesión de nuevo. Los tokens asociados dejarán de funcionar de inmediato.",
+      "confirm": "Revocar"
+    },
+    "confirmSignOutAll": {
+      "title": "¿Cerrar {count} otra{count, plural, one {} other {s}} sesión{count, plural, one {} other {es}}?",
+      "description": "Tu sesión actual en esta pestaña permanece activa. Todas las demás pestañas del navegador, apps móviles y CLI tendrán que iniciar sesión de nuevo.",
+      "confirm": "Cerrar sesión en las demás"
+    },
+    "toasts": {
+      "noOthers": "No hay otras sesiones para cerrar.",
+      "signedOut": "Se cerró sesión en {count} sesion(es).",
+      "signOutFailed": "Error al cerrar sesión",
+      "revoked": "Sesión revocada.",
+      "alreadyRevoked": "La sesión ya estaba revocada.",
+      "revokeFailed": "Error al revocar"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "ahora mismo",
+      "sAgo": "hace {n}s",
+      "mAgo": "hace {n}m",
+      "hAgo": "hace {n}h",
+      "dAgo": "hace {n}d",
+      "moAgo": "hace {n}mes",
+      "yAgo": "hace {n}a"
+    }
   }
 }

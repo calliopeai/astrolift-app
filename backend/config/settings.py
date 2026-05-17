@@ -478,6 +478,40 @@ CONSTANCE_CONFIG = {
         "the worker from runaway exports while still leaving room for multi-year SOC2 "
         "extracts at the default retention.",
     ),
+    "MAX_SESSIONS_PER_CLIENT_KIND": (
+        '{"web": 5, "cli": 3, "mobile": 3, "browser_extension": 2, "api_token": 10}',
+        "Per-user concurrent-session cap, JSON-shaped per client kind. When a fresh "
+        "session would push the user above the cap for that kind, the oldest live "
+        "session of that kind is auto-revoked (audit action `session.quota_evicted`). "
+        "Lower e.g. mobile to 1 if your install enforces single-device mobile; raise "
+        "cli for shops with many concurrent CI runners per engineer. Unknown kinds in "
+        "the JSON are ignored; missing kinds fall back to the per-kind default.",
+    ),
+    "STALE_SESSION_TTL_SECONDS_WEB": (
+        30 * 24 * 3600,
+        "Browser session stale threshold (seconds). `PruneStaleSessionsWorkflow` "
+        "soft-revokes web sessions whose `last_seen_at` is older than this. Default 30 "
+        "days; lower for high-security envs, raise for kiosk-style installs.",
+    ),
+    "STALE_SESSION_TTL_SECONDS_CLI": (
+        90 * 24 * 3600,
+        "CLI session stale threshold (seconds). Default 90 days — covers long-running "
+        "CI tokens that may sit idle between pipeline runs.",
+    ),
+    "STALE_SESSION_TTL_SECONDS_MOBILE": (
+        60 * 24 * 3600,
+        "Mobile session stale threshold (seconds). Default 60 days; covers the common "
+        "'phone in a drawer for a vacation' case before auto-revoking.",
+    ),
+    "STALE_SESSION_TTL_SECONDS_BROWSER_EXTENSION": (
+        60 * 24 * 3600,
+        "Browser-extension session stale threshold (seconds). Default 60 days.",
+    ),
+    "STALE_SESSION_TTL_SECONDS_API_TOKEN": (
+        180 * 24 * 3600,
+        "API-token session stale threshold (seconds). Default 180 days; raise for "
+        "long-lived programmatic clients that legitimately sit idle for quarters.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -505,6 +539,17 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "AUDIT_RETENTION_DAYS",
             "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS",
             "AUDIT_EXPORT_MAX_ROWS",
+        ),
+        "collapse": False,
+    },
+    "Sessions": {
+        "fields": (
+            "MAX_SESSIONS_PER_CLIENT_KIND",
+            "STALE_SESSION_TTL_SECONDS_WEB",
+            "STALE_SESSION_TTL_SECONDS_CLI",
+            "STALE_SESSION_TTL_SECONDS_MOBILE",
+            "STALE_SESSION_TTL_SECONDS_BROWSER_EXTENSION",
+            "STALE_SESSION_TTL_SECONDS_API_TOKEN",
         ),
         "collapse": False,
     },
@@ -563,6 +608,10 @@ MIDDLEWARE = [
     "core.middleware.current_user.CurrentUserMiddleware",  # Track current user for signals
     "core.middleware.request_id.RequestIdMiddleware",  # ULID + W3C traceparent → contextvar
     "core.middleware.tenant.TenantContextMiddleware",  # Resolve org/team/project, populate TenantContext
+    # Sidecar AstroliftSession write path (#480 / #495 / #498). Runs
+    # after AuthenticationMiddleware + TenantContextMiddleware so we
+    # have a resolved user + org context to stamp on the row.
+    "astrolift_identity.sessions.SessionTrackingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # 'django.middleware.gzip.GZipMiddleware',

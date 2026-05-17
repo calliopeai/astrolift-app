@@ -302,6 +302,8 @@ export const LIST_ACTIVE_SESSIONS = gql`
       id
       expiresAt
       isCurrent
+      clientKind
+      label
       createdAt
       lastSeenAt
       ipAddress

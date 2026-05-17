@@ -51,6 +51,7 @@ from astrolift_identity.schema.types import (
     SearchableUserType,
     TeamType,
     _resolve_display_name,
+    active_session_to_type,
     api_token_to_type,
     app_to_summary,
     approver_user_to_type,
@@ -800,54 +801,39 @@ class IdentityQuery:
         return identity_provider_to_type(idp, is_active=True)
 
     @strawberry.field
-    @tenant_scoped()
     def astrolift_active_sessions(self, info: Info) -> list[ActiveSessionType]:
-        """The signed-in viewer's own active sessions.
+        """The signed-in viewer's own AstroliftSession rows.
 
-        Walks ``django_session`` decoding each row's session_data to
-        find the ones bound to this user. Self-only — every authed
-        user can list their own sessions; no permission gate.
+        Self-only — every authed user can list their own sessions;
+        no permission gate. Exempt from ``@tenant_scoped`` because a
+        session is bound to a user, not an org (see
+        ``test_tenancy_guardrail.py`` EXEMPT list).
 
-        v1 surfaces what django_session natively tracks: session_key
-        (suffix), expire_date, is_current. IP / UA / created_at /
-        last_seen_at land once a SessionMetadata model + middleware
-        track them per-request (#289 follow-up).
+        Rows come from ``AstroliftSession`` (the sidecar) populated
+        by ``SessionTrackingMiddleware``; not from ``django_session``
+        directly. That gives us ``client_kind`` + ``last_seen_at`` +
+        a stable GUID for the per-row revoke path.
         """
-        from django.contrib.sessions.models import Session
-        from django.utils import timezone
+        from astrolift_identity.models import AstroliftSession
+        from astrolift_identity.sessions import record_session
 
         request = getattr(info.context, "request", None)
         viewer = getattr(request, "user", None) if request else None
         if viewer is None or not viewer.is_authenticated:
             return []
 
-        current_key = getattr(getattr(request, "session", None), "session_key", None)
-        viewer_pk = str(viewer.pk)
-        now = timezone.now()
-        out: list[ActiveSessionType] = []
-        for s in Session.objects.filter(expire_date__gt=now):
-            try:
-                data = s.get_decoded()
-            except Exception:
-                # Corrupt session row — skip rather than 500 the page.
-                continue
-            if str(data.get("_auth_user_id", "")) != viewer_pk:
-                continue
-            # Return only the last 8 chars of the session key as a
-            # display-safe identifier. The full key never leaves the
-            # cookie jar; logout_all_sessions doesn't need it.
-            out.append(
-                ActiveSessionType(
-                    id=s.session_key[-8:],
-                    expires_at=s.expire_date,
-                    is_current=(s.session_key == current_key),
-                    created_at=None,
-                    last_seen_at=None,
-                    ip_address=None,
-                    user_agent=None,
-                )
-            )
-        return out
+        # Defensive: if the middleware hasn't had a chance to write
+        # the row for the current request yet (e.g. a brand-new login
+        # session being listed before the response cycle completes),
+        # touch it now so the caller doesn't see an empty list.
+        record_session(request)
+
+        current_key = getattr(getattr(request, "session", None), "session_key", None) or ""
+        qs = AstroliftSession.objects.filter(user=viewer).order_by("-last_seen_at", "-created_at")
+        return [
+            active_session_to_type(row, is_current=(bool(current_key) and row.session_key == current_key))
+            for row in qs
+        ]
 
 
 def _active_idp_pk() -> int | None:

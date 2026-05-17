@@ -1169,5 +1169,63 @@
     "sourceColumn": "Quelle",
     "grantRoleRowLabel": "Rolle an {name} vergeben",
     "grantRoleRowTooltip": "Rolle an {name} vergeben"
+  },
+  "securitySessions": {
+    "title": "Aktive Sitzungen",
+    "description": "Browser-, CLI- und Mobil-Sitzungen, die aktuell unter Ihrem Konto angemeldet sind. Eine einzelne widerrufen, um nur dieses Gerät abzumelden.",
+    "signOutEverywhere": "Überall abmelden",
+    "signingOut": "Abmelden…",
+    "loadError": "Sitzungen konnten nicht geladen werden",
+    "noSessions": "Keine aktiven Sitzungen gefunden.",
+    "columns": {
+      "kind": "Typ",
+      "label": "Bezeichnung",
+      "status": "Status",
+      "lastSeen": "Zuletzt gesehen",
+      "expires": "Läuft ab",
+      "actions": "Aktionen"
+    },
+    "status": {
+      "current": "dieses Gerät",
+      "other": "anderes Gerät"
+    },
+    "kind": {
+      "web": "Web",
+      "cli": "CLI",
+      "mobile": "Mobil",
+      "browser_extension": "Erweiterung",
+      "api_token": "API-Token"
+    },
+    "actions": {
+      "revoke": "Widerrufen"
+    },
+    "confirmRevoke": {
+      "title": "Diese Sitzung widerrufen?",
+      "description": "Die Sitzung muss sich erneut anmelden. Gebundene Token funktionieren sofort nicht mehr.",
+      "confirm": "Widerrufen"
+    },
+    "confirmSignOutAll": {
+      "title": "{count} andere Sitzung{count, plural, one {} other {en}} abmelden?",
+      "description": "Ihre aktuelle Sitzung in diesem Tab bleibt angemeldet. Alle anderen Browser-Tabs, Mobil-Apps und CLIs müssen sich neu anmelden.",
+      "confirm": "Andere abmelden"
+    },
+    "toasts": {
+      "noOthers": "Keine anderen Sitzungen zum Abmelden.",
+      "signedOut": "{count} Sitzung(en) abgemeldet.",
+      "signOutFailed": "Abmelden fehlgeschlagen",
+      "revoked": "Sitzung widerrufen.",
+      "alreadyRevoked": "Sitzung war bereits widerrufen.",
+      "revokeFailed": "Widerruf fehlgeschlagen"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "gerade eben",
+      "sAgo": "vor {n}s",
+      "mAgo": "vor {n}m",
+      "hAgo": "vor {n}h",
+      "dAgo": "vor {n}T",
+      "moAgo": "vor {n}Mon",
+      "yAgo": "vor {n}J"
+    }
   }
 }

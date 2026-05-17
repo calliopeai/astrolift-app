@@ -1173,5 +1173,63 @@
     "sourceColumn": "来源",
     "grantRoleRowLabel": "为 {name} 授予角色",
     "grantRoleRowTooltip": "为 {name} 授予角色"
+  },
+  "securitySessions": {
+    "title": "活动会话",
+    "description": "当前以您身份登录的浏览器、CLI 和移动端会话。撤销单个会话以仅注销该设备。",
+    "signOutEverywhere": "全部退出登录",
+    "signingOut": "退出中…",
+    "loadError": "无法加载会话",
+    "noSessions": "未找到活动会话。",
+    "columns": {
+      "kind": "类型",
+      "label": "标签",
+      "status": "状态",
+      "lastSeen": "最近活动",
+      "expires": "到期",
+      "actions": "操作"
+    },
+    "status": {
+      "current": "此设备",
+      "other": "其他设备"
+    },
+    "kind": {
+      "web": "网页",
+      "cli": "CLI",
+      "mobile": "移动端",
+      "browser_extension": "浏览器扩展",
+      "api_token": "API 令牌"
+    },
+    "actions": {
+      "revoke": "撤销"
+    },
+    "confirmRevoke": {
+      "title": "撤销此会话？",
+      "description": "该会话需要重新登录。绑定的令牌将立即失效。",
+      "confirm": "撤销"
+    },
+    "confirmSignOutAll": {
+      "title": "退出其他 {count} 个会话？",
+      "description": "此标签页的当前会话仍保持登录。所有其他浏览器标签页、移动应用和 CLI 都需要重新登录。",
+      "confirm": "退出其他"
+    },
+    "toasts": {
+      "noOthers": "没有其他会话可注销。",
+      "signedOut": "已退出 {count} 个会话。",
+      "signOutFailed": "退出失败",
+      "revoked": "会话已撤销。",
+      "alreadyRevoked": "会话已被撤销。",
+      "revokeFailed": "撤销失败"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "刚刚",
+      "sAgo": "{n}秒前",
+      "mAgo": "{n}分钟前",
+      "hAgo": "{n}小时前",
+      "dAgo": "{n}天前",
+      "moAgo": "{n}个月前",
+      "yAgo": "{n}年前"
+    }
   }
 }

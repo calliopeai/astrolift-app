@@ -34,6 +34,7 @@ from astrolift_workflows.workflows.scheduled import (
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
     PruneAuditLogWorkflow,
+    PruneStaleSessionsWorkflow,
     ReconcileClusterCapabilitiesWorkflow,
     RehealWebhookSubscriptionsWorkflow,
 )
@@ -65,6 +66,7 @@ __all__ = [
     "PreviewGarbageCollectWorkflow",
     "PromoteDeploymentWorkflow",
     "PruneAuditLogWorkflow",
+    "PruneStaleSessionsWorkflow",
     "ReconcileClusterCapabilitiesWorkflow",
     "RehealWebhookSubscriptionsWorkflow",
     "RollbackDeploymentWorkflow",

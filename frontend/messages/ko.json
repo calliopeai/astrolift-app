@@ -1173,5 +1173,63 @@
     "sourceColumn": "출처",
     "grantRoleRowLabel": "{name}에게 역할 부여",
     "grantRoleRowTooltip": "{name}에게 역할 부여"
+  },
+  "securitySessions": {
+    "title": "활성 세션",
+    "description": "현재 본인 계정으로 로그인된 브라우저, CLI, 모바일 세션입니다. 하나만 취소하여 해당 기기만 로그아웃할 수 있습니다.",
+    "signOutEverywhere": "모든 곳에서 로그아웃",
+    "signingOut": "로그아웃 중…",
+    "loadError": "세션을 불러올 수 없습니다",
+    "noSessions": "활성 세션이 없습니다.",
+    "columns": {
+      "kind": "종류",
+      "label": "레이블",
+      "status": "상태",
+      "lastSeen": "최근 접속",
+      "expires": "만료",
+      "actions": "작업"
+    },
+    "status": {
+      "current": "이 기기",
+      "other": "다른 기기"
+    },
+    "kind": {
+      "web": "웹",
+      "cli": "CLI",
+      "mobile": "모바일",
+      "browser_extension": "확장 프로그램",
+      "api_token": "API 토큰"
+    },
+    "actions": {
+      "revoke": "취소"
+    },
+    "confirmRevoke": {
+      "title": "이 세션을 취소하시겠습니까?",
+      "description": "세션은 다시 로그인해야 합니다. 바인딩된 토큰은 즉시 작동을 중지합니다.",
+      "confirm": "취소"
+    },
+    "confirmSignOutAll": {
+      "title": "다른 {count}개 세션에서 로그아웃하시겠습니까?",
+      "description": "이 탭의 현재 세션은 유지됩니다. 다른 모든 브라우저 탭, 모바일 앱, CLI는 다시 로그인해야 합니다.",
+      "confirm": "다른 곳에서 로그아웃"
+    },
+    "toasts": {
+      "noOthers": "로그아웃할 다른 세션이 없습니다.",
+      "signedOut": "{count}개 세션에서 로그아웃했습니다.",
+      "signOutFailed": "로그아웃 실패",
+      "revoked": "세션이 취소되었습니다.",
+      "alreadyRevoked": "세션이 이미 취소되었습니다.",
+      "revokeFailed": "취소 실패"
+    },
+    "relative": {
+      "never": "—",
+      "justNow": "방금",
+      "sAgo": "{n}초 전",
+      "mAgo": "{n}분 전",
+      "hAgo": "{n}시간 전",
+      "dAgo": "{n}일 전",
+      "moAgo": "{n}개월 전",
+      "yAgo": "{n}년 전"
+    }
   }
 }

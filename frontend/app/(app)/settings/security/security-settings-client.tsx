@@ -3,11 +3,16 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  GlobeIcon,
   KeyRoundIcon,
   LogOutIcon,
   MonitorIcon,
+  PuzzleIcon,
   ShieldCheckIcon,
+  SmartphoneIcon,
+  TerminalIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -15,13 +20,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -31,11 +30,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LOGOUT_ALL_SESSIONS } from "@/graphql/identity/identity.mutations";
+import {
+  LOGOUT_ALL_SESSIONS,
+  REVOKE_ASTROLIFT_SESSION,
+} from "@/graphql/identity/identity.mutations";
 import { LIST_ACTIVE_SESSIONS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftActiveSession,
+  AstroliftClientKind,
   AstroliftLogoutAllSessionsPayload,
+  AstroliftRevokeAstroliftSessionPayload,
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
@@ -43,24 +47,81 @@ interface SessionsResp {
   astroliftActiveSessions: AstroliftActiveSession[];
 }
 
+const CLIENT_KIND_ICONS: Record<
+  AstroliftClientKind,
+  React.ComponentType<{ className?: string }>
+> = {
+  web: GlobeIcon,
+  cli: TerminalIcon,
+  mobile: SmartphoneIcon,
+  browser_extension: PuzzleIcon,
+  api_token: KeyRoundIcon,
+};
+
 export function SecuritySettingsClient() {
-  const { data, loading, error, refetch } = useQuery<SessionsResp>(
-    LIST_ACTIVE_SESSIONS,
-    { fetchPolicy: "cache-and-network" },
-  );
+  const t = useTranslations("securitySessions");
+  const { data, loading, error, refetch } = useQuery<SessionsResp>(LIST_ACTIVE_SESSIONS, {
+    fetchPolicy: "cache-and-network",
+  });
 
   const [logoutAll, { loading: signingOut }] = useMutation<{
     logoutAllSessions: MutationResult<AstroliftLogoutAllSessionsPayload>;
   }>(LOGOUT_ALL_SESSIONS);
 
+  const [revokeSession, { loading: revoking }] = useMutation<{
+    revokeAstroliftSession: MutationResult<AstroliftRevokeAstroliftSessionPayload>;
+  }>(REVOKE_ASTROLIFT_SESSION);
+
   const sessions = data?.astroliftActiveSessions ?? [];
   const otherCount = sessions.filter((s) => !s.isCurrent).length;
 
   const [confirmSignOut, setConfirmSignOut] = React.useState(false);
+  const [pendingRevokeId, setPendingRevokeId] = React.useState<string | null>(null);
+
+  // Captured at render-time once so the relative-time helper stays pure
+  // (lint disallows calling Date.now() during render). The "Last seen"
+  // column is naturally fresh because Apollo re-queries every navigation
+  // and the toast/refetch flow re-renders this component.
+  const [renderNow, setRenderNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    // Tick once a minute so a long-lived tab doesn't show stale
+    // "3m ago" hours later. Cheap — single setInterval per page.
+    const id = setInterval(() => setRenderNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  function relativeFromNow(iso: string | null | undefined): string {
+    if (!iso) return t("relative.never");
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return t("relative.never");
+    const diffSec = Math.round((renderNow - then) / 1000);
+    if (diffSec < 5) return t("relative.justNow");
+    if (diffSec < 60) return t("relative.sAgo", { n: diffSec });
+    const minutes = Math.round(diffSec / 60);
+    if (minutes < 60) return t("relative.mAgo", { n: minutes });
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return t("relative.hAgo", { n: hours });
+    const days = Math.round(hours / 24);
+    if (days < 30) return t("relative.dAgo", { n: days });
+    const months = Math.round(days / 30);
+    if (months < 12) return t("relative.moAgo", { n: months });
+    const years = Math.round(months / 12);
+    return t("relative.yAgo", { n: years });
+  }
+
+  function clientKindBadge(kind: AstroliftClientKind): React.JSX.Element {
+    const Icon = CLIENT_KIND_ICONS[kind] ?? MonitorIcon;
+    return (
+      <Badge variant="outline" className="gap-1">
+        <Icon className="size-3" />
+        {t(`kind.${kind}`)}
+      </Badge>
+    );
+  }
 
   function requestSignOutAll() {
     if (otherCount === 0) {
-      toast.info("No other sessions to sign out.");
+      toast.info(t("toasts.noOthers"));
       return;
     }
     setConfirmSignOut(true);
@@ -72,15 +133,34 @@ export function SecuritySettingsClient() {
     });
     if (resp?.logoutAllSessions.ok) {
       toast.success(
-        `Signed out of ${resp.logoutAllSessions.data?.revokedCount ?? 0} session(s).`,
+        t("toasts.signedOut", {
+          count: resp.logoutAllSessions.data?.revokedCount ?? 0,
+        })
       );
       refetch();
     } else {
-      throw new Error(
-        resp?.logoutAllSessions.errors?.[0]?.message ?? "Sign-out failed",
-      );
+      throw new Error(resp?.logoutAllSessions.errors?.[0]?.message ?? t("toasts.signOutFailed"));
     }
   }
+
+  async function handleRevokeOne() {
+    if (!pendingRevokeId) return;
+    const sessionId = pendingRevokeId;
+    setPendingRevokeId(null);
+    const { data: resp } = await revokeSession({
+      variables: { input: { sessionId } },
+    });
+    if (resp?.revokeAstroliftSession.ok) {
+      toast.success(
+        resp.revokeAstroliftSession.data?.revoked ? t("toasts.revoked") : t("toasts.alreadyRevoked")
+      );
+      refetch();
+    } else {
+      toast.error(resp?.revokeAstroliftSession.errors?.[0]?.message ?? t("toasts.revokeFailed"));
+    }
+  }
+
+  const pendingTarget = pendingRevokeId ? sessions.find((s) => s.id === pendingRevokeId) : null;
 
   return (
     <div className="grid gap-4">
@@ -88,11 +168,9 @@ export function SecuritySettingsClient() {
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <MonitorIcon className="size-4" /> Active sessions
+              <MonitorIcon className="size-4" /> {t("title")}
             </CardTitle>
-            <CardDescription>
-              Browser and mobile sessions currently signed in as you.
-            </CardDescription>
+            <CardDescription>{t("description")}</CardDescription>
           </div>
           <Button
             onClick={requestSignOutAll}
@@ -100,7 +178,7 @@ export function SecuritySettingsClient() {
             disabled={signingOut || otherCount === 0}
           >
             <LogOutIcon className="size-4" />
-            {signingOut ? "Signing out…" : "Sign out everywhere"}
+            {signingOut ? t("signingOut") : t("signOutEverywhere")}
           </Button>
         </CardHeader>
         <CardContent>
@@ -113,40 +191,58 @@ export function SecuritySettingsClient() {
             <div className="border-destructive/40 bg-destructive/5 flex items-start gap-2 rounded-md border p-3 text-sm">
               <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
               <div className="flex-1">
-                <p className="text-destructive font-medium">
-                  Couldn&apos;t load sessions
-                </p>
+                <p className="text-destructive font-medium">{t("loadError")}</p>
                 <p className="text-muted-foreground text-xs">{error.message}</p>
               </div>
             </div>
           ) : sessions.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No active sessions found.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("noSessions")}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Session</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expires</TableHead>
+                  <TableHead>{t("columns.kind")}</TableHead>
+                  <TableHead>{t("columns.label")}</TableHead>
+                  <TableHead>{t("columns.status")}</TableHead>
+                  <TableHead>{t("columns.lastSeen")}</TableHead>
+                  <TableHead>{t("columns.expires")}</TableHead>
+                  <TableHead className="text-right">{t("columns.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sessions.map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="font-mono text-xs">…{s.id}</TableCell>
+                    <TableCell>{clientKindBadge(s.clientKind)}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {s.label || "—"}
+                    </TableCell>
                     <TableCell>
                       {s.isCurrent ? (
                         <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-                          this device
+                          {t("status.current")}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">other device</Badge>
+                        <Badge variant="secondary">{t("status.other")}</Badge>
                       )}
                     </TableCell>
+                    <TableCell
+                      className="text-muted-foreground text-xs"
+                      title={s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : undefined}
+                    >
+                      {relativeFromNow(s.lastSeenAt)}
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {new Date(s.expiresAt).toLocaleString()}
+                      {s.expiresAt ? new Date(s.expiresAt).toLocaleString() : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={s.isCurrent || revoking}
+                        onClick={() => setPendingRevokeId(s.id)}
+                      >
+                        {t("actions.revoke")}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -184,9 +280,8 @@ export function SecuritySettingsClient() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">
-              Set up MFA in your identity provider (Auth0 / Okta / Azure AD /
-              Google Workspace). The platform enforces session-freshness for
-              high-risk actions via ABAC policies.
+              Set up MFA in your identity provider (Auth0 / Okta / Azure AD / Google Workspace). The
+              platform enforces session-freshness for high-risk actions via ABAC policies.
             </p>
           </CardContent>
         </Card>
@@ -195,11 +290,27 @@ export function SecuritySettingsClient() {
       <ConfirmDialog
         open={confirmSignOut}
         onOpenChange={setConfirmSignOut}
-        title={`Sign out of ${otherCount} other session${otherCount === 1 ? "" : "s"}?`}
-        description="Your current session in this tab stays signed in. Every other browser tab, mobile app, and CLI you've authenticated will need to log in again."
-        confirmLabel="Sign out everywhere else"
+        title={t("confirmSignOutAll.title", { count: otherCount })}
+        description={t("confirmSignOutAll.description")}
+        confirmLabel={t("confirmSignOutAll.confirm")}
         destructive
         onConfirm={handleSignOutAll}
+      />
+
+      <ConfirmDialog
+        open={pendingRevokeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRevokeId(null);
+        }}
+        title={t("confirmRevoke.title")}
+        description={
+          pendingTarget
+            ? `${t(`kind.${pendingTarget.clientKind}`)}${pendingTarget.label ? ` — ${pendingTarget.label}` : ""}: ${t("confirmRevoke.description")}`
+            : t("confirmRevoke.description")
+        }
+        confirmLabel={t("confirmRevoke.confirm")}
+        destructive
+        onConfirm={handleRevokeOne}
       />
     </div>
   );
