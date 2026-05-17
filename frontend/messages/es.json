@@ -677,6 +677,125 @@
         "received": "Recibido {rel}",
         "review": "Revisar"
       }
+    },
+    "deployments": {
+      "title": "Implementaciones",
+      "description": "Cada intento de despliegue en todas las apps y entornos. Haga clic en una fila para ver la línea de tiempo del workflow, los manifiestos renderizados y los logs.",
+      "start": "Iniciar implementación",
+      "filterApp": "Filtrar por slug de app…",
+      "counts": "{filtered} de {total}",
+      "emptyTitle": "Aún no hay implementaciones",
+      "emptyDescription": "Registre una app y dispare una implementación desde /apps/[slug]/deploy. Las implementaciones aparecen aquí en cuanto el workflow empieza.",
+      "openApps": "Abrir apps",
+      "approvalsCount": "{received}/{required} aprobaciones",
+      "rowAriaLabel": "Implementación {app} → {env}. Pulse Intro para abrir.",
+      "columns": {
+        "appEnv": "App / Entorno",
+        "image": "Imagen",
+        "trigger": "Disparador",
+        "status": "Estado",
+        "duration": "Duración",
+        "started": "Iniciado",
+        "actions": "Acciones"
+      },
+      "pills": {
+        "ariaLabel": "Filtrar por estado",
+        "all": "Todas",
+        "active": "Activas",
+        "running": "Corriendo",
+        "failed": "Fallidas"
+      },
+      "actions": {
+        "label": "Acciones",
+        "more": "Más acciones",
+        "approve": "Aprobar",
+        "abort": "Cancelar",
+        "rollback": "Revertir",
+        "redeploy": "Redesplegar",
+        "viewLogs": "Ver detalle / logs",
+        "viewCommit": "Ver commit",
+        "copyGuid": "Copiar ID de implementación",
+        "copyOk": "ID de implementación copiada.",
+        "copyFail": "No se pudo copiar al portapapeles."
+      },
+      "statusOptions": {
+        "all": "Todos los estados",
+        "pending_approval": "Aprobación pendiente",
+        "pending": "Pendiente",
+        "deploying": "Desplegando",
+        "redeploying": "Redesplegando",
+        "running": "Corriendo",
+        "failed": "Fallida",
+        "rolled_back": "Revertida",
+        "superseded": "Reemplazada"
+      },
+      "envWorkload": "entorno {env} · workload {workload}",
+      "envOnly": "entorno {env}",
+      "confirm": {
+        "approveTitle": "¿Aprobar despliegue de {tag}?",
+        "approveDescription": "Desbloquea el rollout a {app}/{env}. El workflow se reanuda inmediatamente.",
+        "approveConfirm": "Aprobar",
+        "abortTitle": "¿Cancelar despliegue en curso de {app}/{env}?",
+        "abortDescription": "Indica al workflow de Temporal que cancele. La implementación se marca como fallida. Los cambios ya enviados al clúster permanecen — Astrolift no hace rollback automático al cancelar.",
+        "abortConfirm": "Cancelar despliegue",
+        "abortReasonLabel": "Motivo de la cancelación",
+        "abortReasonPlaceholder": "¿Por qué se cancela este despliegue? Persiste en el log de auditoría + barra de historial.",
+        "reasonRequired": "Motivo requerido",
+        "rollbackTitle": "¿Revertir {app}/{env} a la revisión anterior?",
+        "rollbackDescription": "Crea un nuevo despliegue de rollback que apunta a la revisión anterior en ejecución. La revisión actual queda reemplazada.",
+        "rollbackConfirm": "Revertir",
+        "redeployTitle": "¿Redesplegar {tag} a {app}/{env}?",
+        "redeployDescription": "Lanza un nuevo despliegue con la misma imagen. Útil para reintentar tras un fallo transitorio o recoger configuración actualizada.",
+        "redeployConfirm": "Redesplegar"
+      },
+      "bulk": {
+        "selectAllLabel": "Seleccionar todas las implementaciones visibles",
+        "selectRowLabel": "Seleccionar {app} / {env}",
+        "selected": "{count, plural, =1 {1 implementación seleccionada} other {# implementaciones seleccionadas}}",
+        "summary": "En {envs}.",
+        "mixedWarning": "La selección mezcla estados en curso y terminales — las acciones en bloque se desactivan hasta que la selección sea uniforme.",
+        "clear": "Limpiar",
+        "cancelButton": "Cancelar {count}",
+        "redeployButton": "Redesplegar {count}",
+        "confirmCancel": {
+          "title": "¿Cancelar {count} implementaciones en curso?",
+          "description": "Indica a cada workflow de Temporal que cancele. Marca todas las seleccionadas como fallidas. El estado del clúster ya aplicado permanece. Afecta a {envs}.",
+          "reasonLabel": "Motivo de la cancelación",
+          "reasonPlaceholder": "¿Por qué se cancelan estos despliegues? Persiste en el log de auditoría + barra de historial.",
+          "confirm": "Cancelar implementaciones"
+        },
+        "confirmRedeploy": {
+          "title": "¿Redesplegar {count} implementaciones?",
+          "description": "Lanza un nuevo despliegue por cada fila seleccionada con la misma etiqueta de imagen. Afecta a {envs}.",
+          "confirm": "Redesplegar todas"
+        },
+        "toasts": {
+          "abortLabel": "Cancelar",
+          "redeployLabel": "Redesplegar",
+          "allOk": "{label} con éxito para {count} implementaciones.",
+          "allFailed": "{label} falló para {count} implementaciones: {message}",
+          "partial": "{label}: {succeeded} con éxito, {failed} fallidas."
+        }
+      },
+      "startSheet": {
+        "title": "Iniciar implementación",
+        "description": "Envía un nuevo rollout a Temporal. Si el entorno requiere aprobaciones, la implementación queda como pending_approval y el workflow no arranca hasta que firmen suficientes aprobadores.",
+        "appLabel": "App",
+        "appPlaceholder": "Elija una app",
+        "envLabel": "Entorno",
+        "envPlaceholder": "Elija un entorno",
+        "tagLabel": "Etiqueta de imagen",
+        "tagPlaceholder": "v1.4.2 o sha-abc123",
+        "digestLabel": "Digest de imagen (opcional)",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "Cuando se establece, este digest es lo que el workflow renderiza en el manifiesto — objetivo inmutable garantizado.",
+        "triggerLabel": "Disparador",
+        "approvalsSuffix": "{count} aprobación(es)",
+        "paused": "pausado",
+        "cancel": "Cancelar",
+        "submit": "Iniciar implementación",
+        "submitting": "Iniciando…"
+      }
     }
   },
   "jobs": {

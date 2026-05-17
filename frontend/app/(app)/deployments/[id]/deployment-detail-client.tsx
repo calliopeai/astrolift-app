@@ -1,13 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
-import {
-  CheckIcon,
-  ClockIcon,
-  RotateCcwIcon,
-  StopCircleIcon,
-  UndoIcon,
-} from "lucide-react";
+import { CheckIcon, ClockIcon, RotateCcwIcon, StopCircleIcon, UndoIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -15,6 +9,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
+import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Can } from "@/components/Can";
@@ -28,10 +23,7 @@ import {
   REDEPLOY_APP,
   ROLLBACK_DEPLOYMENT,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import {
-  GET_DEPLOYMENT,
-  GET_DEPLOYMENT_LOG,
-} from "@/graphql/lifecycle/lifecycle.queries";
+import { GET_DEPLOYMENT, GET_DEPLOYMENT_LOG } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subscriptions";
@@ -80,10 +72,7 @@ interface EventsResp {
   }>;
 }
 
-const statusToDot: Record<
-  DeploymentStatus,
-  "ok" | "warn" | "error" | "muted" | "pending"
-> = {
+const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
   pending_approval: "warn",
   pending: "warn",
   deploying: "pending",
@@ -107,12 +96,7 @@ function formatTime(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString();
 }
 
-const IN_FLIGHT: DeploymentStatus[] = [
-  "pending_approval",
-  "pending",
-  "deploying",
-  "redeploying",
-];
+const IN_FLIGHT: DeploymentStatus[] = ["pending_approval", "pending", "deploying", "redeploying"];
 
 export function DeploymentDetailClient({ id }: { id: string }) {
   const t = useTranslations("lists.deploymentDetail");
@@ -154,9 +138,9 @@ export function DeploymentDetailClient({ id }: { id: string }) {
   // generic; we narrow at the use-site.
   useSubscription(DEPLOYMENT_LIFECYCLE_STREAM, {
     onData: ({ data: payload }) => {
-      const stream = (payload.data as
+      const stream = payload.data as
         | { astroliftDeploymentLifecycleStream?: { deploymentId?: string } }
-        | undefined);
+        | undefined;
       const evt = stream?.astroliftDeploymentLifecycleStream;
       if (evt && evt.deploymentId === id) {
         refetchDeployment().catch(() => {});
@@ -183,17 +167,14 @@ export function DeploymentDetailClient({ id }: { id: string }) {
   }>(REDEPLOY_APP, { refetchQueries: refetch });
 
   const busy =
-    approveState.loading ||
-    abortState.loading ||
-    rollbackState.loading ||
-    redeployState.loading;
+    approveState.loading || abortState.loading || rollbackState.loading || redeployState.loading;
 
   const d = dData?.astroliftDeployment ?? null;
   const log = lData?.astroliftDeploymentLog ?? [];
 
   function reportResult(
     label: string,
-    result: MutationResultLite<AstroliftDeployment> | null | undefined,
+    result: MutationResultLite<AstroliftDeployment> | null | undefined
   ) {
     if (!result) return;
     if (result.ok) {
@@ -217,12 +198,9 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
   if (!d) {
     return (
-      <PageShell
-        title={t("notFoundTitle")}
-        description={t("notFoundDescription")}
-      >
+      <PageShell title={t("notFoundTitle")} description={t("notFoundDescription")}>
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
+          <CardContent className="text-muted-foreground p-6 text-sm">
             {t("returnLink")}{" "}
             <Link href="/deployments" className="underline">
               {t("deploymentsList")}
@@ -241,8 +219,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
     can("app.approve_deploy");
   const showAbort = inFlight && can("app.deploy");
   const showRollback = d.status === "running" && can("app.rollback");
-  const showRedeploy =
-    (d.status === "running" || d.status === "failed") && can("app.deploy");
+  const showRedeploy = (d.status === "running" || d.status === "failed") && can("app.deploy");
 
   return (
     <PageShell
@@ -320,7 +297,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
             <StatusDot status={statusToDot[d.status]} />
-            <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
+            <DeploymentStatusPill status={d.status} />
             {d.approvalsRequired > 0 && (
               <Badge variant="secondary">
                 {t("approvalsCount", {
@@ -358,12 +335,8 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 <Field label={t("fields.commit")} mono value={d.commitSha.slice(0, 12)} />
               )}
               {d.branch && <Field label={t("fields.branch")} mono value={d.branch} />}
-              {d.ciActorKind && (
-                <Field label={t("fields.ciActor")} mono value={d.ciActorKind} />
-              )}
-              {d.ciProvider && (
-                <Field label={t("fields.ciProvider")} mono value={d.ciProvider} />
-              )}
+              {d.ciActorKind && <Field label={t("fields.ciActor")} mono value={d.ciActorKind} />}
+              {d.ciProvider && <Field label={t("fields.ciProvider")} mono value={d.ciProvider} />}
               {d.ciRunUrl && (
                 <Field
                   label={t("fields.ciRun")}
@@ -397,7 +370,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
             <ol className="border-muted relative ml-3 space-y-4 border-l pl-4">
               {log.map((e) => (
                 <li key={e.id} className="relative">
-                  <span className="bg-background border-muted-foreground absolute -left-[21px] top-1 size-3 rounded-full border" />
+                  <span className="bg-background border-muted-foreground absolute top-1 -left-[21px] size-3 rounded-full border" />
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span className="font-mono text-sm capitalize">
                       {e.status.replace(/_/g, " ")}
@@ -406,9 +379,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                       {formatTime(e.occurredAt)}
                     </span>
                   </div>
-                  {e.message && (
-                    <div className="text-sm">{e.message}</div>
-                  )}
+                  {e.message && <div className="text-sm">{e.message}</div>}
                   {e.detail && Object.keys(e.detail).length > 0 && (
                     <pre className="bg-muted mt-1 max-h-40 overflow-auto rounded p-2 text-xs">
                       {JSON.stringify(e.detail, null, 2)}
@@ -460,14 +431,10 @@ export function DeploymentDetailClient({ id }: { id: string }) {
           ) : (
             (() => {
               const filtered = (events.data?.astroliftEvents ?? []).filter(
-                (e) => e.registeredAppId && d.registeredAppSlug && e.registeredAppId.length > 0,
+                (e) => e.registeredAppId && d.registeredAppSlug && e.registeredAppId.length > 0
               );
               if (filtered.length === 0) {
-                return (
-                  <p className="text-muted-foreground text-sm">
-                    {t("noEvents")}
-                  </p>
-                );
+                return <p className="text-muted-foreground text-sm">{t("noEvents")}</p>;
               }
               return (
                 <ul className="divide-y">
@@ -524,20 +491,10 @@ export function DeploymentDetailClient({ id }: { id: string }) {
   );
 }
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
+function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div>
-      <div className="text-muted-foreground text-xs uppercase tracking-wide">
-        {label}
-      </div>
+      <div className="text-muted-foreground text-xs tracking-wide uppercase">{label}</div>
       <div className={mono ? "font-mono text-sm" : "text-sm"}>{value}</div>
     </div>
   );

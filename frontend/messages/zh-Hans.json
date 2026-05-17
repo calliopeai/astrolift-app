@@ -681,6 +681,125 @@
         "received": "接收于 {rel}",
         "review": "查看"
       }
+    },
+    "deployments": {
+      "title": "部署",
+      "description": "所有应用和环境中的每次部署尝试。点击行可以查看工作流时间线、渲染后的清单和日志。",
+      "start": "开始部署",
+      "filterApp": "按应用 slug 过滤…",
+      "counts": "{filtered} / 共 {total}",
+      "emptyTitle": "暂无部署",
+      "emptyDescription": "在 /apps/[slug]/deploy 注册应用并触发部署。工作流启动后将在此显示。",
+      "openApps": "打开应用",
+      "approvalsCount": "{received}/{required} 个审批",
+      "rowAriaLabel": "部署 {app} → {env}。按 Enter 键打开。",
+      "columns": {
+        "appEnv": "应用 / 环境",
+        "image": "镜像",
+        "trigger": "触发方式",
+        "status": "状态",
+        "duration": "时长",
+        "started": "开始时间",
+        "actions": "操作"
+      },
+      "pills": {
+        "ariaLabel": "按状态过滤",
+        "all": "全部",
+        "active": "进行中",
+        "running": "运行中",
+        "failed": "失败"
+      },
+      "actions": {
+        "label": "操作",
+        "more": "更多操作",
+        "approve": "批准",
+        "abort": "取消",
+        "rollback": "回滚",
+        "redeploy": "重新部署",
+        "viewLogs": "查看详情 / 日志",
+        "viewCommit": "查看提交",
+        "copyGuid": "复制部署 ID",
+        "copyOk": "部署 ID 已复制。",
+        "copyFail": "无法复制到剪贴板。"
+      },
+      "statusOptions": {
+        "all": "所有状态",
+        "pending_approval": "等待审批",
+        "pending": "待处理",
+        "deploying": "部署中",
+        "redeploying": "重新部署中",
+        "running": "运行中",
+        "failed": "失败",
+        "rolled_back": "已回滚",
+        "superseded": "已被替换"
+      },
+      "envWorkload": "环境 {env} · 工作负载 {workload}",
+      "envOnly": "环境 {env}",
+      "confirm": {
+        "approveTitle": "批准 {tag} 的部署？",
+        "approveDescription": "解除对 {app}/{env} 的部署阻塞。工作流将立即恢复。",
+        "approveConfirm": "批准",
+        "abortTitle": "取消 {app}/{env} 进行中的部署？",
+        "abortDescription": "通知 Temporal 工作流取消。部署将标记为失败。已应用到集群的更改保留 — Astrolift 在取消时不会自动回滚。",
+        "abortConfirm": "取消部署",
+        "abortReasonLabel": "取消原因",
+        "abortReasonPlaceholder": "为何取消此部署？将保留在审计日志和历史侧栏中。",
+        "reasonRequired": "需要填写原因",
+        "rollbackTitle": "将 {app}/{env} 回滚到上一个修订？",
+        "rollbackDescription": "创建一个新的回滚部署，指向上一个运行中的修订。当前修订将被标记为已替换。",
+        "rollbackConfirm": "回滚",
+        "redeployTitle": "将 {tag} 重新部署到 {app}/{env}？",
+        "redeployDescription": "使用相同镜像启动一次新部署。可用于在暂时性失败后重试或拾取更新后的配置。",
+        "redeployConfirm": "重新部署"
+      },
+      "bulk": {
+        "selectAllLabel": "选择所有可见的部署",
+        "selectRowLabel": "选择 {app} / {env}",
+        "selected": "{count, plural, =1 {已选择 1 个部署} other {已选择 # 个部署}}",
+        "summary": "位于 {envs}。",
+        "mixedWarning": "所选项混合了进行中和终止状态 — 批量操作将禁用，直到选择保持一致。",
+        "clear": "清除",
+        "cancelButton": "取消 {count} 个",
+        "redeployButton": "重新部署 {count} 个",
+        "confirmCancel": {
+          "title": "取消 {count} 个进行中的部署？",
+          "description": "通知每个 Temporal 工作流取消。将所有所选部署标记为失败。已应用的集群状态保持不变。影响 {envs}。",
+          "reasonLabel": "取消原因",
+          "reasonPlaceholder": "为何取消这些部署？将保留在审计日志和历史侧栏中。",
+          "confirm": "取消部署"
+        },
+        "confirmRedeploy": {
+          "title": "重新部署 {count} 个部署？",
+          "description": "对每个所选行使用相同镜像标签启动一次新部署。影响 {envs}。",
+          "confirm": "全部重新部署"
+        },
+        "toasts": {
+          "abortLabel": "取消",
+          "redeployLabel": "重新部署",
+          "allOk": "{label} 成功：{count} 个部署。",
+          "allFailed": "{label} 失败：{count} 个部署：{message}",
+          "partial": "{label}：成功 {succeeded} 个，失败 {failed} 个。"
+        }
+      },
+      "startSheet": {
+        "title": "开始部署",
+        "description": "向 Temporal 提交新的部署。如果环境需要审批，部署将以 pending_approval 状态创建，直到有足够审批人签字后工作流才会开始。",
+        "appLabel": "应用",
+        "appPlaceholder": "选择应用",
+        "envLabel": "环境",
+        "envPlaceholder": "选择环境",
+        "tagLabel": "镜像标签",
+        "tagPlaceholder": "v1.4.2 或 sha-abc123",
+        "digestLabel": "镜像摘要（可选）",
+        "digestPlaceholder": "sha256:...",
+        "digestHint": "设置后，工作流会将此摘要渲染到清单中 — 确保目标不可变。",
+        "triggerLabel": "触发方式",
+        "approvalsSuffix": "{count} 个审批",
+        "paused": "已暂停",
+        "cancel": "取消",
+        "submit": "开始部署",
+        "submitting": "正在开始…"
+      }
     }
   },
   "jobs": {

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
+import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { PageShell } from "@/components/PageShell";
 import { QuorumWidget } from "@/components/QuorumWidget";
 import { StatusDot } from "@/components/StatusDot";
@@ -173,7 +174,7 @@ export function ApprovalClient({ id }: { id: string }) {
             <CardHeader>
               <CardTitle className="flex flex-wrap items-center gap-3">
                 <StatusDot status={statusToDot[d.status]} />
-                <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
+                <DeploymentStatusPill status={d.status} />
                 {d.approvalsRequired > 0 && (
                   <Badge variant="secondary">
                     {t("approvalsCount", {
