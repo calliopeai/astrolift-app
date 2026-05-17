@@ -86,6 +86,13 @@ EXEMPT: dict[str, str] = {
         "self-service: returns apps the caller can reach via their own RoleBindings"
         " (any scope from app up to org). Permission visibility IS the gate."
     ),
+    "RegistryQuery.astrolift_app_permissions": (
+        "self-service: returns the caller's own effective permission slugs on "
+        "one app, computed via the same RoleBinding scope traversal the "
+        "@require_permission decorator uses (#478). No data leaks past what "
+        "the caller already has — the resolver hides apps in other tenants "
+        "and returns [] when there is no binding."
+    ),
     "RegistryQuery.astrolift_platform_api_url": (
         "platform-level value (the install's PLATFORM_API_URL) surfaced to the "
         "Settings / CI-setup page so the operator can paste it into "
