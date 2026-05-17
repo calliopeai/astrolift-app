@@ -571,6 +571,18 @@
         "title": "Organisation",
         "description": "Nom affiché, site web, valeurs de rétention par défaut."
       },
+      "members": {
+        "title": "Membres",
+        "description": "Membres de l'organisation, invitations et attributions de rôles."
+      },
+      "teams": {
+        "title": "Équipes",
+        "description": "Regroupez les membres pour partager la propriété des apps et projets."
+      },
+      "projects": {
+        "title": "Projets",
+        "description": "Regroupements logiques d'apps appartenant aux équipes."
+      },
       "identityProvider": {
         "title": "Fournisseur d'identité",
         "description": "Configuration OIDC / SAML + provisionnement SCIM."

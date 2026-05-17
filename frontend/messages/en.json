@@ -1895,6 +1895,18 @@
         "title": "Organization",
         "description": "Display name, website, retention defaults."
       },
+      "members": {
+        "title": "Members",
+        "description": "Org members, invitations, and role bindings."
+      },
+      "teams": {
+        "title": "Teams",
+        "description": "Group members for shared ownership of apps and projects."
+      },
+      "projects": {
+        "title": "Projects",
+        "description": "Logical groupings of apps owned by teams."
+      },
       "identityProvider": {
         "title": "Identity provider",
         "description": "OIDC / SAML config + SCIM provisioning."
