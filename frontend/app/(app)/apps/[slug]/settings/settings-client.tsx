@@ -1,9 +1,11 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  BoxIcon,
   ChevronRightIcon,
+  DatabaseIcon,
   FileCodeIcon,
   FlameIcon,
   GlobeIcon,
@@ -16,6 +18,7 @@ import {
   PlayIcon,
   PlugIcon,
   RefreshCwIcon,
+  ShieldIcon,
   TimerIcon,
   Trash2Icon,
   UsersIcon,
@@ -44,6 +47,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -55,14 +59,23 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  CANCEL_DEREGISTER,
   DEREGISTER_APP,
   FORCE_REDEPLOY,
   PAUSE_APP_INGRESS,
   RESUME_APP_INGRESS,
   RUN_JOB_ONCE,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
+import {
+  LIST_ENVIRONMENTS,
+  PREVIEW_DEREGISTER_APP,
+  PREVIEW_FORCE_REDEPLOY,
+} from "@/graphql/lifecycle/lifecycle.queries";
+import type {
+  AstroliftAppEnvironment,
+  AstroliftDeregisterPreview,
+  AstroliftForceRedeployPreview,
+} from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { RESYNC_MANIFEST_FROM_REPO } from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
@@ -73,6 +86,10 @@ import { AppTabs } from "../components/app-tabs";
 import { AssignProjectCard } from "../components/assign-project-card";
 import { CiSetupSection } from "../components/ci-setup-section";
 import { ControlsSection } from "../components/controls-section";
+import {
+  DeregisterPendingBanner,
+  recordDeregisterPending,
+} from "../components/deregister-pending-banner";
 import { TeamsCard } from "../components/teams-card";
 
 interface AppResp {
@@ -180,14 +197,18 @@ export function SettingsClient({ slug }: { slug: string }) {
       description={
         <span className="text-muted-foreground font-mono text-xs">
           {t.rich("description", {
-            slug: () => (
-              <span className="text-foreground">{a.slug}</span>
-            ),
+            slug: () => <span className="text-foreground">{a.slug}</span>,
           })}
         </span>
       }
     >
       <AppTabs slug={a.slug} active="settings" />
+
+      {/* Grace-period cancel banner (#436 B). Mounts above the
+          inline controls so the operator sees the countdown
+          immediately after kicking off a deregister, regardless of
+          which subpage they navigate to next. */}
+      <DeregisterPendingBanner appSlug={a.slug} />
 
       <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />
 
@@ -389,9 +410,7 @@ function IngressControlsSection({ appSlug }: { appSlug: string }) {
           <Skeleton className="h-20 w-full" />
         </div>
       ) : envs.length === 0 ? (
-        <p className="text-muted-foreground text-xs italic">
-          {t("emptyEnvs")}
-        </p>
+        <p className="text-muted-foreground text-xs italic">{t("emptyEnvs")}</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {envs.map((env) => (
@@ -516,8 +535,12 @@ interface ForceRedeployResp {
   }>;
 }
 
+interface ForceRedeployPreviewResp {
+  previewAstroliftForceRedeploy: AstroliftForceRedeployPreview | null;
+}
+
 /**
- * Destructive recovery card for wedged apps (#389).
+ * Destructive recovery card for wedged apps (#389 + #436 D).
  *
  * Three steps run in order: cancel in-flight Deployment rows, delete
  * the per-workload k8s objects (Deployment / Service / Ingress /
@@ -529,20 +552,48 @@ interface ForceRedeployResp {
  * matching the backend's `confirmSlug` muscle-memory guard. The
  * `Continue` button only enables once the typed slug equals the
  * app's slug exactly.
+ *
+ * #436 D — in-flight deployment preview: the modal fetches
+ * `previewAstroliftForceRedeploy` on open and renders the list of
+ * Deployment rows the recovery path will transition to FAILED.
+ * Operator sees timestamps, who triggered, and image tags — enough
+ * provenance to weigh "let this finish" vs "blow it away".
  */
 function ForceRedeploySection({ appSlug }: { appSlug: string }) {
   const t = useTranslations("apps.settings.forceRedeploy");
+  const tPreview = useTranslations("apps.settings.forceRedeploy.preview");
+  const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [typed, setTyped] = React.useState("");
   const [forceRedeploy, { loading }] = useMutation<ForceRedeployResp>(FORCE_REDEPLOY);
 
-  // Reset the typed slug each time the modal closes so a reopened
-  // dialog starts blank — the confirmation is per-attempt.
+  // Lazy-load the in-flight preview when the modal opens. ``cache-and-
+  // network`` keeps the list fresh between reopens — a deploy that
+  // landed since the previous open shouldn't be invisible.
+  const [loadPreview, previewQuery] = useLazyQuery<ForceRedeployPreviewResp>(
+    PREVIEW_FORCE_REDEPLOY,
+    {
+      fetchPolicy: "cache-and-network",
+    }
+  );
+
   React.useEffect(() => {
-    if (!open) {
+    if (open) {
+      void loadPreview({ variables: { appSlug } });
+    } else {
       setTyped("");
     }
-  }, [open]);
+  }, [open, loadPreview, appSlug]);
+
+  // Coerce out of useLazyQuery's DeepPartial<TData> envelope once the
+  // top-level field is present — children below all live on the same
+  // resolver, so either the whole shape lands or `data` is undefined.
+  const preview =
+    (previewQuery.data?.previewAstroliftForceRedeploy as
+      | AstroliftForceRedeployPreview
+      | undefined) ?? null;
+  const previewLoading = previewQuery.loading && !preview;
+  const inFlight = preview?.inFlightDeployments ?? [];
 
   const slugMatches = typed.trim() === appSlug;
 
@@ -615,22 +666,77 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
       </CardContent>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <FlameIcon className="text-destructive size-4" />
               {t("confirmTitle", { slug: appSlug })}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("confirmDescription")}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t("confirmDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* In-flight deployment preview (#436 D) — the rows below
+              are exactly what the recovery path transitions to FAILED
+              before re-firing CI. ``inFlight.length === 0`` is the
+              calm path: no live deploys to interrupt. */}
+          <div className="bg-muted/40 my-2 space-y-2 rounded-md border p-3 text-xs">
+            <p className="font-medium">
+              {previewLoading
+                ? tPreview("loading")
+                : tPreview("header", { count: inFlight.length })}
+            </p>
+            {previewLoading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : inFlight.length === 0 ? (
+              <p className="text-muted-foreground">{tPreview("noInflight")}</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {inFlight.map((d) => (
+                  <li
+                    key={d.id}
+                    className="border-border/60 flex flex-col gap-0.5 rounded-md border bg-transparent p-2 font-mono"
+                  >
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className="text-[10px]">
+                        {d.status}
+                      </Badge>
+                      <span className="text-foreground">{d.environmentName}</span>
+                      {d.workloadSlug ? (
+                        <span className="text-muted-foreground">/ {d.workloadSlug}</span>
+                      ) : null}
+                      {d.imageTag ? (
+                        <span className="text-muted-foreground">@ {d.imageTag}</span>
+                      ) : null}
+                    </div>
+                    <p className="text-muted-foreground text-[10px]">
+                      {tPreview("triggeredBy", {
+                        actor: d.triggeredByDisplay,
+                        when: fmt.formatRelativeTime(d.startedAt ?? d.createdAt),
+                      })}
+                      {d.ciRunUrl ? (
+                        <>
+                          {" · "}
+                          <a
+                            href={d.ciRunUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            {tPreview("ciRun")}
+                          </a>
+                        </>
+                      ) : null}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="grid gap-2 py-2">
             <Label htmlFor="force-redeploy-confirm" className="text-xs">
               {t.rich("typeToConfirm", {
-                slug: () => (
-                  <span className="text-foreground font-mono text-xs">{appSlug}</span>
-                ),
+                slug: () => <span className="text-foreground font-mono text-xs">{appSlug}</span>,
               })}
             </Label>
             <Input
@@ -666,7 +772,7 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
 // ─── danger zone ──────────────────────────────────────────────────────────────
 
 /**
- * Hard-deregister + full teardown surface (#392).
+ * Hard-deregister + full teardown surface (#392 + #436 A/B/C).
  *
  * Fires `DeregisterAppWorkflow` with a deterministic workflow id so
  * re-firing the mutation (same `app_slug`) joins the existing run via
@@ -677,45 +783,25 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
  * app's name verbatim (muscle-memory guard) — the backend enforces
  * the same check server-side via the `confirm_name` field on
  * `DeregisterAppInput`.
+ *
+ * #436 A — blast-radius preview: the modal fetches
+ * `previewAstroliftDeregister` on open and renders an expandable
+ * grouped list (k8s / managed-services / identity / network / secrets)
+ * with the actual object names the workflow will tear down. The
+ * trigger button carries a resource-count badge so the operator sees
+ * the magnitude before clicking through.
+ *
+ * #436 B — grace-period cancel: a successful kickoff writes a pending
+ * entry to localStorage; the {@link DeregisterPendingBanner} at the
+ * top of the page consumes it and renders the 5-min countdown +
+ * Cancel CTA. The cancel mutation signals the workflow within the
+ * window.
+ *
+ * #436 C — partial-failure resume: the still-live banner gets an
+ * inline Retry CTA that fires the deregister mutation directly
+ * (same workflow id → Temporal de-dup joins the existing run). No
+ * modal reopen, no re-type.
  */
-const TEARDOWN_RESOURCE_LABELS: { key: string; label: string; detail: string }[] = [
-  {
-    key: "k8s_namespace",
-    label: "Kubernetes namespace",
-    detail: "Deployments, Services, Ingresses, ConfigMaps, PVCs, Pods.",
-  },
-  {
-    key: "managed_services",
-    label: "Managed services",
-    detail:
-      "Postgres / Redis / object storage — irreversibly deleted with delete_data + force_destroy.",
-  },
-  {
-    key: "registry_repo",
-    label: "Image registry repo",
-    detail: "Archives the per-app repo + clears the stored URI.",
-  },
-  {
-    key: "identity_role",
-    label: "Workload identity role",
-    detail: "Deletes the IRSA / WI / FI role bound to the app's ServiceAccount.",
-  },
-  {
-    key: "materialized_secrets",
-    label: "Cluster secrets",
-    detail: "Drops materialized k8s Secrets + revokes the app's secret-bundle refs.",
-  },
-  {
-    key: "source_webhook",
-    label: "Source-host webhook",
-    detail: "Removes the push-event hook the platform installed on the source repo.",
-  },
-  {
-    key: "deploy_tokens",
-    label: "Deploy tokens",
-    detail: "Revokes every active deploy token so CI / cron pointed at the app fails loudly.",
-  },
-];
 
 interface DeregisterResp {
   deregisterAstroliftApp: MutationResult<{
@@ -724,43 +810,257 @@ interface DeregisterResp {
   }>;
 }
 
+interface PreviewResp {
+  previewAstroliftDeregister: AstroliftDeregisterPreview | null;
+}
+
+interface ResourceGroupSpec {
+  key: string;
+  icon: typeof BoxIcon;
+  count: number;
+  body: React.ReactNode;
+}
+
+function ResourceGroup({ group, labelKey }: { group: ResourceGroupSpec; labelKey: string }) {
+  const t = useTranslations("apps.settings.dangerZone.preview.groups");
+  const [open, setOpen] = React.useState(false);
+  const Icon = group.icon;
+  if (group.count <= 0) return null;
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="hover:bg-muted/60 flex w-full items-center gap-2 rounded-md border bg-transparent px-2 py-1.5 text-left text-xs"
+        >
+          <ChevronRightIcon
+            className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`}
+          />
+          <Icon className="text-muted-foreground size-4" />
+          <span className="text-foreground flex-1 font-medium">{t(labelKey)}</span>
+          <Badge variant="secondary" className="text-[10px]">
+            {group.count}
+          </Badge>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1 pl-7">{group.body}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string }) {
   const t = useTranslations("apps.settings.dangerZone");
+  const tPreview = useTranslations("apps.settings.dangerZone.preview");
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [confirm, setConfirm] = React.useState("");
   const [stillLive, setStillLive] = React.useState<string[]>([]);
   const [deregister, { loading }] = useMutation<DeregisterResp>(DEREGISTER_APP);
 
-  // Reset transient state whenever the modal closes so a re-open is
-  // fresh; preserve `stillLive` between resume attempts so the
-  // operator can see what's outstanding without reopening clean.
+  // Lazy-load the preview when the modal opens so closed-modal renders
+  // don't fire a network call. ``cache-and-network`` keeps the count
+  // badge fresh whenever the modal reopens — the resource list can
+  // change between attempts (operator created/deleted services in a
+  // sibling tab) and a stale badge would mislead.
+  const [loadPreview, previewQuery] = useLazyQuery<PreviewResp>(PREVIEW_DEREGISTER_APP, {
+    fetchPolicy: "cache-and-network",
+  });
+
   React.useEffect(() => {
-    if (!open) {
+    if (open) {
+      void loadPreview({ variables: { appSlug } });
+    } else {
       setConfirm("");
     }
-  }, [open]);
+  }, [open, loadPreview, appSlug]);
+
+  // useLazyQuery returns a DeepPartial<TData> on `data` to model the
+  // "haven't fired yet" state; coerce to the full type once we've
+  // checked the top-level field is present.
+  const preview =
+    (previewQuery.data?.previewAstroliftDeregister as AstroliftDeregisterPreview | undefined) ??
+    null;
+  const previewLoading = previewQuery.loading && !preview;
 
   const armed = confirm.trim() === appName && !loading;
 
-  async function handleConfirm() {
-    if (!armed) return;
+  // Group the preview rows by destination so the expander tree maps
+  // 1:1 with the workflow's per-step ordering (k8s → managed
+  // services → identity → secrets → network).
+  const k8sBody = React.useMemo(() => {
+    if (!preview || preview.k8sObjects.length === 0) return null;
+    // Group k8s objects by (cluster, namespace) for readability.
+    const groups = new Map<string, typeof preview.k8sObjects>();
+    for (const o of preview.k8sObjects) {
+      const key = `${o.clusterSlug}/${o.namespace}`;
+      const arr = groups.get(key) ?? [];
+      arr.push(o);
+      groups.set(key, arr);
+    }
+    return (
+      <ul className="space-y-2 text-[11px]">
+        {Array.from(groups.entries()).map(([key, items]) => (
+          <li key={key}>
+            <p className="text-muted-foreground font-mono">{key}</p>
+            <ul className="mt-0.5 list-disc pl-5 font-mono">
+              {items.map((o) => (
+                <li key={`${key}-${o.apiVersion}-${o.kind}-${o.name}`}>
+                  <span className="text-muted-foreground">{o.kind}</span>{" "}
+                  <span className="text-foreground">{o.name}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    );
+  }, [preview]);
+
+  const managedServicesBody = React.useMemo(() => {
+    if (!preview || preview.managedServices.length === 0) return null;
+    return (
+      <ul className="space-y-1 text-[11px]">
+        {preview.managedServices.map((s) => (
+          <li key={s.id} className="flex items-center gap-2 font-mono">
+            <span className="text-foreground">{s.name || s.kind}</span>
+            <Badge variant="outline" className="text-[10px]">
+              {s.kind}
+              {s.variant ? `/${s.variant}` : ""}
+            </Badge>
+            <span className="text-muted-foreground">{s.environmentName}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }, [preview]);
+
+  const secretsBody = React.useMemo(() => {
+    if (!preview || preview.secretRefs.length === 0) return null;
+    return (
+      <ul className="space-y-1 font-mono text-[11px]">
+        {preview.secretRefs.map((r) => (
+          <li key={r.id}>
+            <span className="text-foreground">{r.bundleSlug}</span>
+            {r.prefix ? <span className="text-muted-foreground"> ({r.prefix})</span> : null}{" "}
+            <span className="text-muted-foreground">→ {r.environmentName}</span>
+            {r.clusterSlug ? (
+              <span className="text-muted-foreground"> @ {r.clusterSlug}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    );
+  }, [preview]);
+
+  const tokensBody = React.useMemo(() => {
+    if (!preview || preview.deployTokens.length === 0) return null;
+    return (
+      <ul className="space-y-1 font-mono text-[11px]">
+        {preview.deployTokens.map((tok) => (
+          <li key={tok.id}>
+            <span className="text-foreground">{tok.name}</span>
+            <span className="text-muted-foreground"> ····{tok.last4}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }, [preview]);
+
+  const identityBody = React.useMemo(() => {
+    if (!preview || preview.identityRoles.length === 0) return null;
+    return (
+      <ul className="space-y-1 font-mono text-[11px]">
+        {preview.identityRoles.map((r) => (
+          <li key={`${r.clusterSlug}-${r.roleArnOrPrincipal}`}>
+            <span className="text-muted-foreground">{r.clusterSlug}</span>{" "}
+            <span className="text-foreground">{r.roleArnOrPrincipal}</span>
+            <Badge variant="outline" className="ml-1 text-[10px]">
+              {r.kind}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+    );
+  }, [preview]);
+
+  const networkBody = React.useMemo(() => {
+    if (!preview) return null;
+    const hasWebhook = preview.sourceWebhook?.installed === true;
+    const hasRegistry = !!preview.registryRepoUri;
+    if (!hasWebhook && !hasRegistry) return null;
+    return (
+      <ul className="space-y-1 font-mono text-[11px]">
+        {hasWebhook && preview.sourceWebhook ? (
+          <li>
+            <span className="text-muted-foreground">{tPreview("sourceWebhookLabel")} →</span>{" "}
+            <span className="text-foreground">{preview.sourceWebhook.repo}</span>
+            <span className="text-muted-foreground"> #{preview.sourceWebhook.hookId}</span>
+          </li>
+        ) : null}
+        {hasRegistry ? (
+          <li>
+            <span className="text-muted-foreground">{tPreview("registryRepoLabel")} →</span>{" "}
+            <span className="text-foreground break-all">{preview.registryRepoUri}</span>
+          </li>
+        ) : null}
+      </ul>
+    );
+  }, [preview, tPreview]);
+
+  const groups: ResourceGroupSpec[] = preview
+    ? [
+        { key: "k8s", icon: BoxIcon, count: preview.k8sObjects.length, body: k8sBody },
+        {
+          key: "managedServices",
+          icon: DatabaseIcon,
+          count: preview.managedServices.length,
+          body: managedServicesBody,
+        },
+        {
+          key: "secrets",
+          icon: LockIcon,
+          count: preview.secretRefs.length,
+          body: secretsBody,
+        },
+        {
+          key: "deployTokens",
+          icon: KeyIcon,
+          count: preview.deployTokens.length,
+          body: tokensBody,
+        },
+        {
+          key: "identity",
+          icon: ShieldIcon,
+          count: preview.identityRoles.length,
+          body: identityBody,
+        },
+        {
+          key: "network",
+          icon: WebhookIcon,
+          count: (preview.sourceWebhook?.installed ? 1 : 0) + (preview.registryRepoUri ? 1 : 0),
+          body: networkBody,
+        },
+      ]
+    : [];
+
+  async function fireDeregister(opts: { confirmName?: string } = {}) {
+    const confirmName = opts.confirmName ?? confirm.trim();
     try {
       const { data } = await deregister({
-        variables: { input: { appSlug, confirmName: confirm.trim() } },
+        variables: { input: { appSlug, confirmName } },
       });
       const env = data?.deregisterAstroliftApp;
       if (!env) {
-        toast.error("Deregister failed: no response from backend.");
+        toast.error(t("toastNoResponse"));
         return;
       }
       if (!env.ok) {
-        toast.error(env.errors?.[0]?.message ?? "Deregister failed.");
+        toast.error(env.errors?.[0]?.message ?? t("toastFailed"));
         return;
       }
       const payload = env.data;
       if (!payload) {
-        toast.error("Deregister returned no payload.");
+        toast.error(t("toastNoPayload"));
         return;
       }
       // Partial-failure resume returns the still-live list; the
@@ -769,19 +1069,33 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
       // empty list — happy-path redirect.
       if (payload.stillLiveResources.length > 0) {
         setStillLive(payload.stillLiveResources);
-        toast.warning(
-          `Resume pending — ${payload.stillLiveResources.length} resource class(es) still live.`,
-        );
+        toast.warning(t("toastResumePending", { count: payload.stillLiveResources.length }));
         return;
       }
-      toast.success(
-        `Deregistering — workflow ${payload.workflowId}. Check the app's Workflows tab for progress.`,
-      );
+      // Pin the grace-period countdown banner so the operator can
+      // cancel within the 5-min window from any app subpage.
+      recordDeregisterPending(appSlug, payload.workflowId);
+      setStillLive([]);
+      toast.success(t("toastKickoff", { workflowId: payload.workflowId }));
       setOpen(false);
       router.push("/apps");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Deregister failed.");
+      toast.error(err instanceof Error ? err.message : t("toastFailed"));
     }
+  }
+
+  async function handleConfirm() {
+    if (!armed) return;
+    await fireDeregister();
+  }
+
+  // Partial-failure resume (#436 C): the retry CTA re-fires the
+  // mutation against the same workflow id (Temporal de-dup joins the
+  // existing run) without re-opening the modal. We pass the app name
+  // through so the backend's confirm-name guard still passes — the
+  // operator already typed it once.
+  async function handleRetry() {
+    await fireDeregister({ confirmName: appName });
   }
 
   return (
@@ -803,6 +1117,11 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
             <Button variant="destructive" onClick={() => setOpen(true)}>
               <Trash2Icon className="size-4" />
               {t("button")}
+              {preview && preview.totalResourceCount > 0 ? (
+                <Badge variant="secondary" className="ml-1.5 text-[10px]">
+                  {preview.totalResourceCount}
+                </Badge>
+              ) : null}
             </Button>
           </Can>
           {stillLive.length > 0 ? (
@@ -820,9 +1139,14 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
                   size="sm"
                   variant="outline"
                   className="mt-2"
-                  onClick={() => setOpen(true)}
+                  onClick={() => void handleRetry()}
                   disabled={loading}
                 >
+                  {loading ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCwIcon className="size-4" />
+                  )}
                   {t("retry")}
                 </Button>
               </Can>
@@ -834,7 +1158,7 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
       </Card>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="text-destructive size-5" />
@@ -843,18 +1167,34 @@ function DangerZoneCard({ appSlug, appName }: { appSlug: string; appName: string
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm">
                 <p>{t("confirmIntro")}</p>
-                <ul className="bg-muted/40 space-y-2 rounded-md border p-3 text-xs">
-                  {TEARDOWN_RESOURCE_LABELS.map((r) => (
-                    <li key={r.key} className="flex flex-col gap-0.5">
-                      <span className="text-foreground font-medium">{r.label}</span>
-                      <span className="text-muted-foreground">{r.detail}</span>
-                    </li>
-                  ))}
-                </ul>
+
+                {/* Blast-radius preview (#436 A) — collapsed by
+                    default. Each group expands to the actual object
+                    names the workflow will tear down. */}
+                <div className="bg-muted/40 space-y-2 rounded-md border p-3">
+                  <p className="text-xs font-medium">
+                    {previewLoading
+                      ? tPreview("loading")
+                      : tPreview("header", {
+                          count: preview?.totalResourceCount ?? 0,
+                        })}
+                  </p>
+                  {previewLoading ? (
+                    <Skeleton className="h-16 w-full" />
+                  ) : preview && preview.totalResourceCount > 0 ? (
+                    <div className="space-y-1.5">
+                      {groups.map((g) => (
+                        <ResourceGroup key={g.key} group={g} labelKey={g.key} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">{tPreview("noResources")}</p>
+                  )}
+                </div>
+
                 <div className="space-y-1.5">
                   <Label htmlFor="deregister-confirm" className="text-xs">
-                    {t("typeToConfirm")}{" "}
-                    <span className="font-mono">{appName}</span>
+                    {t("typeToConfirm")} <span className="font-mono">{appName}</span>
                   </Label>
                   <Input
                     id="deregister-confirm"
@@ -939,9 +1279,7 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
   });
   const [runJobOnce, { loading }] = useMutation<RunJobOnceResp>(RUN_JOB_ONCE);
 
-  const cronJobs = (workloads.data?.astroliftWorkloads ?? []).filter(
-    (w) => w.kind === "cronjob",
-  );
+  const cronJobs = (workloads.data?.astroliftWorkloads ?? []).filter((w) => w.kind === "cronjob");
   const environments = envs.data?.astroliftEnvironments ?? [];
 
   const [jobSlugOverride, setJobSlugOverride] = React.useState<string | null>(null);

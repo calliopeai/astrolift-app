@@ -7,6 +7,14 @@ firing the mutation joins the existing run via a deterministic
 workflow id (``DeregisterAppWorkflow-<app-guid>``), so a partial
 failure can be resumed without manual rescue.
 
+Grace-period cancel (#436 B): the workflow waits up to 5 minutes for
+a ``cancel_teardown`` signal before any destructive step runs. The
+``cancelAstroliftDeregister`` mutation sends the signal; if it
+arrives within the window the workflow returns ``ok=False`` with a
+``cancelled=True`` marker and NO destructive work executes. After
+the window elapses the workflow proceeds with the teardown and
+subsequent cancel signals are no-ops.
+
 Resource teardown order (each step records its result on
 ``WorkflowResult.data["teardown"][<resource>]``):
 
@@ -80,6 +88,14 @@ _QUICK_TIMEOUT = timedelta(minutes=2)
 _NAMESPACE_TIMEOUT = timedelta(minutes=10)
 _DEPROVISION_TIMEOUT = timedelta(minutes=30)
 
+# Grace-period window the workflow holds before the first destructive
+# activity runs. The FE renders a live countdown banner on the app
+# detail page so the operator can cancel a slow-typing mistake. Five
+# minutes is short enough that an abandoned cancel doesn't strand a
+# real teardown indefinitely; long enough that an "oh no" reaction
+# almost always lands inside the window.
+GRACE_PERIOD = timedelta(minutes=5)
+
 _STANDARD_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=2),
     maximum_interval=timedelta(seconds=15),
@@ -99,6 +115,34 @@ def _step_result(*, ok: bool, detail: str, data: Any = None) -> dict[str, Any]:
 
 @workflow.defn(name="DeregisterAppWorkflow")
 class DeregisterAppWorkflow:
+    def __init__(self) -> None:
+        # Grace-period cancellation state (#436 B). Initialised here
+        # rather than on the class so a Temporal workflow replay
+        # rebuilds it cleanly on every history-driven re-execution
+        # (the signal-handler delta is recorded in the workflow
+        # history so the flag is deterministic across replays).
+        self._cancel_requested: bool = False
+        self._cancel_reason: str = ""
+
+    @workflow.signal(name="cancel_teardown")
+    def cancel_teardown(self, reason: str = "") -> None:
+        """Operator-fired cancel signal (#436 B).
+
+        The mutation ``cancelAstroliftDeregister`` sends this signal
+        within the 5-minute grace window. If it lands before the
+        ``wait_condition`` below fires, the workflow short-circuits
+        without doing any destructive work. Signals received after the
+        window are no-ops — the destructive activities have already
+        started and Temporal owns retry semantics from there.
+        """
+        # Idempotent: a second signal arriving before the wait_condition
+        # resolves still sets the flag (no-op) and doesn't lose the
+        # first reason. Last-wins on the reason string when both are
+        # non-empty so the most recent caller's context survives.
+        self._cancel_requested = True
+        if reason:
+            self._cancel_reason = reason
+
     @workflow.run
     async def run(self, input: DeregisterAppInput) -> WorkflowResult:
         app_id = input.registered_app_id
@@ -114,6 +158,40 @@ class DeregisterAppWorkflow:
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
+
+        # ---- Grace-period window (#436 B) -----------------------------
+        # Hold here so the operator gets a chance to cancel a typo'd
+        # confirm before destructive work starts. ``wait_condition``
+        # returns when the predicate becomes true; it raises
+        # ``asyncio.TimeoutError`` if the timeout elapses with the
+        # predicate still false. We only honour cancellation at this
+        # single boundary so the FE's "cancel within X" promise is
+        # observable and the destructive work below is monotonic.
+        try:
+            await workflow.wait_condition(
+                lambda: self._cancel_requested,
+                timeout=GRACE_PERIOD,
+            )
+        except TimeoutError:
+            # Grace window elapsed without a cancel signal — proceed
+            # to the destructive steps. This is the happy path.
+            pass
+        if self._cancel_requested:
+            workflow.logger.info(
+                "deregister cancelled within grace window app=%s reason=%s",
+                app_id,
+                self._cancel_reason,
+            )
+            return WorkflowResult(
+                ok=False,
+                message="cancelled within grace window",
+                data={
+                    "cancelled": True,
+                    "cancel_reason": self._cancel_reason,
+                    "teardown": {},
+                    "still_live_resources": [],
+                },
+            )
 
         teardown: dict[str, dict[str, Any]] = {}
         still_live: list[str] = []

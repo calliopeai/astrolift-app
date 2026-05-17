@@ -33,6 +33,8 @@ from astrolift_lifecycle.schema.types import (
     DeploymentMetricsType,
     DeploymentType,
     DeployTokenType,
+    DeregisterPreviewType,
+    ForceRedeployPreviewType,
     PreviewEnvironmentType,
     ScheduledJobRunType,
     WorkloadPodStatusBucketType,
@@ -685,6 +687,342 @@ class LifecycleQuery:
         if binding is None:
             return None
         return identity_binding_to_type(binding)
+
+    # ----------------------------------------------------------------
+    # #436 A — blast-radius preview for the deregister modal.
+    # ----------------------------------------------------------------
+    #
+    # The deregister modal used to enumerate generic resource-class
+    # labels ("k8s namespace", "managed services"). That made it hard to
+    # spot the case where a teardown was about to remove something the
+    # operator didn't realize was bound to the app (a prod RDS instance,
+    # an IRSA role another workload squatted on, etc.). This resolver
+    # returns the actual object names so the modal renders an auditable
+    # tree — grouped by k8s / managed-services / identity / network — on
+    # open. The data shape mirrors the workflow's per-step teardown order
+    # so a future "show what failed" view can re-use the same projection.
+    #
+    # Gate: ``app.delete`` — same permission the deregister mutation
+    # requires. A user who can read the app but not delete it has no
+    # business previewing the destructive list.
+
+    @strawberry.field
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def preview_astrolift_deregister(
+        self,
+        info: Info,
+        app_slug: str,
+    ) -> DeregisterPreviewType | None:
+        """Blast-radius read for the deregister modal (#436 A).
+
+        Resolves the app + every per-app resource that the deregister
+        workflow will tear down. Returns None on not-found so the FE
+        renders an empty-state without leaking row counts (tenant
+        scoping already filters cross-org rows out of the lookup).
+
+        Read-only — no side effects. Safe to fire on every modal-open
+        without changing platform state.
+        """
+        from astrolift_lifecycle.schema.types import (
+            DeregisterPreviewDeployTokenType,
+            DeregisterPreviewIdentityRoleType,
+            DeregisterPreviewK8sObjectType,
+            DeregisterPreviewManagedServiceType,
+            DeregisterPreviewSecretRefType,
+            DeregisterPreviewSourceWebhookType,
+        )
+        from astrolift_registry.models import Workload
+        from astrolift_services.models import AppSecretBundleRef, ManagedService
+        from core.app_deploy import namespace_for_app
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return None
+
+        # ---- k8s objects across every active env+cluster pair --------
+        envs = list(
+            AppEnvironment.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+            ).select_related("tenant_cluster"),
+        )
+        workloads = list(
+            Workload.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+            ),
+        )
+        # Per-workload canonical names + bare-slug fallback mirrors what
+        # the force-redeploy delete path targets — keep the two paths
+        # aligned so the preview list matches what will actually run.
+        names: list[str] = []
+        seen: set[str] = set()
+        for w in workloads:
+            n = f"{app.slug}-{w.slug}" if w.slug else app.slug
+            if n and n not in seen:
+                names.append(n)
+                seen.add(n)
+        if app.slug and app.slug not in seen:
+            names.append(app.slug)
+            seen.add(app.slug)
+
+        namespace = namespace_for_app(app)
+        # apiVersion / kind pairs the renderer emits for a typical app.
+        # Same list the force-redeploy delete path targets so the preview
+        # honestly reflects what gets deleted; the namespace cascade
+        # picks up Pods/RS/ConfigMaps/PVCs that aren't explicitly named.
+        _RENDER_KINDS = (
+            ("v1", "Namespace"),
+            ("apps/v1", "Deployment"),
+            ("v1", "Service"),
+            ("networking.k8s.io/v1", "Ingress"),
+            ("batch/v1", "CronJob"),
+            ("v1", "Secret"),
+        )
+        k8s_objects: list[DeregisterPreviewK8sObjectType] = []
+        for env in envs:
+            cluster = env.tenant_cluster
+            if cluster is None:
+                continue
+            for api_version, kind in _RENDER_KINDS:
+                if kind == "Namespace":
+                    k8s_objects.append(
+                        DeregisterPreviewK8sObjectType(
+                            cluster_slug=cluster.slug,
+                            namespace=namespace,
+                            api_version=api_version,
+                            kind=kind,
+                            name=namespace,
+                        ),
+                    )
+                    continue
+                for name in names:
+                    k8s_objects.append(
+                        DeregisterPreviewK8sObjectType(
+                            cluster_slug=cluster.slug,
+                            namespace=namespace,
+                            api_version=api_version,
+                            kind=kind,
+                            name=name,
+                        ),
+                    )
+
+        # ---- managed services -----------------------------------------
+        ms_rows = list(
+            ManagedService.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+            ).select_related("app_environment"),
+        )
+        managed_services = [
+            DeregisterPreviewManagedServiceType(
+                id=str(m.guid),
+                name=m.name or m.kind,
+                kind=m.kind,
+                variant=m.variant or "",
+                environment_name=(m.app_environment.name if m.app_environment_id else ""),
+                status=m.status,
+            )
+            for m in ms_rows
+        ]
+
+        # ---- materialized secret refs ---------------------------------
+        ref_rows = list(
+            AppSecretBundleRef.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+            ).select_related(
+                "app_environment__tenant_cluster",
+                "secret_bundle",
+            ),
+        )
+        secret_refs = [
+            DeregisterPreviewSecretRefType(
+                id=str(r.guid),
+                bundle_slug=r.secret_bundle.slug,
+                environment_name=(r.app_environment.name if r.app_environment_id else ""),
+                cluster_slug=(
+                    r.app_environment.tenant_cluster.slug
+                    if r.app_environment_id and r.app_environment.tenant_cluster_id
+                    else None
+                ),
+                prefix=r.prefix or "",
+            )
+            for r in ref_rows
+        ]
+
+        # ---- deploy tokens --------------------------------------------
+        # ``DeployToken`` is app-scoped (no env FK); ``environment_name``
+        # is intentionally None on the preview type so the FE can render
+        # token rows under a flat "all environments" header.
+        token_rows = list(
+            DeployToken.objects.filter(
+                registered_app=app,
+                deleted_at__isnull=True,
+            ),
+        )
+        deploy_tokens = [
+            DeregisterPreviewDeployTokenType(
+                id=str(t.guid),
+                name=t.name,
+                last4=t.token_last_4,
+                environment_name=None,
+            )
+            for t in token_rows
+        ]
+
+        # ---- source webhook -------------------------------------------
+        source_webhook: DeregisterPreviewSourceWebhookType | None = None
+        if app.source_repo:
+            source_webhook = DeregisterPreviewSourceWebhookType(
+                installed=bool(app.source_webhook_id),
+                repo=app.source_repo,
+                hook_id=app.source_webhook_id or "",
+            )
+
+        # ---- identity role binding ------------------------------------
+        # Best-effort per-cluster identity lookup. Falls back to an
+        # empty list when no driver implements describe_identity; the
+        # deregister workflow's identity-role step is itself best-effort
+        # so the preview matches its reach.
+        from core.app_deploy import AppDeployError, driver_for_capability
+
+        identity_roles: list[DeregisterPreviewIdentityRoleType] = []
+        for env in envs:
+            cluster = env.tenant_cluster
+            if cluster is None or not getattr(cluster, "is_active", True):
+                continue
+            try:
+                driver = driver_for_capability(cluster, "identity")
+            except AppDeployError:
+                continue
+            try:
+                binding = driver.describe_identity(app.slug)
+            except NotImplementedError:
+                continue
+            except Exception:  # noqa: BLE001 — degrade silently
+                continue
+            if binding is None:
+                continue
+            identity_roles.append(
+                DeregisterPreviewIdentityRoleType(
+                    cluster_slug=cluster.slug,
+                    kind=binding.kind,
+                    role_arn_or_principal=binding.role_arn_or_principal,
+                ),
+            )
+
+        total = (
+            len(k8s_objects)
+            + len(managed_services)
+            + len(secret_refs)
+            + len(deploy_tokens)
+            + len(identity_roles)
+            + (1 if source_webhook and source_webhook.installed else 0)
+            + (1 if app.registry_repo_uri else 0)
+        )
+
+        return DeregisterPreviewType(
+            app_slug=app.slug,
+            app_name=app.name,
+            k8s_objects=k8s_objects,
+            managed_services=managed_services,
+            secret_refs=secret_refs,
+            deploy_tokens=deploy_tokens,
+            source_webhook=source_webhook,
+            identity_roles=identity_roles,
+            registry_repo_uri=app.registry_repo_uri or "",
+            total_resource_count=total,
+        )
+
+    # ----------------------------------------------------------------
+    # #436 D — force-redeploy in-flight deployment preview.
+    # ----------------------------------------------------------------
+    #
+    # Force-redeploy will transition every in-flight Deployment row on
+    # the (app, env) pair to FAILED before re-firing the CI workflow
+    # (``_cancel_in_flight_deploys_sync``). This resolver returns the
+    # same row set so the operator sees what they're about to interrupt
+    # — timestamps, who triggered, image tag — and can decide to wait
+    # rather than blow it away. Gate matches the mutation: ``app.deploy``
+    # + ``app.update`` (both required for the destructive surface).
+
+    @strawberry.field
+    @require_permission(Permission.APP_DEPLOY, Permission.APP_UPDATE)
+    @tenant_scoped()
+    def preview_astrolift_force_redeploy(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+    ) -> ForceRedeployPreviewType | None:
+        """In-flight deployment list a force-redeploy will cancel (#436 D)."""
+        from astrolift_lifecycle.schema.types import (
+            ForceRedeployPreviewDeploymentType,
+        )
+        from astrolift_workflows.activities.force_redeploy import (
+            _IN_FLIGHT_STATUSES,
+        )
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return None
+
+        qs = (
+            Deployment.objects.filter(
+                registered_app=app,
+                status__in=_IN_FLIGHT_STATUSES,
+                deleted_at__isnull=True,
+            )
+            .select_related("app_environment", "workload", "triggered_by_user")
+            .order_by("-created_at")
+        )
+        if environment_name:
+            qs = qs.filter(app_environment__name=environment_name)
+
+        rows: list[ForceRedeployPreviewDeploymentType] = []
+        for d in qs[:50]:
+            user = d.triggered_by_user
+            if user is not None:
+                triggered_by = str(
+                    getattr(user, "email", "") or getattr(user, "username", "") or "",
+                )
+            elif d.triggered_by_token_kind:
+                triggered_by = f"token:{d.triggered_by_token_kind}"
+            elif d.ci_actor_kind:
+                triggered_by = f"ci:{d.ci_actor_kind}"
+            else:
+                triggered_by = "system"
+            rows.append(
+                ForceRedeployPreviewDeploymentType(
+                    id=str(d.guid),
+                    environment_name=(d.app_environment.name if d.app_environment_id else ""),
+                    workload_slug=(d.workload.slug if d.workload_id else None),
+                    status=d.status,
+                    image_tag=d.image_tag or "",
+                    started_at=d.started_at,
+                    created_at=d.created_at,
+                    trigger_kind=d.trigger_kind,
+                    triggered_by_display=triggered_by,
+                    ci_actor_kind=d.ci_actor_kind or "",
+                    ci_run_url=d.ci_run_url or "",
+                ),
+            )
+
+        return ForceRedeployPreviewType(
+            app_slug=app.slug,
+            environment_name=environment_name,
+            in_flight_deployments=rows,
+        )
 
 
 def _preview_with_cost(p) -> PreviewEnvironmentType:
