@@ -237,6 +237,75 @@
         "copyError": "Couldn't copy — select the text and copy manually",
         "unavailable": "FQDN unavailable — the app row is missing an organization."
       }
+    },
+    "previews": {
+      "title": "{name} · Previews",
+      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "disabled": {
+        "title": "Previews are disabled for this app",
+        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+      },
+      "stale": {
+        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
+        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+      },
+      "openRepo": "Open repo",
+      "enablePreviews": "Enable previews",
+      "openInTab": "새 탭에서 열기",
+      "openPr": "소스 호스트에서 PR #{pr} 열기",
+      "copyHostname": "프리뷰 호스트명 복사",
+      "filterEmpty": "현재 필터와 일치하는 프리뷰가 없습니다.",
+      "filters": {
+        "active": "활성",
+        "running": "실행 중",
+        "failed": "실패",
+        "all": "전체"
+      },
+      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "columns": {
+        "pr": "PR / 브랜치",
+        "hostname": "호스트명",
+        "ttl": "TTL",
+        "footprint": "사용량",
+        "lastDeploy": "최근 배포",
+        "status": "상태",
+        "actions": "작업",
+        "prBranch": "PR / 브랜치"
+      },
+      "ttlTooltip": "자동 해체일: {date}",
+      "extend": {
+        "1d": "+1일",
+        "7d": "+7일"
+      },
+      "costPerDay": "${cost}/일",
+      "costUnavailable": "비용 정보 없음",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
+      "staleBadge": "stale",
+      "tearDown": "해체",
+      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
+      "confirmTitle": "Tear down preview for PR #{pr}?",
+      "confirmFallback": "Tear down preview?",
+      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "empty": {
+        "title": "아직 프리뷰 환경이 없습니다",
+        "enabledHint": "PR을 열면 프리뷰가 자동으로 생성됩니다 — 보통 2분 이내입니다.",
+        "disabledHint": "앱 설정에서 프리뷰를 활성화하면 각 PR마다 자동으로 생성됩니다.",
+        "step1": "이 앱 설정에서 프리뷰를 활성화합니다.",
+        "step2": "연결된 저장소에 PR을 엽니다.",
+        "step3": "프리뷰가 약 2분 만에 빌드되는 것을 확인합니다.",
+        "learnMore": "프리뷰 작동 방식"
+      },
+      "toasts": {
+        "teardownEnqueued": "PR #{pr} 해체가 대기열에 추가되었습니다",
+        "teardownFailed": "해체 실패",
+        "ttlExtended": "PR #{pr} 프리뷰가 {days}일 연장됨",
+        "extendFailed": "TTL을 연장할 수 없습니다"
+      },
+      "emptyTitle": "No preview environments yet",
+      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     }
   },
   "settingsIndex": {
