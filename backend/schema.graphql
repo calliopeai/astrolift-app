@@ -306,7 +306,6 @@ type AstroliftAppSecret {
   managedServiceKind: String!
   isMasked: Boolean!
   lastEditedAt: DateTime
-  lastEditedBy: AstroliftSecretEditor
 }
 
 type AstroliftAppSecretBundleAttachment {
@@ -316,10 +315,6 @@ type AstroliftAppSecretBundleAttachment {
   environmentName: String!
   prefix: String!
   registeredAppSlug: String!
-  teamSlug: String
-  keyCount: Int!
-  mergeOrder: Int!
-  attachedAt: DateTime
 }
 
 type AstroliftAppSecretBundleAttachmentMutationResult {
@@ -547,50 +542,15 @@ type AstroliftContainerStatus {
   resources: AstroliftContainerResources!
 }
 
-type AstroliftCostAttribution {
-  attributedRows: [AstroliftCostBindingRow!]!
-  unattributedCents: Int!
-  totalCents: Int!
-  currency: String!
-}
-
-type AstroliftCostBindingRow {
-  managedServiceBindingId: String
-  managedServiceId: String
-  managedServiceName: String
-  managedServiceKind: String
-  registeredAppSlug: String
-  by: String!
-  amountCents: Int!
-  currency: String!
-}
-
-type AstroliftCostForecast {
-  mtdCents: Int!
-  previousMonthCents: Int!
-  deltaPct: Float!
-  projectedMonthlyCents: Int!
-  confidence: ForecastConfidence!
-  currency: String!
-}
-
 type AstroliftCostSnapshot {
   id: GUID!
   projectId: String
   registeredAppId: String
-  managedServiceBindingId: String
   takenAt: Date!
   by: String!
   amountCents: Int!
   currency: String!
   source: String!
-}
-
-type AstroliftCostTrendPoint {
-  date: Date!
-  amountCents: Int!
-  currency: String!
-  isAnomaly: Boolean!
 }
 
 type AstroliftDeployToken {
@@ -1158,20 +1118,6 @@ type AstroliftRenderedManifest {
   errorColumn: Int
 }
 
-type AstroliftRevealedSecret {
-  secretId: String!
-  key: String!
-  environmentName: String!
-  value: String!
-  revealedAt: DateTime!
-}
-
-type AstroliftRevealedSecretMutationResult {
-  ok: Boolean!
-  errors: [MutationError!]!
-  data: AstroliftRevealedSecret
-}
-
 type AstroliftRole {
   id: GUID!
   slug: String!
@@ -1287,12 +1233,6 @@ type AstroliftSecretBundleMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftSecretBundle
-}
-
-type AstroliftSecretEditor {
-  id: String!
-  username: String!
-  displayName: String!
 }
 
 type AstroliftSecurityPolicy {
@@ -1656,13 +1596,6 @@ input ConnectUserSourceProviderInput {
   providerConfigId: GUID!
 }
 
-enum CostWindow {
-  H24
-  D7
-  D30
-  MTD
-}
-
 input CreateAlertRuleInput {
   name: String!
   target: String!
@@ -1933,12 +1866,6 @@ input ForceRedeployInput {
   appSlug: String!
   environmentName: String = null
   confirmSlug: String!
-}
-
-enum ForecastConfidence {
-  LOW
-  MEDIUM
-  HIGH
 }
 
 """UUID v7 — the platform's external identifier."""
@@ -2326,7 +2253,6 @@ type Mutation {
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
-  revealAppSecret(input: RevealAppSecretInput!): AstroliftRevealedSecretMutationResult!
   attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
   detachSecretBundle(input: DetachSecretBundleInput!): AttachmentremovedpayloadMutationResult!
   rotateSecretBundle(input: RotateSecretBundleInput!): AstroliftSecretBundleMutationResult!
@@ -2619,10 +2545,7 @@ type Query {
   astroliftClusterWorkloadHealth(clusterId: GUID!): [AstroliftClusterWorkloadHealth!]!
   astroliftQuotas: [AstroliftQuota!]!
   astroliftBudgets: [AstroliftBudget!]!
-  astroliftCostSnapshots(days: Int = null, window: CostWindow = null, limit: Int! = 200): [AstroliftCostSnapshot!]!
-  astroliftCostTrend(window: CostWindow = null, days: Int = null): [AstroliftCostTrendPoint!]!
-  astroliftCostForecast: AstroliftCostForecast!
-  astroliftCostByBinding(window: CostWindow = null, days: Int = null, registeredAppSlug: String = null): AstroliftCostAttribution!
+  astroliftCostSnapshots(days: Int! = 30, limit: Int! = 200): [AstroliftCostSnapshot!]!
   astroliftSourceConnections: [AstroliftSourceConnection!]!
   astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
@@ -2740,11 +2663,6 @@ type ResyncManifestPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: ResyncManifestPayload
-}
-
-input RevealAppSecretInput {
-  appSlug: String!
-  secretId: String!
 }
 
 input RevokeApiTokenInput {
