@@ -83,6 +83,8 @@ const DEPLOY_TOKEN_FIELDS = `
   scopes
   expiresAt
   lastUsedAt
+  lastUsedIp
+  lastUsedAgent
   isRevoked
   lastRotatedAt
   registeredAppSlug
@@ -97,6 +99,7 @@ export const CREATE_DEPLOY_TOKEN = gql`
       data {
         token { ${DEPLOY_TOKEN_FIELDS} }
         plaintextSecret
+        rotationGraceSeconds
       }
     }
   }
@@ -110,6 +113,7 @@ export const ROTATE_DEPLOY_TOKEN = gql`
       data {
         token { ${DEPLOY_TOKEN_FIELDS} }
         plaintextSecret
+        rotationGraceSeconds
       }
     }
   }

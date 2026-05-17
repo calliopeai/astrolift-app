@@ -236,10 +236,20 @@ class RevokeDeployTokenInput:
 @strawberry.type
 class DeployTokenSecretReveal:
     """Returned exactly once on creation/rotation; the plaintext
-    token never lives in DB."""
+    token never lives in DB.
+
+    ``rotation_grace_seconds`` is the live Constance-tunable grace
+    window (``DEPLOY_TOKEN_ROTATION_GRACE_SECONDS``, default 24h)
+    the previous secret stays valid for after a rotate. ``0`` on
+    creation (no previous secret to honour). Surfaced so the rotate
+    ConfirmDialog can display the *actual* grace operators are
+    committing to instead of a hard-coded number that may have
+    drifted (#425).
+    """
 
     token: DeployTokenType
     plaintext_secret: str
+    rotation_grace_seconds: int = 0
 
 
 @strawberry.type
@@ -1855,6 +1865,8 @@ class LifecycleMutation:
         import secrets as secrets_lib
         from datetime import datetime, timedelta
 
+        from astrolift_lifecycle.deploy_tokens import rotation_grace_seconds_from_constance
+
         token = DeployToken.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
         if token is None:
             return gql_failure(
@@ -1868,14 +1880,17 @@ class LifecycleMutation:
             )
         plaintext = "alfdt_" + secrets_lib.token_urlsafe(32)
         digest = hashlib.sha256(plaintext.encode()).hexdigest()
-        # Park the previous hash for a 24h grace window so CI
-        # runners holding the old token keep working until they're
-        # updated (matches the model's documented rotation flow).
+        # Park the previous hash for the Constance-tunable grace
+        # window so CI runners holding the old token keep working
+        # until they're updated. The UI surfaces this exact value
+        # on the rotate-confirm dialog (#425).
+        grace_seconds = rotation_grace_seconds_from_constance()
+        now = datetime.now(tz=UTC)
         token.previous_token_hash = token.token_hash
-        token.previous_token_expires_at = datetime.now(tz=UTC) + timedelta(hours=24)
+        token.previous_token_expires_at = now + timedelta(seconds=grace_seconds)
         token.token_hash = digest
         token.token_last_4 = plaintext[-4:]
-        token.last_rotated_at = datetime.now(tz=UTC)
+        token.last_rotated_at = now
         token.save(
             update_fields=[
                 "previous_token_hash",
@@ -1891,6 +1906,7 @@ class LifecycleMutation:
             DeployTokenSecretReveal(
                 token=deploy_token_to_type(token),
                 plaintext_secret=plaintext,
+                rotation_grace_seconds=grace_seconds,
             )
         )
 

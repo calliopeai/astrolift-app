@@ -183,7 +183,9 @@ export type AstroliftApiToken = {
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   isRevoked: Scalars['Boolean']['output'];
+  lastUsedAgent?: Maybe<Scalars['String']['output']>;
   lastUsedAt?: Maybe<Scalars['DateTime']['output']>;
+  lastUsedIp?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   scopes: Array<Scalars['String']['output']>;
   teamSlug?: Maybe<Scalars['String']['output']>;
@@ -671,7 +673,9 @@ export type AstroliftDeployToken = {
   isRevoked: Scalars['Boolean']['output'];
   last4: Scalars['String']['output'];
   lastRotatedAt?: Maybe<Scalars['DateTime']['output']>;
+  lastUsedAgent: Scalars['String']['output'];
   lastUsedAt?: Maybe<Scalars['DateTime']['output']>;
+  lastUsedIp: Scalars['String']['output'];
   name: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   scopes: Array<Scalars['String']['output']>;
@@ -1886,6 +1890,7 @@ export type DeleteWebhookSubscriptionInput = {
 
 export type DeployTokenSecretReveal = {
   plaintextSecret: Scalars['String']['output'];
+  rotationGraceSeconds: Scalars['Int']['output'];
   token: AstroliftDeployToken;
 };
 

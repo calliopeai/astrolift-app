@@ -502,7 +502,13 @@ def app_domain_to_type(d) -> AppDomainType:
 class DeployTokenType:
     """Bearer credential bound to one app, scoped narrowly. The
     plaintext token is only returned on creation/rotation — at any
-    other time, only ``last_4`` is exposed."""
+    other time, only ``last_4`` is exposed.
+
+    ``last_used_ip`` + ``last_used_agent`` are stamped by the deploy-
+    token middleware on every successful ``alft_dt_`` bearer auth
+    (#425), giving operators a forensic anchor when investigating
+    a leaked token: which CI runner / IP last exercised it.
+    """
 
     id: GUID
     name: str
@@ -510,6 +516,8 @@ class DeployTokenType:
     scopes: list[str]
     expires_at: dt.datetime | None
     last_used_at: dt.datetime | None
+    last_used_ip: str
+    last_used_agent: str
     is_revoked: bool
     last_rotated_at: dt.datetime | None
     registered_app_slug: str
@@ -524,6 +532,8 @@ def deploy_token_to_type(t) -> DeployTokenType:
         scopes=list(t.scopes or []),
         expires_at=t.expires_at,
         last_used_at=t.last_used_at,
+        last_used_ip=t.last_used_ip or "",
+        last_used_agent=t.last_used_agent or "",
         is_revoked=t.is_revoked,
         last_rotated_at=t.last_rotated_at,
         registered_app_slug=t.registered_app.slug,

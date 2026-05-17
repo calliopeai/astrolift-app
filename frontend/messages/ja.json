@@ -390,6 +390,88 @@
         "collapse": "折りたたむ",
         "expand": "展開する"
       }
+    },
+    "tokens": {
+      "title": "Deploy tokens",
+      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
+      "createToken": "Create token",
+      "emptyTitle": "No deploy tokens yet",
+      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "allScopes": "all",
+      "never": "never",
+      "createFailed": "Create failed",
+      "revokeFailed": "Revoke failed",
+      "revokedToast": "Revoked {name}",
+      "columns": {
+        "name": "Name",
+        "last4": "Last 4",
+        "scopes": "Scopes",
+        "lastUsed": "Last used",
+        "expires": "Expires",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "active",
+        "revoked": "revoked"
+      },
+      "lastUsedCell": {
+        "ip": "IP",
+        "agent": "Agent"
+      },
+      "createSheet": {
+        "title": "Create deploy token",
+        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
+        "name": "Name",
+        "scopes": "Scopes (comma-separated)",
+        "scopesHint": "Leave blank for all scopes.",
+        "expires": "Expires in (days)",
+        "submit": "Create token",
+        "submitting": "Creating…"
+      },
+      "revealDialog": {
+        "title": "Token created — copy now",
+        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
+        "last4Label": "last 4",
+        "copy": "Copy",
+        "copied": "Copied to clipboard",
+        "done": "Done",
+        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+      },
+      "rotateDialog": {
+        "title": "Rotate {name}?",
+        "fallbackTitle": "Rotate token?",
+        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
+        "newLine": "New token issued now.",
+        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
+        "confirm": "Rotate token"
+      },
+      "revokeDialog": {
+        "title": "Revoke {name}?",
+        "fallbackTitle": "Revoke token?",
+        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
+        "confirm": "Revoke token"
+      }
+    },
+    "domains": {
+      "addSheet": {
+        "byoTitle": "Bring your own certificate",
+        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
+        "methodLabels": {
+          "dns_txt": "DNS-TXT (default)",
+          "http_01": "HTTP-01",
+          "dns_01": "DNS-01",
+          "byo_cert": "Bring your own certificate"
+        },
+        "methodHints": {
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
+          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
+          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
+        }
+      }
     }
   },
   "settingsIndex": {
