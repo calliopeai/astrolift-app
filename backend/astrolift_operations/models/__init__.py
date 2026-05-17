@@ -6,6 +6,13 @@ from astrolift_operations.models.audit_export import AuditExport
 from astrolift_operations.models.device_registration import DeviceRegistration
 from astrolift_operations.models.event import Event
 from astrolift_operations.models.notification import Notification
+from astrolift_operations.models.notification_preference import (
+    DEFAULT_PREFERENCES,
+    NotificationChannel,
+    NotificationPreference,
+    default_enabled,
+    is_enabled,
+)
 from astrolift_operations.models.notification_delivery import NotificationDelivery
 from astrolift_operations.models.notification_profile import NotificationProfile
 from astrolift_operations.models.webhook_delivery import WebhookDelivery
@@ -14,6 +21,7 @@ from astrolift_operations.models.workflow_run import WorkflowRun
 from astrolift_operations.models.workload_identity_role import WorkloadIdentityRole
 
 __all__ = [
+    "DEFAULT_PREFERENCES",
     "AlertEvent",
     "AlertMute",
     "AlertRule",
@@ -23,10 +31,14 @@ __all__ = [
     "DeviceRegistration",
     "Event",
     "Notification",
+    "NotificationChannel",
+    "NotificationPreference",
     "NotificationDelivery",
     "NotificationProfile",
     "WebhookDelivery",
     "WebhookSubscription",
     "WorkflowRun",
     "WorkloadIdentityRole",
+    "default_enabled",
+    "is_enabled",
 ]

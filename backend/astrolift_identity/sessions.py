@@ -299,6 +299,33 @@ def record_session(request: HttpRequest) -> AstroliftSession | None:
             client_kind=row.client_kind,
             current_session_id=row.pk,
         )
+        # #499 — fan out "new sign-in" push to user's OTHER devices.
+        # Lives behind a try/except because session-create must never
+        # break on a notification-pipeline outage; the dispatcher
+        # itself is also defensive but a missing app / import error
+        # at startup time would otherwise tear down auth.
+        try:
+            from astrolift_operations.notification_dispatch import (
+                emit_session_created_event,
+            )
+
+            emit_session_created_event(
+                user_id=user.pk,
+                session_pk=row.pk,
+                session_guid=str(row.guid),
+                client_kind=row.client_kind,
+                ip_address=row.last_seen_ip,
+                user_agent=row.last_seen_agent,
+                label=row.label,
+                organization_id=row.organization_id,
+                occurred_at=row.last_seen_at or now,
+            )
+        except Exception:  # noqa: BLE001 — tracking must never fail the request
+            log.warning(
+                "session-create push fan-out failed",
+                exc_info=True,
+                extra={"user_id": user.pk, "session_pk": row.pk},
+            )
     return row
 
 
