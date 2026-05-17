@@ -149,6 +149,13 @@ class MemberType:
     lifecycle: str
     joined_at: dt.datetime | None
     last_seen_at: dt.datetime | None
+    # Most recent recorded activity for this user — derived from the
+    # AuditEvent stream (max occurred_at where actor_id == user.pk).
+    # Distinct from ``last_seen_at`` which only flips on session login;
+    # ``last_active_at`` covers every audited action (mutations, deploy
+    # commands, API-token use). Null when the user has no audit record
+    # in the current org yet — most often a fresh invite acceptance.
+    last_active_at: dt.datetime | None
     created_at: dt.datetime
     deleted_at: dt.datetime | None
 
@@ -161,6 +168,11 @@ class RoleBindingType:
     role: RoleType
     scope_kind: str
     scope_id: str
+    # Human-readable description of where this binding was granted —
+    # e.g. "team payments", "project frontend/web", "app web-api",
+    # or "organization". Resolved server-side so the FE doesn't need
+    # to parallel-load teams / projects / apps to render the tooltip.
+    source_scope_label: str
     granted_at: dt.datetime
     expires_at: dt.datetime | None
     inherits: bool
@@ -187,7 +199,7 @@ def role_to_type(role) -> RoleType:
     )
 
 
-def member_to_type(member) -> MemberType:
+def member_to_type(member, *, last_active_at: dt.datetime | None = None) -> MemberType:
     return MemberType(
         id=GUID(str(member.guid)),
         user=user_to_type(member.user),
@@ -197,12 +209,13 @@ def member_to_type(member) -> MemberType:
         lifecycle=member.lifecycle,
         joined_at=member.joined_at,
         last_seen_at=member.last_seen_at,
+        last_active_at=last_active_at,
         created_at=member.created_at,
         deleted_at=member.deleted_at,
     )
 
 
-def role_binding_to_type(binding) -> RoleBindingType:
+def role_binding_to_type(binding, *, source_scope_label: str = "") -> RoleBindingType:
     return RoleBindingType(
         id=GUID(str(binding.guid)),
         user=user_to_type(binding.user) if binding.user_id else None,
@@ -210,6 +223,7 @@ def role_binding_to_type(binding) -> RoleBindingType:
         role=role_to_type(binding.role),
         scope_kind=binding.scope_kind,
         scope_id=str(binding.scope_id),
+        source_scope_label=source_scope_label,
         granted_at=binding.granted_at,
         expires_at=binding.expires_at,
         inherits=binding.inherits,

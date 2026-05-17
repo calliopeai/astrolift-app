@@ -1,6 +1,7 @@
 import {
   BellIcon,
   BuildingIcon,
+  FileBoxIcon,
   GitBranchIcon,
   KeyIcon,
   KeyRoundIcon,
@@ -8,6 +9,8 @@ import {
   ShieldCheckIcon,
   ShieldIcon,
   UserCircleIcon,
+  Users2Icon,
+  UsersIcon,
 } from "lucide-react";
 
 /**
@@ -27,6 +30,9 @@ import {
  */
 export type SettingsSectionKey =
   | "organization"
+  | "members"
+  | "teams"
+  | "projects"
   | "identityProvider"
   | "sourceProviders"
   | "policies"
@@ -58,6 +64,27 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
         href: "/settings/organization",
         icon: BuildingIcon,
         i18nKey: "organization",
+      },
+      {
+        key: "members",
+        href: "/members",
+        icon: Users2Icon,
+        i18nKey: "members",
+        external: true,
+      },
+      {
+        key: "teams",
+        href: "/teams",
+        icon: UsersIcon,
+        i18nKey: "teams",
+        external: true,
+      },
+      {
+        key: "projects",
+        href: "/projects",
+        icon: FileBoxIcon,
+        i18nKey: "projects",
+        external: true,
       },
       {
         key: "identityProvider",

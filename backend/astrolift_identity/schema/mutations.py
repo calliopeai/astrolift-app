@@ -588,7 +588,13 @@ class IdentityMutation:
             defaults={"is_active": True, "lifecycle": "active"},
         )
 
-        return gql_success(role_binding_to_type(binding))
+        # Resolve a single source-scope label inline so the FE can show
+        # the role-source tooltip on the freshly-granted binding without
+        # an extra refetch.
+        from astrolift_identity.schema.queries import _resolve_source_scope_labels
+
+        label = _resolve_source_scope_labels([binding]).get((binding.scope_kind, binding.scope_id), "")
+        return gql_success(role_binding_to_type(binding, source_scope_label=label))
 
     @strawberry.field
     @mutation_audit(action="role_binding.revoke")

@@ -3,7 +3,9 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  InfoIcon,
   MailIcon,
+  SearchIcon,
   ShieldIcon,
   Trash2Icon,
   UserMinusIcon,
@@ -32,6 +34,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -41,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   BULK_REVOKE_ROLE_BINDINGS,
   REVOKE_INVITATION,
@@ -64,7 +68,7 @@ import type {
   AstroliftTeam,
   MutationResult,
 } from "@/graphql/identity/identity.types";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useDebounce } from "@/hooks/use-debounce";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
 import { InvitationExpiryBadge } from "./invitation-expiry";
@@ -72,6 +76,9 @@ import { InviteDialog } from "./invite-dialog";
 
 interface MembersResp {
   astroliftMembers: AstroliftMember[];
+}
+interface MembersVars {
+  search?: string | null;
 }
 interface RoleBindingsResp {
   astroliftRoleBindings: AstroliftRoleBinding[];
@@ -94,18 +101,32 @@ type RevokeTarget =
   | { kind: "invitation"; invitation: AstroliftInvitation }
   | { kind: "binding"; binding: AstroliftRoleBinding };
 
+const STALE_THRESHOLD_DAYS = 90;
+
 export function MembersClient() {
+  const t = useTranslations("orgMembers");
   const [open, setOpen] = React.useState(false);
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<RevokeTarget | null>(null);
-  // Bulk-revoke selection state (#416). A Set of binding GUIDs the
-  // operator has checked; cleared on success so the footer disappears.
-  const [selectedBindings, setSelectedBindings] = React.useState<Set<string>>(() => new Set());
-  const [confirmBulkRevoke, setConfirmBulkRevoke] = React.useState(false);
-  const tBulk = useTranslations("lists.membersBulk");
-  const perms = useMyPermissions();
-  const canManageMembers = perms.can("org.manage_members");
-  const members = useQuery<MembersResp>(LIST_MEMBERS);
+  // Deep-link grant: when set, the GrantRoleDialog opens pre-populated
+  // with this member's user PK so the operator skips the user picker.
+  // The dialog calls onOpenChange(false) on submit/cancel, which clears
+  // this back to null via the wrapper handler below.
+  const [grantForMember, setGrantForMember] = React.useState<AstroliftMember | null>(null);
+
+  // A. Search affordance. 200ms debounce matches the issue spec; the
+  // debounced value is what the query keys off, so typing fast doesn't
+  // hammer the resolver.
+  const [searchInput, setSearchInput] = React.useState("");
+  const debouncedSearch = useDebounce(searchInput, 200);
+  const searchVariable: MembersVars = debouncedSearch.trim()
+    ? { search: debouncedSearch.trim() }
+    : {};
+
+  const members = useQuery<MembersResp, MembersVars>(LIST_MEMBERS, {
+    variables: searchVariable,
+    fetchPolicy: "cache-and-network",
+  });
   const bindings = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS);
   const roles = useQuery<RolesResp>(LIST_ROLES);
   const invitations = useQuery<InvitationsResp>(LIST_INVITATIONS);
@@ -269,6 +290,8 @@ export function MembersClient() {
     bindingsByUser.set(b.user.id, arr);
   }
 
+  const hasActiveSearch = debouncedSearch.trim().length > 0;
+
   return (
     <PageShell
       title="Members"
@@ -335,31 +358,136 @@ export function MembersClient() {
                           <Badge className={scopeBadge[m.scopeKind]} variant="secondary">
                             {m.scopeKind}
                           </Badge>
-                          <span className="text-muted-foreground font-mono text-[10px]">
-                            {scopeLabel(m)}
-                          </span>
-                        </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {m.joinedAt
+                            ? new Date(m.joinedAt).toLocaleDateString()
+                            : new Date(m.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Can permission="org.manage_members">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setGrantForMember(m)}
+                                    aria-label={t("grantRoleRowLabel", {
+                                      name: m.user.username,
+                                    })}
+                                  >
+                                    <UserPlusIcon className="size-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {t("grantRoleRowTooltip", { name: m.user.username })}
+                                </TooltipContent>
+                              </Tooltip>
+                            </Can>
+                            <Can permission="org.manage_members">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={alreadyAnonymized}
+                                onClick={() => openAnonymizeDialog(m)}
+                                aria-label={`Anonymize ${m.user.username}`}
+                                title={
+                                  alreadyAnonymized
+                                    ? "Already anonymized"
+                                    : "Anonymize user data (GDPR right-to-delete)"
+                                }
+                              >
+                                <UserMinusIcon className="size-4" />
+                              </Button>
+                            </Can>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Role bindings</CardTitle>
+            <span className="text-muted-foreground text-xs">
+              {bindingList.length} binding{bindingList.length === 1 ? "" : "s"}
+            </span>
+          </CardHeader>
+          <CardContent className="p-0">
+            {bindings.loading ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : bindingList.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<ShieldIcon className="size-5" />}
+                  title="No role bindings"
+                  description="Grant a system role to a user to give them access to the platform."
+                />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>{t("sourceColumn")}</TableHead>
+                    <TableHead>Granted</TableHead>
+                    <TableHead className="text-right">{t("actionsColumn")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bindingList.map((b) => (
+                    <TableRow key={b.id}>
+                      <TableCell>
+                        {b.user ? (
+                          <>
+                            <div className="font-medium">{b.user.username}</div>
+                            <div className="text-muted-foreground text-xs">{b.user.email}</div>
+                          </>
+                        ) : (
+                          <div className="font-mono text-xs">group:{b.groupExternalId}</div>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {userBindings.length === 0 ? (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          ) : (
-                            userBindings.map((b) => (
-                              <Badge key={b.id} variant="outline" className="font-mono text-xs">
-                                {b.role.slug}
-                              </Badge>
-                            ))
+                        <div className="font-medium">{b.role.name}</div>
+                        <div className="text-muted-foreground font-mono text-xs">{b.role.slug}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <Badge className={scopeBadge[b.scopeKind]} variant="secondary">
+                            {b.scopeKind}
+                          </Badge>
+                          {b.sourceScopeLabel && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-foreground inline-flex"
+                                  aria-label={t("sourceTooltipAria", {
+                                    scope: b.sourceScopeLabel,
+                                  })}
+                                >
+                                  <InfoIcon className="size-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {t("rolePillTooltipPrefix", { scope: b.sourceScopeLabel })}
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={m.isActive ? "default" : "secondary"}>{m.lifecycle}</Badge>
-                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {m.joinedAt
-                          ? new Date(m.joinedAt).toLocaleDateString()
-                          : new Date(m.createdAt).toLocaleDateString()}
+                        {new Date(b.grantedAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <Can permission="org.manage_members">
@@ -575,15 +703,98 @@ export function MembersClient() {
                             <span className="sr-only">Revoke</span>
                           </Button>
                         </Can>
-                      )}
-                    </TableCell>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Invitations</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {invitations.loading ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : (invitations.data?.astroliftInvitations ?? []).length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<MailIcon className="size-5" />}
+                  title="No invitations"
+                  description="Use Invite to send a one-time accept link. Tokens are hashed at rest; the plaintext is shown once at creation."
+                />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead>Invited by</TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {(invitations.data?.astroliftInvitations ?? []).map((inv) => (
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-medium">{inv.email}</TableCell>
+                      <TableCell>
+                        {inv.roleSlug ? (
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {inv.roleSlug}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={inv.status === "pending" ? "default" : "secondary"}
+                          className="capitalize"
+                        >
+                          {inv.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(inv.expiresAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {inv.invitedByUsername ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {inv.status === "pending" && (
+                          <Can permission="org.manage_members">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setRevokeTarget({
+                                  kind: "invitation",
+                                  invitation: inv,
+                                })
+                              }
+                              disabled={revokingInvite}
+                            >
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Revoke</span>
+                            </Button>
+                          </Can>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
       {canManageMembers && selectedBindings.size > 0 && (
         // Sticky bulk action bar — surfaces only while a selection is
@@ -660,22 +871,150 @@ export function MembersClient() {
           } else {
             await handleRevoke(revokeTarget.binding);
           }
-        }}
-      />
+        />
+        <InviteDialog
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          roles={roles.data?.astroliftRoles ?? []}
+        />
 
-      <AnonymizeUserDialog
-        target={anonymizeTarget}
-        onOpenChange={(next) => {
-          if (!next) setAnonymizeTarget(null);
-        }}
-        acknowledged={anonymizeAcknowledged}
-        onAcknowledgedChange={setAnonymizeAcknowledged}
-        backendReady={ANONYMIZE_BACKEND_READY}
-        onConfirm={async () => {
-          if (anonymizeTarget) await handleAnonymize(anonymizeTarget);
-        }}
-      />
-    </PageShell>
+        <ConfirmDialog
+          open={revokeTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setRevokeTarget(null);
+          }}
+          title={
+            revokeTarget?.kind === "invitation"
+              ? `Revoke invitation for ${revokeTarget.invitation.email}?`
+              : revokeTarget?.kind === "binding"
+                ? `Revoke ${revokeTarget.binding.role.slug} from ${revokeTarget.binding.user?.username ?? revokeTarget.binding.groupExternalId}?`
+                : "Revoke?"
+          }
+          description={
+            revokeTarget?.kind === "invitation"
+              ? "The pending invitation link stops working immediately. You can re-send a fresh invitation if needed."
+              : "The user loses the permissions this role granted. Other role bindings, if any, remain in effect."
+          }
+          confirmLabel="Revoke"
+          destructive
+          onConfirm={async () => {
+            if (!revokeTarget) return;
+            if (revokeTarget.kind === "invitation") {
+              await handleRevokeInvite(revokeTarget.invitation);
+            } else {
+              await handleRevoke(revokeTarget.binding);
+            }
+          }}
+        />
+
+        <AnonymizeUserDialog
+          target={anonymizeTarget}
+          onOpenChange={(next) => {
+            if (!next) setAnonymizeTarget(null);
+          }}
+          acknowledged={anonymizeAcknowledged}
+          onAcknowledgedChange={setAnonymizeAcknowledged}
+          backendReady={ANONYMIZE_BACKEND_READY}
+          onConfirm={async () => {
+            if (anonymizeTarget) await handleAnonymize(anonymizeTarget);
+          }}
+        />
+      </PageShell>
+    </TooltipProvider>
+  );
+}
+
+/* ---- helper components ---------------------------------------------- */
+
+/**
+ * Role pill with no source-scope tooltip (the cell shows the role
+ * code; the source tooltip lives next to the scope badge in the
+ * role-bindings table). Keeps the People-row pill cheap and uniform.
+ */
+function RoleSourcePill({ binding }: { binding: AstroliftRoleBinding }) {
+  const t = useTranslations("orgMembers");
+  if (!binding.sourceScopeLabel) {
+    return (
+      <Badge variant="outline" className="font-mono text-xs">
+        {binding.role.slug}
+      </Badge>
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className="cursor-help font-mono text-xs">
+          {binding.role.slug}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        {t("rolePillTooltipPrefix", { scope: binding.sourceScopeLabel })}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+const RELATIVE_DIVISIONS: ReadonlyArray<{
+  amount: number;
+  unit: Intl.RelativeTimeFormatUnit;
+}> = [
+  { amount: 60, unit: "second" },
+  { amount: 60, unit: "minute" },
+  { amount: 24, unit: "hour" },
+  { amount: 7, unit: "day" },
+  { amount: 4.34524, unit: "week" },
+  { amount: 12, unit: "month" },
+  { amount: Number.POSITIVE_INFINITY, unit: "year" },
+];
+
+function formatRelative(iso: string, now: number): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  let duration = (date.getTime() - now) / 1000;
+  for (const division of RELATIVE_DIVISIONS) {
+    if (Math.abs(duration) < division.amount) {
+      return rtf.format(Math.round(duration), division.unit);
+    }
+    duration /= division.amount;
+  }
+  return iso;
+}
+
+/**
+ * Last-active cell: relative time + hover-tooltip with absolute, plus
+ * a muted "inactive" chip when older than ``STALE_THRESHOLD_DAYS``.
+ * Null values render as "—" rather than "never" so a user with no
+ * audit records yet doesn't read as suspicious.
+ *
+ * The "now" reference is snapshotted at mount via useState's lazy
+ * initializer so React's purity rules don't trip on a render-time
+ * ``Date.now()`` call. Re-snapshot is fine — even if a row sits on
+ * screen for an hour, the "3d ago" vs "3d ago" delta is invisible.
+ */
+function LastActiveCell({ value }: { value: string | null | undefined }) {
+  const t = useTranslations("orgMembers");
+  const [now] = React.useState(() => Date.now());
+  if (!value) {
+    return <span className="text-muted-foreground text-sm">{t("lastActiveNever")}</span>;
+  }
+  const date = new Date(value);
+  const daysAgo = (now - date.getTime()) / (1000 * 60 * 60 * 24);
+  const isStale = daysAgo > STALE_THRESHOLD_DAYS;
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-foreground cursor-help text-sm">{formatRelative(value, now)}</span>
+        </TooltipTrigger>
+        <TooltipContent>{date.toLocaleString()}</TooltipContent>
+      </Tooltip>
+      {isStale && (
+        <Badge variant="secondary" className="text-[10px]">
+          {t("lastActiveInactive")}
+        </Badge>
+      )}
+    </div>
   );
 }
 

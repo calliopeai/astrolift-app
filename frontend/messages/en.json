@@ -983,6 +983,49 @@
       "title": "Settings",
       "loading": "Loading…",
       "description": "Operational controls and configuration for <slug></slug>.",
+      "controls": {
+        "title": "Controls",
+        "description": "Live operational toggles. Take effect immediately — no CI roundtrip.",
+        "emptyEnvs": "No environments yet — sync the manifest to populate this section.",
+        "paused": "Paused",
+        "active": "Active",
+        "pause": "Pause",
+        "resume": "Resume",
+        "deployNow": "Deploy now",
+        "rebuildAndDeploy": "Rebuild & deploy",
+        "imageTagPlaceholder": "image tag (latest)",
+        "tooltipResumeFirst": "Resume deploys first.",
+        "tooltipDeployNow": "Deploys an existing image tag. Use 'Rebuild & deploy' to rebuild from source.",
+        "tooltipRebuildAndDeploy": "Rebuilds the image from main and runs the deploy end-to-end. Use 'Deploy now' if you want to redeploy an existing image tag.",
+        "approvalsRequired": "{count, plural, one {Requires # approval before rollout} other {Requires # approvals before rollout}}",
+        "workloadsHeader": "Workloads",
+        "workloadsEmpty": "No Deployment workloads yet — sync the manifest to populate this section.",
+        "readyCount": "{ready}/{desired} ready",
+        "apply": "Apply",
+        "applyScale": "Apply scale ({count})",
+        "decreaseReplica": "Decrease replicas",
+        "increaseReplica": "Increase replicas",
+        "rollingRestart": "Rolling restart",
+        "rollingRestartTooltip": "Recycle pods without changing the image — drains long-running connections, propagates sidecar updates.",
+        "ariaDecrease": "Decrease replicas",
+        "ariaIncrease": "Increase replicas",
+        "ariaWorkloadActions": "Workload actions for {workload}",
+        "dropdownLabel": "{workload} · {env}",
+        "confirmRestart": "Restart all replicas of {workload} in {env}? Pods roll one-by-one — long-running connections drain.",
+        "toastDeploysPaused": "Deploys paused for {env}.",
+        "toastDeploysResumed": "Deploys resumed for {env}.",
+        "toastDeployStarted": "Deploy started for {env} · {tag}.",
+        "toastDeployFailed": "Deploy failed.",
+        "toastActionFailed": "Action failed.",
+        "toastCiDispatched": "CI workflow dispatched.",
+        "toastCiBranch": "Branch: {branch}",
+        "toastCiOpenRun": "Open run →",
+        "toastRebuildFailed": "Rebuild & deploy failed.",
+        "toastRestartIssued": "Rolling restart issued for {workload} in {env}.",
+        "toastRestartFailed": "Rolling restart failed.",
+        "toastScaled": "{workload} in {env} scaled to {count, plural, one {# replica} other {# replicas}}.",
+        "toastScaleFailed": "Scale failed."
+      },
       "resync": {
         "title": "Resync from source",
         "description": "Re-read astrolift.toml from the deploy branch and apply env, workload, schedule, and managed-service changes. Non-destructive on local staged drafts.",
@@ -1122,6 +1165,78 @@
         "footer": "The job inherits the cronjob's pod spec verbatim. Manual runs are recorded alongside scheduled runs on the",
         "jobsPage": "jobs page",
         "viewRuns": "View runs"
+      },
+      "managedServicesSummary": {
+        "title": "Managed services",
+        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
+        "openAll": "Open all",
+        "viewDetail": "View detail",
+        "actionsLabel": "Quick actions",
+        "statusTooltip": "{kind} · status: {status}",
+        "statusFailed": "failed",
+        "lastAction": "{action} · {when}",
+        "actionLabels": {
+          "connection.reveal": "Connection revealed",
+          "test_email.send": "Test email sent"
+        },
+        "actions": {
+          "connection.reveal": "View connection details",
+          "objects.list": "List recent objects",
+          "email.send": "Send test email",
+          "queue.depth": "View queue depth"
+        },
+        "revealDialog": {
+          "title": "Connection details · {name}",
+          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
+          "secretRefLabel": "Secrets backend reference",
+          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
+          "revealedAt": "Revealed {when}",
+          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
+          "copy": "Copy",
+          "copied": "Copied to clipboard.",
+          "copyFailed": "Couldn't copy — select the text and copy manually.",
+          "close": "Close",
+          "loading": "Loading…",
+          "noResponse": "No response from backend.",
+          "failed": "Reveal failed."
+        },
+        "sendEmailDialog": {
+          "title": "Send test email · {name}",
+          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
+          "recipientLabel": "Recipient",
+          "subjectLabel": "Subject (optional)",
+          "subjectPlaceholder": "[Astrolift] Test email",
+          "bodyLabel": "Body (optional)",
+          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
+          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
+          "send": "Send test",
+          "cancel": "Cancel",
+          "sent": "Sent to {recipient} via {transport}.",
+          "noResponse": "No response from backend.",
+          "noPayload": "Send returned no payload.",
+          "failed": "Test send failed."
+        },
+        "objectsDialog": {
+          "title": "Recent objects · {name}",
+          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
+          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
+          "cacheAge": "Snapshot is {age} old.",
+          "noCacheAge": "Cache age not recorded yet.",
+          "truncated": "more available — open the full managed-services page.",
+          "refresh": "Refresh",
+          "close": "Close"
+        },
+        "depthDialog": {
+          "title": "Queue depth · {name}",
+          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
+          "depth": "Backlog",
+          "inFlight": "In-flight",
+          "sampledAt": "Sampled {when}.",
+          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
+          "loading": "Loading…",
+          "refresh": "Refresh",
+          "close": "Close"
+        }
       }
     },
     "workloadDetail": {
@@ -1945,6 +2060,18 @@
         "title": "Organization",
         "description": "Display name, website, retention defaults."
       },
+      "members": {
+        "title": "Members",
+        "description": "Org members, invitations, and role bindings."
+      },
+      "teams": {
+        "title": "Teams",
+        "description": "Group members for shared ownership of apps and projects."
+      },
+      "projects": {
+        "title": "Projects",
+        "description": "Logical groupings of apps owned by teams."
+      },
       "identityProvider": {
         "title": "Identity provider",
         "description": "OIDC / SAML config + SCIM provisioning."
@@ -2053,5 +2180,20 @@
       "lines": "{count, plural, one {# line} other {# lines}}",
       "truncated": "200 lines shown — open in console for the full tail."
     }
+  },
+  "orgMembers": {
+    "searchLabel": "Search members",
+    "searchPlaceholder": "Search by username or email…",
+    "lastActiveColumn": "Last active",
+    "actionsColumn": "Actions",
+    "noMatchTitle": "No matches",
+    "noMatchDescription": "No members match \"{term}\". Try a different search term.",
+    "lastActiveNever": "—",
+    "lastActiveInactive": "inactive",
+    "rolePillTooltipPrefix": "Granted via {scope}",
+    "sourceTooltipAria": "Granted via {scope}",
+    "sourceColumn": "Source",
+    "grantRoleRowLabel": "Grant role to {name}",
+    "grantRoleRowTooltip": "Grant role to {name}"
   }
 }
