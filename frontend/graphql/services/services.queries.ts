@@ -21,14 +21,8 @@ export const LIST_APP_SECRETS = gql`
 `;
 
 export const LIST_APP_SECRET_BUNDLE_ATTACHMENTS = gql`
-  query ListAppSecretBundleAttachments(
-    $appSlug: String!
-    $environmentName: String
-  ) {
-    astroliftAppSecretBundleAttachments(
-      appSlug: $appSlug
-      environmentName: $environmentName
-    ) {
+  query ListAppSecretBundleAttachments($appSlug: String!, $environmentName: String) {
+    astroliftAppSecretBundleAttachments(appSlug: $appSlug, environmentName: $environmentName) {
       id
       registeredAppSlug
       environmentName
@@ -57,10 +51,7 @@ export const LIST_SECRET_BUNDLES = gql`
 
 export const LIST_MANAGED_SERVICES = gql`
   query ListManagedServices($appSlug: String!, $environmentName: String) {
-    astroliftManagedServices(
-      appSlug: $appSlug
-      environmentName: $environmentName
-    ) {
+    astroliftManagedServices(appSlug: $appSlug, environmentName: $environmentName) {
       id
       kind
       name

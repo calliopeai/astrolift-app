@@ -52,12 +52,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
@@ -145,15 +140,10 @@ export function SecretsClient({ slug }: { slug: string }) {
   const [envName, setEnvName] = React.useState<string>(ALL_ENVS);
   const [setOpen, setSetOpen] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
-  const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(
-    null,
-  );
-  const [detachTarget, setDetachTarget] =
-    React.useState<AppSecretBundleAttachment | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(null);
+  const [detachTarget, setDetachTarget] = React.useState<AppSecretBundleAttachment | null>(null);
   // revealedValues maps secret.id -> plaintext while revealed.
-  const [revealedValues, setRevealedValues] = React.useState<
-    Record<string, string>
-  >({});
+  const [revealedValues, setRevealedValues] = React.useState<Record<string, string>>({});
   // editingId: which row is in inline-edit mode (must be revealed first).
   const [editingId, setEditingId] = React.useState<string | null>(null);
   // revealingId: which row's reveal mutation is currently in flight.
@@ -174,13 +164,10 @@ export function SecretsClient({ slug }: { slug: string }) {
     variables,
     fetchPolicy: "cache-and-network",
   });
-  const attachments = useQuery<AttachmentsResp>(
-    LIST_APP_SECRET_BUNDLE_ATTACHMENTS,
-    {
-      variables,
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const attachments = useQuery<AttachmentsResp>(LIST_APP_SECRET_BUNDLE_ATTACHMENTS, {
+    variables,
+    fetchPolicy: "cache-and-network",
+  });
 
   const refetch = [
     { query: LIST_APP_SECRETS, variables },
@@ -227,22 +214,17 @@ export function SecretsClient({ slug }: { slug: string }) {
     revealAppSecret: MutationResult<RevealedSecretData>;
   }>(REVEAL_APP_SECRET);
 
-  const busy =
-    setState.loading ||
-    deleteState.loading ||
-    bulkState.loading ||
-    detachState.loading;
+  const busy = setState.loading || deleteState.loading || bulkState.loading || detachState.loading;
   const list = secrets.data?.astroliftAppSecrets ?? [];
   const envList = envs.data?.astroliftEnvironments ?? [];
-  const attachmentList =
-    attachments.data?.astroliftAppSecretBundleAttachments ?? [];
+  const attachmentList = attachments.data?.astroliftAppSecretBundleAttachments ?? [];
 
   function requestDelete(s: AppSecret) {
     if (s.source !== "literal") {
       toast.error(
         s.source === "bundle"
           ? "Detach the bundle to remove this key."
-          : "Managed-service envelope keys aren't editable directly.",
+          : "Managed-service envelope keys aren't editable directly."
       );
       return;
     }
@@ -262,9 +244,7 @@ export function SecretsClient({ slug }: { slug: string }) {
         return next;
       });
     } else {
-      throw new Error(
-        data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed",
-      );
+      throw new Error(data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed");
     }
   }
 
@@ -327,9 +307,7 @@ export function SecretsClient({ slug }: { slug: string }) {
     if (data?.detachSecretBundle.ok) {
       toast.success(t("attached.toastDetached", { name: a.bundleName }));
     } else {
-      throw new Error(
-        data?.detachSecretBundle.errors?.[0]?.message ?? "Detach failed",
-      );
+      throw new Error(data?.detachSecretBundle.errors?.[0]?.message ?? "Detach failed");
     }
   }
 
@@ -361,7 +339,7 @@ export function SecretsClient({ slug }: { slug: string }) {
       <AppTabs slug={slug} active="secrets" />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+        <Label className="text-muted-foreground text-xs tracking-wide uppercase">
           {t("environment")}
         </Label>
         <Select value={envName} onValueChange={setEnvName}>
@@ -423,9 +401,7 @@ export function SecretsClient({ slug }: { slug: string }) {
                     <SecretRow
                       key={s.id}
                       secret={s}
-                      revealed={
-                        s.id in revealedValues ? revealedValues[s.id] : null
-                      }
+                      revealed={s.id in revealedValues ? revealedValues[s.id] : null}
                       editing={editingId === s.id}
                       onToggleReveal={() => handleReveal(s)}
                       onStartEdit={() => setEditingId(s.id)}
@@ -434,8 +410,6 @@ export function SecretsClient({ slug }: { slug: string }) {
                       onRequestDelete={() => requestDelete(s)}
                       busy={busy}
                       revealing={revealingId === s.id}
-                        ).input?.secretId === s.id
-                      }
                     />
                   ))}
                 </TableBody>
@@ -470,9 +444,7 @@ export function SecretsClient({ slug }: { slug: string }) {
           if (!next) setDeleteTarget(null);
         }}
         title={
-          deleteTarget
-            ? t("delete.title", { key: deleteTarget.key })
-            : t("delete.fallbackTitle")
+          deleteTarget ? t("delete.title", { key: deleteTarget.key }) : t("delete.fallbackTitle")
         }
         description={t("delete.description")}
         confirmLabel={t("delete.confirm")}
@@ -517,15 +489,11 @@ export function SecretsClient({ slug }: { slug: string }) {
           });
           if (data?.bulkImportAppSecrets.ok) {
             const keys = data.bulkImportAppSecrets.data?.keysSet ?? [];
-            toast.success(
-              `Imported ${keys.length} key${keys.length === 1 ? "" : "s"}`,
-            );
+            toast.success(`Imported ${keys.length} key${keys.length === 1 ? "" : "s"}`);
             setBulkOpen(false);
             return true;
           }
-          toast.error(
-            data?.bulkImportAppSecrets.errors?.[0]?.message ?? "Import failed",
-          );
+          toast.error(data?.bulkImportAppSecrets.errors?.[0]?.message ?? "Import failed");
           return false;
         }}
         busy={busy}
@@ -594,9 +562,7 @@ function SecretRow({
           {SOURCE_LABEL[s.source] ?? s.source}
         </Badge>
         {s.bundleSlug && (
-          <span className="text-muted-foreground ml-2 font-mono text-[11px]">
-            {s.bundleSlug}
-          </span>
+          <span className="text-muted-foreground ml-2 font-mono text-[11px]">{s.bundleSlug}</span>
         )}
         {s.managedServiceKind && (
           <span className="text-muted-foreground ml-2 font-mono text-[11px]">
@@ -613,9 +579,7 @@ function SecretRow({
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="cursor-help">
-              {s.lastEditedAt
-                ? new Date(s.lastEditedAt).toLocaleString()
-                : "—"}
+              {s.lastEditedAt ? new Date(s.lastEditedAt).toLocaleString() : "—"}
             </span>
           </TooltipTrigger>
           <TooltipContent>{lastEditedTooltip}</TooltipContent>
@@ -647,9 +611,7 @@ function SecretRow({
                     </span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  {isRevealed ? t("reveal.hide") : t("reveal.show")}
-                </TooltipContent>
+                <TooltipContent>{isRevealed ? t("reveal.hide") : t("reveal.show")}</TooltipContent>
               </Tooltip>
             </Can>
           )}
@@ -690,10 +652,7 @@ function ValueRevealed({
   const t = useTranslations("apps.secrets");
   if (canEdit) {
     return (
-      <Can
-        permission="app.deploy"
-        fallback={<span className="break-all">{value}</span>}
-      >
+      <Can permission="app.deploy" fallback={<span className="break-all">{value}</span>}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -792,9 +751,7 @@ function InlineValueEditor({
       >
         <XIcon className="size-4" />
       </Button>
-      <span className="text-muted-foreground hidden text-[10px] sm:inline">
-        {t("edit.hint")}
-      </span>
+      <span className="text-muted-foreground hidden text-[10px] sm:inline">{t("edit.hint")}</span>
     </form>
   );
 }
@@ -821,9 +778,7 @@ function AttachedBundlesSection({
               <LayersIcon className="size-4" />
               {t("title")}
             </h2>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              {t("description")}
-            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
           </div>
         </div>
 
@@ -853,22 +808,15 @@ function AttachedBundlesSection({
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-xs">
                     {a.bundleName}
-                    <span className="text-muted-foreground ml-2 text-[10px]">
-                      {a.bundleSlug}
-                    </span>
+                    <span className="text-muted-foreground ml-2 text-[10px]">{a.bundleSlug}</span>
                   </TableCell>
                   <TableCell>
                     {a.teamSlug ? (
-                      <Badge
-                        variant="outline"
-                        className="font-mono text-[10px]"
-                      >
+                      <Badge variant="outline" className="font-mono text-[10px]">
                         {a.teamSlug}
                       </Badge>
                     ) : (
-                      <span className="text-muted-foreground text-xs">
-                        {t("noTeam")}
-                      </span>
+                      <span className="text-muted-foreground text-xs">{t("noTeam")}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -880,9 +828,7 @@ function AttachedBundlesSection({
                     {a.prefix ? (
                       a.prefix
                     ) : (
-                      <span className="text-muted-foreground">
-                        {t("noPrefix")}
-                      </span>
+                      <span className="text-muted-foreground">{t("noPrefix")}</span>
                     )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
@@ -901,18 +847,11 @@ function AttachedBundlesSection({
                     </TooltipProvider>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {a.attachedAt
-                      ? new Date(a.attachedAt).toLocaleString()
-                      : "—"}
+                    {a.attachedAt ? new Date(a.attachedAt).toLocaleString() : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Can permission="app.deploy">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDetach(a)}
-                        disabled={busy}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => onDetach(a)} disabled={busy}>
                         {t("detach")}
                       </Button>
                     </Can>
@@ -972,9 +911,7 @@ function SetSecretSheet({
             <Input
               id="secret-key"
               value={key}
-              onChange={(e) =>
-                setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))
-              }
+              onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
               placeholder="DATABASE_URL"
               autoFocus
               required
@@ -996,11 +933,7 @@ function SetSecretSheet({
             <p className="text-muted-foreground text-xs">{t("valueHint")}</p>
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !key || !value}>
@@ -1065,17 +998,13 @@ function BulkImportSheet({
             placeholder={"DATABASE_URL=postgres://...\nREDIS_URL=redis://..."}
           />
           {previewKeys.length > 0 && (
-            <div className="rounded border bg-muted/30 p-3 text-xs">
+            <div className="bg-muted/30 rounded border p-3 text-xs">
               <p className="text-muted-foreground mb-2">
                 {t("willSet", { count: previewKeys.length })}
               </p>
               <div className="flex flex-wrap gap-1">
                 {previewKeys.slice(0, 20).map((k) => (
-                  <Badge
-                    key={k}
-                    variant="outline"
-                    className="font-mono text-[10px]"
-                  >
+                  <Badge key={k} variant="outline" className="font-mono text-[10px]">
                     {k}
                   </Badge>
                 ))}
@@ -1088,11 +1017,7 @@ function BulkImportSheet({
             </div>
           )}
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !text.trim()}>
