@@ -1,4 +1,5 @@
 import {
+  GET_COST_FORECAST,
   LIST_BUDGETS,
   LIST_COST_SNAPSHOTS,
 } from "@/graphql/billing/billing.queries";
@@ -13,9 +14,11 @@ export default function CostPage() {
     <PreloadQuery query={LIST_BUDGETS}>
       <PreloadQuery
         query={LIST_COST_SNAPSHOTS}
-        variables={{ days: 30, limit: 100 }}
+        variables={{ window: "D30", limit: 500 }}
       >
-        <CostClient />
+        <PreloadQuery query={GET_COST_FORECAST}>
+          <CostClient />
+        </PreloadQuery>
       </PreloadQuery>
     </PreloadQuery>
   );
