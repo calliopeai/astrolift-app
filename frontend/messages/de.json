@@ -343,6 +343,47 @@
           "amount": "Amount"
         }
       }
+    },
+    "audit": {
+      "title": "Audit-Protokoll",
+      "description": "Jede Berechtigungsentscheidung und jede statusändernde Mutation, append-only. Mandantenscoping auf der Datenbankebene.",
+      "retentionDescription": "Jede Berechtigungsentscheidung und jede statusändernde Mutation, append-only. {days} Tage gemäß Compliance-Richtlinie aufbewahrt.",
+      "loadMore": "Mehr laden",
+      "emptyTitle": "Keine Audit-Ereignisse passen",
+      "emptyDescription": "Keine Audit-Ereignisse entsprechen den aktuellen Filtern. Erweitern Sie den Datumsbereich, löschen Sie den Aktionsfilter oder warten Sie auf neue Aktivität.",
+      "columns": {
+        "when": "Wann",
+        "actor": "Akteur",
+        "action": "Aktion",
+        "target": "Ziel",
+        "decision": "Entscheidung"
+      },
+      "filters": {
+        "actionLabel": "Aktion",
+        "actionPlaceholder": "z. B. team.create",
+        "decisionLabel": "Entscheidung",
+        "anyDecision": "Beliebige Entscheidung",
+        "fromLabel": "Von",
+        "toLabel": "Bis",
+        "totalCount": "{count} Treffer"
+      },
+      "export": {
+        "button": "Exportieren",
+        "formatCsv": "Als CSV exportieren",
+        "formatNdjson": "Als NDJSON exportieren",
+        "toastStart": "Audit-Export wird vorbereitet…",
+        "toastReady": "Audit-Export bereit · {rows} Zeilen",
+        "toastDownload": "Herunterladen",
+        "toastFailure": "Audit-Export fehlgeschlagen"
+      },
+      "sheet": {
+        "targetSection": "Ziel",
+        "beforeSection": "Vorher",
+        "afterSection": "Nachher",
+        "payloadSection": "Mutationskontext",
+        "redactedNote": "Sensible Werte (Geheimnisse, Tokens, Passwörter) werden vor der Anzeige maskiert.",
+        "requestIdSection": "Anfrage-ID"
+      }
     }
   }
 }

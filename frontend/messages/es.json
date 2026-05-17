@@ -343,6 +343,47 @@
           "amount": "Amount"
         }
       }
+    },
+    "audit": {
+      "title": "Registro de auditoría",
+      "description": "Cada decisión de permisos y cada mutación de estado, solo anexar. Aislado por inquilino en la capa de base de datos.",
+      "retentionDescription": "Cada decisión de permisos y cada mutación de estado, solo anexar. Conservado durante {days} días según la política de cumplimiento.",
+      "loadMore": "Cargar más",
+      "emptyTitle": "Ningún evento de auditoría coincide",
+      "emptyDescription": "Ningún evento de auditoría coincide con los filtros actuales. Amplíe el rango de fechas, borre el filtro de acción o espere nueva actividad.",
+      "columns": {
+        "when": "Cuándo",
+        "actor": "Actor",
+        "action": "Acción",
+        "target": "Objetivo",
+        "decision": "Decisión"
+      },
+      "filters": {
+        "actionLabel": "Acción",
+        "actionPlaceholder": "ej. team.create",
+        "decisionLabel": "Decisión",
+        "anyDecision": "Cualquier decisión",
+        "fromLabel": "Desde",
+        "toLabel": "Hasta",
+        "totalCount": "{count} coincidentes"
+      },
+      "export": {
+        "button": "Exportar",
+        "formatCsv": "Exportar como CSV",
+        "formatNdjson": "Exportar como NDJSON",
+        "toastStart": "Preparando exportación de auditoría…",
+        "toastReady": "Exportación lista · {rows} filas",
+        "toastDownload": "Descargar",
+        "toastFailure": "Falló la exportación"
+      },
+      "sheet": {
+        "targetSection": "Objetivo",
+        "beforeSection": "Antes",
+        "afterSection": "Después",
+        "payloadSection": "Contexto de la mutación",
+        "redactedNote": "Los valores sensibles (secretos, tokens, contraseñas) se ocultan antes de mostrarlos.",
+        "requestIdSection": "ID de solicitud"
+      }
     }
   }
 }

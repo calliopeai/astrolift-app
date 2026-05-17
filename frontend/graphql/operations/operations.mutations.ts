@@ -143,3 +143,26 @@ export const MARK_NOTIFICATION_READ = gql`
     }
   }
 `;
+
+export const EXPORT_AUDIT_EVENTS = gql`
+  mutation ExportAuditEvents($input: ExportAuditEventsInput!) {
+    exportAuditEvents(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        format
+        rowCount
+        byteCount
+        sha256
+        downloadUrl
+        expiresAt
+        createdAt
+      }
+    }
+  }
+`;

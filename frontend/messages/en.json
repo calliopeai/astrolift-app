@@ -1235,6 +1235,47 @@
           "amount": "Amount"
         }
       }
+    },
+    "audit": {
+      "title": "Audit log",
+      "description": "Every permission decision and every state-changing mutation, append-only. Tenant-scoped at the database layer.",
+      "retentionDescription": "Every permission decision and every state-changing mutation, append-only. Retained for {days} days per compliance policy.",
+      "loadMore": "Load more",
+      "emptyTitle": "No audit events match",
+      "emptyDescription": "No audit events match the current filters. Widen the date range, clear the action filter, or wait for new activity.",
+      "columns": {
+        "when": "When",
+        "actor": "Actor",
+        "action": "Action",
+        "target": "Target",
+        "decision": "Decision"
+      },
+      "filters": {
+        "actionLabel": "Action",
+        "actionPlaceholder": "e.g. team.create",
+        "decisionLabel": "Decision",
+        "anyDecision": "Any decision",
+        "fromLabel": "From",
+        "toLabel": "To",
+        "totalCount": "{count} matching"
+      },
+      "export": {
+        "button": "Export",
+        "formatCsv": "Export as CSV",
+        "formatNdjson": "Export as NDJSON",
+        "toastStart": "Preparing audit export…",
+        "toastReady": "Audit export ready · {rows} rows",
+        "toastDownload": "Download",
+        "toastFailure": "Audit export failed"
+      },
+      "sheet": {
+        "targetSection": "Target",
+        "beforeSection": "Before",
+        "afterSection": "After",
+        "payloadSection": "Mutation context",
+        "redactedNote": "Sensitive values (secrets, tokens, passwords) are redacted before display.",
+        "requestIdSection": "Request ID"
+      }
     }
   },
   "settingsIndex": {
