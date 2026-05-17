@@ -63,74 +63,6 @@
       "sports": "Sport"
     }
   },
-  "overview": {
-    "title": "Übersicht",
-    "description": "Identitäts-, Registry- und Lebenszyklusdaten für diese Astrolift-Installation.",
-    "errorBanner": {
-      "title": "Einige Daten konnten nicht geladen werden"
-    },
-    "tiles": {
-      "teams": {
-        "label": "Teams",
-        "emptyCta": "Erstes Team anlegen"
-      },
-      "projects": {
-        "label": "Projekte",
-        "emptyCta": "Projekt erstellen"
-      },
-      "apps": {
-        "label": "Registrierte Apps",
-        "emptyCta": "Erste App registrieren"
-      },
-      "deployments": {
-        "label": "Aktive Deployments",
-        "emptyCta": "Deployment auslösen"
-      },
-      "costMtd": {
-        "label": "Kosten (MTD)",
-        "emptyCta": "Warte auf Kostendaten",
-        "vsPrevMonth": "ggü. Vormonat",
-        "noPrevMonth": "kein Vormonat"
-      }
-    },
-    "fleetHealth": {
-      "title": "Flottenzustand",
-      "description": "Zusammenfassung des letzten Deployment-Status für alle registrierten Apps.",
-      "healthy": "gesund",
-      "failing": "{count} fehlerhaft",
-      "hiccup": "{count, plural, one {# Aussetzer} other {# Aussetzer}}",
-      "empty": "Noch keine registrierten Apps. Verbinde ein Repo unter /apps/new, um zu starten.",
-      "tiles": {
-        "running": "Läuft",
-        "recentFailure": "Kürzliche Störung",
-        "failing": "Fehlerhaft",
-        "noDeploys": "Keine Deployments"
-      }
-    },
-    "recentProjects": {
-      "title": "Aktuelle Projekte",
-      "description": "Zuletzt erstellte Projekte aller Teams.",
-      "emptyTitle": "Noch keine Projekte",
-      "emptyDescription": "Erstelle ein Team und ein Projekt, um Apps zu registrieren.",
-      "emptyAction": "Teams verwalten"
-    },
-    "activity": {
-      "title": "Aktivität",
-      "description": "Lebenszyklus-Ereignisse: Deployments, Config-Syncs, Skalierung, Cluster-Aufnahme, Secret-Rotationen.",
-      "emptyTitle": "Noch keine Aktivität",
-      "emptyDescription": "Ereignisse erscheinen hier, sobald Deployments, Konfigurationsänderungen und Cluster-Vorgänge stattfinden.",
-      "errorTitle": "Aktivität konnte nicht geladen werden",
-      "loadMore": "Mehr laden",
-      "loadingMore": "Lädt…"
-    },
-    "registeredApps": {
-      "title": "Registrierte Apps",
-      "description": "Repositories, die für ein Deployment registriert sind.",
-      "emptyTitle": "Keine Apps registriert",
-      "emptyDescription": "Die App-Registry-Oberfläche kommt im nächsten Meilenstein — sobald sie verdrahtet ist, kannst du ein Git-Repo registrieren und ein Deployment von dieser Karte aus starten.",
-      "emptyAction": "Registry öffnen"
-    }
-  },
   "dataTable": {
     "search": "Suchen…",
     "filters": "Filter",
@@ -370,104 +302,6 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
-    },
-    "observability": {
-      "scope": {
-        "title": "Metrik-Geltungsbereich",
-        "environment": "Umgebung",
-        "workload": "Workload",
-        "allWorkloads": "Alle Workloads",
-        "environmentPlaceholder": "Umgebung auswählen",
-        "workloadPlaceholder": "Workload auswählen"
-      },
-      "events": {
-        "warningCount": "{count, plural, =1 {1 Warnung} other {# Warnungen}} in der letzten Stunde",
-        "warningBadgeLabel": "Warnung",
-        "collapse": "Einklappen",
-        "expand": "Ausklappen"
-      }
-    },
-    "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
-      "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
-      },
-      "status": {
-        "active": "active",
-        "revoked": "revoked"
-      },
-      "lastUsedCell": {
-        "ip": "IP",
-        "agent": "Agent"
-      },
-      "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
-      },
-      "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
-      },
-      "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
-      },
-      "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
-      }
-    },
-    "domains": {
-      "addSheet": {
-        "byoTitle": "Bring your own certificate",
-        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
-        "methodLabels": {
-          "dns_txt": "DNS-TXT (default)",
-          "http_01": "HTTP-01",
-          "dns_01": "DNS-01",
-          "byo_cert": "Bring your own certificate"
-        },
-        "methodHints": {
-          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
-          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
-          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
-          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
-        }
-      }
     }
   },
   "settingsIndex": {
@@ -620,257 +454,78 @@
         "requestIdSection": "Anfrage-ID"
       }
     },
-    "approval": {
-      "quorum": {
-        "header": "{received} von {required} Freigaben",
-        "remainingBadge": "{count} weitere benötigt",
-        "metBadge": "Quorum erreicht",
-        "approvedLabel": "Freigegeben von",
-        "approvedEmpty": "Noch keine Freigabe.",
-        "awaitingLabel": "Ausstehend",
-        "awaitingEmpty": "Keine berechtigten Freigebenden gefunden — prüfen Sie die App-Richtlinie."
-      }
+    "events": {
+      "title": "Events",
+      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
+      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
+      "aggregateToggle": "Group repeats",
+      "aggregateBadge": "×{count} similar",
+      "expandLabel": "Expand",
+      "collapseLabel": "Collapse",
+      "sourceLabel": "Source",
+      "emptyTitle": "Quiet feed",
+      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "approvalsQueue": {
-      "title": "Freigabe-Warteschlange",
-      "description": "Alle Deploys, die auf eine Freigabe warten. Wählen Sie Zeilen für Bulk-Aktionen innerhalb einer Umgebung.",
-      "empty": {
-        "title": "Nichts wartet",
-        "description": "Wenn ein Deploy eine Freigabe braucht, landet er hier."
-      },
-      "selectAllLabel": "Alle auswählen",
-      "selectionStatus": "{selected} von {total} ausgewählt",
-      "readOnlyHint": "Sie können einsehen, aber nicht freigeben.",
-      "approveLabel": "Freigeben",
-      "rejectLabel": "Ablehnen",
-      "footer": {
-        "selected": "{count, plural, =1 {1 Deploy ausgewählt} other {# Deploys ausgewählt}}",
-        "summary": "In {envs}.",
-        "crossEnvWarning": "Bulk-Freigabe erfordert dieselbe App/Umgebung — Richtlinien unterscheiden sich pro Umgebung.",
-        "approveButton": "{count} freigeben",
-        "rejectButton": "{count} ablehnen"
-      },
-      "confirmApprove": {
-        "title": "{count} Deploys freigeben?",
-        "description": "Entsperrt {envs}.",
-        "confirm": "Alle freigeben"
-      },
-      "confirmReject": {
-        "title": "{count} Deploys ablehnen?",
-        "description": "Jeder Deploy in {envs} wird als fehlgeschlagen markiert.",
-        "reasonLabel": "Ablehnungsgrund",
-        "reasonPlaceholder": "Warum wird dieser Batch abgelehnt?",
-        "reasonRequired": "Grund erforderlich",
-        "confirm": "Alle ablehnen"
-      },
-      "toasts": {
-        "unexpected": "Bulk-Aktion lieferte keine Antwort.",
-        "allOk": "{label} erfolgreich für {count} Deploys.",
-        "allFailed": "{label} fehlgeschlagen für {count} Deploys: {message}",
-        "partial": "{label}: {succeeded} erfolgreich, {failed} fehlgeschlagen.",
-        "approveFailed": "Bulk-Freigabe fehlgeschlagen.",
-        "rejectFailed": "Bulk-Ablehnung fehlgeschlagen."
-      },
-      "row": {
-        "selectRowLabel": "{app} / {env} auswählen",
-        "approvalsCount": "{received}/{required} Freigaben",
-        "received": "Erhalten {rel}",
-        "review": "Prüfen"
-      }
-    },
-    "deployments": {
-      "title": "Bereitstellungen",
-      "description": "Jeder Rollout-Versuch über alle Apps und Umgebungen. Klicken Sie auf eine Zeile, um die Workflow-Timeline, gerenderte Manifeste und Logs zu sehen.",
-      "start": "Bereitstellung starten",
-      "filterApp": "Nach App-Slug filtern…",
-      "counts": "{filtered} von {total}",
-      "emptyTitle": "Noch keine Bereitstellungen",
-      "emptyDescription": "Registrieren Sie eine App und starten Sie eine Bereitstellung aus /apps/[slug]/deploy. Bereitstellungen erscheinen hier, sobald der Workflow beginnt.",
-      "openApps": "Apps öffnen",
-      "approvalsCount": "{received}/{required} Genehmigungen",
-      "rowAriaLabel": "Bereitstellung {app} → {env}. Eingabetaste zum Öffnen.",
+    "quotas": {
+      "title": "Quotas",
+      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
+      "emptyTitle": "No quotas configured",
+      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
       "columns": {
-        "appEnv": "App / Umgebung",
-        "image": "Image",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Dauer",
-        "started": "Gestartet",
-        "actions": "Aktionen"
+        "scope": "Scope",
+        "resource": "Resource",
+        "usage": "Usage",
+        "bar": "Bar",
+        "limits": "Soft / Hard",
+        "actions": "Actions"
       },
-      "pills": {
-        "ariaLabel": "Nach Status filtern",
-        "all": "Alle",
-        "active": "Aktiv",
-        "running": "Laufend",
-        "failed": "Fehlgeschlagen"
-      },
-      "actions": {
-        "label": "Aktionen",
-        "more": "Weitere Aktionen",
-        "approve": "Genehmigen",
-        "abort": "Abbrechen",
-        "rollback": "Rollback",
-        "redeploy": "Erneut bereitstellen",
-        "viewLogs": "Details / Logs ansehen",
-        "viewCommit": "Commit ansehen",
-        "copyGuid": "Bereitstellungs-ID kopieren",
-        "copyOk": "Bereitstellungs-ID kopiert.",
-        "copyFail": "Konnte nicht in die Zwischenablage kopieren."
-      },
-      "statusOptions": {
-        "all": "Alle Status",
-        "pending_approval": "Genehmigung ausstehend",
-        "pending": "Ausstehend",
-        "deploying": "Wird bereitgestellt",
-        "redeploying": "Wird erneut bereitgestellt",
-        "running": "Läuft",
-        "failed": "Fehlgeschlagen",
-        "rolled_back": "Zurückgerollt",
-        "superseded": "Ersetzt"
-      },
-      "envWorkload": "Umgebung {env} · Workload {workload}",
-      "envOnly": "Umgebung {env}",
-      "confirm": {
-        "approveTitle": "Bereitstellung von {tag} genehmigen?",
-        "approveDescription": "Gibt das Rollout zu {app}/{env} frei. Der Workflow wird sofort fortgesetzt.",
-        "approveConfirm": "Genehmigen",
-        "abortTitle": "Laufende Bereitstellung von {app}/{env} abbrechen?",
-        "abortDescription": "Signalisiert dem Temporal-Workflow den Abbruch. Die Bereitstellung wird als fehlgeschlagen markiert. Bereits zum Cluster ausgerollte Änderungen bleiben — Astrolift macht beim Abbruch kein automatisches Rollback.",
-        "abortConfirm": "Bereitstellung abbrechen",
-        "abortReasonLabel": "Grund für den Abbruch",
-        "abortReasonPlaceholder": "Warum wird diese Bereitstellung abgebrochen? Bleibt im Audit-Log + Verlaufsleiste erhalten.",
-        "reasonRequired": "Grund erforderlich",
-        "rollbackTitle": "{app}/{env} auf die vorherige Revision zurückrollen?",
-        "rollbackDescription": "Erstellt eine neue Rollback-Bereitstellung, die auf die zuvor laufende Revision verweist. Die aktuelle Revision wird ersetzt.",
-        "rollbackConfirm": "Rollback",
-        "redeployTitle": "{tag} erneut zu {app}/{env} bereitstellen?",
-        "redeployDescription": "Startet eine neue Bereitstellung mit demselben Image. Nützlich bei einem vorübergehenden Fehler oder zur Übernahme aktualisierter Konfiguration.",
-        "redeployConfirm": "Erneut bereitstellen"
-      },
-      "bulk": {
-        "selectAllLabel": "Alle sichtbaren Bereitstellungen auswählen",
-        "selectRowLabel": "{app} / {env} auswählen",
-        "selected": "{count, plural, =1 {1 Bereitstellung ausgewählt} other {# Bereitstellungen ausgewählt}}",
-        "summary": "In {envs}.",
-        "mixedWarning": "Auswahl mischt laufende und abgeschlossene Status — Massenaktionen sind deaktiviert, bis die Auswahl einheitlich ist.",
-        "clear": "Zurücksetzen",
-        "cancelButton": "{count} abbrechen",
-        "redeployButton": "{count} erneut bereitstellen",
-        "confirmCancel": {
-          "title": "{count} laufende Bereitstellungen abbrechen?",
-          "description": "Signalisiert jedem Temporal-Workflow den Abbruch. Markiert alle ausgewählten Bereitstellungen als fehlgeschlagen. Bereits angewendeter Cluster-Status bleibt. Betrifft {envs}.",
-          "reasonLabel": "Grund für den Abbruch",
-          "reasonPlaceholder": "Warum werden diese Bereitstellungen abgebrochen? Bleibt im Audit-Log + Verlaufsleiste erhalten.",
-          "confirm": "Bereitstellungen abbrechen"
-        },
-        "confirmRedeploy": {
-          "title": "{count} Bereitstellungen erneut bereitstellen?",
-          "description": "Startet für jede ausgewählte Zeile eine neue Bereitstellung mit demselben Image-Tag. Betrifft {envs}.",
-          "confirm": "Alle erneut bereitstellen"
-        },
-        "toasts": {
-          "abortLabel": "Abbrechen",
-          "redeployLabel": "Erneut bereitstellen",
-          "allOk": "{label} erfolgreich für {count} Bereitstellungen.",
-          "allFailed": "{label} fehlgeschlagen für {count} Bereitstellungen: {message}",
-          "partial": "{label}: {succeeded} erfolgreich, {failed} fehlgeschlagen."
-        }
-      },
-      "startSheet": {
-        "title": "Bereitstellung starten",
-        "description": "Sendet einen neuen Rollout an Temporal. Wenn die Umgebung Genehmigungen erfordert, landet die Bereitstellung als pending_approval und der Workflow startet erst, wenn genügend Genehmiger zugestimmt haben.",
-        "appLabel": "App",
-        "appPlaceholder": "App auswählen",
-        "envLabel": "Umgebung",
-        "envPlaceholder": "Umgebung auswählen",
-        "tagLabel": "Image-Tag",
-        "tagPlaceholder": "v1.4.2 oder sha-abc123",
-        "digestLabel": "Image-Digest (optional)",
-        "digestPlaceholder": "sha256:...",
-        "digestHint": "Wenn gesetzt, wird dieser Digest in das Manifest gerendert — garantiert unveränderbares Ziel.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} Genehmigung(en)",
-        "paused": "pausiert",
-        "cancel": "Abbrechen",
-        "submit": "Bereitstellung starten",
-        "submitting": "Wird gestartet…"
-      }
-    }
-  },
-  "jobs": {
-    "title": "Jobs",
-    "descriptionGlobal": "Geplante Job-Läufe und Ad-hoc-Befehlsausführungen über alle Apps hinweg.",
-    "descriptionForApp": "Geplante Job-Läufe und Ad-hoc-Befehlsausführungen für {app}.",
-    "tabs": {
-      "scheduled": "Geplant",
-      "commands": "Befehle"
-    },
-    "scheduled": {
-      "emptyTitle": "Noch keine geplanten Job-Läufe",
-      "emptyDescription": "Cronjob-Workloads erscheinen hier, sobald der Scheduler den ersten Lauf auslöst.",
-      "envLabel": "env",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "App / Env / Workload",
-        "k8sJob": "K8s-Job",
-        "status": "Status",
-        "duration": "Dauer",
-        "started": "Gestartet"
+      "request": {
+        "buttonRequest": "Request bump",
+        "buttonPending": "Pending request",
+        "title": "Request quota bump",
+        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
+        "factorLabel": "Multiplier",
+        "factor1_5x": "1.5x",
+        "factor2x": "2x",
+        "factor3x": "3x",
+        "factor5x": "5x",
+        "factor10x": "10x",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
+        "reasonHint": "Required. Shows up in the admin notification.",
+        "submit": "Submit request",
+        "submitting": "Submitting…",
+        "cancel": "Cancel",
+        "toastSubmitted": "Quota bump requested",
+        "toastFailed": "Failed to submit request",
+        "pendingBadge": "Pending {factor}x — {reason}"
       }
     },
-    "commands": {
-      "emptyTitle": "Noch keine Befehlsausführungen",
-      "emptyDescription": "Ad-hoc-Befehle gegen einen App-Workload erscheinen hier. Per CLI ausführen mit `astro app run …`.",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "App / Workload",
-        "command": "Befehl",
-        "status": "Status",
-        "invokedBy": "Aufgerufen von",
-        "started": "Gestartet"
+    "alerts": {
+      "mute": {
+        "menuLabel": "Mute",
+        "preset1h": "Mute for 1 hour",
+        "preset4h": "Mute for 4 hours",
+        "preset24h": "Mute for 24 hours",
+        "presetCustom": "Mute for custom duration…",
+        "unmute": "Unmute now",
+        "badge": "Muted ({remaining} left)",
+        "badgeExpired": "Muted",
+        "showMuted": "Show muted",
+        "hideMuted": "Hide muted",
+        "toastMuted": "Muted {name} for {duration}",
+        "toastUnmuted": "Unmuted {name}",
+        "toastMuteFailed": "Failed to mute rule",
+        "toastUnmuteFailed": "Failed to unmute rule",
+        "customTitle": "Mute {name}",
+        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
+        "durationLabel": "Duration (hours)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Known outage — DB migration in progress",
+        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
+        "submit": "Mute rule",
+        "cancel": "Cancel"
       }
-    },
-    "runStatus": {
-      "running": "Läuft",
-      "inProgress": "In Bearbeitung",
-      "succeeded": "Erfolgreich",
-      "failed": "Fehlgeschlagen",
-      "superseded": "Ersetzt",
-      "unknown": "Unbekannt",
-      "exitCodeLabel": "Exit {code}",
-      "exitCodeTooltip": "Prozess endete mit Code {code}"
-    },
-    "concurrency": {
-      "label": {
-        "forbid": "Verbieten",
-        "queue": "Reihen",
-        "replace": "Ersetzen"
-      },
-      "tooltip": {
-        "forbid": "Überspringt den nächsten Trigger, während ein Lauf aktiv ist.",
-        "queue": "Lässt überlappende Läufe stapeln — wähle dies, wenn jeder Trigger unabhängig und kurz ist.",
-        "replace": "Beendet den aktiven Lauf und startet einen neuen."
-      }
-    },
-    "cron": {
-      "invalid": "Ungültiger Cron-Ausdruck",
-      "firesIn": "Startet in {relative}",
-      "now": "weniger als einer Minute",
-      "minutes": "{count, plural, one {# Minute} other {# Minuten}}",
-      "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
-      "days": "{count, plural, one {# Tag} other {# Tage}}"
-    },
-    "workloadCard": {
-      "title": "Cronjob-Workloads",
-      "countLabel": "{count, plural, one {# geplant} other {# geplant}}",
-      "openLogs": "In Konsole öffnen"
-    },
-    "output": {
-      "emptyOutput": "Noch keine erfasste Ausgabe.",
-      "openInConsole": "In Konsole öffnen",
-      "lines": "{count, plural, one {# Zeile} other {# Zeilen}}",
-      "truncated": "200 Zeilen angezeigt — öffne die Konsole für die vollständige Ausgabe."
     }
   }
 }

@@ -10,6 +10,39 @@ export const LIST_QUOTAS = gql`
       hardLimit
       softLimit
       currentUsage
+      pendingRequest {
+        id
+        quotaId
+        requestedFactor
+        reason
+        status
+        requestedByDisplay
+        decidedByDisplay
+        decidedAt
+        decisionNote
+        createdAt
+      }
+    }
+  }
+`;
+
+export const REQUEST_QUOTA_INCREASE = gql`
+  mutation RequestQuotaIncrease($input: RequestQuotaIncreaseInput!) {
+    requestQuotaIncrease(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        id
+        quotaId
+        requestedFactor
+        reason
+        status
+        requestedByDisplay
+        decidedByDisplay
+        decidedAt
+        decisionNote
+        createdAt
+      }
     }
   }
 `;

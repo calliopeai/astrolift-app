@@ -63,74 +63,6 @@
       "sports": "Deportes"
     }
   },
-  "overview": {
-    "title": "Resumen",
-    "description": "Datos de identidad, registro y ciclo de vida de esta instalación de Astrolift.",
-    "errorBanner": {
-      "title": "No se pudieron cargar algunos datos"
-    },
-    "tiles": {
-      "teams": {
-        "label": "Equipos",
-        "emptyCta": "Crea tu primer equipo"
-      },
-      "projects": {
-        "label": "Proyectos",
-        "emptyCta": "Crea un proyecto"
-      },
-      "apps": {
-        "label": "Apps registradas",
-        "emptyCta": "Registra tu primera app"
-      },
-      "deployments": {
-        "label": "Despliegues activos",
-        "emptyCta": "Inicia un despliegue"
-      },
-      "costMtd": {
-        "label": "Coste (MTD)",
-        "emptyCta": "Esperando datos de coste",
-        "vsPrevMonth": "vs mes ant.",
-        "noPrevMonth": "sin mes ant."
-      }
-    },
-    "fleetHealth": {
-      "title": "Salud de la flota",
-      "description": "Compuesto del último estado de despliegue en todas las apps registradas.",
-      "healthy": "saludable",
-      "failing": "{count} con fallos",
-      "hiccup": "{count, plural, one {# fallo} other {# fallos}}",
-      "empty": "Aún no hay apps registradas. Conecta un repo en /apps/new para empezar.",
-      "tiles": {
-        "running": "En ejecución",
-        "recentFailure": "Fallo reciente",
-        "failing": "Con fallos",
-        "noDeploys": "Sin despliegues"
-      }
-    },
-    "recentProjects": {
-      "title": "Proyectos recientes",
-      "description": "Proyectos creados más recientemente en todos los equipos.",
-      "emptyTitle": "Aún no hay proyectos",
-      "emptyDescription": "Crea un equipo y un proyecto para empezar a registrar apps.",
-      "emptyAction": "Administrar equipos"
-    },
-    "activity": {
-      "title": "Actividad",
-      "description": "Eventos del ciclo de vida: despliegues, sincronizaciones de configuración, escalado, alta de clústeres, rotación de secretos.",
-      "emptyTitle": "Aún no hay actividad",
-      "emptyDescription": "Los eventos aparecerán aquí a medida que ocurran despliegues, cambios de configuración y operaciones de clúster.",
-      "errorTitle": "No se pudo cargar la actividad",
-      "loadMore": "Cargar más",
-      "loadingMore": "Cargando…"
-    },
-    "registeredApps": {
-      "title": "Apps registradas",
-      "description": "Repositorios registrados para despliegue.",
-      "emptyTitle": "No hay apps registradas",
-      "emptyDescription": "La superficie del registro de apps llega en el próximo hito — una vez conectada podrás registrar un repo de Git y desplegar desde esta tarjeta.",
-      "emptyAction": "Abrir registro"
-    }
-  },
   "dataTable": {
     "search": "Buscar…",
     "filters": "Filtros",
@@ -370,104 +302,6 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
-    },
-    "observability": {
-      "scope": {
-        "title": "Ámbito de métricas",
-        "environment": "Entorno",
-        "workload": "Carga de trabajo",
-        "allWorkloads": "Todas las cargas de trabajo",
-        "environmentPlaceholder": "Selecciona un entorno",
-        "workloadPlaceholder": "Selecciona una carga de trabajo"
-      },
-      "events": {
-        "warningCount": "{count, plural, =1 {1 advertencia} other {# advertencias}} en la última hora",
-        "warningBadgeLabel": "Advertencia",
-        "collapse": "Contraer",
-        "expand": "Expandir"
-      }
-    },
-    "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
-      "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
-      },
-      "status": {
-        "active": "active",
-        "revoked": "revoked"
-      },
-      "lastUsedCell": {
-        "ip": "IP",
-        "agent": "Agent"
-      },
-      "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
-      },
-      "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
-      },
-      "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
-      },
-      "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
-      }
-    },
-    "domains": {
-      "addSheet": {
-        "byoTitle": "Bring your own certificate",
-        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
-        "methodLabels": {
-          "dns_txt": "DNS-TXT (default)",
-          "http_01": "HTTP-01",
-          "dns_01": "DNS-01",
-          "byo_cert": "Bring your own certificate"
-        },
-        "methodHints": {
-          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
-          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
-          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
-          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
-        }
-      }
     }
   },
   "settingsIndex": {
@@ -620,257 +454,78 @@
         "requestIdSection": "ID de solicitud"
       }
     },
-    "approval": {
-      "quorum": {
-        "header": "{received} de {required} aprobaciones",
-        "remainingBadge": "Faltan {count}",
-        "metBadge": "Quórum alcanzado",
-        "approvedLabel": "Aprobado por",
-        "approvedEmpty": "Aún nadie ha aprobado.",
-        "awaitingLabel": "Pendiente",
-        "awaitingEmpty": "No hay aprobadores elegibles — revise la política de la app."
-      }
+    "events": {
+      "title": "Events",
+      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
+      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
+      "aggregateToggle": "Group repeats",
+      "aggregateBadge": "×{count} similar",
+      "expandLabel": "Expand",
+      "collapseLabel": "Collapse",
+      "sourceLabel": "Source",
+      "emptyTitle": "Quiet feed",
+      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "approvalsQueue": {
-      "title": "Cola de aprobaciones",
-      "description": "Todos los despliegues que esperan firma. Seleccione filas para aprobar o rechazar en bloque dentro de un mismo entorno.",
-      "empty": {
-        "title": "Nada pendiente",
-        "description": "Cuando un despliegue requiere firma, aparece aquí."
-      },
-      "selectAllLabel": "Seleccionar todos",
-      "selectionStatus": "{selected} de {total} seleccionados",
-      "readOnlyHint": "Puede revisar pero no aprobar.",
-      "approveLabel": "Aprobar",
-      "rejectLabel": "Rechazar",
-      "footer": {
-        "selected": "{count, plural, =1 {1 despliegue seleccionado} other {# despliegues seleccionados}}",
-        "summary": "En {envs}.",
-        "crossEnvWarning": "La aprobación en bloque requiere la misma app/entorno — las políticas varían por entorno.",
-        "approveButton": "Aprobar {count}",
-        "rejectButton": "Rechazar {count}"
-      },
-      "confirmApprove": {
-        "title": "¿Aprobar {count} despliegues?",
-        "description": "Desbloquea {envs}.",
-        "confirm": "Aprobar todos"
-      },
-      "confirmReject": {
-        "title": "¿Rechazar {count} despliegues?",
-        "description": "Cada despliegue en {envs} pasará a fallido.",
-        "reasonLabel": "Motivo del rechazo",
-        "reasonPlaceholder": "¿Por qué se rechaza este lote?",
-        "reasonRequired": "Motivo requerido",
-        "confirm": "Rechazar todos"
-      },
-      "toasts": {
-        "unexpected": "La acción en bloque no devolvió respuesta.",
-        "allOk": "{label} con éxito para {count} despliegues.",
-        "allFailed": "{label} falló para {count} despliegues: {message}",
-        "partial": "{label}: {succeeded} con éxito, {failed} fallidos.",
-        "approveFailed": "Aprobación en bloque fallida.",
-        "rejectFailed": "Rechazo en bloque fallido."
-      },
-      "row": {
-        "selectRowLabel": "Seleccionar {app} / {env}",
-        "approvalsCount": "{received}/{required} aprobaciones",
-        "received": "Recibido {rel}",
-        "review": "Revisar"
-      }
-    },
-    "deployments": {
-      "title": "Implementaciones",
-      "description": "Cada intento de despliegue en todas las apps y entornos. Haga clic en una fila para ver la línea de tiempo del workflow, los manifiestos renderizados y los logs.",
-      "start": "Iniciar implementación",
-      "filterApp": "Filtrar por slug de app…",
-      "counts": "{filtered} de {total}",
-      "emptyTitle": "Aún no hay implementaciones",
-      "emptyDescription": "Registre una app y dispare una implementación desde /apps/[slug]/deploy. Las implementaciones aparecen aquí en cuanto el workflow empieza.",
-      "openApps": "Abrir apps",
-      "approvalsCount": "{received}/{required} aprobaciones",
-      "rowAriaLabel": "Implementación {app} → {env}. Pulse Intro para abrir.",
+    "quotas": {
+      "title": "Quotas",
+      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
+      "emptyTitle": "No quotas configured",
+      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
       "columns": {
-        "appEnv": "App / Entorno",
-        "image": "Imagen",
-        "trigger": "Disparador",
-        "status": "Estado",
-        "duration": "Duración",
-        "started": "Iniciado",
-        "actions": "Acciones"
+        "scope": "Scope",
+        "resource": "Resource",
+        "usage": "Usage",
+        "bar": "Bar",
+        "limits": "Soft / Hard",
+        "actions": "Actions"
       },
-      "pills": {
-        "ariaLabel": "Filtrar por estado",
-        "all": "Todas",
-        "active": "Activas",
-        "running": "Corriendo",
-        "failed": "Fallidas"
-      },
-      "actions": {
-        "label": "Acciones",
-        "more": "Más acciones",
-        "approve": "Aprobar",
-        "abort": "Cancelar",
-        "rollback": "Revertir",
-        "redeploy": "Redesplegar",
-        "viewLogs": "Ver detalle / logs",
-        "viewCommit": "Ver commit",
-        "copyGuid": "Copiar ID de implementación",
-        "copyOk": "ID de implementación copiada.",
-        "copyFail": "No se pudo copiar al portapapeles."
-      },
-      "statusOptions": {
-        "all": "Todos los estados",
-        "pending_approval": "Aprobación pendiente",
-        "pending": "Pendiente",
-        "deploying": "Desplegando",
-        "redeploying": "Redesplegando",
-        "running": "Corriendo",
-        "failed": "Fallida",
-        "rolled_back": "Revertida",
-        "superseded": "Reemplazada"
-      },
-      "envWorkload": "entorno {env} · workload {workload}",
-      "envOnly": "entorno {env}",
-      "confirm": {
-        "approveTitle": "¿Aprobar despliegue de {tag}?",
-        "approveDescription": "Desbloquea el rollout a {app}/{env}. El workflow se reanuda inmediatamente.",
-        "approveConfirm": "Aprobar",
-        "abortTitle": "¿Cancelar despliegue en curso de {app}/{env}?",
-        "abortDescription": "Indica al workflow de Temporal que cancele. La implementación se marca como fallida. Los cambios ya enviados al clúster permanecen — Astrolift no hace rollback automático al cancelar.",
-        "abortConfirm": "Cancelar despliegue",
-        "abortReasonLabel": "Motivo de la cancelación",
-        "abortReasonPlaceholder": "¿Por qué se cancela este despliegue? Persiste en el log de auditoría + barra de historial.",
-        "reasonRequired": "Motivo requerido",
-        "rollbackTitle": "¿Revertir {app}/{env} a la revisión anterior?",
-        "rollbackDescription": "Crea un nuevo despliegue de rollback que apunta a la revisión anterior en ejecución. La revisión actual queda reemplazada.",
-        "rollbackConfirm": "Revertir",
-        "redeployTitle": "¿Redesplegar {tag} a {app}/{env}?",
-        "redeployDescription": "Lanza un nuevo despliegue con la misma imagen. Útil para reintentar tras un fallo transitorio o recoger configuración actualizada.",
-        "redeployConfirm": "Redesplegar"
-      },
-      "bulk": {
-        "selectAllLabel": "Seleccionar todas las implementaciones visibles",
-        "selectRowLabel": "Seleccionar {app} / {env}",
-        "selected": "{count, plural, =1 {1 implementación seleccionada} other {# implementaciones seleccionadas}}",
-        "summary": "En {envs}.",
-        "mixedWarning": "La selección mezcla estados en curso y terminales — las acciones en bloque se desactivan hasta que la selección sea uniforme.",
-        "clear": "Limpiar",
-        "cancelButton": "Cancelar {count}",
-        "redeployButton": "Redesplegar {count}",
-        "confirmCancel": {
-          "title": "¿Cancelar {count} implementaciones en curso?",
-          "description": "Indica a cada workflow de Temporal que cancele. Marca todas las seleccionadas como fallidas. El estado del clúster ya aplicado permanece. Afecta a {envs}.",
-          "reasonLabel": "Motivo de la cancelación",
-          "reasonPlaceholder": "¿Por qué se cancelan estos despliegues? Persiste en el log de auditoría + barra de historial.",
-          "confirm": "Cancelar implementaciones"
-        },
-        "confirmRedeploy": {
-          "title": "¿Redesplegar {count} implementaciones?",
-          "description": "Lanza un nuevo despliegue por cada fila seleccionada con la misma etiqueta de imagen. Afecta a {envs}.",
-          "confirm": "Redesplegar todas"
-        },
-        "toasts": {
-          "abortLabel": "Cancelar",
-          "redeployLabel": "Redesplegar",
-          "allOk": "{label} con éxito para {count} implementaciones.",
-          "allFailed": "{label} falló para {count} implementaciones: {message}",
-          "partial": "{label}: {succeeded} con éxito, {failed} fallidas."
-        }
-      },
-      "startSheet": {
-        "title": "Iniciar implementación",
-        "description": "Envía un nuevo rollout a Temporal. Si el entorno requiere aprobaciones, la implementación queda como pending_approval y el workflow no arranca hasta que firmen suficientes aprobadores.",
-        "appLabel": "App",
-        "appPlaceholder": "Elija una app",
-        "envLabel": "Entorno",
-        "envPlaceholder": "Elija un entorno",
-        "tagLabel": "Etiqueta de imagen",
-        "tagPlaceholder": "v1.4.2 o sha-abc123",
-        "digestLabel": "Digest de imagen (opcional)",
-        "digestPlaceholder": "sha256:...",
-        "digestHint": "Cuando se establece, este digest es lo que el workflow renderiza en el manifiesto — objetivo inmutable garantizado.",
-        "triggerLabel": "Disparador",
-        "approvalsSuffix": "{count} aprobación(es)",
-        "paused": "pausado",
-        "cancel": "Cancelar",
-        "submit": "Iniciar implementación",
-        "submitting": "Iniciando…"
-      }
-    }
-  },
-  "jobs": {
-    "title": "Trabajos",
-    "descriptionGlobal": "Ejecuciones de trabajos programados y comandos ad-hoc en todas tus apps.",
-    "descriptionForApp": "Ejecuciones de trabajos programados y comandos ad-hoc para {app}.",
-    "tabs": {
-      "scheduled": "Programados",
-      "commands": "Comandos"
-    },
-    "scheduled": {
-      "emptyTitle": "Aún no hay ejecuciones de trabajos programados",
-      "emptyDescription": "Los workloads cronjob aparecen aquí cuando el planificador dispara su primera ejecución.",
-      "envLabel": "env",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "App / Env / Workload",
-        "k8sJob": "K8s job",
-        "status": "Estado",
-        "duration": "Duración",
-        "started": "Iniciado"
+      "request": {
+        "buttonRequest": "Request bump",
+        "buttonPending": "Pending request",
+        "title": "Request quota bump",
+        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
+        "factorLabel": "Multiplier",
+        "factor1_5x": "1.5x",
+        "factor2x": "2x",
+        "factor3x": "3x",
+        "factor5x": "5x",
+        "factor10x": "10x",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
+        "reasonHint": "Required. Shows up in the admin notification.",
+        "submit": "Submit request",
+        "submitting": "Submitting…",
+        "cancel": "Cancel",
+        "toastSubmitted": "Quota bump requested",
+        "toastFailed": "Failed to submit request",
+        "pendingBadge": "Pending {factor}x — {reason}"
       }
     },
-    "commands": {
-      "emptyTitle": "Aún no hay ejecuciones de comandos",
-      "emptyDescription": "Los comandos ad-hoc invocados contra un workload aparecen aquí. Ejecuta uno desde la CLI con `astro app run …`.",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "App / Workload",
-        "command": "Comando",
-        "status": "Estado",
-        "invokedBy": "Invocado por",
-        "started": "Iniciado"
+    "alerts": {
+      "mute": {
+        "menuLabel": "Mute",
+        "preset1h": "Mute for 1 hour",
+        "preset4h": "Mute for 4 hours",
+        "preset24h": "Mute for 24 hours",
+        "presetCustom": "Mute for custom duration…",
+        "unmute": "Unmute now",
+        "badge": "Muted ({remaining} left)",
+        "badgeExpired": "Muted",
+        "showMuted": "Show muted",
+        "hideMuted": "Hide muted",
+        "toastMuted": "Muted {name} for {duration}",
+        "toastUnmuted": "Unmuted {name}",
+        "toastMuteFailed": "Failed to mute rule",
+        "toastUnmuteFailed": "Failed to unmute rule",
+        "customTitle": "Mute {name}",
+        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
+        "durationLabel": "Duration (hours)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Known outage — DB migration in progress",
+        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
+        "submit": "Mute rule",
+        "cancel": "Cancel"
       }
-    },
-    "runStatus": {
-      "running": "En ejecución",
-      "inProgress": "En progreso",
-      "succeeded": "Exitoso",
-      "failed": "Fallido",
-      "superseded": "Reemplazado",
-      "unknown": "Desconocido",
-      "exitCodeLabel": "salida {code}",
-      "exitCodeTooltip": "El proceso salió con código {code}"
-    },
-    "concurrency": {
-      "label": {
-        "forbid": "Prohibir",
-        "queue": "Encolar",
-        "replace": "Reemplazar"
-      },
-      "tooltip": {
-        "forbid": "Salta el próximo disparo mientras una ejecución está en curso.",
-        "queue": "Permite que las ejecuciones se acumulen — elige esto cuando cada disparo es independiente y corto.",
-        "replace": "Detiene la ejecución en curso y comienza una nueva."
-      }
-    },
-    "cron": {
-      "invalid": "Expresión cron inválida",
-      "firesIn": "Se ejecuta en {relative}",
-      "now": "menos de un minuto",
-      "minutes": "{count, plural, one {# minuto} other {# minutos}}",
-      "hours": "{count, plural, one {# hora} other {# horas}}",
-      "days": "{count, plural, one {# día} other {# días}}"
-    },
-    "workloadCard": {
-      "title": "Workloads cronjob",
-      "countLabel": "{count, plural, one {# programado} other {# programados}}",
-      "openLogs": "Abrir en consola"
-    },
-    "output": {
-      "emptyOutput": "Aún no hay salida capturada.",
-      "openInConsole": "Abrir en consola",
-      "lines": "{count, plural, one {# línea} other {# líneas}}",
-      "truncated": "Mostradas 200 líneas — abre la consola para ver el rastro completo."
     }
   }
 }
