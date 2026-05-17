@@ -67,74 +67,6 @@
       "sports": "Sports"
     }
   },
-  "overview": {
-    "title": "概览",
-    "description": "此 Astrolift 安装的身份、注册表与生命周期数据。",
-    "errorBanner": {
-      "title": "无法加载部分数据"
-    },
-    "tiles": {
-      "teams": {
-        "label": "团队",
-        "emptyCta": "创建你的第一个团队"
-      },
-      "projects": {
-        "label": "项目",
-        "emptyCta": "创建项目"
-      },
-      "apps": {
-        "label": "已注册应用",
-        "emptyCta": "注册你的第一个应用"
-      },
-      "deployments": {
-        "label": "进行中的部署",
-        "emptyCta": "触发部署"
-      },
-      "costMtd": {
-        "label": "成本(月初至今)",
-        "emptyCta": "等待成本数据",
-        "vsPrevMonth": "环比上月",
-        "noPrevMonth": "无上月数据"
-      }
-    },
-    "fleetHealth": {
-      "title": "舰队健康度",
-      "description": "已注册应用的最新部署状态综合。",
-      "healthy": "健康",
-      "failing": "{count} 个失败",
-      "hiccup": "{count, plural, one {# 次抖动} other {# 次抖动}}",
-      "empty": "暂无已注册应用。在 /apps/new 连接仓库以开始。",
-      "tiles": {
-        "running": "运行中",
-        "recentFailure": "近期失败",
-        "failing": "失败中",
-        "noDeploys": "无部署"
-      }
-    },
-    "recentProjects": {
-      "title": "最近项目",
-      "description": "所有团队中最近创建的项目。",
-      "emptyTitle": "暂无项目",
-      "emptyDescription": "创建团队和项目以开始注册应用。",
-      "emptyAction": "管理团队"
-    },
-    "activity": {
-      "title": "活动",
-      "description": "生命周期事件:部署、配置同步、扩缩容、集群接入、密钥轮换。",
-      "emptyTitle": "暂无活动",
-      "emptyDescription": "随着部署、配置变更和集群操作发生,事件将显示在此。",
-      "errorTitle": "无法加载活动",
-      "loadMore": "加载更多",
-      "loadingMore": "加载中…"
-    },
-    "registeredApps": {
-      "title": "已注册应用",
-      "description": "为部署而注册的仓库。",
-      "emptyTitle": "无已注册应用",
-      "emptyDescription": "应用注册表界面将在下一个里程碑上线 —— 一旦接通,你可以从此卡片注册 Git 仓库并发起部署。",
-      "emptyAction": "打开注册表"
-    }
-  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
@@ -167,21 +99,6 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
-    },
-    "nav": {
-      "ariaLabel": "设置分区",
-      "openMobileNav": "打开设置菜单",
-      "openMobileNavLabel": "分区",
-      "mobileTitle": "设置分区",
-      "mobileDescription": "跳转到任意设置区域。",
-      "groups": {
-        "organization": "组织",
-        "personal": "个人",
-        "tokens": "令牌"
-      }
-    },
-    "breadcrumb": {
-      "root": "设置"
     }
   },
   "hooks": {
@@ -253,6 +170,18 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "freshness": {
+        "lastDeployed": "上次部署 {when}",
+        "viewFailed": "查看失败的部署",
+        "stale": "已过时",
+        "never": "从未部署",
+        "status": {
+          "OK": "健康",
+          "DEGRADED": "最近部署失败",
+          "STALE": "近期无部署",
+          "NEVER": "从未部署"
+        }
       }
     },
     "tabs": {
@@ -390,133 +319,39 @@
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     },
-    "observability": {
-      "scope": {
-        "title": "指标范围",
-        "environment": "环境",
-        "workload": "工作负载",
-        "allWorkloads": "所有工作负载",
-        "environmentPlaceholder": "选择环境",
-        "workloadPlaceholder": "选择工作负载"
-      },
-      "events": {
-        "warningCount": "过去 1 小时内有 {count} 条警告",
-        "warningBadgeLabel": "警告",
-        "collapse": "折叠",
-        "expand": "展开"
-      }
-    },
-    "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
-      "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
-      },
-      "status": {
-        "active": "active",
-        "revoked": "revoked"
-      },
-      "lastUsedCell": {
-        "ip": "IP",
-        "agent": "Agent"
-      },
-      "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
-      },
-      "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
-      },
-      "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
-      },
-      "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
-      }
-    },
-    "domains": {
-      "addSheet": {
-        "byoTitle": "Bring your own certificate",
-        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
-        "methodLabels": {
-          "dns_txt": "DNS-TXT (default)",
-          "http_01": "HTTP-01",
-          "dns_01": "DNS-01",
-          "byo_cert": "Bring your own certificate"
-        },
-        "methodHints": {
-          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
-          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
-          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
-          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
-        }
-      }
-    },
-    "detail": {
-      "urlHealth": {
-        "checking": "检查中…",
-        "unknown": "未检查",
-        "ariaLabel": "URL 状态:{status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "无法访问",
-        "tooltip": {
-          "title": "最近探测",
-          "empty": "尚无探测历史。",
-          "uptime": "{ok}/{total} 正常 · 平均 {avgMs}ms",
-          "now": "刚刚",
-          "secondsAgo": "{seconds} 秒前",
-          "minutesAgo": "{minutes} 分钟前",
-          "hoursAgo": "{hours} 小时前",
-          "recheck": "点击重新探测",
-          "rechecking": "重新探测中…"
-        }
+    "settings": {
+      "webhookDeploys": {
+        "title": "Webhook deploys",
+        "description": "App-global pause for CI / push / scheduled deploys. Manual deploys from the UI or CLI keep working so you can still ship a fix.",
+        "paused": "Paused",
+        "live": "Live",
+        "pause": "Pause webhook deploys",
+        "resume": "Resume webhook deploys",
+        "scopeNoteLive": "Webhook-fired deploys (push, CI, scheduled) accept normally. Pausing stops all three; manual deploys remain available.",
+        "scopeNotePaused": "Webhook-fired deploys refused. Manual deploys, rollbacks, promotions, and teardown remain available.",
+        "pausedBy": "Paused by <who></who> · <when></when>",
+        "reasonPrefix": "Reason:",
+        "noReason": "No reason recorded.",
+        "unknownActor": "unknown",
+        "unknownTime": "just now",
+        "confirmTitle": "Pause webhook deploys for this app?",
+        "confirmDescription": "Future deploys from CI, push events, and cron will be refused until you resume. Manual deploys from the UI or CLI continue to work.",
+        "reasonLabel": "Reason (optional)",
+        "reasonPlaceholder": "e.g. CI is misfiring, holding until the upstream pipeline is fixed",
+        "reasonHelp": "Recorded on the audit log and shown on this page until the pause is lifted. Up to 512 characters.",
+        "confirmButton": "Pause webhook deploys",
+        "cancel": "Cancel",
+        "toastPaused": "Webhook deploys paused.",
+        "toastResumed": "Webhook deploys resumed.",
+        "toastPauseFailed": "Pause failed.",
+        "toastResumeFailed": "Resume failed.",
+        "toastNoResponse": "No response from backend."
       }
     }
   },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
-    "cardMeta": {
-      "modified": "Modified {when}"
-    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -533,10 +368,6 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
-      },
-      "permissions": {
-        "title": "Permissions",
-        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",
@@ -668,138 +499,78 @@
         "requestIdSection": "请求 ID"
       }
     },
-    "approval": {
-      "quorum": {
-        "header": "{received} / {required} 已审批",
-        "remainingBadge": "还需 {count} 项",
-        "metBadge": "已达法定人数",
-        "approvedLabel": "已审批",
-        "approvedEmpty": "尚无审批。",
-        "awaitingLabel": "待审批",
-        "awaitingEmpty": "未找到符合条件的审批人，请检查应用策略。"
-      }
+    "events": {
+      "title": "Events",
+      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
+      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
+      "aggregateToggle": "Group repeats",
+      "aggregateBadge": "×{count} similar",
+      "expandLabel": "Expand",
+      "collapseLabel": "Collapse",
+      "sourceLabel": "Source",
+      "emptyTitle": "Quiet feed",
+      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "approvalsQueue": {
-      "title": "审批队列",
-      "description": "所有等待审批的部署。可在同一环境内批量审批或拒绝。",
-      "empty": {
-        "title": "暂无待办",
-        "description": "需要审批的部署会出现在这里。"
-      },
-      "selectAllLabel": "全选",
-      "selectionStatus": "已选 {selected} / {total}",
-      "readOnlyHint": "仅可查看，无法审批。",
-      "approveLabel": "审批",
-      "rejectLabel": "拒绝",
-      "footer": {
-        "selected": "已选择 {count} 个部署",
-        "summary": "覆盖：{envs}。",
-        "crossEnvWarning": "批量操作要求同一应用/环境 — 不同环境策略不同。",
-        "approveButton": "审批 {count} 个",
-        "rejectButton": "拒绝 {count} 个"
-      },
-      "confirmApprove": {
-        "title": "审批 {count} 个部署？",
-        "description": "将解锁 {envs}。",
-        "confirm": "全部审批"
-      },
-      "confirmReject": {
-        "title": "拒绝 {count} 个部署？",
-        "description": "{envs} 中的每个部署将被标记为失败。",
-        "reasonLabel": "拒绝原因",
-        "reasonPlaceholder": "为什么拒绝这批部署？",
-        "reasonRequired": "必须填写原因",
-        "confirm": "全部拒绝"
-      },
-      "toasts": {
-        "unexpected": "批量操作无响应。",
-        "allOk": "{label} 成功：{count} 个部署。",
-        "allFailed": "{label} 失败：{count} 个部署 — {message}",
-        "partial": "{label}：成功 {succeeded}，失败 {failed}。",
-        "approveFailed": "批量审批失败。",
-        "rejectFailed": "批量拒绝失败。"
-      },
-      "row": {
-        "selectRowLabel": "选择 {app} / {env}",
-        "approvalsCount": "{received}/{required} 已审批",
-        "received": "接收于 {rel}",
-        "review": "查看"
-      }
-    }
-  },
-  "jobs": {
-    "title": "任务",
-    "descriptionGlobal": "所有应用的计划任务运行和临时命令执行。",
-    "descriptionForApp": "{app} 的计划任务运行和临时命令执行。",
-    "tabs": {
-      "scheduled": "计划",
-      "commands": "命令"
-    },
-    "scheduled": {
-      "emptyTitle": "尚无计划任务运行",
-      "emptyDescription": "Cronjob 工作负载在调度器触发首次运行后会显示在此。",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+    "quotas": {
+      "title": "Quotas",
+      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
+      "emptyTitle": "No quotas configured",
+      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
       "columns": {
-        "app": "应用 / 环境 / 工作负载",
-        "k8sJob": "K8s 任务",
-        "status": "状态",
-        "duration": "时长",
-        "started": "开始时间"
-      }
-    },
-    "commands": {
-      "emptyTitle": "尚无命令运行",
-      "emptyDescription": "针对工作负载的临时命令会显示在此。使用 CLI 运行 `astro app run …`。",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "应用 / 工作负载",
-        "command": "命令",
-        "status": "状态",
-        "invokedBy": "调用者",
-        "started": "开始时间"
-      }
-    },
-    "runStatus": {
-      "running": "运行中",
-      "inProgress": "进行中",
-      "succeeded": "成功",
-      "failed": "失败",
-      "superseded": "已被替换",
-      "unknown": "未知",
-      "exitCodeLabel": "退出 {code}",
-      "exitCodeTooltip": "进程以代码 {code} 退出"
-    },
-    "concurrency": {
-      "label": {
-        "forbid": "禁止",
-        "queue": "排队",
-        "replace": "替换"
+        "scope": "Scope",
+        "resource": "Resource",
+        "usage": "Usage",
+        "bar": "Bar",
+        "limits": "Soft / Hard",
+        "actions": "Actions"
       },
-      "tooltip": {
-        "forbid": "运行期间跳过下次触发。",
-        "queue": "允许重叠运行堆叠 — 每次触发独立且短小时选用。",
-        "replace": "停止正在运行的任务并启动新任务。"
+      "request": {
+        "buttonRequest": "Request bump",
+        "buttonPending": "Pending request",
+        "title": "Request quota bump",
+        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
+        "factorLabel": "Multiplier",
+        "factor1_5x": "1.5x",
+        "factor2x": "2x",
+        "factor3x": "3x",
+        "factor5x": "5x",
+        "factor10x": "10x",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
+        "reasonHint": "Required. Shows up in the admin notification.",
+        "submit": "Submit request",
+        "submitting": "Submitting…",
+        "cancel": "Cancel",
+        "toastSubmitted": "Quota bump requested",
+        "toastFailed": "Failed to submit request",
+        "pendingBadge": "Pending {factor}x — {reason}"
       }
     },
-    "cron": {
-      "invalid": "无效的 cron 表达式",
-      "firesIn": "{relative}后触发",
-      "now": "少于一分钟",
-      "minutes": "{count}分钟",
-      "hours": "{count}小时",
-      "days": "{count}天"
-    },
-    "workloadCard": {
-      "title": "Cronjob 工作负载",
-      "countLabel": "已计划 {count} 个",
-      "openLogs": "在控制台中打开"
-    },
-    "output": {
-      "emptyOutput": "尚无捕获的输出。",
-      "openInConsole": "在控制台中打开",
-      "lines": "{count}行",
-      "truncated": "已显示 200 行 — 在控制台中查看完整日志。"
+    "alerts": {
+      "mute": {
+        "menuLabel": "Mute",
+        "preset1h": "Mute for 1 hour",
+        "preset4h": "Mute for 4 hours",
+        "preset24h": "Mute for 24 hours",
+        "presetCustom": "Mute for custom duration…",
+        "unmute": "Unmute now",
+        "badge": "Muted ({remaining} left)",
+        "badgeExpired": "Muted",
+        "showMuted": "Show muted",
+        "hideMuted": "Hide muted",
+        "toastMuted": "Muted {name} for {duration}",
+        "toastUnmuted": "Unmuted {name}",
+        "toastMuteFailed": "Failed to mute rule",
+        "toastUnmuteFailed": "Failed to unmute rule",
+        "customTitle": "Mute {name}",
+        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
+        "durationLabel": "Duration (hours)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Known outage — DB migration in progress",
+        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
+        "submit": "Mute rule",
+        "cancel": "Cancel"
+      }
     }
   }
 }

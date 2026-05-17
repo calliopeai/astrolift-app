@@ -1385,6 +1385,10 @@ export type AstroliftRegisteredApp = {
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  webhookDeploysPauseReason: Scalars['String']['output'];
+  webhookDeploysPaused: Scalars['Boolean']['output'];
+  webhookDeploysPausedAt?: Maybe<Scalars['DateTime']['output']>;
+  webhookDeploysPausedByEmail?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftRegisteredAppMutationResult = {
@@ -2508,6 +2512,7 @@ export type Mutation = {
   /** Force a workflow instance to a specific state (admin override). */
   overrideWorkflowState: MutationResult;
   pauseAppIngress: AstroliftAppEnvironmentMutationResult;
+  pauseAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   pauseEnvironment: AstroliftAppEnvironmentMutationResult;
   /** Add or remove users from a permission group. */
   permissionGroupOperation: MutationResult;
@@ -2545,6 +2550,7 @@ export type Mutation = {
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
+  resumeAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
   revealAppSecret: AstroliftRevealedSecretMutationResult;
@@ -3043,6 +3049,11 @@ export type MutationPauseAppIngressArgs = {
 };
 
 
+export type MutationPauseAstroliftAppWebhookDeploysArgs = {
+  input: PauseAppWebhookDeploysInput;
+};
+
+
 export type MutationPauseEnvironmentArgs = {
   input: EnvironmentByIdInput;
 };
@@ -3193,6 +3204,11 @@ export type MutationRestartAstroliftWorkloadArgs = {
 
 export type MutationResumeAppIngressArgs = {
   input: EnvironmentByIdInput;
+};
+
+
+export type MutationResumeAstroliftAppWebhookDeploysArgs = {
+  input: ResumeAppWebhookDeploysInput;
 };
 
 
@@ -3596,6 +3612,11 @@ export type OrganizationType = {
   updatedAt: Scalars['DateTime']['output'];
   version: Scalars['Int']['output'];
   website?: Maybe<Scalars['String']['output']>;
+};
+
+export type PauseAppWebhookDeploysInput = {
+  appSlug: Scalars['String']['input'];
+  reason: InputMaybe<Scalars['String']['input']>;
 };
 
 export type PermissionComparison = {
@@ -4355,6 +4376,10 @@ export type RequestQuotaIncreaseInput = {
 
 export type RestartWorkloadInput = {
   workloadId: Scalars['GUID']['input'];
+};
+
+export type ResumeAppWebhookDeploysInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 export type ResyncManifestFromRepoInput = {

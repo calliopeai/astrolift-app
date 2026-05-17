@@ -67,74 +67,6 @@
       "sports": "Sports"
     }
   },
-  "overview": {
-    "title": "개요",
-    "description": "이 Astrolift 설치의 아이덴티티, 레지스트리 및 라이프사이클 데이터.",
-    "errorBanner": {
-      "title": "일부 데이터를 불러오지 못했습니다"
-    },
-    "tiles": {
-      "teams": {
-        "label": "팀",
-        "emptyCta": "첫 팀 만들기"
-      },
-      "projects": {
-        "label": "프로젝트",
-        "emptyCta": "프로젝트 만들기"
-      },
-      "apps": {
-        "label": "등록된 앱",
-        "emptyCta": "첫 앱 등록하기"
-      },
-      "deployments": {
-        "label": "활성 배포",
-        "emptyCta": "배포 시작"
-      },
-      "costMtd": {
-        "label": "비용 (MTD)",
-        "emptyCta": "비용 데이터 대기 중",
-        "vsPrevMonth": "전월 대비",
-        "noPrevMonth": "전월 데이터 없음"
-      }
-    },
-    "fleetHealth": {
-      "title": "플릿 상태",
-      "description": "등록된 앱 전반의 최근 배포 상태 종합.",
-      "healthy": "정상",
-      "failing": "{count}개 실패",
-      "hiccup": "{count, plural, one {#건의 일시 장애} other {#건의 일시 장애}}",
-      "empty": "등록된 앱이 없습니다. /apps/new에서 저장소를 연결하여 시작하세요.",
-      "tiles": {
-        "running": "실행 중",
-        "recentFailure": "최근 실패",
-        "failing": "실패 중",
-        "noDeploys": "배포 없음"
-      }
-    },
-    "recentProjects": {
-      "title": "최근 프로젝트",
-      "description": "모든 팀에서 최근에 생성된 프로젝트.",
-      "emptyTitle": "프로젝트가 없습니다",
-      "emptyDescription": "팀과 프로젝트를 만들어 앱 등록을 시작하세요.",
-      "emptyAction": "팀 관리"
-    },
-    "activity": {
-      "title": "활동",
-      "description": "라이프사이클 이벤트: 배포, 구성 동기화, 스케일링, 클러스터 등록, 시크릿 로테이션.",
-      "emptyTitle": "활동이 없습니다",
-      "emptyDescription": "배포, 구성 변경 및 클러스터 작업이 발생하면 여기에 표시됩니다.",
-      "errorTitle": "활동을 불러오지 못했습니다",
-      "loadMore": "더 보기",
-      "loadingMore": "불러오는 중…"
-    },
-    "registeredApps": {
-      "title": "등록된 앱",
-      "description": "배포용으로 등록된 저장소.",
-      "emptyTitle": "등록된 앱이 없습니다",
-      "emptyDescription": "앱 레지스트리 화면은 다음 마일스톤에 제공됩니다. 연결되면 이 카드에서 Git 저장소를 등록하고 배포할 수 있습니다.",
-      "emptyAction": "레지스트리 열기"
-    }
-  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
@@ -167,21 +99,6 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
-    },
-    "nav": {
-      "ariaLabel": "설정 섹션",
-      "openMobileNav": "설정 메뉴 열기",
-      "openMobileNavLabel": "섹션",
-      "mobileTitle": "설정 섹션",
-      "mobileDescription": "원하는 설정 영역으로 이동합니다.",
-      "groups": {
-        "organization": "조직",
-        "personal": "개인",
-        "tokens": "토큰"
-      }
-    },
-    "breadcrumb": {
-      "root": "설정"
     }
   },
   "hooks": {
@@ -253,6 +170,18 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
+      },
+      "freshness": {
+        "lastDeployed": "마지막 배포 {when}",
+        "viewFailed": "실패한 배포 보기",
+        "stale": "오래됨",
+        "never": "배포 없음",
+        "status": {
+          "OK": "정상",
+          "DEGRADED": "최근 배포 실패",
+          "STALE": "최근 배포 없음",
+          "NEVER": "배포된 적 없음"
+        }
       }
     },
     "tabs": {
@@ -390,133 +319,39 @@
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     },
-    "observability": {
-      "scope": {
-        "title": "지표 범위",
-        "environment": "환경",
-        "workload": "워크로드",
-        "allWorkloads": "모든 워크로드",
-        "environmentPlaceholder": "환경 선택",
-        "workloadPlaceholder": "워크로드 선택"
-      },
-      "events": {
-        "warningCount": "지난 1시간 동안 경고 {count}건",
-        "warningBadgeLabel": "경고",
-        "collapse": "접기",
-        "expand": "펼치기"
-      }
-    },
-    "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
-      "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
-      },
-      "status": {
-        "active": "active",
-        "revoked": "revoked"
-      },
-      "lastUsedCell": {
-        "ip": "IP",
-        "agent": "Agent"
-      },
-      "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
-      },
-      "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
-      },
-      "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
-      },
-      "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
-      }
-    },
-    "domains": {
-      "addSheet": {
-        "byoTitle": "Bring your own certificate",
-        "byoFollowup": "Hostname is still validated via DNS-TXT. After it goes live, upload your certificate via the per-domain Replace action below.",
-        "methodLabels": {
-          "dns_txt": "DNS-TXT (default)",
-          "http_01": "HTTP-01",
-          "dns_01": "DNS-01",
-          "byo_cert": "Bring your own certificate"
-        },
-        "methodHints": {
-          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
-          "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
-          "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
-          "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
-        }
-      }
-    },
-    "detail": {
-      "urlHealth": {
-        "checking": "확인 중…",
-        "unknown": "미확인",
-        "ariaLabel": "URL 상태: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
-        "down": "{reason}",
-        "downNoReason": "도달 불가",
-        "tooltip": {
-          "title": "최근 프로브",
-          "empty": "프로브 기록이 아직 없습니다.",
-          "uptime": "{ok}/{total} 정상 · 평균 {avgMs}ms",
-          "now": "방금",
-          "secondsAgo": "{seconds}초 전",
-          "minutesAgo": "{minutes}분 전",
-          "hoursAgo": "{hours}시간 전",
-          "recheck": "다시 프로브하려면 클릭",
-          "rechecking": "다시 프로브 중…"
-        }
+    "settings": {
+      "webhookDeploys": {
+        "title": "Webhook deploys",
+        "description": "App-global pause for CI / push / scheduled deploys. Manual deploys from the UI or CLI keep working so you can still ship a fix.",
+        "paused": "Paused",
+        "live": "Live",
+        "pause": "Pause webhook deploys",
+        "resume": "Resume webhook deploys",
+        "scopeNoteLive": "Webhook-fired deploys (push, CI, scheduled) accept normally. Pausing stops all three; manual deploys remain available.",
+        "scopeNotePaused": "Webhook-fired deploys refused. Manual deploys, rollbacks, promotions, and teardown remain available.",
+        "pausedBy": "Paused by <who></who> · <when></when>",
+        "reasonPrefix": "Reason:",
+        "noReason": "No reason recorded.",
+        "unknownActor": "unknown",
+        "unknownTime": "just now",
+        "confirmTitle": "Pause webhook deploys for this app?",
+        "confirmDescription": "Future deploys from CI, push events, and cron will be refused until you resume. Manual deploys from the UI or CLI continue to work.",
+        "reasonLabel": "Reason (optional)",
+        "reasonPlaceholder": "e.g. CI is misfiring, holding until the upstream pipeline is fixed",
+        "reasonHelp": "Recorded on the audit log and shown on this page until the pause is lifted. Up to 512 characters.",
+        "confirmButton": "Pause webhook deploys",
+        "cancel": "Cancel",
+        "toastPaused": "Webhook deploys paused.",
+        "toastResumed": "Webhook deploys resumed.",
+        "toastPauseFailed": "Pause failed.",
+        "toastResumeFailed": "Resume failed.",
+        "toastNoResponse": "No response from backend."
       }
     }
   },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",
-    "cardMeta": {
-      "modified": "Modified {when}"
-    },
     "sections": {
       "organization": {
         "title": "Organization",
@@ -533,10 +368,6 @@
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."
-      },
-      "permissions": {
-        "title": "Permissions",
-        "description": "Inspect every grant resolved for the current user."
       },
       "profile": {
         "title": "Profile",
@@ -668,138 +499,78 @@
         "requestIdSection": "요청 ID"
       }
     },
-    "approval": {
-      "quorum": {
-        "header": "{received} / {required} 승인",
-        "remainingBadge": "{count}건 더 필요",
-        "metBadge": "정족수 충족",
-        "approvedLabel": "승인자",
-        "approvedEmpty": "아직 승인이 없습니다.",
-        "awaitingLabel": "대기 중",
-        "awaitingEmpty": "자격 있는 승인자가 없습니다. 앱 정책을 확인하세요."
-      }
+    "events": {
+      "title": "Events",
+      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
+      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
+      "aggregateToggle": "Group repeats",
+      "aggregateBadge": "×{count} similar",
+      "expandLabel": "Expand",
+      "collapseLabel": "Collapse",
+      "sourceLabel": "Source",
+      "emptyTitle": "Quiet feed",
+      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "approvalsQueue": {
-      "title": "승인 대기열",
-      "description": "승인을 기다리는 모든 배포. 동일 환경 내에서 일괄 승인/거부할 수 있습니다.",
-      "empty": {
-        "title": "대기 항목 없음",
-        "description": "승인이 필요한 배포가 여기에 나타납니다."
-      },
-      "selectAllLabel": "모두 선택",
-      "selectionStatus": "{selected} / {total} 선택됨",
-      "readOnlyHint": "조회만 가능합니다.",
-      "approveLabel": "승인",
-      "rejectLabel": "거부",
-      "footer": {
-        "selected": "{count}개 배포 선택됨",
-        "summary": "{envs}에서 실행됩니다.",
-        "crossEnvWarning": "일괄 작업에는 동일 앱/환경이 필요합니다. 정책은 환경별로 다릅니다.",
-        "approveButton": "{count}개 승인",
-        "rejectButton": "{count}개 거부"
-      },
-      "confirmApprove": {
-        "title": "{count}개 배포를 승인하시겠습니까?",
-        "description": "{envs}의 롤아웃이 재개됩니다.",
-        "confirm": "모두 승인"
-      },
-      "confirmReject": {
-        "title": "{count}개 배포를 거부하시겠습니까?",
-        "description": "{envs}의 각 배포가 실패로 표시됩니다.",
-        "reasonLabel": "거부 사유",
-        "reasonPlaceholder": "이 배치를 거부하는 이유는 무엇입니까?",
-        "reasonRequired": "사유가 필요합니다",
-        "confirm": "모두 거부"
-      },
-      "toasts": {
-        "unexpected": "일괄 작업 응답이 없습니다.",
-        "allOk": "{label} 성공: {count}개 배포.",
-        "allFailed": "{label} 실패 ({count}개): {message}",
-        "partial": "{label}: 성공 {succeeded}, 실패 {failed}.",
-        "approveFailed": "일괄 승인 실패.",
-        "rejectFailed": "일괄 거부 실패."
-      },
-      "row": {
-        "selectRowLabel": "{app} / {env} 선택",
-        "approvalsCount": "{received}/{required} 승인",
-        "received": "수신 {rel}",
-        "review": "검토"
-      }
-    }
-  },
-  "jobs": {
-    "title": "작업",
-    "descriptionGlobal": "모든 앱의 예약된 작업 실행 및 임시 명령 실행.",
-    "descriptionForApp": "{app}의 예약된 작업 실행 및 임시 명령 실행.",
-    "tabs": {
-      "scheduled": "예약됨",
-      "commands": "명령"
-    },
-    "scheduled": {
-      "emptyTitle": "아직 예약된 작업 실행이 없습니다",
-      "emptyDescription": "Cronjob 워크로드는 스케줄러가 첫 실행을 트리거하면 여기에 표시됩니다.",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+    "quotas": {
+      "title": "Quotas",
+      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
+      "emptyTitle": "No quotas configured",
+      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
       "columns": {
-        "app": "앱 / 환경 / 워크로드",
-        "k8sJob": "K8s 작업",
-        "status": "상태",
-        "duration": "실행 시간",
-        "started": "시작됨"
-      }
-    },
-    "commands": {
-      "emptyTitle": "아직 명령 실행이 없습니다",
-      "emptyDescription": "워크로드에 대한 임시 명령은 여기에 표시됩니다. CLI에서 `astro app run …`로 실행하세요.",
-      "workloadLabel": "workload",
-      "columns": {
-        "app": "앱 / 워크로드",
-        "command": "명령",
-        "status": "상태",
-        "invokedBy": "호출자",
-        "started": "시작됨"
-      }
-    },
-    "runStatus": {
-      "running": "실행 중",
-      "inProgress": "진행 중",
-      "succeeded": "성공",
-      "failed": "실패",
-      "superseded": "대체됨",
-      "unknown": "알 수 없음",
-      "exitCodeLabel": "종료 {code}",
-      "exitCodeTooltip": "프로세스가 코드 {code}로 종료되었습니다"
-    },
-    "concurrency": {
-      "label": {
-        "forbid": "금지",
-        "queue": "대기열",
-        "replace": "교체"
+        "scope": "Scope",
+        "resource": "Resource",
+        "usage": "Usage",
+        "bar": "Bar",
+        "limits": "Soft / Hard",
+        "actions": "Actions"
       },
-      "tooltip": {
-        "forbid": "실행 중일 때 다음 예약을 건너뜁니다.",
-        "queue": "겹치는 실행을 쌓을 수 있습니다 — 각 트리거가 독립적이고 짧을 때 선택하세요.",
-        "replace": "실행 중인 작업을 중지하고 새 작업을 시작합니다."
+      "request": {
+        "buttonRequest": "Request bump",
+        "buttonPending": "Pending request",
+        "title": "Request quota bump",
+        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
+        "factorLabel": "Multiplier",
+        "factor1_5x": "1.5x",
+        "factor2x": "2x",
+        "factor3x": "3x",
+        "factor5x": "5x",
+        "factor10x": "10x",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
+        "reasonHint": "Required. Shows up in the admin notification.",
+        "submit": "Submit request",
+        "submitting": "Submitting…",
+        "cancel": "Cancel",
+        "toastSubmitted": "Quota bump requested",
+        "toastFailed": "Failed to submit request",
+        "pendingBadge": "Pending {factor}x — {reason}"
       }
     },
-    "cron": {
-      "invalid": "잘못된 cron 표현식",
-      "firesIn": "{relative} 후에 실행",
-      "now": "1분 미만",
-      "minutes": "{count}분",
-      "hours": "{count}시간",
-      "days": "{count}일"
-    },
-    "workloadCard": {
-      "title": "Cronjob 워크로드",
-      "countLabel": "{count}개 예약됨",
-      "openLogs": "콘솔에서 열기"
-    },
-    "output": {
-      "emptyOutput": "아직 캡처된 출력이 없습니다.",
-      "openInConsole": "콘솔에서 열기",
-      "lines": "{count}줄",
-      "truncated": "200줄 표시 — 콘솔에서 전체 로그를 확인하세요."
+    "alerts": {
+      "mute": {
+        "menuLabel": "Mute",
+        "preset1h": "Mute for 1 hour",
+        "preset4h": "Mute for 4 hours",
+        "preset24h": "Mute for 24 hours",
+        "presetCustom": "Mute for custom duration…",
+        "unmute": "Unmute now",
+        "badge": "Muted ({remaining} left)",
+        "badgeExpired": "Muted",
+        "showMuted": "Show muted",
+        "hideMuted": "Hide muted",
+        "toastMuted": "Muted {name} for {duration}",
+        "toastUnmuted": "Unmuted {name}",
+        "toastMuteFailed": "Failed to mute rule",
+        "toastUnmuteFailed": "Failed to unmute rule",
+        "customTitle": "Mute {name}",
+        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
+        "durationLabel": "Duration (hours)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Known outage — DB migration in progress",
+        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
+        "submit": "Mute rule",
+        "cancel": "Cancel"
+      }
     }
   }
 }
