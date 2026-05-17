@@ -23,6 +23,7 @@ import { useTranslations } from "next-intl";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { EmptyState } from "@/components/EmptyState";
 import { KpiTile } from "@/components/KpiTile";
+import { OnboardingHost } from "@/components/onboarding/OnboardingHost";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,6 +119,7 @@ export function DashboardClient() {
 
   return (
     <PageShell title={t("title")} description={t("description")}>
+      <OnboardingHost />
       {errorBanner && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
@@ -147,14 +149,16 @@ export function DashboardClient() {
           href="/projects"
           emptyCta={t("tiles.projects.emptyCta")}
         />
-        <KpiTile
-          label={t("tiles.apps.label")}
-          icon={RocketIcon}
-          value={apps.length}
-          loading={health.loading}
-          href="/apps"
-          emptyCta={t("tiles.apps.emptyCta")}
-        />
+        <div data-onboarding-tour="apps-tile">
+          <KpiTile
+            label={t("tiles.apps.label")}
+            icon={RocketIcon}
+            value={apps.length}
+            loading={health.loading}
+            href="/apps"
+            emptyCta={t("tiles.apps.emptyCta")}
+          />
+        </div>
         <KpiTile
           label={t("tiles.deployments.label")}
           icon={BoxIcon}
@@ -293,7 +297,7 @@ export function DashboardClient() {
         </Card>
       </div>
 
-      <Card>
+      <Card data-onboarding-tour="apps-nav">
         <CardHeader>
           <CardTitle>{t("registeredApps.title")}</CardTitle>
           <CardDescription>{t("registeredApps.description")}</CardDescription>
