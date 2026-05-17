@@ -233,6 +233,8 @@ export const LIST_POLICIES = gql`
       createdAt
       updatedAt
       deletedAt
+      createdByUsername
+      updatedByUsername
     }
   }
 `;
@@ -250,6 +252,8 @@ const IDP_FIELDS = `
   isActive
   createdAt
   updatedAt
+  activatedAt
+  lastSwitchedByUsername
 `;
 
 export const LIST_IDENTITY_PROVIDERS = gql`

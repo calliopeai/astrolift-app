@@ -248,10 +248,7 @@ class IdentityQuery:
                 except (TypeError, ValueError):
                     continue
 
-        return [
-            member_to_type(m, last_active_at=last_active_by_user_id.get(m.user_id))
-            for m in members
-        ]
+        return [member_to_type(m, last_active_at=last_active_by_user_id.get(m.user_id)) for m in members]
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
@@ -613,9 +610,7 @@ class IdentityQuery:
         one batch per kind to keep this O(scope-kinds) rather than
         O(bindings).
         """
-        qs = list(
-            RoleBinding.objects.select_related("user", "role").order_by("-granted_at")[:500]
-        )
+        qs = list(RoleBinding.objects.select_related("user", "role").order_by("-granted_at")[:500])
         labels = _resolve_source_scope_labels(qs)
         return [
             role_binding_to_type(rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), ""))
@@ -633,7 +628,10 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_policies(self, info: Info) -> list[PolicyType]:
-        qs = Policy.objects.order_by("scope_level", "slug")[:200]
+        # ``created_by`` / ``updated_by`` are FK columns on the Tracking
+        # mixin; ``select_related`` keeps the per-row username lookup
+        # inside the same query (no N+1 on the policies table — #466).
+        qs = Policy.objects.select_related("created_by", "updated_by").order_by("scope_level", "slug")[:200]
         return [policy_to_type(p) for p in qs]
 
     # ---- Domain allowlist --------------------------------------------
@@ -665,7 +663,13 @@ class IdentityQuery:
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
     def astrolift_identity_providers(self, info: Info) -> list[IdentityProviderType]:
-        qs = IdentityProvider.objects.select_related("organization").order_by("-is_default", "kind")[:50]
+        # Prefetch ``last_switched_by`` (FK on the IdP row) so the per-row
+        # username lookup folds into the same query — the FE renders the
+        # "by <operator>" caption on every active IdP, so a naive lookup
+        # would fan out N+1 on the list (#467).
+        qs = IdentityProvider.objects.select_related("organization", "last_switched_by").order_by(
+            "-is_default", "kind"
+        )[:50]
         active_id = _active_idp_pk()
         return [identity_provider_to_type(idp, is_active=(idp.pk == active_id)) for idp in qs]
 
@@ -786,7 +790,11 @@ class IdentityQuery:
         active_id = _active_idp_pk()
         if active_id is None:
             return None
-        idp = IdentityProvider.objects.select_related("organization").filter(pk=active_id).first()
+        idp = (
+            IdentityProvider.objects.select_related("organization", "last_switched_by")
+            .filter(pk=active_id)
+            .first()
+        )
         if idp is None:
             return None
         return identity_provider_to_type(idp, is_active=True)
