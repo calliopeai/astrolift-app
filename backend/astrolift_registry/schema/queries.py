@@ -24,6 +24,7 @@ from astrolift_registry.schema.types import (
     app_team_access_to_type,
     app_to_type,
     build_app_freshness,
+    build_config_drift,
     container_to_type,
     workload_to_type,
 )
@@ -225,11 +226,26 @@ class RegistryQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def astrolift_app(self, info: Info, slug: str) -> RegisteredAppType | None:
+    def astrolift_app(
+        self,
+        info: Info,
+        slug: str,
+        include_drift: bool = False,
+    ) -> RegisteredAppType | None:
+        """Single app by slug.
+
+        ``include_drift`` (default False, #407 C) opts the row into
+        the config-drift rollup — ``configDrift`` is left null when
+        False so the cheap header query stays cheap. The app overview
+        passes True; sidebar / breadcrumb queries pass False.
+        """
         app = (
             RegisteredApp.objects.select_related("organization", "team", "project").filter(slug=slug).first()
         )
-        return app_to_type(app) if app else None
+        if app is None:
+            return None
+        drift = build_config_drift(app) if include_drift else None
+        return app_to_type(app, drift=drift)
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

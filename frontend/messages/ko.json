@@ -509,6 +509,59 @@
           "rechecking": "다시 프로브 중…"
         }
       }
+    },
+    "detail": {
+      "reprovision": {
+        "headline": {
+          "failed": "프로비저닝 실패",
+          "pending": "프로비저닝이 아직 시작되지 않음",
+          "provisioning": "프로비저닝 진행 중",
+          "ready_missing_registry": "컨테이너 레지스트리 정보 누락",
+          "unknown": "프로비저닝에 주의가 필요합니다"
+        },
+        "description": {
+          "failed": "다시 시도해 레지스트리와 네임스페이스를 다시 구성하세요.",
+          "pending": "앱을 온라인 상태로 만들려면 시작하세요.",
+          "provisioning": "잠시 기다리세요 — 멈춘 경우에만 다시 실행하세요.",
+          "ready_missing_registry": "ECR 레포지토리와 푸시 역할을 재구성하려면 재프로비저닝하세요. 그 전까지는 배포가 동작하지 않습니다.",
+          "unknown": "복구하려면 재프로비저닝하세요."
+        },
+        "elapsed": "{minutes}분 전 시작",
+        "cta": "재프로비저닝",
+        "confirm": {
+          "title": "{slug}을(를) 재프로비저닝하시겠습니까?",
+          "description": "진행 중인 배포를 취소하고, 워크로드별 k8s 객체를 삭제한 뒤 배포 CI 워크플로를 다시 실행합니다. 기존 승인은 다시 수행됩니다.",
+          "confirm": "예, 재프로비저닝"
+        },
+        "toast": {
+          "dispatched": "재프로비저닝 시작 — 배포 워크플로가 재실행 중입니다.",
+          "partial": "부분 성공: 정리는 완료되었지만 배포 디스패치가 실패했습니다 ({message})."
+        },
+        "error": {
+          "noResponse": "재프로비저닝 실패: 백엔드 응답 없음.",
+          "generic": "재프로비저닝 실패."
+        }
+      },
+      "configDrift": {
+        "headline": "구성 드리프트가 감지되었습니다",
+        "description": "{env} 환경의 마지막 배포가 현재 매니페스트와 일치하지 않습니다.",
+        "descriptionNoEnv": "마지막 배포가 현재 매니페스트와 일치하지 않습니다.",
+        "cta": "소스에서 동기화",
+        "field": {
+          "manifest_hash": "매니페스트 해시가 마지막 배포 이후 변경됨",
+          "image_tag": "이미지 태그가 스냅샷과 다름",
+          "repo_unsynced": "소스 레포가 플랫폼보다 앞서 있습니다 — 동기화하여 가져오세요",
+          "unknown": "{field}이(가) 변경되었습니다"
+        },
+        "toast": {
+          "synced": "소스에서 동기화했습니다.",
+          "failed": "소스에서 동기화 실패."
+        }
+      },
+      "latestDeploy": {
+        "empty": "아직 배포가 없습니다 — CLI에서 실행하거나 배포 브랜치에 푸시하세요.",
+        "ariaLabel": "최신 배포: {status}, {when}"
+      }
     }
   },
   "settingsIndex": {

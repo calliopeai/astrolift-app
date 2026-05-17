@@ -231,6 +231,13 @@ export type AstroliftAppCertificate = {
   renewalStatus: Scalars['String']['output'];
 };
 
+export type AstroliftAppConfigDrift = {
+  environmentName: Scalars['String']['output'];
+  fields: Array<Scalars['String']['output']>;
+  hasDrift: Scalars['Boolean']['output'];
+  lastChecked: Scalars['DateTime']['output'];
+};
+
 export type AstroliftAppDeploymentSummary = {
   commitSha: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -381,6 +388,13 @@ export type AstroliftAppPod = {
   restarts: Scalars['Int']['output'];
   status: Scalars['String']['output'];
   workload: Scalars['String']['output'];
+};
+
+export type AstroliftAppReprovisionState = {
+  elapsedSeconds?: Maybe<Scalars['Int']['output']>;
+  needsReprovision: Scalars['Boolean']['output'];
+  reason: Scalars['String']['output'];
+  state: Scalars['String']['output'];
 };
 
 export type AstroliftAppSecret = {
@@ -1377,6 +1391,7 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
 export type AstroliftRegisteredApp = {
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
+  configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
   cronPaused: Scalars['Boolean']['output'];
@@ -1413,6 +1428,7 @@ export type AstroliftRegisteredApp = {
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
   registryRepoUri: Scalars['String']['output'];
+  reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
   securityPolicy: AstroliftSecurityPolicy;
   slug: Scalars['String']['output'];
@@ -3941,6 +3957,7 @@ export type QueryAstroliftAlertRulesArgs = {
 
 
 export type QueryAstroliftAppArgs = {
+  includeDrift?: Scalars['Boolean']['input'];
   slug: Scalars['String']['input'];
 };
 

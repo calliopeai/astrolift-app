@@ -206,6 +206,13 @@ type AstroliftAppCertificate {
   renewalStatus: String!
 }
 
+type AstroliftAppConfigDrift {
+  hasDrift: Boolean!
+  fields: [String!]!
+  environmentName: String!
+  lastChecked: DateTime!
+}
+
 type AstroliftAppDeploymentSummary {
   id: GUID!
   status: String!
@@ -357,6 +364,13 @@ type AstroliftAppPod {
   age: DateTime
   node: String!
   containerStatuses: [AstroliftContainerStatus!]!
+}
+
+type AstroliftAppReprovisionState {
+  needsReprovision: Boolean!
+  state: String!
+  reason: String!
+  elapsedSeconds: Int
 }
 
 type AstroliftAppSecret {
@@ -1406,6 +1420,8 @@ type AstroliftRegisteredApp {
   latestDeployment: AstroliftAppDeploymentSummary
   lastDeployedAt: DateTime
   healthPulse: AstroliftAppHealthPulse
+  reprovision: AstroliftAppReprovisionState!
+  configDrift: AstroliftAppConfigDrift
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -2970,7 +2986,7 @@ type Query {
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
-  astroliftApp(slug: String!): AstroliftRegisteredApp
+  astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
