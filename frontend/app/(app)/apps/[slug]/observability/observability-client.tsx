@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/EmptyState";
 import {
   DnsRecordsCard,
   GoldenSignalsPanel,
+  LogViewer,
   TlsCertificatesCard,
   WorkloadIdentityCard,
 } from "@/components/observability";
@@ -117,11 +118,37 @@ function formatAge(iso: string | null | undefined): string {
   return `${d}d`;
 }
 
-function formatLogLine(line: AstroliftAppLogLine): string {
-  const ts = new Date(line.timestamp).toISOString();
-  const pod = line.podName.length > 30 ? line.podName.slice(-30) : line.podName;
-  const container = line.container ? ` (${line.container})` : "";
-  return `[${ts}] ${pod}${container} ${line.message}`;
+// Heuristic for the "default container" — pick the one whose name
+// matches the pod's workload (typical for app workloads named after
+// the deployment). Falls back to the first non-sidecar candidate so
+// we don't auto-select istio-proxy / linkerd-proxy / otel-collector
+// when they're present alongside the main app container.
+const KNOWN_SIDECARS = new Set([
+  "istio-proxy",
+  "envoy",
+  "linkerd-proxy",
+  "datadog-agent",
+  "otel-collector",
+  "otc-container",
+  "newrelic-infrastructure",
+  "fluent-bit",
+  "fluentd",
+  "filebeat",
+  "vault-agent",
+  "vault-agent-init",
+]);
+
+function pickDefaultContainer(
+  containers: string[],
+  workload: string | null | undefined
+): string | null {
+  if (containers.length === 0) return null;
+  if (workload) {
+    const match = containers.find((c) => c === workload);
+    if (match) return match;
+  }
+  const nonSidecar = containers.find((c) => !KNOWN_SIDECARS.has(c));
+  return nonSidecar ?? containers[0];
 }
 
 export function ObservabilityClient({ slug }: { slug: string }) {
@@ -164,20 +191,38 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   }, [pickedPod, podRows]);
 
   const [streaming, setStreaming] = React.useState(false);
-  const [logBuffer, setLogBuffer] = React.useState<string[]>([]);
-  const logRef = React.useRef<HTMLPreElement | null>(null);
-  // Clearing the buffer when the operator switches pods is done at
-  // selection-time via a callback rather than in an effect, which
-  // sidesteps the cascading-render lint and is the React-recommended
-  // shape for "reset state on a different key".
-  const lastTailedPod = React.useRef<string | null>(null);
-  if (lastTailedPod.current !== selectedPod) {
-    lastTailedPod.current = selectedPod;
-    if (logBuffer.length !== 0) {
-      // Set during render is acceptable when guarded — React batches
-      // and replays the render with the new state.
-      setLogBuffer([]);
+  const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
+  // Container list derived from the selected pod's containerStatuses.
+  const podContainers: string[] = React.useMemo(() => {
+    const pod = podRows.find((p) => p.name === selectedPod);
+    return pod?.containerStatuses.map((c) => c.name) ?? [];
+  }, [podRows, selectedPod]);
+  const selectedPodWorkload = React.useMemo(
+    () => podRows.find((p) => p.name === selectedPod)?.workload ?? null,
+    [podRows, selectedPod]
+  );
+
+  // Operator-overridden container; null means "use the default" which
+  // we recompute from the pod's containers below.
+  const [pickedContainer, setPickedContainer] = React.useState<string | null>(null);
+  const selectedContainer: string | null = React.useMemo(() => {
+    if (pickedContainer && podContainers.includes(pickedContainer)) {
+      return pickedContainer;
     }
+    return pickDefaultContainer(podContainers, selectedPodWorkload);
+  }, [pickedContainer, podContainers, selectedPodWorkload]);
+
+  // Clearing the buffer when the operator switches pods or containers
+  // uses the official React pattern for "reset state on a different
+  // key": store the previous key in state alongside the buffer and
+  // compare during render. setState in render is fine when guarded;
+  // React replays the render with the new state on the same commit.
+  // See: https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
+  const streamKey = `${selectedPod ?? ""}::${selectedContainer ?? ""}`;
+  const [prevStreamKey, setPrevStreamKey] = React.useState(streamKey);
+  if (prevStreamKey !== streamKey) {
+    setPrevStreamKey(streamKey);
+    if (logBuffer.length !== 0) setLogBuffer([]);
   }
 
   // Live log subscription — only opens while ``streaming`` is true
@@ -187,6 +232,7 @@ export function ObservabilityClient({ slug }: { slug: string }) {
     variables: {
       appSlug: slug,
       podName: selectedPod ?? "",
+      container: selectedContainer ?? null,
       follow: true,
       tailLines: DEFAULT_TAIL_LINES,
     },
@@ -195,22 +241,12 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       const line = data.data?.astroliftOnAppLog;
       if (!line) return;
       setLogBuffer((prev) => {
-        const next = [...prev, formatLogLine(line)];
+        const next = [...prev, line];
         // Cap memory so an hours-long tail doesn't grow unbounded.
         return next.length > LOG_BUFFER_LIMIT ? next.slice(-LOG_BUFFER_LIMIT) : next;
       });
     },
   });
-
-  // Autoscroll the log pane as new lines arrive — operators expect a
-  // tail-like UX. Easy to defeat by scrolling up (we only auto-snap
-  // when the user is already near the bottom).
-  React.useEffect(() => {
-    const el = logRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    if (nearBottom) el.scrollTop = el.scrollHeight;
-  }, [logBuffer]);
 
   if (app.loading && !a) {
     return (
@@ -385,22 +421,22 @@ export function ObservabilityClient({ slug }: { slug: string }) {
           </div>
         </CardHeader>
         <CardContent>
-          <pre
-            ref={logRef}
-            className="bg-muted/40 h-72 overflow-auto rounded-md border p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap"
-          >
-            {logBuffer.length === 0 ? (
-              <span className="text-muted-foreground italic">
-                {streaming
-                  ? t("logs.waiting")
-                  : selectedPod
-                    ? t("logs.pressStream")
-                    : t("logs.pickPod")}
-              </span>
-            ) : (
-              logBuffer.join("\n")
-            )}
-          </pre>
+          <LogViewer
+            lines={logBuffer}
+            appSlug={a.slug}
+            podName={selectedPod}
+            containers={podContainers}
+            selectedContainer={selectedContainer}
+            onContainerChange={setPickedContainer}
+            bufferLimit={LOG_BUFFER_LIMIT}
+            emptyHint={
+              streaming
+                ? t("logs.waiting")
+                : selectedPod
+                  ? t("logs.pressStream")
+                  : t("logs.pickPod")
+            }
+          />
           <p className="text-muted-foreground mt-2 text-xs">
             {t("logs.bufferCap", { limit: LOG_BUFFER_LIMIT })}{" "}
             <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">
