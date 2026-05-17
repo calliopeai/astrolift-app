@@ -9,6 +9,7 @@ workflow integration tests that spin up the time-skipping env.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +18,7 @@ from django.test import RequestFactory
 from astrolift_workflows.schema.mutations import TemporalWorkflowsMutation
 from astrolift_workflows.schema.queries import TemporalWorkflowsQuery
 from core.permissions import Permission
+from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
 
@@ -31,6 +33,16 @@ def _info():
     )
 
 
+@contextmanager
+def _tenant():
+    """Bind a minimal tenant snapshot for the duration of a resolver call.
+
+    ``@tenant_scoped()`` short-circuits without one — these tests don't
+    exercise tenancy filtering, they just need the contextvar set."""
+    with tenant_context(TenantContext(organization_id=1)):
+        yield
+
+
 # ---- queries -----------------------------------------------------------
 
 
@@ -39,8 +51,9 @@ def test_list_workflow_instances_denied_without_read(permission_resolver, settin
     q = TemporalWorkflowsQuery()
     from core.permissions import PermissionDenied
 
-    with pytest.raises(PermissionDenied):
-        q.astrolift_workflow_instances(_info())
+    with _tenant():
+        with pytest.raises(PermissionDenied):
+            q.astrolift_workflow_instances(_info())
 
 
 def test_list_workflow_instances_returns_empty_page_when_disabled(permission_resolver, settings):
@@ -48,7 +61,8 @@ def test_list_workflow_instances_returns_empty_page_when_disabled(permission_res
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
 
     q = TemporalWorkflowsQuery()
-    page = q.astrolift_workflow_instances(_info())
+    with _tenant():
+        page = q.astrolift_workflow_instances(_info())
     assert page.items == []
     assert page.next_cursor is None
 
@@ -77,7 +91,8 @@ def test_list_workflow_instances_passes_filters(permission_resolver, settings, m
 
     monkeypatch.setattr("astrolift_workflows.schema.queries.list_workflow_instances", _fake_list)
     q = TemporalWorkflowsQuery()
-    page = q.astrolift_workflow_instances(_info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10)
+    with _tenant():
+        page = q.astrolift_workflow_instances(_info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10)
     assert captured == {"workflow_type": "DeployAppWorkflow", "status": "RUNNING", "limit": 10}
     assert len(page.items) == 1
     assert page.items[0].workflow_id == "DeployAppWorkflow-x"
@@ -88,14 +103,16 @@ def test_instance_detail_returns_none_when_missing(permission_resolver, settings
     settings.ASTROLIFT_TEMPORAL_ENABLED = False
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     q = TemporalWorkflowsQuery()
-    assert q.astrolift_workflow_instance_detail(_info(), "missing-id") is None
+    with _tenant():
+        assert q.astrolift_workflow_instance_detail(_info(), "missing-id") is None
 
 
 def test_instance_detail_returns_none_for_empty_workflow_id(permission_resolver, settings):
     settings.ASTROLIFT_TEMPORAL_ENABLED = True
     permission_resolver.grant(Permission.AUDIT_LOG_READ)
     q = TemporalWorkflowsQuery()
-    assert q.astrolift_workflow_instance_detail(_info(), "") is None
+    with _tenant():
+        assert q.astrolift_workflow_instance_detail(_info(), "") is None
 
 
 def test_instance_detail_shapes_history(permission_resolver, settings, monkeypatch):
@@ -128,7 +145,8 @@ def test_instance_detail_shapes_history(permission_resolver, settings, monkeypat
     )
 
     q = TemporalWorkflowsQuery()
-    detail = q.astrolift_workflow_instance_detail(_info(), "DeployAppWorkflow-x")
+    with _tenant():
+        detail = q.astrolift_workflow_instance_detail(_info(), "DeployAppWorkflow-x")
     assert detail is not None
     assert detail.instance.status == "COMPLETED"
     assert detail.instance.duration_seconds == 60.0
