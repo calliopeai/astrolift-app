@@ -30,6 +30,41 @@ export const LIST_EVENTS = gql`
       projectId
       registeredAppId
       occurredAt
+      resourceKind
+      resourceId
+    }
+  }
+`;
+
+export const LIST_EVENTS_AGGREGATED = gql`
+  query ListEventsAggregated(
+    $limit: Int
+    $eventType: String
+    $aggregateWindowSeconds: Int
+  ) {
+    astroliftEventsAggregated(
+      limit: $limit
+      eventType: $eventType
+      aggregateWindowSeconds: $aggregateWindowSeconds
+    ) {
+      representative {
+        id
+        eventType
+        payload
+        organizationId
+        teamId
+        projectId
+        registeredAppId
+        occurredAt
+        resourceKind
+        resourceId
+      }
+      count
+      firstAt
+      lastAt
+      eventType
+      resourceKind
+      resourceId
     }
   }
 `;

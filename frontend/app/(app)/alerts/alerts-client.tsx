@@ -5,8 +5,11 @@ import {
   BellIcon,
   BellOffIcon,
   CheckIcon,
+  MoreHorizontalIcon,
   PlusIcon,
   Trash2Icon,
+  VolumeOffIcon,
+  Volume2Icon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -20,6 +23,13 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -54,7 +64,16 @@ import {
   DELETE_ALERT_RULE,
   LIST_ALERT_EVENTS,
   LIST_ALERT_RULES,
+  MUTE_ALERT_RULE,
+  UNMUTE_ALERT_RULE,
 } from "@/graphql/operations/alerts.queries";
+
+interface AlertMute {
+  id: string;
+  ttlUntil: string;
+  reason: string;
+  createdBy: string;
+}
 
 interface AlertRule {
   id: string;
@@ -68,6 +87,7 @@ interface AlertRule {
   organizationSlug: string;
   createdAt: string;
   updatedAt: string;
+  activeMute: AlertMute | null;
 }
 
 interface AlertEvent {
@@ -132,13 +152,37 @@ export function AlertsClient() {
     refetchQueries: refetch,
     awaitRefetchQueries: true,
   });
+  const [muteRule, muteState] = useMutation<{
+    muteAlertRule: MutationResult<AlertRule>;
+  }>(MUTE_ALERT_RULE, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+  const [unmuteRule, unmuteState] = useMutation<{
+    unmuteAlertRule: MutationResult<AlertRule>;
+  }>(UNMUTE_ALERT_RULE, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
 
-  const busy = createState.loading || deleteState.loading || ackState.loading;
+  const busy =
+    createState.loading ||
+    deleteState.loading ||
+    ackState.loading ||
+    muteState.loading ||
+    unmuteState.loading;
   const ruleList = rules.data?.astroliftAlertRules ?? [];
   const eventList = events.data?.astroliftAlertEvents ?? [];
   const unresolvedEvents = eventList.filter((e) => !e.resolvedAt);
 
   const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
+  const [muteTarget, setMuteTarget] = React.useState<AlertRule | null>(null);
+  const [showMuted, setShowMuted] = React.useState(false);
+
+  const visibleRules = showMuted
+    ? ruleList
+    : ruleList.filter((r) => !r.activeMute);
+  const mutedCount = ruleList.filter((r) => r.activeMute).length;
 
   async function handleDelete(r: AlertRule) {
     const { data } = await deleteRule({ variables: { input: { id: r.id } } });
@@ -154,6 +198,71 @@ export function AlertsClient() {
     if (!data?.acknowledgeAlertEvent.ok) {
       toast.error(
         data?.acknowledgeAlertEvent.errors?.[0]?.message ?? "Ack failed",
+      );
+    }
+  }
+
+  async function handleMutePreset(
+    r: AlertRule,
+    durationHours: number,
+    durationLabel: string,
+  ) {
+    const reason = `Quick mute (${durationLabel})`;
+    const { data } = await muteRule({
+      variables: {
+        input: {
+          ruleId: r.id,
+          durationSeconds: Math.round(durationHours * 3600),
+          reason,
+        },
+      },
+    });
+    if (data?.muteAlertRule.ok) {
+      toast.success(
+        t("mute.toastMuted", { name: r.name, duration: durationLabel }),
+      );
+    } else {
+      toast.error(
+        data?.muteAlertRule.errors?.[0]?.message ?? t("mute.toastMuteFailed"),
+      );
+    }
+  }
+
+  async function handleMuteCustom(
+    r: AlertRule,
+    durationSeconds: number,
+    reason: string,
+  ): Promise<boolean> {
+    const { data } = await muteRule({
+      variables: {
+        input: { ruleId: r.id, durationSeconds, reason },
+      },
+    });
+    if (data?.muteAlertRule.ok) {
+      toast.success(
+        t("mute.toastMuted", {
+          name: r.name,
+          duration: formatDurationSeconds(durationSeconds),
+        }),
+      );
+      return true;
+    }
+    toast.error(
+      data?.muteAlertRule.errors?.[0]?.message ?? t("mute.toastMuteFailed"),
+    );
+    return false;
+  }
+
+  async function handleUnmute(r: AlertRule) {
+    const { data } = await unmuteRule({
+      variables: { input: { ruleId: r.id } },
+    });
+    if (data?.unmuteAlertRule.ok) {
+      toast.success(t("mute.toastUnmuted", { name: r.name }));
+    } else {
+      toast.error(
+        data?.unmuteAlertRule.errors?.[0]?.message ??
+          t("mute.toastUnmuteFailed"),
       );
     }
   }
@@ -207,16 +316,31 @@ export function AlertsClient() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="border-b p-4">
-            <h2 className="font-medium">{t("rules.title")}</h2>
-            <p className="text-muted-foreground text-xs">{t("rules.description")}</p>
+          <div className="flex items-center justify-between border-b p-4">
+            <div>
+              <h2 className="font-medium">{t("rules.title")}</h2>
+              <p className="text-muted-foreground text-xs">
+                {t("rules.description")}
+              </p>
+            </div>
+            {mutedCount > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMuted((v) => !v)}
+              >
+                {showMuted ? t("mute.hideMuted") : t("mute.showMuted")}{" "}
+                ({mutedCount})
+              </Button>
+            )}
           </div>
           {rules.loading && ruleList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : ruleList.length === 0 ? (
+          ) : visibleRules.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 icon={<BellIcon className="size-5" />}
@@ -237,16 +361,27 @@ export function AlertsClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ruleList.map((r) => (
-                  <TableRow key={r.id}>
+                {visibleRules.map((r) => (
+                  <TableRow key={r.id} className={r.activeMute ? "opacity-70" : undefined}>
                     <TableCell className="w-8">
-                      {r.isActive ? (
+                      {r.activeMute ? (
+                        <VolumeOffIcon className="text-muted-foreground size-4" />
+                      ) : r.isActive ? (
                         <BellIcon className="size-4 text-emerald-500" />
                       ) : (
-                        <BellOffIcon className="size-4 text-muted-foreground" />
+                        <BellOffIcon className="text-muted-foreground size-4" />
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {r.name}
+                      {r.activeMute && (
+                        <Badge variant="secondary" className="ml-2 text-[11px]">
+                          {t("mute.badge", {
+                            remaining: formatRemaining(r.activeMute.ttlUntil),
+                          })}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{r.target}</Badge>
                       {r.targetId && (
@@ -264,18 +399,76 @@ export function AlertsClient() {
                       {new Date(r.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Can permission="org.update">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => setDeleteTarget(r)}
-                          disabled={busy}
-                        >
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </Can>
+                      <div className="flex items-center justify-end gap-1">
+                        <Can permission="org.update">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8"
+                                disabled={busy}
+                                aria-label={t("mute.menuLabel")}
+                              >
+                                <MoreHorizontalIcon className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {r.activeMute ? (
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    void handleUnmute(r);
+                                  }}
+                                >
+                                  <Volume2Icon className="size-4" />
+                                  {t("mute.unmute")}
+                                </DropdownMenuItem>
+                              ) : (
+                                <>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      void handleMutePreset(r, 1, "1h");
+                                    }}
+                                  >
+                                    <VolumeOffIcon className="size-4" />
+                                    {t("mute.preset1h")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      void handleMutePreset(r, 4, "4h");
+                                    }}
+                                  >
+                                    <VolumeOffIcon className="size-4" />
+                                    {t("mute.preset4h")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      void handleMutePreset(r, 24, "24h");
+                                    }}
+                                  >
+                                    <VolumeOffIcon className="size-4" />
+                                    {t("mute.preset24h")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => setMuteTarget(r)}
+                                  >
+                                    <VolumeOffIcon className="size-4" />
+                                    {t("mute.presetCustom")}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onSelect={() => setDeleteTarget(r)}
+                                variant="destructive"
+                              >
+                                <Trash2Icon className="size-4" />
+                                {t("delete.confirm")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </Can>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -400,8 +593,120 @@ export function AlertsClient() {
           if (deleteTarget) await handleDelete(deleteTarget);
         }}
       />
+
+      <MuteSheet
+        key={muteTarget?.id ?? "none"}
+        target={muteTarget}
+        onOpenChange={(next) => {
+          if (!next) setMuteTarget(null);
+        }}
+        onSubmit={async (durationSeconds, reason) => {
+          if (muteTarget) {
+            const ok = await handleMuteCustom(muteTarget, durationSeconds, reason);
+            if (ok) setMuteTarget(null);
+          }
+        }}
+        busy={busy}
+      />
     </PageShell>
   );
+}
+
+function MuteSheet({
+  target,
+  onOpenChange,
+  onSubmit,
+  busy,
+}: {
+  target: AlertRule | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (durationSeconds: number, reason: string) => Promise<void>;
+  busy: boolean;
+}) {
+  const t = useTranslations("lists.alerts.mute");
+  const [hours, setHours] = React.useState("2");
+  const [reason, setReason] = React.useState("");
+
+  return (
+    <Sheet open={target !== null} onOpenChange={onOpenChange}>
+      <SheetContent className="flex flex-col sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>
+            {target ? t("customTitle", { name: target.name }) : t("customTitle", { name: "" })}
+          </SheetTitle>
+          <SheetDescription>{t("customDescription")}</SheetDescription>
+        </SheetHeader>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const h = Number(hours);
+            if (!Number.isFinite(h) || h <= 0) return;
+            if (!reason.trim()) return;
+            await onSubmit(Math.round(h * 3600), reason.trim());
+          }}
+          className="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="mute-hours">{t("durationLabel")}</Label>
+            <Input
+              id="mute-hours"
+              type="number"
+              min={1}
+              max={168}
+              step={1}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mute-reason">{t("reasonLabel")}</Label>
+            <Textarea
+              id="mute-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={t("reasonPlaceholder")}
+              rows={4}
+              required
+            />
+            <p className="text-muted-foreground text-xs">{t("reasonHint")}</p>
+          </div>
+          <SheetFooter className="flex-row justify-end gap-2 px-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              {t("cancel")}
+            </Button>
+            <Button type="submit" disabled={busy || !reason.trim()}>
+              {t("submit")}
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function formatRemaining(iso: string): string {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "0m";
+  return formatDurationSeconds(Math.round(ms / 1000));
+}
+
+function formatDurationSeconds(total: number): string {
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) {
+    return remMinutes > 0 ? `${hours}h ${remMinutes}m` : `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
 }
 
 function CreateRuleSheet({

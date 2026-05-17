@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from astrolift_billing.models import Budget, CostSnapshot, Quota
+from astrolift_billing.models import Budget, CostSnapshot, Quota, QuotaIncreaseRequest
 
 
 @admin.register(Quota)
@@ -39,3 +39,19 @@ class CostSnapshotAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, *args, **kwargs):
         return False
+
+
+@admin.register(QuotaIncreaseRequest)
+class QuotaIncreaseRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "quota",
+        "organization",
+        "requested_factor",
+        "status",
+        "requested_by",
+        "decided_by",
+        "decided_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("reason", "decision_note")
+    readonly_fields = ("guid", "created_at", "updated_at", "deleted_at")

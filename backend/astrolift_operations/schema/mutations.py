@@ -21,6 +21,7 @@ from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization, Team
 from astrolift_operations.models import (
     AlertEvent,
+    AlertMute,
     AlertRule,
     AuditEvent,
     AuditExport,
@@ -157,6 +158,36 @@ class DeleteAlertRuleInput:
 @strawberry.input
 class AcknowledgeAlertEventInput:
     id: GUID
+
+
+# Alert mute (#434 scope C) ----------------------------------------
+
+
+@strawberry.input
+class MuteAlertRuleInput:
+    """Silence an alert rule for ``durationSeconds`` (#434 scope C).
+
+    Mute carries a TTL so it auto-expires; no human has to remember
+    to unmute. ``reason`` is required because post-incident review
+    needs the answer to "why was this silenced?". Re-muting an
+    already-muted rule is allowed and extends the silence — the
+    longest-lived mute wins."""
+
+    rule_id: GUID
+    duration_seconds: int
+    """Mute TTL in seconds. Capped at 7 days (604800s) so a
+    forgotten mute doesn't silently outlive the team's interest."""
+
+    reason: str
+
+
+@strawberry.input
+class UnmuteAlertRuleInput:
+    """Immediate unmute — soft-deletes every active mute on the rule
+    so the next firing fans out to channels. The mute history rows
+    stay around for the audit log; only the *active* mute is cleared."""
+
+    rule_id: GUID
 
 
 @strawberry.input
@@ -815,6 +846,118 @@ class OperationsMutation:
                 ]
             )
         return gql_success(alert_event_to_type(event))
+
+    # ---- Alert mute (#434 scope C) --------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="alert_rule.mute")
+    @require_permission(Permission.WEBHOOK_UPDATE)
+    @tenant_scoped()
+    def mute_alert_rule(
+        self,
+        info: Info,
+        input: MuteAlertRuleInput,
+    ) -> MutationResultType[AlertRuleType]:
+        """Silence an alert rule for the requested duration.
+
+        Returns the rule with its ``activeMute`` field populated so
+        the client can update the UI without a refetch. Reason is
+        required so the audit log carries a human-readable answer
+        to "why was this silenced?"."""
+        from datetime import timedelta
+
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+
+        reason = (input.reason or "").strip()
+        if not reason:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "reason is required",
+                field="reason",
+            )
+
+        duration = int(input.duration_seconds or 0)
+        if duration <= 0:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "durationSeconds must be positive",
+                field="durationSeconds",
+            )
+        # Cap at 7 days so a forgotten mute can't silently outlive
+        # the team's interest. Operators wanting longer should disable
+        # the rule entirely.
+        if duration > 7 * 24 * 60 * 60:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "durationSeconds cannot exceed 7 days (604800)",
+                field="durationSeconds",
+            )
+
+        rule = (
+            AlertRule.objects.select_related("organization")
+            .filter(guid=str(input.rule_id), deleted_at__isnull=True)
+            .first()
+        )
+        if rule is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "alert rule not found",
+                field="ruleId",
+            )
+
+        tenant = get_current_tenant()
+        actor = None
+        if tenant is not None and tenant.actor_user_id is not None:
+            actor = get_user_model().objects.filter(pk=tenant.actor_user_id).first()
+
+        AlertMute.objects.create(
+            rule=rule,
+            organization=rule.organization,
+            ttl_until=timezone.now() + timedelta(seconds=duration),
+            reason=reason,
+            muted_by=actor,
+        )
+        return gql_success(alert_rule_to_type(rule))
+
+    @strawberry.field
+    @mutation_audit(action="alert_rule.unmute")
+    @require_permission(Permission.WEBHOOK_UPDATE)
+    @tenant_scoped()
+    def unmute_alert_rule(
+        self,
+        info: Info,
+        input: UnmuteAlertRuleInput,
+    ) -> MutationResultType[AlertRuleType]:
+        """Immediate unmute — soft-deletes every active mute on the
+        rule so the next firing fans out to channels.
+
+        Idempotent: returns ok=true even when no active mute exists.
+        Mute history rows stay around for the audit log; only the
+        *active* mutes are cleared."""
+        from django.utils import timezone
+
+        rule = (
+            AlertRule.objects.select_related("organization")
+            .filter(guid=str(input.rule_id), deleted_at__isnull=True)
+            .first()
+        )
+        if rule is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "alert rule not found",
+                field="ruleId",
+            )
+        active_mutes = AlertMute.objects.filter(
+            rule=rule,
+            deleted_at__isnull=True,
+            ttl_until__gt=timezone.now(),
+        )
+        for mute in active_mutes:
+            # ``soft_delete`` stamps deleted_at + bumps version; the
+            # delivery worker's ``is_rule_muted`` filters those out.
+            mute.soft_delete()
+        return gql_success(alert_rule_to_type(rule))
 
     @strawberry.field
     @mutation_audit(action="audit_log.export")
