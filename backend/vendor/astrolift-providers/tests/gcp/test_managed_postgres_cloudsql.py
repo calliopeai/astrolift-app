@@ -1,0 +1,437 @@
+"""Tests for GCP CloudSQL Postgres managed-service driver (#363).
+
+GCP has no moto-equivalent simulator for CloudSQL, so we drive
+the SDK via fakes that record calls and return canned responses.
+The test surface mirrors the AWS RDS driver tests (#351) one-to-one
+so cross-cloud-symmetry regressions show up loudly.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+import pytest
+
+from _sdk.managed_service import (
+    DeprovisionSpec,
+    ProvisionSpec,
+    ServiceHandle,
+    SnapshotHandle,
+    UpdateSpec,
+)
+from gcp.managed.postgres_cloudsql import (
+    KIND,
+    CloudSQLConfig,
+    CloudSQLPostgresDriver,
+    _generate_master_password,
+    _parse_handle,
+)
+
+
+# ---- fakes -----------------------------------------------------------
+
+
+@dataclass
+class FakeSqlInstance:
+    name: str
+    state: str = "RUNNABLE"
+    settings: dict[str, Any] = field(default_factory=dict)
+    ipAddresses: list[dict[str, Any]] = field(default_factory=list)
+
+
+class FakeSqlClient:
+    def __init__(self):
+        self.instances: dict[str, FakeSqlInstance] = {}
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def _record(self, op: str, **kwargs):
+        self.calls.append((op, kwargs))
+
+    def insert(self, *, project, body):
+        self._record("insert", project=project, body=body)
+        name = body["name"]
+        ip_kind = "PRIVATE" if body.get("settings", {}).get(
+            "ipConfiguration", {}
+        ).get("privateNetwork") else "PRIMARY"
+        self.instances[name] = FakeSqlInstance(
+            name=name,
+            state="RUNNABLE",
+            settings=body.get("settings", {}),
+            ipAddresses=[{"type": ip_kind, "ipAddress": "10.0.0.5"}],
+        )
+
+    def get(self, *, project, instance):
+        self._record("get", project=project, instance=instance)
+        if instance not in self.instances:
+            raise RuntimeError("404 not found")
+        return self.instances[instance]
+
+    def patch(self, *, project, instance, body):
+        self._record("patch", project=project, instance=instance, body=body)
+        inst = self.instances.get(instance)
+        if inst is None:
+            raise RuntimeError("404 not found")
+        for k, v in (body.get("settings", {}) or {}).items():
+            inst.settings[k] = v
+
+    def delete(self, *, project, instance):
+        self._record("delete", project=project, instance=instance)
+        if instance not in self.instances:
+            raise RuntimeError("404 not found")
+        del self.instances[instance]
+
+    def insert_backup_run(self, *, project, instance, body):
+        self._record(
+            "insert_backup_run",
+            project=project, instance=instance, body=body,
+        )
+
+    def clone(self, *, project, instance, body):
+        self._record(
+            "clone", project=project, instance=instance, body=body,
+        )
+        target = body["cloneContext"]["destinationInstanceName"]
+        self.instances[target] = FakeSqlInstance(
+            name=target, state="PENDING_CREATE",
+        )
+
+
+class FakeSecretClient:
+    def __init__(self):
+        self.secrets: dict[str, list[bytes]] = {}
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def create_secret(self, *, request):
+        self.calls.append(("create_secret", request))
+        sid = request["secret_id"]
+        if sid in self.secrets:
+            raise RuntimeError("AlreadyExists")
+        self.secrets[sid] = []
+
+    def add_secret_version(self, *, request):
+        self.calls.append(("add_secret_version", request))
+        # parent looks like ``projects/<p>/secrets/<sid>``
+        parent = request["parent"]
+        sid = parent.split("/secrets/")[-1]
+        if sid not in self.secrets:
+            self.secrets[sid] = []
+        self.secrets[sid].append(request["payload"]["data"])
+
+    def delete_secret(self, *, request):
+        self.calls.append(("delete_secret", request))
+        name = request["name"]
+        sid = name.split("/secrets/")[-1]
+        self.secrets.pop(sid, None)
+
+
+@pytest.fixture
+def driver():
+    return CloudSQLPostgresDriver(
+        config=CloudSQLConfig(project_id="acme-prod", region="us-west1"),
+        sql_client=FakeSqlClient(),
+        secrets_client=FakeSecretClient(),
+    )
+
+
+def _spec(**overrides) -> ProvisionSpec:
+    base = dict(
+        organization_id="1",
+        organization_slug="acme",
+        app_id="1",
+        app_slug="api",
+        environment_id="1",
+        environment_name="prod",
+        tenant_cluster_id="gcp-prod",
+        service_handle_hint="pg",
+        size="small",
+    )
+    base.update(overrides)
+    return ProvisionSpec(**base)
+
+
+# ---- provision --------------------------------------------------
+
+
+def test_provision_creates_instance(driver):
+    result = driver.provision(_spec())
+    assert result.ok
+    kind, instance_id = result.handle.partition("/")[0::2]
+    assert kind == KIND
+    assert instance_id in driver._sql.instances  # type: ignore[attr-defined]
+
+
+def test_provision_idempotent(driver):
+    a = driver.provision(_spec())
+    b = driver.provision(_spec())
+    assert a.handle == b.handle
+    assert "already exists" in b.message
+
+
+def test_provision_stores_master_password_in_secret_manager(driver):
+    result = driver.provision(_spec())
+    instance_id = _parse_handle(result.handle)
+    secret_id = (
+        f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
+    )
+    versions = driver._sm.secrets[secret_id]  # type: ignore[attr-defined]
+    assert len(versions) == 1
+    assert len(versions[0]) >= 16
+
+
+def test_provision_size_to_tier(driver):
+    result = driver.provision(_spec(size="large"))
+    instance_id = _parse_handle(result.handle)
+    inst = driver._sql.instances[instance_id]  # type: ignore[attr-defined]
+    assert inst.settings["tier"] == "db-custom-4-15360"
+    assert inst.settings["dataDiskSizeGb"] == 100
+
+
+def test_provision_honours_high_availability(driver):
+    result = driver.provision(_spec(config={"high_availability": True}))
+    instance_id = _parse_handle(result.handle)
+    inst = driver._sql.instances[instance_id]  # type: ignore[attr-defined]
+    assert inst.settings["availabilityType"] == "REGIONAL"
+
+
+def test_provision_deletion_protection_default_on(driver):
+    result = driver.provision(_spec())
+    instance_id = _parse_handle(result.handle)
+    inst = driver._sql.instances[instance_id]  # type: ignore[attr-defined]
+    assert inst.settings["deletionProtectionEnabled"] is True
+
+
+def test_provision_stamps_binding_and_managed_service_labels(driver):
+    """#438: cost collector joins on astrolift-binding +
+    astrolift-managed-service-id (GCP label-safe form: lowercase,
+    [a-z0-9_-]). Both must land on the instance's userLabels when
+    populated on the ProvisionSpec."""
+    binding_guid = "11111111-2222-3333-4444-555555555555"
+    msvc_guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    result = driver.provision(
+        _spec(binding_id=binding_guid, managed_service_id=msvc_guid),
+    )
+    instance_id = _parse_handle(result.handle)
+    inst = driver._sql.instances[instance_id]  # type: ignore[attr-defined]
+    labels = inst.settings["userLabels"]
+    assert labels["astrolift-binding"] == binding_guid
+    assert labels["astrolift-managed-service-id"] == msvc_guid
+
+
+def test_provision_rolls_back_secret_on_failure():
+    class RaisingSql:
+        def get(self, **_):
+            raise RuntimeError("404")
+
+        def insert(self, **_):
+            raise RuntimeError("synthetic failure")
+
+    sm = FakeSecretClient()
+    d = CloudSQLPostgresDriver(
+        config=CloudSQLConfig(project_id="acme", region="us-west1"),
+        sql_client=RaisingSql(),
+        secrets_client=sm,
+    )
+    result = d.provision(_spec())
+    assert not result.ok
+    # Secret should have been cleaned up after the insert failed.
+    assert not sm.secrets
+
+
+# ---- deprovision four-corner matrix -----------------------------
+
+
+def test_deprovision_default_refuses_when_protected(driver):
+    provisioned = driver.provision(_spec())  # default protection on
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+    )
+    assert not result.ok
+    assert "deletionProtection" in result.message
+
+
+def test_deprovision_delete_data_with_protection_off_skips_backup(driver):
+    provisioned = driver.provision(
+        _spec(config={"deletion_protection": False}),
+    )
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
+    )
+    assert result.ok
+    assert "backup=skipped" in result.message
+    # No backup call recorded
+    sql = driver._sql  # type: ignore[attr-defined]
+    assert not any(op == "insert_backup_run" for op, _ in sql.calls)
+
+
+def test_deprovision_default_with_protection_off_takes_backup(driver):
+    provisioned = driver.provision(
+        _spec(config={"deletion_protection": False}),
+    )
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+    )
+    assert result.ok
+    assert "backup=taken" in result.message
+    sql = driver._sql  # type: ignore[attr-defined]
+    assert any(op == "insert_backup_run" for op, _ in sql.calls)
+
+
+def test_deprovision_force_destroy_clears_protection_first(driver):
+    provisioned = driver.provision(_spec())  # protection on
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        force_destroy=True,
+    )
+    assert result.ok
+    sql = driver._sql  # type: ignore[attr-defined]
+    # Patch with deletionProtectionEnabled=False MUST be called
+    # before delete.
+    patch_calls = [k for op, k in sql.calls if op == "patch"]
+    delete_calls = [k for op, k in sql.calls if op == "delete"]
+    assert any(
+        k["body"]["settings"].get("deletionProtectionEnabled") is False
+        for k in patch_calls
+    )
+    assert delete_calls
+    # Order: protection-cleared patch precedes delete.
+    op_seq = [op for op, _ in sql.calls]
+    assert op_seq.index("patch") < op_seq.index("delete")
+
+
+def test_deprovision_atomic_both_flags(driver):
+    provisioned = driver.provision(_spec())
+    result = driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
+        force_destroy=True,
+    )
+    assert result.ok
+    assert "backup=skipped" in result.message
+    assert "force_destroy=True" in result.message
+
+
+def test_deprovision_idempotent_when_already_gone(driver):
+    result = driver.deprovision(
+        DeprovisionSpec(handle="postgres/does-not-exist"),
+    )
+    assert result.ok
+    assert "already gone" in result.message
+
+
+def test_deprovision_delete_data_drops_master_secret(driver):
+    provisioned = driver.provision(
+        _spec(config={"deletion_protection": False}),
+    )
+    instance_id = _parse_handle(provisioned.handle)
+    secret_id = (
+        f"astrolift/cloudsql/{instance_id}/master".replace("/", "_")
+    )
+    assert secret_id in driver._sm.secrets  # type: ignore[attr-defined]
+    driver.deprovision(
+        DeprovisionSpec(handle=provisioned.handle),
+        delete_data=True,
+    )
+    assert secret_id not in driver._sm.secrets  # type: ignore[attr-defined]
+
+
+# ---- status / binding ------------------------------------------
+
+
+def test_status_for_missing_returns_deprovisioned(driver):
+    state = driver.status(ServiceHandle(handle="postgres/missing"))
+    assert state.state == "deprovisioned"
+
+
+def test_status_maps_runnable_to_available(driver):
+    provisioned = driver.provision(_spec())
+    state = driver.status(ServiceHandle(handle=provisioned.handle))
+    assert state.state == "available"
+
+
+def test_binding_returns_connection_envelope(driver):
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(ServiceHandle(handle=provisioned.handle))
+    env = binding.env_vars
+    for key in (
+        "DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
+        "DATABASE_USER", "DATABASE_PASSWORD", "DATABASE_URL",
+    ):
+        assert key in env
+    assert env["DATABASE_PASSWORD"].secret_ref is not None
+    assert env["DATABASE_USER"].literal == "postgres"
+    assert env["DATABASE_PORT"].literal == "5432"
+
+
+def test_binding_iam_grant_scoped_to_secret(driver):
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(ServiceHandle(handle=provisioned.handle))
+    assert len(binding.iam_grants) == 1
+    assert "secretmanager.versions.access" in binding.iam_grants[0].actions
+
+
+# ---- snapshot + restore ----------------------------------------
+
+
+def test_snapshot_records_backup_run(driver):
+    provisioned = driver.provision(_spec())
+    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    instance_id = _parse_handle(provisioned.handle)
+    assert snap.snapshot_id.startswith(instance_id)
+
+
+def test_restore_clones_instance(driver):
+    provisioned = driver.provision(_spec())
+    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    restore_spec = _spec(service_handle_hint="restored")
+    result = driver.restore(snap, restore_spec)
+    assert result.ok
+
+
+# ---- module helpers --------------------------------------------
+
+
+def test_password_safe_alphabet():
+    pw = _generate_master_password(length=64)
+    assert len(pw) == 64
+    forbidden = set("/@\"\\ ")
+    assert not (set(pw) & forbidden)
+
+
+def test_instance_id_sanitized():
+    """Underscores + uppercase collapse; ≤98 chars."""
+    from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
+
+    d = CloudSQLPostgresDriver(
+        config=CloudSQLConfig(project_id="p", region="r"),
+        sql_client=FakeSqlClient(),
+        secrets_client=FakeSecretClient(),
+    )
+    spec = _spec(app_slug="my_app", environment_name="DEV")
+    iid = d._instance_id_for(spec=spec)  # type: ignore[attr-defined]
+    assert iid == iid.lower()
+    assert "_" not in iid
+    assert len(iid) <= 98
+
+
+# ---- schemas -----------------------------------------------------
+
+
+def test_config_schema_shape(driver):
+    schema = driver.config_schema()
+    for key in (
+        "engine_version", "tier", "storage_gb", "high_availability",
+        "deletion_protection", "backup_retention_days",
+        "kms_key_name", "zone",
+    ):
+        assert key in schema["properties"]
+
+
+def test_binding_schema_lists_all_env_vars(driver):
+    schema = driver.binding_schema()
+    for key in (
+        "DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
+        "DATABASE_USER", "DATABASE_PASSWORD", "DATABASE_URL",
+    ):
+        assert key in schema.env_vars

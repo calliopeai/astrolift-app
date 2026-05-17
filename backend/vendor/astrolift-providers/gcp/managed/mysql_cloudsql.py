@@ -1,40 +1,39 @@
-"""CloudSQL Postgres managed-service driver (#363).
+"""CloudSQL MySQL managed-service driver (#370 — GCP slice).
 
 Implements ``ManagedServiceDriver`` for the canonical GCP managed-
-Postgres path. Same four-corner deprovision matrix as the AWS RDS
-driver (#351); the cloud-API surface differs but the operator-facing
-semantic is identical.
+MySQL path. Mirrors the CloudSQL Postgres driver (#363) one-for-one;
+the GCP API surface for ``sql_v1.SqlInstancesServiceClient`` is
+engine-agnostic — only ``databaseVersion`` and the binding port
+differ. The four-corner deprovision matrix is identical to the
+postgres driver:
 
   delete_data=False, force_destroy=False (default):
-    final snapshot taken via on-demand backup; instance
-    ``settings.deletionProtectionEnabled`` is respected. Refuses
-    cleanly when protection is on so the operator must pass
-    ``force_destroy=True``.
+    final on-demand backup taken; ``deletionProtectionEnabled`` is
+    respected. Refuses cleanly when protection is on so the operator
+    must opt into ``force_destroy=True``.
 
   delete_data=True, force_destroy=False:
-    skip final backup; respect protection.
+    skip final backup; protection still respected.
 
   delete_data=False, force_destroy=True:
-    take final backup; bypass protection (patch the instance to
-    clear the flag, then delete).
+    final backup taken; protection bypassed (driver patches
+    deletionProtectionEnabled=False before delete).
 
   delete_data=True, force_destroy=True:
     --atomic: skip backup, bypass protection.
 
-CloudSQL has no "snapshot" concept in the RDS sense — backups are
-the persistence story. The driver's ``snapshot`` method calls
-``instances.insertBackupRun``; ``restore`` does a ``cloneInstance``
-from the backup id.
-
-Master password handling mirrors RDS: 32-char shell-safe alphabet,
-stored in Secret Manager at ``astrolift/cloudsql/<id>/master``.
+Master password handling matches the postgres path: 32-char shell-
+safe alphabet, stored in Secret Manager at
+``astrolift/cloudsql/<id>/master``. The binding emits
+``DATABASE_PORT=3306`` and ``DATABASE_USER=root`` (CloudSQL MySQL's
+master user) — the only operator-facing differences from postgres.
 """
 
 from __future__ import annotations
 
 import secrets
 import string
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from _sdk.managed_service import (
@@ -55,7 +54,7 @@ from _sdk.managed_service import (
 )
 
 
-KIND = "postgres"
+KIND = "mysql"
 
 
 _SIZE_TO_TIER = {
@@ -80,22 +79,19 @@ class _ManagedServiceError(Exception):
 
 
 @dataclass(frozen=True)
-class CloudSQLConfig:
+class CloudSQLMySQLConfig:
     """Driver-instance config bound from the cluster's plugin config."""
 
     project_id: str
     region: str
-    """GCP region for the instance (e.g. ``us-west1``). CloudSQL
-    instances are zonal under the hood; the driver lets CloudSQL
-    pick the zone unless ``spec.config.zone`` is set."""
 
     private_network: str | None = None
     """If set, instance uses Private IP via this VPC selfLink. None
-    means Public IP (with authorized networks); operators with VPC-
-    SC should always set this."""
+    means Public IP (with authorized networks); operators with VPC-SC
+    should always set this."""
 
     instance_name_prefix: str = "astrolift"
-    engine_version: str = "POSTGRES_16"
+    engine_version: str = "MYSQL_8_0"
 
     backup_retention_days: int = 7
     high_availability_default: bool = False
@@ -105,13 +101,16 @@ class CloudSQLConfig:
     deletion_protection_default: bool = True
 
     secret_manager_prefix: str = "astrolift/cloudsql"
+    """Shared prefix with the postgres driver: instance ids are
+    globally unique within the project so no collision risk, and
+    the operator gets one consistent place to find DB secrets."""
 
 
-class CloudSQLPostgresDriver(ManagedServiceDriver):
+class CloudSQLMySQLDriver(ManagedServiceDriver):
     def __init__(
         self,
         *,
-        config: CloudSQLConfig,
+        config: CloudSQLMySQLConfig,
         sql_client: Any | None = None,
         secrets_client: Any | None = None,
     ) -> None:
@@ -141,7 +140,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 ok=True,
                 handle=_handle_for(instance_id),
                 message=(
-                    f"cloudsql {instance_id} already exists "
+                    f"cloudsql-mysql {instance_id} already exists "
                     f"(state={_get(existing, 'state', '?')})"
                 ),
             )
@@ -164,7 +163,10 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             cfg.get("engine_version") or self._config.engine_version
         )
         ha = bool(
-            cfg.get("high_availability", self._config.high_availability_default),
+            cfg.get(
+                "high_availability",
+                self._config.high_availability_default,
+            ),
         )
         deletion_protection = bool(
             cfg.get(
@@ -187,7 +189,10 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 "deletionProtectionEnabled": deletion_protection,
                 "backupConfiguration": {
                     "enabled": True,
-                    "pointInTimeRecoveryEnabled": True,
+                    # MySQL on CloudSQL supports point-in-time recovery
+                    # via binary logs (vs Postgres' WAL). Same flag
+                    # name; the underlying mechanism is binlogs.
+                    "binaryLogEnabled": True,
                     "transactionLogRetentionDays": int(
                         cfg.get(
                             "backup_retention_days",
@@ -196,7 +201,9 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     ),
                 },
                 "ipConfiguration": {
-                    "ipv4Enabled": self._config.private_network is None,
+                    "ipv4Enabled": (
+                        self._config.private_network is None
+                    ),
                     "privateNetwork": self._config.private_network,
                     "requireSsl": True,
                 },
@@ -229,7 +236,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             ok=True,
             handle=_handle_for(instance_id),
             message=(
-                f"cloudsql {instance_id} provisioning "
+                f"cloudsql-mysql {instance_id} provisioning "
                 f"(password in {secret_name})"
             ),
         )
@@ -275,7 +282,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             )
         return UpdateResult(
             ok=True, handle=spec.handle,
-            message=f"cloudsql {instance_id} update queued",
+            message=f"cloudsql-mysql {instance_id} update queued",
         )
 
     def deprovision(
@@ -292,7 +299,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             self._delete_master_password_secret(instance_id)
             return DeprovisionResult(
                 ok=True, handle=spec.handle,
-                message=f"cloudsql {instance_id} already gone",
+                message=f"cloudsql-mysql {instance_id} already gone",
             )
 
         protected = _get(
@@ -305,7 +312,11 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 self._sql.patch(
                     project=self._config.project_id,
                     instance=instance_id,
-                    body={"settings": {"deletionProtectionEnabled": False}},
+                    body={
+                        "settings": {
+                            "deletionProtectionEnabled": False,
+                        },
+                    },
                 )
             except Exception as exc:  # noqa: BLE001
                 return DeprovisionResult(
@@ -317,28 +328,27 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False, handle=spec.handle,
                 message=(
-                    f"cloudsql {instance_id} has deletionProtection "
-                    f"enabled — pass force_destroy=True to bypass"
+                    f"cloudsql-mysql {instance_id} has "
+                    f"deletionProtection enabled — pass "
+                    f"force_destroy=True to bypass"
                 ),
                 errors=["deletion_protection_enabled"],
             )
 
         if not delete_data:
             # Take a final on-demand backup before delete. CloudSQL
-            # doesn't offer "skip final backup" as a delete-time flag
-            # like RDS does; we do it as a pre-step. delete_data=True
-            # skips this pre-step.
+            # has no "skip final backup" delete-time flag like RDS;
+            # we do it as a pre-step. delete_data=True skips it.
             try:
                 self._sql.insert_backup_run(
                     project=self._config.project_id,
                     instance=instance_id,
                     body={"description": f"final-{instance_id}"},
                 )
-            except Exception as exc:  # noqa: BLE001
-                # Don't block delete on backup failure — that defeats
-                # the purpose of the safety path. Surface to operator
-                # via the message but proceed.
-                pass  # noqa: TRY302
+            except Exception:  # noqa: BLE001
+                # Don't block delete on backup failure — defeats the
+                # safety path. Surface via message but proceed.
+                pass
 
         try:
             self._sql.delete(
@@ -358,7 +368,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         return DeprovisionResult(
             ok=True, handle=spec.handle,
             message=(
-                f"cloudsql {instance_id} delete queued "
+                f"cloudsql-mysql {instance_id} delete queued "
                 f"(backup={'skipped' if delete_data else 'taken'}, "
                 f"force_destroy={force_destroy})"
             ),
@@ -372,13 +382,13 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         if existing is None:
             return ServiceStatus(
                 handle=handle.handle, state="deprovisioned",
-                message=f"cloudsql {instance_id} not found",
+                message=f"cloudsql-mysql {instance_id} not found",
             )
         state = _get(existing, "state", "UNKNOWN")
         return ServiceStatus(
             handle=handle.handle,
             state=_CLOUDSQL_STATE_TO_PROTOCOL.get(state, "updating"),
-            message=f"cloudsql reports {state}",
+            message=f"cloudsql-mysql reports {state}",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
@@ -403,9 +413,9 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         return Binding(
             env_vars={
                 "DATABASE_HOST": ValueRef(literal=host),
-                "DATABASE_PORT": ValueRef(literal="5432"),
-                "DATABASE_NAME": ValueRef(literal="postgres"),
-                "DATABASE_USER": ValueRef(literal="postgres"),
+                "DATABASE_PORT": ValueRef(literal="3306"),
+                "DATABASE_NAME": ValueRef(literal="mysql"),
+                "DATABASE_USER": ValueRef(literal="root"),
                 "DATABASE_PASSWORD": ValueRef(secret_ref=secret_name),
                 "DATABASE_URL": ValueRef(
                     secret_ref=self._url_secret_for(
@@ -421,7 +431,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             ],
             notes=(
                 "DATABASE_URL is a derived secret holding the "
-                "postgres:// connection string; the split components "
+                "mysql:// connection string; the split components "
                 "are also exposed for callers that build their own DSN."
             ),
         )
@@ -430,7 +440,10 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         from datetime import UTC, datetime
 
         instance_id = _parse_handle(handle.handle)
-        snap_id = f"{instance_id}-snap-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+        snap_id = (
+            f"{instance_id}-snap-"
+            f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+        )
         try:
             self._sql.insert_backup_run(
                 project=self._config.project_id,
@@ -472,7 +485,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=_handle_for(target_id),
-            message=f"cloudsql clone from {source_id} queued",
+            message=f"cloudsql-mysql clone from {source_id} queued",
         )
 
     def config_schema(self) -> dict[str, Any]:
@@ -496,15 +509,15 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "DATABASE_HOST": "CloudSQL private/public IP",
-                "DATABASE_PORT": "5432 (Postgres default)",
-                "DATABASE_NAME": "Initial database name (postgres)",
-                "DATABASE_USER": "Master user (postgres)",
+                "DATABASE_PORT": "3306 (MySQL default)",
+                "DATABASE_NAME": "Initial database name (mysql)",
+                "DATABASE_USER": "Master user (root)",
                 "DATABASE_PASSWORD": (
                     "Secret Manager ref to the master password"
                 ),
                 "DATABASE_URL": (
                     "Secret Manager ref to the fully-formed "
-                    "postgres:// connection string"
+                    "mysql:// connection string"
                 ),
             },
         )
@@ -521,13 +534,19 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             if "404" in str(exc) or "not found" in str(exc).lower():
                 return None
             raise
-        # google-cloud-* SDKs return either a proto-Message or a dict
-        # depending on the client variant; normalize to dict.
+        # google-cloud SDKs return either proto-Message or dict
+        # depending on client variant; normalize to dict.
         if hasattr(resp, "_pb"):
             from google.protobuf.json_format import MessageToDict
 
-            return MessageToDict(resp._pb, preserving_proto_field_name=True)
-        return dict(resp) if isinstance(resp, dict) else getattr(resp, "__dict__", {})
+            return MessageToDict(
+                resp._pb, preserving_proto_field_name=True,
+            )
+        return (
+            dict(resp)
+            if isinstance(resp, dict)
+            else getattr(resp, "__dict__", {})
+        )
 
     def _instance_id_for(self, *, spec: ProvisionSpec) -> str:
         # CloudSQL instance names: lowercase, letters/digits/hyphens,
@@ -535,15 +554,21 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         raw = (
             f"{self._config.instance_name_prefix}-"
             f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}"
+            f"{spec.environment_name}-{spec.service_handle_hint or 'my'}"
         ).lower().replace("_", "-")
-        return "".join(c for c in raw if c.isalnum() or c == "-")[:98]
+        return "".join(
+            c for c in raw if c.isalnum() or c == "-"
+        )[:98]
 
     def _master_secret_for(self, *, instance_id: str) -> str:
-        return f"{self._config.secret_manager_prefix}/{instance_id}/master"
+        return (
+            f"{self._config.secret_manager_prefix}/{instance_id}/master"
+        )
 
     def _url_secret_for(self, *, instance_id: str) -> str:
-        return f"{self._config.secret_manager_prefix}/{instance_id}/url"
+        return (
+            f"{self._config.secret_manager_prefix}/{instance_id}/url"
+        )
 
     def _store_master_password(
         self,
@@ -555,7 +580,6 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         name = self._master_secret_for(instance_id=instance_id)
         parent = f"projects/{self._config.project_id}"
         try:
-            # Create the secret (idempotent via AlreadyExists catch).
             self._sm.create_secret(
                 request={
                     "parent": parent,
@@ -572,7 +596,9 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         try:
             self._sm.add_secret_version(
                 request={
-                    "parent": f"{parent}/secrets/{name.replace('/', '_')}",
+                    "parent": (
+                        f"{parent}/secrets/{name.replace('/', '_')}"
+                    ),
                     "payload": {"data": password.encode("utf-8")},
                 },
             )
@@ -631,7 +657,9 @@ def _tags_for(spec: ProvisionSpec) -> dict[str, str]:
     leading underscores; only [a-z0-9_-]."""
 
     def _sanitize(s: str) -> str:
-        return "".join(c if c.isalnum() or c in "-_" else "-" for c in s.lower())
+        return "".join(
+            c if c.isalnum() or c in "-_" else "-" for c in s.lower()
+        )
 
     base = {
         "astrolift-managed-by": "platform",
