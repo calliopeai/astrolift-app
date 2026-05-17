@@ -40,13 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -88,7 +82,11 @@ const PROVIDER_LABEL: Record<string, string> = {
 
 const LIFECYCLE_PRESENTATION: Record<
   Lifecycle,
-  { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: React.ReactNode }
+  {
+    label: string;
+    variant: "default" | "secondary" | "outline" | "destructive";
+    icon: React.ReactNode;
+  }
 > = {
   registered: {
     label: "Registered",
@@ -183,7 +181,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
       toast.success(
         decommissionDeleteInfra
           ? `Decommissioning ${cluster.slug} + deleting cloud infrastructure`
-          : `Decommissioning ${cluster.slug} (cluster left running)`,
+          : `Decommissioning ${cluster.slug} (cluster left running)`
       );
       setDecommissionOpen(false);
       // Reset the destructive flag so the next open starts safe.
@@ -210,7 +208,9 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
     });
     if (data?.refreshClusterManagement.ok) {
       toast.success(
-        forcePreflight ? `Refreshing ${cluster.slug} (full preflight)` : `Refreshing ${cluster.slug}`
+        forcePreflight
+          ? `Refreshing ${cluster.slug} (full preflight)`
+          : `Refreshing ${cluster.slug}`
       );
     } else {
       toast.error(data?.refreshClusterManagement.errors?.[0]?.message ?? "Failed");
@@ -408,7 +408,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="text-destructive whitespace-pre-wrap text-xs">
+            <pre className="text-destructive text-xs whitespace-pre-wrap">
               {cluster.lastManagementError}
             </pre>
           </CardContent>
@@ -452,10 +452,25 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
         </CardHeader>
         <CardContent className="p-0">
           {Object.keys(caps).length === 0 ? (
-            <p className="text-muted-foreground p-6 text-sm">
-              No capabilities reported yet. Click <strong>Bring into management</strong> to run the
-              probe.
-            </p>
+            // Two empty-payload cases collapse here:
+            //  - Never probed (capabilitiesProbedAt is null) OR the
+            //    probe is in flight right now (lifecycle === "managing")
+            //    → render a skeleton matching the table footprint so
+            //    the operator gets shape-parity with the post-probe view
+            //    instead of a copy block that would shift on completion.
+            //  - Probe ran and returned nothing (probedAt set, lifecycle
+            //    settled) → keep the call-to-action copy so the operator
+            //    knows to click Bring into management.
+            !cluster.capabilitiesProbedAt || lifecycle === "managing" ? (
+              <div className="p-6">
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : (
+              <p className="text-muted-foreground p-6 text-sm">
+                No capabilities reported yet. Click <strong>Bring into management</strong> to run
+                the probe.
+              </p>
+            )
           ) : (
             <Table>
               <TableHeader>
@@ -484,12 +499,14 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
           </p>
           <ul className="text-muted-foreground mt-2 ml-4 list-disc space-y-1">
             <li>
-              Use the bootstrap recipe card below to apply driver-tuned prereqs
-              via Flux (recommended for managed clusters).
+              Use the bootstrap recipe card below to apply driver-tuned prereqs via Flux
+              (recommended for managed clusters).
             </li>
             <li>
               Run{" "}
-              <code className="font-mono text-xs">astro cluster bootstrap --cluster-slug {cluster.slug}</code>{" "}
+              <code className="font-mono text-xs">
+                astro cluster bootstrap --cluster-slug {cluster.slug}
+              </code>{" "}
               from your terminal for the one-shot CLI path.{" "}
               <Link href="/downloads" className="text-primary underline-offset-4 hover:underline">
                 Install the CLI
@@ -519,31 +536,27 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Decommission {cluster.slug}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The platform will stop managing this cluster — its lifecycle flips
-              to <strong>decommissioned</strong> and it&apos;s removed from the
-              active-cluster picker for new app deploys. Existing apps already
-              bound to this cluster must be migrated first; the workflow refuses
-              when bindings are active.
+              The platform will stop managing this cluster — its lifecycle flips to{" "}
+              <strong>decommissioned</strong> and it&apos;s removed from the active-cluster picker
+              for new app deploys. Existing apps already bound to this cluster must be migrated
+              first; the workflow refuses when bindings are active.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="my-4 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-            <label className="flex items-start gap-3 text-sm cursor-pointer">
+          <div className="border-destructive/30 bg-destructive/5 my-4 rounded-md border p-3">
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
               <input
                 type="checkbox"
                 checked={decommissionDeleteInfra}
                 onChange={(e) => setDecommissionDeleteInfra(e.target.checked)}
-                className="mt-0.5 size-4 rounded border-destructive/50 accent-destructive cursor-pointer"
+                className="border-destructive/50 accent-destructive mt-0.5 size-4 cursor-pointer rounded"
               />
               <span>
-                <strong className="text-destructive">
-                  Also delete cloud infrastructure.
-                </strong>{" "}
+                <strong className="text-destructive">Also delete cloud infrastructure.</strong>{" "}
                 <span className="text-muted-foreground">
                   This calls the {cluster.providerPluginSlug} driver&apos;s{" "}
-                  <code className="font-mono text-xs">teardown_cluster</code> and
-                  irreversibly deletes the underlying managed cluster (node
-                  groups / Fargate profiles cascade-delete). The
-                  cloud-controlled VPC / IAM / DNS roots remain operator-owned.
+                  <code className="font-mono text-xs">teardown_cluster</code> and irreversibly
+                  deletes the underlying managed cluster (node groups / Fargate profiles
+                  cascade-delete). The cloud-controlled VPC / IAM / DNS roots remain operator-owned.
                   Leave unchecked to keep the cluster running.
                 </span>
               </span>
@@ -556,9 +569,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
               disabled={decommissioning}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {decommissionDeleteInfra
-                ? "Decommission + delete cluster"
-                : "Decommission"}
+              {decommissionDeleteInfra ? "Decommission + delete cluster" : "Decommission"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -598,13 +609,18 @@ function formatCapability(
   value: unknown
 ): { label: string; installed: boolean; detail: string } {
   if (key === "cert_manager") {
-    const v = (value ?? {}) as { installed?: boolean; version?: string | null; default_issuer?: string | null };
+    const v = (value ?? {}) as {
+      installed?: boolean;
+      version?: string | null;
+      default_issuer?: string | null;
+    };
     return {
       label: "cert-manager",
       installed: !!v.installed,
-      detail: [v.version && `version ${v.version}`, v.default_issuer && `issuer ${v.default_issuer}`]
-        .filter(Boolean)
-        .join(" · ") || "—",
+      detail:
+        [v.version && `version ${v.version}`, v.default_issuer && `issuer ${v.default_issuer}`]
+          .filter(Boolean)
+          .join(" · ") || "—",
     };
   }
   if (key === "ingress") {
@@ -616,9 +632,10 @@ function formatCapability(
     return {
       label: "ingress controller",
       installed: !!v.installed,
-      detail: [v.class && `class ${v.class}`, v.controller_version && `version ${v.controller_version}`]
-        .filter(Boolean)
-        .join(" · ") || "—",
+      detail:
+        [v.class && `class ${v.class}`, v.controller_version && `version ${v.controller_version}`]
+          .filter(Boolean)
+          .join(" · ") || "—",
     };
   }
   if (key === "service_mesh") {
@@ -659,21 +676,17 @@ function formatCapability(
       detail: "—",
     };
   }
-  return { label: key, installed: false, detail: typeof value === "object" ? JSON.stringify(value) : String(value) };
+  return {
+    label: key,
+    installed: false,
+    detail: typeof value === "object" ? JSON.stringify(value) : String(value),
+  };
 }
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
+function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-muted-foreground text-xs uppercase tracking-wide">{label}</dt>
+      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
       <dd className={mono ? "font-mono text-sm break-all" : "text-sm"}>{value}</dd>
     </div>
   );
@@ -728,9 +741,9 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
   // sees the driver's opinion checked already; they un-check what they
   // don't want and pick non-default option values for what they do.
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
-  const [optionValues, setOptionValues] = React.useState<
-    Record<string, Record<string, string>>
-  >({});
+  const [optionValues, setOptionValues] = React.useState<Record<string, Record<string, string>>>(
+    {}
+  );
 
   React.useEffect(() => {
     if (!plan) return;
@@ -752,9 +765,7 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
 
   async function handleInstall() {
     if (!plan) return;
-    const selectedComponents = plan.components
-      .filter((c) => selected[c.key])
-      .map((c) => c.key);
+    const selectedComponents = plan.components.filter((c) => selected[c.key]).map((c) => c.key);
     const optionOverrides: { componentKey: string; optionKey: string; value: string }[] = [];
     for (const c of plan.components) {
       if (!selected[c.key]) continue;
@@ -773,20 +784,34 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
     if (data?.installClusterPrereqs.ok) {
       toast.success(`Installing ${selectedComponents.length} prereq(s)`);
     } else {
-      toast.error(
-        data?.installClusterPrereqs.errors?.[0]?.message ?? "Install failed",
-      );
+      toast.error(data?.installClusterPrereqs.errors?.[0]?.message ?? "Install failed");
     }
   }
 
   if (loading) {
+    // Three skeleton rows mimic the BootstrapComponent rows the
+    // recipe normally renders (checkbox + title + rationale). Sizing
+    // matches the eventual row footprint (~64px each) so the card
+    // doesn't jump height when the plan resolves.
     return (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Bootstrap recipe</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Skeleton className="h-24 w-full" />
+        <CardContent className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={`bootstrap-skel-${i}`}
+              className="flex items-start gap-3 rounded-md border p-3"
+            >
+              <Skeleton className="mt-1 size-4 rounded-sm" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
     );
@@ -797,9 +822,8 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
         <CardHeader>
           <CardTitle className="text-base">Bootstrap recipe</CardTitle>
           <CardDescription>
-            No driver recipe available for this provider. Install platform
-            prerequisites manually or via the <code className="font-mono text-xs">astro
-            cluster bootstrap</code> CLI.
+            No driver recipe available for this provider. Install platform prerequisites manually or
+            via the <code className="font-mono text-xs">astro cluster bootstrap</code> CLI.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -816,12 +840,12 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
           Bootstrap recipe
         </CardTitle>
         <CardDescription>
-          Driver recipe from <Badge variant="outline" className="font-mono text-[10px] mx-1">
+          Driver recipe from{" "}
+          <Badge variant="outline" className="mx-1 font-mono text-[10px]">
             {plan.providerPluginSlug || "unknown"}
           </Badge>
-          — pre-tuned helm values per component. Re-installing converges
-          via Flux; un-checking a previously-installed component deletes
-          its HelmRelease on the next install.
+          — pre-tuned helm values per component. Re-installing converges via Flux; un-checking a
+          previously-installed component deletes its HelmRelease on the next install.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -831,16 +855,12 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
               <input
                 type="checkbox"
                 checked={!!selected[c.key]}
-                onChange={(e) =>
-                  setSelected((s) => ({ ...s, [c.key]: e.target.checked }))
-                }
+                onChange={(e) => setSelected((s) => ({ ...s, [c.key]: e.target.checked }))}
                 className="mt-1 size-4 cursor-pointer"
               />
               <div className="flex-1">
                 <div className="font-medium">{c.title}</div>
-                <div className="text-muted-foreground text-xs mt-0.5">
-                  {c.rationale}
-                </div>
+                <div className="text-muted-foreground mt-0.5 text-xs">{c.rationale}</div>
                 {c.requires.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.requires.map((r) => (
@@ -853,12 +873,10 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
               </div>
             </label>
             {selected[c.key] && c.options.length > 0 && (
-              <div className="ml-7 mt-3 space-y-2">
+              <div className="mt-3 ml-7 space-y-2">
                 {c.options.map((o) => (
                   <div key={o.key} className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs w-32 truncate">
-                      {o.label}
-                    </span>
+                    <span className="text-muted-foreground w-32 truncate text-xs">{o.label}</span>
                     <select
                       value={optionValues[c.key]?.[o.key] ?? o.default}
                       onChange={(e) =>
@@ -890,11 +908,7 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
           {selectedCount} of {plan.components.length} selected
         </span>
         <Can permission="cluster.manage">
-          <Button
-            size="sm"
-            onClick={handleInstall}
-            disabled={installing || selectedCount === 0}
-          >
+          <Button size="sm" onClick={handleInstall} disabled={installing || selectedCount === 0}>
             {installing ? (
               <>
                 <Loader2Icon className="size-3 animate-spin" />
@@ -937,9 +951,7 @@ function AppsBoundCard({ clusterId }: { clusterId: string }) {
           <Skeleton className="h-5 w-12" />
         ) : (
           <p className="text-sm">
-            <span className="text-2xl font-semibold">
-              {data?.astroliftAppCountForCluster ?? 0}
-            </span>{" "}
+            <span className="text-2xl font-semibold">{data?.astroliftAppCountForCluster ?? 0}</span>{" "}
             <span className="text-muted-foreground">active</span>
           </p>
         )}
@@ -998,9 +1010,8 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
           </CardTitle>
           <CardDescription>
             No bootstrap runs reported for this cluster yet. Run{" "}
-            <code className="font-mono text-xs">{cliHint}</code> from the
-            CLI to install platform prerequisites; the outcome will land
-            here automatically.
+            <code className="font-mono text-xs">{cliHint}</code> from the CLI to install platform
+            prerequisites; the outcome will land here automatically.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -1018,9 +1029,8 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
           Last bootstrap
         </CardTitle>
         <CardDescription>
-          Most recent <code className="font-mono text-xs">astro cluster bootstrap</code>{" "}
-          run reported by the CLI. Re-runs append; the row never
-          mutates after the CLI submits it.
+          Most recent <code className="font-mono text-xs">astro cluster bootstrap</code> run
+          reported by the CLI. Re-runs append; the row never mutates after the CLI submits it.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -1036,10 +1046,7 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
               Failed
             </Badge>
           )}
-          <span
-            className="text-muted-foreground text-xs"
-            title={fmt.formatDateTime(run.endedAt)}
-          >
+          <span className="text-muted-foreground text-xs" title={fmt.formatDateTime(run.endedAt)}>
             {fmt.formatRelativeTime(run.endedAt)}
           </span>
           {run.cliVersion && (
@@ -1050,11 +1057,7 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
         </div>
 
         <div className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-          <Field
-            label="Chart version"
-            mono
-            value={run.chartVersion || "—"}
-          />
+          <Field label="Chart version" mono value={run.chartVersion || "—"} />
           <Field
             label="Installed releases"
             value={
@@ -1075,18 +1078,13 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
               </span>
             }
           />
-          <Field
-            label="Started"
-            value={fmt.formatDateTime(run.startedAt)}
-          />
+          <Field label="Started" value={fmt.formatDateTime(run.startedAt)} />
         </div>
 
         {!succeeded && run.errorMessage && (
           <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
-            <p className="text-destructive text-xs font-medium">
-              Error reported by the CLI
-            </p>
-            <pre className="text-destructive mt-1 whitespace-pre-wrap text-xs">
+            <p className="text-destructive text-xs font-medium">Error reported by the CLI</p>
+            <pre className="text-destructive mt-1 text-xs whitespace-pre-wrap">
               {run.errorMessage}
             </pre>
           </div>
@@ -1106,21 +1104,15 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(run.installedReleases as Array<Record<string, unknown>>).map(
-                  (r, i) => (
-                    <TableRow key={`${r.name ?? "release"}-${i}`}>
-                      <TableCell className="font-mono text-xs">
-                        {String(r.name ?? "—")}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {String(r.version ?? "—")}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {String(r.status ?? "")}
-                      </TableCell>
-                    </TableRow>
-                  ),
-                )}
+                {(run.installedReleases as Array<Record<string, unknown>>).map((r, i) => (
+                  <TableRow key={`${r.name ?? "release"}-${i}`}>
+                    <TableCell className="font-mono text-xs">{String(r.name ?? "—")}</TableCell>
+                    <TableCell className="font-mono text-xs">{String(r.version ?? "—")}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {String(r.status ?? "")}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </details>
@@ -1133,10 +1125,7 @@ function LastBootstrapCard({ slug, run }: { slug: string; run: BootstrapRun | nu
           className="text-primary hover:text-primary inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
         >
           <ChevronDownIcon
-            className={cn(
-              "size-3 transition-transform",
-              historyOpen && "rotate-180",
-            )}
+            className={cn("size-3 transition-transform", historyOpen && "rotate-180")}
           />
           {historyOpen ? "Hide history" : "View history"}
         </button>
@@ -1162,11 +1151,7 @@ function BootstrapHistoryList({ slug }: { slug: string }) {
     return <Skeleton className="h-16 w-full" />;
   }
   if (runs.length === 0) {
-    return (
-      <p className="text-muted-foreground text-xs">
-        No prior bootstrap runs.
-      </p>
-    );
+    return <p className="text-muted-foreground text-xs">No prior bootstrap runs.</p>;
   }
   return (
     <Table>
@@ -1195,21 +1180,12 @@ function BootstrapHistoryList({ slug }: { slug: string }) {
                 </Badge>
               )}
             </TableCell>
-            <TableCell
-              className="text-xs"
-              title={fmt.formatDateTime(r.endedAt)}
-            >
+            <TableCell className="text-xs" title={fmt.formatDateTime(r.endedAt)}>
               {fmt.formatRelativeTime(r.endedAt)}
             </TableCell>
-            <TableCell className="font-mono text-xs">
-              {r.chartVersion || "—"}
-            </TableCell>
-            <TableCell className="text-xs">
-              {bootstrapReleaseCount(r.installedReleases)}
-            </TableCell>
-            <TableCell className="text-xs">
-              {r.triggeredByUsername || "unknown"}
-            </TableCell>
+            <TableCell className="font-mono text-xs">{r.chartVersion || "—"}</TableCell>
+            <TableCell className="text-xs">{bootstrapReleaseCount(r.installedReleases)}</TableCell>
+            <TableCell className="text-xs">{r.triggeredByUsername || "unknown"}</TableCell>
           </TableRow>
         ))}
       </TableBody>
