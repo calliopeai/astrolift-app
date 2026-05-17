@@ -370,6 +370,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "Metrik-Geltungsbereich",
+        "environment": "Umgebung",
+        "workload": "Workload",
+        "allWorkloads": "Alle Workloads",
+        "environmentPlaceholder": "Umgebung auswählen",
+        "workloadPlaceholder": "Workload auswählen"
+      },
+      "events": {
+        "warningCount": "{count, plural, =1 {1 Warnung} other {# Warnungen}} in der letzten Stunde",
+        "warningBadgeLabel": "Warnung",
+        "collapse": "Einklappen",
+        "expand": "Ausklappen"
+      }
     }
   },
   "settingsIndex": {

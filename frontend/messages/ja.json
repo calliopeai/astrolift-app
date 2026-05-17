@@ -374,6 +374,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "メトリクスのスコープ",
+        "environment": "環境",
+        "workload": "ワークロード",
+        "allWorkloads": "すべてのワークロード",
+        "environmentPlaceholder": "環境を選択",
+        "workloadPlaceholder": "ワークロードを選択"
+      },
+      "events": {
+        "warningCount": "過去1時間に{count}件の警告",
+        "warningBadgeLabel": "警告",
+        "collapse": "折りたたむ",
+        "expand": "展開する"
+      }
     }
   },
   "settingsIndex": {

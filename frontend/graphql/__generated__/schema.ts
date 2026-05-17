@@ -183,9 +183,7 @@ export type AstroliftApiToken = {
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   isRevoked: Scalars['Boolean']['output'];
-  lastUsedAgent?: Maybe<Scalars['String']['output']>;
   lastUsedAt?: Maybe<Scalars['DateTime']['output']>;
-  lastUsedIp?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   scopes: Array<Scalars['String']['output']>;
   teamSlug?: Maybe<Scalars['String']['output']>;
@@ -3576,6 +3574,7 @@ export type QueryAstroliftAppGoldenSignalsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3613,6 +3612,7 @@ export type QueryAstroliftAppStatusCodeBreakdownArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 

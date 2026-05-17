@@ -2,18 +2,15 @@
 
 import { useQuery, useSubscription } from "@apollo/client/react";
 import {
-  ActivityIcon,
   AlertTriangleIcon,
   BoxIcon,
-  ExternalLinkIcon,
   PauseIcon,
   PlayIcon,
-  ScrollTextIcon,
   TerminalIcon,
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -22,12 +19,13 @@ import {
   DnsRecordsCard,
   GoldenSignalsPanel,
   LogViewer,
+  MetricScopePicker,
+  PodEventsPanel,
   TlsCertificatesCard,
   WorkloadIdentityCard,
 } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -190,7 +188,11 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   // operator's explicit pick wins so we don't fight the URL on
   // every interaction.
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const podParam = searchParams?.get("pod") ?? null;
+  const envParam = searchParams?.get("env") ?? null;
+  const workloadParam = searchParams?.get("workload") ?? null;
   const [pickedPod, setPickedPod] = React.useState<string | null>(podParam);
   React.useEffect(() => {
     if (podParam && pickedPod == null) {
@@ -201,6 +203,38 @@ export function ObservabilityClient({ slug }: { slug: string }) {
     // sticky for the rest of the session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [podParam]);
+
+  // Env + workload pickers (#422) — URL is the single source of
+  // truth so deep-links survive refresh. ``null`` means "use the
+  // resolver default" — backend picks the alphabetically-first env;
+  // workload-null rolls every workload up. The picker component
+  // renders both selects above the ``GoldenSignalsPanel``.
+  const scopedEnv = envParam;
+  const scopedWorkload = workloadParam;
+
+  const updateScopeParam = React.useCallback(
+    (key: "env" | "workload", value: string | null) => {
+      if (!pathname) return;
+      const next = new URLSearchParams(searchParams?.toString() ?? "");
+      if (value) {
+        next.set(key, value);
+      } else {
+        next.delete(key);
+      }
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  const handleEnvChange = React.useCallback(
+    (name: string | null) => updateScopeParam("env", name),
+    [updateScopeParam]
+  );
+  const handleWorkloadChange = React.useCallback(
+    (workload: string | null) => updateScopeParam("workload", workload),
+    [updateScopeParam]
+  );
   const selectedPod: string | null = React.useMemo(() => {
     if (pickedPod && podRows.some((p) => p.name === pickedPod)) return pickedPod;
     const running = podRows.find((p) => p.status === "Running");
@@ -382,7 +416,29 @@ export function ObservabilityClient({ slug }: { slug: string }) {
       </Card>
 
       {/* ─── #380 SRE golden signals + status-code breakdown ───────────── */}
-      <GoldenSignalsPanel appSlug={a.slug} />
+      {/* #422 env + workload pickers above the panel; persists via URL. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-medium">{t("scope.title")}</h3>
+        <MetricScopePicker
+          appSlug={a.slug}
+          environmentName={scopedEnv}
+          workloadSlug={scopedWorkload}
+          onEnvironmentChange={handleEnvChange}
+          onWorkloadChange={handleWorkloadChange}
+          labels={{
+            environment: t("scope.environment"),
+            workload: t("scope.workload"),
+            allWorkloads: t("scope.allWorkloads"),
+            environmentPlaceholder: t("scope.environmentPlaceholder"),
+            workloadPlaceholder: t("scope.workloadPlaceholder"),
+          }}
+        />
+      </div>
+      <GoldenSignalsPanel
+        appSlug={a.slug}
+        environmentName={scopedEnv}
+        workloadSlug={scopedWorkload}
+      />
 
       {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}
       <DnsRecordsCard appSlug={a.slug} />
@@ -468,59 +524,8 @@ export function ObservabilityClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
 
-      {/* ─── platform events for this app ──────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ActivityIcon className="size-4" /> {t("events.title")}
-            </CardTitle>
-            <CardDescription>{t("events.description")}</CardDescription>
-          </div>
-          <Link
-            href="/events"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-          >
-            {t("events.all")} <ExternalLinkIcon className="size-3" />
-          </Link>
-        </CardHeader>
-        <CardContent className="p-0">
-          {events.loading && appEvents.length === 0 ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : appEvents.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<ScrollTextIcon className="size-5" />}
-                title={t("events.emptyTitle")}
-                description={t("events.emptyDescription")}
-              />
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {appEvents.slice(0, 25).map((e) => (
-                <li key={e.id} className="px-6 py-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground w-44 shrink-0 font-mono text-xs">
-                      {new Date(e.occurredAt).toLocaleString()}
-                    </span>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {e.eventType}
-                    </Badge>
-                  </div>
-                  {Object.keys(e.payload).length > 0 && (
-                    <pre className="text-muted-foreground mt-1 ml-44 overflow-x-auto font-mono text-[11px]">
-                      {JSON.stringify(e.payload, null, 2)}
-                    </pre>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {/* ─── #422 platform events panel — auto-expands on warnings ─── */}
+      <PodEventsPanel appEvents={appEvents} loading={events.loading} />
     </PageShell>
   );
 }
