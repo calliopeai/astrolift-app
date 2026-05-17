@@ -458,20 +458,6 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
-    "ALLOW_SELF_APPROVE_SECRETS": (
-        False,
-        "When False (default), the user who proposed a secret change cannot also approve it. "
-        "Mirrors ALLOW_SELF_APPROVE_DEPLOYS for the secret-change approval workflow (#488). "
-        "Flip to True for single-engineer / dev orgs that want the audit trail without "
-        "blocking on a second approver.",
-    ),
-    "SECRET_PROPOSAL_TTL_SECONDS": (
-        7 * 24 * 3600,
-        "How long a pending secret-change proposal (#488) stays open before auto-expiring. "
-        "Default 7 days. Expired proposals are not applied; the proposer must re-open. The "
-        "TTL is snapshotted onto the proposal row at create time so a later config change "
-        "does not retroactively expire / un-expire in-flight proposals.",
-    ),
     "AUDIT_RETENTION_DAYS": (
         90,
         "How long audit log entries are retained, in days, per compliance policy. Surfaces "
@@ -492,17 +478,19 @@ CONSTANCE_CONFIG = {
         "the worker from runaway exports while still leaving room for multi-year SOC2 "
         "extracts at the default retention.",
     ),
-    "APP_LOG_EXPORT_DOWNLOAD_TTL_SECONDS": (
-        3600,
-        "How long a generated app-log export download URL stays valid before the token "
-        "expires (default 1h). Lengthen for fleets that need to hand off the URL to a "
-        "vendor / customer auditor; shorten after an incident.",
+    "STEP_UP_AUTH_TTL_SECONDS": (
+        900,
+        "Default elevation window (in seconds) granted by elevateAdminSession. After "
+        "this window expires every @requires_elevation mutation re-prompts for the "
+        "step-up credential. Default 900s (15 min) matches the spec 27 §4.1 ceiling "
+        "and SOC2 / SOX fresh-auth expectations. The mutation accepts a per-call "
+        "ttlSeconds override capped at STEP_UP_AUTH_MAX_TTL_SECONDS.",
     ),
-    "APP_LOG_EXPORT_MAX_LINES": (
-        100000,
-        "Hard cap on the line count a single exportAstroliftAppLogs call will dump. "
-        "Protects the cluster log stream from runaway exports; narrow the time range "
-        "or add a regex filter when an export hits this cap.",
+    "STEP_UP_AUTH_MAX_TTL_SECONDS": (
+        900,
+        "Hard cap on the per-call ttlSeconds an elevateAdminSession request can ask "
+        "for. The spec ceiling is 15 minutes; a longer-lived elevation defeats the "
+        "purpose of step-up auth. Anything above this is silently clamped.",
     ),
 }
 
@@ -515,13 +503,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Workflows": {
-        "fields": (
-            "TEMPORAL_ENABLED",
-            "DEPLOY_PIPELINE_ENABLED",
-            "ALLOW_SELF_APPROVE_DEPLOYS",
-            "ALLOW_SELF_APPROVE_SECRETS",
-            "SECRET_PROPOSAL_TTL_SECONDS",
-        ),
+        "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
         "collapse": False,
     },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
@@ -540,10 +522,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
         ),
         "collapse": False,
     },
-    "App log export": {
+    "Step-up auth": {
         "fields": (
-            "APP_LOG_EXPORT_DOWNLOAD_TTL_SECONDS",
-            "APP_LOG_EXPORT_MAX_LINES",
+            "STEP_UP_AUTH_TTL_SECONDS",
+            "STEP_UP_AUTH_MAX_TTL_SECONDS",
         ),
         "collapse": False,
     },

@@ -12,6 +12,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import (
     delete_app_env_key,
@@ -483,6 +484,7 @@ def _stage_manifest(app, new_text: str, *, actor=None) -> str:
 class ServicesMutation:
     @strawberry.field
     @mutation_audit(action="app.secret.set")
+    @requires_elevation(action_label="app.secret.set")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def set_app_secret(
@@ -540,6 +542,7 @@ class ServicesMutation:
 
     @strawberry.field
     @mutation_audit(action="app.secret.delete")
+    @requires_elevation(action_label="app.secret.delete")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def delete_app_secret(
@@ -595,6 +598,7 @@ class ServicesMutation:
 
     @strawberry.field
     @mutation_audit(action="app.secret.bulk_import")
+    @requires_elevation(action_label="app.secret.bulk_import")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def bulk_import_app_secrets(
@@ -653,6 +657,7 @@ class ServicesMutation:
             else None
         ),
     )
+    @requires_elevation(action_label="app.secret.reveal")
     @require_permission(Permission.APP_READ, Permission.SECRET_READ)
     @tenant_scoped()
     def reveal_app_secret(
@@ -760,6 +765,7 @@ class ServicesMutation:
 
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.attach")
+    @requires_elevation(action_label="app.secret.bundle.attach")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def attach_secret_bundle(
@@ -880,6 +886,7 @@ class ServicesMutation:
 
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.detach")
+    @requires_elevation(action_label="app.secret.bundle.detach")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def detach_secret_bundle(
@@ -1170,6 +1177,7 @@ class ServicesMutation:
             else None
         ),
     )
+    @requires_elevation(action_label="managed_service.connection.reveal")
     @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
     @tenant_scoped()
     def reveal_managed_service_connection(

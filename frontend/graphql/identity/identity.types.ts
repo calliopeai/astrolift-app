@@ -205,3 +205,35 @@ export interface AstroliftBulkAssignTeamMemberRolesPayload {
   alreadyAssignedCount: number;
   failedCount: number;
 }
+
+// ---- #487 step-up auth ------------------------------------------------
+
+export type AstroliftElevationMethod =
+  | "password"
+  | "otp"
+  | "webauthn"
+  | "magic_link";
+
+export interface ElevateAdminSessionInput {
+  method: AstroliftElevationMethod;
+  credential: string;
+  ttlSeconds?: number;
+}
+
+export interface AstroliftElevatePayload {
+  elevatedUntil: string;
+  secondsRemaining: number;
+  method: AstroliftElevationMethod;
+}
+
+export interface AstroliftDeelevatePayload {
+  previouslyElevated: boolean;
+}
+
+export interface AstroliftElevationStatus {
+  elevated: boolean;
+  elevatedUntil: string | null;
+  secondsRemaining: number;
+  method: AstroliftElevationMethod | null;
+  requiredFor: string[];
+}

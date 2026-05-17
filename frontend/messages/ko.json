@@ -342,12 +342,12 @@
         "ariaLabel": "Search apps"
       },
       "filters": {
-        "ariaLabel": "상태별 필터",
-        "all": "전체",
-        "ok": "정상",
-        "degraded": "저하됨",
-        "stale": "오래됨",
-        "never_deployed": "배포 안 됨"
+        "ariaLabel": "Filter by status",
+        "all": "All",
+        "running": "Running",
+        "failed": "Failed",
+        "inflight": "In-flight",
+        "notDeployed": "Not deployed"
       },
       "noMatch": {
         "title": "No apps match the current filter",
@@ -357,11 +357,6 @@
       "errorBanner": {
         "title": "Couldn't load apps",
         "retry": "Retry"
-      },
-      "count": "{total}개 중 {shown}개 표시",
-      "loadMore": {
-        "label": "더 보기",
-        "loading": "불러오는 중…"
       }
     },
     "tabs": {
@@ -561,34 +556,6 @@
         "warningBadgeLabel": "경고",
         "collapse": "접기",
         "expand": "펼치기"
-      },
-      "logs": {
-        "export": "내보내기",
-        "exportTitle": "선택한 Pod 로그 내보내기"
-      },
-      "logExport": {
-        "title": "앱 로그 내보내기",
-        "description": "현재 Pod {pod} 로그 세그먼트를 다운로드 가능한 파일로 묶습니다. 링크는 일회용이며 구성된 TTL 후 만료됩니다.",
-        "descriptionNoPod": "내보내기를 활성화하려면 먼저 Pod를 선택하세요.",
-        "missingPod": "내보내기 전에 Pod를 선택하세요.",
-        "formatLabel": "형식",
-        "formatPlaceholder": "형식 선택",
-        "formatTxt": "원시 텍스트 (.log)",
-        "formatNdjson": "NDJSON (.ndjson)",
-        "formatCsv": "CSV (.csv)",
-        "sinceLabel": "시작 (UTC)",
-        "untilLabel": "종료 (UTC)",
-        "levelLabel": "레벨 필터",
-        "levelPlaceholder": "예: ERROR",
-        "regexLabel": "정규식 필터",
-        "regexPlaceholder": "예: 5\\d{2}",
-        "submitButton": "내보내기",
-        "submittingButton": "준비 중…",
-        "toastStart": "앱 로그 내보내기를 준비 중…",
-        "toastReady": "내보내기 완료 — {rows} 줄 ({format})",
-        "toastReadyTruncated": "내보내기 완료 (잘림) — {rows} 줄 ({format}). 필터를 좁힌 후 다시 시도하세요",
-        "toastDownload": "다운로드",
-        "toastFailure": "내보내기 실패"
       }
     },
     "tokens": {
@@ -724,14 +691,6 @@
       "latestDeploy": {
         "empty": "아직 배포가 없습니다 — CLI에서 실행하거나 배포 브랜치에 푸시하세요.",
         "ariaLabel": "최신 배포: {status}, {when}"
-      }
-    },
-    "secrets": {
-      "pendingProposals": {
-        "title": "{count, plural, =1 {1 secret-change proposal pending review} other {# secret-change proposals pending review}}",
-        "appWide": "(app-wide)",
-        "votes": "({received}/{required} votes)",
-        "seeAll": "See all {count} in the approvals queue →"
       }
     }
   },
@@ -1123,23 +1082,6 @@
         "linkCopied": "수락 링크 복사됨",
         "copyFailed": "복사 실패 — 수동으로 선택하여 복사하세요"
       }
-    },
-    "secretProposalsQueue": {
-      "title": "Pending secret-change proposals",
-      "empty": {
-        "title": "No pending secret-change proposals",
-        "description": "Proposals appear here when an app with secret-approval gating receives a setSecret / attach-bundle write. Enable the gate on a RegisteredApp's settings to start using this queue."
-      },
-      "row": {
-        "appWide": "(app-wide)",
-        "typeBadge": "Secret",
-        "opLabel": "{op}",
-        "approvalsCount": "{received}/{required} approvals",
-        "summary": "{summary}",
-        "proposer": "by {name}",
-        "received": "Received {rel}",
-        "review": "Review"
-      }
     }
   },
   "jobs": {
@@ -1232,63 +1174,19 @@
     "grantRoleRowLabel": "{name}에게 역할 부여",
     "grantRoleRowTooltip": "{name}에게 역할 부여"
   },
-  "approvals": {
-    "secretProposalDetail": {
-      "title": "{app} → {env}",
-      "appWide": "(app-wide)",
-      "opLabel": "{op}",
-      "approvalsCount": "{received}/{required} approvals",
-      "proposedBy": "Proposed by {name}, {rel}",
-      "unknownProposer": "(unknown)",
-      "expiresIn": "Expires {rel}",
-      "applyError": "Apply failed: {message}",
-      "loading": {
-        "title": "Loading proposal…"
-      },
-      "notFound": {
-        "title": "Proposal not found",
-        "description": "It may have been withdrawn, expired, or you may not have access."
-      },
-      "approve": "Approve",
-      "reject": "Reject",
-      "withdraw": "Withdraw",
-      "confirmApprove": {
-        "title": "Approve this proposal?",
-        "description": "When the quorum is reached the change applies immediately to the staged manifest or bundle attachment.",
-        "confirm": "Approve"
-      },
-      "confirmReject": {
-        "title": "Reject this proposal?",
-        "description": "One nay closes the proposal as rejected. The proposer can re-open with a fresh proposal.",
-        "reasonLabel": "Reason for rejection (recorded on the audit log)",
-        "reasonPlaceholder": "Why is this proposal being rejected?",
-        "reasonRequired": "Reason required",
-        "confirm": "Reject"
-      },
-      "confirmWithdraw": {
-        "title": "Withdraw this proposal?",
-        "description": "The proposal moves to withdrawn and stops counting against the queue. Re-open with a fresh proposeSecretChange.",
-        "confirm": "Withdraw"
-      },
-      "diff": {
-        "title": "Diff",
-        "before": "Before",
-        "after": "After",
-        "maskNote": "Values are masked. Use revealAppSecret on the secrets page to inspect plaintext (audit-logged)."
-      },
-      "approvers": {
-        "title": "Approvers",
-        "empty": "No one has voted yet.",
-        "unknownApprover": "(unknown)"
-      },
-      "toasts": {
-        "approveOk": "Proposal approved.",
-        "approveFailed": "Approve failed.",
-        "rejectOk": "Proposal rejected.",
-        "rejectFailed": "Reject failed.",
-        "withdrawOk": "Proposal withdrawn.",
-        "withdrawFailed": "Withdraw failed."
-      }
+  "stepUp": {
+    "title": "본인 확인",
+    "description": "이 작업에는 최근 인증이 필요합니다. 계속하려면 비밀번호를 확인하세요.",
+    "passwordLabel": "비밀번호",
+    "cancel": "취소",
+    "confirm": "확인",
+    "elevating": "확인 중…",
+    "indicator": "관리자 모드 {minutes, plural, one {#분} other {#분}} 남음",
+    "deelevateLabel": "지금 관리자 모드 종료",
+    "errors": {
+      "passwordRequired": "비밀번호가 필요합니다.",
+      "generic": "비밀번호를 확인할 수 없습니다. 다시 시도하세요.",
+      "network": "서버에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요."
     }
   }
 }
