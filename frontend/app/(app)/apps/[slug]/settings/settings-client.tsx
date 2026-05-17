@@ -106,63 +106,94 @@ interface EnvsResp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
 
+/** Field name on ``AstroliftAppSettingsLastModified`` whose timestamp
+ *  drives this card's "Modified N ago" caption (#454). The wrapper is
+ *  keyed by section because each card needs to know which sub-resource
+ *  owns its freshness signal (deploy-tokens → DeployToken.updatedAt,
+ *  secrets → AppSecretBundleRef.updatedAt, etc.). The backend exposes
+ *  ``deployStrategy`` as the on-row proxy for the deploy-strategy card
+ *  since that section has no separate resource. */
+type SettingsSectionTimestampKey =
+  | "deployStrategy"
+  | "deployTokens"
+  | "secrets"
+  | "managedServices"
+  | "domains"
+  | "webhooks"
+  | "members"
+  | "observability";
+
 interface LinkSection {
   key: string;
   i18nKey: string;
   href: (slug: string) => string;
   icon: typeof KeyIcon;
+  lastModifiedKey: SettingsSectionTimestampKey;
 }
 
 /** Ordered list of link cards that compose the settings landing. Inline
- *  controls (deploys, ingress) live above; danger zone lives below. */
+ *  controls (deploys, ingress) live above; danger zone lives below.
+ *
+ *  ``lastModifiedKey`` ties each card to the matching field on
+ *  ``app.settingsLastModified`` (#454) so the caption reflects the
+ *  staleness of the section's primary resource rather than the whole
+ *  app's ``updatedAt``. */
 const LINK_SECTIONS: LinkSection[] = [
   {
     key: "deploy-strategy",
     i18nKey: "deployStrategy",
     href: (s) => `/apps/${s}/config`,
     icon: FileCodeIcon,
+    lastModifiedKey: "deployStrategy",
   },
   {
     key: "deploy-tokens",
     i18nKey: "deployTokens",
     href: (s) => `/apps/${s}/tokens`,
     icon: KeyIcon,
+    lastModifiedKey: "deployTokens",
   },
   {
     key: "secrets",
     i18nKey: "secrets",
     href: (s) => `/apps/${s}/secrets`,
     icon: LockIcon,
+    lastModifiedKey: "secrets",
   },
   {
     key: "managed-services",
     i18nKey: "managedServices",
     href: (s) => `/apps/${s}/managed-services`,
     icon: PlugIcon,
+    lastModifiedKey: "managedServices",
   },
   {
     key: "domains",
     i18nKey: "domains",
     href: (s) => `/apps/${s}/domains`,
     icon: GlobeIcon,
+    lastModifiedKey: "domains",
   },
   {
     key: "webhooks",
     i18nKey: "webhooks",
     href: (s) => `/apps/${s}/webhooks`,
     icon: WebhookIcon,
+    lastModifiedKey: "webhooks",
   },
   {
     key: "members",
     i18nKey: "members",
     href: (s) => `/apps/${s}/members`,
     icon: UsersIcon,
+    lastModifiedKey: "members",
   },
   {
     key: "observability",
     i18nKey: "observability",
     href: (s) => `/apps/${s}/observability`,
     icon: LineChartIcon,
+    lastModifiedKey: "observability",
   },
 ];
 
@@ -244,17 +275,20 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <div className="flex flex-col gap-3">
         {LINK_SECTIONS.map((s) => {
-          // App-level updatedAt is the best available staleness proxy
-          // until each linked config surface exposes its own
-          // lastModifiedAt (filed on the from:backend follow-up for
-          // #437 scope E). Renders consistently for every card so the
-          // visual cue lands today without per-section wiring.
+          // Per-section "Modified N ago" (#454). Each card pulls its
+          // own timestamp off the resolver-derived rollup so the
+          // staleness cue is accurate per surface (deploy-tokens
+          // freshness vs secrets freshness vs domains freshness) rather
+          // than the whole-app proxy that #437 scope E shipped with.
+          // Null means the section has no underlying rows yet — the
+          // helper hides the caption rather than rendering a default.
+          const sectionLastModified = a.settingsLastModified?.[s.lastModifiedKey] ?? null;
           const card = (
             <SettingsLinkCard
               key={s.key}
               section={s}
               slug={a.slug}
-              lastModifiedAt={a.updatedAt ?? null}
+              lastModifiedAt={sectionLastModified}
             />
           );
           // CI-setup section slots between Deploy strategy and Deploy
@@ -718,8 +752,7 @@ function WebhookDeploysPauseSection({
           </p>
           {pauseReason ? (
             <p className="text-muted-foreground">
-              {t("reasonPrefix")}{" "}
-              <span className="text-foreground">{pauseReason}</span>
+              {t("reasonPrefix")} <span className="text-foreground">{pauseReason}</span>
             </p>
           ) : (
             <p className="text-muted-foreground italic">{t("noReason")}</p>

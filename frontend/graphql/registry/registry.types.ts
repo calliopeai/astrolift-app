@@ -7,6 +7,7 @@ import type {
   AstroliftAppDeploymentSummary as GeneratedAppDeploymentSummary,
   AstroliftAppHealthPulse as GeneratedAppHealthPulse,
   AstroliftAppReprovisionState as GeneratedAppReprovisionState,
+  AstroliftAppSettingsLastModified as GeneratedAppSettingsLastModified,
   AstroliftAppTeamAccess as GeneratedAppTeamAccess,
   AstroliftContainer as GeneratedContainer,
   AstroliftRegisteredApp as GeneratedRegisteredApp,
@@ -92,6 +93,19 @@ export type AstroliftAppReprovisionState = Omit<GeneratedAppReprovisionState, "s
  */
 export type AstroliftAppConfigDrift = GeneratedAppConfigDrift;
 
+/**
+ * Per-section "Modified N ago" timestamps for the Settings landing
+ * card grid (#454). One field per LINK_SECTIONS card; each is the
+ * ``max(updated_at)`` across the section's primary resource scoped
+ * to the parent app, or ``null`` when no rows exist (FE hides the
+ * caption rather than rendering a misleading default).
+ *
+ * Populated only on the ``astroliftApp(slug)`` detail resolver;
+ * list-shape queries leave the wrapper ``null`` to keep the cheap
+ * list path cheap.
+ */
+export type AstroliftAppSettingsLastModified = GeneratedAppSettingsLastModified;
+
 export type AstroliftRegisteredApp = Omit<
   GeneratedRegisteredApp,
   | "sourceKind"
@@ -102,6 +116,7 @@ export type AstroliftRegisteredApp = Omit<
   | "latestDeployment"
   | "reprovision"
   | "configDrift"
+  | "settingsLastModified"
 > & {
   sourceKind: SourceKind;
   provisioningStatus: ProvisioningStatus;
@@ -111,6 +126,7 @@ export type AstroliftRegisteredApp = Omit<
   latestDeployment: AstroliftAppDeploymentSummary | null;
   reprovision: AstroliftAppReprovisionState;
   configDrift: AstroliftAppConfigDrift | null;
+  settingsLastModified: AstroliftAppSettingsLastModified | null;
 };
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {

@@ -404,6 +404,17 @@ type AstroliftAppSecretBundleAttachmentMutationResult {
   data: AstroliftAppSecretBundleAttachment
 }
 
+type AstroliftAppSettingsLastModified {
+  deployStrategy: DateTime
+  deployTokens: DateTime
+  secrets: DateTime
+  managedServices: DateTime
+  domains: DateTime
+  webhooks: DateTime
+  members: DateTime
+  observability: DateTime
+}
+
 type AstroliftAppSummary {
   id: GUID!
   slug: String!
@@ -1494,6 +1505,7 @@ type AstroliftRegisteredApp {
   healthPulse: AstroliftAppHealthPulse
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
+  settingsLastModified: AstroliftAppSettingsLastModified
 }
 
 type AstroliftRegisteredAppMutationResult {

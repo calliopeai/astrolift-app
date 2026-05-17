@@ -27,6 +27,7 @@ from astrolift_registry.schema.types import (
     app_to_type,
     build_app_freshness,
     build_config_drift,
+    build_settings_last_modified,
     container_to_type,
     workload_to_type,
 )
@@ -335,7 +336,15 @@ class RegistryQuery:
         if app is None:
             return None
         drift = build_config_drift(app) if include_drift else None
-        return app_to_type(app, drift=drift)
+        # Per-section "Modified N ago" timestamps power the Settings
+        # landing card grid (#454). Computed only on the detail path —
+        # the list resolvers leave the wrapper None.
+        settings_last_modified = build_settings_last_modified(app)
+        return app_to_type(
+            app,
+            drift=drift,
+            settings_last_modified=settings_last_modified,
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
