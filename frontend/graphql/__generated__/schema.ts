@@ -1132,15 +1132,78 @@ export type AstroliftManagedService = {
   environmentName: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
+  lastActionAt?: Maybe<Scalars['DateTime']['output']>;
+  lastActionKind: Scalars['String']['output'];
   name: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   status: Scalars['String']['output'];
+  statusError: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
 };
 
+export type AstroliftManagedServiceConnection = {
+  connectionSecretRef: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  keys: Array<AstroliftManagedServiceConnectionKey>;
+  kind: Scalars['String']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  revealedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftManagedServiceConnectionKey = {
+  isSecret: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftManagedServiceConnectionMutationResult = {
+  data?: Maybe<AstroliftManagedServiceConnection>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftManagedServiceMutationResult = {
   data?: Maybe<AstroliftManagedService>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceObject = {
+  key: Scalars['String']['output'];
+  lastModified?: Maybe<Scalars['DateTime']['output']>;
+  sizeBytes: Scalars['Int']['output'];
+};
+
+export type AstroliftManagedServiceObjects = {
+  cacheAgeSeconds?: Maybe<Scalars['Int']['output']>;
+  kind: Scalars['String']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  objects: Array<AstroliftManagedServiceObject>;
+  truncated: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceQueueDepth = {
+  depth: Scalars['Int']['output'];
+  inFlight: Scalars['Int']['output'];
+  kind: Scalars['String']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  sampledAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftManagedServiceTestEmailResult = {
+  managedServiceId: Scalars['GUID']['output'];
+  recipient: Scalars['String']['output'];
+  sentAt: Scalars['DateTime']['output'];
+  subject: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+};
+
+export type AstroliftManagedServiceTestEmailResultMutationResult = {
+  data?: Maybe<AstroliftManagedServiceTestEmailResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -2623,6 +2686,7 @@ export type Mutation = {
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
   revealAppSecret: AstroliftRevealedSecretMutationResult;
+  revealManagedServiceConnection: AstroliftManagedServiceConnectionMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
@@ -2636,6 +2700,7 @@ export type Mutation = {
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
   runAstroliftJobOnce: AstroliftRunJobOncePayloadMutationResult;
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
+  sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
@@ -3306,6 +3371,11 @@ export type MutationRevealAppSecretArgs = {
 };
 
 
+export type MutationRevealManagedServiceConnectionArgs = {
+  input: RevealManagedServiceConnectionInput;
+};
+
+
 export type MutationRevokeApiTokenArgs = {
   input: RevokeApiTokenInput;
 };
@@ -3368,6 +3438,11 @@ export type MutationRunAstroliftJobOnceArgs = {
 
 export type MutationScaleAstroliftWorkloadArgs = {
   input: ScaleWorkloadInput;
+};
+
+
+export type MutationSendManagedServiceTestEmailArgs = {
+  input: SendManagedServiceTestEmailInput;
 };
 
 
@@ -3878,6 +3953,8 @@ export type Query = {
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
+  astroliftManagedServiceObjects?: Maybe<AstroliftManagedServiceObjects>;
+  astroliftManagedServiceQueueDepth?: Maybe<AstroliftManagedServiceQueueDepth>;
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftMembers: Array<AstroliftMember>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
@@ -4198,6 +4275,17 @@ export type QueryAstroliftInvitationsArgs = {
 };
 
 
+export type QueryAstroliftManagedServiceObjectsArgs = {
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftManagedServiceQueueDepthArgs = {
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftManagedServicesArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -4511,6 +4599,10 @@ export type RevealAppSecretInput = {
   secretId: Scalars['String']['input'];
 };
 
+export type RevealManagedServiceConnectionInput = {
+  managedServiceId: Scalars['GUID']['input'];
+};
+
 export type RevokeApiTokenInput = {
   id: Scalars['GUID']['input'];
 };
@@ -4561,6 +4653,13 @@ export type RunJobOnceInput = {
 export type ScaleWorkloadInput = {
   replicas: Scalars['Int']['input'];
   workloadId: Scalars['GUID']['input'];
+};
+
+export type SendManagedServiceTestEmailInput = {
+  body: InputMaybe<Scalars['String']['input']>;
+  managedServiceId: Scalars['GUID']['input'];
+  recipient: Scalars['String']['input'];
+  subject: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SetActiveIdentityProviderInput = {

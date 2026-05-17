@@ -25,6 +25,9 @@ from astrolift_services.models import (
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
+    ManagedServiceConnectionKeyType,
+    ManagedServiceConnectionType,
+    ManagedServiceTestEmailResultType,
     ManagedServiceType,
     RevealedSecretType,
     SecretBundleType,
@@ -155,6 +158,45 @@ class DeprovisionManagedServiceInput:
     id: GUID
     delete_data: bool = False
     force_destroy: bool = False
+
+
+@strawberry.input
+class RevealManagedServiceConnectionInput:
+    """Audit-logged reveal of the connection envelope key set for one
+    bound managed service (#401).
+
+    Mirrors `RevealAppSecretInput` (#424): the call is explicit and
+    every successful reveal lands in the audit log via the
+    @mutation_audit decorator + a sibling emit_audit row carrying the
+    client IP.
+
+    The returned envelope NEVER contains plaintext values — the actual
+    credentials live in the platform secrets backend and aren't reachable
+    from this API surface. The reveal exposes the envelope key set
+    (variable names) + the `connection_secret_ref` pointer so an
+    operator can confirm which env vars the workload sees and where to
+    find the values in the secrets backend.
+    """
+
+    managed_service_id: GUID
+
+
+@strawberry.input
+class SendManagedServiceTestEmailInput:
+    """Operator-fired 'send test email' against a bound `email` kind
+    managed service (#401).
+
+    `subject` / `body` are optional — sensible defaults are used so the
+    common case is a one-field interaction (recipient).  The send rides
+    the existing `astrolift_operations.email_infra.send()` plumbing —
+    the configured transport (SES / SendGrid / Postmark / SMTP) receives
+    the payload; suppression list checks fire normally; bypasses
+    UNSUBSCRIBE since the operator triggered it deliberately."""
+
+    managed_service_id: GUID
+    recipient: str
+    subject: str | None = None
+    body: str | None = None
 
 
 @strawberry.type
@@ -809,3 +851,391 @@ class ServicesMutation:
                 deleted=False,  # workflow finalizes the soft-delete
             )
         )
+
+    # ---- Per-service quick actions (#401) -----------------------------
+    #
+    # The Settings landing surfaces a managed-services summary card with
+    # a per-row dropdown of kind-specific actions:
+    #   - postgres / redis / mysql  → revealManagedServiceConnection
+    #   - object_store              → listManagedServiceObjects (query)
+    #   - email                     → sendManagedServiceTestEmail
+    #   - queue / topic             → managedServiceQueueDepth (query)
+    #
+    # Reveal mirrors #424's pattern: explicit mutation, decorated with
+    # @mutation_audit + a sibling emit_audit row for the client IP.  No
+    # plaintext leaves the platform — the envelope's `value` field is
+    # always a `secret-ref:` or `placeholder:` shim.
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.connection.reveal",
+        extras=lambda result: (
+            {
+                "managed_service_id": str(result.data.managed_service_id),
+                "kind": result.data.kind,
+                "environment_name": result.data.environment_name,
+                "key_count": len(result.data.keys),
+            }
+            if result.ok and result.data is not None
+            else None
+        ),
+    )
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def reveal_managed_service_connection(
+        self,
+        info: Info,
+        input: RevealManagedServiceConnectionInput,
+    ) -> MutationResultType[ManagedServiceConnectionType]:
+        """Disclose the connection envelope key set for one managed
+        service (#401).
+
+        Returns the stable env-var key set the workload sees at runtime
+        for the service's kind, paired with the platform's
+        `connection_secret_ref` pointer.  Plaintext values are NEVER
+        returned — they live in the platform secrets backend (Vault /
+        SecretsManager / GSM / KeyVault) and aren't reachable from this
+        API surface.  Each `value` field is the opaque
+        ``secret-ref:<ref>`` or ``placeholder:<note>`` shim that points
+        the operator at where to fetch the value via the platform's
+        secrets-backend client.
+
+        Permission gate stacks `app.read` (caller can see the app) with
+        `managed_service.update` (caller can disclose the pointer) so
+        the surface matches the rest of the per-service action set.
+        """
+        # Lazy import to avoid circulars; the env_injection module is
+        # the source of truth for the envelope key set per kind.
+        from astrolift_manifest.env_injection import envelope_keys_for
+
+        svc = (
+            ManagedService.objects.select_related("app_environment", "registered_app")
+            .filter(guid=str(input.managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found",
+                field="managedServiceId",
+            )
+
+        envelope = envelope_keys_for(svc.kind)
+        if not envelope:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                (
+                    f"kind {svc.kind!r} has no connection envelope to reveal; "
+                    "reveal is only meaningful for kinds the platform injects "
+                    "env vars for (postgres, redis, mysql, queue, topic, "
+                    "object_store, email, etc.)"
+                ),
+                field="managedServiceId",
+            )
+
+        # Shape each key as ``secret-ref:<ref>`` when the workflow has
+        # populated `connection_secret_ref`, else ``placeholder:pending``
+        # so the UI can render a clear "not yet provisioned" hint
+        # without us inventing a fake value.
+        ref = svc.connection_secret_ref or ""
+        if ref:
+            value_for = lambda k: f"secret-ref:{ref}#{k}"  # noqa: E731
+        else:
+            value_for = lambda k: "placeholder:pending"  # noqa: E731
+
+        keys = [
+            ManagedServiceConnectionKeyType(
+                key=k,
+                value=value_for(k),
+                # The handful of non-secret envelope keys are stable
+                # config (region, prefix) — surface them as is_secret=
+                # False so the UI doesn't mask them.
+                is_secret=not _is_envelope_key_public(k),
+            )
+            for k in envelope
+        ]
+
+        # Sibling audit row carrying the client IP so the trail captures
+        # the disclosure source (#424 pattern).  Done as a separate
+        # emit_audit call so the IP isn't surfaced in the GraphQL
+        # response (which would leak the caller's IP to a layered
+        # proxy).
+        ip = _client_ip(info)
+        tenant = get_current_tenant()
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="managed_service.connection.reveal.disclosure",
+                decision="ALLOW",
+                target_kind="managed_service",
+                target_id=str(svc.guid),
+                duration_ms=0,
+                permissions=(
+                    Permission.APP_READ.value,
+                    Permission.MANAGED_SERVICE_UPDATE.value,
+                ),
+                extra={
+                    "kind": svc.kind,
+                    "name": svc.name,
+                    "app_slug": svc.registered_app.slug,
+                    "environment_name": svc.app_environment.name,
+                    "key_count": len(keys),
+                    "connection_secret_ref": ref,
+                    "client_ip": ip,
+                },
+            )
+        )
+
+        # Stamp the cached "last operator action" surface so the
+        # summary card can render "revealed N seconds ago" without
+        # re-walking the audit log.
+        now = timezone.now()
+        svc.last_action_at = now
+        svc.last_action_kind = "connection.reveal"
+        svc.save(update_fields=["last_action_at", "last_action_kind", "updated_at", "version"])
+
+        return gql_success(
+            ManagedServiceConnectionType(
+                managed_service_id=input.managed_service_id,
+                kind=svc.kind,
+                name=svc.name,
+                environment_name=svc.app_environment.name,
+                connection_secret_ref=ref,
+                keys=keys,
+                revealed_at=now,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.test_email.send",
+        extras=lambda result: (
+            {
+                "managed_service_id": str(result.data.managed_service_id),
+                "recipient": result.data.recipient,
+                "transport": result.data.transport,
+            }
+            if result.ok and result.data is not None
+            else None
+        ),
+    )
+    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def send_managed_service_test_email(
+        self,
+        info: Info,
+        input: SendManagedServiceTestEmailInput,
+    ) -> MutationResultType[ManagedServiceTestEmailResultType]:
+        """Operator-fired test send through a bound `email` kind managed
+        service (#401).
+
+        Rides the existing `astrolift_operations.email_infra` plumbing —
+        the configured transport (SES / SendGrid / Postmark / SMTP)
+        receives the rendered payload.  Suppression list checks fire
+        normally so a hard-bounced address won't be retried; bypasses
+        UNSUBSCRIBE since the operator triggered it deliberately to
+        verify deliverability.
+        """
+        # Lazy imports — keep mutation module light when email infra
+        # isn't reached.
+        from astrolift_operations.email_infra import (
+            Email,
+            EmailError,
+            EmailKind,
+            configured_transport,
+            is_configured,
+        )
+        from astrolift_operations.email_infra import (
+            send as email_send,
+        )
+
+        svc = (
+            ManagedService.objects.select_related("app_environment", "registered_app")
+            .filter(guid=str(input.managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found",
+                field="managedServiceId",
+            )
+        if svc.kind != ManagedService.Kind.EMAIL:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                (
+                    f"managed service is {svc.kind!r}, not 'email'; "
+                    "test-email is only supported for email kinds (SES, "
+                    "SendGrid, Postmark, SMTP variants)"
+                ),
+                field="managedServiceId",
+            )
+
+        recipient = (input.recipient or "").strip()
+        if not recipient:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "recipient is required",
+                field="recipient",
+            )
+
+        # Resolve a sane from_address from the binding config; falls
+        # back to a synthesized address scoped to the app so the email's
+        # provenance is obvious in the recipient's mailbox.
+        config = svc.config or {}
+        from_address = (
+            config.get("email_from")
+            or config.get("EMAIL_FROM")
+            or f"noreply@{svc.registered_app.slug}.astrolift.local"
+        )
+        subject = (input.subject or "").strip() or (f"[Astrolift] Test email from {svc.name or svc.kind}")
+        body = (input.body or "").strip() or (
+            f"This is a deliverability test fired from the {svc.registered_app.slug} "
+            f"settings page against managed service {svc.name or svc.kind} "
+            f"({svc.app_environment.name}).  If you received this, the email "
+            "binding is working."
+        )
+
+        if not is_configured():
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                (
+                    "no email transport configured on this install; admin "
+                    "must set EMAIL_BACKEND before test sends will land"
+                ),
+                field="managedServiceId",
+            )
+
+        try:
+            email = Email(
+                to_address=recipient,
+                subject=subject,
+                html_body=f"<p>{body}</p>",
+                plain_body=body,
+                from_address=from_address,
+                kind=EmailKind.MANAGED_SERVICE_TEST,
+            )
+        except EmailError as exc:
+            field = "recipient" if "to_address" in str(exc) else "managedServiceId"
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                str(exc),
+                field=field,
+            )
+
+        try:
+            email_send(email, suppression_lookup=lambda _addr: None)
+        except EmailError as exc:
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                str(exc),
+                field="managedServiceId",
+            )
+
+        transport = configured_transport().value
+
+        # Cache the operator action for the summary card.
+        now = timezone.now()
+        svc.last_action_at = now
+        svc.last_action_kind = "test_email.send"
+        svc.save(update_fields=["last_action_at", "last_action_kind", "updated_at", "version"])
+
+        # Sibling audit row carrying client IP + recipient so the trail
+        # captures the disclosure source (operators triggering a test
+        # send to an unfamiliar address should be obvious in audit).
+        ip = _client_ip(info)
+        tenant = get_current_tenant()
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="managed_service.test_email.send.disclosure",
+                decision="ALLOW",
+                target_kind="managed_service",
+                target_id=str(svc.guid),
+                duration_ms=0,
+                permissions=(
+                    Permission.APP_UPDATE.value,
+                    Permission.MANAGED_SERVICE_UPDATE.value,
+                ),
+                extra={
+                    "kind": svc.kind,
+                    "name": svc.name,
+                    "app_slug": svc.registered_app.slug,
+                    "environment_name": svc.app_environment.name,
+                    "recipient": recipient,
+                    "from_address": from_address,
+                    "transport": transport,
+                    "client_ip": ip,
+                },
+            )
+        )
+
+        return gql_success(
+            ManagedServiceTestEmailResultType(
+                managed_service_id=input.managed_service_id,
+                recipient=recipient,
+                subject=subject,
+                sent_at=now,
+                transport=transport,
+            )
+        )
+
+
+# Envelope keys that are stable configuration (region, prefix, name)
+# rather than secrets.  Used by the reveal mutation to mark non-secret
+# rows so the UI doesn't mask them.
+_PUBLIC_ENVELOPE_KEY_SUFFIXES: tuple[str, ...] = (
+    "_REGION",
+    "_PREFIX",
+    "_NAME",
+    "_HOST",
+    "_PORT",
+    "_DB",
+    "_BUCKET",
+    "_DOMAIN",
+    "_FROM",
+    "_PROVIDER",
+    "_SSL_MODE",
+    "_TLS",
+    "_TOPIC",
+    "_INDEX",
+    "_INDEX_PREFIX",
+    "_TABLE_NAME",
+    "_VOLUME",
+    "_PARTITION_KEY",
+    "_SORT_KEY",
+    "_DISTRIBUTION_ID",
+    "_DOMAIN_NAME",
+    "_INVALIDATION_ROLE",
+    "_ENDPOINT",
+    "_NAMESPACE",
+    "_ORG",
+    "_ARN_OR_ID",
+    "_MASTER_SECRET_REF",
+    "_BOOTSTRAP_SERVERS",
+    "_SECURITY_PROTOCOL",
+    "_SASL_MECHANISM",
+    "_SASL_USERNAME",
+    "_TOPIC_PREFIX",
+)
+
+
+def _is_envelope_key_public(key: str) -> bool:
+    """An envelope key is 'public' (non-secret) if it carries
+    configuration shape rather than a credential.  The reveal mutation
+    marks public keys with ``is_secret=False`` so the UI doesn't mask
+    them; secret-shaped keys (PASSWORD, API_KEY, URL with embedded
+    creds, etc.) stay masked."""
+    upper = key.upper()
+    # URLs typically embed creds (postgres://user:pass@host); treat as
+    # secret unless explicitly suffixed to a region/endpoint marker.
+    if upper.endswith("_URL"):
+        return False
+    if upper.endswith(("_PASSWORD", "_API_KEY", "_USER")):
+        return False
+    for suffix in _PUBLIC_ENVELOPE_KEY_SUFFIXES:
+        if upper.endswith(suffix):
+            return True
+    return False

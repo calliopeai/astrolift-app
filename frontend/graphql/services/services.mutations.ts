@@ -112,11 +112,14 @@ const MANAGED_SERVICE_FIELDS = `
   kind
   variant
   status
+  statusError
   config
   registeredAppSlug
   environmentName
   createdAt
   updatedAt
+  lastActionAt
+  lastActionKind
 `;
 
 export const PROVISION_MANAGED_SERVICE = gql`
@@ -161,6 +164,52 @@ export const DEPROVISION_MANAGED_SERVICE = gql`
       data {
         id
         deleted
+      }
+    }
+  }
+`;
+
+export const REVEAL_MANAGED_SERVICE_CONNECTION = gql`
+  mutation RevealManagedServiceConnection($input: RevealManagedServiceConnectionInput!) {
+    revealManagedServiceConnection(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        managedServiceId
+        kind
+        name
+        environmentName
+        connectionSecretRef
+        revealedAt
+        keys {
+          key
+          value
+          isSecret
+        }
+      }
+    }
+  }
+`;
+
+export const SEND_MANAGED_SERVICE_TEST_EMAIL = gql`
+  mutation SendManagedServiceTestEmail($input: SendManagedServiceTestEmailInput!) {
+    sendManagedServiceTestEmail(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        managedServiceId
+        recipient
+        subject
+        sentAt
+        transport
       }
     }
   }
