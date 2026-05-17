@@ -106,6 +106,23 @@ export type AstroliftActiveSession = {
   userAgent?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftActivityItem = {
+  action: Scalars['String']['output'];
+  actorDisplay: Scalars['String']['output'];
+  eventType: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  occurredAt: Scalars['DateTime']['output'];
+  payload: Scalars['JSON']['output'];
+  targetHref?: Maybe<Scalars['String']['output']>;
+  targetKind: Scalars['String']['output'];
+  targetLabel: Scalars['String']['output'];
+};
+
+export type AstroliftActivityPage = {
+  items: Array<AstroliftActivityItem>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftAlertEvent = {
   acknowledgedAt?: Maybe<Scalars['DateTime']['output']>;
   detail: Scalars['JSON']['output'];
@@ -3467,6 +3484,7 @@ export type Query = {
   astroliftProjects: Array<AstroliftProject>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
   astroliftQuotas: Array<AstroliftQuota>;
+  astroliftRecentActivity: AstroliftActivityPage;
   astroliftRecentClusterWorkflows: Array<AstroliftClusterWorkflowRun>;
   astroliftRenderedManifest?: Maybe<AstroliftRenderedManifest>;
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
@@ -3752,6 +3770,12 @@ export type QueryAstroliftOrganizationArgs = {
 
 export type QueryAstroliftPreviewEnvironmentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftRecentActivityArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
