@@ -432,6 +432,13 @@ CONSTANCE_CONFIG = {
         "fleets that need a longer rollout window, lower (e.g. 60) after a compromise so the "
         "old secret dies fast.",
     ),
+    "ALLOW_SELF_APPROVE_DEPLOYS": (
+        False,
+        "When False (default), the user who triggered a deployment cannot also approve it — "
+        "compliance + separation-of-duties. Flip to True for single-engineer / dev orgs that "
+        "still want the deploy-approval audit trail without blocking on a second approver. "
+        "Per-deployment auditability is unchanged either way.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -442,7 +449,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
     "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
-    "Workflows": {"fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED"), "collapse": False},
+    "Workflows": {
+        "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
+        "collapse": False,
+    },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
 }
 
