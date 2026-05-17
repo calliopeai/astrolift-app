@@ -91,6 +91,51 @@ export const LIST_APPS = gql`
   }
 `;
 
+/**
+ * Server-side filter + cursor-pagination companion to ``LIST_APPS`` (#481).
+ *
+ * Returns a page envelope so the FE can render "N of M" + a "Load more"
+ * cursor walk instead of pulling the entire registry into memory and
+ * client-filtering. Filter axes match the backend resolver: ``search``
+ * (case-insensitive contains on name/slug/description/repo), ``status``
+ * (health-pulse bucket), ``teamSlug`` / ``projectSlug`` (exact match),
+ * ``sourceKind`` (source-host enum). All filters compose intersectionally.
+ *
+ * ``cursor``/``limit`` follow the same shape ``astroliftEventsPage`` uses
+ * (base64-JSON of ``(createdAt, guid)``); the FE treats the value as
+ * opaque and just round-trips ``nextCursor`` back via ``fetchMore``.
+ */
+export const LIST_APPS_PAGE = gql`
+  query ListAppsPage(
+    $includeFreshness: Boolean = false
+    $search: String
+    $teamSlug: String
+    $projectSlug: String
+    $status: AstroliftAppListStatusFilter
+    $sourceKind: AstroliftAppSourceKindFilter
+    $cursor: String
+    $limit: Int = 50
+  ) {
+    astroliftAppsPage(
+      includeFreshness: $includeFreshness
+      search: $search
+      teamSlug: $teamSlug
+      projectSlug: $projectSlug
+      status: $status
+      sourceKind: $sourceKind
+      cursor: $cursor
+      limit: $limit
+    ) {
+      items {
+        ${APP_FIELDS}
+        ${APP_FRESHNESS_FIELDS}
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
 export const GET_APP = gql`
   query GetApp($slug: String!, $includeDrift: Boolean = false) {
     astroliftApp(slug: $slug, includeDrift: $includeDrift) {
