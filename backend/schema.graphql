@@ -162,8 +162,6 @@ type AstroliftApiToken {
   scopes: [String!]!
   expiresAt: DateTime
   lastUsedAt: DateTime
-  lastUsedIp: String
-  lastUsedAgent: String
   isRevoked: Boolean!
   createdAt: DateTime!
 }
@@ -2692,8 +2690,8 @@ type Query {
   astroliftSecretBundles: [AstroliftSecretBundle!]!
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
-  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null): [AstroliftAppGoldenSignal!]!
-  astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftStatusCodeBreakdown
+  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
+  astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!

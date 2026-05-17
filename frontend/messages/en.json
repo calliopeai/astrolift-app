@@ -396,7 +396,19 @@
         "description": "App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions, alert transitions.",
         "all": "All events",
         "emptyTitle": "No events for this app yet",
-        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire."
+        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire.",
+        "warningCount": "{count, plural, =1 {1 warning} other {# warnings}} in the last hour",
+        "warningBadgeLabel": "Warning",
+        "collapse": "Collapse",
+        "expand": "Expand"
+      },
+      "scope": {
+        "title": "Metric scope",
+        "environment": "Environment",
+        "workload": "Workload",
+        "allWorkloads": "All workloads",
+        "environmentPlaceholder": "Select an environment",
+        "workloadPlaceholder": "Select a workload"
       }
     },
     "console": {

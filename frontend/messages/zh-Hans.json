@@ -374,6 +374,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "指标范围",
+        "environment": "环境",
+        "workload": "工作负载",
+        "allWorkloads": "所有工作负载",
+        "environmentPlaceholder": "选择环境",
+        "workloadPlaceholder": "选择工作负载"
+      },
+      "events": {
+        "warningCount": "过去 1 小时内有 {count} 条警告",
+        "warningBadgeLabel": "警告",
+        "collapse": "折叠",
+        "expand": "展开"
+      }
     }
   },
   "settingsIndex": {
