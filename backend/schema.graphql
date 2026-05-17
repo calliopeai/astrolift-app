@@ -1958,6 +1958,21 @@ type AstroliftWorkloadPodSummary {
   ready: Boolean!
 }
 
+type AstroliftWorkloadResourceGauge {
+  unit: String!
+  current: Float!
+  request: Float!
+  limit: Float!
+  percentOfRequest: Float!
+  percentOfLimit: Float!
+}
+
+type AstroliftWorkloadResourceUsage {
+  cpu: AstroliftWorkloadResourceGauge!
+  memory: AstroliftWorkloadResourceGauge!
+  sourcedAt: DateTime!
+}
+
 input AttachSecretBundleInput {
   appSlug: String!
   environmentName: String!
@@ -3105,6 +3120,7 @@ type Query {
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!

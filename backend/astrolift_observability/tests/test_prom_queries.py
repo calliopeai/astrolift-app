@@ -162,7 +162,7 @@ def test_status_code_breakdown_query_aggregates_by_code() -> None:
         range_seconds=60 * 60,
     )
     assert plan.promql == (
-        "sum by (code) (rate(http_requests_total" '{app="hello-world",environment="prod"}[1m]))'
+        'sum by (code) (rate(http_requests_total{app="hello-world",environment="prod"}[1m]))'
     )
 
 
@@ -266,8 +266,7 @@ def test_status_code_breakdown_with_workload() -> None:
         workload_slug="api",
     )
     assert plan.promql == (
-        "sum by (code) (rate(http_requests_total"
-        '{app="hello-world",environment="prod",workload="api"}[1m]))'
+        'sum by (code) (rate(http_requests_total{app="hello-world",environment="prod",workload="api"}[1m]))'
     )
 
 
@@ -280,4 +279,70 @@ def test_builder_rejects_unsafe_workload_slug() -> None:
             environment_name="prod",
             range_seconds=60 * 60,
             workload_slug='api"; delete from workloads; --',
+        )
+
+
+# ----------------------------------------------------------------------
+# Workload resource-usage builders (#430)
+# ----------------------------------------------------------------------
+
+
+def test_workload_cpu_usage_query_uses_1m_rate_window() -> None:
+    plan = prom_queries.build_workload_cpu_usage_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        workload_slug="api",
+    )
+    assert plan.rate_window == "1m"
+    assert plan.labels == {"app": "hello-world", "environment": "prod", "workload": "api"}
+    assert plan.promql == (
+        'sum(rate(container_cpu_usage_seconds_total{app="hello-world",environment="prod",workload="api"}[1m]))'
+    )
+
+
+def test_workload_memory_usage_query_uses_working_set_bytes() -> None:
+    plan = prom_queries.build_workload_memory_usage_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        workload_slug="api",
+    )
+    assert plan.rate_window == "instant"
+    assert plan.promql == (
+        'sum(container_memory_working_set_bytes{app="hello-world",environment="prod",workload="api"})'
+    )
+
+
+def test_workload_resource_request_query_cpu() -> None:
+    plan = prom_queries.build_workload_resource_request_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        workload_slug="api",
+        resource="cpu",
+    )
+    assert plan.promql == (
+        "sum(kube_pod_container_resource_requests"
+        '{app="hello-world",environment="prod",workload="api",resource="cpu"})'
+    )
+
+
+def test_workload_resource_limit_query_memory() -> None:
+    plan = prom_queries.build_workload_resource_limit_query(
+        app_slug="hello-world",
+        environment_name="prod",
+        workload_slug="api",
+        resource="memory",
+    )
+    assert plan.promql == (
+        "sum(kube_pod_container_resource_limits"
+        '{app="hello-world",environment="prod",workload="api",resource="memory"})'
+    )
+
+
+def test_workload_request_query_rejects_bad_resource() -> None:
+    with pytest.raises(ValueError):
+        prom_queries.build_workload_resource_request_query(
+            app_slug="hello-world",
+            environment_name="prod",
+            workload_slug="api",
+            resource="disk",
         )

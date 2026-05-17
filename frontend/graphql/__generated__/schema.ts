@@ -1987,6 +1987,21 @@ export type AstroliftWorkloadPodSummary = {
   ready: Scalars['Boolean']['output'];
 };
 
+export type AstroliftWorkloadResourceGauge = {
+  current: Scalars['Float']['output'];
+  limit: Scalars['Float']['output'];
+  percentOfLimit: Scalars['Float']['output'];
+  percentOfRequest: Scalars['Float']['output'];
+  request: Scalars['Float']['output'];
+  unit: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadResourceUsage = {
+  cpu: AstroliftWorkloadResourceGauge;
+  memory: AstroliftWorkloadResourceGauge;
+  sourcedAt: Scalars['DateTime']['output'];
+};
+
 export type AttachSecretBundleInput = {
   appSlug: Scalars['String']['input'];
   bundleSlug: Scalars['String']['input'];
@@ -3993,6 +4008,7 @@ export type Query = {
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
+  astroliftWorkloadResourceUsage?: Maybe<AstroliftWorkloadResourceUsage>;
   astroliftWorkloads: Array<AstroliftWorkload>;
   /** Query mutation audit logs. Admin only. */
   auditLogs: Array<AuditLogEntry>;
@@ -4403,6 +4419,13 @@ export type QueryAstroliftWorkloadArgs = {
 
 
 export type QueryAstroliftWorkloadPodStatusBreakdownArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  workloadSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftWorkloadResourceUsageArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   workloadSlug: Scalars['String']['input'];

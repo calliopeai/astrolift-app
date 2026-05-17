@@ -41,7 +41,10 @@ from astrolift_observability.schema.types import (
     StatusCodeBreakdown,
     StatusCodeSeries,
     TimeSeriesPoint,
+    WorkloadResourceGauge,
+    WorkloadResourceUsage,
 )
+from astrolift_operations import prometheus_client
 from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import RegisteredApp
 from core.decorators import tenant_scoped
@@ -94,6 +97,81 @@ def _classify_status_code(code: str) -> str:
     if bucket in ("2", "3", "4", "5"):
         return f"{bucket}xx"
     return "other"
+
+
+def _instant_resource_gauge(
+    *,
+    endpoint: str,
+    app_slug: str,
+    environment_name: str | None,
+    workload_slug: str,
+    resource: str,
+    unit: str,
+) -> WorkloadResourceGauge | None:
+    """Run usage/request/limit instant queries for one resource and
+    fold into a gauge.
+
+    Returns ``None`` when **every** of the three queries errored —
+    that's the "Prometheus is dark" signal the caller uses to pick
+    the empty-state. A single-query error is swallowed and surfaced
+    as 0.0 on that field; the FE is robust to a missing denominator.
+    """
+
+    builders = {
+        "usage": (
+            prom_queries.build_workload_cpu_usage_query
+            if resource == "cpu"
+            else prom_queries.build_workload_memory_usage_query
+        ),
+        "request": prom_queries.build_workload_resource_request_query,
+        "limit": prom_queries.build_workload_resource_limit_query,
+    }
+    plans = {
+        "usage": builders["usage"](
+            app_slug=app_slug,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+        ),
+        "request": builders["request"](
+            app_slug=app_slug,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            resource=resource,
+        ),
+        "limit": builders["limit"](
+            app_slug=app_slug,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            resource=resource,
+        ),
+    }
+    values: dict[str, float] = {}
+    error_count = 0
+    for key, plan in plans.items():
+        try:
+            values[key] = float(
+                prometheus_client.query_instant(
+                    endpoint=endpoint,
+                    query=plan.promql,
+                )
+            )
+        except PrometheusError:
+            values[key] = 0.0
+            error_count += 1
+    if error_count == len(plans):
+        return None
+
+    current = values["usage"]
+    request = values["request"]
+    limit = values["limit"]
+    return WorkloadResourceGauge(
+        unit=unit,
+        current=current,
+        request=request,
+        limit=limit,
+        percent_of_request=(current / request * 100.0) if request > 0 else 0.0,
+        percent_of_limit=(current / limit * 100.0) if limit > 0 else 0.0,
+    )
 
 
 @strawberry.type
@@ -304,6 +382,101 @@ class GoldenSignalsQuery:
             range_seconds=seconds,
             series=series_out,
             promql=plan.promql,
+        )
+
+    # -- Per-workload live resource usage (#430) ---------------------
+    #
+    # Drives the two gauges (CPU + memory) at the top of the workload
+    # detail page. Returns ``None`` (rather than an empty list) when
+    # Prometheus is unreachable so the FE can render the "metrics not
+    # yet flowing" callout instead of a stale-looking gauge at 0%.
+    #
+    # The resolver issues four instant queries per call (usage +
+    # request + limit for each of CPU and memory). They share the
+    # same TTL cache the operations client uses, so the 5s FE poll
+    # mostly hits cache and Prometheus sees a roughly 30s effective
+    # cadence under sustained load.
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_workload_resource_usage(
+        self,
+        info: Info,
+        app_slug: str,
+        workload_slug: str,
+        environment_name: str | None = None,
+    ) -> WorkloadResourceUsage | None:
+        """Live CPU + memory usage vs. request/limit for one workload.
+
+        Sources four instant PromQL queries per resource against the
+        environment's Prometheus endpoint:
+
+        * usage — ``sum(rate(container_cpu_usage_seconds_total[1m]))``
+          (cores) or ``sum(container_memory_working_set_bytes)`` (bytes)
+        * request — ``sum(kube_pod_container_resource_requests{resource=...})``
+        * limit — ``sum(kube_pod_container_resource_limits{resource=...})``
+
+        Returns ``None`` when the app is unknown to the tenant, the
+        environment's cluster has no Prometheus endpoint configured,
+        or every query errored — the FE treats null as the empty-state
+        signal.
+        """
+        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        if app is None:
+            return None
+
+        endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
+        if endpoint is None:
+            return None
+
+        cpu_gauge = _instant_resource_gauge(
+            endpoint=endpoint,
+            app_slug=app.slug,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            resource="cpu",
+            unit="cores",
+        )
+        memory_gauge = _instant_resource_gauge(
+            endpoint=endpoint,
+            app_slug=app.slug,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            resource="memory",
+            unit="bytes",
+        )
+        # Both gauges failing = Prometheus is down / mis-scoped; treat
+        # the same as no endpoint so the FE shows one consistent empty
+        # state instead of two flavours.
+        if cpu_gauge is None and memory_gauge is None:
+            return None
+        # Mixed-state: one source dark, the other live. Synthesize a
+        # zero gauge for the dark side so the FE can still render the
+        # half that works (rather than dropping the whole card).
+        if cpu_gauge is None:
+            cpu_gauge = WorkloadResourceGauge(
+                unit="cores",
+                current=0.0,
+                request=0.0,
+                limit=0.0,
+                percent_of_request=0.0,
+                percent_of_limit=0.0,
+            )
+        if memory_gauge is None:
+            memory_gauge = WorkloadResourceGauge(
+                unit="bytes",
+                current=0.0,
+                request=0.0,
+                limit=0.0,
+                percent_of_request=0.0,
+                percent_of_limit=0.0,
+            )
+
+        return WorkloadResourceUsage(
+            cpu=cpu_gauge,
+            memory=memory_gauge,
+            sourced_at=_now_utc(),
         )
 
     # -- URL health probe (#406) -------------------------------------

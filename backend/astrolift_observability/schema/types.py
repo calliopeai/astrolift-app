@@ -77,6 +77,49 @@ class StatusCodeBreakdown:
     promql: str
 
 
+@strawberry.type(name="AstroliftWorkloadResourceGauge")
+class WorkloadResourceGauge:
+    """One resource (CPU or memory) gauge for the workload-detail page (#430).
+
+    ``current`` / ``request`` / ``limit`` are all in the same unit (cores
+    for CPU, bytes for memory) so the FE doesn't have to coerce. Either
+    ``request`` or ``limit`` may be 0.0 when the workload's manifest
+    omitted the bound — the FE picks the available denominator (limit
+    when set, request when not) for the percentage gauge.
+
+    ``percent_of_request`` and ``percent_of_limit`` are pre-computed
+    server-side so two clients on the same gauge agree on the colour
+    band even if they round differently. Both are 0.0..>100.0 (over-100
+    means usage exceeded the bound — surfaced as a red gauge).
+    """
+
+    unit: str
+    current: float
+    request: float
+    limit: float
+    percent_of_request: float
+    percent_of_limit: float
+
+
+@strawberry.type(name="AstroliftWorkloadResourceUsage")
+class WorkloadResourceUsage:
+    """Per-workload live resource usage vs. requests/limits (#430).
+
+    Powers the two gauges on the workload-detail page. ``None`` is
+    returned at the resolver layer when the cluster has no Prometheus
+    endpoint or every PromQL call errored — the FE renders the
+    empty-state callout in either case.
+
+    ``sourced_at`` is the wall-clock when the resolver queried
+    Prometheus. The FE uses it to show "x seconds ago" so an operator
+    can tell at-a-glance whether the poll loop is alive.
+    """
+
+    cpu: WorkloadResourceGauge
+    memory: WorkloadResourceGauge
+    sourced_at: dt.datetime
+
+
 @strawberry.type(name="AstroliftAppUrlHealth")
 class AppUrlHealth:
     """One probe result for an app URL (#406).

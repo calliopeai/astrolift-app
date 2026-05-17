@@ -300,3 +300,120 @@ def build_status_code_breakdown_query(
     match = _render_label_match(labels)
     expr = f"sum by (code) (rate(http_requests_total{match}[{rate_window}]))"
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+# ----------------------------------------------------------------------
+# Workload resource-usage builders (#430)
+# ----------------------------------------------------------------------
+#
+# Instant (not range) queries used by the workload-detail gauges. The
+# usage queries pick a 1m rate window so a spike at t-30s shows up
+# without smoothing it out; the request/limit queries are bare sum() on
+# kube-state-metrics gauges because requests and limits don't change
+# minute-to-minute (only at deploy time).
+#
+# All four use the same ``app + workload + environment`` label
+# matchers — narrower than the app-level golden signals because the
+# gauges are per-workload-only by design.
+
+
+def build_workload_cpu_usage_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    workload_slug: str,
+) -> QueryPlan:
+    """CPU usage in cores (1m rate over CPU-seconds counter).
+
+    ``sum(rate(container_cpu_usage_seconds_total{...}[1m]))``
+
+    ``rate(... seconds[1m])`` already lands on a "cores currently in
+    use" number — a series valued 0.25 means ~250m of CPU consumed
+    over the last minute. The FE compares this directly against the
+    request / limit cores returned by the matching gauge query.
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    match = _render_label_match(labels)
+    expr = f"sum(rate(container_cpu_usage_seconds_total{match}[1m]))"
+    return QueryPlan(promql=expr, labels=labels, rate_window="1m")
+
+
+def build_workload_memory_usage_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    workload_slug: str,
+) -> QueryPlan:
+    """Memory usage in bytes — ``container_memory_working_set_bytes``.
+
+    Working-set bytes is what the kubelet uses for OOM accounting, so
+    it's the right number to compare against the memory limit (the FE
+    can't put "is this pod near OOM?" any plainer than 'usage/limit
+    in percent').
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    match = _render_label_match(labels)
+    expr = f"sum(container_memory_working_set_bytes{match})"
+    return QueryPlan(promql=expr, labels=labels, rate_window="instant")
+
+
+def build_workload_resource_request_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    workload_slug: str,
+    resource: str,
+) -> QueryPlan:
+    """Per-resource requests aggregate from kube-state-metrics.
+
+    ``sum(kube_pod_container_resource_requests{app=...,resource="cpu|memory"})``
+
+    The exported gauge is already in the same unit as the usage query
+    (cores for CPU, bytes for memory), so the resolver can divide
+    usage / request without conversion.
+    """
+    if resource not in ("cpu", "memory"):
+        raise ValueError(f"resource must be cpu|memory; got {resource!r}")
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    match = _render_label_match_with_extra(labels, f'resource="{resource}"')
+    expr = f"sum(kube_pod_container_resource_requests{match})"
+    return QueryPlan(promql=expr, labels=labels, rate_window="instant")
+
+
+def build_workload_resource_limit_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    workload_slug: str,
+    resource: str,
+) -> QueryPlan:
+    """Per-resource limits aggregate from kube-state-metrics.
+
+    ``sum(kube_pod_container_resource_limits{app=...,resource="cpu|memory"})``
+
+    Same shape as the request query, different metric name; cleaner
+    than one builder with a kind kwarg because the call sites at the
+    resolver layer pair them up explicitly.
+    """
+    if resource not in ("cpu", "memory"):
+        raise ValueError(f"resource must be cpu|memory; got {resource!r}")
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    match = _render_label_match_with_extra(labels, f'resource="{resource}"')
+    expr = f"sum(kube_pod_container_resource_limits{match})"
+    return QueryPlan(promql=expr, labels=labels, rate_window="instant")

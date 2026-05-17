@@ -32,12 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   GET_WORKLOAD_POD_STATUS_BREAKDOWN,
   LIST_APP_PODS,
@@ -50,15 +45,11 @@ import type {
   AstroliftWorkloadPodStatusBucket,
   ContainerKind,
 } from "@/graphql/lifecycle/lifecycle.types";
-import {
-  GET_WORKLOAD,
-  LIST_CONTAINERS,
-} from "@/graphql/registry/registry.queries";
-import type {
-  AstroliftContainer,
-  AstroliftWorkload,
-} from "@/graphql/registry/registry.types";
+import { GET_WORKLOAD, LIST_CONTAINERS } from "@/graphql/registry/registry.queries";
+import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { cn } from "@/lib/utils";
+
+import { ResourceUsageGauges } from "./resource-usage-gauges";
 
 interface WorkloadResp {
   astroliftWorkload: AstroliftWorkload | null;
@@ -105,8 +96,7 @@ const STATUS_VARIANT: Record<string, string> = {
   CrashLoopBackOff: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   ImagePullBackOff: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   ErrImagePull: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  CreateContainerConfigError:
-    "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  CreateContainerConfigError: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   CreateContainerError: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   InvalidImageName: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   OOMKilled: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
@@ -164,33 +154,24 @@ export function WorkloadDetailClient({
   workloadSlug: string;
 }) {
   const t = useTranslations("apps.workloadDetail");
-  const { data: wlData, loading: wlLoading } = useQuery<WorkloadResp>(
-    GET_WORKLOAD,
-    {
-      variables: { appSlug, slug: workloadSlug },
-      fetchPolicy: "cache-and-network",
-    },
-  );
-  const { data: cData, loading: cLoading } = useQuery<ContainersResp>(
-    LIST_CONTAINERS,
-    {
-      variables: { workloadSlug },
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const { data: wlData, loading: wlLoading } = useQuery<WorkloadResp>(GET_WORKLOAD, {
+    variables: { appSlug, slug: workloadSlug },
+    fetchPolicy: "cache-and-network",
+  });
+  const { data: cData, loading: cLoading } = useQuery<ContainersResp>(LIST_CONTAINERS, {
+    variables: { workloadSlug },
+    fetchPolicy: "cache-and-network",
+  });
   const w = wlData?.astroliftWorkload ?? null;
 
   // Live pod state — drives the restart column + sidecar resource
   // cards. Filtered to *this* workload's pods only so a noisy
   // sibling workload doesn't drown the table.
-  const { data: pdData, loading: pdLoading } = useQuery<PodsResp>(
-    LIST_APP_PODS,
-    {
-      variables: { appSlug },
-      pollInterval: POD_POLL_MS,
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const { data: pdData, loading: pdLoading } = useQuery<PodsResp>(LIST_APP_PODS, {
+    variables: { appSlug },
+    pollInterval: POD_POLL_MS,
+    fetchPolicy: "cache-and-network",
+  });
 
   const { data: brData, loading: brLoading } = useQuery<BreakdownResp>(
     GET_WORKLOAD_POD_STATUS_BREAKDOWN,
@@ -198,31 +179,25 @@ export function WorkloadDetailClient({
       variables: { appSlug, workloadSlug },
       pollInterval: POD_POLL_MS,
       fetchPolicy: "cache-and-network",
-    },
+    }
   );
 
   const isCronjob = w?.kind === "cronjob";
-  const { data: rData, loading: rLoading } = useQuery<JobRunsResp>(
-    LIST_SCHEDULED_JOB_RUNS,
-    {
-      variables: { appSlug, limit: 10 },
-      skip: !isCronjob,
-      pollInterval: isCronjob ? 15000 : 0,
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const { data: rData, loading: rLoading } = useQuery<JobRunsResp>(LIST_SCHEDULED_JOB_RUNS, {
+    variables: { appSlug, limit: 10 },
+    skip: !isCronjob,
+    pollInterval: isCronjob ? 15000 : 0,
+    fetchPolicy: "cache-and-network",
+  });
 
   const containers = cData?.astroliftContainers ?? [];
   const runs = (rData?.astroliftScheduledJobRuns ?? []).filter(
-    (r) => r.workloadSlug === workloadSlug,
+    (r) => r.workloadSlug === workloadSlug
   );
 
   const podRows: AstroliftAppPod[] = React.useMemo(
-    () =>
-      (pdData?.astroliftAppPods ?? []).filter(
-        (p) => (p.workload || "") === workloadSlug,
-      ),
-    [pdData, workloadSlug],
+    () => (pdData?.astroliftAppPods ?? []).filter((p) => (p.workload || "") === workloadSlug),
+    [pdData, workloadSlug]
   );
   const buckets = brData?.astroliftWorkloadPodStatusBreakdown ?? [];
 
@@ -344,6 +319,24 @@ export function WorkloadDetailClient({
         </CardContent>
       </Card>
 
+      <ResourceUsageGauges
+        appSlug={appSlug}
+        workloadSlug={workloadSlug}
+        environmentName={null}
+        labels={{
+          title: t("resourceUsage.title"),
+          cpuTitle: t("resourceUsage.cpuTitle"),
+          memoryTitle: t("resourceUsage.memoryTitle"),
+          ofRequest: t("resourceUsage.ofRequest"),
+          ofLimit: t("resourceUsage.ofLimit"),
+          currentLabel: t("resourceUsage.currentLabel"),
+          requestLabel: t("resourceUsage.requestLabel"),
+          limitLabel: t("resourceUsage.limitLabel"),
+          empty: t("resourceUsage.empty"),
+          sourcedAt: t("resourceUsage.sourcedAt"),
+        }}
+      />
+
       <PodStatusGridCard
         appSlug={appSlug}
         buckets={buckets}
@@ -441,8 +434,7 @@ export function WorkloadDetailClient({
                         env <span className="font-mono">{r.environmentName}</span>
                         {r.startedAt && (
                           <>
-                            {" · "}started{" "}
-                            {new Date(r.startedAt).toLocaleString()}
+                            {" · "}started {new Date(r.startedAt).toLocaleString()}
                           </>
                         )}
                         {r.durationSeconds != null && (
@@ -563,20 +555,13 @@ function PodStatusGridRow({
       >
         <TableCell>
           <ChevronRightIcon
-            className={cn(
-              "text-muted-foreground size-4 transition-transform",
-              open && "rotate-90",
-            )}
+            className={cn("text-muted-foreground size-4 transition-transform", open && "rotate-90")}
           />
         </TableCell>
         <TableCell>
-          <Badge className={cn("font-medium", statusClass(bucket.status))}>
-            {bucket.status}
-          </Badge>
+          <Badge className={cn("font-medium", statusClass(bucket.status))}>{bucket.status}</Badge>
         </TableCell>
-        <TableCell className="text-right font-mono tabular-nums">
-          {bucket.count}
-        </TableCell>
+        <TableCell className="text-right font-mono tabular-nums">{bucket.count}</TableCell>
         <TableCell className="text-right font-mono tabular-nums">
           {bucket.percent.toFixed(1)}%
         </TableCell>
@@ -586,16 +571,11 @@ function PodStatusGridRow({
           <TableCell />
           <TableCell colSpan={3} className="py-3">
             {bucket.pods.length === 0 ? (
-              <span className="text-muted-foreground text-xs">
-                {bucketEmptyLabel}
-              </span>
+              <span className="text-muted-foreground text-xs">{bucketEmptyLabel}</span>
             ) : (
               <ul className="space-y-1.5">
                 {bucket.pods.map((p) => (
-                  <li
-                    key={p.name}
-                    className="flex items-center justify-between gap-3 text-xs"
-                  >
+                  <li key={p.name} className="flex items-center justify-between gap-3 text-xs">
                     <Link
                       href={`/apps/${appSlug}/observability?pod=${encodeURIComponent(p.name)}`}
                       className="font-mono hover:underline"
@@ -605,7 +585,7 @@ function PodStatusGridRow({
                     <span
                       className={cn(
                         "text-muted-foreground font-mono",
-                        !p.ready && "text-rose-500 dark:text-rose-300",
+                        !p.ready && "text-rose-500 dark:text-rose-300"
                       )}
                     >
                       {formatAge(p.age)}
@@ -675,9 +655,7 @@ function PodHealthTableCard({
                 <TableRow>
                   <TableHead>{labels.columnName}</TableHead>
                   <TableHead>{labels.columnStatus}</TableHead>
-                  <TableHead className="text-right">
-                    {labels.columnRestarts}
-                  </TableHead>
+                  <TableHead className="text-right">{labels.columnRestarts}</TableHead>
                   <TableHead>{labels.columnNode}</TableHead>
                   <TableHead className="text-right">{labels.columnAge}</TableHead>
                 </TableRow>
@@ -699,9 +677,7 @@ function PodHealthTableCard({
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn(statusClass(p.status))}>
-                          {p.status}
-                        </Badge>
+                        <Badge className={cn(statusClass(p.status))}>{p.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono tabular-nums">
                         <div className="flex items-center justify-end gap-2">
@@ -967,8 +943,7 @@ function ContainerCard({
         {manifest && (
           <Badge variant="secondary" className="ml-auto gap-1 text-xs">
             <ActivityIcon className="size-3" />
-            {HEALTHCHECK_LABEL[manifest.healthcheckKind] ??
-              manifest.healthcheckKind}
+            {HEALTHCHECK_LABEL[manifest.healthcheckKind] ?? manifest.healthcheckKind}
           </Badge>
         )}
       </div>
@@ -985,11 +960,7 @@ function ContainerCard({
           value={`${emptyOrValue(memReq)} / ${emptyOrValue(memLim)}`}
         />
         {live?.restarts != null && (
-          <Field
-            label={fieldLabels.restarts}
-            mono
-            value={String(live.restarts)}
-          />
+          <Field label={fieldLabels.restarts} mono value={String(live.restarts)} />
         )}
       </dl>
     </div>
@@ -1008,13 +979,7 @@ interface ServiceFqdnLabels {
   unavailable: string;
 }
 
-function ServiceFqdnField({
-  fqdn,
-  labels,
-}: {
-  fqdn: string;
-  labels: ServiceFqdnLabels;
-}) {
+function ServiceFqdnField({ fqdn, labels }: { fqdn: string; labels: ServiceFqdnLabels }) {
   const onCopy = React.useCallback(async () => {
     if (!fqdn) return;
     try {
@@ -1027,9 +992,7 @@ function ServiceFqdnField({
 
   return (
     <div className="sm:col-span-3">
-      <dt className="text-muted-foreground text-xs uppercase tracking-wide">
-        {labels.label}
-      </dt>
+      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{labels.label}</dt>
       <dd className="mt-1">
         {fqdn ? (
           <button
@@ -1037,7 +1000,7 @@ function ServiceFqdnField({
             onClick={onCopy}
             className={cn(
               "bg-muted/60 hover:bg-muted inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-left",
-              "font-mono text-xs transition-colors",
+              "font-mono text-xs transition-colors"
             )}
             title={labels.copyTitle}
             aria-label={`${labels.copyTitle}: ${fqdn}`}
@@ -1061,20 +1024,10 @@ function ServiceFqdnField({
 // pages don't pull it as a shared dep).
 // ---------------------------------------------------------------------------
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
+function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-muted-foreground text-xs uppercase tracking-wide">
-        {label}
-      </dt>
+      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
       <dd className={mono ? "font-mono text-sm" : "text-sm"}>{value}</dd>
     </div>
   );
