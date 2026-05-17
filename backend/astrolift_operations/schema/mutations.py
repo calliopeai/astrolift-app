@@ -33,6 +33,8 @@ from astrolift_operations.schema.types import (
     AlertRuleType,
     AppLogExportType,
     AuditExportType,
+    DeviceRegistrationType,
+    NotificationPreferenceType,
     NotificationType,
     WebhookSubscriptionType,
     WebhookTestResultType,
@@ -122,6 +124,46 @@ class MarkNotificationReadInput:
 @strawberry.type
 class _MarkAllReadPayload:
     marked: int
+
+
+# ---- Push device registration (#476 §B) --------------------------
+
+
+@strawberry.input
+class RegisterMobileDeviceInput:
+    device_token: str
+    platform: str
+    """ios | android | web_push"""
+
+    label: str | None = None
+
+
+@strawberry.input
+class RevokeMobileDeviceInput:
+    id: GUID
+
+
+@strawberry.type
+class _RevokeMobileDevicePayload:
+    id: GUID
+    revoked: bool
+
+
+# ---- Notification preferences (#476 §F, #499 §E) -----------------
+
+
+@strawberry.input
+class SetNotificationPreferenceInput:
+    channel: str
+    """push | email | webhook (only ``push`` is wired today)"""
+
+    event_kind: str
+    """One of ``iter_template_event_types()`` (or a
+    ``auth.session.created.<client_kind>`` sub-key). Unknown kinds
+    are accepted — the dispatcher just won't fire on them until a
+    template lands."""
+
+    enabled: bool
 
 
 # Alert rules + events (#282) ---------------------------------------
@@ -740,6 +782,218 @@ class OperationsMutation:
             read_at=timezone.now()
         )
         return gql_success(_MarkAllReadPayload(marked=marked))
+
+    # ---- Push device registration (#476 §B) -----------------------
+
+    @strawberry.field
+    @mutation_audit(action="mobile_device.register")
+    def register_mobile_device(
+        self, info: Info, input: RegisterMobileDeviceInput
+    ) -> MutationResultType[DeviceRegistrationType]:
+        """Register a push-receivable device for the current user.
+
+        Self-scoped — any authenticated user can register a device
+        on their own account; no extra permission. The token
+        uniqueness constraint covers re-registration: re-presenting
+        a token resurrects the existing row (clears soft-delete +
+        stale state) rather than inserting a duplicate.
+
+        ``label`` is optional; surfaced in /settings/devices verbatim.
+        Tokens up to 512 chars (FCM / APNs / web-push all fit).
+        """
+        from astrolift_operations.models import DeviceRegistration
+        from astrolift_operations.notification_dispatch import get_driver
+        from astrolift_operations.schema.types import device_registration_to_type
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        platform = (input.platform or "").strip().lower()
+        valid_platforms = {c for c, _ in DeviceRegistration.Platform.choices}
+        if platform not in valid_platforms:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"platform must be one of {sorted(valid_platforms)}",
+                field="platform",
+            )
+        token = (input.device_token or "").strip()
+        if not token:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "device_token is required",
+                field="deviceToken",
+            )
+        if len(token) > 512:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "device_token exceeds 512 characters",
+                field="deviceToken",
+            )
+        label = (input.label or "").strip()[:200]
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+
+        # Bind the registration to the caller's active AstroliftSession
+        # row when one exists — the #499 dispatcher uses this to skip
+        # echoing back to the device that just signed in.
+        session_key = (
+            getattr(getattr(request, "session", None), "session_key", None) if request else None
+        )
+        enrolled_session_id: int | None = None
+        if session_key:
+            from astrolift_identity.models import AstroliftSession
+
+            row = (
+                AstroliftSession.objects.filter(user_id=viewer.pk, session_key=session_key)
+                .only("pk")
+                .first()
+            )
+            if row is not None:
+                enrolled_session_id = row.pk
+
+        driver_slug = get_driver().name
+
+        existing = (
+            DeviceRegistration.all_objects.filter(user_id=viewer.pk, device_token=token)
+            .order_by("-created_at")
+            .first()
+        )
+        if existing is not None:
+            updates: list[str] = []
+            if existing.platform != platform:
+                existing.platform = platform
+                updates.append("platform")
+            if label and existing.label != label:
+                existing.label = label
+                updates.append("label")
+            if existing.driver != driver_slug:
+                existing.driver = driver_slug
+                updates.append("driver")
+            if existing.organization_id != org_id:
+                existing.organization_id = org_id
+                updates.append("organization")
+            if enrolled_session_id and existing.enrolled_session_id != enrolled_session_id:
+                existing.enrolled_session_id = enrolled_session_id
+                updates.append("enrolled_session")
+            # Re-issued after a soft-delete / stale prune — clear both
+            # so the row counts as live again.
+            if existing.stale_at is not None or existing.deleted_at is not None:
+                existing.stale_at = None
+                existing.deleted_at = None
+                updates += ["stale_at", "deleted_at"]
+            if updates:
+                existing.save(update_fields=updates + ["updated_at", "version"])
+            return gql_success(device_registration_to_type(existing))
+
+        row = DeviceRegistration.objects.create(
+            user=viewer,
+            device_token=token,
+            platform=platform,
+            label=label,
+            organization_id=org_id,
+            enrolled_session_id=enrolled_session_id,
+            driver=driver_slug,
+        )
+        return gql_success(device_registration_to_type(row))
+
+    @strawberry.field
+    @mutation_audit(
+        action="mobile_device.revoke",
+        target=lambda self, info, input: ("device_registration", str(input.id)),
+    )
+    def revoke_mobile_device(
+        self, info: Info, input: RevokeMobileDeviceInput
+    ) -> MutationResultType[_RevokeMobileDevicePayload]:
+        """Soft-delete one of the caller's push registrations.
+
+        Self-only. Idempotent: revoking an already-revoked row
+        returns ``ok: true`` with ``revoked=False``.
+        """
+        from astrolift_operations.models import DeviceRegistration
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        row = DeviceRegistration.all_objects.filter(guid=str(input.id)).first()
+        if row is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "device not found")
+        if row.user_id != viewer.pk:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "cannot revoke this device")
+
+        already = row.deleted_at is not None
+        if not already:
+            row.soft_delete(by=viewer)
+        return gql_success(_RevokeMobileDevicePayload(id=input.id, revoked=not already))
+
+    # ---- Notification preferences (#476 §F, #499 §E) --------------
+
+    @strawberry.field
+    @mutation_audit(action="notification_preference.set")
+    def set_notification_preference(
+        self, info: Info, input: SetNotificationPreferenceInput
+    ) -> MutationResultType[NotificationPreferenceType]:
+        """Upsert one preference row for the caller.
+
+        Self-only. ``enabled=True`` and ``enabled=False`` both create
+        an explicit row that overrides the platform default. To
+        revert to the default, the caller deletes the row via
+        ``revokeNotificationPreference`` (no dedicated mutation
+        today — the user just toggles back to the default value).
+        """
+        from astrolift_operations.models import (
+            NotificationChannel,
+            NotificationPreference,
+        )
+        from astrolift_operations.schema.types import notification_preference_to_type
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+
+        channel = (input.channel or "").strip().lower()
+        valid_channels = {c for c, _ in NotificationChannel.choices}
+        if channel not in valid_channels:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"channel must be one of {sorted(valid_channels)}",
+                field="channel",
+            )
+        event_kind = (input.event_kind or "").strip()
+        if not event_kind:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "event_kind is required",
+                field="eventKind",
+            )
+        if len(event_kind) > 64:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "event_kind exceeds 64 characters",
+                field="eventKind",
+            )
+
+        row = NotificationPreference.objects.filter(
+            user_id=viewer.pk,
+            channel=channel,
+            event_kind=event_kind,
+        ).first()
+        if row is None:
+            row = NotificationPreference.objects.create(
+                user=viewer,
+                channel=channel,
+                event_kind=event_kind,
+                enabled=bool(input.enabled),
+            )
+        else:
+            row.enabled = bool(input.enabled)
+            row.save(update_fields=["enabled", "updated_at", "version"])
+        return gql_success(notification_preference_to_type(row))
 
     # ---- Alert rules + events (#282) ------------------------------
 

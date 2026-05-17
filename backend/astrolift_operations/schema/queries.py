@@ -18,11 +18,15 @@ from astrolift_operations.models import (
     AlertEvent,
     AlertRule,
     AuditEvent,
+    DeviceRegistration,
     Event,
     Notification,
+    NotificationChannel,
+    NotificationPreference,
     WebhookDelivery,
     WebhookSubscription,
     WorkflowRun,
+    default_enabled,
 )
 from astrolift_operations.schema.types import (
     ActivityPageType,
@@ -34,8 +38,10 @@ from astrolift_operations.schema.types import (
     AuditEventPageType,
     AuditEventType,
     AuditRetentionType,
+    DeviceRegistrationType,
     EventPageType,
     EventType,
+    NotificationPreferenceType,
     NotificationType,
     WebhookDeliveryType,
     WebhookSubscriptionType,
@@ -43,9 +49,12 @@ from astrolift_operations.schema.types import (
     alert_event_to_type,
     alert_rule_to_type,
     audit_to_type,
+    device_registration_to_type,
     event_to_type,
+    notification_preference_to_type,
     notification_to_type,
     shape_activity_item,
+    synthetic_preference_type,
     webhook_delivery_to_type,
     webhook_to_type,
     workflow_run_to_type,
@@ -426,6 +435,105 @@ class OperationsQuery:
         if unread_only:
             qs = qs.filter(read_at__isnull=True)
         return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]
+
+    # ---- Push device registry (#476 §B) ----------------------------
+
+    @strawberry.field
+    def astrolift_my_mobile_devices(
+        self,
+        info: Info,
+    ) -> list[DeviceRegistrationType]:
+        """List the caller's live push registrations.
+
+        Self-only — no permission gate (a user can only see their
+        own devices). Returns live rows (stale + soft-deleted
+        omitted) ordered most-recently-registered first.
+        """
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return []
+        qs = (
+            DeviceRegistration.objects.filter(user_id=viewer.pk, stale_at__isnull=True)
+            .order_by("-registered_at")
+        )
+        return [device_registration_to_type(d) for d in qs]
+
+    # ---- Notification preferences (#476 §F, #499 §E) ---------------
+
+    @strawberry.field
+    def astrolift_my_notification_preferences(
+        self,
+        info: Info,
+        channel: str | None = None,
+    ) -> list[NotificationPreferenceType]:
+        """Resolve the caller's effective preferences.
+
+        Returns one row per (channel, event_kind) in the platform
+        default catalog, overlaid with any explicit DB row the
+        caller has set. Unknown event kinds (one a custom driver
+        emits) are NOT enumerated here — they only surface after
+        the caller has explicitly opted in via
+        ``setNotificationPreference``.
+        """
+        from astrolift_operations.notification_dispatch import iter_template_event_types
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return []
+
+        valid_channels = {c for c, _ in NotificationChannel.choices}
+        if channel is not None:
+            channel_lc = channel.lower()
+            if channel_lc not in valid_channels:
+                return []
+            channels = (channel_lc,)
+        else:
+            channels = ("push",)  # only channel we render today
+
+        # Pull every persisted row first so the synthesis loop can
+        # overlay them in one pass without N+1.
+        explicit: dict[tuple[str, str], NotificationPreference] = {}
+        for row in NotificationPreference.objects.filter(
+            user_id=viewer.pk,
+            channel__in=channels,
+        ):
+            explicit[(row.channel, row.event_kind)] = row
+
+        # Build the synthesised list from the dispatcher's catalog so
+        # the UI gets the canonical event kinds + the session-kind
+        # sub-keys (auth.session.created.{web,mobile,cli,...}).
+        event_kinds: list[str] = []
+        for et in iter_template_event_types():
+            if et == "auth.session.created":
+                event_kinds.extend(
+                    [
+                        "auth.session.created.web",
+                        "auth.session.created.mobile",
+                        "auth.session.created.cli",
+                        "auth.session.created.api_token",
+                        "auth.session.created.browser_extension",
+                    ]
+                )
+            else:
+                event_kinds.append(et)
+
+        out: list[NotificationPreferenceType] = []
+        for ch in channels:
+            for kind in event_kinds:
+                row = explicit.get((ch, kind))
+                if row is not None:
+                    out.append(notification_preference_to_type(row))
+                else:
+                    out.append(
+                        synthetic_preference_type(
+                            channel=ch,
+                            event_kind=kind,
+                            enabled=default_enabled(channel=ch, event_kind=kind),
+                        )
+                    )
+        return out
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

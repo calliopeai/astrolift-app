@@ -5,8 +5,10 @@ from django.contrib import admin
 from astrolift_operations.models import (
     AlertMute,
     AuditEvent,
+    DeviceRegistration,
     Event,
     Notification,
+    NotificationPreference,
     WebhookDelivery,
     WebhookSubscription,
     WorkflowRun,
@@ -137,3 +139,18 @@ class AlertMuteAdmin(admin.ModelAdmin):
     list_filter = ("organization",)
     search_fields = ("rule__name", "reason")
     readonly_fields = ("guid", "created_at", "updated_at", "deleted_at")
+
+
+@admin.register(DeviceRegistration)
+class DeviceRegistrationAdmin(admin.ModelAdmin):
+    list_display = ("user", "platform", "label", "driver", "registered_at", "stale_at")
+    list_filter = ("platform", "driver")
+    search_fields = ("label",)
+    readonly_fields = ("guid", "device_token", "registered_at")
+
+
+@admin.register(NotificationPreference)
+class NotificationPreferenceAdmin(admin.ModelAdmin):
+    list_display = ("user", "channel", "event_kind", "enabled", "updated_at")
+    list_filter = ("channel", "enabled")
+    search_fields = ("event_kind",)
