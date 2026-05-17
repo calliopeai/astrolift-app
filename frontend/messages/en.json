@@ -806,6 +806,9 @@
         "abortTitle": "Abort in-flight deploy of {app}/{env}?",
         "abortDescription": "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
         "abortConfirm": "Abort deploy",
+        "abortReasonLabel": "Reason for abort",
+        "abortReasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
+        "reasonRequired": "Reason required",
         "rollbackTitle": "Rollback {app}/{env} to the previous revision?",
         "rollbackDescription": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "rollbackConfirm": "Rollback",
@@ -873,6 +876,9 @@
       "confirmAbort": {
         "title": "Abort deploy of {app}/{env}?",
         "description": "Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed.",
+        "reasonLabel": "Reason for abort",
+        "reasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
+        "reasonRequired": "Reason required",
         "confirm": "Abort deploy"
       },
       "confirmRollback": {
@@ -948,6 +954,7 @@
       "awaiting": "Awaiting approval",
       "awaitingDesc": "{remaining} more approval(s) required before this deployment proceeds. Self-approval is rejected by the backend.",
       "approve": "Approve",
+      "reject": "Reject",
       "missingPermission": "You don't have app.approve_deploy; ask an org admin to approve.",
       "viewDetail": "View full detail",
       "viewDetailShort": "View detail",
@@ -956,10 +963,45 @@
       "failed": "Deployment failed",
       "failedDesc": "Approval no longer applies. Inspect the lifecycle log on the detail page.",
       "noAction": "No approval action available in current state {status}.",
+      "selfTriggerBadge": "Pushed by you",
+      "selfTriggerHelp": "This deployment was triggered by you. Another approver is required (separation of duties).",
+      "rejectedReasonLabel": "Rejection reason",
+      "commit": {
+        "viewDiff": "View commit",
+        "noMessage": "No commit message recorded for this deploy.",
+        "expand": "Show {hidden} more lines",
+        "collapse": "Collapse"
+      },
+      "toasts": {
+        "approved": "Approved — status now {status}",
+        "approveFailed": "Approve failed",
+        "rejected": "Deployment rejected",
+        "rejectFailed": "Reject failed"
+      },
+      "history": {
+        "title": "Approval history",
+        "empty": "No approval events recorded yet.",
+        "actorUnknown": "unknown actor",
+        "action": {
+          "started": "Deploy started",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "aborted": "Aborted",
+          "other": "Lifecycle event"
+        }
+      },
       "confirm": {
         "title": "Approve deploy of {tag}?",
         "description": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately and traffic shifts according to the configured strategy. Self-approval on a deploy you triggered is rejected by the backend.",
         "confirm": "Approve deployment"
+      },
+      "confirmReject": {
+        "title": "Reject deploy of {tag}?",
+        "description": "Marks the deployment failed for {app}/{env}. CI must re-trigger to create a fresh deployment for review.",
+        "reasonLabel": "Reason for rejection",
+        "reasonPlaceholder": "Why is this deploy being rejected? Persists on the audit log + history sidebar.",
+        "reasonRequired": "Reason required",
+        "confirm": "Reject deployment"
       }
     },
     "alerts": {
