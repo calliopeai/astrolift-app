@@ -1036,6 +1036,7 @@ export type AstroliftForceRedeployPreviewDeployment = {
 };
 
 export type AstroliftIdentityProvider = {
+  activatedAt?: Maybe<Scalars['DateTime']['output']>;
   clientId: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -1043,6 +1044,7 @@ export type AstroliftIdentityProvider = {
   isActive: Scalars['Boolean']['output'];
   isDefault: Scalars['Boolean']['output'];
   kind: Scalars['String']['output'];
+  lastSwitchedByUsername?: Maybe<Scalars['String']['output']>;
   metadataUrl: Scalars['String']['output'];
   name: Scalars['String']['output'];
   oidcDiscoveryUrl: Scalars['String']['output'];
@@ -1328,6 +1330,7 @@ export type AstroliftPolicy = {
   actorPattern: Scalars['JSON']['output'];
   conditions: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
+  createdByUsername?: Maybe<Scalars['String']['output']>;
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   description: Scalars['String']['output'];
   effect: Scalars['String']['output'];
@@ -1338,6 +1341,7 @@ export type AstroliftPolicy = {
   scopeLevel: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  updatedByUsername?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftPolicyMutationResult = {

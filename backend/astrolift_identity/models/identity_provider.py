@@ -11,6 +11,7 @@ See ``specs/03`` §3.1 and ``specs/04`` §3.4.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 from core.models.base import BaseCoreModel
@@ -44,6 +45,22 @@ class IdentityProvider(BaseCoreModel):
     client_id = models.CharField(max_length=256, blank=True, default="")
     client_secret_ref = models.CharField(max_length=512, blank=True, default="")
     is_default = models.BooleanField(default=False)
+
+    # Stamped only when this IdP is bound as the org's active provider
+    # (i.e. ``Organization.identity_provider_id`` flips to point at this
+    # row). Distinct from ``updated_at`` so the "active since" caption
+    # on the settings page doesn't reset every time an operator edits
+    # the discovery URL or client secret. Nullable for legacy rows that
+    # were active before this field existed; the 0010 migration
+    # backfills currently-active IdPs from ``updated_at``.
+    activated_at = models.DateTimeField(null=True, blank=True)
+    last_switched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="+",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
 
     @property
     def name(self) -> str:

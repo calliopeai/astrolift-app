@@ -208,14 +208,14 @@ export function IdentityProviderClient() {
                         ) : (
                           <Badge variant="secondary">configured</Badge>
                         )}
-                        {idp.isActive && idp.updatedAt && (
-                          // `updatedAt` is the closest proxy we have
-                          // for "switched to active at" until the
-                          // backend exposes a dedicated
-                          // `activated_at` / `last_switched_by`
-                          // (filed as a #415 follow-on).
+                        {idp.isActive && (idp.activatedAt || idp.updatedAt) && (
+                          // Prefer the dedicated `activatedAt` stamp
+                          // (set only when the IdP is flipped to
+                          // active); fall back to `updatedAt` for
+                          // legacy rows from before #467.
                           <span className="text-muted-foreground text-[10px]">
-                            Active since {fmt.formatDate(idp.updatedAt)}
+                            Active since{" "}
+                            {fmt.formatDate((idp.activatedAt ?? idp.updatedAt) as string)}
                           </span>
                         )}
                         {idp.isActive && idp.lastSwitchedByUsername && (
