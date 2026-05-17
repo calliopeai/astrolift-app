@@ -1538,6 +1538,7 @@ export type AstroliftRegisteredApp = {
   teamSlug: Scalars['String']['output'];
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  viewerPermissions: Array<Scalars['String']['output']>;
   webhookDeploysPauseReason: Scalars['String']['output'];
   webhookDeploysPaused: Scalars['Boolean']['output'];
   webhookDeploysPausedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -4017,6 +4018,7 @@ export type Query = {
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppPermissions: Array<Scalars['String']['output']>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
@@ -4189,6 +4191,11 @@ export type QueryAstroliftAppIdentityBindingArgs = {
 export type QueryAstroliftAppMetricsArgs = {
   appSlug: Scalars['String']['input'];
   timeRange?: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppPermissionsArgs = {
+  appSlug: Scalars['String']['input'];
 };
 
 

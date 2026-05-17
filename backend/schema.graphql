@@ -1566,6 +1566,7 @@ type AstroliftRegisteredApp {
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
   settingsLastModified: AstroliftAppSettingsLastModified
+  viewerPermissions: [String!]!
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -3233,6 +3234,7 @@ type Query {
   astroliftApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftMyApps(includeFreshness: Boolean! = false): [AstroliftRegisteredApp!]!
   astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
+  astroliftAppPermissions(appSlug: String!): [String!]!
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
