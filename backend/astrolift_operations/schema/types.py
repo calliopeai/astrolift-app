@@ -50,6 +50,73 @@ class AuditEventType:
     target_slug: str
     request_id: str
     data: JSON
+    """Redacted mutation context. Sensitive values (``secret``,
+    ``password``, ``token``, ``api_key``, ``authorization``,
+    ``private_key``, ``credential``) are replaced with the literal
+    ``***redacted***`` sentinel before crossing the GraphQL boundary
+    (#433). Resolvers must call :func:`scrub_payload` rather than
+    handing back the raw JSONField."""
+
+    before: JSON | None
+    """Pre-mutation snapshot, when the originating mutation persisted
+    one to ``data.before``. Null for mutations that don't carry a
+    before-state (e.g. permission denials, create-shaped actions)."""
+
+    after: JSON | None
+    """Post-mutation snapshot, when the originating mutation persisted
+    one to ``data.after``. Null when the mutation didn't snapshot."""
+
+
+@strawberry.type(name="AstroliftAuditEventPage")
+class AuditEventPageType:
+    """Cursor-paginated audit slice. ``next_cursor`` is null when the
+    caller has reached the end of the stream within the date bounds.
+
+    Pairs with ``astroliftAuditEvents`` — same cursor encoding as the
+    Event stream so a UI can use a single helper for both."""
+
+    items: list[AuditEventType]
+    next_cursor: str | None
+    total_count: int | None
+    """Best-effort total of matching rows across the active filter set.
+    Null when the query opted out of the count (large ranges) — the UI
+    falls back to ``next_cursor != null`` to decide whether to show a
+    'load more' control."""
+
+
+@strawberry.type(name="AstroliftAuditExport")
+class AuditExportType:
+    """Result of an ``exportAuditEvents`` mutation. Carries the
+    pre-signed download URL plus enough metadata (row count, byte
+    count, sha256) for the UI to surface verification + progress."""
+
+    id: GUID
+    format: str
+    """``csv`` | ``ndjson``."""
+
+    row_count: int
+    byte_count: int
+    sha256: str
+    download_url: str
+    """Token-gated URL the client GETs to retrieve the bytes. The
+    token is single-use-traceable but re-downloadable inside the TTL
+    window so operators can recover from a fumbled save."""
+
+    expires_at: dt.datetime
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAuditRetention")
+class AuditRetentionType:
+    """The org's audit-log retention policy in days. Surfaces in the
+    UI subtitle as 'Audit events retained for N days per compliance
+    policy' — required for SOC2 surface (#433 scope D).
+
+    Value sourced from the ``AUDIT_RETENTION_DAYS`` Constance flag so
+    operators can tune at runtime without a redeploy."""
+
+    days: int
+    """The retention window, in days. Always >= 1. Defaults to 90."""
 
 
 @strawberry.type(name="AstroliftWorkflowRun")
@@ -84,6 +151,16 @@ def event_to_type(e) -> EventType:
 
 
 def audit_to_type(a) -> AuditEventType:
+    from astrolift_operations.audit_redaction import scrub_payload
+
+    raw = a.data or {}
+    # Redact at the GraphQL boundary so callers never see plaintext
+    # secrets even if a mutation accidentally stuffed one onto the
+    # extras dict. Scrubbing is keyed off field name, not value
+    # heuristics — see ``audit_redaction``.
+    scrubbed = scrub_payload(raw)
+    before = scrubbed.get("before") if isinstance(scrubbed, dict) else None
+    after = scrubbed.get("after") if isinstance(scrubbed, dict) else None
     return AuditEventType(
         id=GUID(str(a.guid)),
         organization_id=_maybe_str(a.organization_id),
@@ -97,7 +174,22 @@ def audit_to_type(a) -> AuditEventType:
         target_id=a.target_id or "",
         target_slug=a.target_slug or "",
         request_id=a.request_id or "",
-        data=a.data or {},
+        data=scrubbed,
+        before=before,
+        after=after,
+    )
+
+
+def audit_export_to_type(e, *, download_url: str) -> AuditExportType:
+    return AuditExportType(
+        id=GUID(str(e.guid)),
+        format=e.format,
+        row_count=int(e.row_count or 0),
+        byte_count=int(e.byte_count or 0),
+        sha256=e.sha256 or "",
+        download_url=download_url,
+        expires_at=e.expires_at,
+        created_at=e.created_at,
     )
 
 

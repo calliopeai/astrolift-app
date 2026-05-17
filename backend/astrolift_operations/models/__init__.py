@@ -1,5 +1,6 @@
 from astrolift_operations.models.alert import AlertEvent, AlertRule
 from astrolift_operations.models.audit_event import AuditEvent
+from astrolift_operations.models.audit_export import AuditExport
 from astrolift_operations.models.event import Event
 from astrolift_operations.models.notification import Notification
 from astrolift_operations.models.webhook_delivery import WebhookDelivery
@@ -11,6 +12,7 @@ __all__ = [
     "AlertEvent",
     "AlertRule",
     "AuditEvent",
+    "AuditExport",
     "Event",
     "Notification",
     "WebhookDelivery",

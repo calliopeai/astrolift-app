@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
 import logging
@@ -21,17 +22,21 @@ from astrolift_identity.models import Organization, Team
 from astrolift_operations.models import (
     AlertEvent,
     AlertRule,
+    AuditEvent,
+    AuditExport,
     Notification,
     WebhookSubscription,
 )
 from astrolift_operations.schema.types import (
     AlertEventType,
     AlertRuleType,
+    AuditExportType,
     NotificationType,
     WebhookSubscriptionType,
     WebhookTestResultType,
     alert_event_to_type,
     alert_rule_to_type,
+    audit_export_to_type,
     notification_to_type,
     webhook_to_type,
 )
@@ -152,6 +157,26 @@ class DeleteAlertRuleInput:
 @strawberry.input
 class AcknowledgeAlertEventInput:
     id: GUID
+
+
+@strawberry.input
+class ExportAuditEventsInput:
+    """Filter snapshot for the audit-log export (#433).
+
+    Bounds + filters must match the active UI query so what the
+    operator sees on screen is what lands in the file. Cap on row
+    count enforced server-side via the ``AUDIT_EXPORT_MAX_ROWS``
+    Constance flag — out-of-bound exports fail loudly rather than
+    truncating silently."""
+
+    format: str
+    """``CSV`` or ``NDJSON``. Case-insensitive."""
+
+    created_at_gte: dt.datetime | None = None
+    created_at_lte: dt.datetime | None = None
+    action: str | None = None
+    decision: str | None = None
+    actor_id: str | None = None
 
 
 @strawberry.type
@@ -790,3 +815,150 @@ class OperationsMutation:
                 ]
             )
         return gql_success(alert_event_to_type(event))
+
+    @strawberry.field
+    @mutation_audit(action="audit_log.export")
+    @require_permission(Permission.AUDIT_LOG_EXPORT)
+    @tenant_scoped()
+    def export_audit_events(
+        self, info: Info, input: ExportAuditEventsInput
+    ) -> MutationResultType[AuditExportType]:
+        """Stream the matching audit slice into a token-gated download
+        (#433). The mutation persists an :class:`AuditExport` row and
+        returns the pre-signed URL + TTL + integrity hash. Honours the
+        same filters as ``astroliftAuditEventsPage`` so the download
+        matches what the operator sees on screen."""
+        from datetime import timedelta
+
+        from constance import config as constance_config
+        from django.utils import timezone
+
+        from astrolift_operations.audit_export import (
+            hash_token,
+            mint_token,
+            write_artifact,
+        )
+
+        fmt = (input.format or "").strip().lower()
+        if fmt not in {"csv", "ndjson"}:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "format must be CSV or NDJSON",
+                field="format",
+            )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        org = Organization.objects.filter(pk=org_id).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        # Build the queryset under the exact same filter contract as
+        # the page query. Order ascending so the export reads
+        # naturally for an auditor (oldest -> newest).
+        qs = AuditEvent.objects.order_by("occurred_at", "guid")
+        if input.action:
+            qs = qs.filter(action=input.action)
+        if input.decision:
+            qs = qs.filter(decision=input.decision.upper())
+        if input.actor_id:
+            qs = qs.filter(actor_id=input.actor_id)
+        if input.created_at_gte is not None:
+            qs = qs.filter(occurred_at__gte=input.created_at_gte)
+        if input.created_at_lte is not None:
+            qs = qs.filter(occurred_at__lte=input.created_at_lte)
+
+        max_rows = max(1, int(getattr(constance_config, "AUDIT_EXPORT_MAX_ROWS", 100000)))
+        candidate_count = qs.count()
+        if candidate_count > max_rows:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                (
+                    f"export would produce {candidate_count} rows, exceeding the "
+                    f"AUDIT_EXPORT_MAX_ROWS cap ({max_rows}); narrow the date range "
+                    "or actor/action filter and retry"
+                ),
+            )
+
+        # UUIDv7 default fills in on save, but the artifact filename
+        # needs the guid before we hit the DB — generate explicitly so
+        # the file path + DB row agree.
+        from core.fields.uuid_v7 import uuid7
+
+        export_guid = uuid7()
+
+        artifact = write_artifact(
+            qs.iterator(chunk_size=500),
+            format=fmt,
+            guid=str(export_guid),
+        )
+
+        plaintext_token, token_hash = mint_token()
+        ttl_seconds = max(
+            60,
+            int(getattr(constance_config, "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS", 3600)),
+        )
+        expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
+
+        actor_user_id = tenant.actor_user_id if tenant else None
+        from django.contrib.auth import get_user_model
+
+        requested_by = None
+        if actor_user_id is not None:
+            requested_by = get_user_model().objects.filter(pk=actor_user_id).first()
+
+        export = AuditExport.objects.create(
+            guid=export_guid,
+            organization=org,
+            requested_by=requested_by,
+            format=fmt,
+            row_count=artifact.row_count,
+            byte_count=artifact.byte_count,
+            sha256=artifact.sha256,
+            relative_path=artifact.relative_path,
+            token_hash=token_hash,
+            filters_snapshot={
+                "action": input.action or "",
+                "decision": (input.decision or "").upper() or "",
+                "actor_id": input.actor_id or "",
+                "created_at_gte": (input.created_at_gte.isoformat() if input.created_at_gte else ""),
+                "created_at_lte": (input.created_at_lte.isoformat() if input.created_at_lte else ""),
+            },
+            expires_at=expires_at,
+        )
+        # ``token_hash`` here is computed from the plaintext so a later
+        # download-view check matches.
+        assert export.token_hash == hash_token(plaintext_token)
+
+        download_url = _build_audit_export_url(
+            info=info,
+            guid=str(export.guid),
+            token=plaintext_token,
+        )
+        return gql_success(audit_export_to_type(export, download_url=download_url))
+
+
+def _build_audit_export_url(*, info: Info, guid: str, token: str) -> str:
+    """Build the absolute download URL for an audit export. Uses the
+    incoming request to honor the public base URL when reverse-proxied
+    (X-Forwarded-Host); falls back to ``PLATFORM_API_URL`` for cases
+    where the resolver runs outside a request context."""
+    from django.conf import settings
+
+    base_url_setting = getattr(settings, "DJANGO_BASE_URL", None) or getattr(settings, "BASE_URL", "app/")
+    base_url = (base_url_setting or "app/").lstrip("/")
+    relative = f"/{base_url}audit_exports/{guid}/{token}/"
+
+    request = getattr(info.context, "request", None) if info and info.context else None
+    if request is not None:
+        try:
+            return request.build_absolute_uri(relative)
+        except Exception:  # noqa: BLE001 — never let URL building break the mutation
+            pass
+
+    platform_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+    if platform_url:
+        return platform_url + relative
+    return relative

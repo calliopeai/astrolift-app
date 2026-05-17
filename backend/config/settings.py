@@ -439,6 +439,26 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
+    "AUDIT_RETENTION_DAYS": (
+        90,
+        "How long audit log entries are retained, in days, per compliance policy. Surfaces "
+        "as a subtitle on the /audit page so operators see the policy at a glance. The "
+        "retention sweeper honours this value; bumping it lengthens the visible history "
+        "without redeploy. Lower bound 1 day, upper bound 2557 days (~7 years, the spec "
+        "ceiling).",
+    ),
+    "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS": (
+        3600,
+        "How long a generated audit-export download URL stays valid before the token "
+        "expires (default 1h). Lengthen for fleets that need to hand off the URL to a "
+        "third-party auditor; shorten after an incident.",
+    ),
+    "AUDIT_EXPORT_MAX_ROWS": (
+        100000,
+        "Hard cap on the row count a single exportAuditEvents call will dump. Protects "
+        "the worker from runaway exports while still leaving room for multi-year SOC2 "
+        "extracts at the default retention.",
+    ),
 }
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -454,6 +474,14 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "collapse": False,
     },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
+    "Audit": {
+        "fields": (
+            "AUDIT_RETENTION_DAYS",
+            "AUDIT_EXPORT_DOWNLOAD_TTL_SECONDS",
+            "AUDIT_EXPORT_MAX_ROWS",
+        ),
+        "collapse": False,
+    },
 }
 
 INTERNAL_IPS = [
