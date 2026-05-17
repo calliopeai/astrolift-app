@@ -67,6 +67,74 @@
       "sports": "Sports"
     }
   },
+  "overview": {
+    "title": "개요",
+    "description": "이 Astrolift 설치의 아이덴티티, 레지스트리 및 라이프사이클 데이터.",
+    "errorBanner": {
+      "title": "일부 데이터를 불러오지 못했습니다"
+    },
+    "tiles": {
+      "teams": {
+        "label": "팀",
+        "emptyCta": "첫 팀 만들기"
+      },
+      "projects": {
+        "label": "프로젝트",
+        "emptyCta": "프로젝트 만들기"
+      },
+      "apps": {
+        "label": "등록된 앱",
+        "emptyCta": "첫 앱 등록하기"
+      },
+      "deployments": {
+        "label": "활성 배포",
+        "emptyCta": "배포 시작"
+      },
+      "costMtd": {
+        "label": "비용 (MTD)",
+        "emptyCta": "비용 데이터 대기 중",
+        "vsPrevMonth": "전월 대비",
+        "noPrevMonth": "전월 데이터 없음"
+      }
+    },
+    "fleetHealth": {
+      "title": "플릿 상태",
+      "description": "등록된 앱 전반의 최근 배포 상태 종합.",
+      "healthy": "정상",
+      "failing": "{count}개 실패",
+      "hiccup": "{count, plural, one {#건의 일시 장애} other {#건의 일시 장애}}",
+      "empty": "등록된 앱이 없습니다. /apps/new에서 저장소를 연결하여 시작하세요.",
+      "tiles": {
+        "running": "실행 중",
+        "recentFailure": "최근 실패",
+        "failing": "실패 중",
+        "noDeploys": "배포 없음"
+      }
+    },
+    "recentProjects": {
+      "title": "최근 프로젝트",
+      "description": "모든 팀에서 최근에 생성된 프로젝트.",
+      "emptyTitle": "프로젝트가 없습니다",
+      "emptyDescription": "팀과 프로젝트를 만들어 앱 등록을 시작하세요.",
+      "emptyAction": "팀 관리"
+    },
+    "activity": {
+      "title": "활동",
+      "description": "라이프사이클 이벤트: 배포, 구성 동기화, 스케일링, 클러스터 등록, 시크릿 로테이션.",
+      "emptyTitle": "활동이 없습니다",
+      "emptyDescription": "배포, 구성 변경 및 클러스터 작업이 발생하면 여기에 표시됩니다.",
+      "errorTitle": "활동을 불러오지 못했습니다",
+      "loadMore": "더 보기",
+      "loadingMore": "불러오는 중…"
+    },
+    "registeredApps": {
+      "title": "등록된 앱",
+      "description": "배포용으로 등록된 저장소.",
+      "emptyTitle": "등록된 앱이 없습니다",
+      "emptyDescription": "앱 레지스트리 화면은 다음 마일스톤에 제공됩니다. 연결되면 이 카드에서 Git 저장소를 등록하고 배포할 수 있습니다.",
+      "emptyAction": "레지스트리 열기"
+    }
+  },
   "dataTable": {
     "search": "Search…",
     "filters": "Filters",
