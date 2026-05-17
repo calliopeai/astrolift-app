@@ -92,3 +92,41 @@ export const TRANSITION_WORKFLOW = gql`
     }
   }
 `;
+
+// ─── Temporal instance viewer (#437) ────────────────────────────────────
+
+export const CANCEL_WORKFLOW_INSTANCE = gql`
+  mutation CancelWorkflowInstance($workflowId: String!) {
+    cancelWorkflowInstance(workflowId: $workflowId) {
+      ok
+      errors {
+        field
+        messages
+      }
+    }
+  }
+`;
+
+export const TERMINATE_WORKFLOW_INSTANCE = gql`
+  mutation TerminateWorkflowInstance($workflowId: String!, $reason: String!) {
+    terminateWorkflowInstance(workflowId: $workflowId, reason: $reason) {
+      ok
+      errors {
+        field
+        messages
+      }
+    }
+  }
+`;
+
+export const SIGNAL_WORKFLOW_INSTANCE = gql`
+  mutation SignalWorkflowInstance($workflowId: String!, $signalName: String!, $payload: JSON) {
+    signalWorkflowInstance(workflowId: $workflowId, signalName: $signalName, payload: $payload) {
+      ok
+      errors {
+        field
+        messages
+      }
+    }
+  }
+`;

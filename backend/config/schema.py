@@ -19,6 +19,7 @@ import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
 import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 import astrolift_scm.schema as AstroliftScmSchema  # noqa: E402
 import astrolift_services.schema as AstroliftServicesSchema  # noqa: E402
+import astrolift_workflows.schema as AstroliftTemporalWorkflowsSchema  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Always-on imports (core infrastructure)
@@ -43,6 +44,7 @@ _query_bases = [
     AstroliftScmSchema.ScmQuery,
     AstroliftServicesSchema.ServicesQuery,
     AstroliftObservabilitySchema.GoldenSignalsQuery,
+    AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
@@ -54,6 +56,7 @@ _mutation_bases = [
     AstroliftLifecycleSchema.LifecycleMutation,
     AstroliftScmSchema.ScmMutation,
     AstroliftServicesSchema.ServicesMutation,
+    AstroliftTemporalWorkflowsSchema.TemporalWorkflowsMutation,
     AstroliftBillingSchema.BillingMutation,
 ]
 
