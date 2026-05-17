@@ -23,6 +23,9 @@ _READ_ALL = (
     Permission.APP_READ_METRICS,
     Permission.SECRET_LIST,
     Permission.AUDIT_LOG_READ,
+    # Auditors need to download the log for compliance reviews — issue
+    # #433 makes the audit surface usable for SOC2 / similar audits.
+    Permission.AUDIT_LOG_EXPORT,
 )
 
 _DEPLOY_OPS = (

@@ -82,6 +82,7 @@ class Permission(enum.StrEnum):
 
     # --- Audit / Billing -------------------------------------------
     AUDIT_LOG_READ = "audit_log.read"
+    AUDIT_LOG_EXPORT = "audit_log.export"
     BILLING_READ = "billing.read"
     BILLING_UPDATE = "billing.update"
 

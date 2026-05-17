@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import datetime as dt
 import hashlib
 import json
 from datetime import timedelta
@@ -28,7 +29,9 @@ from astrolift_operations.schema.types import (
     AlertRuleType,
     AppMetricsPointType,
     AppMetricsType,
+    AuditEventPageType,
     AuditEventType,
+    AuditRetentionType,
     EventPageType,
     EventType,
     NotificationType,
@@ -133,13 +136,107 @@ class OperationsQuery:
         limit: int = 100,
         action: str | None = None,
         decision: str | None = None,
+        actor_id: str | None = None,
+        created_at_gte: dt.datetime | None = None,
+        created_at_lte: dt.datetime | None = None,
     ) -> list[AuditEventType]:
+        """Legacy bounded audit query (#433): supports the existing
+        polling list view while ``astroliftAuditEventsPage`` migrates
+        the frontend onto cursor pagination + true date bounds.
+
+        Filters: ``action`` (exact), ``decision`` (ALLOW/DENY/UNKNOWN),
+        ``actor_id`` (exact), and inclusive ``occurred_at`` bounds.
+        Caps at 500 rows per call regardless of ``limit``."""
         qs = AuditEvent.objects.order_by("-occurred_at")
         if action:
             qs = qs.filter(action=action)
         if decision:
             qs = qs.filter(decision=decision.upper())
+        if actor_id:
+            qs = qs.filter(actor_id=actor_id)
+        if created_at_gte is not None:
+            qs = qs.filter(occurred_at__gte=created_at_gte)
+        if created_at_lte is not None:
+            qs = qs.filter(occurred_at__lte=created_at_lte)
         return [audit_to_type(a) for a in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ)
+    @tenant_scoped()
+    def astrolift_audit_events_page(
+        self,
+        info: Info,
+        limit: int = 100,
+        after: str | None = None,
+        action: str | None = None,
+        decision: str | None = None,
+        actor_id: str | None = None,
+        created_at_gte: dt.datetime | None = None,
+        created_at_lte: dt.datetime | None = None,
+        include_total: bool = False,
+    ) -> AuditEventPageType:
+        """Cursor-paginated audit slice with date bounds (#433).
+
+        Cursor encoding mirrors ``astrolift_events_page`` so the UI can
+        reuse one paging helper. ``include_total`` returns the matching
+        row count alongside the page — operators want the count for
+        narrow filters but a full-range count is expensive, so the
+        caller opts in."""
+        page_size = max(1, min(limit, 500))
+        qs = AuditEvent.objects.order_by("-occurred_at", "-guid")
+        if action:
+            qs = qs.filter(action=action)
+        if decision:
+            qs = qs.filter(decision=decision.upper())
+        if actor_id:
+            qs = qs.filter(actor_id=actor_id)
+        if created_at_gte is not None:
+            qs = qs.filter(occurred_at__gte=created_at_gte)
+        if created_at_lte is not None:
+            qs = qs.filter(occurred_at__lte=created_at_lte)
+
+        total_count: int | None = None
+        if include_total:
+            total_count = qs.count()
+
+        if after:
+            decoded = _decode_event_cursor(after)
+            if decoded is not None:
+                from django.db.models import Q
+
+                cursor_at, cursor_guid = decoded
+                qs = qs.filter(
+                    Q(occurred_at__lt=cursor_at) | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
+                )
+
+        rows = list(qs[: page_size + 1])
+        items = rows[:page_size]
+        next_cursor = (
+            _encode_event_cursor(items[-1].occurred_at, str(items[-1].guid))
+            if len(rows) > page_size and items
+            else None
+        )
+        return AuditEventPageType(
+            items=[audit_to_type(a) for a in items],
+            next_cursor=next_cursor,
+            total_count=total_count,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ)
+    @tenant_scoped()
+    def astrolift_audit_retention(self, info: Info) -> AuditRetentionType:
+        """Org-visible retention policy. Sourced from the
+        ``AUDIT_RETENTION_DAYS`` Constance flag so operators can tune
+        the visible window at runtime. Always returns a value >= 1."""
+        from constance import config as constance_config
+
+        raw = getattr(constance_config, "AUDIT_RETENTION_DAYS", 90)
+        try:
+            days = int(raw)
+        except (TypeError, ValueError):
+            days = 90
+        return AuditRetentionType(days=max(1, days))
 
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ)
