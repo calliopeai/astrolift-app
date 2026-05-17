@@ -295,6 +295,34 @@ def test_dispatch_skips_soft_deleted(cron_app_stack, settings):
 
 
 @pytest.mark.django_db
+def test_dispatch_skips_webhook_paused_app(cron_app_stack, settings):
+    """The cron tick fires ``scheduled``-kind deploys, which the
+    app-global ``webhook_deploys_paused`` gate (#399) blocks. Pausing
+    the app must therefore stop scheduled dispatch from minting
+    Deployment rows."""
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_workflows.activities.cron_deploy import (
+        _dispatch_cron_deploys_sync,
+    )
+
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    app = cron_app_stack["app"]
+    app.webhook_deploys_paused = True
+    app.save(update_fields=["webhook_deploys_paused", "updated_at", "version"])
+
+    from astrolift_workflows.client import WorkflowHandle
+
+    def _stub_start(*a, workflow_id, task_queue=None, **kw):
+        return WorkflowHandle(workflow_id=workflow_id, run_id="", enqueued=False)
+
+    with patch("astrolift_workflows.client.start_workflow", _stub_start):
+        summary = _dispatch_cron_deploys_sync()
+
+    assert summary.fired_count == 0
+    assert Deployment.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_dispatch_uses_last_running_image_tag(cron_app_stack, settings):
     """Cron deploys re-roll the last known good image, not 'latest'."""
     from astrolift_lifecycle.models import Deployment

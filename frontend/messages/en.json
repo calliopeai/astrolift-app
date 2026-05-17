@@ -949,6 +949,33 @@
         "resume": "Resume",
         "pause": "Pause"
       },
+      "webhookDeploys": {
+        "title": "Webhook deploys",
+        "description": "App-global pause for CI / push / scheduled deploys. Manual deploys from the UI or CLI keep working so you can still ship a fix.",
+        "paused": "Paused",
+        "live": "Live",
+        "pause": "Pause webhook deploys",
+        "resume": "Resume webhook deploys",
+        "scopeNoteLive": "Webhook-fired deploys (push, CI, scheduled) accept normally. Pausing stops all three; manual deploys remain available.",
+        "scopeNotePaused": "Webhook-fired deploys refused. Manual deploys, rollbacks, promotions, and teardown remain available.",
+        "pausedBy": "Paused by <who></who> · <when></when>",
+        "reasonPrefix": "Reason:",
+        "noReason": "No reason recorded.",
+        "unknownActor": "unknown",
+        "unknownTime": "just now",
+        "confirmTitle": "Pause webhook deploys for this app?",
+        "confirmDescription": "Future deploys from CI, push events, and cron will be refused until you resume. Manual deploys from the UI or CLI continue to work.",
+        "reasonLabel": "Reason (optional)",
+        "reasonPlaceholder": "e.g. CI is misfiring, holding until the upstream pipeline is fixed",
+        "reasonHelp": "Recorded on the audit log and shown on this page until the pause is lifted. Up to 512 characters.",
+        "confirmButton": "Pause webhook deploys",
+        "cancel": "Cancel",
+        "toastPaused": "Webhook deploys paused.",
+        "toastResumed": "Webhook deploys resumed.",
+        "toastPauseFailed": "Pause failed.",
+        "toastResumeFailed": "Resume failed.",
+        "toastNoResponse": "No response from backend."
+      },
       "links": {
         "deployStrategy": {
           "title": "Deploy strategy",

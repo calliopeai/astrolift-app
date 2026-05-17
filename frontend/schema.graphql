@@ -1348,6 +1348,10 @@ type AstroliftRegisteredApp {
   cronPaused: Boolean!
   deployBranch: String!
   previewScreenshotUrl: String!
+  webhookDeploysPaused: Boolean!
+  webhookDeploysPausedAt: DateTime
+  webhookDeploysPausedByEmail: String
+  webhookDeploysPauseReason: String!
   requiresApproval: Boolean!
   approverTeamId: GUID
   approverUserIds: [String!]!
@@ -2556,6 +2560,8 @@ type Mutation {
   resyncAstroliftManifestFromRepo(input: ResyncManifestFromRepoInput!): ResyncManifestPayloadMutationResult!
   assignAstroliftAppToProject(input: AssignAppToProjectInput!): AstroliftRegisteredAppMutationResult!
   updateAstroliftSecurityPolicy(input: UpdateSecurityPolicyInput!): AstroliftRegisteredAppMutationResult!
+  pauseAstroliftAppWebhookDeploys(input: PauseAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
+  resumeAstroliftAppWebhookDeploys(input: ResumeAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -2640,10 +2646,10 @@ type Mutation {
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
-  requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
+  requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -2722,6 +2728,11 @@ type OrganizationType {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+}
+
+input PauseAppWebhookDeploysInput {
+  appSlug: String!
+  reason: String = null
 }
 
 type PermissionComparison {
@@ -3051,6 +3062,10 @@ input RequestQuotaIncreaseInput {
 
 input RestartWorkloadInput {
   workloadId: GUID!
+}
+
+input ResumeAppWebhookDeploysInput {
+  appSlug: String!
 }
 
 input ResyncManifestFromRepoInput {

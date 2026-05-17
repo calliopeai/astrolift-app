@@ -66,6 +66,12 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
             trigger_mode=RegisteredApp.TriggerMode.CRON.value,
             deleted_at__isnull=True,
             is_active=True,
+            # App-global webhook-deploy pause (#399) blocks scheduled
+            # dispatch — ``scheduled`` is a webhook-shaped trigger
+            # kind. Filtering at the query is simpler than letting
+            # the ``select_matches`` policy decide; this layer already
+            # excludes soft-deleted + inactive rows.
+            webhook_deploys_paused=False,
         )
         .exclude(cron_expression="")
         .only(

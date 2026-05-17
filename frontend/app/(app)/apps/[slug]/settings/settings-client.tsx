@@ -58,6 +58,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   CANCEL_DEREGISTER,
   DEREGISTER_APP,
@@ -77,7 +78,11 @@ import type {
   AstroliftForceRedeployPreview,
 } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import { RESYNC_MANIFEST_FROM_REPO } from "@/graphql/registry/registry.mutations";
+import {
+  PAUSE_APP_WEBHOOK_DEPLOYS,
+  RESUME_APP_WEBHOOK_DEPLOYS,
+  RESYNC_MANIFEST_FROM_REPO,
+} from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { formatRelativeAge } from "@/lib/format";
@@ -214,6 +219,14 @@ export function SettingsClient({ slug }: { slug: string }) {
       <ControlsSection appSlug={a.slug} deployBranch={a.deployBranch} />
 
       <ResyncSourceSection appSlug={a.slug} lastResyncAt={a.lastResyncAt ?? null} />
+
+      <WebhookDeploysPauseSection
+        appSlug={a.slug}
+        paused={a.webhookDeploysPaused}
+        pausedAt={a.webhookDeploysPausedAt ?? null}
+        pausedByEmail={a.webhookDeploysPausedByEmail ?? null}
+        pauseReason={a.webhookDeploysPauseReason ?? ""}
+      />
 
       <IngressControlsSection appSlug={a.slug} />
 
@@ -508,6 +521,252 @@ function IngressRow({ env, appSlug }: { env: AstroliftAppEnvironment; appSlug: s
         </Button>
       </Can>
     </div>
+  );
+}
+
+// ─── webhook deploys pause (#399) ─────────────────────────────────────────────
+
+interface PauseWebhookDeploysResp {
+  pauseAstroliftAppWebhookDeploys: MutationResult<{
+    id: string;
+    slug: string;
+    webhookDeploysPaused: boolean;
+    webhookDeploysPausedAt: string | null;
+    webhookDeploysPausedByEmail: string | null;
+    webhookDeploysPauseReason: string;
+  }>;
+}
+interface ResumeWebhookDeploysResp {
+  resumeAstroliftAppWebhookDeploys: MutationResult<{
+    id: string;
+    slug: string;
+    webhookDeploysPaused: boolean;
+    webhookDeploysPausedAt: string | null;
+    webhookDeploysPausedByEmail: string | null;
+    webhookDeploysPauseReason: string;
+  }>;
+}
+
+/**
+ * App-global webhook-deploy pause toggle (#399).
+ *
+ * Independent of the per-environment `deploys_paused` (#378) and
+ * `ingress_paused` axes. Stops the deploy storm from CI / push /
+ * scheduled triggers across every environment of this app without
+ * paging through each env's controls and without taking ingress down.
+ * Manual deploys from the UI / CLI continue to flow — explicit
+ * on-call escape valve so a wedged CI can be stopped without locking
+ * the operator out of fixing the app.
+ *
+ * UX shape mirrors the IngressRow pattern:
+ * - Live pill (emerald play) ↔ Paused pill (amber pause).
+ * - Toggle on OFF→ON opens a confirm dialog with an optional reason
+ *   textarea — the reason lands on the audit log AND the row, surfaced
+ *   below as "Paused by X · 5m ago — reason: <reason>".
+ * - OFF→ON only — resuming is one click (the inverse always works).
+ * - Hidden behind `app.deploy` for read-only viewers.
+ */
+function WebhookDeploysPauseSection({
+  appSlug,
+  paused,
+  pausedAt,
+  pausedByEmail,
+  pauseReason,
+}: {
+  appSlug: string;
+  paused: boolean;
+  pausedAt: string | null;
+  pausedByEmail: string | null;
+  pauseReason: string;
+}) {
+  const t = useTranslations("apps.settings.webhookDeploys");
+  const fmt = useFormatters();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [reason, setReason] = React.useState("");
+
+  const refetch = [{ query: GET_APP, variables: { slug: appSlug } }];
+  const [pause, { loading: pausing }] = useMutation<PauseWebhookDeploysResp>(
+    PAUSE_APP_WEBHOOK_DEPLOYS,
+    { refetchQueries: refetch, awaitRefetchQueries: true }
+  );
+  const [resume, { loading: resuming }] = useMutation<ResumeWebhookDeploysResp>(
+    RESUME_APP_WEBHOOK_DEPLOYS,
+    { refetchQueries: refetch, awaitRefetchQueries: true }
+  );
+  const busy = pausing || resuming;
+
+  React.useEffect(() => {
+    if (!confirmOpen) setReason("");
+  }, [confirmOpen]);
+
+  async function handlePauseConfirm() {
+    try {
+      const { data } = await pause({
+        variables: { input: { appSlug, reason: reason.trim() || null } },
+      });
+      const env = data?.pauseAstroliftAppWebhookDeploys;
+      if (!env) {
+        toast.error(t("toastNoResponse"));
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? t("toastPauseFailed"));
+        return;
+      }
+      toast.success(t("toastPaused"));
+      setConfirmOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastPauseFailed"));
+    }
+  }
+
+  async function handleResume() {
+    try {
+      const { data } = await resume({ variables: { input: { appSlug } } });
+      const env = data?.resumeAstroliftAppWebhookDeploys;
+      if (!env) {
+        toast.error(t("toastNoResponse"));
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? t("toastResumeFailed"));
+        return;
+      }
+      toast.success(t("toastResumed"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastResumeFailed"));
+    }
+  }
+
+  return (
+    <section className="rounded-lg border p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">{t("title")}</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {paused ? (
+            <Badge
+              variant="outline"
+              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            >
+              <PauseIcon className="size-3" />
+              {t("paused")}
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+            >
+              <PlayIcon className="size-3" />
+              {t("live")}
+            </Badge>
+          )}
+          <Can permission="app.deploy">
+            {paused ? (
+              <Button size="sm" variant="default" onClick={handleResume} disabled={busy}>
+                {busy ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <PlayIcon className="size-3.5" />
+                )}
+                {t("resume")}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setConfirmOpen(true)}
+                disabled={busy}
+              >
+                {busy ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <PauseIcon className="size-3.5" />
+                )}
+                {t("pause")}
+              </Button>
+            )}
+          </Can>
+        </div>
+      </div>
+
+      {/* Audit / explainer footer — the paused branch surfaces the
+          actor + time + reason so the operator can spot a stale pause
+          at a glance; the live branch reminds operators what the
+          toggle's scope is so the next "why is CI not deploying?"
+          page lands here first. */}
+      {paused ? (
+        <div className="space-y-1.5 text-xs">
+          <p className="text-foreground">
+            {t.rich("pausedBy", {
+              who: () => (
+                <span className="text-foreground font-medium">
+                  {pausedByEmail ?? t("unknownActor")}
+                </span>
+              ),
+              when: () => (
+                <span className="text-muted-foreground">
+                  {pausedAt ? fmt.formatRelativeTime(pausedAt) : t("unknownTime")}
+                </span>
+              ),
+            })}
+          </p>
+          {pauseReason ? (
+            <p className="text-muted-foreground">
+              {t("reasonPrefix")}{" "}
+              <span className="text-foreground">{pauseReason}</span>
+            </p>
+          ) : (
+            <p className="text-muted-foreground italic">{t("noReason")}</p>
+          )}
+          <p className="text-muted-foreground text-[11px]">{t("scopeNotePaused")}</p>
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-[11px]">{t("scopeNoteLive")}</p>
+      )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <PauseIcon className="size-4 text-amber-600" />
+              {t("confirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t("confirmDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="webhook-pause-reason" className="text-xs">
+              {t("reasonLabel")}
+            </Label>
+            <Textarea
+              id="webhook-pause-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={t("reasonPlaceholder")}
+              rows={3}
+              maxLength={512}
+            />
+            <p className="text-muted-foreground text-[11px]">{t("reasonHelp")}</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pausing}>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handlePauseConfirm();
+              }}
+              disabled={pausing}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {pausing ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              {t("confirmButton")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
   );
 }
 
