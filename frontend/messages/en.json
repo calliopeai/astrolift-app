@@ -381,25 +381,63 @@
         "title": "{count, plural, one {# preview stale} other {# previews stale}}",
         "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
       },
-      "emptyTitle": "No preview environments yet",
-      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR.",
       "openRepo": "Open repo",
       "enablePreviews": "Enable previews",
+      "openInTab": "Open in new tab",
+      "openPr": "Open PR #{pr} on the source host",
+      "copyHostname": "Copy preview hostname",
+      "filterEmpty": "No previews match the current filter.",
+      "filters": {
+        "active": "Active",
+        "running": "Running",
+        "failed": "Failed",
+        "all": "All"
+      },
+      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
       "columns": {
-        "prBranch": "PR / branch",
+        "pr": "PR / branch",
         "hostname": "Hostname",
+        "ttl": "TTL",
+        "footprint": "Footprint",
         "lastDeploy": "Last deploy",
         "status": "Status",
-        "actions": "Actions"
+        "actions": "Actions",
+        "prBranch": "PR / branch"
       },
+      "ttlTooltip": "Auto-teardown on {date}",
+      "extend": {
+        "1d": "+1d",
+        "7d": "+7d"
+      },
+      "costPerDay": "${cost}/day",
+      "costUnavailable": "Cost unavailable",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
       "staleBadge": "stale",
       "tearDown": "Tear down",
       "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
       "confirmTitle": "Tear down preview for PR #{pr}?",
       "confirmFallback": "Tear down preview?",
       "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released."
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "empty": {
+        "title": "No preview environments yet",
+        "enabledHint": "Open a pull request and the preview spins up automatically — usually in under two minutes.",
+        "disabledHint": "Enable previews in app settings to spin one up automatically on each PR.",
+        "step1": "Enable previews in this app's configuration.",
+        "step2": "Open a pull request against the connected repository.",
+        "step3": "Watch the preview build land in about two minutes.",
+        "learnMore": "How previews work"
+      },
+      "toasts": {
+        "teardownEnqueued": "Teardown enqueued for PR #{pr}",
+        "teardownFailed": "Teardown failed",
+        "ttlExtended": "PR #{pr} preview extended by {days}d",
+        "extendFailed": "Could not extend TTL"
+      },
+      "emptyTitle": "No preview environments yet",
+      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     },
     "domains": {
       "title": "Custom domains",

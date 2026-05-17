@@ -237,6 +237,75 @@
         "copyError": "Couldn't copy — select the text and copy manually",
         "unavailable": "FQDN unavailable — the app row is missing an organization."
       }
+    },
+    "previews": {
+      "title": "{name} · Previews",
+      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "disabled": {
+        "title": "Previews are disabled for this app",
+        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+      },
+      "stale": {
+        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
+        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+      },
+      "openRepo": "Open repo",
+      "enablePreviews": "Enable previews",
+      "openInTab": "在新标签页打开",
+      "openPr": "在源主机打开 PR #{pr}",
+      "copyHostname": "复制预览主机名",
+      "filterEmpty": "没有匹配当前筛选条件的预览。",
+      "filters": {
+        "active": "活动",
+        "running": "运行中",
+        "failed": "失败",
+        "all": "全部"
+      },
+      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "columns": {
+        "pr": "PR / 分支",
+        "hostname": "主机名",
+        "ttl": "TTL",
+        "footprint": "占用",
+        "lastDeploy": "最后部署",
+        "status": "状态",
+        "actions": "操作",
+        "prBranch": "PR / 分支"
+      },
+      "ttlTooltip": "自动拆除时间:{date}",
+      "extend": {
+        "1d": "+1天",
+        "7d": "+7天"
+      },
+      "costPerDay": "${cost}/天",
+      "costUnavailable": "无法获取费用",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
+      "staleBadge": "stale",
+      "tearDown": "拆除",
+      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
+      "confirmTitle": "Tear down preview for PR #{pr}?",
+      "confirmFallback": "Tear down preview?",
+      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "empty": {
+        "title": "暂无预览环境",
+        "enabledHint": "打开 PR,预览会自动构建 — 通常不到两分钟。",
+        "disabledHint": "在应用设置中启用预览,每个 PR 都会自动创建一个。",
+        "step1": "在此应用的配置中启用预览。",
+        "step2": "在已连接的仓库中打开 PR。",
+        "step3": "观察预览大约在两分钟内构建完成。",
+        "learnMore": "预览的工作原理"
+      },
+      "toasts": {
+        "teardownEnqueued": "已将 PR #{pr} 的拆除加入队列",
+        "teardownFailed": "拆除失败",
+        "ttlExtended": "PR #{pr} 预览已延长 {days} 天",
+        "extendFailed": "无法延长 TTL"
+      },
+      "emptyTitle": "No preview environments yet",
+      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
     }
   },
   "settingsIndex": {
