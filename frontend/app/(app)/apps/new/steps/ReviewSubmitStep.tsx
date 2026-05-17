@@ -10,6 +10,7 @@ import {
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,12 @@ const TRIGGER_LABELS: Record<string, string> = {
   cron: "Cron schedule",
   manual: "Manual only",
   external_ci: "External CI",
+};
+
+const DEPLOY_TIMING_LABELS: Record<string, string> = {
+  now: "Deploy now",
+  later: "Configure, deploy later",
+  skip: "Skip — configure after onboarding",
 };
 
 // Connection kinds that hold a usable write-token. OAuth-app config
@@ -116,30 +123,48 @@ export function ReviewSubmitStep({
           stepIdx={4}
           title={steps[3].label}
           onJump={onJumpToStep}
-          rows={[
-            {
-              label: "Trigger",
-              value: TRIGGER_LABELS[state.triggerMode] ?? state.triggerMode,
-            },
-            {
-              label: "Deploy branch",
-              value: state.deployBranch,
-              mono: true,
-            },
-            ...(state.triggerMode === "cron"
+          rows={
+            state.deployTiming === "skip"
               ? [
                   {
-                    label: "Cron",
-                    value: state.cronExpression,
-                    mono: true,
+                    label: "Deploy timing",
+                    value: DEPLOY_TIMING_LABELS[state.deployTiming],
+                  },
+                  {
+                    label: "Trigger",
+                    value: "Manual (configure later)",
                   },
                 ]
-              : []),
-            {
-              label: "Approval gate",
-              value: state.requiresApproval ? "Required" : "Not required",
-            },
-          ]}
+              : [
+                  {
+                    label: "Deploy timing",
+                    value:
+                      DEPLOY_TIMING_LABELS[state.deployTiming] ?? state.deployTiming,
+                  },
+                  {
+                    label: "Trigger",
+                    value: TRIGGER_LABELS[state.triggerMode] ?? state.triggerMode,
+                  },
+                  {
+                    label: "Deploy branch",
+                    value: state.deployBranch,
+                    mono: true,
+                  },
+                  ...(state.triggerMode === "cron"
+                    ? [
+                        {
+                          label: "Cron",
+                          value: state.cronExpression,
+                          mono: true,
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Approval gate",
+                    value: state.requiresApproval ? "Required" : "Not required",
+                  },
+                ]
+          }
         />
       </section>
 
@@ -282,14 +307,17 @@ function SummaryCard({
           <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             {title}
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => onJump(stepIdx)}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+            className="text-muted-foreground hover:text-foreground -mr-2 -mt-1 h-7 gap-1 px-2 text-xs"
+            aria-label={`Edit ${title}`}
           >
             <EditIcon className="size-3" />
             Edit
-          </button>
+          </Button>
         </div>
         <dl className="grid gap-1">
           {rows.map((r) => (

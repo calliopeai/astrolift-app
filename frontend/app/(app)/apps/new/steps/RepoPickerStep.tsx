@@ -1,12 +1,27 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { GitBranchIcon, LinkIcon, LockIcon, ServerIcon, UnlockIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CogIcon,
+  GitBranchIcon,
+  LinkIcon,
+  LockIcon,
+  PlugIcon,
+  RocketIcon,
+  ServerIcon,
+  UnlockIcon,
+} from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Combobox,
   ComboboxContent,
@@ -25,7 +40,10 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CLUSTER_COUNT } from "@/graphql/clusters/clusters.queries";
+import { LIST_APPS } from "@/graphql/registry/registry.queries";
+import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { LIST_AVAILABLE_REPOS, LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
+import { cn } from "@/lib/utils";
 import type {
   AstroliftRemoteRepoList,
   AstroliftSourceConnection,
@@ -45,6 +63,10 @@ interface ReposResp {
 
 interface ClusterCountResp {
   astroliftClusterCount: number;
+}
+
+interface AppsResp {
+  astroliftApps: AstroliftRegisteredApp[];
 }
 
 const KIND_TO_SOURCE_KIND: Record<ScmConnectionKind, SourceKind> = {
@@ -93,6 +115,23 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
   const clusterCount = useQuery<ClusterCountResp>(CLUSTER_COUNT, {
     fetchPolicy: "cache-and-network",
   });
+
+  // Existing apps — used to surface a "monorepo" badge on repo rows
+  // that already host a registered app at a different manifest path.
+  // Backend currently has no per-repo flag (#409 follow-on); we derive
+  // it client-side off the LIST_APPS payload.
+  const existingApps = useQuery<AppsResp>(LIST_APPS, {
+    fetchPolicy: "cache-first",
+  });
+  const repoToAppCount = React.useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of existingApps.data?.astroliftApps ?? []) {
+      if (a.deletedAt) continue;
+      if (!a.sourceRepo) continue;
+      map.set(a.sourceRepo, (map.get(a.sourceRepo) ?? 0) + 1);
+    }
+    return map;
+  }, [existingApps.data]);
   const hasCluster = (clusterCount.data?.astroliftClusterCount ?? 0) > 0;
   const clusterCountReady = clusterCount.data !== undefined;
 
@@ -159,7 +198,9 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
       defaultBranch: branch,
       deployBranch: branch,
       // Seed name/slug only if the operator hasn't typed anything yet.
-      name: s.name || repo.name,
+      // Title-case the repo name for the human-readable label so it
+      // doesn't ship to the UI as `api-gateway` or `api_gateway`.
+      name: s.name || titleCased(repo.name),
       slug: s.slugTouched ? s.slug : kebab(repo.name),
       manifestFromRepo: false, // step 2 will refetch
       manifestErrors: [],
@@ -218,10 +259,29 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
     );
   }
 
+  const pickedConnection = usable.find((c) => c.id === state.connectionId);
+
   return (
     <div className="flex flex-col gap-5">
+      <IntroCard />
+
       <div className="space-y-2">
-        <Label htmlFor="connection">Source connection</Label>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="connection">Source connection</Label>
+            {pickedConnection && (
+              <Badge variant="outline" className="text-[10px] font-normal">
+                {connectionKindLabel(pickedConnection.kind as ScmConnectionKind)}
+              </Badge>
+            )}
+          </div>
+          <Link
+            href="/settings/source-providers"
+            className="text-primary text-xs underline-offset-4 hover:underline"
+          >
+            Missing a host? Connect another source →
+          </Link>
+        </div>
         <Select
           value={state.connectionId}
           onValueChange={(v) => {
@@ -255,16 +315,6 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-muted-foreground text-xs">
-          Missing a host?{" "}
-          <Link
-            href="/settings/source-providers"
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Connect another source
-          </Link>
-          .
-        </p>
       </div>
 
       {state.connectionId && (
@@ -320,10 +370,24 @@ export function RepoPickerStep({ state, setState, setValid }: Props) {
                         isArchived: boolean;
                         pushedAt: string | null;
                       };
+                      const existingCount = repoToAppCount.get(r.fullName) ?? 0;
                       return (
                         <ComboboxItem key={r.fullName} value={r}>
                           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                            <span className="truncate font-mono text-xs">{r.fullName}</span>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-mono text-xs">{r.fullName}</span>
+                              {existingCount > 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="shrink-0 gap-1 px-1 py-0 text-[10px]"
+                                  title={`This repo already hosts ${existingCount} registered app${existingCount === 1 ? "" : "s"} (different manifest path).`}
+                                >
+                                  {existingCount === 1
+                                    ? "1 app already registered"
+                                    : `${existingCount} apps already registered`}
+                                </Badge>
+                              )}
+                            </div>
                             <div className="text-muted-foreground flex items-center gap-2 text-[10px]">
                               <VisibilityBadge visibility={r.visibility} />
                               {r.defaultBranch && (
@@ -427,4 +491,87 @@ function kebab(s: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
+}
+
+function titleCased(s: string): string {
+  return s
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/**
+ * Collapsible orientation card shown above the first step body. Three
+ * icon tiles surface the wizard's structure before the operator starts
+ * filling in fields — a friendlier landing than "pick a connection"
+ * cold.
+ */
+function IntroCard() {
+  const [open, setOpen] = React.useState(true);
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="bg-muted/30 rounded-md border"
+    >
+      <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left transition-colors">
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">How registration works</span>
+          <span className="text-muted-foreground text-xs">
+            Three quick steps: connect a Git source, configure the manifest and app
+            details, then deploy.
+          </span>
+        </div>
+        <ChevronDownIcon
+          className={cn(
+            "text-muted-foreground size-4 shrink-0 transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="grid gap-3 px-4 pb-4 md:grid-cols-3">
+          <IntroTile
+            icon={PlugIcon}
+            title="Connect"
+            description="Pick a source connection and the repo that holds your app's code."
+          />
+          <IntroTile
+            icon={CogIcon}
+            title="Configure"
+            description="We load or scaffold an astrolift.toml manifest, then collect the app name, slug, and project."
+          />
+          <IntroTile
+            icon={RocketIcon}
+            title="Deploy"
+            description="Choose a trigger (auto on push, cron, or manual) and Astrolift onboards the app."
+          />
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function IntroTile({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof PlugIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="bg-background flex flex-col gap-2 rounded-md border p-3">
+      <div className="bg-primary/10 text-primary flex size-7 items-center justify-center rounded-md">
+        <Icon className="size-4" />
+      </div>
+      <div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{description}</p>
+      </div>
+    </div>
+  );
 }

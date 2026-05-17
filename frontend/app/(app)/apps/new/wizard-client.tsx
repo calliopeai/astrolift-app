@@ -57,6 +57,15 @@ function ciWorkflowPathForSourceKind(sourceKind: SourceKind): string {
 // the union without reaching for the full registry type module.
 export type WizardTriggerMode = TriggerMode;
 
+// Conversion-flow signal for *when* the operator wants to deploy
+// after registration. "now" runs the trigger normally; "later"
+// registers but keeps approval/trigger configuration in place;
+// "skip" registers the app and hides downstream deploy config so a
+// first-time operator can finish onboarding without picking a
+// trigger mode. Pure FE concern — the backend mutation is unchanged;
+// "skip" maps to `triggerMode: manual` + `triggerFirstDeploy: false`.
+export type DeployTiming = "now" | "later" | "skip";
+
 export interface WizardState {
   step: StepNumber;
 
@@ -89,6 +98,7 @@ export interface WizardState {
   projectId: string;
 
   // Step 4
+  deployTiming: DeployTiming;
   triggerMode: WizardTriggerMode;
   deployBranch: string;
   cronExpression: string;
@@ -121,6 +131,7 @@ export function initialWizardState(): WizardState {
     slugTouched: false,
     description: "",
     projectId: "",
+    deployTiming: "now",
     triggerMode: "auto_on_push",
     deployBranch: "main",
     cronExpression: "0 * * * *",
@@ -296,9 +307,14 @@ export function WizardClient() {
             manifestRaw: state.manifestRaw.trim() || null,
             defaultBranch: state.defaultBranch.trim() || "main",
             deployBranch: state.deployBranch.trim() || "main",
-            triggerMode: state.triggerMode,
+            // "skip" timing forces manual trigger so the app registers
+            // cleanly without committing to a deploy strategy yet —
+            // operator can configure it from the app detail page.
+            triggerMode: state.deployTiming === "skip" ? "manual" : state.triggerMode,
             cronExpression:
-              state.triggerMode === "cron" ? state.cronExpression.trim() : null,
+              state.deployTiming !== "skip" && state.triggerMode === "cron"
+                ? state.cronExpression.trim()
+                : null,
           },
         },
       });

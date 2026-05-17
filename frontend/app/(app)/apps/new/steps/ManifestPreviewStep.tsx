@@ -10,6 +10,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,59 +88,73 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
     fetchPolicy: "network-only",
   });
 
-  const auto = React.useCallback(async () => {
-    if (!state.connectionId || !state.sourceRepo) return;
-    setFetchState("fetching");
-    setFetchError("");
-    const { data, error } = await fetchManifest({
-      variables: {
-        connectionId: state.connectionId,
-        repoFullName: state.sourceRepo,
-        path: state.manifestPath || "astrolift.toml",
-        ref: state.defaultBranch || "main",
-      },
-    });
-    if (error) {
-      setFetchState("error");
-      setFetchError(error.message);
-      return;
-    }
-    const f = data?.astroliftSourceFile;
-    if (!f) {
-      setFetchState("error");
-      setFetchError("no response from server");
-      return;
-    }
-    if (f.errorCode) {
-      setFetchState("error");
-      setFetchError(f.errorMessage ?? f.errorCode);
-      return;
-    }
-    if (f.content == null) {
-      // Not found — seed the editor with the template.
-      setFetchState("missing");
-      setEditing(true);
+  const auto = React.useCallback(
+    async (opts?: { manual?: boolean }) => {
+      if (!state.connectionId || !state.sourceRepo) return;
+      const manual = opts?.manual ?? false;
+      setFetchState("fetching");
+      setFetchError("");
+      const { data, error } = await fetchManifest({
+        variables: {
+          connectionId: state.connectionId,
+          repoFullName: state.sourceRepo,
+          path: state.manifestPath || "astrolift.toml",
+          ref: state.defaultBranch || "main",
+        },
+      });
+      if (error) {
+        setFetchState("error");
+        setFetchError(error.message);
+        if (manual) toast.error(`Manifest refetch failed: ${error.message}`);
+        return;
+      }
+      const f = data?.astroliftSourceFile;
+      if (!f) {
+        setFetchState("error");
+        setFetchError("no response from server");
+        if (manual) toast.error("Manifest refetch failed: no response from server.");
+        return;
+      }
+      if (f.errorCode) {
+        setFetchState("error");
+        setFetchError(f.errorMessage ?? f.errorCode);
+        if (manual) {
+          toast.error(`Manifest refetch failed: ${f.errorMessage ?? f.errorCode}`);
+        }
+        return;
+      }
+      if (f.content == null) {
+        // Not found — seed the editor with the template.
+        setFetchState("missing");
+        setEditing(true);
+        setState((s) => ({
+          ...s,
+          manifestRaw:
+            s.manifestRaw || TEMPLATE.replace(/REPLACE-ME/g, s.slug || s.name || "my-app"),
+          manifestFromRepo: false,
+        }));
+        if (manual) {
+          toast.message("No manifest at that path — seeded a template you can edit.");
+        }
+        return;
+      }
+      setFetchState("found");
       setState((s) => ({
         ...s,
-        manifestRaw: s.manifestRaw || TEMPLATE.replace(/REPLACE-ME/g, s.slug || s.name || "my-app"),
-        manifestFromRepo: false,
+        manifestRaw: f.content ?? "",
+        manifestFromRepo: true,
       }));
-      return;
-    }
-    setFetchState("found");
-    setState((s) => ({
-      ...s,
-      manifestRaw: f.content ?? "",
-      manifestFromRepo: true,
-    }));
-  }, [
-    state.connectionId,
-    state.sourceRepo,
-    state.manifestPath,
-    state.defaultBranch,
-    fetchManifest,
-    setState,
-  ]);
+      if (manual) toast.success("Manifest re-fetched from repo.");
+    },
+    [
+      state.connectionId,
+      state.sourceRepo,
+      state.manifestPath,
+      state.defaultBranch,
+      fetchManifest,
+      setState,
+    ]
+  );
 
   // Auto-fetch when entering the step the first time (or whenever the
   // repo / manifest path / branch changes upstream).
@@ -178,7 +193,8 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
           />
           <p className="text-muted-foreground text-xs">
             Where <code className="font-mono">astrolift.toml</code> lives in the repo. Defaults to
-            the repository root.
+            the repository root. Monorepos can host multiple apps — point each registration at
+            its own path (e.g. <code className="font-mono">services/api/astrolift.toml</code>).
           </p>
         </div>
         <div className="space-y-2">
@@ -208,13 +224,14 @@ export function ManifestPreviewStep({ state, setState, setValid }: Props) {
               type="button"
               size="sm"
               variant="ghost"
-              onClick={() => void auto()}
+              onClick={() => void auto({ manual: true })}
               disabled={fetchState === "fetching"}
+              title="Test connection & re-fetch the manifest from the picked repo"
             >
               <RefreshCwIcon
                 className={cn("size-3.5", fetchState === "fetching" && "animate-spin")}
               />
-              {fetchState === "fetching" ? "Fetching…" : "Re-fetch"}
+              {fetchState === "fetching" ? "Fetching…" : "Test & re-fetch"}
             </Button>
           </div>
         </div>
