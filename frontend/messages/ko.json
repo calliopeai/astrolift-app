@@ -347,6 +347,47 @@
           "amount": "Amount"
         }
       }
+    },
+    "audit": {
+      "title": "감사 로그",
+      "description": "모든 권한 결정 및 모든 상태 변경 뮤테이션, 추가 전용. 데이터베이스 계층에서 테넌트 범위 지정.",
+      "retentionDescription": "모든 권한 결정 및 모든 상태 변경 뮤테이션, 추가 전용. 컴플라이언스 정책에 따라 {days}일 동안 보관.",
+      "loadMore": "더 보기",
+      "emptyTitle": "일치하는 감사 이벤트 없음",
+      "emptyDescription": "현재 필터와 일치하는 감사 이벤트가 없습니다. 날짜 범위를 넓히거나, 작업 필터를 지우거나, 새 활동을 기다리세요.",
+      "columns": {
+        "when": "시간",
+        "actor": "행위자",
+        "action": "작업",
+        "target": "대상",
+        "decision": "결정"
+      },
+      "filters": {
+        "actionLabel": "작업",
+        "actionPlaceholder": "예: team.create",
+        "decisionLabel": "결정",
+        "anyDecision": "모든 결정",
+        "fromLabel": "시작",
+        "toLabel": "종료",
+        "totalCount": "{count}건 일치"
+      },
+      "export": {
+        "button": "내보내기",
+        "formatCsv": "CSV로 내보내기",
+        "formatNdjson": "NDJSON으로 내보내기",
+        "toastStart": "감사 내보내기 준비 중…",
+        "toastReady": "내보내기 준비 완료 · {rows}행",
+        "toastDownload": "다운로드",
+        "toastFailure": "감사 내보내기 실패"
+      },
+      "sheet": {
+        "targetSection": "대상",
+        "beforeSection": "이전",
+        "afterSection": "이후",
+        "payloadSection": "뮤테이션 컨텍스트",
+        "redactedNote": "민감한 값(비밀, 토큰, 비밀번호)은 표시 전에 마스킹됩니다.",
+        "requestIdSection": "요청 ID"
+      }
     }
   }
 }

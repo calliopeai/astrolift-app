@@ -343,6 +343,47 @@
           "amount": "Amount"
         }
       }
+    },
+    "audit": {
+      "title": "Journal d'audit",
+      "description": "Chaque décision d'autorisation et chaque mutation d'état, append-only. Isolement par locataire au niveau de la base de données.",
+      "retentionDescription": "Chaque décision d'autorisation et chaque mutation d'état, append-only. Conservé pendant {days} jours selon la politique de conformité.",
+      "loadMore": "Charger plus",
+      "emptyTitle": "Aucun événement d'audit ne correspond",
+      "emptyDescription": "Aucun événement d'audit ne correspond aux filtres actuels. Élargissez la plage de dates, effacez le filtre d'action ou attendez une nouvelle activité.",
+      "columns": {
+        "when": "Quand",
+        "actor": "Acteur",
+        "action": "Action",
+        "target": "Cible",
+        "decision": "Décision"
+      },
+      "filters": {
+        "actionLabel": "Action",
+        "actionPlaceholder": "ex. team.create",
+        "decisionLabel": "Décision",
+        "anyDecision": "Toute décision",
+        "fromLabel": "De",
+        "toLabel": "À",
+        "totalCount": "{count} correspondance(s)"
+      },
+      "export": {
+        "button": "Exporter",
+        "formatCsv": "Exporter en CSV",
+        "formatNdjson": "Exporter en NDJSON",
+        "toastStart": "Préparation de l'export…",
+        "toastReady": "Export prêt · {rows} lignes",
+        "toastDownload": "Télécharger",
+        "toastFailure": "Échec de l'export"
+      },
+      "sheet": {
+        "targetSection": "Cible",
+        "beforeSection": "Avant",
+        "afterSection": "Après",
+        "payloadSection": "Contexte de mutation",
+        "redactedNote": "Les valeurs sensibles (secrets, tokens, mots de passe) sont masquées avant affichage.",
+        "requestIdSection": "ID de requête"
+      }
     }
   }
 }

@@ -4,6 +4,9 @@
 
 import type {
   AstroliftAuditEvent as GeneratedAuditEvent,
+  AstroliftAuditEventPage as GeneratedAuditEventPage,
+  AstroliftAuditExport as GeneratedAuditExport,
+  AstroliftAuditRetention as GeneratedAuditRetention,
   AstroliftEvent as GeneratedEvent,
   AstroliftNotification as GeneratedNotification,
   AstroliftWebhookDelivery as GeneratedWebhookDelivery,
@@ -30,6 +33,18 @@ export type AstroliftEvent = GeneratedEvent;
 export type AstroliftAuditEvent = Omit<GeneratedAuditEvent, "decision"> & {
   decision: AuditDecision;
 };
+
+export type AstroliftAuditEventPage = Omit<GeneratedAuditEventPage, "items"> & {
+  items: AstroliftAuditEvent[];
+};
+
+export type AuditExportFormat = "csv" | "ndjson";
+
+export type AstroliftAuditExport = Omit<GeneratedAuditExport, "format"> & {
+  format: AuditExportFormat;
+};
+
+export type AstroliftAuditRetention = GeneratedAuditRetention;
 
 export type WebhookFormat = "generic" | "slack" | "discord";
 

@@ -16,8 +16,22 @@ export const LIST_EVENTS = gql`
 `;
 
 export const LIST_AUDIT_EVENTS = gql`
-  query ListAuditEvents($limit: Int, $action: String, $decision: String) {
-    astroliftAuditEvents(limit: $limit, action: $action, decision: $decision) {
+  query ListAuditEvents(
+    $limit: Int
+    $action: String
+    $decision: String
+    $actorId: String
+    $createdAtGte: DateTime
+    $createdAtLte: DateTime
+  ) {
+    astroliftAuditEvents(
+      limit: $limit
+      action: $action
+      decision: $decision
+      actorId: $actorId
+      createdAtGte: $createdAtGte
+      createdAtLte: $createdAtLte
+    ) {
       id
       organizationId
       occurredAt
@@ -31,6 +45,60 @@ export const LIST_AUDIT_EVENTS = gql`
       targetSlug
       requestId
       data
+      before
+      after
+    }
+  }
+`;
+
+export const LIST_AUDIT_EVENTS_PAGE = gql`
+  query ListAuditEventsPage(
+    $limit: Int
+    $after: String
+    $action: String
+    $decision: String
+    $actorId: String
+    $createdAtGte: DateTime
+    $createdAtLte: DateTime
+    $includeTotal: Boolean
+  ) {
+    astroliftAuditEventsPage(
+      limit: $limit
+      after: $after
+      action: $action
+      decision: $decision
+      actorId: $actorId
+      createdAtGte: $createdAtGte
+      createdAtLte: $createdAtLte
+      includeTotal: $includeTotal
+    ) {
+      items {
+        id
+        organizationId
+        occurredAt
+        actorKind
+        actorId
+        actorDisplay
+        action
+        decision
+        targetKind
+        targetId
+        targetSlug
+        requestId
+        data
+        before
+        after
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+export const GET_AUDIT_RETENTION = gql`
+  query GetAuditRetention {
+    astroliftAuditRetention {
+      days
     }
   }
 `;

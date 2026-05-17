@@ -347,6 +347,47 @@
           "amount": "Amount"
         }
       }
+    },
+    "audit": {
+      "title": "監査ログ",
+      "description": "すべての権限決定とすべての状態変更ミューテーション、追記専用。データベース層でテナントスコープ。",
+      "retentionDescription": "すべての権限決定とすべての状態変更ミューテーション、追記専用。コンプライアンス ポリシーに従って{days}日間保持。",
+      "loadMore": "さらに読み込む",
+      "emptyTitle": "一致する監査イベントはありません",
+      "emptyDescription": "現在のフィルターに一致する監査イベントはありません。日付範囲を広げるか、アクション フィルターをクリアするか、新しいアクティビティを待ってください。",
+      "columns": {
+        "when": "いつ",
+        "actor": "アクター",
+        "action": "アクション",
+        "target": "ターゲット",
+        "decision": "判定"
+      },
+      "filters": {
+        "actionLabel": "アクション",
+        "actionPlaceholder": "例: team.create",
+        "decisionLabel": "判定",
+        "anyDecision": "すべての判定",
+        "fromLabel": "開始",
+        "toLabel": "終了",
+        "totalCount": "{count}件一致"
+      },
+      "export": {
+        "button": "エクスポート",
+        "formatCsv": "CSV としてエクスポート",
+        "formatNdjson": "NDJSON としてエクスポート",
+        "toastStart": "監査エクスポートを準備しています…",
+        "toastReady": "エクスポート準備完了 · {rows}行",
+        "toastDownload": "ダウンロード",
+        "toastFailure": "監査エクスポートに失敗しました"
+      },
+      "sheet": {
+        "targetSection": "ターゲット",
+        "beforeSection": "変更前",
+        "afterSection": "変更後",
+        "payloadSection": "ミューテーション コンテキスト",
+        "redactedNote": "機密情報 (シークレット、トークン、パスワード) は表示前にマスクされます。",
+        "requestIdSection": "リクエスト ID"
+      }
     }
   }
 }
