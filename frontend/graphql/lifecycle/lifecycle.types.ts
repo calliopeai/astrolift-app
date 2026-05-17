@@ -109,6 +109,15 @@ export type AstroliftScheduledJobRun = Omit<GeneratedScheduledJobRun, "status"> 
 
 export type AstroliftCommandRun = GeneratedCommandRun;
 
+/**
+ * CronJob concurrency policy (#427). The backend serialises this as
+ * a plain `String!` so the FE narrows it here for switch-exhaustive
+ * styling on the badge component. Anything else falls through to
+ * the generic "unknown" badge so a future enum addition doesn't
+ * crash the table.
+ */
+export type ConcurrencyPolicy = "forbid" | "queue" | "replace";
+
 // Observability — pod + log surface. The backend's status string is
 // a rolled-up surface label so it can contain k8s container-waiting
 // reasons (CrashLoopBackOff, ImagePullBackOff, …) in addition to

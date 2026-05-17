@@ -220,7 +220,57 @@ command = ["/bin/run"]
     w = Workload.objects.get(registered_app=app, slug="nightly")
     assert w.kind == "cronjob"
     assert w.schedule == "0 0 * * *"
+    # #427: default concurrency policy persists as "forbid".
+    assert w.concurrency_policy == "forbid"
     c = Container.objects.get(workload=w)
     assert c.command == ["/bin/run"]
     assert c.is_primary is True
     assert c.port == 0
+
+
+def test_persist_round_trips_concurrency_policy_override():
+    """A manifest that specifies ``concurrency_policy = "replace"``
+    lands on the Workload row so the jobs UI can render the badge
+    (#427)."""
+    app = _scaffold()
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "rolling"
+schedule = "*/5 * * * *"
+command = ["/bin/run"]
+concurrency_policy = "replace"
+"""
+    persist_manifest(app, _normalize(toml), raw_text=toml)
+    w = Workload.objects.get(registered_app=app, slug="rolling")
+    assert w.concurrency_policy == "replace"
+
+
+def test_persist_updates_concurrency_policy_on_existing_row():
+    """Edit-flow: a Workload row already exists; re-persisting the
+    same manifest with a flipped concurrency_policy updates the row
+    (rather than soft-deleting + recreating)."""
+    app = _scaffold()
+    before = """
+name = "hello"
+
+[[jobs]]
+name = "rolling"
+schedule = "*/5 * * * *"
+command = ["/bin/run"]
+"""
+    persist_manifest(app, _normalize(before), raw_text=before)
+    after = """
+name = "hello"
+
+[[jobs]]
+name = "rolling"
+schedule = "*/5 * * * *"
+command = ["/bin/run"]
+concurrency_policy = "queue"
+"""
+    result = persist_manifest(app, _normalize(after), raw_text=after)
+    assert result.workloads_updated == 1
+    w = Workload.objects.get(registered_app=app, slug="rolling")
+    assert w.concurrency_policy == "queue"

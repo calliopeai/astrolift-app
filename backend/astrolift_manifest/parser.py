@@ -46,6 +46,7 @@ class ManifestError(ValueError):
 
 _VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob"}
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
+_VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
 
 
 _TOML_POS_RE = __import__("re").compile(r"line\s+(\d+),\s+column\s+(\d+)")
@@ -109,6 +110,13 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     schedule = d.get("schedule") if kind == "cronjob" else None
     if kind == "cronjob" and not schedule:
         raise ManifestError("cronjob workload requires a 'schedule'", path=f"{path}.schedule")
+    concurrency_policy = str(d.get("concurrency_policy", "forbid")).lower()
+    if concurrency_policy not in _VALID_CONCURRENCY_POLICY:
+        raise ManifestError(
+            "concurrency_policy must be one of "
+            f"{sorted(_VALID_CONCURRENCY_POLICY)}, got {concurrency_policy!r}",
+            path=f"{path}.concurrency_policy",
+        )
 
     containers = tuple(
         _parse_container(item, f"{path}.containers[{i}]") for i, item in enumerate(d.get("containers", []))
@@ -119,6 +127,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         kind=kind,
         is_public=bool(d.get("is_public", False)),
         schedule=schedule,
+        concurrency_policy=concurrency_policy,
         replicas=int(d.get("replicas", 1)),
         cpu_request=d.get("cpu_request"),
         cpu_limit=d.get("cpu_limit"),
@@ -172,6 +181,13 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
     schedule = d.get("schedule")
     if not schedule:
         raise ManifestError("[[jobs]] entry requires a 'schedule'", path=f"{path}.schedule")
+    concurrency_policy = str(d.get("concurrency_policy", "forbid")).lower()
+    if concurrency_policy not in _VALID_CONCURRENCY_POLICY:
+        raise ManifestError(
+            "concurrency_policy must be one of "
+            f"{sorted(_VALID_CONCURRENCY_POLICY)}, got {concurrency_policy!r}",
+            path=f"{path}.concurrency_policy",
+        )
 
     env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
 
@@ -197,6 +213,7 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
         kind="cronjob",
         is_public=False,
         schedule=schedule,
+        concurrency_policy=concurrency_policy,
         replicas=1,
         cpu_request=d.get("cpu_request"),
         cpu_limit=d.get("cpu_limit"),

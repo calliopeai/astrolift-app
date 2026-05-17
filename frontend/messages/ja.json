@@ -542,5 +542,80 @@
         "requestIdSection": "リクエスト ID"
       }
     }
+  },
+  "jobs": {
+    "title": "ジョブ",
+    "descriptionGlobal": "全アプリにわたるスケジュールされたジョブ実行とアドホックコマンド実行。",
+    "descriptionForApp": "{app} のスケジュールされたジョブ実行とアドホックコマンド実行。",
+    "tabs": {
+      "scheduled": "スケジュール済み",
+      "commands": "コマンド"
+    },
+    "scheduled": {
+      "emptyTitle": "まだスケジュールされたジョブ実行はありません",
+      "emptyDescription": "Cronjob ワークロードは、スケジューラが最初の実行をトリガーするとここに表示されます。",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "アプリ / 環境 / ワークロード",
+        "k8sJob": "K8s ジョブ",
+        "status": "ステータス",
+        "duration": "実行時間",
+        "started": "開始"
+      }
+    },
+    "commands": {
+      "emptyTitle": "まだコマンド実行はありません",
+      "emptyDescription": "ワークロードに対するアドホックコマンドはここに表示されます。`astro app run …` でCLIから実行してください。",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "アプリ / ワークロード",
+        "command": "コマンド",
+        "status": "ステータス",
+        "invokedBy": "実行者",
+        "started": "開始"
+      }
+    },
+    "runStatus": {
+      "running": "実行中",
+      "inProgress": "進行中",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "superseded": "置換済み",
+      "unknown": "不明",
+      "exitCodeLabel": "終了コード {code}",
+      "exitCodeTooltip": "プロセスは終了コード {code} で終了しました"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "禁止",
+        "queue": "キュー",
+        "replace": "置換"
+      },
+      "tooltip": {
+        "forbid": "実行中の間、次のスケジュールをスキップします。",
+        "queue": "重複する実行をスタックできます — 各トリガーが独立して短い場合に選択してください。",
+        "replace": "実行中のジョブを停止し、新しいジョブを開始します。"
+      }
+    },
+    "cron": {
+      "invalid": "無効な cron 式",
+      "firesIn": "{relative}後に実行",
+      "now": "1分未満",
+      "minutes": "{count}分",
+      "hours": "{count}時間",
+      "days": "{count}日"
+    },
+    "workloadCard": {
+      "title": "Cronjob ワークロード",
+      "countLabel": "{count}件スケジュール済み",
+      "openLogs": "コンソールで開く"
+    },
+    "output": {
+      "emptyOutput": "まだ出力がキャプチャされていません。",
+      "openInConsole": "コンソールで開く",
+      "lines": "{count}行",
+      "truncated": "200行表示 — コンソールで全ログを確認できます。"
+    }
   }
 }

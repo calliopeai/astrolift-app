@@ -22,6 +22,19 @@ class Workload(NamedBaseCoreModel):
         JOB = "job"
         CRONJOB = "cronjob"
 
+    class ConcurrencyPolicy(models.TextChoices):
+        # Mirrors Kubernetes ``CronJob.spec.concurrencyPolicy``:
+        #   forbid  → ``Forbid``  (skip the next firing while one runs)
+        #   queue   → ``Allow``   (let overlapping runs stack)
+        #   replace → ``Replace`` (kill the in-flight run, start fresh)
+        # Only meaningful when ``kind == CRONJOB``; deployment / job /
+        # statefulset rows ignore the field. Default ``forbid`` matches
+        # the platform's manifest renderer pre-#427 behaviour so the
+        # migration is a no-op for every existing cronjob.
+        FORBID = "forbid"
+        QUEUE = "queue"
+        REPLACE = "replace"
+
     registered_app = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="workloads",
@@ -30,6 +43,11 @@ class Workload(NamedBaseCoreModel):
     kind = models.CharField(max_length=32, choices=Kind.choices, default=Kind.DEPLOYMENT)
     is_public = models.BooleanField(default=False)
     schedule = models.CharField(max_length=64, blank=True, default="")
+    concurrency_policy = models.CharField(
+        max_length=16,
+        choices=ConcurrencyPolicy.choices,
+        default=ConcurrencyPolicy.FORBID,
+    )
     notify_on_failure = models.BooleanField(default=True)
 
     replicas = models.PositiveIntegerField(default=1)

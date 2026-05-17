@@ -145,6 +145,7 @@ export const LIST_SCHEDULED_JOB_RUNS = gql`
       durationSeconds
       exitCode
       logExcerpt
+      output
       createdAt
     }
   }
@@ -162,6 +163,7 @@ export const LIST_COMMAND_RUNS = gql`
       endedAt
       exitCode
       logExcerpt
+      output
       createdAt
     }
   }

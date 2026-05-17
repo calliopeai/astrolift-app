@@ -412,6 +412,68 @@ def test_env_from_preserves_inline_env():
     assert container["envFrom"] == [{"secretRef": {"name": "app-shared"}}]
 
 
+def test_cronjob_concurrency_policy_defaults_to_forbid():
+    """A cronjob workload that omits ``concurrency_policy`` keeps the
+    pre-#427 hard-coded ``Forbid`` so existing manifests don't change
+    behaviour after the migration."""
+    w = WorkloadManifest(
+        name="nightly",
+        kind="cronjob",
+        schedule="0 0 * * *",
+        containers=(_container(name="job", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+    )
+    cj = next(r for r in out if r["kind"] == "CronJob")
+    assert cj["spec"]["concurrencyPolicy"] == "Forbid"
+
+
+def test_cronjob_concurrency_policy_maps_queue_to_k8s_allow():
+    """``queue`` is the platform name for K8s ``Allow`` — the K8s
+    enum is unintuitive ("Allow" means stack overlapping runs) so
+    the platform exposes the friendlier verb."""
+    w = WorkloadManifest(
+        name="nightly",
+        kind="cronjob",
+        schedule="0 0 * * *",
+        concurrency_policy="queue",
+        containers=(_container(name="job", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+    )
+    cj = next(r for r in out if r["kind"] == "CronJob")
+    assert cj["spec"]["concurrencyPolicy"] == "Allow"
+
+
+def test_cronjob_concurrency_policy_maps_replace_passthrough():
+    w = WorkloadManifest(
+        name="nightly",
+        kind="cronjob",
+        schedule="0 0 * * *",
+        concurrency_policy="replace",
+        containers=(_container(name="job", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+    )
+    cj = next(r for r in out if r["kind"] == "CronJob")
+    assert cj["spec"]["concurrencyPolicy"] == "Replace"
+
+
 def test_cronjob_without_schedule_raises():
     """Belt-and-suspenders: parser guarantees this can't happen via
     the public API, but the renderer's invariant still holds."""
