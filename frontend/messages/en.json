@@ -195,6 +195,37 @@
       "backToApps": "Back to apps",
       "cancel": "Cancel"
     },
+    "logViewer": {
+      "searchPlaceholder": "Search log buffer…  (press / to focus)",
+      "searchAriaLabel": "Search log buffer",
+      "clearSearch": "Clear search",
+      "regexToggle": "Toggle regex",
+      "regexInvalid": "Invalid regex",
+      "matchCount": "{current} of {total}",
+      "matchNone": "0 matches",
+      "prevMatch": "Previous match (Shift+Enter)",
+      "nextMatch": "Next match (Enter)",
+      "containerLabel": "Container",
+      "containerAll": "All containers",
+      "copyAll": "Copy",
+      "copied": "Copied {count, plural, one {# line} other {# lines}} to clipboard",
+      "copyEmpty": "Nothing to copy — the buffer is empty.",
+      "copyFailed": "Couldn't copy — clipboard access blocked.",
+      "download": "Download",
+      "downloadEmpty": "Nothing to download — the buffer is empty.",
+      "downloadStarted": "Downloading {filename}",
+      "paneAriaLabel": "Log buffer",
+      "levelGroupLabel": "Filter by log level",
+      "bufferFootnote": "Showing {shown} of {buffered} buffered lines (cap {limit}).",
+      "level": {
+        "all": "All",
+        "error": "Error",
+        "warn": "Warn",
+        "info": "Info",
+        "debug": "Debug",
+        "other": "Other"
+      }
+    },
     "detail": {
       "actions": {
         "open": "Open",
@@ -303,6 +334,12 @@
     "console": {
       "title": "{name} · Console",
       "description": "{slug} · interactive shell into the running workloads",
+      "logs": {
+        "title": "Live logs",
+        "selectPrompt": "Pick a pod to start tailing — sidecars surface under the container picker once a pod is selected.",
+        "podLabel": "Pod",
+        "podPlaceholder": "Pick a pod…"
+      },
       "terminal": {
         "title": "In-browser terminal",
         "comingSoon": "coming soon",
