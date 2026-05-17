@@ -286,6 +286,33 @@
     },
     "breadcrumb": {
       "root": "설정"
+    },
+    "security": {
+      "devices": {
+        "title": "모바일 기기",
+        "description": "QR 코드를 스캔하여 Astrolift 모바일 앱을 이 설치에 페어링합니다 — 휴대폰에서 URL을 입력할 필요가 없습니다.",
+        "buttonPair": "새 기기 페어링",
+        "dialogTitle": "모바일 기기 페어링",
+        "dialogDescription": "일회용 QR 코드를 생성한 다음 Astrolift 모바일 앱으로 스캔하여 이 설치를 등록합니다.",
+        "labelLabel": "기기 라벨 (선택사항)",
+        "labelPlaceholder": "Sarah의 iPhone",
+        "labelHelp": "나중에 기기를 구분할 수 있도록 발급된 자격 증명 옆에 표시됩니다.",
+        "buttonCancel": "취소",
+        "buttonGenerate": "QR 생성",
+        "buttonGenerating": "생성 중…",
+        "buttonRegenerate": "새 QR",
+        "buttonDone": "완료",
+        "buttonCopyPayload": "페이로드 복사",
+        "qrAriaLabel": "설치 등록 QR 코드",
+        "expiresIn": "{time} 후 만료",
+        "expiredLabel": "QR 만료됨 — 새로 생성하세요",
+        "sessionIdLabel": "세션 ID",
+        "verificationUriLabel": "확인 URL",
+        "verificationUriHelp": "QR이 스캔되지 않으면 이 URL을 기기에 입력하세요.",
+        "toastGenerateFailed": "QR을 생성할 수 없습니다 — 다시 시도하세요.",
+        "toastUriCopied": "확인 URL이 복사되었습니다",
+        "toastPayloadCopied": "페이로드가 복사되었습니다"
+      }
     }
   },
   "hooks": {

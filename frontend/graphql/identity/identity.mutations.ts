@@ -656,3 +656,29 @@ export const DEELEVATE_ADMIN_SESSION = gql`
     }
   }
 `;
+
+// #494 — mobile install enrollment QR. Operator clicks "Pair new
+// device" → this mutation mints a pre-approved device-flow session
+// and returns the QR (rendered server-side as SVG to avoid a
+// frontend QR-encoder dependency) + the payload mobile scanners
+// decode. Single-use; rate-limited per operator.
+export const GENERATE_INSTALL_ENROLLMENT_QR = gql`
+  mutation GenerateInstallEnrollmentQr($input: GenerateInstallEnrollmentQrInput!) {
+    generateInstallEnrollmentQr(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        qrPayload
+        qrSvg
+        verificationUri
+        sessionId
+        sessionGuid
+        expiresAt
+      }
+    }
+  }
+`;

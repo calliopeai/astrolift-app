@@ -286,6 +286,33 @@
     },
     "breadcrumb": {
       "root": "设置"
+    },
+    "security": {
+      "devices": {
+        "title": "移动设备",
+        "description": "通过扫描二维码将 Astrolift 移动应用与此安装配对——无需在手机上输入网址。",
+        "buttonPair": "配对新设备",
+        "dialogTitle": "配对移动设备",
+        "dialogDescription": "生成一次性二维码，然后使用 Astrolift 移动应用扫描以注册此安装。",
+        "labelLabel": "设备标签（可选）",
+        "labelPlaceholder": "Sarah 的 iPhone",
+        "labelHelp": "显示在已颁发凭据旁边，方便您稍后区分设备。",
+        "buttonCancel": "取消",
+        "buttonGenerate": "生成二维码",
+        "buttonGenerating": "正在生成…",
+        "buttonRegenerate": "新二维码",
+        "buttonDone": "完成",
+        "buttonCopyPayload": "复制载荷",
+        "qrAriaLabel": "安装注册二维码",
+        "expiresIn": "{time} 后过期",
+        "expiredLabel": "二维码已过期 — 生成新的",
+        "sessionIdLabel": "会话 ID",
+        "verificationUriLabel": "验证 URL",
+        "verificationUriHelp": "如果二维码无法扫描，请在设备上输入此 URL。",
+        "toastGenerateFailed": "无法生成二维码 — 请重试。",
+        "toastUriCopied": "验证 URL 已复制",
+        "toastPayloadCopied": "载荷已复制"
+      }
     }
   },
   "hooks": {

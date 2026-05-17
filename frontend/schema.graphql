@@ -344,6 +344,26 @@ enum AstroliftAppListStatusFilter {
   NEVER_DEPLOYED
 }
 
+type AstroliftAppLogExport {
+  id: GUID!
+  format: String!
+  status: String!
+  rowCount: Int!
+  byteCount: Int!
+  sha256: String!
+  truncated: Boolean!
+  downloadUrl: String!
+  expiresAt: DateTime!
+  createdAt: DateTime!
+  errorMessage: String!
+}
+
+type AstroliftAppLogExportMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppLogExport
+}
+
 type AstroliftAppLogLine {
   podName: String!
   container: String!
@@ -1042,6 +1062,21 @@ type AstroliftElevationStatus {
   secondsRemaining: Int!
   method: String
   requiredFor: [String!]!
+}
+
+type AstroliftEnrollmentQrPayload {
+  qrPayload: String!
+  qrSvg: String!
+  verificationUri: String!
+  sessionId: String!
+  sessionGuid: GUID!
+  expiresAt: DateTime!
+}
+
+type AstroliftEnrollmentQrPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftEnrollmentQrPayload
 }
 
 type AstroliftEvent {
@@ -2655,6 +2690,19 @@ input EnvironmentByIdInput {
   id: GUID!
 }
 
+input ExportAppLogsInput {
+  appSlug: String!
+  format: String!
+  environmentName: String = null
+  workloadSlug: String = null
+  podName: String = null
+  container: String = null
+  since: DateTime = null
+  until: DateTime = null
+  level: String = null
+  regex: String = null
+}
+
 input ExportAuditEventsInput {
   format: String!
   createdAtGte: DateTime = null
@@ -2720,6 +2768,11 @@ input FormDefinitionUpdateInput {
 
 """UUID v7 — the platform's external identifier."""
 scalar GUID
+
+input GenerateInstallEnrollmentQrInput {
+  label: String = null
+  ttlSeconds: Int = null
+}
 
 input GenerateSshDeployKeyInput {
   name: String!
@@ -3014,6 +3067,7 @@ type Mutation {
   removeOrganizationAllowlistDomain(input: RemoveOrganizationAllowlistDomainInput!): SoftdeletepayloadMutationResult!
   createApiToken(input: CreateApiTokenInput!): AstroliftApiTokenPlaintextMutationResult!
   revokeApiToken(input: RevokeApiTokenInput!): SoftdeletepayloadMutationResult!
+  generateInstallEnrollmentQr(input: GenerateInstallEnrollmentQrInput!): AstroliftEnrollmentQrPayloadMutationResult!
   createPolicy(input: CreatePolicyInput!): AstroliftPolicyMutationResult!
   updatePolicy(input: UpdatePolicyInput!): AstroliftPolicyMutationResult!
   softDeletePolicy(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
@@ -3063,6 +3117,7 @@ type Mutation {
   muteAlertRule(input: MuteAlertRuleInput!): AstroliftAlertRuleMutationResult!
   unmuteAlertRule(input: UnmuteAlertRuleInput!): AstroliftAlertRuleMutationResult!
   exportAuditEvents(input: ExportAuditEventsInput!): AstroliftAuditExportMutationResult!
+  exportAstroliftAppLogs(input: ExportAppLogsInput!): AstroliftAppLogExportMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
@@ -3438,7 +3493,6 @@ type Query {
   astroliftMyApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftMyAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
   astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
-  astroliftAppPermissions(appSlug: String!): [String!]!
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload

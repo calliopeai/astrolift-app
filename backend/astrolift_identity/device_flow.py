@@ -77,6 +77,32 @@ REFRESH_TOKEN_PREFIX = "alft_rt_"
 ``alft_at_`` (access) and lets accidental-leak detectors flag the
 right shape."""
 
+ENROLLMENT_TOKEN_PREFIX = "alft_enroll_"
+"""Plaintext prefix on the mobile-enrollment token (#494). The QR
+encodes a URL whose query string carries this value; mobile posts it
+to ``/api/cli/v1/auth/start`` to skip the browser-approval step.
+Single-use; rate-limited per operator."""
+
+ENROLLMENT_TTL_DEFAULT = dt.timedelta(minutes=5)
+"""Default enrollment lifetime — matches the issue spec
+(``ttlSeconds = 300``). Short on purpose: the operator is right
+there at the screen when they generate it."""
+
+ENROLLMENT_TTL_MAX = dt.timedelta(minutes=15)
+"""Hard cap regardless of the caller's requested TTL — a QR that
+lives longer than 15 min defeats the safety property of binding
+"the operator was here just now"."""
+
+ENROLLMENT_TTL_MIN = dt.timedelta(seconds=30)
+"""Floor so a misbehaving client can't request a near-zero TTL and
+get a row that is born expired."""
+
+ENROLLMENT_MAX_ACTIVE_PER_USER = 5
+"""Per-user cap on concurrent unconsumed-and-unexpired enrollments.
+Stops the "mash the button" failure mode (operator generates dozens
+of QRs trying to debug their phone) from filling the table or
+making forensic review noisy."""
+
 
 # ---- secret minting --------------------------------------------------
 
@@ -568,10 +594,335 @@ def build_login_url(*, session_id: str, request) -> str:
     return request.build_absolute_uri(path)
 
 
+# ---- mobile enrollment (#494) ---------------------------------------
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class IssuedEnrollment:
+    """Plaintext enrollment token + the row it's bound to.
+
+    The plaintext is shown to the operator exactly once (inside the
+    rendered QR); the row keeps only the hash + last4 for forensic
+    review of consumed enrollments.
+    """
+
+    plaintext: str
+    token_hash: str
+    last_4: str
+
+
+def mint_enrollment_token() -> IssuedEnrollment:
+    """Mint a fresh ``alft_enroll_…`` opaque secret.
+
+    Wider entropy budget than the refresh token (the QR is a
+    pre-authorized credential — there's no second factor between
+    "scan" and "issued").
+    """
+    body = secrets.token_urlsafe(48)
+    plaintext = ENROLLMENT_TOKEN_PREFIX + body
+    return IssuedEnrollment(
+        plaintext=plaintext,
+        token_hash=_hash(plaintext),
+        last_4=plaintext[-4:],
+    )
+
+
+def _clamp_enrollment_ttl(ttl_seconds: int | None) -> dt.timedelta:
+    """Clamp the caller's requested TTL to the safe range.
+
+    Always returns a value: ``None`` resolves to the default,
+    too-short rounds up to the floor, too-long rounds down to the
+    cap. We never raise — bad TTLs are a UI bug, not a security
+    boundary.
+    """
+    if ttl_seconds is None:
+        return ENROLLMENT_TTL_DEFAULT
+    try:
+        requested = dt.timedelta(seconds=int(ttl_seconds))
+    except (TypeError, ValueError):
+        return ENROLLMENT_TTL_DEFAULT
+    if requested < ENROLLMENT_TTL_MIN:
+        return ENROLLMENT_TTL_MIN
+    if requested > ENROLLMENT_TTL_MAX:
+        return ENROLLMENT_TTL_MAX
+    return requested
+
+
+def count_active_enrollments_for_user(user, *, now: dt.datetime | None = None) -> int:
+    """Return how many unconsumed-and-unexpired QR enrollments the
+    user currently owns.
+
+    "Active" means: ``origin=enrollment``, ``state=pre_approved``,
+    ``enrollment_consumed_at IS NULL``, ``enrollment_token_expires_at
+    > now``, ``deleted_at IS NULL``.
+    """
+    from astrolift_identity.models import DeviceFlowSession
+
+    now = now or timezone.now()
+    return DeviceFlowSession.objects.filter(
+        approved_user=user,
+        origin=DeviceFlowSession.ORIGIN_ENROLLMENT,
+        state=DeviceFlowSession.STATE_PRE_APPROVED,
+        enrollment_consumed_at__isnull=True,
+        enrollment_token_expires_at__gt=now,
+    ).count()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class EnrollmentCreated:
+    """Result of a successful ``create_enrollment`` call.
+
+    The mutation layer renders ``token_plaintext`` into the
+    ``qrPayload`` URL; ``session_guid`` lets the FE poll the listing
+    surfaces for the row that will be flipped to ``consumed`` when
+    the mobile redeems the QR.
+    """
+
+    session_id: str
+    session_guid: str
+    token_plaintext: str
+    expires_at: dt.datetime
+
+
+def create_enrollment(
+    *,
+    user,
+    organization=None,
+    label: str = "",
+    ttl_seconds: int | None = None,
+    now: dt.datetime | None = None,
+) -> EnrollmentCreated | str:
+    """Mint a pre-approved enrollment row + plaintext QR token.
+
+    Returns :class:`EnrollmentCreated` on success or a string error
+    code on rejection:
+
+    * ``"rate_limited"`` — operator is at the active-enrollment cap
+
+    The caller is responsible for the actor + permission check; this
+    function trusts ``user`` as the operator-on-the-wire.
+    """
+    from astrolift_identity.models import DeviceFlowSession
+
+    now = now or timezone.now()
+    if user is None:
+        return "no_actor"
+    # Issued tokens are org-scoped (ApiToken.organization is NOT NULL),
+    # so an enrollment without an org would mint un-issuable
+    # credentials downstream. Reject up front so the operator gets a
+    # crisp error instead of an opaque consume-time failure on the
+    # mobile side.
+    if organization is None:
+        return "no_organization"
+    if count_active_enrollments_for_user(user, now=now) >= ENROLLMENT_MAX_ACTIVE_PER_USER:
+        return "rate_limited"
+
+    ttl = _clamp_enrollment_ttl(ttl_seconds)
+    session_id = _mint_session_guid()
+    minted = mint_enrollment_token()
+    # ``state=pre_approved`` + ``origin=enrollment`` is the marker the
+    # mobile-redeem path looks for. ``client_kind=mobile`` is the
+    # forensic field that pairs with the QR's wire shape.
+    label_clean = normalize_client_label(label, fallback="mobile")
+    row = DeviceFlowSession.objects.create(
+        session_guid=session_id,
+        client_label=label_clean,
+        client_kind="mobile",
+        state=DeviceFlowSession.STATE_PRE_APPROVED,
+        origin=DeviceFlowSession.ORIGIN_ENROLLMENT,
+        expires_at=now + ttl,
+        approved_user=user,
+        organization=organization,
+        approved_at=now,
+        enrollment_token_hash=minted.token_hash,
+        enrollment_token_last_4=minted.last_4,
+        enrollment_token_expires_at=now + ttl,
+        enrollment_label=label_clean,
+    )
+    return EnrollmentCreated(
+        session_id=session_id,
+        session_guid=str(row.guid),
+        token_plaintext=minted.plaintext,
+        expires_at=row.enrollment_token_expires_at,
+    )
+
+
+def _consume_enrollment_locked(
+    session,
+    *,
+    client_label: str,
+    client_kind: str,
+    user_agent: str,
+    client_ip: str | None,
+    now: dt.datetime,
+) -> IssuedCredentials:
+    """Mint credentials for a redeemed enrollment.
+
+    Caller MUST hold a row lock (the view does this via
+    ``select_for_update``). Mirrors :func:`_consume_session_locked`
+    but transitions ``pre_approved`` → ``consumed`` and stamps the
+    enrollment-side terminal fields so a second redeem-attempt
+    sees a burned row.
+    """
+    from astrolift_identity.models import ApiToken
+
+    minted_access = mint_api_token()
+    minted_refresh = mint_refresh_token()
+    access_expires = now + ACCESS_TOKEN_TTL
+    refresh_expires = now + REFRESH_TOKEN_TTL
+
+    api_token_row = ApiToken.objects.create(
+        user=session.approved_user,
+        organization=session.organization,
+        name=client_label or session.enrollment_label or session.client_label or "mobile",
+        token_hash=minted_access.token_hash,
+        token_last_4=minted_access.last4,
+        scopes=list(DEFAULT_SCOPES),
+        expires_at=access_expires,
+    )
+
+    # Capture the mobile-side metadata onto the row at consume time —
+    # the QR-generation row only knew "an iPhone might pick this up";
+    # the actual UA / IP comes from the /start request.
+    session.client_label = client_label or session.enrollment_label or session.client_label
+    session.client_kind = normalize_client_kind(client_kind or "mobile")
+    session.user_agent = (user_agent or "")[:512]
+    session.client_ip = client_ip
+    session.api_token = api_token_row
+    session.state = session.STATE_CONSUMED
+    session.consumed_at = now
+    session.enrollment_consumed_at = now
+    # Burn the enrollment hash so a replay can't re-redeem.
+    session.enrollment_token_hash = ""
+    session.refresh_token_hash = minted_refresh.token_hash
+    session.refresh_token_last_4 = minted_refresh.last_4
+    session.refresh_token_expires_at = refresh_expires
+    session.access_token_expires_at = access_expires
+    session.save(
+        update_fields=[
+            "client_label",
+            "client_kind",
+            "user_agent",
+            "client_ip",
+            "api_token",
+            "state",
+            "consumed_at",
+            "enrollment_consumed_at",
+            "enrollment_token_hash",
+            "refresh_token_hash",
+            "refresh_token_last_4",
+            "refresh_token_expires_at",
+            "access_token_expires_at",
+            "updated_at",
+            "version",
+        ]
+    )
+
+    return IssuedCredentials(
+        access_token=minted_access.plaintext,
+        refresh_token=minted_refresh.plaintext,
+        access_token_expires_at=access_expires,
+        refresh_token_expires_at=refresh_expires,
+    )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class EnrollmentResult:
+    """Result of an ``/auth/start`` call carrying an enrollment_token.
+
+    ``status`` mirrors the wire shape:
+
+    * ``"issued"`` — credentials returned in ``credentials``
+    * ``"unknown"`` — token had the wrong shape or no row matches
+      (covers both "never existed" and "already burned")
+    * ``"expired"`` — row matched but past its enrollment TTL
+    """
+
+    status: str
+    credentials: IssuedCredentials | None = None
+    session: object | None = None
+
+
+def consume_enrollment(
+    enrollment_plaintext: str,
+    *,
+    client_label: str = "",
+    client_kind: str = "mobile",
+    user_agent: str = "",
+    client_ip: str | None = None,
+    now: dt.datetime | None = None,
+) -> EnrollmentResult:
+    """Redeem a mobile-issued ``alft_enroll_…`` token for credentials.
+
+    Wire path called from ``POST /api/cli/v1/auth/start`` when the
+    request body includes ``enrollment_token``. On success the
+    response is identical in shape to the standard /complete success
+    payload — the mobile client doesn't poll, it gets credentials
+    immediately.
+    """
+    from astrolift_identity.models import DeviceFlowSession
+
+    now = now or timezone.now()
+    if not enrollment_plaintext or not isinstance(enrollment_plaintext, str):
+        return EnrollmentResult(status="unknown")
+    if not enrollment_plaintext.startswith(ENROLLMENT_TOKEN_PREFIX):
+        return EnrollmentResult(status="unknown")
+
+    digest = _hash(enrollment_plaintext)
+
+    with transaction.atomic():
+        row = DeviceFlowSession.all_objects.select_for_update().filter(enrollment_token_hash=digest).first()
+        if row is None:
+            # Hash miss → never minted, or already burned. Either way
+            # the mobile client should re-prompt the operator to
+            # generate a fresh QR.
+            return EnrollmentResult(status="unknown")
+        if row.deleted_at is not None:
+            return EnrollmentResult(status="expired")
+        if row.state != DeviceFlowSession.STATE_PRE_APPROVED:
+            # A consumed / denied / expired row carrying a non-empty
+            # hash would be a defensive anomaly — the consume path
+            # clears the hash. Treat as already-burned.
+            return EnrollmentResult(status="unknown")
+        if row.enrollment_token_expires_at is None or row.enrollment_token_expires_at <= now:
+            # Lazy expiry: mark the row terminal so the audit trail
+            # tells the operator "the QR ran out before mobile got
+            # to it" rather than leaving it pending forever.
+            row.state = DeviceFlowSession.STATE_EXPIRED
+            row.enrollment_token_hash = ""
+            row.save(
+                update_fields=[
+                    "state",
+                    "enrollment_token_hash",
+                    "updated_at",
+                    "version",
+                ]
+            )
+            return EnrollmentResult(status="expired")
+
+        creds = _consume_enrollment_locked(
+            row,
+            client_label=client_label,
+            client_kind=client_kind,
+            user_agent=user_agent,
+            client_ip=client_ip,
+            now=now,
+        )
+        return EnrollmentResult(status="issued", credentials=creds, session=row)
+
+
 __all__ = [
     "ACCESS_TOKEN_TTL",
     "CompletionResult",
+    "EnrollmentCreated",
+    "EnrollmentResult",
+    "ENROLLMENT_MAX_ACTIVE_PER_USER",
+    "ENROLLMENT_TOKEN_PREFIX",
+    "ENROLLMENT_TTL_DEFAULT",
+    "ENROLLMENT_TTL_MAX",
+    "ENROLLMENT_TTL_MIN",
     "IssuedCredentials",
+    "IssuedEnrollment",
     "MIN_POLL_INTERVAL",
     "POLL_INTERVAL_SECONDS",
     "REFRESH_TOKEN_PREFIX",
@@ -579,10 +930,14 @@ __all__ = [
     "SESSION_TTL",
     "approve_session",
     "build_login_url",
+    "consume_enrollment",
+    "count_active_enrollments_for_user",
+    "create_enrollment",
     "create_session",
     "deny_session",
     "lookup_session_for_complete",
     "mark_expired_if_needed",
+    "mint_enrollment_token",
     "mint_refresh_token",
     "poll_complete",
     "refresh_credentials",

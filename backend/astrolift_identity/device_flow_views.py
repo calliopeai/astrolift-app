@@ -116,16 +116,21 @@ def _resolve_default_org_for_user(user) -> Organization | None:
 @csrf_exempt
 @require_http_methods(["POST"])
 def device_flow_start(request: HttpRequest) -> JsonResponse:
-    """Mint a fresh ``DeviceFlowSession``.
+    """Mint a fresh ``DeviceFlowSession`` — or redeem a QR enrollment.
 
     Body (all optional)::
 
         {
           "client_label": "astro CLI on lmata-mbp",
-          "client_kind": "cli"  // or "mobile" / "ide" / "browser"
+          "client_kind": "cli",  // or "mobile" / "ide" / "browser"
+          "enrollment_token": "alft_enroll_..."  // #494 mobile QR
         }
 
-    Response::
+    When ``enrollment_token`` is present and valid, the response is
+    the credential payload — no browser approval step. Otherwise the
+    behaviour matches the original CLI device-flow contract.
+
+    Standard response::
 
         {
           "session_id": "...",
@@ -133,10 +138,69 @@ def device_flow_start(request: HttpRequest) -> JsonResponse:
           "poll_interval_seconds": 2,
           "expires_in_seconds": 600
         }
+
+    Enrollment-redeem response (200)::
+
+        {
+          "access_token": "alft_at_...",
+          "refresh_token": "alft_rt_...",
+          "expires_at": "...",
+          "token_type": "Bearer"
+        }
     """
     body = _json_body(request)
     label = body.get("client_label") if isinstance(body.get("client_label"), str) else ""
     kind = body.get("client_kind") if isinstance(body.get("client_kind"), str) else ""
+    enrollment_token = body.get("enrollment_token")
+
+    # ---- #494: enrollment_token path takes precedence ----------------
+    if isinstance(enrollment_token, str) and enrollment_token:
+        result = device_flow.consume_enrollment(
+            enrollment_token,
+            client_label=label or "",
+            client_kind=kind or "mobile",
+            user_agent=user_agent_from_request(request),
+            client_ip=client_ip_from_request(request),
+        )
+        if result.status == "issued":
+            creds = result.credentials
+            assert creds is not None
+            # Audit: enrollment consumption. Actor is the operator who
+            # originally minted the QR (recorded on the row); the
+            # mobile client itself is unauthenticated at this point.
+            session = result.session
+            from core.mutations import AuditEntry, emit_audit
+
+            emit_audit(
+                AuditEntry(
+                    actor_user_id=getattr(session, "approved_user_id", None) if session else None,
+                    organization_id=getattr(session, "organization_id", None) if session else None,
+                    action="auth.enrollment.consumed",
+                    decision="ALLOW",
+                    target_kind="device_flow_session",
+                    target_id=str(getattr(session, "guid", "")) if session else None,
+                    duration_ms=0,
+                    permissions=(),
+                    extra={
+                        "client_label": label or "",
+                        "client_kind": kind or "mobile",
+                        "client_ip": client_ip_from_request(request),
+                    },
+                )
+            )
+            return JsonResponse(
+                {
+                    "access_token": creds.access_token,
+                    "refresh_token": creds.refresh_token,
+                    "expires_at": creds.access_token_expires_at.isoformat(),
+                    "token_type": "Bearer",
+                },
+                status=200,
+            )
+        if result.status == "expired":
+            return _error("enrollment token expired", status=410, code="expired_token")
+        # ``unknown`` (bad prefix, missing row, already burned)
+        return _error("invalid enrollment token", status=401, code="invalid_grant")
 
     row, session_id = device_flow.create_session(
         client_label=label or "",

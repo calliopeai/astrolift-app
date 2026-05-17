@@ -17,6 +17,7 @@ import type {
   AstroliftApiTokenPlaintext as GeneratedApiTokenPlaintext,
   AstroliftApproverUser as GeneratedApproverUser,
   AstroliftAppSummary as GeneratedAppSummary,
+  AstroliftEnrollmentQrPayload as GeneratedEnrollmentQrPayload,
   AstroliftHeartbeatSessionPayload as GeneratedHeartbeatSessionPayload,
   AstroliftIdentityProvider as GeneratedIdentityProvider,
   AstroliftInvitation as GeneratedInvitation,
@@ -163,6 +164,12 @@ export type AstroliftActiveSession = Omit<GeneratedActiveSession, "clientKind"> 
 
 export type AstroliftLogoutAllSessionsPayload = GeneratedLogoutAllSessionsPayload;
 
+// #494 — mobile install enrollment QR payload (returned by
+// ``generateInstallEnrollmentQr``). All scalars are non-null per
+// the backend ``EnrollmentQrPayloadType`` — including ``qrSvg``,
+// which is the server-rendered SVG markup the frontend embeds
+// directly.
+export type AstroliftEnrollmentQrPayload = GeneratedEnrollmentQrPayload;
 export type AstroliftRevokeAstroliftSessionPayload = GeneratedRevokeAstroliftSessionPayload;
 
 export type AstroliftHeartbeatSessionPayload = GeneratedHeartbeatSessionPayload;
