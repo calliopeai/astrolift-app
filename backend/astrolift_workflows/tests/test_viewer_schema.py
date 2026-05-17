@@ -92,7 +92,9 @@ def test_list_workflow_instances_passes_filters(permission_resolver, settings, m
     monkeypatch.setattr("astrolift_workflows.schema.queries.list_workflow_instances", _fake_list)
     q = TemporalWorkflowsQuery()
     with _tenant():
-        page = q.astrolift_workflow_instances(_info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10)
+        page = q.astrolift_workflow_instances(
+            _info(), workflow_type="DeployAppWorkflow", status="RUNNING", limit=10
+        )
     assert captured == {"workflow_type": "DeployAppWorkflow", "status": "RUNNING", "limit": 10}
     assert len(page.items) == 1
     assert page.items[0].workflow_id == "DeployAppWorkflow-x"
