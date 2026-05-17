@@ -120,6 +120,20 @@ EXEMPT: dict[str, str] = {
     "TemporalWorkflowsMutation.signal_workflow_instance": (
         "admin-only: Temporal signals span tenants; gated on AUDIT_LOG_READ + ADMIN_ELEVATE permissions"
     ),
+    # Forms (#453): conditional gate on a runtime row.
+    "FormsMutation.submit_form": (
+        "permission gate depends on FormDefinition.is_public, which has "
+        "to be loaded first — public forms accept submissions without "
+        "form.submit (anonymous / non-member submitters on a published "
+        "public form), private forms gate on form.submit. The gate "
+        "lives inline in the resolver body. @tenant_scoped is still "
+        "applied for the org filter on the form lookup."
+    ),
+    "FormsQuery.form_field_types": (
+        "public metadata: returns the static palette of widget kinds "
+        "the form builder UI offers. Knowing which renderers exist "
+        "leaks nothing about any tenant."
+    ),
 }
 
 

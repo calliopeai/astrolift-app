@@ -71,7 +71,7 @@ export default function NewFormPage() {
       router.push(`/forms/${data.slug}`);
     } else {
       for (const e of result?.createFormDefinition?.errors ?? []) {
-        toast.error(`${e.field}: ${e.messages.join(", ")}`);
+        toast.error(`${e.field ?? "form"}: ${e.message}`);
       }
     }
   };
