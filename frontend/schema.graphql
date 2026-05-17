@@ -162,8 +162,6 @@ type AstroliftApiToken {
   scopes: [String!]!
   expiresAt: DateTime
   lastUsedAt: DateTime
-  lastUsedIp: String
-  lastUsedAgent: String
   isRevoked: Boolean!
   createdAt: DateTime!
 }
@@ -429,15 +427,23 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
-type AstroliftCancelDeregisterPayload {
-  workflowId: String!
-  signalDelivered: Boolean!
+type AstroliftBulkDeploymentResultData {
+  results: [AstroliftBulkDeploymentResultItem!]!
+  succeededCount: Int!
+  failedCount: Int!
 }
 
-type AstroliftCancelDeregisterPayloadMutationResult {
+type AstroliftBulkDeploymentResultDataMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
-  data: AstroliftCancelDeregisterPayload
+  data: AstroliftBulkDeploymentResultData
+}
+
+type AstroliftBulkDeploymentResultItem {
+  deploymentId: GUID!
+  ok: Boolean!
+  errors: [MutationError!]!
+  deployment: AstroliftDeployment
 }
 
 type AstroliftCapabilityDeprovisionPayload {
@@ -554,6 +560,10 @@ type AstroliftCommandRun {
   endedAt: DateTime
   exitCode: Int
   logExcerpt: String!
+  """Last 200 lines of ``log_excerpt`` (#427). Mirrors the
+  ``ScheduledJobRun.output`` surface so the FE's shared row-expand
+  component works against both run kinds."""
+  output: String!
   createdAt: DateTime!
 }
 
@@ -677,6 +687,9 @@ type AstroliftDeployment {
   clusterRevision: String!
   approvalsRequired: Int!
   approvalsReceived: Int!
+  requiredApproverCount: Int!
+  approvedBy: [AstroliftDeploymentApprover!]!
+  awaitingApprovers: [AstroliftDeploymentApprover!]!
   startedAt: DateTime
   succeededAt: DateTime
   failedAt: DateTime
@@ -705,6 +718,14 @@ type AstroliftDeploymentApprovalHistoryEntry {
   actorDisplay: String!
   occurredAt: DateTime!
   reason: String!
+}
+
+type AstroliftDeploymentApprover {
+  userId: String!
+  displayName: String!
+  email: String!
+  approvedAt: DateTime
+  mailtoUrl: String!
 }
 
 type AstroliftDeploymentLifecycleEvent {
@@ -753,63 +774,6 @@ type AstroliftDeregisterAppPayloadMutationResult {
   data: AstroliftDeregisterAppPayload
 }
 
-type AstroliftDeregisterPreview {
-  appSlug: String!
-  appName: String!
-  k8sObjects: [AstroliftDeregisterPreviewK8sObject!]!
-  managedServices: [AstroliftDeregisterPreviewManagedService!]!
-  secretRefs: [AstroliftDeregisterPreviewSecretRef!]!
-  deployTokens: [AstroliftDeregisterPreviewDeployToken!]!
-  sourceWebhook: AstroliftDeregisterPreviewSourceWebhook
-  identityRoles: [AstroliftDeregisterPreviewIdentityRole!]!
-  registryRepoUri: String!
-  totalResourceCount: Int!
-}
-
-type AstroliftDeregisterPreviewDeployToken {
-  id: GUID!
-  name: String!
-  last4: String!
-  environmentName: String
-}
-
-type AstroliftDeregisterPreviewIdentityRole {
-  clusterSlug: String!
-  kind: String!
-  roleArnOrPrincipal: String!
-}
-
-type AstroliftDeregisterPreviewK8sObject {
-  clusterSlug: String!
-  namespace: String!
-  apiVersion: String!
-  kind: String!
-  name: String!
-}
-
-type AstroliftDeregisterPreviewManagedService {
-  id: GUID!
-  name: String!
-  kind: String!
-  variant: String!
-  environmentName: String!
-  status: String!
-}
-
-type AstroliftDeregisterPreviewSecretRef {
-  id: GUID!
-  bundleSlug: String!
-  environmentName: String!
-  clusterSlug: String
-  prefix: String!
-}
-
-type AstroliftDeregisterPreviewSourceWebhook {
-  installed: Boolean!
-  repo: String!
-  hookId: String!
-}
-
 type AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: GUID!
   disconnectedId: GUID
@@ -849,26 +813,6 @@ type AstroliftForceRedeployPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftForceRedeployPayload
-}
-
-type AstroliftForceRedeployPreview {
-  appSlug: String!
-  environmentName: String
-  inFlightDeployments: [AstroliftForceRedeployPreviewDeployment!]!
-}
-
-type AstroliftForceRedeployPreviewDeployment {
-  id: GUID!
-  environmentName: String!
-  workloadSlug: String
-  status: String!
-  imageTag: String!
-  startedAt: DateTime
-  createdAt: DateTime!
-  triggerKind: String!
-  triggeredByDisplay: String!
-  ciActorKind: String!
-  ciRunUrl: String!
 }
 
 type AstroliftIdentityProvider {
@@ -1366,6 +1310,11 @@ type AstroliftScheduledJobRun {
   durationSeconds: Int
   exitCode: Int
   logExcerpt: String!
+  """Last 200 lines of ``log_excerpt`` (#427). Powers the inline
+  row-expand surface on the jobs table so operators can confirm a
+  run worked without leaving the page. The full tail lives behind
+  the per-app logs surface; the UI footer flags truncation."""
+  output: String!
   createdAt: DateTime!
 }
 
@@ -1654,6 +1603,12 @@ type AstroliftWorkload {
   kind: String!
   isPublic: Boolean!
   schedule: String!
+  """CronJob concurrency policy (#427): ``forbid`` | ``queue`` |
+  ``replace``. Only meaningful when ``kind == "cronjob"``; always
+  present so the FE doesn't have to branch on null. Defaults to
+  ``forbid`` for non-cronjob rows so the badge component never
+  renders garbage."""
+  concurrencyPolicy: String!
   replicas: Int!
   cpuRequest: String!
   cpuLimit: String!
@@ -1749,9 +1704,19 @@ input BringClusterIntoManagementInputType {
   clusterId: GUID!
 }
 
+input BulkApproveDeploymentsInput {
+  deploymentIds: [GUID!]!
+  reason: String = null
+}
+
 input BulkImportAppSecretsInput {
   appSlug: String!
   dotenvText: String!
+}
+
+input BulkRejectDeploymentsInput {
+  deploymentIds: [GUID!]!
+  reason: String!
 }
 
 type Bulkimportpayload {
@@ -1764,11 +1729,6 @@ type BulkimportpayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Bulkimportpayload
-}
-
-input CancelDeregisterInput {
-  workflowId: String!
-  reason: String = null
 }
 
 input ConfigureProviderPluginInput {
@@ -2433,6 +2393,8 @@ type Mutation {
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rejectDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
+  bulkApproveDeployments(input: BulkApproveDeploymentsInput!): AstroliftBulkDeploymentResultDataMutationResult!
+  bulkRejectDeployments(input: BulkRejectDeploymentsInput!): AstroliftBulkDeploymentResultDataMutationResult!
   approveDeploymentByToken(input: ApproveByTokenInput!): AstroliftDeploymentMutationResult!
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
@@ -2464,7 +2426,6 @@ type Mutation {
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
   pushAstroliftCiWorkflowToRepo(input: PushCiWorkflowToRepoInput!): AstroliftPushCiWorkflowPayloadMutationResult!
   deregisterAstroliftApp(input: DeregisterAppInput!): AstroliftDeregisterAppPayloadMutationResult!
-  cancelAstroliftDeregister(input: CancelDeregisterInput!): AstroliftCancelDeregisterPayloadMutationResult!
   forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
   runAstroliftJobOnce(input: RunJobOnceInput!): AstroliftRunJobOncePayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -2762,8 +2723,6 @@ type Query {
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): [AstroliftAppDnsRecord!]!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): [AstroliftAppCertificate!]!
   astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBinding
-  previewAstroliftDeregister(appSlug: String!): AstroliftDeregisterPreview
-  previewAstroliftForceRedeploy(appSlug: String!, environmentName: String = null): AstroliftForceRedeployPreview
   astroliftClusters: [AstroliftTenantCluster!]!
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
@@ -2788,8 +2747,8 @@ type Query {
   astroliftSecretBundles: [AstroliftSecretBundle!]!
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
-  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null): [AstroliftAppGoldenSignal!]!
-  astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftStatusCodeBreakdown
+  astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
+  astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!

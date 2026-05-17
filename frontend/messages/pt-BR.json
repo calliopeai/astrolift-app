@@ -374,6 +374,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "Escopo das métricas",
+        "environment": "Ambiente",
+        "workload": "Workload",
+        "allWorkloads": "Todos os workloads",
+        "environmentPlaceholder": "Selecione um ambiente",
+        "workloadPlaceholder": "Selecione um workload"
+      },
+      "events": {
+        "warningCount": "{count, plural, =1 {1 aviso} other {# avisos}} na última hora",
+        "warningBadgeLabel": "Aviso",
+        "collapse": "Recolher",
+        "expand": "Expandir"
+      }
     }
   },
   "settingsIndex": {
@@ -525,6 +541,139 @@
         "redactedNote": "Valores sensíveis (segredos, tokens, senhas) são ocultados antes da exibição.",
         "requestIdSection": "ID da requisição"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} de {required} aprovações",
+        "remainingBadge": "Faltam {count}",
+        "metBadge": "Quórum atingido",
+        "approvedLabel": "Aprovado por",
+        "approvedEmpty": "Ainda sem aprovações.",
+        "awaitingLabel": "Aguardando",
+        "awaitingEmpty": "Sem aprovadores elegíveis — verifique a política do app."
+      }
+    },
+    "approvalsQueue": {
+      "title": "Fila de aprovações",
+      "description": "Todos os deploys aguardando aprovação. Selecione linhas para aprovar/rejeitar em lote dentro do mesmo ambiente.",
+      "empty": {
+        "title": "Nada pendente",
+        "description": "Quando um deploy precisar de aprovação, aparecerá aqui."
+      },
+      "selectAllLabel": "Selecionar todos",
+      "selectionStatus": "{selected} de {total} selecionados",
+      "readOnlyHint": "Você pode revisar, mas não aprovar.",
+      "approveLabel": "Aprovar",
+      "rejectLabel": "Rejeitar",
+      "footer": {
+        "selected": "{count, plural, =1 {1 deploy selecionado} other {# deploys selecionados}}",
+        "summary": "Em {envs}.",
+        "crossEnvWarning": "Operações em lote exigem o mesmo app/ambiente — políticas variam por ambiente.",
+        "approveButton": "Aprovar {count}",
+        "rejectButton": "Rejeitar {count}"
+      },
+      "confirmApprove": {
+        "title": "Aprovar {count} deploys?",
+        "description": "Libera {envs}.",
+        "confirm": "Aprovar todos"
+      },
+      "confirmReject": {
+        "title": "Rejeitar {count} deploys?",
+        "description": "Cada deploy em {envs} será marcado como falho.",
+        "reasonLabel": "Motivo da rejeição",
+        "reasonPlaceholder": "Por que este lote está sendo rejeitado?",
+        "reasonRequired": "Motivo obrigatório",
+        "confirm": "Rejeitar todos"
+      },
+      "toasts": {
+        "unexpected": "Ação em lote sem resposta.",
+        "allOk": "{label} com sucesso para {count} deploys.",
+        "allFailed": "{label} falhou para {count} deploys: {message}",
+        "partial": "{label}: {succeeded} com sucesso, {failed} falhos.",
+        "approveFailed": "Aprovação em lote falhou.",
+        "rejectFailed": "Rejeição em lote falhou."
+      },
+      "row": {
+        "selectRowLabel": "Selecionar {app} / {env}",
+        "approvalsCount": "{received}/{required} aprovações",
+        "received": "Recebido {rel}",
+        "review": "Revisar"
+      }
+    }
+  },
+  "jobs": {
+    "title": "Tarefas",
+    "descriptionGlobal": "Execuções de tarefas agendadas e comandos ad-hoc em todas as suas apps.",
+    "descriptionForApp": "Execuções de tarefas agendadas e comandos ad-hoc para {app}.",
+    "tabs": {
+      "scheduled": "Agendadas",
+      "commands": "Comandos"
+    },
+    "scheduled": {
+      "emptyTitle": "Ainda sem execuções de tarefas agendadas",
+      "emptyDescription": "Workloads cronjob aparecem aqui assim que o agendador disparar a primeira execução.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Status",
+        "duration": "Duração",
+        "started": "Iniciado"
+      }
+    },
+    "commands": {
+      "emptyTitle": "Ainda sem execuções de comando",
+      "emptyDescription": "Comandos ad-hoc invocados contra um workload aparecem aqui. Rode um pela CLI com `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Comando",
+        "status": "Status",
+        "invokedBy": "Invocado por",
+        "started": "Iniciado"
+      }
+    },
+    "runStatus": {
+      "running": "Em execução",
+      "inProgress": "Em andamento",
+      "succeeded": "Sucesso",
+      "failed": "Falhou",
+      "superseded": "Substituída",
+      "unknown": "Desconhecido",
+      "exitCodeLabel": "saída {code}",
+      "exitCodeTooltip": "Processo encerrou com código {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Proibir",
+        "queue": "Enfileirar",
+        "replace": "Substituir"
+      },
+      "tooltip": {
+        "forbid": "Pula o próximo disparo enquanto uma execução está em andamento.",
+        "queue": "Permite que execuções se acumulem — escolha quando cada disparo for independente e curto.",
+        "replace": "Interrompe a execução atual e inicia uma nova."
+      }
+    },
+    "cron": {
+      "invalid": "Expressão cron inválida",
+      "firesIn": "Dispara em {relative}",
+      "now": "menos de um minuto",
+      "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+      "hours": "{count, plural, one {# hora} other {# horas}}",
+      "days": "{count, plural, one {# dia} other {# dias}}"
+    },
+    "workloadCard": {
+      "title": "Workloads cronjob",
+      "countLabel": "{count, plural, one {# agendado} other {# agendados}}",
+      "openLogs": "Abrir no console"
+    },
+    "output": {
+      "emptyOutput": "Sem saída capturada ainda.",
+      "openInConsole": "Abrir no console",
+      "lines": "{count, plural, one {# linha} other {# linhas}}",
+      "truncated": "200 linhas exibidas — abra o console para o registro completo."
     }
   }
 }

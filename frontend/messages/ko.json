@@ -374,6 +374,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "지표 범위",
+        "environment": "환경",
+        "workload": "워크로드",
+        "allWorkloads": "모든 워크로드",
+        "environmentPlaceholder": "환경 선택",
+        "workloadPlaceholder": "워크로드 선택"
+      },
+      "events": {
+        "warningCount": "지난 1시간 동안 경고 {count}건",
+        "warningBadgeLabel": "경고",
+        "collapse": "접기",
+        "expand": "펼치기"
+      }
     }
   },
   "settingsIndex": {
@@ -525,6 +541,139 @@
         "redactedNote": "민감한 값(비밀, 토큰, 비밀번호)은 표시 전에 마스킹됩니다.",
         "requestIdSection": "요청 ID"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} / {required} 승인",
+        "remainingBadge": "{count}건 더 필요",
+        "metBadge": "정족수 충족",
+        "approvedLabel": "승인자",
+        "approvedEmpty": "아직 승인이 없습니다.",
+        "awaitingLabel": "대기 중",
+        "awaitingEmpty": "자격 있는 승인자가 없습니다. 앱 정책을 확인하세요."
+      }
+    },
+    "approvalsQueue": {
+      "title": "승인 대기열",
+      "description": "승인을 기다리는 모든 배포. 동일 환경 내에서 일괄 승인/거부할 수 있습니다.",
+      "empty": {
+        "title": "대기 항목 없음",
+        "description": "승인이 필요한 배포가 여기에 나타납니다."
+      },
+      "selectAllLabel": "모두 선택",
+      "selectionStatus": "{selected} / {total} 선택됨",
+      "readOnlyHint": "조회만 가능합니다.",
+      "approveLabel": "승인",
+      "rejectLabel": "거부",
+      "footer": {
+        "selected": "{count}개 배포 선택됨",
+        "summary": "{envs}에서 실행됩니다.",
+        "crossEnvWarning": "일괄 작업에는 동일 앱/환경이 필요합니다. 정책은 환경별로 다릅니다.",
+        "approveButton": "{count}개 승인",
+        "rejectButton": "{count}개 거부"
+      },
+      "confirmApprove": {
+        "title": "{count}개 배포를 승인하시겠습니까?",
+        "description": "{envs}의 롤아웃이 재개됩니다.",
+        "confirm": "모두 승인"
+      },
+      "confirmReject": {
+        "title": "{count}개 배포를 거부하시겠습니까?",
+        "description": "{envs}의 각 배포가 실패로 표시됩니다.",
+        "reasonLabel": "거부 사유",
+        "reasonPlaceholder": "이 배치를 거부하는 이유는 무엇입니까?",
+        "reasonRequired": "사유가 필요합니다",
+        "confirm": "모두 거부"
+      },
+      "toasts": {
+        "unexpected": "일괄 작업 응답이 없습니다.",
+        "allOk": "{label} 성공: {count}개 배포.",
+        "allFailed": "{label} 실패 ({count}개): {message}",
+        "partial": "{label}: 성공 {succeeded}, 실패 {failed}.",
+        "approveFailed": "일괄 승인 실패.",
+        "rejectFailed": "일괄 거부 실패."
+      },
+      "row": {
+        "selectRowLabel": "{app} / {env} 선택",
+        "approvalsCount": "{received}/{required} 승인",
+        "received": "수신 {rel}",
+        "review": "검토"
+      }
+    }
+  },
+  "jobs": {
+    "title": "작업",
+    "descriptionGlobal": "모든 앱의 예약된 작업 실행 및 임시 명령 실행.",
+    "descriptionForApp": "{app}의 예약된 작업 실행 및 임시 명령 실행.",
+    "tabs": {
+      "scheduled": "예약됨",
+      "commands": "명령"
+    },
+    "scheduled": {
+      "emptyTitle": "아직 예약된 작업 실행이 없습니다",
+      "emptyDescription": "Cronjob 워크로드는 스케줄러가 첫 실행을 트리거하면 여기에 표시됩니다.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "앱 / 환경 / 워크로드",
+        "k8sJob": "K8s 작업",
+        "status": "상태",
+        "duration": "실행 시간",
+        "started": "시작됨"
+      }
+    },
+    "commands": {
+      "emptyTitle": "아직 명령 실행이 없습니다",
+      "emptyDescription": "워크로드에 대한 임시 명령은 여기에 표시됩니다. CLI에서 `astro app run …`로 실행하세요.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "앱 / 워크로드",
+        "command": "명령",
+        "status": "상태",
+        "invokedBy": "호출자",
+        "started": "시작됨"
+      }
+    },
+    "runStatus": {
+      "running": "실행 중",
+      "inProgress": "진행 중",
+      "succeeded": "성공",
+      "failed": "실패",
+      "superseded": "대체됨",
+      "unknown": "알 수 없음",
+      "exitCodeLabel": "종료 {code}",
+      "exitCodeTooltip": "프로세스가 코드 {code}로 종료되었습니다"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "금지",
+        "queue": "대기열",
+        "replace": "교체"
+      },
+      "tooltip": {
+        "forbid": "실행 중일 때 다음 예약을 건너뜁니다.",
+        "queue": "겹치는 실행을 쌓을 수 있습니다 — 각 트리거가 독립적이고 짧을 때 선택하세요.",
+        "replace": "실행 중인 작업을 중지하고 새 작업을 시작합니다."
+      }
+    },
+    "cron": {
+      "invalid": "잘못된 cron 표현식",
+      "firesIn": "{relative} 후에 실행",
+      "now": "1분 미만",
+      "minutes": "{count}분",
+      "hours": "{count}시간",
+      "days": "{count}일"
+    },
+    "workloadCard": {
+      "title": "Cronjob 워크로드",
+      "countLabel": "{count}개 예약됨",
+      "openLogs": "콘솔에서 열기"
+    },
+    "output": {
+      "emptyOutput": "아직 캡처된 출력이 없습니다.",
+      "openInConsole": "콘솔에서 열기",
+      "lines": "{count}줄",
+      "truncated": "200줄 표시 — 콘솔에서 전체 로그를 확인하세요."
     }
   }
 }

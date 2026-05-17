@@ -70,6 +70,7 @@ export const LIST_WORKLOADS = gql`
       kind
       isPublic
       schedule
+      concurrencyPolicy
       replicas
       cpuRequest
       cpuLimit
@@ -86,11 +87,7 @@ export const LIST_WORKLOADS = gql`
 `;
 
 export const GET_RENDERED_MANIFEST = gql`
-  query GetRenderedManifest(
-    $appSlug: String!
-    $environmentName: String
-    $imageTag: String
-  ) {
+  query GetRenderedManifest($appSlug: String!, $environmentName: String, $imageTag: String) {
     astroliftRenderedManifest(
       appSlug: $appSlug
       environmentName: $environmentName
@@ -118,6 +115,7 @@ export const GET_WORKLOAD = gql`
       kind
       isPublic
       schedule
+      concurrencyPolicy
       replicas
       cpuRequest
       cpuLimit

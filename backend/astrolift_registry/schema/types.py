@@ -169,6 +169,12 @@ class WorkloadType:
     kind: str
     is_public: bool
     schedule: str
+    # CronJob concurrency policy (#427): ``forbid`` | ``queue`` |
+    # ``replace``. Only meaningful when ``kind == "cronjob"``; always
+    # present so the FE doesn't have to branch on null. Defaults to
+    # ``forbid`` for non-cronjob rows so the badge component never
+    # renders garbage.
+    concurrency_policy: str
     replicas: int
     cpu_request: str
     cpu_limit: str
@@ -321,6 +327,7 @@ def workload_to_type(workload) -> WorkloadType:
         kind=workload.kind,
         is_public=workload.is_public,
         schedule=workload.schedule or "",
+        concurrency_policy=workload.concurrency_policy or "forbid",
         replicas=workload.replicas,
         cpu_request=workload.cpu_request or "",
         cpu_limit=workload.cpu_limit or "",

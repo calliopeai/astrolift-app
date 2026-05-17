@@ -183,9 +183,7 @@ export type AstroliftApiToken = {
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   isRevoked: Scalars['Boolean']['output'];
-  lastUsedAgent?: Maybe<Scalars['String']['output']>;
   lastUsedAt?: Maybe<Scalars['DateTime']['output']>;
-  lastUsedIp?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   scopes: Array<Scalars['String']['output']>;
   teamSlug?: Maybe<Scalars['String']['output']>;
@@ -454,13 +452,21 @@ export type AstroliftBudget = {
   scopeKind: Scalars['String']['output'];
 };
 
-export type AstroliftCancelDeregisterPayload = {
-  signalDelivered: Scalars['Boolean']['output'];
-  workflowId: Scalars['String']['output'];
+export type AstroliftBulkDeploymentResultData = {
+  failedCount: Scalars['Int']['output'];
+  results: Array<AstroliftBulkDeploymentResultItem>;
+  succeededCount: Scalars['Int']['output'];
 };
 
-export type AstroliftCancelDeregisterPayloadMutationResult = {
-  data?: Maybe<AstroliftCancelDeregisterPayload>;
+export type AstroliftBulkDeploymentResultDataMutationResult = {
+  data?: Maybe<AstroliftBulkDeploymentResultData>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBulkDeploymentResultItem = {
+  deployment?: Maybe<AstroliftDeployment>;
+  deploymentId: Scalars['GUID']['output'];
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -577,6 +583,12 @@ export type AstroliftCommandRun = {
   id: Scalars['GUID']['output'];
   invokedByUsername?: Maybe<Scalars['String']['output']>;
   logExcerpt: Scalars['String']['output'];
+  /**
+   * Last 200 lines of ``log_excerpt`` (#427). Mirrors the
+   * ``ScheduledJobRun.output`` surface so the FE's shared row-expand
+   * component works against both run kinds.
+   */
+  output: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   workloadSlug?: Maybe<Scalars['String']['output']>;
@@ -694,6 +706,8 @@ export type AstroliftDeployment = {
   abortedReason: Scalars['String']['output'];
   approvalsReceived: Scalars['Int']['output'];
   approvalsRequired: Scalars['Int']['output'];
+  approvedBy: Array<AstroliftDeploymentApprover>;
+  awaitingApprovers: Array<AstroliftDeploymentApprover>;
   branch: Scalars['String']['output'];
   ciActorKind: Scalars['String']['output'];
   ciProvider: Scalars['String']['output'];
@@ -712,6 +726,7 @@ export type AstroliftDeployment = {
   imageTag: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   repoUrl: Scalars['String']['output'];
+  requiredApproverCount: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
@@ -730,6 +745,14 @@ export type AstroliftDeploymentApprovalHistoryEntry = {
   id: Scalars['GUID']['output'];
   occurredAt: Scalars['DateTime']['output'];
   reason: Scalars['String']['output'];
+};
+
+export type AstroliftDeploymentApprover = {
+  approvedAt?: Maybe<Scalars['DateTime']['output']>;
+  displayName: Scalars['String']['output'];
+  email: Scalars['String']['output'];
+  mailtoUrl: Scalars['String']['output'];
+  userId: Scalars['String']['output'];
 };
 
 export type AstroliftDeploymentLifecycleEvent = {
@@ -778,63 +801,6 @@ export type AstroliftDeregisterAppPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-export type AstroliftDeregisterPreview = {
-  appName: Scalars['String']['output'];
-  appSlug: Scalars['String']['output'];
-  deployTokens: Array<AstroliftDeregisterPreviewDeployToken>;
-  identityRoles: Array<AstroliftDeregisterPreviewIdentityRole>;
-  k8sObjects: Array<AstroliftDeregisterPreviewK8sObject>;
-  managedServices: Array<AstroliftDeregisterPreviewManagedService>;
-  registryRepoUri: Scalars['String']['output'];
-  secretRefs: Array<AstroliftDeregisterPreviewSecretRef>;
-  sourceWebhook?: Maybe<AstroliftDeregisterPreviewSourceWebhook>;
-  totalResourceCount: Scalars['Int']['output'];
-};
-
-export type AstroliftDeregisterPreviewDeployToken = {
-  environmentName?: Maybe<Scalars['String']['output']>;
-  id: Scalars['GUID']['output'];
-  last4: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-};
-
-export type AstroliftDeregisterPreviewIdentityRole = {
-  clusterSlug: Scalars['String']['output'];
-  kind: Scalars['String']['output'];
-  roleArnOrPrincipal: Scalars['String']['output'];
-};
-
-export type AstroliftDeregisterPreviewK8sObject = {
-  apiVersion: Scalars['String']['output'];
-  clusterSlug: Scalars['String']['output'];
-  kind: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  namespace: Scalars['String']['output'];
-};
-
-export type AstroliftDeregisterPreviewManagedService = {
-  environmentName: Scalars['String']['output'];
-  id: Scalars['GUID']['output'];
-  kind: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  status: Scalars['String']['output'];
-  variant: Scalars['String']['output'];
-};
-
-export type AstroliftDeregisterPreviewSecretRef = {
-  bundleSlug: Scalars['String']['output'];
-  clusterSlug?: Maybe<Scalars['String']['output']>;
-  environmentName: Scalars['String']['output'];
-  id: Scalars['GUID']['output'];
-  prefix: Scalars['String']['output'];
-};
-
-export type AstroliftDeregisterPreviewSourceWebhook = {
-  hookId: Scalars['String']['output'];
-  installed: Scalars['Boolean']['output'];
-  repo: Scalars['String']['output'];
-};
-
 export type AstroliftDisconnectUserSourceProviderPayload = {
   disconnectedId?: Maybe<Scalars['GUID']['output']>;
   providerConfigId: Scalars['GUID']['output'];
@@ -874,26 +840,6 @@ export type AstroliftForceRedeployPayloadMutationResult = {
   data?: Maybe<AstroliftForceRedeployPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
-};
-
-export type AstroliftForceRedeployPreview = {
-  appSlug: Scalars['String']['output'];
-  environmentName?: Maybe<Scalars['String']['output']>;
-  inFlightDeployments: Array<AstroliftForceRedeployPreviewDeployment>;
-};
-
-export type AstroliftForceRedeployPreviewDeployment = {
-  ciActorKind: Scalars['String']['output'];
-  ciRunUrl: Scalars['String']['output'];
-  createdAt: Scalars['DateTime']['output'];
-  environmentName: Scalars['String']['output'];
-  id: Scalars['GUID']['output'];
-  imageTag: Scalars['String']['output'];
-  startedAt?: Maybe<Scalars['DateTime']['output']>;
-  status: Scalars['String']['output'];
-  triggerKind: Scalars['String']['output'];
-  triggeredByDisplay: Scalars['String']['output'];
-  workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftIdentityProvider = {
@@ -1388,6 +1334,13 @@ export type AstroliftScheduledJobRun = {
   id: Scalars['GUID']['output'];
   k8sJobName: Scalars['String']['output'];
   logExcerpt: Scalars['String']['output'];
+  /**
+   * Last 200 lines of ``log_excerpt`` (#427). Powers the inline
+   * row-expand surface on the jobs table so operators can confirm a
+   * run worked without leaving the page. The full tail lives behind
+   * the per-app logs surface; the UI footer flags truncation.
+   */
+  output: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
@@ -1678,6 +1631,14 @@ export type AstroliftWorkflowRun = {
 };
 
 export type AstroliftWorkload = {
+  /**
+   * CronJob concurrency policy (#427): ``forbid`` | ``queue`` |
+   * ``replace``. Only meaningful when ``kind == "cronjob"``; always
+   * present so the FE doesn't have to branch on null. Defaults to
+   * ``forbid`` for non-cronjob rows so the badge component never
+   * renders garbage.
+   */
+  concurrencyPolicy: Scalars['String']['output'];
   cpuLimit: Scalars['String']['output'];
   cpuRequest: Scalars['String']['output'];
   hpaMaxReplicas?: Maybe<Scalars['Int']['output']>;
@@ -1779,9 +1740,19 @@ export type BringClusterIntoManagementInputType = {
   clusterId: Scalars['GUID']['input'];
 };
 
+export type BulkApproveDeploymentsInput = {
+  deploymentIds: Array<Scalars['GUID']['input']>;
+  reason: InputMaybe<Scalars['String']['input']>;
+};
+
 export type BulkImportAppSecretsInput = {
   appSlug: Scalars['String']['input'];
   dotenvText: Scalars['String']['input'];
+};
+
+export type BulkRejectDeploymentsInput = {
+  deploymentIds: Array<Scalars['GUID']['input']>;
+  reason: Scalars['String']['input'];
 };
 
 export type Bulkimportpayload = {
@@ -1794,11 +1765,6 @@ export type BulkimportpayloadMutationResult = {
   data?: Maybe<Bulkimportpayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
-};
-
-export type CancelDeregisterInput = {
-  reason: InputMaybe<Scalars['String']['input']>;
-  workflowId: Scalars['String']['input'];
 };
 
 export type ConfigureProviderPluginInput = {
@@ -2273,8 +2239,9 @@ export type Mutation = {
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
+  bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
-  cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
+  bulkRejectDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -2541,13 +2508,18 @@ export type MutationBringClusterIntoManagementArgs = {
 };
 
 
+export type MutationBulkApproveDeploymentsArgs = {
+  input: BulkApproveDeploymentsInput;
+};
+
+
 export type MutationBulkImportAppSecretsArgs = {
   input: BulkImportAppSecretsInput;
 };
 
 
-export type MutationCancelAstroliftDeregisterArgs = {
-  input: CancelDeregisterInput;
+export type MutationBulkRejectDeploymentsArgs = {
+  input: BulkRejectDeploymentsInput;
 };
 
 
@@ -3614,8 +3586,6 @@ export type Query = {
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission. */
   permissionDiagnose?: Maybe<PermissionDiagnosis>;
-  previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
-  previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
   /** Get a workflow definition by slug. */
   workflowDefinition?: Maybe<WorkflowDefinitionType>;
   /** List all workflow definitions. */
@@ -3677,6 +3647,7 @@ export type QueryAstroliftAppGoldenSignalsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3714,6 +3685,7 @@ export type QueryAstroliftAppStatusCodeBreakdownArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3990,17 +3962,6 @@ export type QueryPermissionCompareArgs = {
 export type QueryPermissionDiagnoseArgs = {
   permission: Scalars['String']['input'];
   userId: Scalars['ID']['input'];
-};
-
-
-export type QueryPreviewAstroliftDeregisterArgs = {
-  appSlug: Scalars['String']['input'];
-};
-
-
-export type QueryPreviewAstroliftForceRedeployArgs = {
-  appSlug: Scalars['String']['input'];
-  environmentName?: InputMaybe<Scalars['String']['input']>;
 };
 
 

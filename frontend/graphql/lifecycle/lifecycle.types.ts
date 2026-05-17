@@ -22,9 +22,12 @@ import type {
   AstroliftAppIdentityBinding as GeneratedAppIdentityBinding,
   AstroliftAppLogLine as GeneratedAppLogLine,
   AstroliftAppPod as GeneratedAppPod,
+  AstroliftBulkDeploymentResultData as GeneratedBulkDeploymentResultData,
+  AstroliftBulkDeploymentResultItem as GeneratedBulkDeploymentResultItem,
   AstroliftCommandRun as GeneratedCommandRun,
   AstroliftContainerStatus as GeneratedContainerStatus,
   AstroliftDeployment as GeneratedDeployment,
+  AstroliftDeploymentApprover as GeneratedDeploymentApprover,
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
   AstroliftDeregisterPreview as GeneratedDeregisterPreview,
@@ -72,6 +75,15 @@ export type AstroliftDeployment = Omit<GeneratedDeployment, "status" | "triggerK
     triggerKind: TriggerKind;
   };
 
+// #420 — quorum widget surface: who already approved, who we're
+// waiting on, and the magic-link mailto: nudge per awaiting approver.
+// Exported as the generated type so codegen drift is loud (TS will
+// flag a member rename instead of silently passing the wrong shape).
+export type AstroliftDeploymentApprover = GeneratedDeploymentApprover;
+
+export type AstroliftBulkDeploymentResultItem = GeneratedBulkDeploymentResultItem;
+export type AstroliftBulkDeploymentResultData = GeneratedBulkDeploymentResultData;
+
 export interface AstroliftDeploymentApprovalHistoryEntry {
   id: string;
   action: string;
@@ -111,6 +123,15 @@ export type AstroliftScheduledJobRun = Omit<GeneratedScheduledJobRun, "status"> 
 };
 
 export type AstroliftCommandRun = GeneratedCommandRun;
+
+/**
+ * CronJob concurrency policy (#427). The backend serialises this as
+ * a plain `String!` so the FE narrows it here for switch-exhaustive
+ * styling on the badge component. Anything else falls through to
+ * the generic "unknown" badge so a future enum addition doesn't
+ * crash the table.
+ */
+export type ConcurrencyPolicy = "forbid" | "queue" | "replace";
 
 // Observability — pod + log surface. The backend's status string is
 // a rolled-up surface label so it can contain k8s container-waiting

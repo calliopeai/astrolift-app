@@ -317,3 +317,71 @@ def test_status_code_breakdown_returns_none_on_prometheus_error(permission_resol
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_status_code_breakdown(_info(), app_slug=app.slug)
     assert result is None
+
+
+# ----------------------------------------------------------------------
+# workload_slug scoping (#422)
+# ----------------------------------------------------------------------
+
+
+def test_golden_signals_workload_slug_threads_into_promql(permission_resolver):
+    """The ``workload_slug`` resolver arg lands as a
+    ``workload="<slug>"`` matcher in every emitted PromQL expression
+    so Prometheus narrows the metric stream to one workload."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with patch.object(prom_client, "query_range_series", return_value=[]):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_golden_signals(
+                _info(),
+                app_slug=app.slug,
+                environment_name="prod",
+                workload_slug="api",
+                range_seconds=60 * 60,
+            )
+
+    assert result, "expected one row per signal kind even when samples are empty"
+    for row in result:
+        assert 'workload="api"' in row.promql, row.promql
+
+
+def test_golden_signals_without_workload_slug_omits_label(permission_resolver):
+    """Omitting ``workload_slug`` preserves pre-#422 behavior — no
+    ``workload=`` label in the PromQL, so the query rolls every
+    workload up."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with patch.object(prom_client, "query_range_series", return_value=[]):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_golden_signals(
+                _info(),
+                app_slug=app.slug,
+                environment_name="prod",
+                range_seconds=60 * 60,
+            )
+
+    assert result
+    for row in result:
+        assert "workload=" not in row.promql, row.promql
+
+
+def test_status_code_breakdown_workload_slug_threads_into_promql(permission_resolver):
+    """The status-code breakdown query mirrors the golden-signals
+    scoping — ``workload_slug`` appears verbatim in the PromQL."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with patch.object(prom_client, "query_range_series", return_value=[]):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_status_code_breakdown(
+                _info(),
+                app_slug=app.slug,
+                environment_name="prod",
+                workload_slug="worker",
+                range_seconds=60 * 60,
+            )
+
+    assert result is not None
+    assert 'workload="worker"' in result.promql

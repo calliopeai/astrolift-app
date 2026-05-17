@@ -374,6 +374,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "指标范围",
+        "environment": "环境",
+        "workload": "工作负载",
+        "allWorkloads": "所有工作负载",
+        "environmentPlaceholder": "选择环境",
+        "workloadPlaceholder": "选择工作负载"
+      },
+      "events": {
+        "warningCount": "过去 1 小时内有 {count} 条警告",
+        "warningBadgeLabel": "警告",
+        "collapse": "折叠",
+        "expand": "展开"
+      }
     }
   },
   "settingsIndex": {
@@ -525,6 +541,139 @@
         "redactedNote": "敏感值（密钥、令牌、密码）在显示前已被遮蔽。",
         "requestIdSection": "请求 ID"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} / {required} 已审批",
+        "remainingBadge": "还需 {count} 项",
+        "metBadge": "已达法定人数",
+        "approvedLabel": "已审批",
+        "approvedEmpty": "尚无审批。",
+        "awaitingLabel": "待审批",
+        "awaitingEmpty": "未找到符合条件的审批人，请检查应用策略。"
+      }
+    },
+    "approvalsQueue": {
+      "title": "审批队列",
+      "description": "所有等待审批的部署。可在同一环境内批量审批或拒绝。",
+      "empty": {
+        "title": "暂无待办",
+        "description": "需要审批的部署会出现在这里。"
+      },
+      "selectAllLabel": "全选",
+      "selectionStatus": "已选 {selected} / {total}",
+      "readOnlyHint": "仅可查看，无法审批。",
+      "approveLabel": "审批",
+      "rejectLabel": "拒绝",
+      "footer": {
+        "selected": "已选择 {count} 个部署",
+        "summary": "覆盖：{envs}。",
+        "crossEnvWarning": "批量操作要求同一应用/环境 — 不同环境策略不同。",
+        "approveButton": "审批 {count} 个",
+        "rejectButton": "拒绝 {count} 个"
+      },
+      "confirmApprove": {
+        "title": "审批 {count} 个部署？",
+        "description": "将解锁 {envs}。",
+        "confirm": "全部审批"
+      },
+      "confirmReject": {
+        "title": "拒绝 {count} 个部署？",
+        "description": "{envs} 中的每个部署将被标记为失败。",
+        "reasonLabel": "拒绝原因",
+        "reasonPlaceholder": "为什么拒绝这批部署？",
+        "reasonRequired": "必须填写原因",
+        "confirm": "全部拒绝"
+      },
+      "toasts": {
+        "unexpected": "批量操作无响应。",
+        "allOk": "{label} 成功：{count} 个部署。",
+        "allFailed": "{label} 失败：{count} 个部署 — {message}",
+        "partial": "{label}：成功 {succeeded}，失败 {failed}。",
+        "approveFailed": "批量审批失败。",
+        "rejectFailed": "批量拒绝失败。"
+      },
+      "row": {
+        "selectRowLabel": "选择 {app} / {env}",
+        "approvalsCount": "{received}/{required} 已审批",
+        "received": "接收于 {rel}",
+        "review": "查看"
+      }
+    }
+  },
+  "jobs": {
+    "title": "任务",
+    "descriptionGlobal": "所有应用的计划任务运行和临时命令执行。",
+    "descriptionForApp": "{app} 的计划任务运行和临时命令执行。",
+    "tabs": {
+      "scheduled": "计划",
+      "commands": "命令"
+    },
+    "scheduled": {
+      "emptyTitle": "尚无计划任务运行",
+      "emptyDescription": "Cronjob 工作负载在调度器触发首次运行后会显示在此。",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "应用 / 环境 / 工作负载",
+        "k8sJob": "K8s 任务",
+        "status": "状态",
+        "duration": "时长",
+        "started": "开始时间"
+      }
+    },
+    "commands": {
+      "emptyTitle": "尚无命令运行",
+      "emptyDescription": "针对工作负载的临时命令会显示在此。使用 CLI 运行 `astro app run …`。",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "应用 / 工作负载",
+        "command": "命令",
+        "status": "状态",
+        "invokedBy": "调用者",
+        "started": "开始时间"
+      }
+    },
+    "runStatus": {
+      "running": "运行中",
+      "inProgress": "进行中",
+      "succeeded": "成功",
+      "failed": "失败",
+      "superseded": "已被替换",
+      "unknown": "未知",
+      "exitCodeLabel": "退出 {code}",
+      "exitCodeTooltip": "进程以代码 {code} 退出"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "禁止",
+        "queue": "排队",
+        "replace": "替换"
+      },
+      "tooltip": {
+        "forbid": "运行期间跳过下次触发。",
+        "queue": "允许重叠运行堆叠 — 每次触发独立且短小时选用。",
+        "replace": "停止正在运行的任务并启动新任务。"
+      }
+    },
+    "cron": {
+      "invalid": "无效的 cron 表达式",
+      "firesIn": "{relative}后触发",
+      "now": "少于一分钟",
+      "minutes": "{count}分钟",
+      "hours": "{count}小时",
+      "days": "{count}天"
+    },
+    "workloadCard": {
+      "title": "Cronjob 工作负载",
+      "countLabel": "已计划 {count} 个",
+      "openLogs": "在控制台中打开"
+    },
+    "output": {
+      "emptyOutput": "尚无捕获的输出。",
+      "openInConsole": "在控制台中打开",
+      "lines": "{count}行",
+      "truncated": "已显示 200 行 — 在控制台中查看完整日志。"
     }
   }
 }

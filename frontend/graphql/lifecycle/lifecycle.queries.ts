@@ -31,6 +31,7 @@ export const LIST_DEPLOYMENTS = gql`
       clusterRevision
       approvalsRequired
       approvalsReceived
+      requiredApproverCount
       startedAt
       succeededAt
       failedAt
@@ -48,6 +49,20 @@ export const LIST_DEPLOYMENTS = gql`
       abortedReason
       triggeredByUserId
       triggeredByMe
+      approvedBy {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
+      awaitingApprovers {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
     }
   }
 `;
@@ -66,6 +81,7 @@ export const GET_DEPLOYMENT = gql`
       clusterRevision
       approvalsRequired
       approvalsReceived
+      requiredApproverCount
       startedAt
       succeededAt
       failedAt
@@ -83,6 +99,20 @@ export const GET_DEPLOYMENT = gql`
       abortedReason
       triggeredByUserId
       triggeredByMe
+      approvedBy {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
+      awaitingApprovers {
+        userId
+        displayName
+        email
+        approvedAt
+        mailtoUrl
+      }
     }
   }
 `;
@@ -145,6 +175,7 @@ export const LIST_SCHEDULED_JOB_RUNS = gql`
       durationSeconds
       exitCode
       logExcerpt
+      output
       createdAt
     }
   }
@@ -162,6 +193,7 @@ export const LIST_COMMAND_RUNS = gql`
       endedAt
       exitCode
       logExcerpt
+      output
       createdAt
     }
   }

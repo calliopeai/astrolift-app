@@ -370,6 +370,22 @@
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
       "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+    },
+    "observability": {
+      "scope": {
+        "title": "Portée des métriques",
+        "environment": "Environnement",
+        "workload": "Charge de travail",
+        "allWorkloads": "Toutes les charges de travail",
+        "environmentPlaceholder": "Sélectionnez un environnement",
+        "workloadPlaceholder": "Sélectionnez une charge de travail"
+      },
+      "events": {
+        "warningCount": "{count, plural, =1 {1 avertissement} other {# avertissements}} au cours de la dernière heure",
+        "warningBadgeLabel": "Avertissement",
+        "collapse": "Réduire",
+        "expand": "Développer"
+      }
     }
   },
   "settingsIndex": {
@@ -521,6 +537,139 @@
         "redactedNote": "Les valeurs sensibles (secrets, tokens, mots de passe) sont masquées avant affichage.",
         "requestIdSection": "ID de requête"
       }
+    },
+    "approval": {
+      "quorum": {
+        "header": "{received} sur {required} approbations",
+        "remainingBadge": "{count} de plus requises",
+        "metBadge": "Quorum atteint",
+        "approvedLabel": "Approuvé par",
+        "approvedEmpty": "Aucune approbation pour le moment.",
+        "awaitingLabel": "En attente",
+        "awaitingEmpty": "Aucun approbateur éligible — vérifiez la politique de l'application."
+      }
+    },
+    "approvalsQueue": {
+      "title": "File d'attente d'approbations",
+      "description": "Tous les déploiements en attente de validation. Sélectionnez des lignes pour approuver ou rejeter en lot dans un même environnement.",
+      "empty": {
+        "title": "Rien en attente",
+        "description": "Quand un déploiement nécessite une validation, il apparaît ici."
+      },
+      "selectAllLabel": "Tout sélectionner",
+      "selectionStatus": "{selected} sur {total} sélectionnés",
+      "readOnlyHint": "Vous pouvez consulter mais pas approuver.",
+      "approveLabel": "Approuver",
+      "rejectLabel": "Rejeter",
+      "footer": {
+        "selected": "{count, plural, =1 {1 déploiement sélectionné} other {# déploiements sélectionnés}}",
+        "summary": "Dans {envs}.",
+        "crossEnvWarning": "L'approbation en lot exige la même app/environnement — les politiques varient.",
+        "approveButton": "Approuver {count}",
+        "rejectButton": "Rejeter {count}"
+      },
+      "confirmApprove": {
+        "title": "Approuver {count} déploiements ?",
+        "description": "Débloque {envs}.",
+        "confirm": "Tout approuver"
+      },
+      "confirmReject": {
+        "title": "Rejeter {count} déploiements ?",
+        "description": "Chaque déploiement dans {envs} passe en échec.",
+        "reasonLabel": "Motif du rejet",
+        "reasonPlaceholder": "Pourquoi ce lot est-il rejeté ?",
+        "reasonRequired": "Motif requis",
+        "confirm": "Tout rejeter"
+      },
+      "toasts": {
+        "unexpected": "Action en lot sans réponse.",
+        "allOk": "{label} réussi pour {count} déploiements.",
+        "allFailed": "{label} a échoué pour {count} déploiements : {message}",
+        "partial": "{label} : {succeeded} réussis, {failed} échoués.",
+        "approveFailed": "Approbation en lot échouée.",
+        "rejectFailed": "Rejet en lot échoué."
+      },
+      "row": {
+        "selectRowLabel": "Sélectionner {app} / {env}",
+        "approvalsCount": "{received}/{required} approbations",
+        "received": "Reçu {rel}",
+        "review": "Examiner"
+      }
+    }
+  },
+  "jobs": {
+    "title": "Tâches",
+    "descriptionGlobal": "Exécutions de tâches planifiées et commandes ad-hoc sur toutes vos apps.",
+    "descriptionForApp": "Exécutions de tâches planifiées et commandes ad-hoc pour {app}.",
+    "tabs": {
+      "scheduled": "Planifiées",
+      "commands": "Commandes"
+    },
+    "scheduled": {
+      "emptyTitle": "Aucune exécution de tâche planifiée",
+      "emptyDescription": "Les workloads cronjob apparaissent ici dès que l'ordonnanceur déclenche leur première exécution.",
+      "envLabel": "env",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Env / Workload",
+        "k8sJob": "K8s job",
+        "status": "Statut",
+        "duration": "Durée",
+        "started": "Démarré"
+      }
+    },
+    "commands": {
+      "emptyTitle": "Aucune exécution de commande",
+      "emptyDescription": "Les commandes ad-hoc invoquées contre un workload apparaissent ici. Lancez-en une depuis la CLI avec `astro app run …`.",
+      "workloadLabel": "workload",
+      "columns": {
+        "app": "App / Workload",
+        "command": "Commande",
+        "status": "Statut",
+        "invokedBy": "Invoqué par",
+        "started": "Démarré"
+      }
+    },
+    "runStatus": {
+      "running": "En cours",
+      "inProgress": "En cours",
+      "succeeded": "Réussi",
+      "failed": "Échec",
+      "superseded": "Remplacé",
+      "unknown": "Inconnu",
+      "exitCodeLabel": "code {code}",
+      "exitCodeTooltip": "Le processus s'est terminé avec le code {code}"
+    },
+    "concurrency": {
+      "label": {
+        "forbid": "Interdire",
+        "queue": "File",
+        "replace": "Remplacer"
+      },
+      "tooltip": {
+        "forbid": "Saute le prochain déclenchement tant qu'une exécution est en cours.",
+        "queue": "Laisse les exécutions se cumuler — à choisir quand chaque déclenchement est indépendant et court.",
+        "replace": "Arrête l'exécution en cours et en démarre une nouvelle."
+      }
+    },
+    "cron": {
+      "invalid": "Expression cron invalide",
+      "firesIn": "Se déclenche dans {relative}",
+      "now": "moins d'une minute",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "hours": "{count, plural, one {# heure} other {# heures}}",
+      "days": "{count, plural, one {# jour} other {# jours}}"
+    },
+    "workloadCard": {
+      "title": "Workloads cronjob",
+      "countLabel": "{count, plural, one {# planifié} other {# planifiés}}",
+      "openLogs": "Ouvrir dans la console"
+    },
+    "output": {
+      "emptyOutput": "Aucune sortie capturée pour l'instant.",
+      "openInConsole": "Ouvrir dans la console",
+      "lines": "{count, plural, one {# ligne} other {# lignes}}",
+      "truncated": "200 lignes affichées — ouvrez la console pour la suite."
     }
   }
 }

@@ -71,6 +71,72 @@ schedule = "0 0 * * *"
 """
     raw = parse_raw(toml)
     assert raw.workloads[0].schedule == "0 0 * * *"
+    # Default concurrency policy when key omitted (#427).
+    assert raw.workloads[0].concurrency_policy == "forbid"
+
+
+def test_parse_cronjob_concurrency_policy_round_trips():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "nightly"
+kind = "cronjob"
+schedule = "0 0 * * *"
+concurrency_policy = "queue"
+
+  [[workloads.containers]]
+  name = "job"
+  is_primary = true
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].concurrency_policy == "queue"
+
+
+def test_parse_cronjob_rejects_unknown_concurrency_policy():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "nightly"
+kind = "cronjob"
+schedule = "0 0 * * *"
+concurrency_policy = "spaceship"
+
+  [[workloads.containers]]
+  name = "job"
+  is_primary = true
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "concurrency_policy" in str(exc.value)
+
+
+def test_parse_jobs_shorthand_concurrency_policy_default():
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+command = ["/bin/run-job"]
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].concurrency_policy == "forbid"
+
+
+def test_parse_jobs_shorthand_concurrency_policy_override():
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+command = ["/bin/run-job"]
+concurrency_policy = "replace"
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].concurrency_policy == "replace"
 
 
 def test_parse_managed_service_block():
