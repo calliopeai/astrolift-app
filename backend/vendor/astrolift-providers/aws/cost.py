@@ -21,12 +21,16 @@ to 720h ~= 30 days).
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from _sdk.cost import (
+    BillingActualLineItem,
+    BillingActualsResult,
+    BillingActualsUnavailable,
     CostEstimate,
     CostEstimateRequest,
     CostEstimateUnavailable,
@@ -34,6 +38,14 @@ from _sdk.cost import (
     CostLineItem,
     CostResult,
 )
+
+log = logging.getLogger(__name__)
+
+# Tag key the platform stamps on every provisioned cloud resource so
+# Cost Explorer's GroupBy can attribute spend back to the binding.
+# Mirrors ``core.cloud_tags.TAG_BINDING``. Defining it here keeps the
+# vendor module self-contained (no app-side imports).
+AWS_BINDING_TAG_KEY = "astrolift.io/binding"
 
 
 # AWS Pricing API service codes per managed-service kind/variant.
@@ -134,7 +146,7 @@ class AWSCostEstimator(CostEstimator):
                 Filters=filters,
                 MaxResults=20,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return CostEstimateUnavailable(
                 request=request,
                 reason="api_error",
@@ -217,7 +229,7 @@ class AWSCostEstimator(CostEstimator):
                 service_code=service_code,
                 filters=filters,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return CostEstimateUnavailable(
                 request=request,
                 reason="api_error",
@@ -533,6 +545,121 @@ class AWSCostEstimator(CostEstimator):
         if "hour" in unit_lower:
             return unit_price * usage.get("hours_per_month", 720.0)
         return unit_price
+
+
+# ---- billing actuals (#502) ---------------------------------------
+
+
+@dataclass(frozen=True)
+class AWSBillingActualsConfig:
+    """Per-cloud config for the actuals client. ``ce_client`` is an
+    injectable boto3 ``client('ce')`` so tests can stub the Cost
+    Explorer responses without hitting AWS."""
+
+    ce_client: Any | None = None
+    """boto3 client('ce'). Inject for tests."""
+
+
+class AWSBillingActuals:
+    """Reads actual AWS spend grouped by the ``astrolift.io/binding``
+    tag via Cost Explorer's ``GetCostAndUsage`` API.
+
+    Cost Explorer accepts ``GroupBy=[{Type:'TAG', Key:'astrolift.io/binding'}]``
+    which returns one ``Group`` per distinct tag value plus a
+    ``$untagged`` group for resources missing the tag. The client
+    converts each group's amortized cost into integer cents and emits
+    one :class:`BillingActualLineItem` per (tag value, currency) pair.
+
+    Cost Explorer requires the account to be opted in to cost
+    allocation tags AND the tag to be activated for cost allocation;
+    a fresh AWS account will return :class:`BillingActualsUnavailable`
+    with ``reason='not_enabled'`` until the operator activates the
+    tag. The error message points at the AWS console path.
+    """
+
+    def __init__(self, *, config: AWSBillingActualsConfig | None = None) -> None:
+        cfg = config or AWSBillingActualsConfig()
+        if cfg.ce_client is not None:
+            self._client = cfg.ce_client
+        else:
+            import boto3
+
+            # Cost Explorer is global but the boto3 client expects a
+            # region — us-east-1 is the canonical home.
+            self._client = boto3.client("ce", region_name="us-east-1")
+
+    def query_actuals_by_binding(
+        self,
+        *,
+        start: date,
+        end: date,
+        currency: str = "USD",
+    ) -> BillingActualsResult:
+        if start >= end:
+            return BillingActualsUnavailable(
+                reason="api_error",
+                message=f"start={start} must be before end={end}",
+            )
+        try:
+            response = self._client.get_cost_and_usage(
+                TimePeriod={"Start": start.isoformat(), "End": end.isoformat()},
+                Granularity="DAILY",
+                Metrics=["AmortizedCost"],
+                GroupBy=[{"Type": "TAG", "Key": AWS_BINDING_TAG_KEY}],
+            )
+        except Exception as exc:
+            msg = str(exc)
+            # AWS surfaces "is not enabled as a cost allocation tag"
+            # as a DataUnavailableException; distinguish so the caller
+            # can show a clearer enablement hint.
+            if "not enabled" in msg.lower() or "cost allocation" in msg.lower():
+                return BillingActualsUnavailable(
+                    reason="not_enabled",
+                    message=(
+                        f"Activate {AWS_BINDING_TAG_KEY!r} as a cost-allocation tag "
+                        f"in Billing → Cost allocation tags. Underlying: {exc}"
+                    ),
+                )
+            return BillingActualsUnavailable(
+                reason="api_error",
+                message=f"Cost Explorer GetCostAndUsage failed: {exc}",
+            )
+
+        # Sum across the daily buckets — the caller asks for total
+        # spend in the window, not per-day. ``ResultsByTime`` is a
+        # list of {TimePeriod, Total, Groups}; only Groups are
+        # interesting for the tag breakdown.
+        totals_cents: dict[str, int] = {}
+        for bucket in response.get("ResultsByTime", []) or []:
+            for group in bucket.get("Groups", []) or []:
+                # Keys come back as ['astrolift.io/binding$<value>']
+                # ('$' between tag key and value). Missing tags
+                # surface as ['astrolift.io/binding$'] (no value)
+                # which we map to the untagged bucket.
+                raw_key = (group.get("Keys") or [""])[0]
+                _, _, tag_value = raw_key.partition("$")
+                amount_raw = group.get("Metrics", {}).get("AmortizedCost", {}).get("Amount", "0")
+                try:
+                    amount = float(amount_raw)
+                except (TypeError, ValueError):
+                    continue
+                if amount <= 0:
+                    continue
+                cents = round(amount * 100)
+                totals_cents[tag_value] = totals_cents.get(tag_value, 0) + cents
+
+        if not totals_cents:
+            return []
+        return [
+            BillingActualLineItem(
+                binding_guid=tag_value,
+                amount_cents=cents,
+                currency=currency,
+                provider="aws",
+                service="",
+            )
+            for tag_value, cents in totals_cents.items()
+        ]
 
 
 def _region_to_location(region: str) -> str:

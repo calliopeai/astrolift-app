@@ -394,6 +394,41 @@
       "backToApps": "Back to apps",
       "cancel": "Cancel"
     },
+    "deployStrategy": {
+      "eyebrow": "Deploy strategy",
+      "edit": "Edit",
+      "previewEnvironments": "Preview environments",
+      "previewEnvironmentsHelp": "Spin up an ephemeral environment per pull request.",
+      "sheetTitle": "Edit deploy strategy",
+      "sheetDescription": "Changes apply to the next deploy. In-flight rollouts complete on the previous strategy.",
+      "triggerModeLabel": "Trigger mode",
+      "cronExpressionLabel": "Cron expression",
+      "cronExpressionHelp": "Five fields (minute hour day month weekday). The backend rejects malformed expressions.",
+      "deployBranchLabel": "Deploy branch",
+      "deployBranchHelp": "Default branch from the repo is <branch></branch>.",
+      "cancel": "Cancel",
+      "save": "Save strategy",
+      "toastSaved": "Deploy strategy updated.",
+      "toastFailed": "Update failed.",
+      "modes": {
+        "auto_on_push": {
+          "label": "Auto on push",
+          "hint": "Any push to the deploy branch fans out a deploy."
+        },
+        "manual": {
+          "label": "Manual only",
+          "hint": "Deploys only when triggered from the UI or CLI."
+        },
+        "external_ci": {
+          "label": "External CI",
+          "hint": "Your CI calls Astrolift with a deploy token. No webhook."
+        },
+        "cron": {
+          "label": "Cron schedule",
+          "hint": "Deploys run on a recurring schedule defined by the cron expression."
+        }
+      }
+    },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
       "searchAriaLabel": "Search log buffer",
@@ -1185,9 +1220,9 @@
         "toastNoResponse": "No response from backend."
       },
       "links": {
-        "deployStrategy": {
-          "title": "Deploy strategy",
-          "description": "Edit the manifest TOML — image build, environments, triggers, approvals, and rollout strategy."
+        "manifestEditor": {
+          "title": "Edit manifest TOML",
+          "description": "Open the full astrolift.toml editor — image build, environments, triggers, approvals, and rollout strategy."
         },
         "deployTokens": {
           "title": "Deploy tokens",
