@@ -49,10 +49,16 @@ input ApproveByTokenInput {
   token: String!
 }
 
+input ApproveSecretChangeInput {
+  proposalId: GUID!
+  reason: String = null
+}
+
 type Appsecretwritepayload {
   appSlug: String!
   key: String!
   rawManifestStaged: String!
+  pendingProposalId: GUID
 }
 
 type AppsecretwritepayloadMutationResult {
@@ -1753,6 +1759,41 @@ type AstroliftSecretBundleMutationResult {
   data: AstroliftSecretBundle
 }
 
+type AstroliftSecretChangeApproval {
+  id: GUID!
+  approverUserId: String!
+  approverDisplayName: String!
+  decision: String!
+  decidedAt: DateTime!
+  reason: String!
+}
+
+type AstroliftSecretChangeProposal {
+  id: GUID!
+  registeredAppSlug: String!
+  environmentName: String!
+  op: String!
+  status: String!
+  proposerUserId: String!
+  proposerDisplayName: String!
+  payload: JSON!
+  payloadDiff: JSON!
+  requiredApproverCount: Int!
+  approvalsCount: Int!
+  expiresAt: DateTime!
+  decidedAt: DateTime
+  appliedAt: DateTime
+  applyError: String!
+  createdAt: DateTime!
+  approvals: [AstroliftSecretChangeApproval!]!
+}
+
+type AstroliftSecretChangeProposalMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftSecretChangeProposal
+}
+
 type AstroliftSecretEditor {
   id: String!
   username: String!
@@ -2107,6 +2148,7 @@ input AttachSecretBundleInput {
 type Attachmentremovedpayload {
   attachmentId: GUID!
   deleted: Boolean!
+  pendingProposalId: GUID
 }
 
 type AttachmentremovedpayloadMutationResult {
@@ -2952,6 +2994,10 @@ type Mutation {
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
+  proposeSecretChange(input: ProposeSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  withdrawSecretChange(input: WithdrawSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
@@ -3133,6 +3179,17 @@ type ProfileType {
   signature: UploadType
 }
 
+input ProposeSecretChangeInput {
+  appSlug: String!
+  op: String!
+  environmentName: String = null
+  key: String = null
+  value: String = null
+  bundleSlug: String = null
+  prefix: String = null
+  attachmentId: GUID = null
+}
+
 type Providerpluginconfigpayload {
   pluginSlug: String!
   organizationScoped: Boolean!
@@ -3286,6 +3343,8 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
+  astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
+  astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
@@ -3371,6 +3430,11 @@ input RegisterTenantClusterInput {
 input RejectByTokenInput {
   token: String!
   reason: String = null
+}
+
+input RejectSecretChangeInput {
+  proposalId: GUID!
+  reason: String!
 }
 
 input RemoveAppDomainInput {
@@ -3812,6 +3876,10 @@ type WebhookSecretRevealMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: WebhookSecretReveal
+}
+
+input WithdrawSecretChangeInput {
+  proposalId: GUID!
 }
 
 type WorkflowDefinitionType {

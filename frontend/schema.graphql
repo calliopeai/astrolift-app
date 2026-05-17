@@ -49,10 +49,16 @@ input ApproveByTokenInput {
   token: String!
 }
 
+input ApproveSecretChangeInput {
+  proposalId: GUID!
+  reason: String = null
+}
+
 type Appsecretwritepayload {
   appSlug: String!
   key: String!
   rawManifestStaged: String!
+  pendingProposalId: GUID
 }
 
 type AppsecretwritepayloadMutationResult {
@@ -1022,6 +1028,54 @@ type AstroliftForceRedeployPreviewDeployment {
   ciRunUrl: String!
 }
 
+type AstroliftFormDefinition {
+  id: GUID!
+  slug: String!
+  name: String!
+  description: String!
+  schema: JSON!
+  fieldConfig: JSON!
+  logicRules: JSON!
+  scoring: JSON!
+  status: String!
+  formType: String!
+  isPublic: Boolean!
+  version: Int!
+  submissionCount: Int!
+  publishedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdByUsername: String
+  updatedByUsername: String
+}
+
+type AstroliftFormDefinitionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftFormDefinition
+}
+
+type AstroliftFormSubmission {
+  id: GUID!
+  formSlug: String!
+  formName: String!
+  formVersion: Int!
+  submittedAt: DateTime!
+  createdAt: DateTime!
+  submitterDisplayName: String!
+  submitterEmail: String!
+  payload: JSON!
+  sourceIp: String
+  userAgent: String!
+  status: String!
+}
+
+type AstroliftFormSubmissionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftFormSubmission
+}
+
 type AstroliftIdentityProvider {
   id: GUID!
   organizationSlug: String!
@@ -1705,6 +1759,41 @@ type AstroliftSecretBundleMutationResult {
   data: AstroliftSecretBundle
 }
 
+type AstroliftSecretChangeApproval {
+  id: GUID!
+  approverUserId: String!
+  approverDisplayName: String!
+  decision: String!
+  decidedAt: DateTime!
+  reason: String!
+}
+
+type AstroliftSecretChangeProposal {
+  id: GUID!
+  registeredAppSlug: String!
+  environmentName: String!
+  op: String!
+  status: String!
+  proposerUserId: String!
+  proposerDisplayName: String!
+  payload: JSON!
+  payloadDiff: JSON!
+  requiredApproverCount: Int!
+  approvalsCount: Int!
+  expiresAt: DateTime!
+  decidedAt: DateTime
+  appliedAt: DateTime
+  applyError: String!
+  createdAt: DateTime!
+  approvals: [AstroliftSecretChangeApproval!]!
+}
+
+type AstroliftSecretChangeProposalMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftSecretChangeProposal
+}
+
 type AstroliftSecretEditor {
   id: String!
   username: String!
@@ -2059,6 +2148,7 @@ input AttachSecretBundleInput {
 type Attachmentremovedpayload {
   attachmentId: GUID!
   deleted: Boolean!
+  pendingProposalId: GUID
 }
 
 type AttachmentremovedpayloadMutationResult {
@@ -2319,6 +2409,10 @@ input DeleteAppSecretInput {
   key: String!
 }
 
+input DeleteFormDefinitionInput {
+  slug: String!
+}
+
 input DeleteRoleInput {
   id: GUID!
 }
@@ -2465,6 +2559,30 @@ enum ForecastConfidence {
   LOW
   MEDIUM
   HIGH
+}
+
+input FormDefinitionInput {
+  name: String!
+  slug: String!
+  schema: JSON!
+  description: String = null
+  fieldConfig: JSON = null
+  logicRules: JSON = null
+  scoring: JSON = null
+  formType: String = null
+  isPublic: Boolean = null
+}
+
+input FormDefinitionUpdateInput {
+  slug: String!
+  name: String = null
+  schema: JSON = null
+  description: String = null
+  fieldConfig: JSON = null
+  logicRules: JSON = null
+  scoring: JSON = null
+  formType: String = null
+  isPublic: Boolean = null
 }
 
 """UUID v7 — the platform's external identifier."""
@@ -2876,10 +2994,21 @@ type Mutation {
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
+  proposeSecretChange(input: ProposeSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  withdrawSecretChange(input: WithdrawSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
   requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
+  createFormDefinition(input: FormDefinitionInput!): AstroliftFormDefinitionMutationResult!
+  updateFormDefinition(input: FormDefinitionUpdateInput!): AstroliftFormDefinitionMutationResult!
+  publishForm(slug: String!): AstroliftFormDefinitionMutationResult!
+  archiveForm(slug: String!): AstroliftFormDefinitionMutationResult!
+  deleteFormDefinition(input: DeleteFormDefinitionInput!): AstroliftFormDefinitionMutationResult!
+  submitForm(slug: String!, payload: JSON!): AstroliftFormSubmissionMutationResult!
+  updateSubmissionStatus(submissionId: GUID!, status: String!): AstroliftFormSubmissionMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -3050,6 +3179,17 @@ type ProfileType {
   signature: UploadType
 }
 
+input ProposeSecretChangeInput {
+  appSlug: String!
+  op: String!
+  environmentName: String = null
+  key: String = null
+  value: String = null
+  bundleSlug: String = null
+  prefix: String = null
+  attachmentId: GUID = null
+}
+
 type Providerpluginconfigpayload {
   pluginSlug: String!
   organizationScoped: Boolean!
@@ -3203,6 +3343,8 @@ type Query {
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
+  astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
+  astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
@@ -3211,6 +3353,10 @@ type Query {
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
+  formDefinitions(status: String = null): [AstroliftFormDefinition!]!
+  formDefinition(slug: String!): AstroliftFormDefinition
+  formSubmissions(slug: String!, status: String = null): [AstroliftFormSubmission!]!
+  formFieldTypes: [String!]!
 
   """List all workflow definitions."""
   workflowDefinitions(modelLabel: String = null, includeDisabled: Boolean! = true): [WorkflowDefinitionType!]!
@@ -3284,6 +3430,11 @@ input RegisterTenantClusterInput {
 input RejectByTokenInput {
   token: String!
   reason: String = null
+}
+
+input RejectSecretChangeInput {
+  proposalId: GUID!
+  reason: String!
 }
 
 input RemoveAppDomainInput {
@@ -3725,6 +3876,10 @@ type WebhookSecretRevealMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: WebhookSecretReveal
+}
+
+input WithdrawSecretChangeInput {
+  proposalId: GUID!
 }
 
 type WorkflowDefinitionType {

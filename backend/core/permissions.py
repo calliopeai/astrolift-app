@@ -62,6 +62,7 @@ class Permission(enum.StrEnum):
     SECRET_READ = "secret.read"
     SECRET_WRITE = "secret.write"
     SECRET_LIST = "secret.list"
+    SECRET_APPROVE = "secret.approve"
 
     # --- Managed services -----------------------------------------
     MANAGED_SERVICE_CREATE = "managed_service.create"
