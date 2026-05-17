@@ -1389,6 +1389,10 @@ type AstroliftRegisteredApp {
   cronPaused: Boolean!
   deployBranch: String!
   previewScreenshotUrl: String!
+  webhookDeploysPaused: Boolean!
+  webhookDeploysPausedAt: DateTime
+  webhookDeploysPausedByEmail: String
+  webhookDeploysPauseReason: String!
   requiresApproval: Boolean!
   approverTeamId: GUID
   approverUserIds: [String!]!
@@ -2609,6 +2613,8 @@ type Mutation {
   resyncAstroliftManifestFromRepo(input: ResyncManifestFromRepoInput!): ResyncManifestPayloadMutationResult!
   assignAstroliftAppToProject(input: AssignAppToProjectInput!): AstroliftRegisteredAppMutationResult!
   updateAstroliftSecurityPolicy(input: UpdateSecurityPolicyInput!): AstroliftRegisteredAppMutationResult!
+  pauseAstroliftAppWebhookDeploys(input: PauseAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
+  resumeAstroliftAppWebhookDeploys(input: ResumeAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -2775,6 +2781,11 @@ type OrganizationType {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+}
+
+input PauseAppWebhookDeploysInput {
+  appSlug: String!
+  reason: String = null
 }
 
 type PermissionComparison {
@@ -3107,6 +3118,10 @@ input RequestQuotaIncreaseInput {
 
 input RestartWorkloadInput {
   workloadId: GUID!
+}
+
+input ResumeAppWebhookDeploysInput {
+  appSlug: String!
 }
 
 input ResyncManifestFromRepoInput {

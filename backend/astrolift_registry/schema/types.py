@@ -152,6 +152,16 @@ class RegisteredAppType:
     deploy_branch: str
     preview_screenshot_url: str
 
+    # App-global webhook-deploy pause (#399). Independent of the
+    # per-env axes. ``webhook_deploys_paused_by_email`` is rendered
+    # by the Settings card as "Paused by <email>"; null when no actor
+    # was captured (e.g. system-initiated automation). The reason
+    # string is empty unless the operator supplied one on pause.
+    webhook_deploys_paused: bool
+    webhook_deploys_paused_at: dt.datetime | None
+    webhook_deploys_paused_by_email: str | None
+    webhook_deploys_pause_reason: str
+
     # Approval policy (#291). ``approver_team_id`` is the team's GUID
     # (or null when no team gate is set); ``approver_user_ids`` are
     # Django user PKs as strings (matching ``AstroliftUser.id``).
@@ -482,6 +492,10 @@ def app_to_type(app, *, freshness: AppFreshness | None = None) -> RegisteredAppT
         cron_paused=bool(app.cron_paused),
         deploy_branch=app.deploy_branch,
         preview_screenshot_url=app.preview_screenshot_url or "",
+        webhook_deploys_paused=bool(app.webhook_deploys_paused),
+        webhook_deploys_paused_at=app.webhook_deploys_paused_at,
+        webhook_deploys_paused_by_email=_paused_by_email(app),
+        webhook_deploys_pause_reason=app.webhook_deploys_pause_reason or "",
         requires_approval=bool(app.requires_approval),
         approver_team_id=(GUID(str(app.approver_team.guid)) if app.approver_team_id else None),
         approver_user_ids=[str(uid) for uid in app.approver_users.values_list("pk", flat=True)],
@@ -496,6 +510,26 @@ def app_to_type(app, *, freshness: AppFreshness | None = None) -> RegisteredAppT
         last_deployed_at=(freshness.last_deployed_at if freshness else None),
         health_pulse=(freshness.pulse if freshness else None),
     )
+
+
+def _paused_by_email(app) -> str | None:
+    """Resolve the display email for the user who flipped
+    ``webhook_deploys_paused`` to True (#399).
+
+    Returns None when no actor is captured on the row — system-fired
+    pauses, or the column is null because the flag has never been set.
+    The User FK is set to NULL on user deletion (``on_delete=SET_NULL``)
+    so historic pauses don't go stale; we surface the empty case as
+    None and let the UI render "system" / "unknown" copy.
+    """
+    user_id = getattr(app, "webhook_deploys_paused_by_id", None)
+    if user_id is None:
+        return None
+    user = app.webhook_deploys_paused_by
+    if user is None:
+        return None
+    email = getattr(user, "email", "") or getattr(user, "username", "")
+    return email or None
 
 
 def _security_policy_to_type(app) -> SecurityPolicyType:
