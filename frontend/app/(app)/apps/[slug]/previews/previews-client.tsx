@@ -1,12 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  AlertTriangleIcon,
-  CalendarClockIcon,
-  GitPullRequestIcon,
-  TrashIcon,
-} from "lucide-react";
+import { AlertTriangleIcon, CalendarClockIcon, GitPullRequestIcon, TrashIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -30,10 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  EXTEND_PREVIEW_TTL,
-  TEAR_DOWN_PREVIEW,
-} from "@/graphql/lifecycle/lifecycle.mutations";
+import { EXTEND_PREVIEW_TTL, TEAR_DOWN_PREVIEW } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_PREVIEW_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftPreviewEnvironment,
@@ -57,10 +49,7 @@ interface MutationResultLite {
   errors: { code: string; message: string }[];
 }
 
-const statusToDot: Record<
-  PreviewStatus,
-  "ok" | "warn" | "error" | "muted" | "pending"
-> = {
+const statusToDot: Record<PreviewStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
   building: "pending",
   running: "ok",
   failed: "error",
@@ -158,17 +147,13 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   const [tearDown, tearState] = useMutation<{
     tearDownPreview: MutationResultLite;
   }>(TEAR_DOWN_PREVIEW, {
-    refetchQueries: [
-      { query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } },
-    ],
+    refetchQueries: [{ query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } }],
   });
 
   const [extendTtl, extendState] = useMutation<{
     extendPreviewTtl: MutationResultLite;
   }>(EXTEND_PREVIEW_TTL, {
-    refetchQueries: [
-      { query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } },
-    ],
+    refetchQueries: [{ query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug: slug } }],
   });
 
   const a = app.data?.astroliftApp;
@@ -177,7 +162,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
   const filtered = React.useMemo(
     () => list.filter((p) => matchesFilter(p, statusFilter)),
-    [list, statusFilter],
+    [list, statusFilter]
   );
 
   const counts = React.useMemo(
@@ -188,12 +173,12 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       tornDown: list.filter((p) => p.status === "torn_down").length,
       total: list.length,
     }),
-    [list],
+    [list]
   );
 
   const stale = list.filter((p) => p.status !== "torn_down").filter(isStale);
   const [tearDownTarget, setTearDownTarget] = React.useState<AstroliftPreviewEnvironment | null>(
-    null,
+    null
   );
 
   // Live countdown ticker. Re-renders every 60s — that's the right
@@ -279,12 +264,8 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
           <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
             <CalendarClockIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
             <div className="flex-1">
-              <CardTitle className="text-sm">
-                {t("stale.title", { count: stale.length })}
-              </CardTitle>
-              <CardDescription>
-                {t("stale.description", { days: STALE_DAYS })}
-              </CardDescription>
+              <CardTitle className="text-sm">{t("stale.title", { count: stale.length })}</CardTitle>
+              <CardDescription>{t("stale.description", { days: STALE_DAYS })}</CardDescription>
             </div>
           </CardHeader>
         </Card>
@@ -338,16 +319,10 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                 title={t("empty.title")}
                 description={a.previewEnabled ? t("empty.enabledHint") : t("empty.disabledHint")}
                 actionHref={
-                  a.previewEnabled
-                    ? a.sourceUrl ?? undefined
-                    : `/apps/${a.slug}/config`
+                  a.previewEnabled ? (a.sourceUrl ?? undefined) : `/apps/${a.slug}/config`
                 }
                 actionLabel={
-                  a.previewEnabled
-                    ? a.sourceUrl
-                      ? t("openRepo")
-                      : undefined
-                    : t("enablePreviews")
+                  a.previewEnabled ? (a.sourceUrl ? t("openRepo") : undefined) : t("enablePreviews")
                 }
                 learnMoreHref={DOCS_PREVIEWS_HREF}
                 learnMoreLabel={t("empty.learnMore")}
@@ -355,9 +330,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
               />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-muted-foreground p-10 text-center text-sm">
-              {t("filterEmpty")}
-            </div>
+            <div className="text-muted-foreground p-10 text-center text-sm">{t("filterEmpty")}</div>
           ) : (
             <TooltipProvider delayDuration={200}>
               <Table>
@@ -408,9 +381,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
           if (!next) setTearDownTarget(null);
         }}
         title={
-          tearDownTarget
-            ? t("confirmTitle", { pr: tearDownTarget.prNumber })
-            : t("confirmFallback")
+          tearDownTarget ? t("confirmTitle", { pr: tearDownTarget.prNumber }) : t("confirmFallback")
         }
         description={
           tearDownTarget
@@ -503,17 +474,13 @@ function PreviewRow({
                 <span
                   className={cn(
                     "font-mono text-xs",
-                    countdown.expired
-                      ? "text-rose-600 dark:text-rose-400"
-                      : "text-muted-foreground",
+                    countdown.expired ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
                   )}
                 >
                   {countdown.label}
                 </span>
               </TooltipTrigger>
-              <TooltipContent>
-                {t("ttlTooltip", { date: ttlDate.toLocaleString() })}
-              </TooltipContent>
+              <TooltipContent>{t("ttlTooltip", { date: ttlDate.toLocaleString() })}</TooltipContent>
             </Tooltip>
             <Can permission="app.deploy">
               <div className="flex items-center gap-1">
@@ -583,12 +550,7 @@ function PreviewRow({
       <TableCell className="text-right">
         {teardown && (
           <Can permission="app.deploy">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={tearLoading}
-              onClick={onTearDown}
-            >
+            <Button size="sm" variant="outline" disabled={tearLoading} onClick={onTearDown}>
               <TrashIcon className="size-3" /> {t("tearDown")}
             </Button>
           </Can>
