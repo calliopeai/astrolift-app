@@ -50,6 +50,30 @@ export const UPDATE_APP = gql`
   }
 `;
 
+/**
+ * Rename the platform-managed subdomain for an app (#408). The
+ * backend enforces uniqueness within the install and re-issues DNS;
+ * the FE just refetches `GET_APP` so the new host string flows
+ * through topology, the URL card, and the Open button.
+ */
+export const SET_APP_SUBDOMAIN = gql`
+  mutation SetAppSubdomain($input: SetAppSubdomainInput!) {
+    setAppSubdomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        subdomain
+      }
+    }
+  }
+`;
+
 export const SOFT_DELETE_APP = gql`
   mutation SoftDeleteApp($input: SoftDeleteAppInput!) {
     softDeleteApp(input: $input) {
