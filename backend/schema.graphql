@@ -162,6 +162,8 @@ type AstroliftApiToken {
   scopes: [String!]!
   expiresAt: DateTime
   lastUsedAt: DateTime
+  lastUsedIp: String
+  lastUsedAgent: String
   isRevoked: Boolean!
   createdAt: DateTime!
 }
