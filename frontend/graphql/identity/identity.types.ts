@@ -57,10 +57,7 @@ export type AstroliftTeam = Omit<GeneratedTeam, "organization"> & {
   organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
 };
 
-export type AstroliftProject = Omit<
-  GeneratedProject,
-  "organization" | "team"
-> & {
+export type AstroliftProject = Omit<GeneratedProject, "organization" | "team"> & {
   organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;
   team: Pick<AstroliftTeam, "id" | "slug" | "name">;
 };
@@ -70,11 +67,7 @@ export type AstroliftProject = Omit<
  * backend (pending/provisioning/ready/failed). The schema exposes it
  * as a free `String!` so narrow it here for switch exhaustiveness.
  */
-export type AstroliftAppStatus =
-  | "pending"
-  | "provisioning"
-  | "ready"
-  | "failed";
+export type AstroliftAppStatus = "pending" | "provisioning" | "ready" | "failed";
 
 export type AstroliftAppSummary = Omit<GeneratedAppSummary, "status"> & {
   status: AstroliftAppStatus;
@@ -111,18 +104,12 @@ export type AstroliftRoleBinding = Omit<GeneratedRoleBinding, "scopeKind"> & {
   scopeKind: ScopeKind;
 };
 
-export type AstroliftPolicy = Omit<
-  GeneratedPolicy,
-  "scopeLevel" | "effect"
-> & {
+export type AstroliftPolicy = Omit<GeneratedPolicy, "scopeLevel" | "effect"> & {
   scopeLevel: ScopeKind;
   effect: PolicyEffect;
 };
 
-export type AstroliftIdentityProvider = Omit<
-  GeneratedIdentityProvider,
-  "kind"
-> & {
+export type AstroliftIdentityProvider = Omit<GeneratedIdentityProvider, "kind"> & {
   kind: IdpKind;
 };
 
@@ -130,18 +117,14 @@ export type AstroliftApiToken = GeneratedApiToken;
 
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 
-export type AstroliftInvitation = Omit<
-  GeneratedInvitation,
-  "scopeKind" | "status"
-> & {
+export type AstroliftInvitation = Omit<GeneratedInvitation, "scopeKind" | "status"> & {
   scopeKind: ScopeKind;
   status: InvitationStatus;
 };
 
 export type AstroliftApiTokenPlaintext = GeneratedApiTokenPlaintext;
 
-export type AstroliftOrganizationAllowlistedDomain =
-  GeneratedOrganizationAllowlistedDomain;
+export type AstroliftOrganizationAllowlistedDomain = GeneratedOrganizationAllowlistedDomain;
 
 export type AstroliftActiveSession = GeneratedActiveSession;
 
@@ -177,4 +160,27 @@ export interface AstroliftConnectUserSourceProviderPayload {
 export interface AstroliftDisconnectUserSourceProviderPayload {
   providerConfigId: string;
   disconnectedId: string | null;
+}
+
+/** Per-id outcome row for a bulk identity mutation. */
+export interface AstroliftBulkOpItemResult {
+  id: AstroliftGuid;
+  ok: boolean;
+  alreadyExisted: boolean;
+  errors: MutationError[];
+}
+
+/** Payload of `bulkRevokeAstroliftRoleBindings`. */
+export interface AstroliftBulkRevokeRoleBindingsPayload {
+  results: AstroliftBulkOpItemResult[];
+  revokedCount: number;
+  failedCount: number;
+}
+
+/** Payload of `bulkAssignAstroliftTeamMemberRoles`. */
+export interface AstroliftBulkAssignTeamMemberRolesPayload {
+  results: AstroliftBulkOpItemResult[];
+  assignedCount: number;
+  alreadyAssignedCount: number;
+  failedCount: number;
 }

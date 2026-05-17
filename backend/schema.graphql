@@ -472,6 +472,19 @@ type AstroliftBudget {
   alertsAtPct: [Int!]!
 }
 
+type AstroliftBulkAssignTeamMemberRolesPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  assignedCount: Int!
+  alreadyAssignedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkAssignTeamMemberRolesPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkAssignTeamMemberRolesPayload
+}
+
 type AstroliftBulkDeploymentResultData {
   results: [AstroliftBulkDeploymentResultItem!]!
   succeededCount: Int!
@@ -489,6 +502,25 @@ type AstroliftBulkDeploymentResultItem {
   ok: Boolean!
   errors: [MutationError!]!
   deployment: AstroliftDeployment
+}
+
+type AstroliftBulkOpItemResult {
+  id: GUID!
+  ok: Boolean!
+  alreadyExisted: Boolean!
+  errors: [MutationError!]!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayload {
+  results: [AstroliftBulkOpItemResult!]!
+  revokedCount: Int!
+  failedCount: Int!
+}
+
+type AstroliftBulkRevokeRoleBindingsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBulkRevokeRoleBindingsPayload
 }
 
 type AstroliftCancelDeregisterPayload {
@@ -1887,6 +1919,12 @@ input BulkApproveDeploymentsInput {
   reason: String = null
 }
 
+input BulkAssignTeamMemberRolesInput {
+  teamId: GUID!
+  roleId: GUID!
+  memberIds: [GUID!]!
+}
+
 input BulkImportAppSecretsInput {
   appSlug: String!
   dotenvText: String!
@@ -1895,6 +1933,10 @@ input BulkImportAppSecretsInput {
 input BulkRejectDeploymentsInput {
   deploymentIds: [GUID!]!
   reason: String!
+}
+
+input BulkRevokeRoleBindingsInput {
+  bindingIds: [GUID!]!
 }
 
 type Bulkimportpayload {
@@ -2515,6 +2557,8 @@ type Mutation {
   softDeleteProject(input: SoftDeleteByGuidInput!): SoftdeletepayloadMutationResult!
   grantRole(input: GrantRoleInput!): AstroliftRoleBindingMutationResult!
   revokeRoleBinding(input: RevokeRoleBindingInput!): SoftdeletepayloadMutationResult!
+  bulkRevokeAstroliftRoleBindings(input: BulkRevokeRoleBindingsInput!): AstroliftBulkRevokeRoleBindingsPayloadMutationResult!
+  bulkAssignAstroliftTeamMemberRoles(input: BulkAssignTeamMemberRolesInput!): AstroliftBulkAssignTeamMemberRolesPayloadMutationResult!
   createRole(input: CreateRoleInput!): AstroliftRoleMutationResult!
   updateRole(input: UpdateRoleInput!): AstroliftRoleMutationResult!
   softDeleteRole(input: DeleteRoleInput!): SoftdeletepayloadMutationResult!
@@ -2633,10 +2677,10 @@ type Mutation {
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
-  requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
+  requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
 
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
@@ -2869,6 +2913,7 @@ type Query {
   astroliftProjects: [AstroliftProject!]!
   astroliftNavTree: AstroliftNavTree
   astroliftMembers: [AstroliftMember!]!
+  astroliftTeamMembers(teamId: GUID!): [AstroliftMember!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]!
   astroliftRoles: [AstroliftRole!]!
   astroliftRoleBindings: [AstroliftRoleBinding!]!

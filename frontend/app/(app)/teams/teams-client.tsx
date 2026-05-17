@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -98,7 +99,11 @@ export function TeamsClient() {
               <TableBody>
                 {list.map((team) => (
                   <TableRow key={team.id}>
-                    <TableCell className="font-medium">{team.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/teams/${team.slug}`} className="hover:underline">
+                        {team.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground font-mono text-xs">
                       {team.slug}
                     </TableCell>
