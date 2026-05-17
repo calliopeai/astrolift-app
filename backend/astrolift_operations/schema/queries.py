@@ -25,6 +25,7 @@ from astrolift_operations.models import (
     WorkflowRun,
 )
 from astrolift_operations.schema.types import (
+    ActivityPageType,
     AlertEventType,
     AlertRuleType,
     AppMetricsPointType,
@@ -43,6 +44,7 @@ from astrolift_operations.schema.types import (
     audit_to_type,
     event_to_type,
     notification_to_type,
+    shape_activity_item,
     webhook_delivery_to_type,
     webhook_to_type,
     workflow_run_to_type,
@@ -124,6 +126,67 @@ class OperationsQuery:
         )
         return EventPageType(
             items=[event_to_type(e) for e in items],
+            next_cursor=next_cursor,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ)
+    @tenant_scoped()
+    def astrolift_recent_activity(
+        self,
+        info: Info,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> ActivityPageType:
+        """Cursor-paginated lifecycle activity feed for the dashboard
+        landing card (#435).
+
+        Filters the raw ``Event`` stream down to operator-relevant
+        lifecycle facts — deploys, config syncs, scaling, cluster
+        bring-in, secret rotations, and the like. The set of prefixes
+        is intentionally permissive (``_LIFECYCLE_EVENT_PREFIXES``):
+        new emit sites slot in for free as long as they follow the
+        ``{resource}.{action}`` naming convention. The
+        ``astroliftEventsPage`` query still exposes the unfiltered
+        stream for the audit / events surface.
+
+        Cursor shape matches ``astroliftEventsPage`` — base64-JSON of
+        ``[occurred_at_iso, guid_str]`` over the
+        ``(-occurred_at, -guid)`` seek key. Cursors round-trip across
+        queries since the underlying table is the same, but callers
+        shouldn't rely on that.
+
+        The resolver pre-shapes each row into ``AstroliftActivityItem``
+        — actor display, action verb, target label, and the
+        canonical drill-down route — so the dashboard doesn't have to
+        decode payloads. ``select_related`` on ``actor_user`` /
+        ``registered_app`` keeps the per-row lookups off the per-page
+        hot path.
+        """
+        page_size = max(1, min(limit, 100))
+        qs = (
+            Event.objects.select_related("actor_user", "registered_app")
+            .filter(_lifecycle_event_filter())
+            .order_by("-occurred_at", "-guid")
+        )
+        if cursor:
+            decoded = _decode_event_cursor(cursor)
+            if decoded is not None:
+                from django.db.models import Q
+
+                cursor_at, cursor_guid = decoded
+                qs = qs.filter(
+                    Q(occurred_at__lt=cursor_at) | (Q(occurred_at=cursor_at) & Q(guid__lt=cursor_guid))
+                )
+        rows = list(qs[: page_size + 1])
+        items = rows[:page_size]
+        next_cursor = (
+            _encode_event_cursor(items[-1].occurred_at, str(items[-1].guid))
+            if len(rows) > page_size and items
+            else None
+        )
+        return ActivityPageType(
+            items=[shape_activity_item(e) for e in items],
             next_cursor=next_cursor,
         )
 
@@ -452,6 +515,46 @@ class OperationsQuery:
             qs = qs.filter(resolved_at__isnull=True)
         qs = qs.order_by("-fired_at")[: max(1, min(limit, 500))]
         return [alert_event_to_type(e) for e in qs]
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle event filter (dashboard activity feed, #435)
+# ---------------------------------------------------------------------------
+
+# Event-type prefixes the dashboard activity feed surfaces. The list
+# is permissive on purpose — every operator-relevant lifecycle fact
+# follows the ``{resource}.{action}`` naming convention so new emit
+# sites are picked up without a backend change. Anything outside
+# this set (audit, webhook test-fires, etc.) stays out of the
+# dashboard but is still queryable via ``astroliftEventsPage``.
+_LIFECYCLE_EVENT_PREFIXES: tuple[str, ...] = (
+    "app.",
+    "deploy.",
+    "deployment.",
+    "cluster.",
+    "config.",
+    "secret.",
+    "scale.",
+    "service.",
+    "binding.",
+    "managed_service.",
+    "preview.",
+    "promotion.",
+    "rollback.",
+    "drift.",
+    "environment.",
+)
+
+
+def _lifecycle_event_filter():
+    """Build the ``Q`` filter that matches any event whose
+    ``event_type`` begins with one of the lifecycle prefixes."""
+    from django.db.models import Q
+
+    q = Q()
+    for prefix in _LIFECYCLE_EVENT_PREFIXES:
+        q |= Q(event_type__startswith=prefix)
+    return q
 
 
 # ---------------------------------------------------------------------------
