@@ -54,7 +54,7 @@ def test_not_found_is_shared_helper_exception() -> None:
 
 
 def test_build_in_cluster_loads_incluster_config() -> None:
-    fake_client, fake_config, fake_api_client = _patched_kubernetes()
+    fake_client, fake_config, _fake_api_client = _patched_kubernetes()
     # The factory does ``from kubernetes import client, config``; we
     # can't patch the import statement directly, so patch the bound
     # names on the kubernetes package and also seed ``sys.modules`` so
