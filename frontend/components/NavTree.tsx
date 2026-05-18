@@ -338,21 +338,19 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
       <SidebarMenuSubItem>
         <SidebarMenuSubButton
           asChild
-          className="group/team !w-full !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+          className="group/team !flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
         >
-          <div className="flex w-full items-start">
+          <div className="flex w-full min-w-0 items-start gap-2">
+            <UsersIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
             <Link
               href={`/teams?team=${encodeURIComponent(node.team.slug)}`}
-              className="flex flex-1 items-start gap-2 min-w-0"
+              className="flex-1 min-w-0 break-words whitespace-normal text-left leading-tight"
               title={node.team.name}
             >
-              <UsersIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
-              <span className="break-words whitespace-normal flex-1 min-w-0">
-                {node.team.name}
-              </span>
+              {node.team.name}
             </Link>
             <CollapsibleTrigger
-              className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              className="-mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
               aria-label={`Toggle ${node.team.name}`}
             >
               <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/team:rotate-90" />
@@ -415,21 +413,19 @@ function ProjectNode({
       <SidebarMenuSubItem>
         <SidebarMenuSubButton
           asChild
-          className="group/project !w-full !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+          className="group/project !flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
         >
-          <div className="flex w-full items-start">
+          <div className="flex w-full min-w-0 items-start gap-2">
+            <FileBoxIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
             <Link
               href={`/projects/${encodeURIComponent(node.project.slug)}`}
-              className="flex flex-1 items-start gap-2 min-w-0"
+              className="flex-1 min-w-0 break-words whitespace-normal text-left leading-tight"
               title={node.project.name}
             >
-              <FileBoxIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
-              <span className="break-words whitespace-normal flex-1 min-w-0">
-                {node.project.name}
-              </span>
+              {node.project.name}
             </Link>
             <CollapsibleTrigger
-              className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              className="-mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
               aria-label={`Toggle ${node.project.name}`}
             >
               <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/project:rotate-90" />
@@ -471,19 +467,19 @@ function AppLeaf({ app, active }: AppLeafProps) {
       <SidebarMenuSubButton
         asChild
         isActive={active}
-        className="!w-full !h-auto !min-h-7 !overflow-visible py-1 [&>span:last-child]:!whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip"
+        className="!flex !w-full !max-w-none !h-auto !min-h-7 !overflow-visible !whitespace-normal py-1 [&>span:last-child]:!text-clip [&>span:last-child]:!overflow-visible [&>span:last-child]:!whitespace-normal"
       >
         <Link
           href={`/apps/${app.slug}`}
           aria-current={active ? "page" : undefined}
-          className="flex items-start gap-2 min-w-0 w-full"
+          className="flex w-full min-w-0 items-start gap-2"
           title={app.name}
         >
           {statusIcon(app.status)}
           <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
           <span
             className={cn(
-              "!whitespace-normal !overflow-visible !text-clip break-words flex-1 min-w-0",
+              "flex-1 min-w-0 break-words whitespace-normal leading-tight",
               active && "font-semibold text-sidebar-accent-foreground",
             )}
           >
