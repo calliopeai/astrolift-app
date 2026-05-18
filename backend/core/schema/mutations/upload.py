@@ -4,6 +4,7 @@ Includes PreSignedUrlImageUploadMutation, ConfirmPreSignedUrlImageUploadMutation
 DataImportFileUploadMutation, ProcessFileMutation, FileUploadMutation,
 and ProfileImageFieldUploadMutation.
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,6 +28,7 @@ from strawberry.relay import from_base64
 # Optional import - Domain-specific functionality
 try:
     from domain_app.models import Employee
+
     HAS_DOMAIN_APP = True
 except ImportError:
     Employee = None
@@ -47,6 +49,7 @@ ProfileImageFieldEnum = strawberry.enum(Profile.ImageField, name="ProfileImageFi
 # ---------------------------------------------------------------------------
 # Response types
 # ---------------------------------------------------------------------------
+
 
 @strawberry.type
 class PreSignedUrlUploadResult:
@@ -92,6 +95,7 @@ class ProfileImageFieldUploadResult:
 # Shared create_upload helper (mirrors PreSignedUrlImageUploadMutation.create_upload)
 # ---------------------------------------------------------------------------
 
+
 def _exists_global_id_guard(info, global_id: str):
     """Ensure the entity referenced by global_id exists."""
     type_name, pk = GlobalIDUtils.from_global_id(global_id)
@@ -116,6 +120,7 @@ def create_upload(
     """
     _exists_global_id_guard(info, global_id)
     from organization.models import Organization
+
     organization: Organization = info.context.user.profile.organization()
     upload_location: Upload.Location = location and Upload.Location(location) or Upload.Location.STATIC
     uuid = uuid or (upload and upload.id) or uuid4()
@@ -128,7 +133,7 @@ def create_upload(
     )
     public_url = Upload.generate_pre_signed_url_for_get(path, content_type=mimetype)
     if upload_location == Upload.Location.PUBLIC:
-        public_url = public_url.split('?')[0]
+        public_url = public_url.split("?")[0]
     if upload is None:
         pre_signed_url = Upload.generate_pre_signed_url_for_put(path, content_type=mimetype)
         upload, _created = Upload.objects.update_or_create(
@@ -139,12 +144,17 @@ def create_upload(
                 content_type=mimetype,
                 target_global_id=global_id,
                 created_by=info.context.user,
+                # #537: persist the resolved tenant so
+                # UploadQuerySet.with_view_permission can filter rows
+                # back to the owning organization. Previously NULL,
+                # which kept the queryset from being able to scope.
+                organization=organization,
                 metadata=metadata,
                 location=upload_location.value,
                 path=path,
                 name=name,
                 description=description,
-            )
+            ),
         )
     else:
         upload.metadata = metadata
@@ -156,12 +166,12 @@ def create_upload(
 # Mutations
 # ---------------------------------------------------------------------------
 
+
 @strawberry.type
 class UploadMutations:
-
     @strawberry.mutation(
         description="Get a pre-signed URL for uploading an image or file. "
-                    "Optionally attach it to an entity via owner_container_property."
+        "Optionally attach it to an entity via owner_container_property."
     )
     def pre_signed_url_image_upload(
         self,
@@ -186,7 +196,7 @@ class UploadMutations:
         )
 
         model_name, pk = GlobalIDUtils.from_global_id(global_id)
-        model_name_lower: str = model_name.replace('Type', '').lower()
+        model_name_lower: str = model_name.replace("Type", "").lower()
 
         ct = ContentType.objects.get(model=model_name_lower)
         model = ct.model_class()
@@ -194,15 +204,13 @@ class UploadMutations:
         if owner_container_property:
             if not hasattr(model, owner_container_property):
                 raise ValueError(
-                    f'Property {owner_container_property} is not a member of type {model_name_lower}'
+                    f"Property {owner_container_property} is not a member of type {model_name_lower}"
                 )
 
             match type(model._meta.get_field(owner_container_property)).__name__:
                 case "ManyToManyField" if model is SharedDirectory:
                     if name is None:
-                        raise ValueError(
-                            f'Property {name} is required uploading a file to Shared Directory'
-                        )
+                        raise ValueError(f"Property {name} is required uploading a file to Shared Directory")
                     shared_directory: SharedDirectory = model.objects.filter(pk=pk).first()
                     shared_file = SharedFile(
                         file=upload,
@@ -218,11 +226,11 @@ class UploadMutations:
                     owner_model.save()
                 case "ForeignKey":
                     owner_model = model.objects.filter(pk=pk).first()
-                    setattr(owner_model, owner_container_property + '_id', upload.id)
+                    setattr(owner_model, owner_container_property + "_id", upload.id)
                     owner_model.save()
                 case _:
                     raise ValueError(
-                        f'Created upload cannot be attach to target property {owner_container_property}'
+                        f"Created upload cannot be attach to target property {owner_container_property}"
                     )
 
         return PreSignedUrlUploadResult(
@@ -233,8 +241,7 @@ class UploadMutations:
         )
 
     @strawberry.mutation(
-        description="Confirm or update a previously uploaded file. "
-                    "Set delete=true to soft-delete the upload."
+        description="Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload."
     )
     def confirm_pre_signed_url_image_upload(
         self,
@@ -249,7 +256,7 @@ class UploadMutations:
 
         if not upload_id and not public_url:
             raise GraphQLError(
-                'Requires either an upload id or a public URL to complete the update/confirmation.'
+                "Requires either an upload id or a public URL to complete the update/confirmation."
             )
         if upload_id:
             upload = UploadType.get_object(info, global_id=upload_id, raise_not_found=True)
@@ -265,7 +272,7 @@ class UploadMutations:
         if delete:
             upload.deleted_by = info.context.user
             upload.deleted_at = datetime.now()
-            logger.info(f'Marking upload with id {upload.id} as deleted')
+            logger.info(f"Marking upload with id {upload.id} as deleted")
 
         upload.save()
         return ConfirmUploadResult(ack=True)
@@ -278,12 +285,10 @@ class UploadMutations:
         metadata: Optional[strawberry.scalars.JSON] = None,
     ) -> DataImportUploadResult:
         if mimetype not in FileType.labels:
-            raise GraphQLError(
-                'Invalid mimetype, must be one of {}'.format(', '.join(FileType.labels))
-            )
+            raise GraphQLError("Invalid mimetype, must be one of {}".format(", ".join(FileType.labels)))
 
         if not HAS_DOMAIN_APP:
-            raise GraphQLError('Data import feature requires domain app')
+            raise GraphQLError("Data import feature requires domain app")
 
         employee: Employee = Employee.objects.filter(
             membership__member_id=info.context.user.id,
@@ -291,7 +296,7 @@ class UploadMutations:
         ).first()
 
         if not employee:
-            raise GraphQLError('No active employee found for current user')
+            raise GraphQLError("No active employee found for current user")
 
         upload = create_upload(
             info=info,
@@ -330,10 +335,12 @@ class UploadMutations:
 
         process = AwsProcessSystem.process(process, info.context.user)
         error_count = DataProcessEntity.objects.filter(
-            process=process, status__exact=ProcessStatus.FAILED,
+            process=process,
+            status__exact=ProcessStatus.FAILED,
         ).count()
         success_count = DataProcessEntity.objects.filter(
-            process=process, status__exact=ProcessStatus.DONE,
+            process=process,
+            status__exact=ProcessStatus.DONE,
         ).count()
 
         return ProcessFileResult(
@@ -344,8 +351,7 @@ class UploadMutations:
         )
 
     @strawberry.mutation(
-        description="Upload a file and get a pre-signed URL. "
-                    "Creates a FileUpload wrapper around the Upload."
+        description="Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload."
     )
     def file_upload(
         self,
@@ -388,7 +394,7 @@ class UploadMutations:
 
     @strawberry.mutation(
         description="Upload an image for a specific profile image field (avatar, signature). "
-                    "Supports the approval request workflow for non-whitelisted fields."
+        "Supports the approval request workflow for non-whitelisted fields."
     )
     def profile_image_field_upload(
         self,
@@ -401,6 +407,7 @@ class UploadMutations:
         # Optional import - Domain-specific functionality
         try:
             from domain_app.models import ApprovalRequest
+
             has_domain_app = True
         except ImportError:
             ApprovalRequest = None
@@ -417,7 +424,12 @@ class UploadMutations:
             # Skip approval request flow
             return ProfileImageFieldUploadResult(
                 upload=self._save_profile_upload(
-                    field, global_id, info, metadata, mimetype, profile_original,
+                    field,
+                    global_id,
+                    info,
+                    metadata,
+                    mimetype,
+                    profile_original,
                 )
             )
 
@@ -425,19 +437,29 @@ class UploadMutations:
 
         if has_domain_app:
             with ApprovalRequest.objects.for_instance(
-                    instance=draft,
-                    permission=P.PROFILE_APPROVE_CHANGES.perm(),
-                    created_by=info.context.user,
+                instance=draft,
+                permission=P.PROFILE_APPROVE_CHANGES.perm(),
+                created_by=info.context.user,
             ):
                 profile = draft
                 profile.document_option = Profile.DocumentOptions.DRAFTED
                 upload = self._save_profile_upload(
-                    field, global_id, info, metadata, mimetype, profile,
+                    field,
+                    global_id,
+                    info,
+                    metadata,
+                    mimetype,
+                    profile,
                 )
         else:
             profile = draft
             upload = self._save_profile_upload(
-                field, global_id, info, metadata, mimetype, profile,
+                field,
+                global_id,
+                info,
+                metadata,
+                mimetype,
+                profile,
             )
 
         return ProfileImageFieldUploadResult(upload=upload)
