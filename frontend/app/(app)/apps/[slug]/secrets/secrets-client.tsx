@@ -74,6 +74,7 @@ import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.
 import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 
 import { AppTabs } from "../components/app-tabs";
+import { PushAndRotateButton } from "../components/ci-setup-section";
 
 const ALL_ENVS = "__all__";
 
@@ -354,6 +355,16 @@ export function SecretsClient({ slug }: { slug: string }) {
       }
       actions={
         <>
+          {/* #681 — mirror the Settings tab's "Push & rotate" affordance
+              here, where an operator's mental model says "I'm working
+              with secrets, that belongs in this view". The Settings card
+              wraps the same button with an explanatory blurb; the
+              toolbar surfaces the action without the prose since the
+              operator already knows what it does by the time they hit
+              this page. */}
+          <Can permission="app.deploy">
+            <PushAndRotateButton appSlug={slug} variant="outline" label="Push to GitHub" />
+          </Can>
           <Can permission="app.deploy">
             <Button variant="outline" onClick={() => setBulkOpen(true)}>
               <UploadIcon className="size-4" />
