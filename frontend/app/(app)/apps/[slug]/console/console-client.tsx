@@ -179,22 +179,76 @@ export function ConsoleClient({ slug }: { slug: string }) {
     },
   });
 
+  // #674 — prefilled command palette. Each shortcut is a frequent
+  // operator action; clicking the row copies the command. Grouped by
+  // intent (shell / runtime / observability / lifecycle) but rendered
+  // flat for now since the list is short. Templates take the app slug
+  // so the command is paste-ready for the current app.
   const sampleCommands = React.useMemo(
     () => [
+      // Interactive shell + REPL — fastest way to land inside a pod
       {
         key: "openShell" as const,
         label: t("shortcuts.openShell"),
         template: (s: string) => `astro exec --app=${s} -- bash`,
       },
       {
+        key: "djangoShell" as const,
+        label: "Open Django shell (Python)",
+        template: (s: string) => `astro exec --app=${s} -- python manage.py shell`,
+      },
+      {
+        key: "dbShell" as const,
+        label: "Open psql against DATABASE_URL",
+        template: (s: string) => `astro exec --app=${s} -- bash -lc 'psql "$DATABASE_URL"'`,
+      },
+      {
+        key: "redisShell" as const,
+        label: "Open redis-cli against REDIS_URL",
+        template: (s: string) => `astro exec --app=${s} -- bash -lc 'redis-cli -u "$REDIS_URL"'`,
+      },
+      // Migrations — Django and Flask/Alembic variants
+      {
         key: "djangoCmd" as const,
         label: t("shortcuts.djangoCmd"),
         template: (s: string) => `astro exec --app=${s} -- python manage.py migrate --check`,
       },
       {
+        key: "djangoMigrate" as const,
+        label: "Run Django migrations",
+        template: (s: string) => `astro exec --app=${s} -- python manage.py migrate --noinput`,
+      },
+      {
+        key: "flaskUpgrade" as const,
+        label: "Run Flask / Alembic upgrade",
+        template: (s: string) => `astro exec --app=${s} -- flask db upgrade`,
+      },
+      // Observability — logs + recent deploys + env
+      {
         key: "tailLogs" as const,
         label: t("shortcuts.tailLogs"),
         template: (s: string) => `astro logs --app=${s} --follow`,
+      },
+      {
+        key: "recentLogs" as const,
+        label: "Last 200 log lines",
+        template: (s: string) => `astro logs --app=${s} --tail=200`,
+      },
+      {
+        key: "envDump" as const,
+        label: "Dump pod environment (debug missing var)",
+        template: (s: string) => `astro exec --app=${s} -- bash -lc 'env | sort'`,
+      },
+      // Lifecycle — deploy + rollback
+      {
+        key: "deploy" as const,
+        label: "Trigger a deploy",
+        template: (s: string) => `astro deploy --app=${s}`,
+      },
+      {
+        key: "rollback" as const,
+        label: "Rollback to previous deploy",
+        template: (s: string) => `astro deploy --app=${s} --rollback`,
       },
     ],
     [t]
