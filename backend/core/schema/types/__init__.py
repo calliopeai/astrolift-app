@@ -1,7 +1,6 @@
 from .address import AddressType
 from .library import SharedDirectoryType, SharedFileType
 from .localization import SiteLabelType
-from .metabase import MetabaseChartType, MetabaseUnimportedChartType
 from .notification import NotificationType
 from .permissions import (
     ContentTypeType,
@@ -27,8 +26,6 @@ __all__ = [
     'SharedDirectoryType',
     'SharedFileType',
     'SiteLabelType',
-    'MetabaseChartType',
-    'MetabaseUnimportedChartType',
     'NotificationType',
     'ContentTypeType',
     'FieldPermissionType',
