@@ -217,7 +217,24 @@ interface PushCiSecretsResp {
   };
 }
 
-function PushAndRotateAction({ appSlug }: { appSlug: string }) {
+/**
+ * "Push & rotate" affordance — the button + ConfirmDialog round-trip.
+ * Exported (#681) so the Secrets tab can mirror the action without
+ * duplicating the mutation wiring. The Settings page wraps this in a
+ * card-style block; the Secrets page uses just the button in its
+ * action toolbar.
+ */
+export function PushAndRotateButton({
+  appSlug,
+  size = "sm",
+  variant = "default",
+  label = "Push & rotate",
+}: {
+  appSlug: string;
+  size?: "sm" | "default";
+  variant?: "default" | "outline";
+  label?: string;
+}) {
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [push, { loading }] = useMutation<PushCiSecretsResp>(PUSH_CI_SECRETS_TO_REPO);
 
@@ -234,17 +251,10 @@ function PushAndRotateAction({ appSlug }: { appSlug: string }) {
   }
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium">Push & rotate</p>
-        <p className="text-muted-foreground text-xs">
-          Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the
-          deploy token as part of the round-trip.
-        </p>
-      </div>
+    <>
       <Button
-        size="sm"
-        variant="default"
+        size={size}
+        variant={variant}
         onClick={() => setConfirmOpen(true)}
         disabled={loading}
         className="gap-1.5"
@@ -254,7 +264,7 @@ function PushAndRotateAction({ appSlug }: { appSlug: string }) {
         ) : (
           <UploadCloudIcon className="size-3.5" />
         )}
-        Push &amp; rotate
+        {label}
       </Button>
       <ConfirmDialog
         open={confirmOpen}
@@ -264,6 +274,21 @@ function PushAndRotateAction({ appSlug }: { appSlug: string }) {
         confirmLabel="Push & rotate"
         onConfirm={handleConfirm}
       />
+    </>
+  );
+}
+
+function PushAndRotateAction({ appSlug }: { appSlug: string }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">Push & rotate</p>
+        <p className="text-muted-foreground text-xs">
+          Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the
+          deploy token as part of the round-trip.
+        </p>
+      </div>
+      <PushAndRotateButton appSlug={appSlug} />
     </div>
   );
 }
