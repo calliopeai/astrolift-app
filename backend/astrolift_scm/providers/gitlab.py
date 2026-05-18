@@ -533,3 +533,111 @@ def _gitlab_blob_url(*, base: str, repo_full_name: str, branch: str, file_path: 
     project = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/"))
     safe_path = "/".join(urllib.parse.quote(p, safe="") for p in file_path.split("/"))
     return f"{base}/{project}/-/blob/{urllib.parse.quote(branch)}/{safe_path}"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class OpenMergeRequestResult:
+    """Outcome of ``POST /projects/{id}/merge_requests``. ``url`` is
+    the operator-clickable MR page (``web_url`` on GitLab); ``number``
+    is the MR's ``iid`` (project-scoped) stringified for parity with
+    the GitHub PR number."""
+
+    url: str
+    number: str
+
+
+def open_gitlab_merge_request(
+    connection,
+    *,
+    repo_full_name: str,
+    head_branch: str,
+    base_branch: str,
+    title: str,
+    body: str,
+) -> OpenMergeRequestResult:
+    """Open a merge request via
+    ``POST /projects/{url-encoded full path}/merge_requests``.
+
+    Auth follows :func:`put_gitlab_file`: ``Authorization: Bearer
+    <token>`` regardless of whether the underlying credential is a
+    PAT or an OAuth user token.
+
+    Returns the MR's ``web_url`` + ``iid``. Errors map to recoverable
+    :class:`GitlabProviderError`:
+
+    - 401 / 403 → ``AUTH_FAILED``
+    - 404      → ``NOT_FOUND``
+    - 409 or 4xx body containing ``already exists`` → ``ALREADY_EXISTS``
+      (a sibling push already opened the MR; the mutation layer
+      surfaces the existing one rather than failing)
+    """
+    token = _token(connection)
+    base = _api_base(connection)
+    project = urllib.parse.quote(repo_full_name, safe="")
+    url = f"{base}/api/v4/projects/{project}/merge_requests"
+
+    body_payload = {
+        "source_branch": head_branch,
+        "target_branch": base_branch,
+        "title": title,
+        "description": body or "",
+        # Common-sense defaults for automation-opened MRs. The opener
+        # is the token bearer; squash-on-merge is left to the project's
+        # default policy so we don't fight the operator's CI config.
+        "remove_source_branch": False,
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body_payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GitlabProviderError(
+                "NOT_FOUND",
+                f"GitLab couldn't find project {repo_full_name}. Check the connection's project access.",
+                recoverable=True,
+            ) from exc
+        text = body_text.lower()
+        if exc.code == 409 or "already exists" in text:
+            raise GitlabProviderError(
+                "ALREADY_EXISTS",
+                f"a merge request from {head_branch!r} into {base_branch!r} is already open",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError(
+            "API_ERROR",
+            f"GitLab returned {exc.code}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+    web_url = (payload or {}).get("web_url") or ""
+    iid = (payload or {}).get("iid")
+    if not web_url or iid is None:
+        raise GitlabProviderError(
+            "UNEXPECTED_SHAPE",
+            "GitLab POST merge_requests response missing web_url or iid",
+        )
+    return OpenMergeRequestResult(url=web_url, number=str(iid))
