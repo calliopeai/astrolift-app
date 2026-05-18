@@ -17,7 +17,7 @@ Cost panel surface (#432):
 All cost numbers originate from ``CostSnapshot`` rows; the daily
 collector in ``astrolift_workflows.activities.scheduled`` populates
 those rows from each provider's live pricing/billing API
-(``vendor/astrolift-providers/<cloud>/cost.py``). The resolvers
+(``providers/<cloud>/cost.py``). The resolvers
 never invent or hard-code prices — empty trend / forecast means
 "no snapshots in the window" and the UI degrades to an empty state.
 """
