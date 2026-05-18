@@ -336,15 +336,20 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
-        <SidebarMenuSubButton asChild className="group/team">
-          <div className="flex w-full items-center">
+        <SidebarMenuSubButton
+          asChild
+          className="group/team !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+        >
+          <div className="flex w-full items-start">
             <Link
               href={`/teams?team=${encodeURIComponent(node.team.slug)}`}
-              className="flex flex-1 items-center gap-2 min-w-0"
+              className="flex flex-1 items-start gap-2 min-w-0"
               title={node.team.name}
             >
-              <UsersIcon className="shrink-0 text-sidebar-foreground/70" />
-              <span className="break-words">{node.team.name}</span>
+              <UsersIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
+              <span className="break-words whitespace-normal flex-1 min-w-0">
+                {node.team.name}
+              </span>
             </Link>
             <CollapsibleTrigger
               className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
@@ -408,15 +413,20 @@ function ProjectNode({
   return (
     <Collapsible open={isOpen} onOpenChange={() => toggle(key, true)} asChild>
       <SidebarMenuSubItem>
-        <SidebarMenuSubButton asChild className="group/project">
-          <div className="flex w-full items-center">
+        <SidebarMenuSubButton
+          asChild
+          className="group/project !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+        >
+          <div className="flex w-full items-start">
             <Link
               href={`/projects/${encodeURIComponent(node.project.slug)}`}
-              className="flex flex-1 items-center gap-2 min-w-0"
+              className="flex flex-1 items-start gap-2 min-w-0"
               title={node.project.name}
             >
-              <FileBoxIcon className="shrink-0 text-sidebar-foreground/70" />
-              <span className="break-words">{node.project.name}</span>
+              <FileBoxIcon className="shrink-0 text-sidebar-foreground/70 mt-0.5" />
+              <span className="break-words whitespace-normal flex-1 min-w-0">
+                {node.project.name}
+              </span>
             </Link>
             <CollapsibleTrigger
               className="ml-auto -mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
@@ -458,18 +468,22 @@ interface AppLeafProps {
 function AppLeaf({ app, active }: AppLeafProps) {
   return (
     <SidebarMenuSubItem>
-      <SidebarMenuSubButton asChild isActive={active}>
+      <SidebarMenuSubButton
+        asChild
+        isActive={active}
+        className="!h-auto !min-h-7 !overflow-visible py-1 [&>*]:!whitespace-normal [&_span]:!truncate-none [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+      >
         <Link
           href={`/apps/${app.slug}`}
           aria-current={active ? "page" : undefined}
-          className="flex items-center gap-2 min-w-0"
+          className="flex items-start gap-2 min-w-0 w-full"
           title={app.name}
         >
           {statusIcon(app.status)}
-          <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60" />
+          <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
           <span
             className={cn(
-              "break-words",
+              "break-words whitespace-normal flex-1 min-w-0",
               active && "font-semibold text-sidebar-accent-foreground",
             )}
           >
