@@ -471,7 +471,7 @@ function AppLeaf({ app, active }: AppLeafProps) {
       <SidebarMenuSubButton
         asChild
         isActive={active}
-        className="!h-auto !min-h-7 !overflow-visible py-1 [&>*]:!whitespace-normal [&_span]:!truncate-none [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+        className="!h-auto !min-h-7 !overflow-visible py-1 [&>span:last-child]:!whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip"
       >
         <Link
           href={`/apps/${app.slug}`}
@@ -483,7 +483,7 @@ function AppLeaf({ app, active }: AppLeafProps) {
           <RocketIcon className="size-3.5 shrink-0 text-sidebar-foreground/60 mt-0.5" />
           <span
             className={cn(
-              "break-words whitespace-normal flex-1 min-w-0",
+              "!whitespace-normal !overflow-visible !text-clip break-words flex-1 min-w-0",
               active && "font-semibold text-sidebar-accent-foreground",
             )}
           >
