@@ -2445,6 +2445,13 @@
     "elevating": "正在确认…",
     "indicator": "管理员模式还剩 {minutes, plural, one {#分钟} other {#分钟}}",
     "deelevateLabel": "立即结束管理员模式",
+    "sso": {
+      "title": "请重新认证以继续",
+      "description": "此操作需要最近的身份验证。我们将引导您前往身份提供商以确认身份。",
+      "providerHint": "在您的身份提供商确认您之后,您将返回此页面。",
+      "action": "重新认证",
+      "cancel": "取消"
+    },
     "errors": {
       "passwordRequired": "需要密码。",
       "generic": "无法确认您的密码。请重试。",

@@ -55,6 +55,15 @@ def dev_login(request):
     # Skip the authenticate() round-trip (no password check) — DEBUG-only.
     user.backend = f"{ModelBackend.__module__}.{ModelBackend.__qualname__}"
     login(request, user)
+    # #526 — dev-login impersonates a password-backed local session;
+    # carry that through so the step-up modal renders the password
+    # form (not the SSO redirect button) in local dev.
+    try:
+        from astrolift_identity.sessions import SESSION_LOGIN_METHOD_KEY
+
+        request.session[SESSION_LOGIN_METHOD_KEY] = "password"
+    except Exception:  # noqa: BLE001 — metadata stamping must never break dev-login
+        pass
     # auth1.Auth0SessionMiddleware.process_response intentionally
     # drops SessionMiddleware's auto-save behavior, so we have to
     # save + set-cookie ourselves. Without this, login() succeeds

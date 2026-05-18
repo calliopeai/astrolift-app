@@ -2485,6 +2485,13 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "elevating": "Verifying…",
+    "sso": {
+      "title": "Re-authenticate to continue",
+      "description": "This action requires recent authentication. We'll send you to your identity provider to confirm it's you.",
+      "providerHint": "You'll be redirected back to this page once your identity provider confirms you.",
+      "action": "Re-authenticate",
+      "cancel": "Cancel"
+    },
     "errors": {
       "passwordRequired": "Password is required.",
       "generic": "Verification failed. Try again.",

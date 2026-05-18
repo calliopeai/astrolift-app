@@ -537,6 +537,15 @@ CONSTANCE_CONFIG = {
         "for. The spec ceiling is 15 minutes; a longer-lived elevation defeats the "
         "purpose of step-up auth. Anything above this is silently clamped.",
     ),
+    "STEP_UP_SSO_FRESHNESS_SECONDS": (
+        60,
+        "Maximum age (in seconds) of the IdP-asserted auth_time claim that the SSO "
+        "step-up callback will accept. A cached id_token with an auth_time older than "
+        "this window is rejected to prevent replay — even if state + nonce check out, "
+        "the operator must have actually re-authenticated at the IdP within this "
+        "window for the elevation to succeed. Default 60s gives a generous round-trip "
+        "buffer while keeping the replay surface tight.",
+    ),
     # ---- Device attestation (#496) ----
     "REQUIRE_ATTESTATION_FOR_MOBILE": (
         False,
@@ -643,6 +652,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "fields": (
             "STEP_UP_AUTH_TTL_SECONDS",
             "STEP_UP_AUTH_MAX_TTL_SECONDS",
+            "STEP_UP_SSO_FRESHNESS_SECONDS",
         ),
         "collapse": False,
     },

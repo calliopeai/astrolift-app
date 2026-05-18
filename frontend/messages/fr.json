@@ -2445,6 +2445,13 @@
     "elevating": "Confirmation…",
     "indicator": "Mode admin actif pendant {minutes, plural, one {# minute supplémentaire} other {# minutes supplémentaires}}",
     "deelevateLabel": "Mettre fin à l'élévation administrateur",
+    "sso": {
+      "title": "Authentifiez-vous à nouveau pour continuer",
+      "description": "Cette action nécessite une authentification récente. Nous vous redirigerons vers votre fournisseur d'identité pour confirmer votre identité.",
+      "providerHint": "Vous serez redirigé vers cette page dès que votre fournisseur d'identité vous aura confirmé.",
+      "action": "Se réauthentifier",
+      "cancel": "Annuler"
+    },
     "errors": {
       "passwordRequired": "Le mot de passe est requis.",
       "generic": "Impossible de vérifier votre mot de passe. Réessayez.",
