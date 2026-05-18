@@ -20,12 +20,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
-import {
-  AppTopologyMap,
-  type TopologyEdge,
-  type TopologyNode,
-  type TopologyNodeStatus,
-} from "@/components/topology";
+import { AppTopologyMap, appTopology } from "@/components/topology";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,69 +76,9 @@ interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
 }
 
-// ─── topology synthesis ───────────────────────────────────────────────────────
-
-function appTopology(
-  app: AstroliftRegisteredApp,
-  workloads: AstroliftWorkload[]
-): { nodes: TopologyNode[]; edges: TopologyEdge[] } {
-  const nodes: TopologyNode[] = [];
-  const edges: TopologyEdge[] = [];
-
-  const appStatus: TopologyNodeStatus =
-    app.provisioningStatus === "ready"
-      ? "running"
-      : app.provisioningStatus === "failed"
-        ? "failed"
-        : "provisioning";
-
-  const publicWorkloads = workloads.filter((w) => w.isPublic);
-
-  if (publicWorkloads.length > 0) {
-    nodes.push({
-      id: "ingress",
-      type: "ingress",
-      label: "Public ingress",
-      sublabel: app.subdomain,
-      status: appStatus,
-      hostnames: publicWorkloads.map((w) => `${w.slug}.${app.subdomain}`),
-    });
-  }
-
-  for (const w of workloads) {
-    const wlStatus: TopologyNodeStatus = w.replicas > 0 ? "running" : "provisioning";
-
-    if (w.isPublic) {
-      const svcId = `svc-${w.slug}`;
-      nodes.push({
-        id: svcId,
-        type: "service",
-        label: w.slug,
-        sublabel: "ClusterIP",
-        status: wlStatus,
-      });
-      edges.push({ id: `e-ingress-${svcId}`, source: "ingress", target: svcId });
-      edges.push({
-        id: `e-${svcId}-wl-${w.slug}`,
-        source: svcId,
-        target: `wl-${w.slug}`,
-      });
-    }
-
-    nodes.push({
-      id: `wl-${w.slug}`,
-      type: "workload",
-      label: w.name,
-      sublabel: w.kind,
-      status: wlStatus,
-      replicas: { ready: w.replicas, desired: w.replicas },
-      hostnames: w.isPublic ? [`${w.slug}.${app.subdomain}`] : undefined,
-      href: `/apps/${app.slug}/workloads/${w.slug}`,
-    });
-  }
-
-  return { nodes, edges };
-}
+// Topology synthesis lives in @/components/topology/synthesize (#705)
+// so the dedicated Topology tab and the Overview thumbnail render the
+// same graph.
 
 // ─── component ────────────────────────────────────────────────────────────────
 
@@ -318,15 +253,25 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
       <DeploymentPanel appSlug={a.slug} />
 
+      {/* Topology thumbnail (#705). Full graph lives on its own tab —
+          this is a glance-pane: 160px tall, non-interactive at this
+          size, with "Open Topology" cta pinned to the corner. Empty
+          state still surfaces inline so the operator gets the same
+          "no workloads yet" hint without bouncing between tabs. */}
       <Card>
-        <CardHeader>
-          <CardTitle>{tDetail("topology.title")}</CardTitle>
-          <CardDescription>{tDetail("topology.description")}</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
+          <div>
+            <CardTitle>{tDetail("topology.title")}</CardTitle>
+            <CardDescription>{tDetail("topology.description")}</CardDescription>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <a href={`/apps/${a.slug}/topology`}>{tDetail("topology.open")}</a>
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           {workloads.loading ? (
             <div className="space-y-2 p-6">
-              <Skeleton className="h-[420px] w-full" />
+              <Skeleton className="h-40 w-full" />
             </div>
           ) : topoNodes.length === 0 ? (
             <div className="p-6">
@@ -337,9 +282,15 @@ export function AppDetailClient({ slug }: { slug: string }) {
               />
             </div>
           ) : (
-            <div className="p-4">
-              <AppTopologyMap nodes={topoNodes} edges={topoEdges} height={440} />
-            </div>
+            <a
+              href={`/apps/${a.slug}/topology`}
+              className="hover:bg-muted/30 block rounded-b-md p-4 transition-colors"
+              aria-label={tDetail("topology.open")}
+            >
+              <div className="pointer-events-none">
+                <AppTopologyMap nodes={topoNodes} edges={topoEdges} height={160} />
+              </div>
+            </a>
           )}
         </CardContent>
       </Card>
