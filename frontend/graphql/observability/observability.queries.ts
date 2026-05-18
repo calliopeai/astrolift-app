@@ -65,6 +65,73 @@ export const GET_APP_STATUS_CODE_BREAKDOWN = gql`
   }
 `;
 
+/**
+ * Per-managed-service metric envelope (#645 + #646).
+ *
+ * RDS-style tile when the app has a `postgres` managed service;
+ * S3-style tile when it has an `object_store` managed service.
+ * Returns null for unsupported kinds (anything else today); the panel
+ * skips render in that case.
+ *
+ * The resolver narrows to one ManagedService row by guid so a single
+ * panel renders per binding. Callers iterate the app's managed-service
+ * list and render one panel per supported binding.
+ */
+export const GET_MANAGED_SERVICE_METRICS = gql`
+  query GetManagedServiceMetrics($managedServiceId: ID!, $rangeSeconds: Int) {
+    astroliftAppManagedServiceMetrics(
+      managedServiceId: $managedServiceId
+      rangeSeconds: $rangeSeconds
+    ) {
+      managedServiceId
+      kind
+      name
+      rangeSeconds
+      series {
+        name
+        unit
+        source
+        samples {
+          ${TIME_SERIES_POINT_FIELDS}
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Per-pod CPU + memory time-series + restart history (#713).
+ *
+ * Powers the pod-row expander on the Observability tab. Returns null
+ * when the cluster has no Prometheus endpoint or the app/pod doesn't
+ * resolve — the FE renders the "metrics not flowing" callout.
+ */
+export const GET_POD_RESOURCE_USAGE = gql`
+  query GetPodResourceUsage(
+    $appSlug: String!
+    $podName: String!
+    $environmentName: String
+    $rangeSeconds: Int
+  ) {
+    astroliftPodResourceUsage(
+      appSlug: $appSlug
+      podName: $podName
+      environmentName: $environmentName
+      rangeSeconds: $rangeSeconds
+    ) {
+      podName
+      rangeSeconds
+      restartCount
+      lastRestartAt
+      samples {
+        ts
+        cpuCores
+        memoryBytes
+      }
+    }
+  }
+`;
+
 // Live HTTP health probe (#406). Backend issues a sync GET, classifies
 // (ok/degraded/down) by status code + latency, and caches the result
 // per (app, url) for 30s. `forceRefresh: true` skips the cache for the

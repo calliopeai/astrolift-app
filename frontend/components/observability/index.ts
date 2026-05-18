@@ -6,6 +6,12 @@ export { DnsRecordsCard } from "./DnsRecordsCard";
 export { TlsCertificatesCard } from "./TlsCertificatesCard";
 export { WorkloadIdentityCard } from "./WorkloadIdentityCard";
 export { GoldenSignalsPanel } from "./GoldenSignalsPanel";
+export {
+  ManagedServiceMetricsList,
+  ManagedServiceMetricsPanel,
+  SUPPORTED_KINDS as MANAGED_SERVICE_METRIC_KINDS,
+} from "./ManagedServiceMetricsPanel";
+export type { ManagedServiceBindingLite } from "./ManagedServiceMetricsPanel";
 export { LogViewer, classifyLogLevel } from "./LogViewer";
 export type { LogLevel, LogLevelFilter, LogViewerProps } from "./LogViewer";
 export { AppLogExportDialog } from "./AppLogExportDialog";

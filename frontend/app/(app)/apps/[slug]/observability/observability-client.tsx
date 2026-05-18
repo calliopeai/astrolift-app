@@ -20,6 +20,7 @@ import {
   DnsRecordsCard,
   GoldenSignalsPanel,
   LogViewer,
+  ManagedServiceMetricsList,
   MetricScopePicker,
   PodEventsPanel,
   TlsCertificatesCard,
@@ -46,6 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
 import { ON_APP_LOG, ON_APP_LOGS } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
@@ -204,6 +206,16 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   const pods = useQuery<PodsResp>(LIST_APP_PODS, {
     variables: { appSlug: slug },
     pollInterval: POD_POLL_MS,
+  });
+
+  // #645 / #646 — fetch the app's managed-service list so we can fan
+  // out one MetricsPanel per supported binding (postgres → RDS-style
+  // tile; object_store → S3-style tile). Unsupported kinds are
+  // filtered out inside ManagedServiceMetricsList.
+  const managedServices = useQuery<{
+    astroliftManagedServices: Array<{ id: string; kind: string }>;
+  }>(LIST_MANAGED_SERVICES, {
+    variables: { appSlug: slug, environmentName: null },
   });
 
   const a = app.data?.astroliftApp;
@@ -600,6 +612,11 @@ export function ObservabilityClient({ slug }: { slug: string }) {
         appSlug={a.slug}
         environmentName={scopedEnv}
         workloadSlug={scopedWorkload}
+      />
+
+      {/* ─── #645 / #646 managed-service metric tiles ─────────────── */}
+      <ManagedServiceMetricsList
+        managedServices={managedServices.data?.astroliftManagedServices ?? []}
       />
 
       {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}
