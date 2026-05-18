@@ -110,6 +110,15 @@ class Deployment(BaseCoreModel):
     # populate them, manual UI deploys don't.
     commit_message = models.TextField(blank=True, default="")
     commit_author = models.CharField(max_length=255, blank=True, default="")
+    # GitHub provenance (#722) — populated by the push-webhook ingestion
+    # when the deploy was triggered from a PR. Deployments triggered
+    # manually from the UI or via a tagged release have pr_number=0
+    # (rendered as "—" on the FE per #651). Avatar URL is stored at
+    # deploy-creation time because the GitHub commits API rate-limits
+    # otherwise and we don't want every list-deployments call to fan
+    # out to GitHub.
+    pr_number = models.PositiveIntegerField(default=0)
+    commit_author_avatar_url = models.URLField(blank=True, default="")
     # Rejection / abort context (#419) — non-empty when an operator
     # rejected or aborted the deploy. Persisted on the row (rather than
     # only on the audit log) so the approvals UI can render it without

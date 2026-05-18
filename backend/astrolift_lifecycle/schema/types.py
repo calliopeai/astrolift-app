@@ -97,6 +97,17 @@ class DeploymentType:
     commit_message: str
     commit_author: str
     repo_url: str
+    # GitHub provenance (#722) — surfaces on the deployments table
+    # (#651). When the deploy was not triggered from a PR these come
+    # back as 0/"" and the FE renders a dash placeholder.
+    pr_number: int
+    pr_url: str
+    """Convenience: ``{source_url}/pull/{pr_number}`` when both are
+    known, else "". Derived at serialization time using
+    ``_build_pr_url`` — matches the preview-environment pattern so
+    GitLab MR / Bitbucket links land here when those integrations
+    grow a per-provider mapper."""
+    commit_author_avatar_url: str
     """Public source-repo URL the operator can deep-link into for the
     full commit/diff. Resolved from ``RegisteredApp.source_url`` at
     serialization time so we don't denormalize it onto every row."""
@@ -263,6 +274,8 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         )
 
     approved_by, awaiting = _resolve_quorum_lists(d)
+    pr_number = int(getattr(d, "pr_number", 0) or 0)
+    pr_url = _build_pr_url(repo_url, pr_number) if (repo_url and pr_number) else ""
     return DeploymentType(
         id=GUID(str(d.guid)),
         registered_app_slug=d.registered_app.slug,
@@ -291,6 +304,9 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         ci_provider=d.ci_provider or "",
         commit_message=getattr(d, "commit_message", "") or "",
         commit_author=getattr(d, "commit_author", "") or "",
+        pr_number=pr_number,
+        pr_url=pr_url,
+        commit_author_avatar_url=getattr(d, "commit_author_avatar_url", "") or "",
         repo_url=repo_url,
         aborted_reason=getattr(d, "aborted_reason", "") or "",
         triggered_by_user_id=(str(triggered_by_user_id) if triggered_by_user_id is not None else None),

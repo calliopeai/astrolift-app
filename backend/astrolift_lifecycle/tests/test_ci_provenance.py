@@ -94,3 +94,106 @@ def test_manual_deployment_leaves_ci_metadata_empty(org, app, env, fake_info, pe
     assert d.branch == ""
     assert d.ci_run_url == ""
     assert d.ci_provider == ""
+
+
+# ---------------------------------------------------------------------------
+# #722 — GitHub PR provenance + commit-author avatar
+# ---------------------------------------------------------------------------
+
+
+def test_start_deployment_persists_pr_provenance(org, app, env, fake_info, permission_resolver, settings):
+    """PR-triggered deploys carry pr_number + commit_author_avatar_url
+    on the input; both round-trip to the Deployment row verbatim."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    permission_resolver.grant(Permission.APP_DEPLOY)
+    from core.tenancy import TenantContext, tenant_context
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = LifecycleMutation().start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="abc123",
+                pr_number=1234,
+                commit_author="octocat",
+                commit_author_avatar_url="https://avatars.githubusercontent.com/u/583231?v=4",
+            ),
+        )
+
+    assert result.ok, result.errors
+    d = Deployment.objects.get(guid=str(result.data.id))
+    assert d.pr_number == 1234
+    assert d.commit_author == "octocat"
+    assert d.commit_author_avatar_url == "https://avatars.githubusercontent.com/u/583231?v=4"
+
+
+def test_manual_deployment_leaves_pr_fields_zero(org, app, env, fake_info, permission_resolver, settings):
+    """Manual UI deploys don't have a PR — pr_number defaults to 0
+    (not NULL), avatar URL defaults to "" (FE renders a dash)."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    permission_resolver.grant(Permission.APP_DEPLOY)
+    from core.tenancy import TenantContext, tenant_context
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = LifecycleMutation().start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="abc123",
+            ),
+        )
+
+    d = Deployment.objects.get(guid=str(result.data.id))
+    assert d.pr_number == 0
+    assert d.commit_author_avatar_url == ""
+
+
+def test_deployment_to_type_derives_pr_url_when_repo_known(
+    org, app, env, fake_info, permission_resolver, settings,
+):
+    """``deployment_to_type`` builds ``pr_url`` from the registered
+    app's ``source_url`` + ``pr_number`` — matching the preview-env
+    pattern. When ``pr_number == 0`` the URL stays empty so the FE
+    doesn't render a broken link."""
+    from astrolift_lifecycle.schema.types import deployment_to_type
+
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    permission_resolver.grant(Permission.APP_DEPLOY)
+    app.source_url = "https://github.com/acme/hello"
+    app.save(update_fields=["source_url"])
+
+    from core.tenancy import TenantContext, tenant_context
+
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = LifecycleMutation().start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="abc123",
+                pr_number=42,
+            ),
+        )
+
+    d = Deployment.objects.get(guid=str(result.data.id))
+    t = deployment_to_type(d)
+    assert t.pr_number == 42
+    assert t.pr_url == "https://github.com/acme/hello/pull/42"
+
+    # No PR → no URL even if the repo is known
+    with tenant_context(TenantContext(organization_id=org.id)):
+        manual = LifecycleMutation().start_deployment(
+            fake_info,
+            input=StartDeploymentInput(
+                app_slug=app.slug,
+                environment_name=env.name,
+                image_tag="def456",
+            ),
+        )
+
+    dm = Deployment.objects.get(guid=str(manual.data.id))
+    tm = deployment_to_type(dm)
+    assert tm.pr_number == 0
+    assert tm.pr_url == ""
