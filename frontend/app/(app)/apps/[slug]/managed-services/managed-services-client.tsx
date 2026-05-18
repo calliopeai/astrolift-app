@@ -1,11 +1,18 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { DatabaseIcon, MailIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  DatabaseIcon,
+  InfoIcon,
+  MailIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { EmailDetailSheet } from "./email-detail-sheet";
+import { ServiceDetailSheet } from "./service-detail-sheet";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
@@ -103,6 +110,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   const [deleteData, setDeleteData] = React.useState(false);
   const [forceDestroy, setForceDestroy] = React.useState(false);
   const [emailDetailTarget, setEmailDetailTarget] = React.useState<ManagedService | null>(null);
+  const [serviceDetailTarget, setServiceDetailTarget] = React.useState<ManagedService | null>(null);
   React.useEffect(() => {
     if (deprovisionTarget === null) {
       setDeleteData(false);
@@ -219,54 +227,88 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="w-8">
-                      <StatusDot status={STATUS_DOT[s.status] ?? "muted"} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{s.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{s.kind}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">
-                      {s.variant || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {s.environmentName}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="capitalize">{s.status}</TableCell>
-                    <TableCell className="flex justify-end gap-1 text-right">
-                      {s.kind === "email" && s.status !== "deleted" ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => setEmailDetailTarget(s)}
-                          title="Email deliverability details"
-                        >
-                          <MailIcon className="size-4" />
-                          <span className="sr-only">Email details</span>
-                        </Button>
-                      ) : null}
-                      {s.status !== "deleted" && (
-                        <Can permission="app.deploy">
+                {list.map((s) => {
+                  // #709 — every kind except email opens the generic detail
+                  // sheet on row-click. Email keeps its kind-specific sheet
+                  // (deliverability + suppression + DKIM, much richer than
+                  // metrics alone).
+                  const isEmail = s.kind === "email";
+                  const isActive = s.status !== "deleted";
+                  const onRowOpen = () => {
+                    if (!isActive) return;
+                    if (isEmail) setEmailDetailTarget(s);
+                    else setServiceDetailTarget(s);
+                  };
+                  return (
+                    <TableRow
+                      key={s.id}
+                      onClick={isActive ? onRowOpen : undefined}
+                      className={isActive ? "cursor-pointer" : undefined}
+                    >
+                      <TableCell className="w-8">
+                        <StatusDot status={STATUS_DOT[s.status] ?? "muted"} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{s.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{s.kind}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        {s.variant || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-[10px]">
+                          {s.environmentName}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="capitalize">{s.status}</TableCell>
+                      <TableCell
+                        className="flex justify-end gap-1 text-right"
+                        // Stop propagation so action-buttons in this cell
+                        // don't double-trigger the row's onClick.
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isEmail && isActive ? (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="size-8"
-                            onClick={() => setDeprovisionTarget(s)}
-                            disabled={busy}
+                            onClick={() => setEmailDetailTarget(s)}
+                            title="Email deliverability details"
                           >
-                            <Trash2Icon className="size-4" />
-                            <span className="sr-only">Deprovision</span>
+                            <MailIcon className="size-4" />
+                            <span className="sr-only">Email details</span>
                           </Button>
-                        </Can>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        ) : null}
+                        {!isEmail && isActive ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            onClick={() => setServiceDetailTarget(s)}
+                            title="Service details"
+                          >
+                            <InfoIcon className="size-4" />
+                            <span className="sr-only">Details</span>
+                          </Button>
+                        ) : null}
+                        {isActive && (
+                          <Can permission="app.deploy">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              onClick={() => setDeprovisionTarget(s)}
+                              disabled={busy}
+                            >
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Deprovision</span>
+                            </Button>
+                          </Can>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -394,6 +436,12 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
           }}
         />
       ) : null}
+      <ServiceDetailSheet
+        service={serviceDetailTarget}
+        onOpenChange={(next) => {
+          if (!next) setServiceDetailTarget(null);
+        }}
+      />
     </PageShell>
   );
 }
