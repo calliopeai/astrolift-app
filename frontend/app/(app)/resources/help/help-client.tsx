@@ -33,10 +33,10 @@ interface HelpClientProps {
 // `supportContacts` org-level setting on the backend.
 const SUPPORT_LINKS = [
   {
-    key: "slack",
-    label: "Community Slack",
+    key: "discord",
+    label: "Community Discord",
     description: "Real-time chat with the Astrolift team and other operators.",
-    href: "https://calliopeai.slack.com/",
+    href: "https://discord.com/invite/Z9bbbE6hJv",
     icon: MessageSquareIcon,
   },
   {
