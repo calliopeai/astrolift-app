@@ -1375,6 +1375,21 @@ type AstroliftManagedServiceConnectionMutationResult {
   data: AstroliftManagedServiceConnection
 }
 
+type AstroliftManagedServiceMetricSeries {
+  name: String!
+  unit: String!
+  samples: [AstroliftTimeSeriesPoint!]!
+  source: String!
+}
+
+type AstroliftManagedServiceMetrics {
+  managedServiceId: ID!
+  kind: String!
+  name: String!
+  rangeSeconds: Int!
+  series: [AstroliftManagedServiceMetricSeries!]!
+}
+
 type AstroliftManagedServiceMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
@@ -1553,6 +1568,20 @@ type AstroliftOrganizationMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftOrganization
+}
+
+type AstroliftPodResourceUsage {
+  podName: String!
+  rangeSeconds: Int!
+  samples: [AstroliftPodResourceUsagePoint!]!
+  restartCount: Int!
+  lastRestartAt: DateTime
+}
+
+type AstroliftPodResourceUsagePoint {
+  ts: DateTime!
+  cpuCores: Float!
+  memoryBytes: Float!
 }
 
 type AstroliftPolicy {
@@ -2032,6 +2061,8 @@ type AstroliftSourceConnection {
   installationId: String!
   apiBaseUrl: String!
   oauthClientId: String!
+  appClientId: String!
+  needsClientId: Boolean!
   oauthRedirectUri: String!
   repoVisibilityScopes: [String!]!
   isOauthAppConfig: Boolean!
@@ -2480,6 +2511,7 @@ input ConnectSourceInput {
   apiBaseUrl: String = null
   secretPlaintext: String!
   oauthClientId: String = null
+  appClientId: String = null
   oauthRedirectUri: String = null
   repoVisibilityScopes: [String!] = null
 }
@@ -2855,8 +2887,10 @@ enum GoldenSignalKind {
   ERRORS
   LATENCY_P50
   LATENCY_P90
+  LATENCY_P95
   LATENCY_P99
   SATURATION_CPU
+  SATURATION_MEMORY
 }
 
 input GrantRoleInput {
@@ -3518,7 +3552,7 @@ type Query {
   """Compare effective permissions between two users."""
   permissionCompare(userIdA: ID!, userIdB: ID!): PermissionComparison
 
-  """Query mutation audit logs. Admin only."""
+  """Query mutation audit logs. Superuser only."""
   auditLogs(operation: String = null, userId: String = null, limit: Int! = 50): [AuditLogEntry!]!
 
   """
@@ -3629,11 +3663,15 @@ type Query {
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
+  PostgresMetrics: [[String!]!]!
+  ObjectStoreMetrics: [[String!]!]!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppGoldenSignal!]!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
+  astroliftAppManagedServiceMetrics(managedServiceId: ID!, rangeSeconds: Int = null): AstroliftManagedServiceMetrics
+  astroliftPodResourceUsage(appSlug: String!, podName: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftPodResourceUsage
   astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
@@ -4110,6 +4148,7 @@ input UpdateSourceConnectionInput {
   repoVisibilityScopes: [String!] = null
   isActive: Boolean = null
   rotateSecretPlaintext: String = null
+  appClientId: String = null
 }
 
 input UpdateTeamInput {
