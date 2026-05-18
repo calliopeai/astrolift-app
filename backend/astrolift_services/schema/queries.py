@@ -19,6 +19,14 @@ from astrolift_services.models import (
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
     AppSecretType,
+    EmailAccountStatusType,
+    EmailDkimTokenType,
+    EmailDnsAuthCheckType,
+    EmailDnsAuthStatusType,
+    EmailIdentityVerificationType,
+    EmailSendQuotaType,
+    EmailServiceDetailType,
+    EmailSuppressionEntryType,
     ManagedServiceObjectsType,
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
@@ -37,6 +45,159 @@ from core.permissions import Permission, require_permission
 
 def _secret_id(*, source: str, key: str, env: str) -> str:
     return f"{source}:{env}:{key}"
+
+
+def _build_email_detail(
+    *,
+    managed_service_id: GUID,
+    plugin_slug: str,
+    region: str,
+    identity: str,
+) -> EmailServiceDetailType:
+    """Drive every read-only email-detail call against the cloud's
+    driver, accumulating ``unsupported_notes`` for any operation the
+    backend doesn't implement so the UI can show why a tile is empty.
+
+    Each driver call is wrapped in its own try/except so one cloud-side
+    transient failure (network, permissions) doesn't bring down the
+    whole page — operators see the tiles that loaded plus a hint for
+    the ones that didn't.
+    """
+    from _sdk import UnsupportedOperationError
+
+    from astrolift_services.email_observability import driver_for_plugin_slug
+
+    unsupported: list[str] = []
+    quota = None
+    account_status = None
+    identity_verification = None
+    dns_auth_status = None
+    suppression_entries: list[EmailSuppressionEntryType] = []
+
+    try:
+        driver = driver_for_plugin_slug(
+            plugin_slug=plugin_slug, region=region,
+        )
+    except LookupError as exc:
+        return EmailServiceDetailType(
+            managed_service_id=managed_service_id,
+            plugin_slug=plugin_slug,
+            region=region,
+            identity=identity,
+            unsupported_notes=[str(exc)],
+        )
+
+    try:
+        sq = driver.get_send_quota()
+        quota = EmailSendQuotaType(
+            max_send_rate=sq.max_send_rate,
+            max_24_hour_send=sq.max_24_hour_send,
+            sent_last_24h=sq.sent_last_24h,
+        )
+    except UnsupportedOperationError as exc:
+        unsupported.append(f"quota: {exc}")
+    except Exception as exc:  # noqa: BLE001 -- defensive: cloud-side transients
+        unsupported.append(f"quota: {type(exc).__name__}: {exc}")
+
+    try:
+        ass = driver.get_account_send_status()
+        account_status = EmailAccountStatusType(
+            sending_enabled=ass.sending_enabled,
+            production_access=ass.production_access,
+            reputation_score=ass.reputation_score,
+            bounce_rate_pct=ass.bounce_rate_pct,
+            complaint_rate_pct=ass.complaint_rate_pct,
+        )
+    except UnsupportedOperationError as exc:
+        unsupported.append(f"account_status: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        unsupported.append(f"account_status: {type(exc).__name__}: {exc}")
+
+    if identity:
+        try:
+            iv = driver.get_identity_verification_details(identity)
+            identity_verification = EmailIdentityVerificationType(
+                identity=iv.identity,
+                is_domain=iv.is_domain,
+                status=iv.status,
+                verification_token=iv.verification_token,
+                dkim_tokens=[
+                    EmailDkimTokenType(
+                        token=t.token,
+                        cname_host=t.cname_host,
+                        cname_target=t.cname_target,
+                    )
+                    for t in iv.dkim_tokens
+                ],
+            )
+        except UnsupportedOperationError as exc:
+            unsupported.append(f"identity_verification: {exc}")
+        except Exception as exc:  # noqa: BLE001
+            unsupported.append(
+                f"identity_verification: {type(exc).__name__}: {exc}",
+            )
+
+        try:
+            dns = driver.verify_dns_authentication(identity)
+            dns_auth_status = EmailDnsAuthStatusType(
+                identity=dns.identity,
+                checked_at=dns.checked_at,
+                overall=dns.overall.value,
+                dkim=EmailDnsAuthCheckType(
+                    protocol=dns.dkim.protocol,
+                    outcome=dns.dkim.outcome.value,
+                    records=list(dns.dkim.records),
+                    message=dns.dkim.message,
+                ),
+                spf=EmailDnsAuthCheckType(
+                    protocol=dns.spf.protocol,
+                    outcome=dns.spf.outcome.value,
+                    records=list(dns.spf.records),
+                    message=dns.spf.message,
+                ),
+                dmarc=EmailDnsAuthCheckType(
+                    protocol=dns.dmarc.protocol,
+                    outcome=dns.dmarc.outcome.value,
+                    records=list(dns.dmarc.records),
+                    message=dns.dmarc.message,
+                ),
+            )
+        except UnsupportedOperationError as exc:
+            unsupported.append(f"dns_auth_status: {exc}")
+        except Exception as exc:  # noqa: BLE001
+            unsupported.append(
+                f"dns_auth_status: {type(exc).__name__}: {exc}",
+            )
+
+    try:
+        for entry in driver.list_suppression_entries(page_size=100):
+            suppression_entries.append(
+                EmailSuppressionEntryType(
+                    address=entry.address,
+                    reason=entry.reason.value,
+                    suppressed_at=entry.suppressed_at,
+                    detail=entry.detail,
+                )
+            )
+    except UnsupportedOperationError as exc:
+        unsupported.append(f"suppression_entries: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        unsupported.append(
+            f"suppression_entries: {type(exc).__name__}: {exc}",
+        )
+
+    return EmailServiceDetailType(
+        managed_service_id=managed_service_id,
+        plugin_slug=plugin_slug,
+        region=region,
+        identity=identity,
+        quota=quota,
+        account_status=account_status,
+        identity_verification=identity_verification,
+        dns_auth_status=dns_auth_status,
+        suppression_entries=suppression_entries,
+        unsupported_notes=unsupported,
+    )
 
 
 def _bundle_key_count(bundle) -> int:
@@ -413,6 +574,71 @@ class ServicesQuery:
             depth=int(depth) if isinstance(depth, (int, float)) else 0,
             in_flight=int(in_flight) if isinstance(in_flight, (int, float)) else 0,
             sampled_at=sampled_at,
+        )
+
+    # ---- Email observability (#629, #631, #632, #633, #634) ----------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def astrolift_email_service_detail(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+    ) -> EmailServiceDetailType | None:
+        """Composite read-surface for the email-detail page.
+
+        One round-trip carries the quota, account status, identity
+        verification, DNS auth status, and a slice of the suppression
+        list. Each field is independently nullable so a partial failure
+        in one driver call doesn't take the whole page down — the UI
+        renders the available tiles + an unsupported-notes list for the
+        rest.
+
+        Permission gate stacks ``app.read`` (caller can see the app) with
+        ``managed_service.update`` (the email-detail surface contains
+        operator-actionable rows like the suppression list).
+        """
+        svc = (
+            ManagedService.objects.select_related(
+                "app_environment",
+                "app_environment__tenant_cluster",
+                "app_environment__tenant_cluster__provider_plugin",
+                "registered_app",
+            )
+            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return None
+        if svc.kind != ManagedService.Kind.EMAIL:
+            return None
+
+        plugin = svc.app_environment.tenant_cluster.provider_plugin
+        plugin_slug = plugin.slug
+        region = svc.app_environment.tenant_cluster.region or ""
+        # Identity lives on the driver config blob the lifecycle driver
+        # stamped at provision time; fall back to the binding's
+        # configured identity / from-address when present.
+        config = svc.config or {}
+        identity = (
+            config.get("identity")
+            or config.get("email_identity")
+            or config.get("EMAIL_FROM_ADDRESS")
+            or ""
+        )
+        # The handle the lifecycle driver returned carries the identity
+        # too — use that when nothing's in config (handle format is
+        # ``email/<identity>``).
+        if not identity and svc.connection_secret_ref:
+            handle_parts = svc.connection_secret_ref.split("/", 1)
+            if len(handle_parts) == 2 and handle_parts[0] == "email":
+                identity = handle_parts[1]
+        return _build_email_detail(
+            managed_service_id=managed_service_id,
+            plugin_slug=plugin_slug,
+            region=region,
+            identity=identity,
         )
 
     # ---- Secret-change proposals (#488) ------------------------------
