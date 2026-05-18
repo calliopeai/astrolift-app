@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { FileBoxIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -44,6 +45,16 @@ export function ProjectsClient() {
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftProject | null>(null);
   const projects = useQuery<Resp>(LIST_PROJECTS);
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
+
+  // #717 — When the NavTree's "Add project" affordance navigates here
+  // with ?new=1, auto-open the dialog. The optional ?team=<slug> is
+  // honored by the dialog itself if it's wired to read the URL; we
+  // only open the modal here to keep this hook small.
+  const searchParams = useSearchParams();
+  const newParam = searchParams.get("new");
+  React.useEffect(() => {
+    if (newParam === "1") setOpen(true);
+  }, [newParam]);
 
   const [softDeleteProject, { loading: deleting }] = useMutation<{
     softDeleteProject: MutationResult<{ id: string; deleted: boolean }>;

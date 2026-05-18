@@ -377,6 +377,12 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
                     activeAppSlug={activeAppSlug}
                   />
                 ) : null}
+                {/* #717 — Inline "create project" affordance so operators
+                    don't have to navigate to /projects to add one. Mirrors
+                    the EmptyRow pattern used when the team has no
+                    projects yet; here it sits as a footer under the
+                    existing project list. */}
+                <AddProjectRow teamSlug={node.team.slug} />
               </>
             ) : (
               <EmptyRow
@@ -389,6 +395,25 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
         </CollapsibleContent>
       </SidebarMenuSubItem>
     </Collapsible>
+  );
+}
+
+function AddProjectRow({ teamSlug }: { teamSlug: string }) {
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton
+        asChild
+        className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
+      >
+        <Link
+          href={`/projects?team=${encodeURIComponent(teamSlug)}&new=1`}
+          className="flex items-center gap-2 py-1 text-xs"
+        >
+          <span aria-hidden className="text-[14px] leading-none">+</span>
+          <span>Add project</span>
+        </Link>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
   );
 }
 
