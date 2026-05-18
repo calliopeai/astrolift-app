@@ -2357,6 +2357,8 @@
     "scheduled": {
       "emptyTitle": "尚无计划任务运行",
       "emptyDescription": "Cronjob 工作负载在调度器触发首次运行后会显示在此。",
+      "emptyExampleCaption": "在 astrolift.toml 中添加 [[jobs]] 条目以声明一个 cronjob 工作负载：",
+      "emptyLearnMore": "查看 astrolift.toml jobs 参考",
       "envLabel": "env",
       "workloadLabel": "workload",
       "columns": {

@@ -2357,6 +2357,8 @@
     "scheduled": {
       "emptyTitle": "まだスケジュールされたジョブ実行はありません",
       "emptyDescription": "Cronjob ワークロードは、スケジューラが最初の実行をトリガーするとここに表示されます。",
+      "emptyExampleCaption": "Cronjob ワークロードを宣言するには、astrolift.toml に [[jobs]] エントリを追加してください:",
+      "emptyLearnMore": "astrolift.toml の jobs リファレンスを見る",
       "envLabel": "env",
       "workloadLabel": "workload",
       "columns": {

@@ -2357,6 +2357,8 @@
     "scheduled": {
       "emptyTitle": "Noch keine geplanten Job-Läufe",
       "emptyDescription": "Cronjob-Workloads erscheinen hier, sobald der Scheduler den ersten Lauf auslöst.",
+      "emptyExampleCaption": "Fügen Sie einen [[jobs]]-Eintrag zu Ihrer astrolift.toml hinzu, um einen Cronjob-Workload zu deklarieren:",
+      "emptyLearnMore": "astrolift.toml-Jobs-Referenz ansehen",
       "envLabel": "env",
       "workloadLabel": "workload",
       "columns": {

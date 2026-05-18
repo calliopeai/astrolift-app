@@ -191,6 +191,9 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
                   icon={<CalendarClockIcon className="size-5" />}
                   title={t("scheduled.emptyTitle")}
                   description={t("scheduled.emptyDescription")}
+                  learnMoreHref="https://github.com/calliopeai/astrolift-docs/blob/main/reference/manifest.md#jobs"
+                  learnMoreLabel={t("scheduled.emptyLearnMore")}
+                  secondary={<ScheduledJobsExample caption={t("scheduled.emptyExampleCaption")} />}
                 />
               </div>
             ) : (
@@ -264,6 +267,28 @@ function CronWorkloadsCard({
         </ul>
       </CardContent>
     </Card>
+  );
+}
+
+function ScheduledJobsExample({ caption }: { caption: string }) {
+  // Concrete worked example of a `[[jobs]]` block — picked to mirror the
+  // shape an operator will paste into their astrolift.toml verbatim:
+  // slug, image, the cron `schedule`, and the `command` to run.
+  // Kept to 5 lines so the empty state stays visually compact.
+  const example = [
+    "[[jobs]]",
+    'slug = "nightly-report"',
+    'image = "ghcr.io/acme/reports:latest"',
+    'schedule = "0 2 * * *"   # 02:00 UTC daily',
+    'command = ["python", "-m", "reports.nightly"]',
+  ].join("\n");
+  return (
+    <div className="mt-2 w-full max-w-xl text-left">
+      <p className="text-muted-foreground mb-2 text-xs">{caption}</p>
+      <pre className="bg-muted text-muted-foreground overflow-x-auto rounded-md border p-3 font-mono text-[11px] leading-relaxed">
+        {example}
+      </pre>
+    </div>
   );
 }
 
