@@ -7,6 +7,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { NavTree } from "@/components/NavTree";
 import { NavUser } from "@/components/NavUser";
 import { OrgSwitcher } from "@/components/OrgSwitcher";
+import { StatusPageLink } from "@/components/StatusPageLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Sidebar,
@@ -40,6 +41,7 @@ export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
       <SidebarFooter>
         <LanguageSwitcher />
         <ThemeToggle />
+        <StatusPageLink />
         <SidebarSeparator />
         <NavUser ssrUser={ssrUser} />
       </SidebarFooter>
