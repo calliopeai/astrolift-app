@@ -172,6 +172,12 @@ EXEMPT: dict[str, str] = {
     ),
     "OperationsMutation.mark_notification_read": "self-service: marks the caller's own notification",
     "OperationsMutation.mark_all_notifications_read": "self-service: marks all the caller's notifications",
+    "ClustersQuery.astrolift_provider_plugins": (
+        "platform-level reference data — the list of provider plugins is "
+        "install-wide (not per-tenant). Surfaced on /resources/drivers to "
+        "any authed operator so they can see the install's capability "
+        "surface. The resolver enforces is_authenticated inline."
+    ),
     # Token-based public approval (#125, spec 06 §4.6). The single-use
     # magic link in the operator's email is the auth proof — by
     # construction the resolver runs unauthenticated, hash-at-rest in

@@ -523,6 +523,14 @@ CONSTANCE_CONFIG = {
         "API-token session stale threshold (seconds). Default 180 days; raise for "
         "long-lived programmatic clients that legitimately sit idle for quarters.",
     ),
+    "REQUIRE_STEP_UP_AUTH": (
+        False,
+        "Master switch for the #487 step-up auth gate. Default OFF — sensitive "
+        "mutations run without a re-auth prompt unless explicitly enabled. Flip "
+        "to True for installs whose compliance posture requires SOC2 / SOX-style "
+        "fresh-auth on secret writes, role changes, force-redeploys, etc. When "
+        "True, STEP_UP_AUTH_TTL_SECONDS controls the elevation window.",
+    ),
     "STEP_UP_AUTH_TTL_SECONDS": (
         900,
         "Default elevation window (in seconds) granted by elevateAdminSession. After "
@@ -650,6 +658,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
     },
     "Step-up auth": {
         "fields": (
+            "REQUIRE_STEP_UP_AUTH",
             "STEP_UP_AUTH_TTL_SECONDS",
             "STEP_UP_AUTH_MAX_TTL_SECONDS",
             "STEP_UP_SSO_FRESHNESS_SECONDS",
