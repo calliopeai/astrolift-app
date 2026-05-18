@@ -76,6 +76,34 @@ _VERIFIERS = {
 }
 
 
+def verify_signature(
+    *,
+    kind: str,
+    request: HttpRequest,
+    body: bytes,
+    secret: bytes,
+) -> bool:
+    """Canonical HMAC signature check for an SCM push webhook (#529).
+
+    Dispatches to the per-host verifier (``_verify_github`` /
+    ``_verify_gitlab``) and returns True only when the presented header
+    matches the stored secret in constant time. Returns False for any
+    failure mode — unknown kind, missing header, mismatched digest —
+    so the caller turns False into a single generic 401 (avoiding
+    leaking which check fired to an attacker probing the surface).
+
+    Named ``verify_signature`` so the ``test_webhook_signature_guard``
+    CI guard recognizes it as the auth boundary. Every new
+    ``/.../webhook/...`` view in this codebase MUST call one of the
+    canonical verifier names (or list itself in the guard's EXEMPT
+    dict with a written reason) before reading the request body.
+    """
+    verifier = _VERIFIERS.get(kind)
+    if verifier is None:
+        return False
+    return verifier(request, body, secret)
+
+
 def _decrypt_webhook_secret(conn: SourceConnection) -> bytes | None:
     if not conn.webhook_secret_backend_kind or not conn.webhook_secret_ciphertext:
         return None
@@ -213,8 +241,7 @@ def _handle(
         )
 
     body = request.body
-    verifier = _VERIFIERS.get(kind)
-    if verifier is None or not verifier(request, body, secret):
+    if not verify_signature(kind=kind, request=request, body=body, secret=secret):
         # Don't tell the caller whether the signature was missing or
         # invalid — both leak the same useful info to a probe.
         return JsonResponse({"detail": "unauthorized"}, status=401)
