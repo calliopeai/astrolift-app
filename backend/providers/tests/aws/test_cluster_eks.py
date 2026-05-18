@@ -62,9 +62,7 @@ def driver(fake_k8s_client) -> EKSClusterDriver:
         eks_client.create_cluster(
             name="test-cluster",
             version="1.30",
-            roleArn=(
-                "arn:aws:iam::123456789012:role/eks-cluster-role"
-            ),
+            roleArn=("arn:aws:iam::123456789012:role/eks-cluster-role"),
             resourcesVpcConfig={
                 "subnetIds": ["subnet-12345678"],
             },
@@ -85,7 +83,8 @@ def driver(fake_k8s_client) -> EKSClusterDriver:
 
 
 def test_driver_caches_k8s_client_per_cluster(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     """Multiple operations on the same cluster don't re-call
     DescribeCluster + don't rebuild the k8s client."""
@@ -99,14 +98,18 @@ def test_driver_caches_k8s_client_per_cluster(
 
 
 def test_apply_aggregates_outcomes(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     """Per-manifest outcomes aggregate into ApplyResult."""
     fake_k8s_client.server_side_apply.side_effect = [
-        "created", "updated", "unchanged",
+        "created",
+        "updated",
+        "unchanged",
     ]
     result = driver.apply_manifests(
-        "aws-prod", "ns",
+        "aws-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "a"}},
             {"kind": "Service", "metadata": {"name": "b"}},
@@ -121,14 +124,16 @@ def test_apply_aggregates_outcomes(
 
 
 def test_apply_collects_errors(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.server_side_apply.side_effect = [
         "created",
         Exception("webhook denied"),
     ]
     result = driver.apply_manifests(
-        "aws-prod", "ns",
+        "aws-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "ok"}},
             {"kind": "Service", "metadata": {"name": "bad"}},
@@ -136,16 +141,25 @@ def test_apply_collects_errors(
     )
     assert result.created == ["Deployment/ok"]
     assert len(result.errors) == 1
-    assert "webhook denied" in result.errors[0]
+    # Structured ApplyError (#603) -- str() preserves the legacy
+    # ``Kind/name: message`` shape while the new fields expose the
+    # exception type + retryability for the workflow's classifier.
+    err = result.errors[0]
+    assert err.kind == "Service"
+    assert err.name == "bad"
+    assert "webhook denied" in err.exception_message
+    assert "webhook denied" in str(err)
     assert result.ok is False
 
 
 def test_apply_propagates_dry_run(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     """dry_run flag must reach the k8s client wrapper."""
     driver.apply_manifests(
-        "aws-prod", "ns",
+        "aws-prod",
+        "ns",
         [{"kind": "Deployment", "metadata": {"name": "x"}}],
         dry_run=True,
     )
@@ -160,11 +174,13 @@ def test_apply_propagates_dry_run(
 
 
 def test_delete_classifies_not_found_separately(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.delete.side_effect = [None, _NotFoundError()]
     result = driver.delete_manifests(
-        "aws-prod", "ns",
+        "aws-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "exists"}},
             {"kind": "Deployment", "metadata": {"name": "absent"}},
@@ -176,11 +192,13 @@ def test_delete_classifies_not_found_separately(
 
 
 def test_delete_collects_errors(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.delete.side_effect = Exception("forbidden")
     result = driver.delete_manifests(
-        "aws-prod", "ns",
+        "aws-prod",
+        "ns",
         [{"kind": "Service", "metadata": {"name": "bad"}}],
     )
     assert result.errors == ["Service/bad: forbidden"]
@@ -191,7 +209,8 @@ def test_delete_collects_errors(
 
 
 def test_get_namespace_returns_state(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get_namespace.return_value = {
         "metadata": {
@@ -209,17 +228,20 @@ def test_get_namespace_returns_state(
 
 
 def test_get_namespace_missing_returns_none(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get_namespace.side_effect = _NotFoundError()
     assert driver.get_namespace("aws-prod", "missing") is None
 
 
 def test_ensure_namespace_calls_apply(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     ns = driver.ensure_namespace(
-        "aws-prod", "acme-api",
+        "aws-prod",
+        "acme-api",
         labels={"astrolift.io/managed-by": "platform"},
         annotations={"k": "v"},
     )
@@ -228,16 +250,20 @@ def test_ensure_namespace_calls_apply(
 
 
 def test_delete_namespace_no_wait(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     driver.delete_namespace("aws-prod", "old-ns", wait=False)
     fake_k8s_client.delete.assert_called_with(
-        kind="Namespace", namespace=None, name="old-ns",
+        kind="Namespace",
+        namespace=None,
+        name="old-ns",
     )
 
 
 def test_delete_namespace_idempotent_on_missing(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.delete.side_effect = _NotFoundError()
     # Should NOT raise
@@ -248,7 +274,8 @@ def test_delete_namespace_idempotent_on_missing(
 
 
 def test_get_workload_status_projection(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.return_value = {
         "metadata": {"name": "api"},
@@ -261,7 +288,10 @@ def test_get_workload_status_projection(
         },
     }
     status = driver.get_workload_status(
-        "aws-prod", "ns", "Deployment", "api",
+        "aws-prod",
+        "ns",
+        "Deployment",
+        "api",
     )
     assert status.ready_replicas == 3
     assert status.desired_replicas == 5
@@ -269,17 +299,22 @@ def test_get_workload_status_projection(
 
 
 def test_get_workload_status_not_found(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.side_effect = _NotFoundError()
     with pytest.raises(NotFoundError):
         driver.get_workload_status(
-            "aws-prod", "ns", "Deployment", "missing",
+            "aws-prod",
+            "ns",
+            "Deployment",
+            "missing",
         )
 
 
 def test_poll_rollout_returns_success_when_ready(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.return_value = {
         "metadata": {"name": "api"},
@@ -287,14 +322,19 @@ def test_poll_rollout_returns_success_when_ready(
         "status": {"readyReplicas": 3, "conditions": []},
     }
     result = driver.poll_rollout(
-        "aws-prod", "ns", "Deployment", "api", timeout=5,
+        "aws-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
     )
     assert result.success is True
     assert result.timed_out is False
 
 
 def test_poll_rollout_detects_progressing_failure(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     """Progressing=False is k8s-speak for rollout stuck."""
     fake_k8s_client.get.return_value = {
@@ -302,15 +342,21 @@ def test_poll_rollout_detects_progressing_failure(
         "spec": {"replicas": 3},
         "status": {
             "readyReplicas": 0,
-            "conditions": [{
-                "type": "Progressing",
-                "status": "False",
-                "message": "ProgressDeadlineExceeded",
-            }],
+            "conditions": [
+                {
+                    "type": "Progressing",
+                    "status": "False",
+                    "message": "ProgressDeadlineExceeded",
+                }
+            ],
         },
     }
     result = driver.poll_rollout(
-        "aws-prod", "ns", "Deployment", "api", timeout=5,
+        "aws-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
     )
     assert result.success is False
     assert result.timed_out is False
@@ -318,7 +364,8 @@ def test_poll_rollout_detects_progressing_failure(
 
 
 def test_poll_rollout_invokes_on_tick(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     """on_tick callback fires per poll loop."""
     fake_k8s_client.get.return_value = {
@@ -328,7 +375,11 @@ def test_poll_rollout_invokes_on_tick(
     }
     seen: list[WorkloadStatus] = []
     driver.poll_rollout(
-        "aws-prod", "ns", "Deployment", "api", timeout=5,
+        "aws-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
         on_tick=seen.append,
     )
     # Success on first tick → at least one callback
@@ -336,11 +387,16 @@ def test_poll_rollout_invokes_on_tick(
 
 
 def test_poll_rollout_workload_not_found(
-    driver: EKSClusterDriver, fake_k8s_client,
+    driver: EKSClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.side_effect = _NotFoundError()
     result = driver.poll_rollout(
-        "aws-prod", "ns", "Deployment", "missing", timeout=5,
+        "aws-prod",
+        "ns",
+        "Deployment",
+        "missing",
+        timeout=5,
     )
     assert result.success is False
     assert "not found" in result.message

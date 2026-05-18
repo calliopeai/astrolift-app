@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.cost import (
     BillingActualLineItem,
     BillingActualsResult,
@@ -106,9 +107,11 @@ class AzureCostEstimator(CostEstimator):
         ] = {}
         self._vm_size_lock = threading.Lock()
 
+    @driver_op(cloud="azure", driver="cost", heartbeat=False)
     def supported(self, *, kind: str, variant: str) -> bool:
         return (kind, variant) in SERVICE_NAME_BY_VARIANT
 
+    @driver_op(cloud="azure", driver="cost")
     def estimate(self, request: CostEstimateRequest) -> CostResult:
         service_name = SERVICE_NAME_BY_VARIANT.get(
             (request.kind, request.variant),
@@ -639,6 +642,7 @@ class AzureBillingActuals:
             credential = DefaultAzureCredential()
             self._client = CostManagementClient(credential=credential)
 
+    @driver_op(cloud="azure", driver="cost")
     def query_actuals_by_binding(
         self,
         *,

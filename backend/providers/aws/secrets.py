@@ -20,6 +20,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.secrets import SecretsBackend
 
 from aws._errors import NotFoundError, map_client_error
@@ -70,7 +71,8 @@ class AWSSecretsBackend(SecretsBackend):
             import boto3
 
             self._sm = boto3.client(
-                "secretsmanager", region_name=config.region,
+                "secretsmanager",
+                region_name=config.region,
             )
         if ssm_client is not None:
             self._ssm = ssm_client
@@ -79,12 +81,14 @@ class AWSSecretsBackend(SecretsBackend):
 
             self._ssm = boto3.client("ssm", region_name=config.region)
 
+    @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
         backend, sub = _split_backend(path)
         if backend == "sm":
             return self._sm_get(sub)
         return self._ssm_get(sub)
 
+    @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.write", redact_args=("kvs",))
     def upsert(self, path: str, kvs: dict[str, str]) -> None:
         backend, sub = _split_backend(path)
         if backend == "sm":
@@ -92,6 +96,7 @@ class AWSSecretsBackend(SecretsBackend):
         else:
             self._ssm_upsert(sub, kvs)
 
+    @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.delete")
     def delete(self, path: str) -> None:
         backend, sub = _split_backend(path)
         if backend == "sm":
@@ -99,6 +104,7 @@ class AWSSecretsBackend(SecretsBackend):
         else:
             self._ssm_delete(sub)
 
+    @driver_op(cloud="aws", driver="secrets", audit=True, sensitive_kind="secret.list")
     def list(self, prefix: str) -> list[str]:
         backend, sub = _split_backend(prefix)
         if backend == "sm":
@@ -185,7 +191,7 @@ class AWSSecretsBackend(SecretsBackend):
                     # path the upsert call would use
                     if name.startswith(self._config.secrets_manager_prefix + "/"):
                         out.append(
-                            name[len(self._config.secrets_manager_prefix) + 1:],
+                            name[len(self._config.secrets_manager_prefix) + 1 :],
                         )
                     else:
                         out.append(name)
@@ -205,7 +211,8 @@ class AWSSecretsBackend(SecretsBackend):
         # JSON the same way the SM backend does for symmetry.
         try:
             response = self._ssm.get_parameter(
-                Name=self._ssm_name(path), WithDecryption=True,
+                Name=self._ssm_name(path),
+                WithDecryption=True,
             )
         except self._ssm.exceptions.ParameterNotFound:
             return None
@@ -249,16 +256,18 @@ class AWSSecretsBackend(SecretsBackend):
             paginator = self._ssm.get_paginator("describe_parameters")
             out: list[str] = []
             for page in paginator.paginate(
-                ParameterFilters=[{
-                    "Key": "Name",
-                    "Option": "BeginsWith",
-                    "Values": [full_prefix],
-                }],
+                ParameterFilters=[
+                    {
+                        "Key": "Name",
+                        "Option": "BeginsWith",
+                        "Values": [full_prefix],
+                    }
+                ],
             ):
                 for param in page.get("Parameters", []):
                     name = param.get("Name", "")
                     if name.startswith(self._config.ssm_prefix + "/"):
-                        out.append(name[len(self._config.ssm_prefix) + 1:])
+                        out.append(name[len(self._config.ssm_prefix) + 1 :])
                     else:
                         out.append(name)
             return sorted(out)

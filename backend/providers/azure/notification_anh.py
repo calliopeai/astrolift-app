@@ -48,6 +48,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.notification import (
     DeliveryTarget,
     DevicePlatform,
@@ -100,6 +101,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
+    @driver_op(cloud="azure", driver="notification")
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -145,6 +147,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
             provider_metadata=provider_metadata,
         )
 
+    @driver_op(cloud="azure", driver="notification")
     def revoke_device(self, *, registration_id: str) -> None:
         if not registration_id:
             return
@@ -157,6 +160,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
+    @driver_op(cloud="azure", driver="notification")
     def send(
         self,
         *,
@@ -177,6 +181,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
+    @driver_op(cloud="azure", driver="notification")
     def send_bulk(
         self,
         *,
@@ -185,6 +190,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
     ) -> list[SendResult]:
         return [self.send(target=t, payload=payload) for t in targets]
 
+    @driver_op(cloud="azure", driver="notification", heartbeat=False)
     def healthcheck(self) -> ProviderHealth:
         # Sas-validation HEAD against the hub: cheap + auth-bound.
         url = self._build_url("")

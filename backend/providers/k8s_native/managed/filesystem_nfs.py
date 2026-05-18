@@ -93,7 +93,7 @@ class NFSDriver(ManagedServiceDriver):
                 ok=False,
                 handle="",
                 message="apply_manifests failed",
-                errors=result.errors,
+                errors=result.summary(),
             )
         return ProvisionResult(
             ok=True,
@@ -155,8 +155,8 @@ class NFSDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=str(result.errors),
-                errors=result.errors,
+                message=str(result.summary()),
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,
@@ -186,13 +186,19 @@ class NFSDriver(ManagedServiceDriver):
         )
 
     def snapshot(self, handle):
-        raise NotImplementedError(
-            "NFS snapshots are CSI-driver-specific; wire to your " "CSI's VolumeSnapshot CRD",
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.snapshot(NFS) not supported -- NFS snapshots are "
+            "CSI-driver-specific; wire to your CSI's VolumeSnapshot CRD (#618)",
         )
 
     def restore(self, snapshot, target):
-        raise NotImplementedError(
-            "NFS restore from VolumeSnapshot at PVC-create time; " "out of scope for this driver",
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.restore(NFS) not supported -- restore from "
+            "VolumeSnapshot happens at PVC-create time; out of scope (#618)",
         )
 
     def config_schema(self):

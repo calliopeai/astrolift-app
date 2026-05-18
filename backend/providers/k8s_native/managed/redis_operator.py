@@ -89,8 +89,8 @@ class RedisOperatorDriver(ManagedServiceDriver):
                 return ProvisionResult(
                     ok=False,
                     handle="",
-                    message=f"failed to apply Redis: {result.errors}",
-                    errors=result.errors,
+                    message=f"failed to apply Redis: {result.summary()}",
+                    errors=result.summary(),
                 )
         handle = _pack_handle(
             kind=KIND,
@@ -163,8 +163,8 @@ class RedisOperatorDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=f"delete failed: {result.errors}",
-                errors=result.errors,
+                message=f"delete failed: {result.summary()}",
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,

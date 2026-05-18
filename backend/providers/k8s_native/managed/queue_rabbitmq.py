@@ -104,7 +104,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
                 ok=False,
                 handle="",
                 message="apply_manifests failed",
-                errors=result.errors,
+                errors=result.summary(),
             )
         return ProvisionResult(
             ok=True,
@@ -162,8 +162,8 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=str(result.errors),
-                errors=result.errors,
+                message=str(result.summary()),
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,
@@ -199,12 +199,18 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
         )
 
     def snapshot(self, handle):
-        raise NotImplementedError(
-            "RabbitMQ snapshots via cluster export; out of scope",
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.snapshot(RabbitMQ) not supported -- snapshots " "via cluster export; out of scope (#618)",
         )
 
     def restore(self, snapshot, target):
-        raise NotImplementedError("RabbitMQ doesn't restore from snapshot")
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.restore(RabbitMQ) not supported -- RabbitMQ " "doesn't restore from snapshot (#618)",
+        )
 
     def config_schema(self):
         return {

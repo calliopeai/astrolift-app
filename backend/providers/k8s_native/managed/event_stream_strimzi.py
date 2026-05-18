@@ -109,7 +109,7 @@ class StrimziKafkaDriver(ManagedServiceDriver):
                 ok=False,
                 handle="",
                 message="apply_manifests failed",
-                errors=result.errors,
+                errors=result.summary(),
             )
         return ProvisionResult(
             ok=True,
@@ -198,8 +198,8 @@ class StrimziKafkaDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=str(result.errors),
-                errors=result.errors,
+                message=str(result.summary()),
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,
@@ -238,12 +238,19 @@ class StrimziKafkaDriver(ManagedServiceDriver):
         )
 
     def snapshot(self, handle):
-        raise NotImplementedError(
-            "Kafka snapshot via MirrorMaker2 / cluster mirroring; " "out of scope for this driver",
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.snapshot(Kafka) not supported -- snapshot via "
+            "MirrorMaker2 / cluster mirroring; out of scope for this driver (#618)",
         )
 
     def restore(self, snapshot, target):
-        raise NotImplementedError("Kafka doesn't restore from a snapshot")
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.restore(Kafka) not supported -- Kafka doesn't " "restore from a snapshot (#618)",
+        )
 
     def config_schema(self):
         return {

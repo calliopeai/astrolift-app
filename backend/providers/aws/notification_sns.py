@@ -51,6 +51,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.notification import (
     DeliveryTarget,
     DevicePlatform,
@@ -116,6 +117,7 @@ class SNSNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
+    @driver_op(cloud="aws", driver="notification")
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -172,6 +174,7 @@ class SNSNotificationDriver(NotificationDriver):
             provider_metadata=provider_metadata,
         )
 
+    @driver_op(cloud="aws", driver="notification")
     def revoke_device(self, *, registration_id: str) -> None:
         if not registration_id or registration_id.startswith("unmapped:"):
             return
@@ -185,6 +188,7 @@ class SNSNotificationDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
+    @driver_op(cloud="aws", driver="notification")
     def send(
         self,
         *,
@@ -211,6 +215,7 @@ class SNSNotificationDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
+    @driver_op(cloud="aws", driver="notification")
     def send_bulk(
         self,
         *,
@@ -219,6 +224,7 @@ class SNSNotificationDriver(NotificationDriver):
     ) -> list[SendResult]:
         return [self.send(target=t, payload=payload) for t in targets]
 
+    @driver_op(cloud="aws", driver="notification", heartbeat=False)
     def healthcheck(self) -> ProviderHealth:
         try:
             self._sns.list_topics(NextToken="")

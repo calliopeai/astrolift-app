@@ -73,6 +73,13 @@ class TlsDriver(Protocol):
         """Return the certs the driver knows about, optionally
         filtered to a hostname (substring match — the driver decides
         what "match" means; ACM matches against ``DomainName`` +
-        ``SubjectAlternativeNames``). The default raises so non-AWS
-        drivers stay shape-compatible."""
-        raise NotImplementedError("not implemented for this driver")
+        ``SubjectAlternativeNames``). The default raises
+        :class:`UnsupportedOperationError` so non-AWS drivers stay
+        shape-compatible without forcing every plugin to ship a stub
+        (#619). Resolvers map this to a user-facing "not supported on
+        this cloud" message."""
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            f"tls.list_certificates({filter_hostname=}) not supported on this driver",
+        )

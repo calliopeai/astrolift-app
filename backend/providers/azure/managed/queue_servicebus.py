@@ -214,12 +214,19 @@ class ServiceBusDriver(ManagedServiceDriver):
         )
 
     def snapshot(self, handle):
-        raise NotImplementedError(
-            "Service Bus messages are ephemeral; no snapshot",
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.snapshot(ServiceBus) not supported -- Service "
+            "Bus messages are ephemeral; no snapshot (#618)",
         )
 
     def restore(self, snapshot, target):
-        raise NotImplementedError("Service Bus doesn't restore")
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.restore(ServiceBus) not supported -- Service " "Bus doesn't restore from snapshot (#618)",
+        )
 
     def config_schema(self):
         return {

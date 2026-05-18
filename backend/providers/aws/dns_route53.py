@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, DnsRecord, Record
 from aws._errors import NotFoundError, map_client_error
 
@@ -36,10 +37,12 @@ class Route53Driver(DnsDriver):
             import boto3
 
             self._r53 = boto3.client(
-                "route53", region_name=self._config.region,
+                "route53",
+                region_name=self._config.region,
             )
         self._zone_cache: dict[str, str] = {}
 
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.ensure_record")
     def ensure_record(
         self,
         zone: str,
@@ -56,21 +59,24 @@ class Route53Driver(DnsDriver):
                 HostedZoneId=zone_id,
                 ChangeBatch={
                     "Comment": "managed by astrolift",
-                    "Changes": [{
-                        "Action": "UPSERT",
-                        "ResourceRecordSet": {
-                            "Name": fqdn,
-                            "Type": type,
-                            "TTL": ttl,
-                            "ResourceRecords": [{"Value": value}],
-                        },
-                    }],
+                    "Changes": [
+                        {
+                            "Action": "UPSERT",
+                            "ResourceRecordSet": {
+                                "Name": fqdn,
+                                "Type": type,
+                                "TTL": ttl,
+                                "ResourceRecords": [{"Value": value}],
+                            },
+                        }
+                    ],
                 },
             )
         except Exception as exc:
             raise map_client_error(exc) from exc
         return Record(zone=zone, name=name, type=type, value=value, ttl=ttl)
 
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.delete_record")
     def delete_record(self, zone: str, name: str, type: str) -> None:
         zone_id = self._resolve_zone(zone)
         fqdn = self._fqdn(name=name, zone=zone)
@@ -89,11 +95,7 @@ class Route53Driver(DnsDriver):
 
         records = response.get("ResourceRecordSets", []) or []
         match = next(
-            (
-                rs for rs in records
-                if rs.get("Name", "").rstrip(".") == fqdn.rstrip(".")
-                and rs.get("Type") == type
-            ),
+            (rs for rs in records if rs.get("Name", "").rstrip(".") == fqdn.rstrip(".") and rs.get("Type") == type),
             None,
         )
         if match is None:
@@ -105,15 +107,18 @@ class Route53Driver(DnsDriver):
             self._r53.change_resource_record_sets(
                 HostedZoneId=zone_id,
                 ChangeBatch={
-                    "Changes": [{
-                        "Action": "DELETE",
-                        "ResourceRecordSet": match,
-                    }],
+                    "Changes": [
+                        {
+                            "Action": "DELETE",
+                            "ResourceRecordSet": match,
+                        }
+                    ],
                 },
             )
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+    @driver_op(cloud="aws", driver="dns")
     def list_records(self, zone: str) -> list[Record]:
         zone_id = self._resolve_zone(zone)
         try:
@@ -127,19 +132,22 @@ class Route53Driver(DnsDriver):
                     rtype = rs.get("Type", "")
                     ttl = rs.get("TTL", 0)
                     for r in rs.get("ResourceRecords", []) or []:
-                        out.append(Record(
-                            zone=zone,
-                            name=self._strip_zone(fqdn=name, zone=zone),
-                            type=rtype,
-                            value=r.get("Value", ""),
-                            ttl=ttl,
-                        ))
+                        out.append(
+                            Record(
+                                zone=zone,
+                                name=self._strip_zone(fqdn=name, zone=zone),
+                                type=rtype,
+                                value=r.get("Value", ""),
+                                ttl=ttl,
+                            )
+                        )
             return out
         except Exception as exc:
             raise map_client_error(exc) from exc
 
     # ---- observability reads (#377) -------------------------------
 
+    @driver_op(cloud="aws", driver="dns")
     def list_records_for_app(self, zone_or_app: str) -> list[DnsRecord]:
         """Return the operator-facing record snapshot for a zone.
 
@@ -175,13 +183,15 @@ class Route53Driver(DnsDriver):
                     rtype = rs.get("Type", "")
                     ttl = rs.get("TTL", 0)
                     for r in rs.get("ResourceRecords", []) or []:
-                        out.append(DnsRecord(
-                            name=name,
-                            type=rtype,
-                            value=r.get("Value", ""),
-                            ttl=ttl,
-                            propagation_status=propagation,
-                        ))
+                        out.append(
+                            DnsRecord(
+                                name=name,
+                                type=rtype,
+                                value=r.get("Value", ""),
+                                ttl=ttl,
+                                propagation_status=propagation,
+                            )
+                        )
             return out
         except NotFoundError:
             raise
@@ -212,17 +222,15 @@ class Route53Driver(DnsDriver):
             zone_id = z["Id"].rsplit("/", 1)[-1]
             try:
                 tags_resp = self._r53.list_tags_for_resource(
-                    ResourceType="hostedzone", ResourceId=zone_id,
+                    ResourceType="hostedzone",
+                    ResourceId=zone_id,
                 )
             except Exception:
                 # Tag lookups are best-effort; a permissions hiccup on
                 # one zone shouldn't kill the whole scan.
                 continue
             for t in tags_resp.get("ResourceTagSet", {}).get("Tags", []) or []:
-                if (
-                    t.get("Key") == "astrolift.io/app-slug"
-                    and t.get("Value") == zone_or_app
-                ):
+                if t.get("Key") == "astrolift.io/app-slug" and t.get("Value") == zone_or_app:
                     name = str(z.get("Name", "")).rstrip(".")
                     self._zone_cache[name + "."] = zone_id
                     return name
@@ -254,7 +262,8 @@ class Route53Driver(DnsDriver):
             return self._zone_cache[canonical]
         try:
             response = self._r53.list_hosted_zones_by_name(
-                DNSName=canonical, MaxItems="1",
+                DNSName=canonical,
+                MaxItems="1",
             )
         except Exception as exc:
             raise map_client_error(exc) from exc

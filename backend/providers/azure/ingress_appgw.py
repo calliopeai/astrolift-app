@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
 
 
@@ -41,6 +42,7 @@ class AzureAppGatewayIngressDriver(IngressDriver):
             )
         self._config = config
 
+    @driver_op(cloud="azure", driver="ingress")
     def render_ingress(
         self,
         app: str,
@@ -50,34 +52,48 @@ class AzureAppGatewayIngressDriver(IngressDriver):
     ) -> list[Manifest]:
         if self._config.variant == "agic":
             return self._render_agic(
-                app=app, workload=workload,
-                hostnames=hostnames, tls_strategy=tls_strategy,
+                app=app,
+                workload=workload,
+                hostnames=hostnames,
+                tls_strategy=tls_strategy,
             )
         if self._config.variant == "gateway_api":
             return self._render_gateway_api(
-                app=app, workload=workload, hostnames=hostnames,
+                app=app,
+                workload=workload,
+                hostnames=hostnames,
                 tls_strategy=tls_strategy,
             )
         raise ValueError(f"unhandled variant {self._config.variant!r}")
 
+    @driver_op(cloud="azure", driver="ingress")
     def update_ingress_host(
-        self, cluster, namespace, app, workload, new_hostname,
+        self,
+        cluster,
+        namespace,
+        app,
+        workload,
+        new_hostname,
     ):
         if self._config.cluster_driver is None:
             raise RuntimeError(
                 "update_ingress_host requires cluster_driver",
             )
         manifests = self.render_ingress(
-            app=app, workload=workload,
+            app=app,
+            workload=workload,
             hostnames=[new_hostname],
             tls_strategy="akv_referenced",
         )
         result = self._config.cluster_driver.apply_manifests(
-            cluster, namespace, manifests,
+            cluster,
+            namespace,
+            manifests,
         )
         if not result.ok:
-            raise RuntimeError(f"update failed: {result.errors}")
+            raise RuntimeError(f"update failed: {result.summary()}")
 
+    @driver_op(cloud="azure", driver="ingress")
     def delete_ingress(self, cluster, namespace, app, workload):
         if self._config.cluster_driver is None:
             raise RuntimeError(
@@ -102,82 +118,105 @@ class AzureAppGatewayIngressDriver(IngressDriver):
             },
         ]
         result = self._config.cluster_driver.delete_manifests(
-            cluster, namespace, stubs,
+            cluster,
+            namespace,
+            stubs,
         )
         if result.errors:
-            raise RuntimeError(f"delete failed: {result.errors}")
+            raise RuntimeError(f"delete failed: {result.summary()}")
 
     def _render_agic(
-        self, *, app, workload, hostnames, tls_strategy,
+        self,
+        *,
+        app,
+        workload,
+        hostnames,
+        tls_strategy,
     ) -> list[Manifest]:
         annotations: dict[str, str] = {
             "kubernetes.io/ingress.class": "azure/application-gateway",
             "appgw.ingress.kubernetes.io/use-private-ip": "false",
         }
-        if (
-            tls_strategy == "akv_referenced"
-            and self._config.akv_secret_id
-        ):
-            annotations[
-                "appgw.ingress.kubernetes.io/appgw-ssl-certificate"
-            ] = self._config.akv_secret_id
-        rules = [{
-            "host": h,
-            "http": {
-                "paths": [{
-                    "path": "/*",
-                    "pathType": "ImplementationSpecific",
-                    "backend": {
-                        "service": {
-                            "name": workload,
-                            "port": {"number": 80},
-                        },
-                    },
-                }],
-            },
-        } for h in hostnames]
-        return [{
-            "apiVersion": "networking.k8s.io/v1",
-            "kind": "Ingress",
-            "metadata": {
-                "name": f"{app}-{workload}",
-                "labels": {
-                    "astrolift.io/app": app,
-                    "astrolift.io/workload": workload,
-                    "astrolift.io/managed-by": "platform",
+        if tls_strategy == "akv_referenced" and self._config.akv_secret_id:
+            annotations["appgw.ingress.kubernetes.io/appgw-ssl-certificate"] = self._config.akv_secret_id
+        rules = [
+            {
+                "host": h,
+                "http": {
+                    "paths": [
+                        {
+                            "path": "/*",
+                            "pathType": "ImplementationSpecific",
+                            "backend": {
+                                "service": {
+                                    "name": workload,
+                                    "port": {"number": 80},
+                                },
+                            },
+                        }
+                    ],
                 },
-                "annotations": annotations,
-            },
-            "spec": {"rules": rules},
-        }]
+            }
+            for h in hostnames
+        ]
+        return [
+            {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": {
+                    "name": f"{app}-{workload}",
+                    "labels": {
+                        "astrolift.io/app": app,
+                        "astrolift.io/workload": workload,
+                        "astrolift.io/managed-by": "platform",
+                    },
+                    "annotations": annotations,
+                },
+                "spec": {"rules": rules},
+            }
+        ]
 
     def _render_gateway_api(
-        self, *, app, workload, hostnames, tls_strategy,
+        self,
+        *,
+        app,
+        workload,
+        hostnames,
+        tls_strategy,
     ) -> list[Manifest]:
-        return [{
-            "apiVersion": "gateway.networking.k8s.io/v1",
-            "kind": "HTTPRoute",
-            "metadata": {
-                "name": f"{app}-{workload}",
-                "labels": {
-                    "astrolift.io/app": app,
-                    "astrolift.io/workload": workload,
-                    "astrolift.io/managed-by": "platform",
+        return [
+            {
+                "apiVersion": "gateway.networking.k8s.io/v1",
+                "kind": "HTTPRoute",
+                "metadata": {
+                    "name": f"{app}-{workload}",
+                    "labels": {
+                        "astrolift.io/app": app,
+                        "astrolift.io/workload": workload,
+                        "astrolift.io/managed-by": "platform",
+                    },
                 },
-            },
-            "spec": {
-                "parentRefs": [{
-                    "name": "astrolift-gateway",
-                    "namespace": "gateway-system",
-                }],
-                "hostnames": list(hostnames),
-                "rules": [{
-                    "matches": [
-                        {"path": {"type": "PathPrefix", "value": "/"}},
+                "spec": {
+                    "parentRefs": [
+                        {
+                            "name": "astrolift-gateway",
+                            "namespace": "gateway-system",
+                        }
                     ],
-                    "backendRefs": [{
-                        "name": workload, "port": 80,
-                    }],
-                }],
-            },
-        }]
+                    "hostnames": list(hostnames),
+                    "rules": [
+                        {
+                            "matches": [
+                                {"path": {"type": "PathPrefix", "value": "/"}},
+                            ],
+                            "backendRefs": [
+                                {
+                                    "name": workload,
+                                    "port": 80,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            }
+        ]

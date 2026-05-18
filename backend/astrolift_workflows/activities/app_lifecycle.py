@@ -588,8 +588,12 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
         )
     result = driver.apply_manifests(ctx.slug, namespace, resources)
     if not result.ok:
+        # ``result.errors`` is now ``list[ApplyError]`` (#603). Use the
+        # legacy string shape via ``.summary()`` so the message keeps the
+        # historical ``Kind/name: exc`` format the workflow log + UI
+        # already render.
         raise AppDeployError(
-            f"apply_manifests failed for deployment {deployment_id}: " + "; ".join(result.errors),
+            f"apply_manifests failed for deployment {deployment_id}: " + "; ".join(result.summary()),
         )
     return {
         "created": list(result.created),
@@ -777,8 +781,10 @@ def _update_secrets_sync(deployment_id: int) -> int:
         return 0
     result = cluster_driver.apply_manifests(ctx.slug, namespace, resources)
     if not result.ok:
+        # ``result.errors`` is ``list[ApplyError]`` (#603); ``.summary()``
+        # preserves the legacy ``Kind/name: exc`` string list.
         raise AppDeployError(
-            f"update_secrets apply failed for deployment {deployment_id}: " + "; ".join(result.errors),
+            f"update_secrets apply failed for deployment {deployment_id}: " + "; ".join(result.summary()),
         )
     return len(resources)
 

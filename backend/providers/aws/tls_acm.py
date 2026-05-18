@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.tls import Certificate, CertificateInfo, TlsDriver
 from aws._errors import NotFoundError, map_client_error
 
@@ -41,6 +42,7 @@ class ACMDriver(TlsDriver):
 
             self._acm = boto3.client("acm", region_name=config.region)
 
+    @driver_op(cloud="aws", driver="tls", audit=True, sensitive_kind="tls.mint")
     def ensure_certificate(
         self,
         domain: str,
@@ -65,9 +67,12 @@ class ACMDriver(TlsDriver):
             kwargs: dict[str, Any] = {
                 "DomainName": domain,
                 "ValidationMethod": "DNS",
-                "Tags": [{
-                    "Key": "astrolift.io/managed-by", "Value": "platform",
-                }],
+                "Tags": [
+                    {
+                        "Key": "astrolift.io/managed-by",
+                        "Value": "platform",
+                    }
+                ],
             }
             if sans:
                 kwargs["SubjectAlternativeNames"] = sans
@@ -76,6 +81,7 @@ class ACMDriver(TlsDriver):
             raise map_client_error(exc) from exc
         return self.get_certificate(response["CertificateArn"])
 
+    @driver_op(cloud="aws", driver="tls")
     def get_certificate(self, certificate_id: str) -> Certificate:
         try:
             response = self._acm.describe_certificate(
@@ -97,6 +103,7 @@ class ACMDriver(TlsDriver):
             not_after=_iso_or_none(cert.get("NotAfter")),
         )
 
+    @driver_op(cloud="aws", driver="tls", audit=True, sensitive_kind="tls.revoke")
     def revoke_certificate(self, certificate_id: str) -> None:
         """ACM doesn't revoke — it deletes. The next renewal cycle
         is implicit. If the cert is in use by another resource,
@@ -110,6 +117,7 @@ class ACMDriver(TlsDriver):
 
     # ---- observability reads (#377) -------------------------------
 
+    @driver_op(cloud="aws", driver="tls")
     def list_certificates(
         self,
         filter_hostname: str | None = None,
@@ -161,18 +169,22 @@ class ACMDriver(TlsDriver):
             renewal_status = _renewal_status(cert)
             issuer = cert.get("Issuer") or ""
 
-            out.append(CertificateInfo(
-                id=cert_arn,
-                hostname=domain,
-                issuer=issuer,
-                not_after=not_after_iso,
-                days_until_expiry=days_until,
-                renewal_status=renewal_status,
-            ))
+            out.append(
+                CertificateInfo(
+                    id=cert_arn,
+                    hostname=domain,
+                    issuer=issuer,
+                    not_after=not_after_iso,
+                    days_until_expiry=days_until,
+                    renewal_status=renewal_status,
+                )
+            )
         return out
 
+    @driver_op(cloud="aws", driver="tls")
     def get_validation_cnames(
-        self, certificate_id: str,
+        self,
+        certificate_id: str,
     ) -> list[tuple[str, str]]:
         """Return the (Name, Value) pairs the DnsDriver must publish
         to complete DNS-01 validation. Not part of the SDK protocol

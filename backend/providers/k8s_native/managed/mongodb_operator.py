@@ -107,7 +107,7 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
                 ok=False,
                 handle="",
                 message="apply_manifests failed",
-                errors=result.errors,
+                errors=result.summary(),
             )
         return ProvisionResult(
             ok=True,
@@ -165,8 +165,8 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=str(result.errors),
-                errors=result.errors,
+                message=str(result.summary()),
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,

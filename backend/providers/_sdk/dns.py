@@ -77,7 +77,15 @@ class DnsDriver(Protocol):
         Drivers may interpret ``zone_or_app`` as either a DNS zone name
         (``"acme.platform.example"``) or an app slug — whichever the
         driver can resolve via its tag scheme. The default implementation
-        raises so non-AWS drivers stay shape-compatible without forcing
-        every plugin to ship a stub.
+        raises :class:`UnsupportedOperationError` so non-AWS drivers stay
+        shape-compatible without forcing every plugin to ship a stub.
+        Resolvers translate this exception to a "not supported on this
+        cloud" user-facing message (#619).
         """
-        raise NotImplementedError("not implemented for this driver")
+        # Local import keeps the protocol module free of the runtime
+        # exception class until call time. Circular-import safe.
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            f"dns.list_records_for_app({zone_or_app=}) not supported on this driver",
+        )

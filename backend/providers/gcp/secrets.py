@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.secrets import SecretsBackend
 
 from gcp._errors import NotFoundError, map_api_error
@@ -32,12 +33,10 @@ class GCPSecretsBackend(SecretsBackend):
 
             self._client = secretmanager.SecretManagerServiceClient()
 
+    @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
         secret_name = self._secret_name(path)
-        version_path = (
-            f"projects/{self._config.project_id}"
-            f"/secrets/{secret_name}/versions/latest"
-        )
+        version_path = f"projects/{self._config.project_id}" f"/secrets/{secret_name}/versions/latest"
         try:
             response = self._client.access_secret_version(
                 name=version_path,
@@ -55,11 +54,10 @@ class GCPSecretsBackend(SecretsBackend):
             pass
         return {"value": payload}
 
+    @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.write", redact_args=("kvs",))
     def upsert(self, path: str, kvs: dict[str, str]) -> None:
         secret_name = self._secret_name(path)
-        secret_path = (
-            f"projects/{self._config.project_id}/secrets/{secret_name}"
-        )
+        secret_path = f"projects/{self._config.project_id}/secrets/{secret_name}"
         # Create the parent secret if missing, then add a new
         # version with the payload.
         try:
@@ -77,11 +75,9 @@ class GCPSecretsBackend(SecretsBackend):
         except Exception as exc:  # noqa: BLE001
             raise map_api_error(exc) from exc
 
+    @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.delete")
     def delete(self, path: str) -> None:
-        secret_path = (
-            f"projects/{self._config.project_id}"
-            f"/secrets/{self._secret_name(path)}"
-        )
+        secret_path = f"projects/{self._config.project_id}" f"/secrets/{self._secret_name(path)}"
         try:
             self._client.delete_secret(name=secret_path)
         except Exception as exc:  # noqa: BLE001
@@ -89,6 +85,7 @@ class GCPSecretsBackend(SecretsBackend):
                 raise NotFoundError(f"secret {path} not found") from exc
             raise map_api_error(exc) from exc
 
+    @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.list")
     def list(self, prefix: str) -> list[str]:
         full_prefix = self._secret_name(prefix)
         try:
@@ -101,11 +98,13 @@ class GCPSecretsBackend(SecretsBackend):
         out: list[str] = []
         for secret in iterator:
             name = secret.name.rsplit("/", 1)[-1]
-            stripped = name[
-                len(self._config.secret_id_prefix) + 1:
-            ] if name.startswith(
-                self._config.secret_id_prefix + "-",
-            ) else name
+            stripped = (
+                name[len(self._config.secret_id_prefix) + 1 :]
+                if name.startswith(
+                    self._config.secret_id_prefix + "-",
+                )
+                else name
+            )
             out.append(stripped.replace("-", "/"))
         return sorted(out)
 
@@ -113,9 +112,7 @@ class GCPSecretsBackend(SecretsBackend):
         # GCP Secret IDs: ASCII letters, digits, hyphens,
         # underscores; max 255 chars; can't start with a number.
         clean = path.replace("/", "-").lstrip("/")
-        clean = "".join(
-            c if c.isalnum() or c in "-_" else "-" for c in clean
-        )
+        clean = "".join(c if c.isalnum() or c in "-_" else "-" for c in clean)
         return f"{self._config.secret_id_prefix}-{clean}"
 
     def _create_secret(self, *, secret_name: str) -> None:
@@ -123,12 +120,14 @@ class GCPSecretsBackend(SecretsBackend):
         if self._config.kms_key_name:
             replication = {
                 "user_managed": {
-                    "replicas": [{
-                        "location": self._config.project_id.split("-")[0],
-                        "customer_managed_encryption": {
-                            "kms_key_name": self._config.kms_key_name,
-                        },
-                    }],
+                    "replicas": [
+                        {
+                            "location": self._config.project_id.split("-")[0],
+                            "customer_managed_encryption": {
+                                "kms_key_name": self._config.kms_key_name,
+                            },
+                        }
+                    ],
                 },
             }
         try:
