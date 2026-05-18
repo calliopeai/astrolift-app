@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  AlertTriangleIcon,
   BookOpenIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
@@ -49,6 +50,7 @@ import type {
 
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
+import { AddClientIdDialog } from "./add-client-id-dialog";
 import { ConnectGitHubDialog } from "./connect-github-dialog";
 import { ConnectGitLabDialog } from "./connect-gitlab-dialog";
 import { ConnectSourceDialog } from "./connect-source-dialog";
@@ -125,6 +127,11 @@ export function SourceProvidersClient() {
         "GitHub can't reach this install. Set APP_BASE_URL on the backend to your public URL (e.g. https://astrolift.example.com) and redeploy.",
         { duration: 10_000 }
       );
+    } else if (err === "config_missing_client_id") {
+      toast.error(
+        "This GitHub connection is missing its Client ID — add it via 'Add Client ID' below.",
+        { duration: 10_000 }
+      );
     } else if (err) {
       toast.error(`SCM OAuth: ${err.replace(/_/g, " ")}`);
     }
@@ -167,6 +174,11 @@ export function SourceProvidersClient() {
   const [rotateSecretTarget, setRotateSecretTarget] =
     React.useState<AstroliftSourceConnection | null>(null);
 
+  // Connection currently being edited to add a missing Client ID (#525
+  // recovery flow). NULL when the dialog is closed.
+  const [clientIdTarget, setClientIdTarget] =
+    React.useState<AstroliftSourceConnection | null>(null);
+
   async function handleRotateSecret(c: AstroliftSourceConnection) {
     const { data } = await rotateSecret({
       variables: { input: { connectionId: c.id } },
@@ -180,6 +192,7 @@ export function SourceProvidersClient() {
 
   const connectionList = conns.data?.astroliftSourceConnections ?? [];
   const keyList = keys.data?.astroliftSshDeployKeys ?? [];
+  const incompleteClientIdConnections = connectionList.filter((c) => c.needsClientId);
 
   async function handleDisconnect(c: AstroliftSourceConnection) {
     const { data } = await disconnect({ variables: { input: { id: c.id } } });
@@ -240,6 +253,48 @@ export function SourceProvidersClient() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {/*
+            Action-required banner — surfaces GitHub connections that
+            are missing the OAuth Client ID (post-#525 schema split).
+            Existing rows registered before the column was added carry
+            an empty app_client_id; clicking "Connect my GitHub" on
+            them would redirect to github.com with the numeric App ID
+            in the client_id query param and 404 there. The banner
+            walks the operator to a focused dialog that takes only the
+            Client ID and runs UpdateSourceConnection in place.
+          */}
+          {incompleteClientIdConnections.length > 0 && (
+            <div className="border-amber-500/30 bg-amber-500/5 mx-6 mt-6 flex items-start gap-3 rounded-md border p-3 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <p className="font-medium">
+                  Action required: {incompleteClientIdConnections.length === 1
+                    ? "a GitHub connection needs"
+                    : `${incompleteClientIdConnections.length} GitHub connections need`}{" "}
+                  a Client ID
+                </p>
+                <p>
+                  The user-to-server OAuth flow (&quot;Connect my GitHub&quot;) will
+                  fail with a 404 at github.com until you add the GitHub App
+                  Client ID. Find it on your GitHub App settings page — it looks
+                  like <code className="font-mono">Iv23l…</code> for new GitHub
+                  Apps.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {incompleteClientIdConnections.map((c) => (
+                    <Button
+                      key={c.id}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setClientIdTarget(c)}
+                    >
+                      Add Client ID for {c.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {conns.loading && connectionList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-12 w-full" />
@@ -330,15 +385,27 @@ export function SourceProvidersClient() {
                             in oauth_client_id and GitHub's /login/oauth/authorize
                             endpoint accepts either. */}
                         {((c.kind === "github_oauth_app" && c.isOauthAppConfig) ||
-                          c.kind === "github_app_install") && (
-                          <Button asChild size="sm" variant="outline">
-                            <a
-                              href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
-                            >
-                              Connect my GitHub
-                            </a>
-                          </Button>
-                        )}
+                          c.kind === "github_app_install") &&
+                          (c.needsClientId ? (
+                            <Can permission="scm.connect">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setClientIdTarget(c)}
+                              >
+                                <AlertTriangleIcon className="size-3.5 text-amber-600 dark:text-amber-400" />
+                                Add Client ID
+                              </Button>
+                            </Can>
+                          ) : (
+                            <Button asChild size="sm" variant="outline">
+                              <a
+                                href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/settings/source-providers`}
+                              >
+                                Connect my GitHub
+                              </a>
+                            </Button>
+                          ))}
                         {c.kind === "gitlab_oauth_app" && c.isOauthAppConfig && (
                           <Button asChild size="sm" variant="outline">
                             <a
@@ -496,6 +563,10 @@ export function SourceProvidersClient() {
       <ConnectGitLabDialog open={openConnectGitlab} onOpenChange={setOpenConnectGitlab} />
       <ConnectSourceDialog open={openConnect} onOpenChange={setOpenConnect} />
       <GenerateSshKeyDialog open={openGenerateKey} onOpenChange={setOpenGenerateKey} />
+      <AddClientIdDialog
+        connection={clientIdTarget}
+        onClose={() => setClientIdTarget(null)}
+      />
       {revealedSecret && (
         <WebhookSecretReveal reveal={revealedSecret} onClose={() => setRevealedSecret(null)} />
       )}

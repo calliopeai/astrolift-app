@@ -74,6 +74,15 @@ def local_login(request):
         return _bad("invalid credentials", status=401)
 
     login(request, user)
+    # #526 — record which credential family minted this session so
+    # the step-up gate knows which re-auth UI to surface. Local-login
+    # is always password-backed.
+    try:
+        from astrolift_identity.sessions import SESSION_LOGIN_METHOD_KEY
+
+        request.session[SESSION_LOGIN_METHOD_KEY] = "password"
+    except Exception:  # noqa: BLE001 — never let metadata-stamping break the login
+        pass
     request.session.save()
 
     # The UI accepts either a JSON or a redirect response shape; we

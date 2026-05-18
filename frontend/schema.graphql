@@ -2032,6 +2032,8 @@ type AstroliftSourceConnection {
   installationId: String!
   apiBaseUrl: String!
   oauthClientId: String!
+  appClientId: String!
+  needsClientId: Boolean!
   oauthRedirectUri: String!
   repoVisibilityScopes: [String!]!
   isOauthAppConfig: Boolean!
@@ -2480,6 +2482,7 @@ input ConnectSourceInput {
   apiBaseUrl: String = null
   secretPlaintext: String!
   oauthClientId: String = null
+  appClientId: String = null
   oauthRedirectUri: String = null
   repoVisibilityScopes: [String!] = null
 }
@@ -3308,6 +3311,7 @@ type MutationError {
   requiresAttestation: Boolean
   currentVersion: Int
   requestedVersion: Int
+  supportedMethods: [String!]
 }
 
 """Standard mutation result with ok flag and validation errors."""
@@ -4109,6 +4113,7 @@ input UpdateSourceConnectionInput {
   repoVisibilityScopes: [String!] = null
   isActive: Boolean = null
   rotateSecretPlaintext: String = null
+  appClientId: String = null
 }
 
 input UpdateTeamInput {

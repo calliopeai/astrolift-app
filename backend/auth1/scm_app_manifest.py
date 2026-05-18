@@ -10,9 +10,11 @@ us with a temporary ``code`` query param, and we exchange that ``code``
 at ``POST https://api.github.com/app-manifests/<code>/conversions``
 for the App's ``client_id``, ``client_secret``, ``webhook_secret``,
 private-key ``pem``, and ``html_url``. We persist those as a new
-``github_app_install`` ``SourceConnection`` row (the PEM goes in
-``secret_ciphertext``, the App ID in ``oauth_client_id`` — same column
-re-use already used by the manual-paste path).
+``github_app_install`` ``SourceConnection`` row: the PEM goes in
+``secret_ciphertext``, the numeric **App ID** in ``oauth_client_id``
+(used by webhook-payload App lookups), and the OAuth **Client ID** in
+``app_client_id`` (used by the ``/login/oauth/authorize`` redirect +
+the GitHub-recommended JWT ``iss`` claim per #525).
 
 The webhook URL inside the manifest references a stable guid we
 pre-allocate (the new SourceConnection's ``guid``); the App is created
@@ -383,6 +385,11 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
     assert payload is not None  # narrow for type-checkers
 
     app_id = str(payload.get("id") or "")
+    # The user-to-server OAuth Client ID — distinct from the numeric
+    # App ID above. Drives the /login/oauth/authorize redirect + the
+    # JWT iss claim (per #525). Manifest payloads after 2022 include
+    # both fields; we persist them separately.
+    client_id = str(payload.get("client_id") or "").strip()
     pem = (payload.get("pem") or "").encode("utf-8")
     webhook_secret_plain = (payload.get("webhook_secret") or "").encode("utf-8")
     client_secret_plain = (payload.get("client_secret") or "").encode("utf-8")
@@ -396,7 +403,8 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
 
     pem_encrypted = encrypt_at_rest(pem)
     update_fields: dict[str, Any] = {
-        "oauth_client_id": app_id,  # github_app provider reads app_id from this column
+        "oauth_client_id": app_id,  # numeric App ID — webhook payload lookups
+        "app_client_id": client_id,  # OAuth Client ID — /authorize + JWT iss
         "account_login": owner_login,
         "display_name": f"GitHub App: {app_slug}",
         "secret_backend_kind": pem_encrypted.backend_kind,

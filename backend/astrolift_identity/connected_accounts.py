@@ -293,7 +293,18 @@ class MyConnectedAccountsMutation:
                 "provider config not found or not user-connectable",
                 field="providerConfigId",
             )
-        if not cfg.oauth_client_id:
+        # GitHub kinds need the OAuth **Client ID** (``app_client_id``)
+        # for the /login/oauth/authorize URL; the legacy
+        # ``oauth_client_id`` column carries the numeric App ID on
+        # github_app_install rows and would 404 if we sent it. GitLab
+        # OAuth Apps still use ``oauth_client_id`` directly.
+        if cfg.kind.startswith("github_"):
+            if not cfg.app_client_id:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "provider config is missing GitHub App Client ID; the org admin needs to finish setup",
+                )
+        elif not cfg.oauth_client_id:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 "provider config is missing OAuth client_id; the org admin needs to finish setup",

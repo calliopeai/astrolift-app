@@ -36,6 +36,7 @@ def failure(
     requires_attestation: bool | None = None,
     current_version: int | None = None,
     requested_version: int | None = None,
+    supported_methods: list[str] | None = None,
 ) -> MutationResultType[None]:
     return MutationResultType(
         ok=False,
@@ -48,6 +49,7 @@ def failure(
                 requires_attestation=requires_attestation,
                 current_version=current_version,
                 requested_version=requested_version,
+                supported_methods=supported_methods,
             )
         ],
     )

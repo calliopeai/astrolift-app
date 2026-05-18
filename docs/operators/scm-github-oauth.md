@@ -127,7 +127,8 @@ If the dance fails the URL comes back with `?scm_error=<code>`:
 |---------------------|---------------|-----|
 | `missing_config_id` | `Connect my GitHub` was clicked without a config row reference. | Don't hand-craft the URL; click the button on the OAuth-app row. |
 | `config_not_found`  | The OAuth-app row was deleted or belongs to a different org. | Reconfigure Step 2 in the org you're signed into. |
-| `config_incomplete` | The row's `oauth_client_id` is blank. | Edit the row, paste the Client ID from GitHub. |
+| `config_incomplete` | The row's `oauth_client_id` is blank (GitLab path only — see `config_missing_client_id` for GitHub). | Edit the row, paste the Client ID from GitLab. |
+| `config_missing_client_id` | The GitHub row's `app_client_id` is blank — the OAuth dance would 404 at github.com because we'd send the numeric App ID where the Client ID belongs. | Edit the row from `/settings/source-providers` and paste the GitHub App **Client ID** (e.g. `Iv23lic8662KXwe4XKEI`). Distinct from the numeric App ID. |
 | `state_mismatch`    | CSRF check failed — the session lost the state token (e.g. the user spent >2h on GitHub's authorize page, or session was rotated). | Click the button again. |
 | `no_code`           | GitHub didn't return a `code` (user denied authorization). | Click again, accept on GitHub. |
 | `exchange_failed`   | Astrolift couldn't reach `github.com/login/oauth/access_token` or the request was rejected. | Check that the **callback URL** registered on GitHub *exactly* matches the **OAuth redirect URI** in Astrolift; both must include the protocol and the trailing path. |

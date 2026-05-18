@@ -4,8 +4,8 @@ GitHub App installation token minter.
 Three-step exchange:
 
   1. Sign a short-lived JWT with the App's private key (RS256,
-     ``iss=<app_id>``, ``iat=now``, ``exp=now+9min`` — GitHub allows
-     up to 10 minutes; we leave a one-minute safety margin).
+     ``iss=<client_id>``, ``iat=now``, ``exp=now+9min`` — GitHub
+     allows up to 10 minutes; we leave a one-minute safety margin).
   2. POST the JWT to
      ``/app/installations/<installation_id>/access_tokens``.
   3. GitHub returns an installation access token that lasts ~1 hour
@@ -18,16 +18,26 @@ swaps this for Redis at the cache layer (the rest of the call shape
 stays identical).
 
 The App's private-key PEM lives encrypted in
-``SourceConnection.secret_ciphertext``. The connection's
-``oauth_client_id`` field repurposed as ``app_id`` on
-github_app_install rows — saving a column and keeping the SCM
-data model uniform.
+``SourceConnection.secret_ciphertext``. The connection carries two
+GitHub-side identifiers:
+
+  - ``app_client_id`` (e.g. ``Iv23lic8662KXwe4XKEI``) — the OAuth
+    Client ID. GitHub now recommends this for the JWT ``iss`` claim
+    too; see the GitHub docs on "Generating a JSON web token (JWT) for
+    a GitHub App". Required for the user-to-server OAuth dance.
+  - ``oauth_client_id`` — historically dual-purposed; on
+    ``github_app_install`` rows it carries the numeric **App ID**
+    (e.g. ``3705068``) which is what GitHub embeds in webhook payloads
+    and what the pre-Client-ID JWT format required. We keep using it
+    as a fallback for the JWT ``iss`` when ``app_client_id`` is empty
+    (legacy connections that pre-date #525).
 """
 
 from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import threading
 import time
 import urllib.error
@@ -36,6 +46,8 @@ import urllib.request
 import jwt
 
 from core.secrets import EncryptedSecret, decrypt
+
+logger = logging.getLogger(__name__)
 
 GITHUB_API_DEFAULT = "https://api.github.com"
 
@@ -72,12 +84,20 @@ def _decrypt_pem(connection) -> bytes:
     )
 
 
-def _mint_jwt(app_id: str, private_pem: bytes) -> str:
+def _mint_jwt(issuer: str, private_pem: bytes) -> str:
+    """Sign a short-lived RS256 JWT for the GitHub App.
+
+    ``issuer`` is the value to use as the JWT ``iss`` claim. GitHub
+    now recommends the App **Client ID** (string, e.g.
+    ``Iv23lic8662KXwe4XKEI``); the legacy numeric **App ID** still
+    works for Apps registered before the Client-ID rollout. The
+    caller is responsible for picking the right value — this helper
+    just signs whatever it's handed."""
     now = int(time.time())
     payload = {
         "iat": now - 30,  # GitHub clock-skew tolerance is ±60s
         "exp": now + 9 * 60,
-        "iss": str(app_id),
+        "iss": str(issuer),
     }
     return jwt.encode(payload, private_pem, algorithm="RS256")
 
@@ -147,12 +167,28 @@ def installation_token(connection) -> str:
             "WRONG_KIND",
             f"installation_token only works on github_app_install rows, got {connection.kind!r}",
         )
-    app_id = connection.oauth_client_id or ""
+    # Prefer the App Client ID for the JWT ``iss`` claim (post-#525,
+    # post-GitHub-recommendation). Fall back to the numeric App ID
+    # stored in ``oauth_client_id`` for connections that pre-date the
+    # split — GitHub still accepts it but we log a one-line deprecation
+    # warning so operators can be nudged via observability.
+    issuer = connection.app_client_id or ""
+    if not issuer:
+        legacy_app_id = connection.oauth_client_id or ""
+        if legacy_app_id:
+            logger.warning(
+                "github_app_install connection %s is using numeric App ID "
+                "for the JWT iss claim (deprecated); set app_client_id to "
+                "the GitHub App Client ID to silence this warning",
+                connection.guid,
+            )
+            issuer = legacy_app_id
     installation_id = connection.installation_id or ""
-    if not app_id or not installation_id:
+    if not issuer or not installation_id:
         raise GithubAppError(
             "INCOMPLETE_CONFIG",
-            "github_app_install connection needs both app_id (stored in oauth_client_id) and installation_id",
+            "github_app_install connection needs both app_client_id "
+            "(or legacy oauth_client_id App ID) and installation_id",
             recoverable=True,
         )
 
@@ -164,7 +200,7 @@ def installation_token(connection) -> str:
             return cached.token
 
     private_pem = _decrypt_pem(connection)
-    jwt_token = _mint_jwt(app_id, private_pem)
+    jwt_token = _mint_jwt(issuer, private_pem)
     token, expires_at = _exchange_for_installation_token(_api_base(connection), jwt_token, installation_id)
 
     with _LOCK:
