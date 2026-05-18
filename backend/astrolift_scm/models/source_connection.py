@@ -131,7 +131,45 @@ class SourceConnection(BaseCoreModel):
     # OAuth-app config when this row IS the OAuth app (kind ends in
     # _oauth_app). client_id is non-secret; the client secret goes
     # in secret_ciphertext above.
-    oauth_client_id = models.CharField(max_length=256, blank=True, default="")
+    #
+    # DUAL-SEMANTICS WARNING:
+    #   For ``github_app_install`` rows this column carries the numeric
+    #   **App ID** (e.g. ``3705068``) — the value GitHub embeds in
+    #   webhook payloads + the value the legacy JWT ``iss`` claim used
+    #   before GitHub recommended switching to the Client ID. The
+    #   user-to-server OAuth ``client_id`` (e.g. ``Iv23lic8662KXwe4XKEI``)
+    #   lives in ``app_client_id`` below. TODO: rename this column to
+    #   ``provider_app_id`` in a follow-up migration so the dual use is
+    #   no longer load-bearing on the column name.
+    oauth_client_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default="",
+        help_text=(
+            "Non-secret provider identifier. For github_oauth_app + "
+            "gitlab_oauth_app: the OAuth Client ID. For "
+            "github_app_install: the numeric App ID (NOT the Client "
+            "ID — see app_client_id for the OAuth Client ID)."
+        ),
+    )
+    # GitHub App OAuth Client ID — string slug (e.g. ``Iv23lic8662KXwe4XKEI``
+    # for new Apps; 20-char lowercase hex for legacy OAuth Apps). Required
+    # for the OAuth dance URL (``/login/oauth/authorize?client_id=…``) and
+    # preferred for the GitHub-App JWT ``iss`` claim per
+    # https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app.
+    # Distinct from ``oauth_client_id`` which on github_app_install rows
+    # stores the numeric App ID for webhook-signature lookups + legacy
+    # JWT compatibility. Empty on rows that pre-date this column.
+    app_client_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=(
+            "GitHub App OAuth Client ID (e.g. Iv23lic8662KXwe4XKEI). "
+            "Required for github_oauth_app + github_app_install kinds. "
+            "Not derivable from existing data; operator enters it once."
+        ),
+    )
     oauth_redirect_uri = models.CharField(max_length=512, blank=True, default="")
 
     # User-to-server OAuth client_secret for GitHub-App rows. The App's
@@ -184,3 +222,20 @@ class SourceConnection(BaseCoreModel):
     def is_oauth_app_config(self) -> bool:
         """True when this row holds OAuth-app credentials (not a token)."""
         return self.kind.endswith("_oauth_app") and not self.account_login
+
+    @property
+    def needs_client_id(self) -> bool:
+        """True when this row REQUIRES ``app_client_id`` for the OAuth
+        flow but it's empty — surfaces a "configuration incomplete"
+        banner in the FE. Per-user token rows + non-GitHub rows are
+        excluded; only the org-level GitHub config rows that drive the
+        OAuth dance need this."""
+        if not self.kind.startswith("github_"):
+            return False
+        if self.kind not in ("github_oauth_app", "github_app_install"):
+            return False
+        # Per-user token rows attach to a parent_oauth_app; they
+        # themselves don't drive the OAuth dance.
+        if self.user_id is not None:
+            return False
+        return not self.app_client_id

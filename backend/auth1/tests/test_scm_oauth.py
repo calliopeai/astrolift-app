@@ -58,13 +58,20 @@ def org_user_member():
 
 
 def _make_oauth_app(org, kind, *, client_id="abc123", client_secret=b"shh", api_base_url=""):
-    """Persist an OAuth-app config row carrying an encrypted client secret."""
+    """Persist an OAuth-app config row carrying an encrypted client secret.
+
+    For github_* kinds the OAuth dance (post-#525) reads
+    ``app_client_id`` rather than ``oauth_client_id``. We populate both
+    with the same value so existing tests stay equivalent — GitLab
+    reads from ``oauth_client_id`` directly, so this is harmless for
+    the GitLab branch."""
     enc = encrypt_at_rest(client_secret)
     return SourceConnection.objects.create(
         organization=org,
         kind=kind,
         display_name=f"{kind} config",
         oauth_client_id=client_id,
+        app_client_id=client_id if kind.startswith("github_") else "",
         oauth_redirect_uri="",
         secret_backend_kind=enc.backend_kind,
         secret_ciphertext=enc.backend_ref,
@@ -91,7 +98,14 @@ def _make_github_app_install(
         organization=org,
         kind="github_app_install",
         display_name="GitHub App: astrolift-test",
+        # ``client_id`` here represents the App Client ID — that's what
+        # the OAuth dance (#525) needs in ``app_client_id``. The
+        # numeric App ID would live in ``oauth_client_id``; the
+        # existing tests don't exercise webhook payloads so either is
+        # fine, but we mirror the post-fix world by writing the same
+        # value to both columns.
         oauth_client_id=client_id,
+        app_client_id=client_id,
         oauth_redirect_uri="",
         secret_backend_kind=pem_enc.backend_kind,
         secret_ciphertext=pem_enc.backend_ref,
@@ -323,7 +337,13 @@ def test_github_callback_app_install_without_oauth_secret_errors(org_user_member
     parent = SourceConnection.objects.create(
         organization=org,
         kind="github_app_install",
-        oauth_client_id="Iv1.legacy",
+        # Set both columns so the post-#525 OAuth dance flow gets past
+        # the new "missing Client ID" check and exercises the
+        # missing-OAuth-secret branch that the test is actually
+        # asserting on. Without ``app_client_id`` we'd short-circuit
+        # to ``config_missing_client_id`` first.
+        oauth_client_id="3705068",
+        app_client_id="Iv1.legacy",
         secret_backend_kind=pem_enc.backend_kind,
         secret_ciphertext=pem_enc.backend_ref,
         account_login="acme-corp",

@@ -243,8 +243,15 @@ def github_start(request: HttpRequest) -> Any:
     ).first()
     if config is None:
         return _redirect_with_error(return_to, "config_not_found")
-    if not config.oauth_client_id:
-        return _redirect_with_error(return_to, "config_incomplete")
+    # The OAuth /login/oauth/authorize endpoint wants the App Client ID
+    # (e.g. ``Iv23lic8662KXwe4XKEI``) — NOT the numeric App ID that
+    # ``oauth_client_id`` historically held on github_app_install rows.
+    # An empty ``app_client_id`` means the operator hasn't migrated the
+    # row to the post-#525 schema yet; the OAuth dance would 404 at
+    # github.com, so we bail with a clean error code the UI can toast.
+    client_id_for_oauth = config.app_client_id
+    if not client_id_for_oauth:
+        return _redirect_with_error(return_to, "config_missing_client_id")
 
     state = secrets.token_urlsafe(32)
     _store_pending_state(
@@ -258,7 +265,7 @@ def github_start(request: HttpRequest) -> Any:
     redirect_uri = config.oauth_redirect_uri or request.build_absolute_uri(reverse("scm_github_callback"))
     params = urllib.parse.urlencode(
         {
-            "client_id": config.oauth_client_id,
+            "client_id": client_id_for_oauth,
             "redirect_uri": redirect_uri,
             "state": state,
             # 'repo' covers private+public repos for the user; tighten
@@ -310,10 +317,17 @@ def github_callback(request: HttpRequest) -> Any:
     if not client_secret:
         return _redirect_with_error(return_to, "config_missing_oauth_secret")
 
+    # The token exchange POST also needs the App Client ID — the same
+    # value we used on the authorize redirect. The numeric App ID in
+    # oauth_client_id would 404 here just like it did on /authorize.
+    client_id_for_oauth = config.app_client_id
+    if not client_id_for_oauth:
+        return _redirect_with_error(return_to, "config_missing_client_id")
+
     access_token, err = _resolve_user_token_via_post(
         GITHUB_TOKEN_EXCHANGE,
         {
-            "client_id": config.oauth_client_id,
+            "client_id": client_id_for_oauth,
             "client_secret": client_secret,
             "code": code,
             "redirect_uri": config.oauth_redirect_uri or "",

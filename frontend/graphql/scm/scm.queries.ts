@@ -9,6 +9,8 @@ const CONNECTION_FIELDS = `
   installationId
   apiBaseUrl
   oauthClientId
+  appClientId
+  needsClientId
   oauthRedirectUri
   repoVisibilityScopes
   isOauthAppConfig
