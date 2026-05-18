@@ -40,7 +40,7 @@ MAX_DESCRIPTION_LENGTH = 1024
 
 class DataProcess(Tracking):
     class Meta:
-        indexes = [models.Index(fields=['status'])]
+        indexes = [models.Index(fields=['status']), models.Index(fields=['organization', 'status'])]
         verbose_name_plural = 'Data Processes'
 
     batch = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
@@ -55,6 +55,21 @@ class DataProcess(Tracking):
                                        help_text='Date when the status was updated')
     status_description = models.CharField(max_length=MAX_DESCRIPTION_LENGTH, null=True, blank=True, editable=False)
     uploaded_file = models.ForeignKey(Upload, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # #542: row-level tenant anchor. ``DataProcessType.get_queryset``
+    # filters on this column so DataProcess rows are scoped to the
+    # caller's organization. Nullable on the column itself so the
+    # backfill migration can leave rows that have no resolvable org as
+    # NULL — the resolver denies-by-default for those (the row exists
+    # but no caller can read it, which is the safer failure mode).
+    organization = models.ForeignKey(
+        'organization.Organization',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='data_processes',
+        help_text='Owning organization; filters DataProcessType.get_queryset (#542).',
+    )
 
     def __str__(self):
         return f'{self.batch} - {self.status}'
