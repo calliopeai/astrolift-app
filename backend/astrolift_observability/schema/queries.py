@@ -38,12 +38,17 @@ from astrolift_observability.schema.types import (
     AppGoldenSignal,
     AppUrlHealth,
     GoldenSignalKind,
+    ManagedServiceMetrics,
+    ManagedServiceMetricSeries,
+    PodResourceUsage,
+    PodResourceUsagePoint,
     StatusCodeBreakdown,
     StatusCodeSeries,
     TimeSeriesPoint,
     WorkloadResourceGauge,
     WorkloadResourceUsage,
 )
+from astrolift_services.models.managed_service import ManagedService
 from astrolift_operations import prometheus_client
 from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import RegisteredApp
@@ -240,6 +245,16 @@ class GoldenSignalsQuery:
                 prom_queries.build_latency_quantile_query,
                 {"quantile": 0.90},
             ),
+            # #640 — p95 is the SLO-canonical default for the latency
+            # tile. Keep p90 in the wire shape so legacy dashboards
+            # don't break; the FE renders three at a time by default
+            # (p50, p95, p99) and exposes p90 via the PromQL disclosure.
+            (
+                GoldenSignalKind.LATENCY_P95,
+                "seconds",
+                prom_queries.build_latency_quantile_query,
+                {"quantile": 0.95},
+            ),
             (
                 GoldenSignalKind.LATENCY_P99,
                 "seconds",
@@ -250,6 +265,15 @@ class GoldenSignalsQuery:
                 GoldenSignalKind.SATURATION_CPU,
                 "ratio",
                 prom_queries.build_cpu_saturation_query,
+                {},
+            ),
+            # #642 — memory saturation completes the SATURATION pair.
+            # Same PromQL shape as CPU but on working-set bytes vs the
+            # memory limit. >100% means OOM is imminent.
+            (
+                GoldenSignalKind.SATURATION_MEMORY,
+                "ratio",
+                prom_queries.build_memory_saturation_query,
                 {},
             ),
         ]
@@ -598,3 +622,285 @@ class GoldenSignalsQuery:
             )
             for r in results
         ]
+
+    # -- Managed-service metrics (#645 + #646) -----------------------
+    #
+    # One resolver covers both RDS-style (postgres) and S3-style
+    # (object_store) panels. Switches on the managed-service ``kind``
+    # to pick the metric set + PromQL builder. Returns ``None`` when
+    # the kind isn't supported today (anything other than postgres /
+    # object_store) so the FE doesn't render an empty panel; returns
+    # an envelope with an empty ``series`` list when Prometheus is
+    # reachable but has no data (the FE shows the "metrics not yet
+    # flowing" callout).
+    #
+    # Data path: Prometheus over the same ``prometheus_endpoint`` the
+    # golden-signals resolver uses, scraping the per-kind exporter
+    # sidecars (postgres-exporter / s3-exporter). The exporters tag
+    # series with the managed-service guid so we can scope per-row.
+
+    _POSTGRES_METRICS: tuple[tuple[str, str], ...] = (
+        ("connections", "count"),
+        ("cpu", "seconds"),
+        ("iops", "rps"),
+        ("slow_queries", "rps"),
+        ("replica_lag", "seconds"),
+    )
+    _OBJECT_STORE_METRICS: tuple[tuple[str, str], ...] = (
+        ("bucket_size", "bytes"),
+        ("request_count", "rps"),
+        ("errors_4xx", "rps"),
+        ("errors_5xx", "rps"),
+        ("egress_bytes", "rps"),
+    )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_managed_service_metrics(
+        self,
+        info: Info,
+        managed_service_id: strawberry.ID,
+        range_seconds: int | None = None,
+    ) -> ManagedServiceMetrics | None:
+        """Time-series metrics for one managed-service row (#645 + #646).
+
+        Postgres kind → connections / cpu / iops / slow_queries /
+        replica_lag. Object-store kind → bucket_size / request_count /
+        errors_4xx / errors_5xx / egress_bytes.
+
+        Returns ``None`` for unsupported kinds (anything other than
+        postgres / object_store today, or a missing service). Returns
+        an envelope with empty ``series`` when Prometheus is dark —
+        same shape as the golden-signals empty state.
+        """
+        seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
+        svc = (
+            ManagedService.objects.select_related("registered_app", "app_environment")
+            .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
+        if svc is None:
+            return None
+
+        kind = svc.kind
+        if kind == ManagedService.Kind.POSTGRES:
+            metric_set = self._POSTGRES_METRICS
+            builder = prom_queries.build_managed_service_postgres_query
+        elif kind == ManagedService.Kind.OBJECT_STORE:
+            metric_set = self._OBJECT_STORE_METRICS
+            builder = prom_queries.build_managed_service_object_store_query
+        else:
+            return None
+
+        endpoint = prom_client.resolve_prometheus_endpoint(
+            app=svc.registered_app,
+            environment_name=svc.app_environment.name,
+        )
+        if endpoint is None:
+            # Same envelope shape as the populated case, with an empty
+            # series list — the FE renders the "metrics not yet
+            # flowing" callout inside the panel.
+            return ManagedServiceMetrics(
+                managed_service_id=managed_service_id,
+                kind=kind,
+                name=svc.name,
+                range_seconds=seconds,
+                series=[],
+            )
+
+        end_unix = int(_now_utc().timestamp())
+        start_unix = end_unix - seconds
+        step = prom_queries.pick_step_seconds(seconds)
+        # ``source`` field on each series is hardcoded to
+        # ``prometheus`` for now — once the cost-driver per-cloud
+        # metrics integration is wired we'll branch on cluster.kind
+        # and label CloudWatch / Cloud Monitoring / Azure Monitor
+        # appropriately. The wire shape is forward-compatible.
+        source = "prometheus"
+
+        series_out: list[ManagedServiceMetricSeries] = []
+        for metric, unit in metric_set:
+            plan = builder(
+                service_guid=str(svc.guid),
+                metric=metric,
+                range_seconds=seconds,
+            )
+            try:
+                rows = prom_client.query_range_series(
+                    endpoint=endpoint,
+                    promql=plan.promql,
+                    start_unix=start_unix,
+                    end_unix=end_unix,
+                    step_seconds=step,
+                )
+            except PrometheusError:
+                # Per-metric error degrades to empty samples — keep
+                # the rest of the panel renderable. The FE shows the
+                # empty-state callout inside the affected card only.
+                rows = []
+            pairs = rows[0][1] if rows else []
+            series_out.append(
+                ManagedServiceMetricSeries(
+                    name=metric,
+                    unit=unit,
+                    samples=_samples_from_pairs(pairs),
+                    source=source,
+                )
+            )
+
+        return ManagedServiceMetrics(
+            managed_service_id=managed_service_id,
+            kind=kind,
+            name=svc.name,
+            range_seconds=seconds,
+            series=series_out,
+        )
+
+    # -- Per-pod resource usage (#713) -------------------------------
+    #
+    # Powers the pod-row expander on the Observability tab. Returns a
+    # CPU + memory time-series narrowed by the pod's name plus the
+    # kubelet's restart counter for the pod (so the operator sees both
+    # "how often it restarts" and the live resource consumption).
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_pod_resource_usage(
+        self,
+        info: Info,
+        app_slug: str,
+        pod_name: str,
+        environment_name: str | None = None,
+        range_seconds: int | None = None,
+    ) -> PodResourceUsage | None:
+        """Per-pod CPU + memory sparkline + restart history (#713).
+
+        Returns ``None`` when the app doesn't resolve for the tenant
+        or the cluster has no Prometheus endpoint. Returns an envelope
+        with empty samples when Prometheus is reachable but has
+        nothing for the pod (e.g. the pod terminated minutes ago and
+        cAdvisor dropped its series).
+        """
+        seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "slug")
+            .first()
+        )
+        if app is None:
+            return None
+
+        endpoint = prom_client.resolve_prometheus_endpoint(
+            app=app, environment_name=environment_name
+        )
+        if endpoint is None:
+            return None
+
+        end_unix = int(_now_utc().timestamp())
+        start_unix = end_unix - seconds
+        step = prom_queries.pick_step_seconds(seconds)
+
+        cpu_plan = prom_queries.build_pod_cpu_usage_query(
+            app_slug=app.slug,
+            environment_name=environment_name,
+            pod_name=pod_name,
+            range_seconds=seconds,
+        )
+        mem_plan = prom_queries.build_pod_memory_usage_query(
+            app_slug=app.slug,
+            environment_name=environment_name,
+            pod_name=pod_name,
+            range_seconds=seconds,
+        )
+
+        try:
+            cpu_rows = prom_client.query_range_series(
+                endpoint=endpoint,
+                promql=cpu_plan.promql,
+                start_unix=start_unix,
+                end_unix=end_unix,
+                step_seconds=step,
+            )
+        except PrometheusError:
+            cpu_rows = []
+        try:
+            mem_rows = prom_client.query_range_series(
+                endpoint=endpoint,
+                promql=mem_plan.promql,
+                start_unix=start_unix,
+                end_unix=end_unix,
+                step_seconds=step,
+            )
+        except PrometheusError:
+            mem_rows = []
+
+        cpu_pairs = cpu_rows[0][1] if cpu_rows else []
+        mem_pairs = mem_rows[0][1] if mem_rows else []
+
+        # The two queries share start/end/step so their sample arrays
+        # line up by index. Take the longest as the baseline and
+        # fill in missing values with 0.0 — the FE renders gaps as
+        # the y-axis floor rather than a discontinuity.
+        baseline = cpu_pairs if len(cpu_pairs) >= len(mem_pairs) else mem_pairs
+        samples: list[PodResourceUsagePoint] = []
+        for i, (ts_unix, _) in enumerate(baseline):
+            cpu_value = cpu_pairs[i][1] if i < len(cpu_pairs) else 0.0
+            mem_value = mem_pairs[i][1] if i < len(mem_pairs) else 0.0
+            samples.append(
+                PodResourceUsagePoint(
+                    ts=dt.datetime.fromtimestamp(ts_unix, tz=dt.UTC),
+                    cpu_cores=cpu_value,
+                    memory_bytes=mem_value,
+                )
+            )
+
+        # Restart count comes from the existing cluster-side pod-list
+        # path so the expander stays consistent with the row above it.
+        # ``last_restart_at`` isn't on the driver SDK's PodInfo yet —
+        # leave it null and file a follow-up to wire the kubelet
+        # ``ContainerStateTerminated.finishedAt`` through every driver.
+        # Lazy import keeps schema-export from pulling providers in.
+        from core import cluster_observability
+
+        restart_count = 0
+        last_restart_at: dt.datetime | None = None
+        try:
+            # Pick the env-scoped cluster the same way list_app_pods
+            # does — we go via the AppEnvironment row to get the
+            # namespace + cluster for this env.
+            from astrolift_lifecycle.models import AppEnvironment
+
+            env_qs = AppEnvironment.objects.filter(
+                registered_app=app, deleted_at__isnull=True
+            ).select_related("tenant_cluster")
+            if environment_name:
+                env_qs = env_qs.filter(name=environment_name)
+            env = env_qs.order_by("name").first()
+            if env is not None and env.tenant_cluster is not None:
+                pods = cluster_observability.list_app_pods(
+                    cluster=env.tenant_cluster,
+                    namespace=cluster_observability.namespace_for_app(app),
+                    app_slug=app.slug,
+                )
+                for p in pods:
+                    if p.name == pod_name:
+                        restart_count = p.restarts
+                        # ``last_restart_at`` stays None — see comment
+                        # above; mirrored on the FE empty-state copy.
+                        break
+        except cluster_observability.ClusterObservabilityError:
+            pass
+        except Exception:
+            # Cluster-side read is best-effort — never block the
+            # metric sparkline on a cluster outage.
+            pass
+
+        return PodResourceUsage(
+            pod_name=pod_name,
+            range_seconds=seconds,
+            samples=samples,
+            restart_count=restart_count,
+            last_restart_at=last_restart_at,
+        )

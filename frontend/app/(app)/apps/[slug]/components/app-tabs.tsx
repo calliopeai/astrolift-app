@@ -10,6 +10,7 @@ type TabKey =
   | "overview"
   | "deployments"
   | "workloads"
+  | "topology"
   | "observability"
   | "console"
   | "previews"
@@ -46,6 +47,11 @@ const TABS: TabSpec[] = [
     key: "workloads",
     href: (s) => `/apps/${s}/workloads`,
     match: (p, s) => p.startsWith(`/apps/${s}/workloads`),
+  },
+  {
+    key: "topology",
+    href: (s) => `/apps/${s}/topology`,
+    match: (p, s) => p.startsWith(`/apps/${s}/topology`),
   },
   {
     key: "observability",

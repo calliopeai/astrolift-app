@@ -277,6 +277,92 @@ def build_cpu_saturation_query(
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
 
 
+def build_memory_saturation_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    range_seconds: int,
+    workload_slug: str | None = None,
+) -> QueryPlan:
+    """Saturation — working-set memory vs. requested limit (#642).
+
+    ``sum(container_memory_working_set_bytes{app=...}) / sum(kube_pod_container_resource_limits{app=...,resource="memory"})``
+
+    Series is a ratio in [0, 1+] (>1 = over-limit ⇒ OOMKill imminent).
+    Working-set bytes is what the kubelet uses for OOM accounting; the
+    request/limit gauge comes from kube-state-metrics same as CPU.
+
+    No ``rate(...)`` wrapper — memory is a gauge, not a counter, so
+    the value at the latest scrape is what we want. Prometheus's
+    ``query_range`` still produces one sample per ``step`` (the
+    last-scrape value within each window).
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    rate_window = pick_rate_window(range_seconds)
+    usage_match = _render_label_match(labels)
+    limits_match = _render_label_match_with_extra(labels, 'resource="memory"')
+    expr = (
+        f"sum(container_memory_working_set_bytes{usage_match}) "
+        f"/ clamp_min(sum(kube_pod_container_resource_limits{limits_match}), 1e-9)"
+    )
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+def build_pod_cpu_usage_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    pod_name: str,
+    range_seconds: int,
+) -> QueryPlan:
+    """Per-pod CPU usage in cores over time (#713).
+
+    ``sum(rate(container_cpu_usage_seconds_total{app=...,pod="..."}[<w>]))``
+
+    Narrowed by the pod's name (cAdvisor exposes ``pod`` as a label on
+    every container metric). The result is a per-pod sparkline that
+    sums across containers in the pod — same shape as the app-level
+    saturation but with one extra label matcher.
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+    )
+    labels["pod"] = sanitize_label_value(pod_name)
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+    expr = f"sum(rate(container_cpu_usage_seconds_total{match}[{rate_window}]))"
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+def build_pod_memory_usage_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    pod_name: str,
+    range_seconds: int,
+) -> QueryPlan:
+    """Per-pod memory working-set bytes over time (#713).
+
+    ``sum(container_memory_working_set_bytes{app=...,pod="..."})``
+
+    Gauge (no rate). Same per-pod narrowing as the CPU query above.
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+    )
+    labels["pod"] = sanitize_label_value(pod_name)
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+    expr = f"sum(container_memory_working_set_bytes{match})"
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
 def build_status_code_breakdown_query(
     *,
     app_slug: str,
@@ -390,6 +476,112 @@ def build_workload_resource_request_query(
     match = _render_label_match_with_extra(labels, f'resource="{resource}"')
     expr = f"sum(kube_pod_container_resource_requests{match})"
     return QueryPlan(promql=expr, labels=labels, rate_window="instant")
+
+
+# ----------------------------------------------------------------------
+# Managed-service metric builders (#645 + #646)
+# ----------------------------------------------------------------------
+#
+# Postgres metrics come from the postgres-exporter sidecar the
+# postgres_cnpg / aurora / cloudsql variants all ship. The exporter
+# exposes the metrics under the ``pg_*`` namespace with a
+# ``managed_service`` label set to the service guid — same label the
+# kube-state-metrics ``app`` / ``workload`` chain uses elsewhere.
+#
+# Object-store metrics come from the s3-exporter (per-cloud sidecar
+# the platform's storage workflow installs alongside the bucket). The
+# label shape mirrors the postgres path: one ``managed_service``
+# matcher narrows to a single service.
+#
+# Both builders take ``service_guid`` instead of ``app_slug`` because
+# they're indexed by the service, not the app — one app can have many
+# managed services of the same kind, and the FE renders one panel per
+# managed-service row.
+
+
+def build_managed_service_postgres_query(
+    *,
+    service_guid: str,
+    metric: str,
+    range_seconds: int,
+) -> QueryPlan:
+    """One postgres-exporter metric scoped to one managed-service guid.
+
+    ``metric`` is one of ``connections`` / ``cpu`` / ``iops`` /
+    ``slow_queries`` / ``replica_lag``. Each maps to a PromQL series
+    over the standard ``pg_*`` exporter names:
+
+    * connections → ``sum(pg_stat_activity_count{managed_service="<g>"})``
+    * cpu         → ``sum(rate(process_cpu_seconds_total{managed_service="<g>",job="postgres-exporter"}[<w>]))``
+    * iops        → ``sum(rate(pg_stat_database_blks_read{managed_service="<g>"}[<w>])) + sum(rate(pg_stat_database_blks_hit{managed_service="<g>"}[<w>]))``
+    * slow_queries→ ``sum(rate(pg_stat_statements_calls_above_1s{managed_service="<g>"}[<w>]))``
+    * replica_lag → ``max(pg_replication_lag_seconds{managed_service="<g>"})``
+    """
+    labels = {"managed_service": sanitize_label_value(service_guid)}
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+
+    if metric == "connections":
+        expr = f"sum(pg_stat_activity_count{match})"
+    elif metric == "cpu":
+        labels_with_job = dict(labels)
+        labels_with_job["job"] = "postgres-exporter"
+        match_with_job = _render_label_match(labels_with_job)
+        expr = f"sum(rate(process_cpu_seconds_total{match_with_job}[{rate_window}]))"
+        labels = labels_with_job
+    elif metric == "iops":
+        expr = (
+            f"sum(rate(pg_stat_database_blks_read{match}[{rate_window}])) "
+            f"+ sum(rate(pg_stat_database_blks_hit{match}[{rate_window}]))"
+        )
+    elif metric == "slow_queries":
+        expr = f"sum(rate(pg_stat_statements_calls_above_1s{match}[{rate_window}]))"
+    elif metric == "replica_lag":
+        expr = f"max(pg_replication_lag_seconds{match})"
+    else:
+        raise ValueError(f"unknown postgres metric: {metric!r}")
+
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+def build_managed_service_object_store_query(
+    *,
+    service_guid: str,
+    metric: str,
+    range_seconds: int,
+) -> QueryPlan:
+    """One object-store metric scoped to one managed-service guid.
+
+    ``metric`` is one of ``bucket_size`` / ``request_count`` /
+    ``errors_4xx`` / ``errors_5xx`` / ``egress_bytes``. Each maps to a
+    PromQL series over the standard ``s3_exporter_*`` names:
+
+    * bucket_size  → ``sum(s3_bucket_size_bytes{managed_service="<g>"})``
+    * request_count→ ``sum(rate(s3_request_count_total{managed_service="<g>"}[<w>]))``
+    * errors_4xx   → ``sum(rate(s3_request_count_total{managed_service="<g>",code=~"4.."}[<w>]))``
+    * errors_5xx   → ``sum(rate(s3_request_count_total{managed_service="<g>",code=~"5.."}[<w>]))``
+    * egress_bytes → ``sum(rate(s3_bytes_downloaded_total{managed_service="<g>"}[<w>]))``
+    """
+    labels = {"managed_service": sanitize_label_value(service_guid)}
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+
+    if metric == "bucket_size":
+        expr = f"sum(s3_bucket_size_bytes{match})"
+    elif metric == "request_count":
+        expr = f"sum(rate(s3_request_count_total{match}[{rate_window}]))"
+    elif metric == "errors_4xx":
+        err_match = _render_label_match_with_extra(labels, 'code=~"4.."')
+        expr = f"sum(rate(s3_request_count_total{err_match}[{rate_window}]))"
+    elif metric == "errors_5xx":
+        err_match = _render_label_match_with_extra(labels, 'code=~"5.."')
+        expr = f"sum(rate(s3_request_count_total{err_match}[{rate_window}]))"
+    elif metric == "egress_bytes":
+        expr = f"sum(rate(s3_bytes_downloaded_total{match}[{rate_window}]))"
+    else:
+        raise ValueError(f"unknown object_store metric: {metric!r}")
+
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
 
 
 def build_workload_resource_limit_query(

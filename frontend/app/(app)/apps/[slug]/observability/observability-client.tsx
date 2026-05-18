@@ -20,8 +20,10 @@ import {
   DnsRecordsCard,
   GoldenSignalsPanel,
   LogViewer,
+  ManagedServiceMetricsList,
   MetricScopePicker,
   PodEventsPanel,
+  PodExpander,
   TlsCertificatesCard,
   WorkloadIdentityCard,
 } from "@/components/observability";
@@ -46,6 +48,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
+import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
 import { ON_APP_LOG, ON_APP_LOGS } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
@@ -204,6 +207,16 @@ export function ObservabilityClient({ slug }: { slug: string }) {
   const pods = useQuery<PodsResp>(LIST_APP_PODS, {
     variables: { appSlug: slug },
     pollInterval: POD_POLL_MS,
+  });
+
+  // #645 / #646 — fetch the app's managed-service list so we can fan
+  // out one MetricsPanel per supported binding (postgres → RDS-style
+  // tile; object_store → S3-style tile). Unsupported kinds are
+  // filtered out inside ManagedServiceMetricsList.
+  const managedServices = useQuery<{
+    astroliftManagedServices: Array<{ id: string; kind: string }>;
+  }>(LIST_MANAGED_SERVICES, {
+    variables: { appSlug: slug, environmentName: null },
   });
 
   const a = app.data?.astroliftApp;
@@ -540,35 +553,62 @@ export function ObservabilityClient({ slug }: { slug: string }) {
                   const readyCount = pod.containerStatuses.filter((c) => c.ready).length;
                   const total = pod.containerStatuses.length;
                   const isSelected = pod.name === selectedPod;
+                  // #713 — when the operator picks a pod row, an
+                  // expander follows immediately under it with
+                  // per-pod CPU + mem sparkline, restart count, and
+                  // an Open-in-Console deep link. The expander is
+                  // an extra TableRow with colspan so it lives in
+                  // the same table semantics (no separate widget
+                  // breaking the row striping).
                   return (
-                    <TableRow
-                      key={pod.name}
-                      onClick={() => setPickedPod(pod.name)}
-                      data-selected={isSelected}
-                      className="hover:bg-muted/40 data-[selected=true]:bg-muted/60 cursor-pointer"
-                    >
-                      <TableCell className="font-mono text-xs">{pod.name}</TableCell>
-                      <TableCell className="font-mono text-xs">{pod.workload || "—"}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-2 text-xs">
-                          <StatusDot status={statusToDot(pod.status)} />
-                          <span>{pod.status}</span>
-                          {pod.status !== pod.phase && pod.phase && (
-                            <span className="text-muted-foreground font-mono">({pod.phase})</span>
-                          )}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {readyCount}/{total || 0}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">{pod.restarts}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatAge(pod.age)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {pod.node || "—"}
-                      </TableCell>
-                    </TableRow>
+                    <React.Fragment key={pod.name}>
+                      <TableRow
+                        onClick={() => setPickedPod(pod.name)}
+                        data-selected={isSelected}
+                        className="hover:bg-muted/40 data-[selected=true]:bg-muted/60 cursor-pointer"
+                      >
+                        <TableCell className="font-mono text-xs">{pod.name}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {pod.workload || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-2 text-xs">
+                            <StatusDot status={statusToDot(pod.status)} />
+                            <span>{pod.status}</span>
+                            {pod.status !== pod.phase && pod.phase && (
+                              <span className="text-muted-foreground font-mono">
+                                ({pod.phase})
+                              </span>
+                            )}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {readyCount}/{total || 0}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {pod.restarts}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatAge(pod.age)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs">
+                          {pod.node || "—"}
+                        </TableCell>
+                      </TableRow>
+                      {isSelected ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={7} className="p-0">
+                            <PodExpander
+                              appSlug={a.slug}
+                              podName={pod.name}
+                              environmentName={scopedEnv}
+                              defaultContainer={selectedContainer}
+                              fallbackRestartCount={pod.restarts}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
@@ -600,6 +640,11 @@ export function ObservabilityClient({ slug }: { slug: string }) {
         appSlug={a.slug}
         environmentName={scopedEnv}
         workloadSlug={scopedWorkload}
+      />
+
+      {/* ─── #645 / #646 managed-service metric tiles ─────────────── */}
+      <ManagedServiceMetricsList
+        managedServices={managedServices.data?.astroliftManagedServices ?? []}
       />
 
       {/* ─── #377 observability cards (DNS / TLS / Workload identity) ── */}
