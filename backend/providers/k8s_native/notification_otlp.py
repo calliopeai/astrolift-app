@@ -41,6 +41,7 @@ from datetime import UTC, datetime
 from email.message import EmailMessage
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.notification import (
     DeliveryTarget,
     DeviceRegistration,
@@ -103,6 +104,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="notification")
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -119,6 +121,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
             provider_metadata=dict(request.provider_metadata),
         )
 
+    @driver_op(cloud="k8s_native", driver="notification")
     def revoke_device(self, *, registration_id: str) -> None:
         # Best-effort: ping the bridge so it can drop the device.
         if not self._config.push_webhook_url or not registration_id:
@@ -140,6 +143,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="notification")
     def send(
         self,
         *,
@@ -169,6 +173,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
+    @driver_op(cloud="k8s_native", driver="notification")
     def send_bulk(
         self,
         *,
@@ -177,6 +182,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
     ) -> list[SendResult]:
         return [self.send(target=t, payload=payload) for t in targets]
 
+    @driver_op(cloud="k8s_native", driver="notification", heartbeat=False)
     def healthcheck(self) -> ProviderHealth:
         # No remote ping -- consider healthy when at least one
         # channel is configured.

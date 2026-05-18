@@ -15,7 +15,9 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
+    ApplyError,
     ApplyResult,
     BootstrapComponent,
     BootstrapOption,
@@ -31,6 +33,7 @@ from _sdk.cluster import (
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
+    classify_apply_error,
 )
 from _sdk.k8s_dynamic_client import (
     KubernetesDynamicClient as _RealK8sClient,
@@ -131,6 +134,7 @@ class AKSClusterDriver(ClusterDriver):
         self._clock: Callable[[], float] = clock or time.monotonic
         self._kubeconfig_cache: dict[tuple[str, str], tuple[float, str]] = {}
 
+    @driver_op(cloud="azure", driver="cluster")
     def apply_manifests(
         self,
         cluster,
@@ -140,9 +144,14 @@ class AKSClusterDriver(ClusterDriver):
         dry_run=False,
     ):
         client = self._k8s(cluster)
-        created, updated, unchanged, errors = [], [], [], []
+        created: list[str] = []
+        updated: list[str] = []
+        unchanged: list[str] = []
+        errors: list[ApplyError] = []
         for m in manifests:
-            ref = f"{m.get('kind', '')}/{m.get('metadata', {}).get('name', '')}"
+            maybe_heartbeat(f"cluster.apply_manifests:{cluster}")
+            kind = m.get("kind", "")
+            name = m.get("metadata", {}).get("name", "")
             try:
                 outcome = client.server_side_apply(
                     namespace=namespace,
@@ -150,8 +159,18 @@ class AKSClusterDriver(ClusterDriver):
                     dry_run=dry_run,
                 )
             except Exception as exc:
-                errors.append(f"{ref}: {exc}")
+                errors.append(
+                    ApplyError(
+                        kind=kind,
+                        name=name,
+                        namespace=namespace,
+                        exception_type=type(exc).__name__,
+                        exception_message=str(exc),
+                        is_retryable=classify_apply_error(exc),
+                    )
+                )
                 continue
+            ref = f"{kind}/{name}"
             if outcome == "created":
                 created.append(ref)
             elif outcome == "updated":
@@ -165,6 +184,7 @@ class AKSClusterDriver(ClusterDriver):
             errors=errors,
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def delete_manifests(self, cluster, namespace, manifests):
         client = self._k8s(cluster)
         deleted, not_found, errors = [], [], []
@@ -185,6 +205,7 @@ class AKSClusterDriver(ClusterDriver):
             errors=errors,
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def get_namespace(self, cluster, name):
         client = self._k8s(cluster)
         try:
@@ -198,6 +219,7 @@ class AKSClusterDriver(ClusterDriver):
             phase=ns.get("status", {}).get("phase", "Active"),
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def ensure_namespace(self, cluster, name, labels, annotations):
         client = self._k8s(cluster)
         client.server_side_apply(
@@ -219,6 +241,7 @@ class AKSClusterDriver(ClusterDriver):
             annotations=dict(annotations),
         )
 
+    @driver_op(cloud="azure", driver="cluster", audit=True, sensitive_kind="cluster.delete_namespace")
     def delete_namespace(self, cluster, name, *, wait=True):
         import time
 
@@ -231,11 +254,15 @@ class AKSClusterDriver(ClusterDriver):
             return
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:
+            # Heartbeat per iteration so the wrapping Temporal activity
+            # stays alive across the 10-minute finalizer-wait (#597).
+            maybe_heartbeat(f"cluster.delete_namespace:{name}")
             if self.get_namespace(cluster=cluster, name=name) is None:
                 return
             time.sleep(2)
         raise TimeoutError(f"namespace {name} did not delete within 10m")
 
+    @driver_op(cloud="azure", driver="cluster")
     def get_workload_status(self, cluster, namespace, kind, name):
         client = self._k8s(cluster)
         try:
@@ -257,6 +284,7 @@ class AKSClusterDriver(ClusterDriver):
             conditions=status.get("conditions", []) or [],
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def poll_rollout(
         self,
         cluster,
@@ -273,6 +301,7 @@ class AKSClusterDriver(ClusterDriver):
             timeout = 600
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            maybe_heartbeat(f"cluster.poll_rollout:{kind}/{name}")
             try:
                 status = self.get_workload_status(
                     cluster=cluster,
@@ -320,6 +349,7 @@ class AKSClusterDriver(ClusterDriver):
             timed_out=True,
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def exec_in_pod(self, cluster, namespace, pod, container, command):
         return self._k8s(cluster).exec_in_pod(
             namespace=namespace,
@@ -328,6 +358,7 @@ class AKSClusterDriver(ClusterDriver):
             command=command,
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def port_forward(self, cluster, namespace, pod, ports):
         return self._k8s(cluster).port_forward(
             namespace=namespace,
@@ -337,6 +368,7 @@ class AKSClusterDriver(ClusterDriver):
 
     # ---- runtime observability (#299) -----------------------------
 
+    @driver_op(cloud="azure", driver="cluster")
     def list_pods(
         self,
         *,
@@ -359,6 +391,7 @@ class AKSClusterDriver(ClusterDriver):
             app_slug=app_slug,
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def stream_logs(
         self,
         *,
@@ -381,12 +414,14 @@ class AKSClusterDriver(ClusterDriver):
 
     # ---- bring-into-management (#316) -----------------------------
 
+    @driver_op(cloud="azure", driver="cluster")
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
         return probe_cluster_capabilities(
             backend=self._management_backend,
             cluster=self._resolve_aks_auth_context(cluster),
         )
 
+    @driver_op(cloud="azure", driver="cluster", audit=True, sensitive_kind="cluster.bring_into_management")
     def bring_into_management(
         self,
         cluster: ClusterContext,
@@ -401,6 +436,7 @@ class AKSClusterDriver(ClusterDriver):
 
     # ---- cluster teardown (#337) ---------------------------------
 
+    @driver_op(cloud="azure", driver="cluster", audit=True, sensitive_kind="cluster.teardown_cluster")
     def teardown_cluster(
         self,
         cluster: ClusterContext,
@@ -462,6 +498,7 @@ class AKSClusterDriver(ClusterDriver):
 
     # ---- bootstrap recipe ----------------------------------------
 
+    @driver_op(cloud="azure", driver="cluster")
     def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
         """AKS recipe — uses Azure-native paths where they're the
         easiest option, falls back to in-cluster controllers where
@@ -548,6 +585,7 @@ class AKSClusterDriver(ClusterDriver):
 
     # ---- Cluster health (#68 slice 1) -----------------------------
 
+    @driver_op(cloud="azure", driver="cluster")
     def list_pod_phase_summary(
         self,
         cluster: ClusterContext,
@@ -564,9 +602,11 @@ class AKSClusterDriver(ClusterDriver):
         except Exception:
             return []
         return pod_phase_summary_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def list_events(
         self,
         cluster: ClusterContext,
@@ -588,6 +628,7 @@ class AKSClusterDriver(ClusterDriver):
             limit=limit,
         )
 
+    @driver_op(cloud="azure", driver="cluster")
     def list_workload_health(
         self,
         cluster: ClusterContext,
@@ -604,7 +645,8 @@ class AKSClusterDriver(ClusterDriver):
         except Exception:
             return []
         return workload_health_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
     def _k8s(self, cluster: str) -> Any:
@@ -684,21 +726,18 @@ class AKSClusterDriver(ClusterDriver):
         except Exception as exc:
             mapped = map_api_error(exc)
             raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: "
-                f"list_cluster_admin_credentials failed: {mapped}",
+                f"AKS {resource_group}/{cluster_name}: " f"list_cluster_admin_credentials failed: {mapped}",
             ) from exc
 
         kubeconfigs = getattr(result, "kubeconfigs", None) or []
         if not kubeconfigs:
             raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: "
-                "list_cluster_admin_credentials returned no kubeconfigs",
+                f"AKS {resource_group}/{cluster_name}: " "list_cluster_admin_credentials returned no kubeconfigs",
             )
         raw = getattr(kubeconfigs[0], "value", None)
         if raw is None:
             raise ClusterAuthError(
-                f"AKS {resource_group}/{cluster_name}: "
-                "list_cluster_admin_credentials kubeconfig.value is empty",
+                f"AKS {resource_group}/{cluster_name}: " "list_cluster_admin_credentials kubeconfig.value is empty",
             )
         # Azure returns ``value`` as bytes (the kubeconfig YAML) on
         # the real SDK; some fakes return str directly. Some operator
@@ -711,8 +750,7 @@ class AKSClusterDriver(ClusterDriver):
                     blob = base64.b64decode(raw).decode("utf-8")
                 except Exception as exc:
                     raise ClusterAuthError(
-                        f"AKS {resource_group}/{cluster_name}: "
-                        "kubeconfig blob is neither UTF-8 nor base64-UTF-8",
+                        f"AKS {resource_group}/{cluster_name}: " "kubeconfig blob is neither UTF-8 nor base64-UTF-8",
                     ) from exc
         else:
             blob = str(raw)

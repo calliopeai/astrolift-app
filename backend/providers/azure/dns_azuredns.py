@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, Record
 
 from azure._errors import NotFoundError, map_api_error
@@ -42,6 +43,7 @@ class AzureDNSDriver(DnsDriver):
                 subscription_id=config.subscription_id,
             )
 
+    @driver_op(cloud="azure", driver="dns", audit=True, sensitive_kind="dns.ensure_record")
     def ensure_record(
         self,
         zone: str,
@@ -57,7 +59,8 @@ class AzureDNSDriver(DnsDriver):
                 resource_group_name=self._config.resource_group,
                 zone_name=zone,
                 relative_record_set_name=self._relative_name(
-                    name=name, zone=zone,
+                    name=name,
+                    zone=zone,
                 ),
                 record_type=type,
                 parameters=params,
@@ -66,6 +69,7 @@ class AzureDNSDriver(DnsDriver):
             raise map_api_error(exc) from exc
         return Record(zone=zone, name=name, type=type, value=value, ttl=ttl)
 
+    @driver_op(cloud="azure", driver="dns", audit=True, sensitive_kind="dns.delete_record")
     def delete_record(self, zone: str, name: str, type: str) -> None:
         record_type = type
         try:
@@ -73,18 +77,19 @@ class AzureDNSDriver(DnsDriver):
                 resource_group_name=self._config.resource_group,
                 zone_name=zone,
                 relative_record_set_name=self._relative_name(
-                    name=name, zone=zone,
+                    name=name,
+                    zone=zone,
                 ),
                 record_type=record_type,
             )
         except Exception as exc:  # noqa: BLE001
             if exc.__class__.__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
-                    f"record {name} ({record_type}) in zone {zone} "
-                    f"not found",
+                    f"record {name} ({record_type}) in zone {zone} " f"not found",
                 ) from exc
             raise map_api_error(exc) from exc
 
+    @driver_op(cloud="azure", driver="dns")
     def list_records(self, zone: str) -> list[Record]:
         try:
             iterator = self._client.record_sets.list_by_dns_zone(
@@ -98,14 +103,23 @@ class AzureDNSDriver(DnsDriver):
             rtype = getattr(rs, "type", "").rsplit("/", 1)[-1]
             ttl = getattr(rs, "ttl", 0) or 0
             for value in self._extract_values(rs, rtype=rtype):
-                out.append(Record(
-                    zone=zone, name=getattr(rs, "name", "") or "@",
-                    type=rtype, value=value, ttl=ttl,
-                ))
+                out.append(
+                    Record(
+                        zone=zone,
+                        name=getattr(rs, "name", "") or "@",
+                        type=rtype,
+                        value=value,
+                        ttl=ttl,
+                    )
+                )
         return out
 
     def _record_params(
-        self, *, type: str, value: str, ttl: int,
+        self,
+        *,
+        type: str,
+        value: str,
+        ttl: int,
     ) -> dict[str, Any]:
         params: dict[str, Any] = {"ttl": ttl}
         if type == "A":
@@ -133,9 +147,7 @@ class AzureDNSDriver(DnsDriver):
         if rtype == "A":
             return [r.ipv4_address for r in getattr(rs, "a_records", []) or []]
         if rtype == "AAAA":
-            return [
-                r.ipv6_address for r in getattr(rs, "aaaa_records", []) or []
-            ]
+            return [r.ipv6_address for r in getattr(rs, "aaaa_records", []) or []]
         if rtype == "CNAME":
             cname = getattr(rs, "cname_record", None)
             return [cname.cname] if cname else []

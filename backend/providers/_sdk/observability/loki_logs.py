@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.log_stream import LogLine, LogStreamDriver
 
 
@@ -41,6 +42,7 @@ class LokiLogStreamDriver(LogStreamDriver):
                 org_id=config.org_id,
             )
 
+    @driver_op(driver="loki_logs")
     async def stream_logs(
         self,
         query: str,
@@ -68,12 +70,10 @@ class LokiLogStreamDriver(LogStreamDriver):
             stream_labels = dict(stream.get("stream", {}))
             namespace = stream_labels.get("namespace", "")
             pod = stream_labels.get("pod", "") or stream_labels.get(
-                "kubernetes_pod_name", "",
+                "kubernetes_pod_name",
+                "",
             )
-            container = (
-                stream_labels.get("container", "")
-                or stream_labels.get("kubernetes_container_name", "")
-            )
+            container = stream_labels.get("container", "") or stream_labels.get("kubernetes_container_name", "")
             for ts_ns, message in stream.get("values", []):
                 yield LogLine(
                     timestamp=str(ts_ns),
@@ -101,7 +101,10 @@ class _DefaultHttp:
         self._org_id = org_id
 
     def get(
-        self, url: str, *, params: dict[str, str] | None = None,
+        self,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
     ) -> Any:
         from urllib.error import HTTPError
         from urllib.parse import urlencode

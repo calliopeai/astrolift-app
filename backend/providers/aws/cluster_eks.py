@@ -33,7 +33,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
+from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
+    ApplyError,
     ApplyResult,
     BootstrapComponent,
     BootstrapOption,
@@ -51,6 +53,7 @@ from _sdk.cluster import (
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
+    classify_apply_error,
 )
 
 # Shared helper re-exports. ``_RealK8sClient`` + ``_NotFoundError`` are
@@ -213,6 +216,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- apply / delete -------------------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def apply_manifests(
         self,
         cluster: str,
@@ -225,12 +229,15 @@ class EKSClusterDriver(ClusterDriver):
         created: list[str] = []
         updated: list[str] = []
         unchanged: list[str] = []
-        errors: list[str] = []
+        errors: list[ApplyError] = []
 
         for manifest in manifests:
+            # Per-manifest heartbeat: a 100-manifest apply against a slow
+            # cluster easily exceeds the default activity start_to_close
+            # timeout otherwise (#595-#598).
+            maybe_heartbeat(f"cluster.apply_manifests:{cluster}")
             kind = manifest.get("kind", "")
             name = manifest.get("metadata", {}).get("name", "")
-            ref = f"{kind}/{name}"
             try:
                 outcome = client.server_side_apply(
                     namespace=namespace,
@@ -238,8 +245,18 @@ class EKSClusterDriver(ClusterDriver):
                     dry_run=dry_run,
                 )
             except Exception as exc:
-                errors.append(f"{ref}: {exc}")
+                errors.append(
+                    ApplyError(
+                        kind=kind,
+                        name=name,
+                        namespace=namespace,
+                        exception_type=type(exc).__name__,
+                        exception_message=str(exc),
+                        is_retryable=classify_apply_error(exc),
+                    )
+                )
                 continue
+            ref = f"{kind}/{name}"
             if outcome == "created":
                 created.append(ref)
             elif outcome == "updated":
@@ -253,6 +270,7 @@ class EKSClusterDriver(ClusterDriver):
             errors=errors,
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def delete_manifests(
         self,
         cluster: str,
@@ -286,6 +304,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- namespaces -----------------------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def get_namespace(
         self,
         cluster: str,
@@ -305,6 +324,7 @@ class EKSClusterDriver(ClusterDriver):
             phase=ns.get("status", {}).get("phase", "Active"),
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def ensure_namespace(
         self,
         cluster: str,
@@ -336,6 +356,7 @@ class EKSClusterDriver(ClusterDriver):
             annotations=dict(annotations),
         )
 
+    @driver_op(cloud="aws", driver="cluster", audit=True, sensitive_kind="cluster.delete_namespace")
     def delete_namespace(
         self,
         cluster: str,
@@ -354,9 +375,12 @@ class EKSClusterDriver(ClusterDriver):
         if not wait:
             return
         # Poll until the namespace is gone (k8s finalizers can take
-        # minutes for namespaces with PVCs / webhooks).
+        # minutes for namespaces with PVCs / webhooks). Heartbeat per
+        # iteration so the Temporal activity stays alive across the full
+        # 10-minute window (#595-#598).
         deadline = time.monotonic() + 600  # 10 minutes
         while time.monotonic() < deadline:
+            maybe_heartbeat(f"cluster.delete_namespace:{name}")
             existing = self.get_namespace(cluster=cluster, name=name)
             if existing is None:
                 return
@@ -367,6 +391,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- workload status ------------------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def get_workload_status(
         self,
         cluster: str,
@@ -399,6 +424,7 @@ class EKSClusterDriver(ClusterDriver):
             conditions=status.get("conditions", []) or [],
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def poll_rollout(
         self,
         cluster: str,
@@ -412,6 +438,11 @@ class EKSClusterDriver(ClusterDriver):
         deadline = time.monotonic() + timeout
         last_status: WorkloadStatus | None = None
         while time.monotonic() < deadline:
+            # Per-poll heartbeat keeps the wrapping Temporal activity
+            # alive across the full ``timeout`` (default 10m). The
+            # entry-time heartbeat from ``@driver_op`` alone isn't
+            # enough on long rollouts (#595-#598).
+            maybe_heartbeat(f"cluster.poll_rollout:{kind}/{name}")
             try:
                 status = self.get_workload_status(
                     cluster=cluster,
@@ -473,6 +504,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- exec / port-forward --------------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def exec_in_pod(
         self,
         cluster: str,
@@ -496,6 +528,7 @@ class EKSClusterDriver(ClusterDriver):
                 f"pod {pod} in namespace {namespace}",
             ) from exc
 
+    @driver_op(cloud="aws", driver="cluster")
     def port_forward(
         self,
         cluster: str,
@@ -512,6 +545,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- runtime observability (#299) -----------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def list_pods(
         self,
         *,
@@ -532,6 +566,7 @@ class EKSClusterDriver(ClusterDriver):
             app_slug=app_slug,
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def stream_logs(
         self,
         *,
@@ -554,12 +589,14 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- bring-into-management (#316) -----------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
         return probe_cluster_capabilities(
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
         )
 
+    @driver_op(cloud="aws", driver="cluster", audit=True, sensitive_kind="cluster.bring_into_management")
     def bring_into_management(
         self,
         cluster: ClusterContext,
@@ -574,6 +611,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- cluster teardown (#337) ---------------------------------
 
+    @driver_op(cloud="aws", driver="cluster", audit=True, sensitive_kind="cluster.teardown_cluster")
     def teardown_cluster(
         self,
         cluster: ClusterContext,
@@ -646,6 +684,10 @@ class EKSClusterDriver(ClusterDriver):
 
         # Wait for node groups to be gone before attempting cluster delete.
         if node_groups:
+            # Heartbeat before the boto3 waiter: it blocks for up to 15
+            # minutes by default and Temporal would time out the activity
+            # without it (#595).
+            maybe_heartbeat("cluster.teardown_cluster:wait_nodegroups")
             try:
                 self._eks.get_waiter("nodegroup_deleted").wait(
                     clusterName=self._config.cluster_name,
@@ -708,6 +750,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- bootstrap recipe ----------------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
         """EKS recipe — leans on AWS-native services where they're the
         path of least resistance and falls back to in-cluster controllers
@@ -925,6 +968,7 @@ class EKSClusterDriver(ClusterDriver):
         self._describe_cache[cluster_name] = entry
         return entry
 
+    @driver_op(cloud="aws", driver="cluster", heartbeat=False)
     def invalidate_describe_cache(self, cluster_name: str | None = None) -> None:
         """Drop a cached DescribeCluster entry. Operators rotating
         the cluster CA can call this; the next observability call
@@ -1036,6 +1080,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- Cluster health (#68 slice 1) -----------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def list_pod_phase_summary(
         self,
         cluster: ClusterContext,
@@ -1052,9 +1097,11 @@ class EKSClusterDriver(ClusterDriver):
         except Exception:
             return []
         return pod_phase_summary_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def list_events(
         self,
         cluster: ClusterContext,
@@ -1076,6 +1123,7 @@ class EKSClusterDriver(ClusterDriver):
             limit=limit,
         )
 
+    @driver_op(cloud="aws", driver="cluster")
     def list_workload_health(
         self,
         cluster: ClusterContext,
@@ -1092,7 +1140,8 @@ class EKSClusterDriver(ClusterDriver):
         except Exception:
             return []
         return workload_health_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
     # ---- internals ------------------------------------------------

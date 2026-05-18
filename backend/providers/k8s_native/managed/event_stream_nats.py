@@ -78,7 +78,7 @@ class NATSDriver(ManagedServiceDriver):
                 ok=False,
                 handle="",
                 message="apply_manifests failed",
-                errors=result.errors,
+                errors=result.summary(),
             )
         return ProvisionResult(
             ok=True,
@@ -136,8 +136,8 @@ class NATSDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=str(result.errors),
-                errors=result.errors,
+                message=str(result.summary()),
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,
@@ -170,12 +170,19 @@ class NATSDriver(ManagedServiceDriver):
         )
 
     def snapshot(self, handle):
-        raise NotImplementedError(
-            "NATS JetStream snapshot via stream backup; out of scope",
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.snapshot(NATS) not supported -- JetStream "
+            "snapshot via stream backup; out of scope for this driver (#618)",
         )
 
     def restore(self, snapshot, target):
-        raise NotImplementedError("NATS doesn't restore from snapshot")
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            "managed_service.restore(NATS) not supported -- NATS doesn't " "restore from snapshot (#618)",
+        )
 
     def config_schema(self):
         return {

@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.secrets import SecretsBackend
 
 
@@ -56,6 +57,7 @@ class VaultSecretsBackend(SecretsBackend):
         self._config = config
         self._client = config.http_client or _build_http_client(config)
 
+    @driver_op(cloud="k8s_native", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
         full = self._kv_path(path)
         try:
@@ -73,6 +75,7 @@ class VaultSecretsBackend(SecretsBackend):
             return {}
         return {str(k): str(v) for k, v in data.items()}
 
+    @driver_op(cloud="k8s_native", driver="secrets", audit=True, sensitive_kind="secret.write", redact_args=("kvs",))
     def upsert(self, path: str, kvs: dict[str, str]) -> None:
         full = self._kv_path(path)
         self._client.post(
@@ -81,6 +84,7 @@ class VaultSecretsBackend(SecretsBackend):
             headers=self._headers(),
         )
 
+    @driver_op(cloud="k8s_native", driver="secrets", audit=True, sensitive_kind="secret.delete")
     def delete(self, path: str) -> None:
         full = self._kv_path(path)
         # KV v2 supports soft-delete by default; this hits the
@@ -91,6 +95,7 @@ class VaultSecretsBackend(SecretsBackend):
             headers=self._headers(),
         )
 
+    @driver_op(cloud="k8s_native", driver="secrets", audit=True, sensitive_kind="secret.list")
     def list(self, prefix: str) -> list[str]:
         full_prefix = self._kv_path(prefix).rstrip("/")
         try:
@@ -102,10 +107,7 @@ class VaultSecretsBackend(SecretsBackend):
             return []
         body = response.get("body", {})
         keys = body.get("data", {}).get("keys", []) or []
-        return sorted(
-            f"{prefix.rstrip('/')}/{k.rstrip('/')}" if prefix else k.rstrip("/")
-            for k in keys
-        )
+        return sorted(f"{prefix.rstrip('/')}/{k.rstrip('/')}" if prefix else k.rstrip("/") for k in keys)
 
     def _kv_path(self, path: str) -> str:
         cleaned = path.lstrip("/")
@@ -219,7 +221,10 @@ class _RealVaultClient:
         return self._envelope(response)
 
     def post(
-        self, path: str, json: dict[str, Any], headers: dict[str, str],
+        self,
+        path: str,
+        json: dict[str, Any],
+        headers: dict[str, str],
     ) -> dict[str, Any]:
         response = self._http().post(path, json=json, headers=headers)
         if response.status_code == 404:
@@ -228,7 +233,9 @@ class _RealVaultClient:
         return self._envelope(response)
 
     def delete(
-        self, path: str, headers: dict[str, str],
+        self,
+        path: str,
+        headers: dict[str, str],
     ) -> dict[str, Any]:
         response = self._http().delete(path, headers=headers)
         # Vault returns 204 for a successful delete; 404 means the
@@ -240,7 +247,9 @@ class _RealVaultClient:
         return self._envelope(response)
 
     def list(
-        self, path: str, headers: dict[str, str],
+        self,
+        path: str,
+        headers: dict[str, str],
     ) -> dict[str, Any]:
         # Vault's list verb is the non-standard "LIST" method. httpx
         # supports arbitrary verbs via ``request()``. The header

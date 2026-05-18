@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.tls import Certificate, TlsDriver
 
 from azure._errors import NotFoundError, map_api_error
@@ -50,6 +51,7 @@ class AzureAppGatewayTlsDriver(TlsDriver):
         self._secret_client = config.secret_client
         self._cert_client = config.cert_client
 
+    @driver_op(cloud="azure", driver="tls", audit=True, sensitive_kind="tls.mint")
     def ensure_certificate(
         self,
         domain: str,
@@ -91,7 +93,9 @@ class AzureAppGatewayTlsDriver(TlsDriver):
                     )
                 raise map_api_error(exc) from exc
             return self._certificate_from_akv(
-                cert=cert, domain=domain, sans=list(sans or []),
+                cert=cert,
+                domain=domain,
+                sans=list(sans or []),
                 strategy=strategy,
             )
         # letsencrypt + provided defer to operator-driven flows
@@ -105,6 +109,7 @@ class AzureAppGatewayTlsDriver(TlsDriver):
             not_after=None,
         )
 
+    @driver_op(cloud="azure", driver="tls")
     def get_certificate(self, certificate_id: str) -> Certificate:
         if self._cert_client is None:
             raise NotFoundError(
@@ -119,10 +124,13 @@ class AzureAppGatewayTlsDriver(TlsDriver):
                 ) from exc
             raise map_api_error(exc) from exc
         return self._certificate_from_akv(
-            cert=cert, domain="", sans=[],
+            cert=cert,
+            domain="",
+            sans=[],
             strategy="akv_referenced",
         )
 
+    @driver_op(cloud="azure", driver="tls", audit=True, sensitive_kind="tls.revoke")
     def revoke_certificate(self, certificate_id: str) -> None:
         if self._cert_client is None:
             raise NotFoundError(
@@ -142,7 +150,12 @@ class AzureAppGatewayTlsDriver(TlsDriver):
             raise map_api_error(exc) from exc
 
     def _certificate_from_akv(
-        self, *, cert: Any, domain: str, sans: list[str], strategy: str,
+        self,
+        *,
+        cert: Any,
+        domain: str,
+        sans: list[str],
+        strategy: str,
     ) -> Certificate:
         attrs = getattr(cert, "properties", None) or cert
         return Certificate(
@@ -156,10 +169,7 @@ class AzureAppGatewayTlsDriver(TlsDriver):
         )
 
     def _cert_name(self, *, domain: str) -> str:
-        clean = "".join(
-            c if c.isalnum() or c == "-" else "-"
-            for c in domain.lower()
-        )
+        clean = "".join(c if c.isalnum() or c == "-" else "-" for c in domain.lower())
         while "--" in clean:
             clean = clean.replace("--", "-")
         return f"{self._config.cert_name_prefix}-{clean.strip('-')[:80]}"

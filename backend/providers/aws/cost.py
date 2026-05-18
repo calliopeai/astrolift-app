@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.cost import (
     BillingActualLineItem,
     BillingActualsResult,
@@ -119,9 +120,11 @@ class AWSCostEstimator(CostEstimator):
         ] = {}
         self._ec2_sku_lock = threading.Lock()
 
+    @driver_op(cloud="aws", driver="cost", heartbeat=False)
     def supported(self, *, kind: str, variant: str) -> bool:
         return (kind, variant) in SERVICE_CODE_BY_VARIANT
 
+    @driver_op(cloud="aws", driver="cost")
     def estimate(self, request: CostEstimateRequest) -> CostResult:
         service_code = SERVICE_CODE_BY_VARIANT.get(
             (request.kind, request.variant),
@@ -147,6 +150,21 @@ class AWSCostEstimator(CostEstimator):
                 MaxResults=20,
             )
         except Exception as exc:
+            # #616 -- log the API failure so the cost-estimate
+            # dead-zone has a debuggable trace. The estimator returns a
+            # structured Unavailable result so callers can still degrade,
+            # but the log is the only signal an operator gets when the
+            # Pricing API call started rejecting traffic.
+            log.warning(
+                "aws cost estimate failed",
+                extra={
+                    "service_code": service_code,
+                    "kind": request.kind,
+                    "variant": request.variant,
+                    "exception_type": type(exc).__name__,
+                },
+                exc_info=True,
+            )
             return CostEstimateUnavailable(
                 request=request,
                 reason="api_error",
@@ -588,6 +606,7 @@ class AWSBillingActuals:
             # region — us-east-1 is the canonical home.
             self._client = boto3.client("ce", region_name="us-east-1")
 
+    @driver_op(cloud="aws", driver="cost")
     def query_actuals_by_binding(
         self,
         *,

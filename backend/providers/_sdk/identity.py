@@ -66,6 +66,12 @@ class WorkloadIdentityDriver(Protocol):
         app_slug: str,
     ) -> IdentityBinding | None:
         """Return the identity bound to the given app, or ``None`` when
-        no binding exists yet. The default raises so non-AWS drivers
-        stay shape-compatible without forced stubs."""
-        raise NotImplementedError("not implemented for this driver")
+        no binding exists yet. The default raises
+        :class:`UnsupportedOperationError` so non-AWS drivers stay
+        shape-compatible without forced stubs (#619). Resolvers map this
+        to a user-facing "not supported on this cloud" message."""
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            f"identity.describe_identity({app_slug=}) not supported on this driver",
+        )

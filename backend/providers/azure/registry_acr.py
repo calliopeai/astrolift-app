@@ -15,6 +15,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk import UnsupportedOperationError
+from _sdk._telemetry import driver_op
 from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
 
 from azure._errors import NotFoundError, map_api_error
@@ -58,6 +60,7 @@ class ACRDriver(ImageRegistryDriver):
     def login_server(self) -> str:
         return f"{self._config.registry_name}.azurecr.io"
 
+    @driver_op(cloud="azure", driver="registry")
     def ensure_repo(self, name: str) -> Repo:
         """ACR registries auto-create repositories on first push, so
         ensure_repo verifies the registry exists + returns the
@@ -71,8 +74,7 @@ class ACRDriver(ImageRegistryDriver):
         except Exception as exc:  # noqa: BLE001
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
-                    f"ACR registry {self._config.registry_name} "
-                    f"not found in {self._config.resource_group}",
+                    f"ACR registry {self._config.registry_name} " f"not found in {self._config.resource_group}",
                 ) from exc
             raise map_api_error(exc) from exc
 
@@ -81,17 +83,23 @@ class ACRDriver(ImageRegistryDriver):
             uri=f"{self.login_server}/{name}",
         )
 
+    @driver_op(cloud="azure", driver="registry", audit=True, sensitive_kind="registry.delete")
     def delete_repo(self, name: str, *, archive: bool = True) -> None:
         """ACR delete-repository is a per-repo operation via the data
         plane (ContainerRegistryClient, not the management client).
         archive=True is a no-op (path stays; access via RBAC)."""
         if archive:
             return
-        raise NotImplementedError(
-            "force-delete of ACR repositories requires data-plane "
-            "ContainerRegistryClient; out of scope for this driver",
+        # #614 -- previously raised bare NotImplementedError; upgraded so
+        # the resolver layer can map to a "not supported on this backend"
+        # response distinct from a partial-stub bug.
+        raise UnsupportedOperationError(
+            f"registry.delete_repo({name=}, archive=False) not supported "
+            "on Azure ACR via this driver -- requires data-plane "
+            "ContainerRegistryClient; out of scope",
         )
 
+    @driver_op(cloud="azure", driver="registry", audit=True, sensitive_kind="registry.get_pull_secret")
     def get_pull_secret(self, cluster: str, namespace: str) -> SecretSpec:
         """For AKS clusters attached via `az aks update --attach-acr`,
         pull auth flows through the kubelet's managed identity — no
@@ -124,12 +132,14 @@ class ACRDriver(ImageRegistryDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="registry")
     def push(self, local_image: str, repo: str, tag: str) -> str:
         if not local_image:
             raise ValueError("local_image is required")
         ensured = self.ensure_repo(repo)
         return f"{ensured.uri}:{tag}"
 
+    @driver_op(cloud="azure", driver="registry")
     def list_tags(self, repo: str) -> list[Tag]:
         # ACR's list_tags requires the data-plane client; mirroring
         # AWS pattern, expose minimal metadata.
@@ -146,9 +156,11 @@ class ACRDriver(ImageRegistryDriver):
 
         out: list[Tag] = []
         for item in response:
-            out.append(Tag(
-                name=getattr(item, "name", "") or "",
-                digest=getattr(item, "digest", "") or "",
-                pushed_at=getattr(item, "last_updated", None),
-            ))
+            out.append(
+                Tag(
+                    name=getattr(item, "name", "") or "",
+                    digest=getattr(item, "digest", "") or "",
+                    pushed_at=getattr(item, "last_updated", None),
+                )
+            )
         return out

@@ -13,7 +13,9 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
+    ApplyError,
     ApplyResult,
     BootstrapComponent,
     BootstrapOption,
@@ -29,6 +31,7 @@ from _sdk.cluster import (
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
+    classify_apply_error,
 )
 from _sdk.k8s_dynamic_client import (
     KubernetesDynamicClient as _RealK8sClient,
@@ -123,6 +126,7 @@ class GKEClusterDriver(ClusterDriver):
         # Maps (project, location, cluster_name) → (kubeconfig_yaml, expires_at)
         self._wi_kubeconfig_cache: dict[tuple[str, str, str], tuple[str, float]] = {}
 
+    @driver_op(cloud="gcp", driver="cluster")
     def apply_manifests(
         self,
         cluster,
@@ -132,9 +136,14 @@ class GKEClusterDriver(ClusterDriver):
         dry_run=False,
     ):
         client = self._k8s(cluster)
-        created, updated, unchanged, errors = [], [], [], []
+        created: list[str] = []
+        updated: list[str] = []
+        unchanged: list[str] = []
+        errors: list[ApplyError] = []
         for m in manifests:
-            ref = f"{m.get('kind', '')}/{m.get('metadata', {}).get('name', '')}"
+            maybe_heartbeat(f"cluster.apply_manifests:{cluster}")
+            kind = m.get("kind", "")
+            name = m.get("metadata", {}).get("name", "")
             try:
                 outcome = client.server_side_apply(
                     namespace=namespace,
@@ -142,8 +151,18 @@ class GKEClusterDriver(ClusterDriver):
                     dry_run=dry_run,
                 )
             except Exception as exc:
-                errors.append(f"{ref}: {exc}")
+                errors.append(
+                    ApplyError(
+                        kind=kind,
+                        name=name,
+                        namespace=namespace,
+                        exception_type=type(exc).__name__,
+                        exception_message=str(exc),
+                        is_retryable=classify_apply_error(exc),
+                    )
+                )
                 continue
+            ref = f"{kind}/{name}"
             if outcome == "created":
                 created.append(ref)
             elif outcome == "updated":
@@ -157,6 +176,7 @@ class GKEClusterDriver(ClusterDriver):
             errors=errors,
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def delete_manifests(self, cluster, namespace, manifests):
         client = self._k8s(cluster)
         deleted, not_found, errors = [], [], []
@@ -177,6 +197,7 @@ class GKEClusterDriver(ClusterDriver):
             errors=errors,
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def get_namespace(self, cluster, name):
         client = self._k8s(cluster)
         try:
@@ -190,6 +211,7 @@ class GKEClusterDriver(ClusterDriver):
             phase=ns.get("status", {}).get("phase", "Active"),
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def ensure_namespace(self, cluster, name, labels, annotations):
         client = self._k8s(cluster)
         client.server_side_apply(
@@ -211,6 +233,7 @@ class GKEClusterDriver(ClusterDriver):
             annotations=dict(annotations),
         )
 
+    @driver_op(cloud="gcp", driver="cluster", audit=True, sensitive_kind="cluster.delete_namespace")
     def delete_namespace(self, cluster, name, *, wait=True):
         import time
 
@@ -221,13 +244,17 @@ class GKEClusterDriver(ClusterDriver):
             return
         if not wait:
             return
+        # Heartbeat per iteration so the wrapping Temporal activity
+        # stays alive across the 10-minute finalizer-wait (#596).
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:
+            maybe_heartbeat(f"cluster.delete_namespace:{name}")
             if self.get_namespace(cluster=cluster, name=name) is None:
                 return
             time.sleep(2)
         raise TimeoutError(f"namespace {name} did not delete within 10m")
 
+    @driver_op(cloud="gcp", driver="cluster")
     def get_workload_status(self, cluster, namespace, kind, name):
         client = self._k8s(cluster)
         try:
@@ -249,6 +276,7 @@ class GKEClusterDriver(ClusterDriver):
             conditions=status.get("conditions", []) or [],
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def poll_rollout(
         self,
         cluster,
@@ -266,6 +294,7 @@ class GKEClusterDriver(ClusterDriver):
         deadline = time.monotonic() + timeout
         last_status = None
         while time.monotonic() < deadline:
+            maybe_heartbeat(f"cluster.poll_rollout:{kind}/{name}")
             try:
                 status = self.get_workload_status(
                     cluster=cluster,
@@ -320,6 +349,7 @@ class GKEClusterDriver(ClusterDriver):
             timed_out=True,
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def exec_in_pod(self, cluster, namespace, pod, container, command):
         return self._k8s(cluster).exec_in_pod(
             namespace=namespace,
@@ -328,6 +358,7 @@ class GKEClusterDriver(ClusterDriver):
             command=command,
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def port_forward(self, cluster, namespace, pod, ports):
         return self._k8s(cluster).port_forward(
             namespace=namespace,
@@ -337,6 +368,7 @@ class GKEClusterDriver(ClusterDriver):
 
     # ---- runtime observability (#299) -----------------------------
 
+    @driver_op(cloud="gcp", driver="cluster")
     def list_pods(
         self,
         *,
@@ -357,6 +389,7 @@ class GKEClusterDriver(ClusterDriver):
             app_slug=app_slug,
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def stream_logs(
         self,
         *,
@@ -379,12 +412,14 @@ class GKEClusterDriver(ClusterDriver):
 
     # ---- bring-into-management (#316) -----------------------------
 
+    @driver_op(cloud="gcp", driver="cluster")
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
         return probe_cluster_capabilities(
             backend=self._management_backend,
             cluster=self._materialize_gke_auth_context(cluster),
         )
 
+    @driver_op(cloud="gcp", driver="cluster", audit=True, sensitive_kind="cluster.bring_into_management")
     def bring_into_management(
         self,
         cluster: ClusterContext,
@@ -399,6 +434,7 @@ class GKEClusterDriver(ClusterDriver):
 
     # ---- cluster teardown (#337) ---------------------------------
 
+    @driver_op(cloud="gcp", driver="cluster", audit=True, sensitive_kind="cluster.teardown_cluster")
     def teardown_cluster(
         self,
         cluster: ClusterContext,
@@ -452,6 +488,7 @@ class GKEClusterDriver(ClusterDriver):
 
     # ---- bootstrap recipe ----------------------------------------
 
+    @driver_op(cloud="gcp", driver="cluster")
     def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
         """GKE recipe — uses GCP-native paths where they're the
         easiest option, falls back to in-cluster controllers when
@@ -530,6 +567,7 @@ class GKEClusterDriver(ClusterDriver):
 
     # ---- Cluster health (#68 slice 1) -----------------------------
 
+    @driver_op(cloud="gcp", driver="cluster")
     def list_pod_phase_summary(
         self,
         cluster: ClusterContext,
@@ -546,9 +584,11 @@ class GKEClusterDriver(ClusterDriver):
         except Exception:
             return []
         return pod_phase_summary_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def list_events(
         self,
         cluster: ClusterContext,
@@ -570,6 +610,7 @@ class GKEClusterDriver(ClusterDriver):
             limit=limit,
         )
 
+    @driver_op(cloud="gcp", driver="cluster")
     def list_workload_health(
         self,
         cluster: ClusterContext,
@@ -586,7 +627,8 @@ class GKEClusterDriver(ClusterDriver):
         except Exception:
             return []
         return workload_health_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
     def _k8s(self, cluster: str) -> Any:

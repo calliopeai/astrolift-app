@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.identity import WorkloadIdentityDriver
 
 from azure._errors import NotFoundError, map_api_error
@@ -42,6 +43,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         self._msi = config.msi_client
         self._graph = config.graph_client
 
+    @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(
         self,
         cluster: str,
@@ -60,9 +62,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
             self._msi.federated_identity_credentials.create_or_update(
                 resource_group_name=self._config.resource_group,
                 resource_name=identity_role,
-                federated_identity_credential_resource_name=(
-                    f"astrolift-{namespace}-{sa_name}"
-                ),
+                federated_identity_credential_resource_name=(f"astrolift-{namespace}-{sa_name}"),
                 parameters={
                     "properties": {
                         "issuer": self._config.cluster_oidc_issuer,
@@ -84,6 +84,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
             "azure.workload.identity/tenant-id": self._config.tenant_id,
         }
 
+    @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.create_role")
     def create_identity_role(
         self,
         name: str,
@@ -111,6 +112,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
             raise map_api_error(exc) from exc
         return getattr(identity, "client_id", "") or ""
 
+    @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.attach_policy")
     def attach_policy(self, role: str, policy: str) -> None:
         """For Azure, 'policy' is a roleDefinitionId. The actual
         attachment is a Microsoft.Authorization/roleAssignments
@@ -121,6 +123,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         # operator's deployment definition, not the runtime driver.
         return None
 
+    @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.delete_role")
     def delete_identity_role(self, role: str) -> None:
         if self._msi is None:
             raise RuntimeError(

@@ -14,6 +14,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.trace import SpanRef, TraceDriver, TraceSummary
 
 
@@ -42,6 +43,7 @@ class TempoTraceDriver(TraceDriver):
                 org_id=config.org_id,
             )
 
+    @driver_op(driver="tempo_traces")
     def list_traces(
         self,
         *,
@@ -76,21 +78,21 @@ class TempoTraceDriver(TraceDriver):
         traces = body.get("traces", [])
         out: list[TraceSummary] = []
         for trace in traces:
-            out.append(TraceSummary(
-                trace_id=trace.get("traceID", ""),
-                root_service=trace.get("rootServiceName", ""),
-                root_operation=trace.get("rootTraceName", ""),
-                span_count=int(trace.get("spanCount", 0) or 0),
-                duration_ms=float(trace.get("durationMs", 0.0) or 0.0),
-                status_code=trace.get("status", "UNSET"),
-            ))
+            out.append(
+                TraceSummary(
+                    trace_id=trace.get("traceID", ""),
+                    root_service=trace.get("rootServiceName", ""),
+                    root_operation=trace.get("rootTraceName", ""),
+                    span_count=int(trace.get("spanCount", 0) or 0),
+                    duration_ms=float(trace.get("durationMs", 0.0) or 0.0),
+                    status_code=trace.get("status", "UNSET"),
+                )
+            )
         return out
 
+    @driver_op(driver="tempo_traces")
     def get_trace(self, trace_id: str) -> list[SpanRef]:
-        url = (
-            f"{self._config.base_url.rstrip('/')}"
-            f"/api/traces/{trace_id}"
-        )
+        url = f"{self._config.base_url.rstrip('/')}" f"/api/traces/{trace_id}"
         response = self._http.get(url)
         body = response.json() if hasattr(response, "json") else response
         spans = body.get("spans", []) or self._extract_spans(body)
@@ -110,7 +112,10 @@ class TempoTraceDriver(TraceDriver):
         # listing traces + fetching each. Production wires
         # OTLP-side streaming separately.
         traces = self.list_traces(
-            service=service, since=since, until=until, limit=100,
+            service=service,
+            since=since,
+            until=until,
+            limit=100,
         )
         for trace in traces:
             for span in self.get_trace(trace.trace_id):
@@ -128,12 +133,7 @@ class TempoTraceDriver(TraceDriver):
         attrs = {}
         for attr in span.get("attributes", []) or []:
             value = attr.get("value", {}) or {}
-            v = (
-                value.get("stringValue")
-                or value.get("intValue")
-                or value.get("boolValue")
-                or ""
-            )
+            v = value.get("stringValue") or value.get("intValue") or value.get("boolValue") or ""
             attrs[attr.get("key", "")] = str(v)
         status_code = "UNSET"
         status = span.get("status", {}) or {}
@@ -171,7 +171,10 @@ class _DefaultHttp:
         self._org_id = org_id
 
     def get(
-        self, url: str, *, params: dict[str, str] | None = None,
+        self,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
     ) -> Any:
         from urllib.error import HTTPError
         from urllib.parse import urlencode

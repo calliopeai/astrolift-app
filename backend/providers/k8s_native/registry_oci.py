@@ -26,6 +26,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk import UnsupportedOperationError
+from _sdk._telemetry import driver_op
 from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
 
 
@@ -51,12 +53,14 @@ class OCIRegistryDriver(ImageRegistryDriver):
         self._config = config
         self._http = config.http_client
 
+    @driver_op(cloud="k8s_native", driver="registry")
     def ensure_repo(self, name: str) -> Repo:
         """OCI doesn't have explicit 'create repo' — repos are
         implicit on first push. Return the canonical URI."""
         uri = self._image_uri(name=name)
         return Repo(name=name, uri=uri)
 
+    @driver_op(cloud="k8s_native", driver="registry", audit=True, sensitive_kind="registry.delete")
     def delete_repo(self, name: str, *, archive: bool = True) -> None:
         """Generic OCI doesn't standardize repo deletion. Per
         registry, operators use:
@@ -65,33 +69,45 @@ class OCIRegistryDriver(ImageRegistryDriver):
         - Zot: delete via tags-list iteration
         Out of scope for this generic driver."""
         if not archive:
-            raise NotImplementedError(
-                "generic OCI driver doesn't support repo deletion "
-                "— delete via the registry's native admin UI/API",
+            # #614 -- previously raised bare NotImplementedError.
+            raise UnsupportedOperationError(
+                f"registry.delete_repo({name=}, archive=False) not supported "
+                "on the generic OCI driver -- delete via the registry's "
+                "native admin UI/API",
             )
         # archive=True is a no-op for the generic driver
 
+    @driver_op(cloud="k8s_native", driver="registry", audit=True, sensitive_kind="registry.get_pull_secret")
     def get_pull_secret(
-        self, cluster: str, namespace: str,
+        self,
+        cluster: str,
+        namespace: str,
     ) -> SecretSpec:
         if not self._config.username or not self._config.password:
             raise RuntimeError(
                 "registry credentials required (username + password)",
             )
-        registry_host = self._config.registry_url.replace(
-            "https://", "",
-        ).replace("http://", "").rstrip("/")
+        registry_host = (
+            self._config.registry_url.replace(
+                "https://",
+                "",
+            )
+            .replace("http://", "")
+            .rstrip("/")
+        )
         auth = base64.b64encode(
             f"{self._config.username}:{self._config.password}".encode(),
         ).decode()
-        dockerconfig = json.dumps({
-            "auths": {
-                registry_host: {
-                    "auth": auth,
-                    "email": self._config.auth_email,
+        dockerconfig = json.dumps(
+            {
+                "auths": {
+                    registry_host: {
+                        "auth": auth,
+                        "email": self._config.auth_email,
+                    },
                 },
-            },
-        })
+            }
+        )
         return {
             "apiVersion": "v1",
             "kind": "Secret",
@@ -111,6 +127,7 @@ class OCIRegistryDriver(ImageRegistryDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="registry")
     def push(self, local_image: str, repo: str, tag: str) -> str:
         """Returns canonical URI; actual push is delegated to
         the build runner (BuildKit/Kaniko/buildah)."""
@@ -118,6 +135,7 @@ class OCIRegistryDriver(ImageRegistryDriver):
             raise ValueError("local_image is required")
         return f"{self._image_uri(name=repo)}:{tag}"
 
+    @driver_op(cloud="k8s_native", driver="registry")
     def list_tags(self, repo: str) -> list[Tag]:
         """GET /v2/{repo}/tags/list. The OCI Distribution Spec
         returns just tag names — no digest / pushed_at — so the
@@ -126,24 +144,25 @@ class OCIRegistryDriver(ImageRegistryDriver):
         if self._http is None:
             return []
         response = self._http.get(
-            f"{self._config.registry_url.rstrip('/')}"
-            f"/v2/{repo}/tags/list",
+            f"{self._config.registry_url.rstrip('/')}" f"/v2/{repo}/tags/list",
             headers=self._auth_header(),
         )
         if response.get("status_code", 0) != 200:
             return []
         body = response.get("body", {})
-        return [
-            Tag(name=t, digest="", pushed_at=None)
-            for t in (body.get("tags") or [])
-        ]
+        return [Tag(name=t, digest="", pushed_at=None) for t in (body.get("tags") or [])]
 
     # ---- internals ------------------------------------------------
 
     def _image_uri(self, *, name: str) -> str:
-        host = self._config.registry_url.replace(
-            "https://", "",
-        ).replace("http://", "").rstrip("/")
+        host = (
+            self._config.registry_url.replace(
+                "https://",
+                "",
+            )
+            .replace("http://", "")
+            .rstrip("/")
+        )
         return f"{host}/{name}"
 
     def _auth_header(self) -> dict[str, str]:

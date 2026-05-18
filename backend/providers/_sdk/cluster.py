@@ -11,22 +11,135 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class ApplyError:
+    """One per-manifest failure inside :class:`ApplyResult`.
+
+    Carries the manifest's identifying fields plus the exception class
+    name + message so the workflow can distinguish transient (HTTP 5xx,
+    ``ConnectionError``, ``TimeoutError``) from permanent (HTTP 4xx,
+    ``ValidationError``) failures without re-parsing free-text strings.
+    Audit issue #603 -- the previous shape stringified the exception into
+    ``errors: list[str]`` and the workflow had to substring-match to
+    decide whether to retry.
+
+    ``is_retryable`` is the driver's call. The default classifier
+    (:func:`classify_apply_error`) maps the common kubernetes /
+    requests / urllib3 exception types to a sensible default; drivers
+    may override per call.
+    """
+
+    kind: str
+    name: str
+    namespace: str
+    exception_type: str
+    exception_message: str
+    is_retryable: bool
+
+    def __str__(self) -> str:
+        """Match the old ``f\"{kind}/{name}: {exc}\"`` string shape.
+
+        Preserves backwards-compat for log emission + any caller that
+        ingested the historical ``errors: list[str]`` representation.
+        """
+        return f"{self.kind}/{self.name}: {self.exception_message}"
+
+
+# Exception-class name patterns the audit's recommended classifier treats
+# as transient. The list is conservative on purpose -- a false-positive
+# permanent-classification keeps the workflow from retrying, which is the
+# safer default than retrying a hard validation failure forever.
+_TRANSIENT_EXCEPTION_NAMES = frozenset(
+    {
+        "ConnectionError",
+        "ConnectionResetError",
+        "ConnectionRefusedError",
+        "TimeoutError",
+        "ReadTimeoutError",
+        "ConnectTimeoutError",
+        "ProtocolError",
+        "ChunkedEncodingError",
+        "MaxRetryError",
+        "ServiceUnavailable",
+        "InternalServerError",
+        "ServerSelectionTimeoutError",
+    }
+)
+
+
+def classify_apply_error(exc: BaseException) -> bool:
+    """Return ``True`` when ``exc`` is transient and the workflow should retry.
+
+    Distinguishes:
+
+    * HTTP 5xx + ``ConnectionError`` + ``TimeoutError`` family -> ``True``
+    * HTTP 4xx + ``ValidationError`` / ``ValueError`` / ``TypeError`` -> ``False``
+
+    The kubernetes Python client raises ``ApiException`` with a ``status``
+    attribute on HTTP errors; the classifier prefers the status when it's
+    set, falling back to the exception class name match. Anything outside
+    the known transient set is treated as permanent so the workflow doesn't
+    retry hard validation failures forever.
+    """
+    status = getattr(exc, "status", None)
+    if isinstance(status, int):
+        if 500 <= status < 600:
+            return True
+        if 400 <= status < 500:
+            return False
+    return type(exc).__name__ in _TRANSIENT_EXCEPTION_NAMES
+
+
+@dataclass(frozen=True)
 class ApplyResult:
-    """Result of applying manifests to a cluster."""
+    """Result of applying manifests to a cluster.
+
+    ``errors`` carries structured :class:`ApplyError` rows so the workflow
+    can classify failures + decide retry policy without re-parsing strings.
+    The legacy ``list[str]`` representation is still emitted by
+    :meth:`summary` for log lines + downstream consumers that haven't
+    migrated.
+    """
 
     created: list[str]
     updated: list[str]
     unchanged: list[str]
-    errors: list[str]
+    errors: list[ApplyError]
 
     @property
     def ok(self) -> bool:
         return len(self.errors) == 0
 
+    def summary(self) -> list[str]:
+        """Return the legacy ``f\"{kind}/{name}: {exc}\"`` string list.
+
+        Use when emitting a free-text log line or when an external
+        consumer still expects the historical shape. Audit issue #603 --
+        new code should iterate ``errors`` directly to read
+        ``is_retryable`` + ``exception_type``.
+        """
+        return [str(e) for e in self.errors]
+
+    @property
+    def has_retryable(self) -> bool:
+        """``True`` when at least one error is retryable.
+
+        Workflow uses this to pick between ``ActivityFailure`` (re-raise
+        for retry) and ``ApplicationError`` (terminal, surface to the
+        UI).
+        """
+        return any(e.is_retryable for e in self.errors)
+
 
 @dataclass(frozen=True)
 class DeleteResult:
-    """Result of deleting manifests from a cluster."""
+    """Result of deleting manifests from a cluster.
+
+    ``errors`` stays ``list[str]`` here -- the per-manifest delete path
+    doesn't surface the same retry-class distinction the apply path
+    needs. ``.summary()`` mirrors :class:`ApplyResult` so polymorphic
+    callers (managed-service drivers that compose apply + delete) can
+    use the same accessor regardless of which result type they got.
+    """
 
     deleted: list[str]
     not_found: list[str]
@@ -35,6 +148,9 @@ class DeleteResult:
     @property
     def ok(self) -> bool:
         return len(self.errors) == 0
+
+    def summary(self) -> list[str]:
+        return list(self.errors)
 
 
 @dataclass(frozen=True)
