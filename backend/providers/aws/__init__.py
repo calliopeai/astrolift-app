@@ -1,0 +1,1 @@
+"""Astrolift AWS provider plugin."""
