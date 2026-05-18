@@ -79,12 +79,18 @@ def _ctx(org):
 
 
 def _github_oauth_app(org, client_id="cid", login=""):
+    # ``client_id`` doubles as ``app_client_id`` for the OAuth dance
+    # (see #525) — both columns track the OAuth Client ID for
+    # github_oauth_app rows. The test passes the same value through
+    # both so a config_id="" empty case still represents "operator
+    # hasn't finished setup".
     return SourceConnection.objects.create(
         organization=org,
         kind=SourceConnection.Kind.GITHUB_OAUTH_APP,
         display_name="Acme GitHub OAuth",
         account_login=login,
         oauth_client_id=client_id,
+        app_client_id=client_id,
         oauth_redirect_uri="https://astrolift.test/app/auth1/scm/github/callback",
         is_active=True,
     )

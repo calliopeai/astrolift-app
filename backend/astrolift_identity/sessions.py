@@ -40,6 +40,7 @@ from astrolift_identity.models import (
     LAST_SEEN_WRITE_THROTTLE_SECONDS,
     AstroliftSession,
     ClientKind,
+    LoginMethod,
     RevocationReason,
 )
 
@@ -60,6 +61,16 @@ SESSION_LABEL_KEY = "client_label"
 operator-facing sessions list."""
 
 
+SESSION_LOGIN_METHOD_KEY = "login_method"
+"""Django-session key the login path writes when the session is
+minted, recording which credential family the operator used to
+authenticate (``password``, ``sso``, ``magic_link``, ``webauthn``).
+:func:`record_session` reads it back on the next authed request to
+stamp :attr:`AstroliftSession.login_method`. Missing key defaults to
+``password`` for backward compat with sessions minted before #526.
+"""
+
+
 def _normalize_client_kind(raw: Any) -> str:
     """Coerce a session value to a valid ClientKind, defaulting to
     WEB when unknown/missing so a malformed legacy row never crashes
@@ -69,6 +80,24 @@ def _normalize_client_kind(raw: Any) -> str:
     lowered = raw.strip().lower()
     if lowered not in ClientKind.values:
         return ClientKind.WEB.value
+    return lowered
+
+
+def _normalize_login_method(raw: Any) -> str:
+    """Coerce a session value to a valid LoginMethod, defaulting to
+    PASSWORD when unknown/missing.
+
+    Pre-#526 sessions don't carry the key, and a misconfigured login
+    path that wrote a garbage value mustn't crash the request — the
+    safe fallback is PASSWORD because that's what the pre-#526
+    verifier ran against unconditionally. SSO callers explicitly set
+    the key to ``sso`` at login time.
+    """
+    if not isinstance(raw, str):
+        return LoginMethod.PASSWORD.value
+    lowered = raw.strip().lower()
+    if lowered not in LoginMethod.values:
+        return LoginMethod.PASSWORD.value
     return lowered
 
 
@@ -237,6 +266,7 @@ def record_session(request: HttpRequest) -> AstroliftSession | None:
 
     now = timezone.now()
     client_kind = _normalize_client_kind(session.get(SESSION_CLIENT_KIND_KEY) if session else None)
+    login_method = _normalize_login_method(session.get(SESSION_LOGIN_METHOD_KEY) if session else None)
     label = (session.get(SESSION_LABEL_KEY, "") if session else "") or ""
     if not isinstance(label, str):
         label = ""
@@ -253,6 +283,7 @@ def record_session(request: HttpRequest) -> AstroliftSession | None:
                 session_key=session_key,
                 organization=None,
                 client_kind=client_kind,
+                login_method=login_method,
                 label=label,
                 last_seen_at=now,
                 last_seen_ip=_client_ip(request),
@@ -281,6 +312,19 @@ def record_session(request: HttpRequest) -> AstroliftSession | None:
             if expires_at and row.expires_at != expires_at:
                 row.expires_at = expires_at
                 updates.append("expires_at")
+            # #526 — when the login path stamped the bag with an
+            # explicit method (the SSO callback does), persist it.
+            # Don't overwrite an existing non-default value with the
+            # PASSWORD fallback (which is what a session bag missing
+            # the key resolves to) — that would clobber an SSO row's
+            # method on every authenticated request from a client
+            # that doesn't re-stamp the bag.
+            bag_method_raw = session.get(SESSION_LOGIN_METHOD_KEY) if session else None
+            if isinstance(bag_method_raw, str) and bag_method_raw.strip().lower() in LoginMethod.values:
+                normalized = bag_method_raw.strip().lower()
+                if row.login_method != normalized:
+                    row.login_method = normalized
+                    updates.append("login_method")
             should_touch_last_seen = (
                 row.last_seen_at is None
                 or (now - row.last_seen_at).total_seconds() >= LAST_SEEN_WRITE_THROTTLE_SECONDS

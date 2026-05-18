@@ -688,4 +688,26 @@ class Auth1SessionWorkflow:
                 f"[Auth0] Login with userinfo: {repr(authentication.userinfo.internal_user.username)}"
             )
             login(request, authentication.userinfo.internal_user)
+            # #526 — stamp the session bag so AstroliftSession.login_method
+            # records this row as SSO-minted. The step-up gate reads it back
+            # to decide whether to offer the password form or the SSO
+            # re-auth button when a sensitive mutation requires step-up.
+            # Also record the IdP-asserted ``auth_time`` (seconds since
+            # epoch) so the SSO step-up callback can verify freshness on
+            # re-auth without round-tripping back to the IdP for a
+            # userinfo lookup.
+            try:
+                from astrolift_identity.sessions import (
+                    SESSION_LOGIN_METHOD_KEY,
+                )
+                from astrolift_identity.step_up_sso import (
+                    SESSION_SSO_AUTH_TIME_KEY,
+                )
+
+                request.session[SESSION_LOGIN_METHOD_KEY] = "sso"
+                auth_time = auth0_token.get("userinfo", {}).get("auth_time") or auth0_token.get("auth_time")
+                if isinstance(auth_time, (int, float)):
+                    request.session[SESSION_SSO_AUTH_TIME_KEY] = int(auth_time)
+            except Exception:  # noqa: BLE001 — metadata stamping must never break auth
+                logger.exception("[Auth0] failed to stamp SSO session metadata")
         return authentication

@@ -16,15 +16,18 @@ class AstroliftIdentityConfig(AppConfig):
 
         register_permission_resolver(resolve)
 
-        # #487 — register the default password verifier so the
-        # elevateAdminSession mutation works out of the box on
-        # local-login installs. SSO-only installs override at
-        # startup via ``register_credential_verifier`` with a
-        # composed verifier covering their IdP-specific methods
-        # (WebAuthn assertion, OTP, magic-link).
+        # #487 / #526 — register the default password verifier composed
+        # with the SSO stub so the elevateAdminSession mutation works
+        # out of the box on local-login installs and surfaces a typed
+        # deny (not a silent pass) when a misconfigured FE tries to
+        # post ``method=sso`` directly. The real SSO step-up ceremony
+        # runs through ``astrolift_identity.step_up_sso`` — not the
+        # mutation — so the SSO verifier is intentionally deny-only.
         from astrolift_identity.session_elevation import (
+            compose_verifiers,
             default_password_verifier,
+            default_sso_verifier,
             register_credential_verifier,
         )
 
-        register_credential_verifier(default_password_verifier)
+        register_credential_verifier(compose_verifiers(default_password_verifier, default_sso_verifier))

@@ -108,13 +108,35 @@ const stepUpLink = new ApolloLink((operation, forward) => {
                 Array.isArray((value as { errors: unknown[] }).errors)
               ) {
                 const errs = (
-                  value as { errors: { code?: string; message?: string }[] }
+                  value as {
+                    errors: {
+                      code?: string;
+                      message?: string;
+                      supportedMethods?: string[] | null;
+                    }[];
+                  }
                 ).errors;
                 const stepUp = errs.find((e) => e.code === "STEP_UP_REQUIRED");
                 if (stepUp && typeof window !== "undefined") {
+                  // #526 — propagate supportedMethods from the deny
+                  // envelope so the modal can branch SSO → IdP redirect
+                  // vs. password → form. Backend may return null when
+                  // the session bag hasn't been stamped yet; the modal
+                  // treats undefined as the legacy password-only case.
+                  const raw = stepUp.supportedMethods;
+                  const known = ["password", "sso", "webauthn", "magic_link"];
+                  const supported = Array.isArray(raw)
+                    ? (raw.filter((m): m is string => typeof m === "string" && known.includes(m)) as (
+                        | "password"
+                        | "sso"
+                        | "webauthn"
+                        | "magic_link"
+                      )[])
+                    : undefined;
                   const detail: StepUpEventDetail = {
                     operationName: operation.operationName ?? "",
                     message: stepUp.message ?? "",
+                    supportedMethods: supported,
                   };
                   window.dispatchEvent(
                     new CustomEvent(STEP_UP_EVENT, { detail }),

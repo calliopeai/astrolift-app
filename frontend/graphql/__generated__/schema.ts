@@ -2043,6 +2043,7 @@ export type AstroliftServerInfo = {
 export type AstroliftSourceConnection = {
   accountLogin: Scalars['String']['output'];
   apiBaseUrl: Scalars['String']['output'];
+  appClientId: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   displayName: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -2053,6 +2054,7 @@ export type AstroliftSourceConnection = {
   kind: Scalars['String']['output'];
   lastUsedAt?: Maybe<Scalars['DateTime']['output']>;
   name: Scalars['String']['output'];
+  needsClientId: Scalars['Boolean']['output'];
   oauthClientId: Scalars['String']['output'];
   oauthRedirectUri: Scalars['String']['output'];
   parentOauthAppId?: Maybe<Scalars['GUID']['output']>;
@@ -2497,6 +2499,7 @@ export type ConfirmUploadResult = {
 export type ConnectSourceInput = {
   accountLogin: InputMaybe<Scalars['String']['input']>;
   apiBaseUrl: InputMaybe<Scalars['String']['input']>;
+  appClientId: InputMaybe<Scalars['String']['input']>;
   displayName: InputMaybe<Scalars['String']['input']>;
   installationId: InputMaybe<Scalars['String']['input']>;
   kind: Scalars['String']['input'];
@@ -4317,6 +4320,7 @@ export type MutationError = {
   message: Scalars['String']['output'];
   requestedVersion?: Maybe<Scalars['Int']['output']>;
   requiresAttestation?: Maybe<Scalars['Boolean']['output']>;
+  supportedMethods?: Maybe<Array<Scalars['String']['output']>>;
 };
 
 /** Standard mutation result with ok flag and validation errors. */
@@ -5710,6 +5714,7 @@ export type UpdateSecurityPolicyInput = {
 };
 
 export type UpdateSourceConnectionInput = {
+  appClientId: InputMaybe<Scalars['String']['input']>;
   displayName: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   isActive: InputMaybe<Scalars['Boolean']['input']>;

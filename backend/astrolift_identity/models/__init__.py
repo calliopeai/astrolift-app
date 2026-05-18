@@ -22,6 +22,7 @@ from astrolift_identity.models.session import (
     AttestationKind,
     AttestationTrustLevel,
     ClientKind,
+    LoginMethod,
     RevocationReason,
 )
 from astrolift_identity.models.team import Team
@@ -40,6 +41,7 @@ __all__ = [
     "GroupRoleMapping",
     "IdentityProvider",
     "Invitation",
+    "LoginMethod",
     "Member",
     "OrgDomain",
     "Organization",

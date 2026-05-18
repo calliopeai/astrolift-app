@@ -58,7 +58,15 @@ METHOD_PASSWORD = "password"
 METHOD_OTP = "otp"
 METHOD_WEBAUTHN = "webauthn"
 METHOD_MAGIC_LINK = "magic_link"
-KNOWN_METHODS: frozenset[str] = frozenset({METHOD_PASSWORD, METHOD_OTP, METHOD_WEBAUTHN, METHOD_MAGIC_LINK})
+# #526 — SSO step-up. The elevateAdminSession mutation cannot
+# directly accept an SSO credential (the actual ceremony happens via
+# the /auth1/elevate-sso redirect flow), but the method needs to be
+# in KNOWN_METHODS so the elevation row + audit + status query
+# surface ``sso`` consistently with the password / webauthn paths.
+METHOD_SSO = "sso"
+KNOWN_METHODS: frozenset[str] = frozenset(
+    {METHOD_PASSWORD, METHOD_OTP, METHOD_WEBAUTHN, METHOD_MAGIC_LINK, METHOD_SSO}
+)
 
 # Default fallback when Constance is unreachable (test settings that
 # disable constance, fresh installs before migrate runs, etc.). 15 min
@@ -321,6 +329,29 @@ def default_password_verifier(user: Any, method: str, credential: Any) -> bool:
     if not user.has_usable_password():
         return False
     return bool(user.check_password(credential))
+
+
+def default_sso_verifier(user: Any, method: str, credential: Any) -> bool:
+    """Reject the elevateAdminSession path for ``method == "sso"``.
+
+    SSO step-up is a redirect-driven ceremony (see
+    :mod:`astrolift_identity.step_up_sso`) — there's no raw credential
+    the operator can paste into a modal that the backend can verify
+    server-side. The mutation interface still has to know the method
+    exists (so the FE can render the right branch + audit rows carry
+    the right label) but the actual elevation flips via
+    :func:`elevate` from inside the SSO callback.
+
+    Returning False here is the explicit-deny so a misconfigured FE
+    that POSTs ``method=sso`` to elevateAdminSession surfaces the
+    standard PERMISSION_DENIED envelope instead of silently elevating.
+    Other methods fall through to deny — caller composes this with
+    :func:`default_password_verifier` (and any install-specific
+    webauthn / otp verifiers) via :func:`compose_verifiers`.
+    """
+    if method != METHOD_SSO:
+        return False
+    return False
 
 
 def compose_verifiers(*verifiers: CredentialVerifier) -> CredentialVerifier:

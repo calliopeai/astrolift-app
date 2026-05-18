@@ -31,9 +31,13 @@ from typing import Any
 
 from astrolift_graphql import failure as gql_failure
 from astrolift_identity.session_elevation import (
+    METHOD_PASSWORD,
+    METHOD_SSO,
+    METHOD_WEBAUTHN,
     SESSION_KEY_ELEVATED_UNTIL,
     get_status,
 )
+from astrolift_identity.sessions import SESSION_LOGIN_METHOD_KEY
 from core.mutations import AuditEntry, ErrorCode, emit_audit
 from core.tenancy import get_current_tenant
 
@@ -99,6 +103,7 @@ def requires_elevation(
             attest_required = _attestation_gate_active(request)
             if status.elevated and not attest_required:
                 return fn(self, info, *args, **kwargs)
+            supported = _supported_step_up_methods(session)
             if attest_required:
                 _emit_deny_audit(
                     fn=fn,
@@ -108,12 +113,14 @@ def requires_elevation(
                         "resolver": fn.__qualname__,
                         "action_label": action_label,
                         "reason": "attestation_required",
+                        "supported_methods": supported,
                     },
                 )
                 return gql_failure(
                     ErrorCode.STEP_UP_REQUIRED.value,
                     _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
                     requires_attestation=True,
+                    supported_methods=supported,
                 )
 
             # Audit the deny so security review can spot patterns
@@ -127,12 +134,14 @@ def requires_elevation(
                 extra={
                     "resolver": fn.__qualname__,
                     "action_label": action_label,
+                    "supported_methods": supported,
                 },
             )
 
             return gql_failure(
                 ErrorCode.STEP_UP_REQUIRED.value,
                 _DEFAULT_MESSAGE if not action_label else f"{action_label}: {_DEFAULT_MESSAGE}",
+                supported_methods=supported,
             )
 
         wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
@@ -172,6 +181,46 @@ def _emit_deny_audit(
         )
     except Exception:  # noqa: BLE001 — audit emission must never break a deny
         log.exception("step_up: audit emit failed on deny for %s", fn.__qualname__)
+
+
+def _supported_step_up_methods(session: Any) -> list[str]:
+    """Derive the credential families the FE may use to satisfy step-up.
+
+    Driven by :data:`SESSION_LOGIN_METHOD_KEY` written at login time:
+
+    * ``password`` (or unset, the legacy default) → ``["password"]``
+    * ``sso`` → ``["sso"]``
+    * ``webauthn`` → ``["webauthn"]``
+
+    SSO users lack a usable password hash on the User row, so a modal
+    that only offers password is unfulfillable for them (#526). Returning
+    the right method on the deny envelope lets the FE pick the correct
+    branch — password form vs. IdP redirect button vs. WebAuthn prompt
+    — without a second round-trip to ``astroliftElevationStatus``.
+
+    Falls back to ``["password"]`` for any unrecognized / missing
+    value so the worst case is the pre-#526 behaviour (which still
+    works for password users) rather than an empty list (which would
+    render no controls at all).
+    """
+    if session is None:
+        return [METHOD_PASSWORD]
+    try:
+        raw = session.get(SESSION_LOGIN_METHOD_KEY) if hasattr(session, "get") else None
+    except Exception:  # noqa: BLE001 — never blow up the deny path on a bag read
+        raw = None
+    if not isinstance(raw, str):
+        return [METHOD_PASSWORD]
+    lowered = raw.strip().lower()
+    if lowered == "sso":
+        return [METHOD_SSO]
+    if lowered == "webauthn":
+        return [METHOD_WEBAUTHN]
+    # ``password`` and ``magic_link`` both surface as the password form
+    # — magic-link users do have a usable password hash because the
+    # link consumption mints one. Future iteration may split magic-link
+    # into its own UI branch; for now password is the safe fallback.
+    return [METHOD_PASSWORD]
 
 
 def _attestation_gate_active(request: Any) -> bool:

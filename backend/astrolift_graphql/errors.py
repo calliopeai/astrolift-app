@@ -29,3 +29,11 @@ class MutationErrorType:
     # other error code.
     current_version: int | None = None
     requested_version: int | None = None
+    # #526 — credential families the FE may use to satisfy step-up
+    # for the current session. Set only when ``code == STEP_UP_REQUIRED``.
+    # ``["password"]`` for local-login sessions (the original #487
+    # behaviour); ``["sso"]`` for sessions minted via the IdP redirect
+    # flow — without this hint the StepUpPrompt modal renders the
+    # password form for SSO users who can't satisfy it (unusable
+    # password hash). Null on every other envelope.
+    supported_methods: list[str] | None = None
