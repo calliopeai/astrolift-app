@@ -2445,6 +2445,13 @@
     "elevating": "確認中…",
     "indicator": "管理者モードは残り {minutes, plural, one {#分} other {#分}} 有効",
     "deelevateLabel": "管理者モードを今すぐ終了",
+    "sso": {
+      "title": "続行するには再認証してください",
+      "description": "この操作には最近の認証が必要です。本人確認のためIDプロバイダーに移動します。",
+      "providerHint": "IDプロバイダーが本人確認を完了すると、このページに戻ります。",
+      "action": "再認証する",
+      "cancel": "キャンセル"
+    },
     "errors": {
       "passwordRequired": "パスワードを入力してください。",
       "generic": "パスワードを確認できませんでした。もう一度お試しください。",

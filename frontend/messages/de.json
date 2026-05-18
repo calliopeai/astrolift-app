@@ -2445,6 +2445,13 @@
     "elevating": "Wird bestätigt…",
     "indicator": "Admin-Modus aktiv für {minutes, plural, one {# weitere Minute} other {# weitere Minuten}}",
     "deelevateLabel": "Admin-Erhöhung jetzt beenden",
+    "sso": {
+      "title": "Erneut authentifizieren, um fortzufahren",
+      "description": "Diese Aktion erfordert eine aktuelle Authentifizierung. Wir leiten dich zu deinem Identitätsanbieter weiter, um deine Identität zu bestätigen.",
+      "providerHint": "Du wirst zurück auf diese Seite geleitet, sobald dein Identitätsanbieter dich bestätigt hat.",
+      "action": "Erneut authentifizieren",
+      "cancel": "Abbrechen"
+    },
     "errors": {
       "passwordRequired": "Passwort ist erforderlich.",
       "generic": "Passwort konnte nicht bestätigt werden. Bitte erneut versuchen.",

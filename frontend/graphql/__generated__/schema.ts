@@ -4317,6 +4317,7 @@ export type MutationError = {
   message: Scalars['String']['output'];
   requestedVersion?: Maybe<Scalars['Int']['output']>;
   requiresAttestation?: Maybe<Scalars['Boolean']['output']>;
+  supportedMethods?: Maybe<Array<Scalars['String']['output']>>;
 };
 
 /** Standard mutation result with ok flag and validation errors. */

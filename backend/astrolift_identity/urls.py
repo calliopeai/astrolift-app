@@ -1,9 +1,10 @@
 """URL routes owned by ``astrolift_identity``.
 
-Currently exposes the CLI / mobile device-flow surface (#475). The
-REST endpoints (``/api/cli/v1/auth/{start,complete,refresh}``) are
-mounted at the project root by ``config.urls``; the in-browser
-approval page lives under the auth1-protected ``/app/`` prefix.
+Currently exposes the CLI / mobile device-flow surface (#475) and the
+SSO step-up re-auth flow (#526). The REST endpoints
+(``/api/cli/v1/auth/{start,complete,refresh}``) are mounted at the
+project root by ``config.urls``; the in-browser approval page and the
+SSO step-up endpoints live under the auth1-protected ``/app/`` prefix.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from __future__ import annotations
 from django.urls import path
 from django_ratelimit.decorators import ratelimit
 
-from astrolift_identity import device_flow_views
+from astrolift_identity import device_flow_views, step_up_sso
 
 app_name = "astrolift_identity"
 
@@ -49,5 +50,20 @@ app_urlpatterns = [
         "cli/auth/device/<str:session_guid>/",
         device_flow_views.device_flow_approval,
         name="device-flow-approval",
+    ),
+    # SSO step-up re-auth (#526). Lives under /app/ so the auth1 login
+    # gate enforces an authenticated session on entry; the callback
+    # validates ``state`` + ``auth_time`` itself. The names are
+    # referenced by ``elevate_sso_start.reverse()`` so keep them
+    # stable — a rename here breaks the redirect.
+    path(
+        "auth1/elevate-sso/",
+        step_up_sso.elevate_sso_start,
+        name="auth1-elevate-sso-start",
+    ),
+    path(
+        "auth1/elevate-sso/callback/",
+        step_up_sso.elevate_sso_callback,
+        name="auth1-elevate-sso-callback",
     ),
 ]

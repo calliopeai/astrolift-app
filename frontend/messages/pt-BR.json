@@ -2445,6 +2445,13 @@
     "elevating": "Confirmando…",
     "indicator": "Modo admin ativo por mais {minutes, plural, one {# minuto} other {# minutos}}",
     "deelevateLabel": "Encerrar elevação de admin agora",
+    "sso": {
+      "title": "Reautentique-se para continuar",
+      "description": "Esta ação exige autenticação recente. Enviaremos você ao seu provedor de identidade para confirmar que é você.",
+      "providerHint": "Você voltará para esta página assim que o seu provedor de identidade confirmar.",
+      "action": "Reautenticar",
+      "cancel": "Cancelar"
+    },
     "errors": {
       "passwordRequired": "A senha é obrigatória.",
       "generic": "Não foi possível confirmar sua senha. Tente novamente.",
