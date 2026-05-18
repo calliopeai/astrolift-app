@@ -185,16 +185,32 @@ export function AppsClient() {
 
   // #697 — pinned apps sort to the top of the grid.
   const { pinned: pinnedSet, toggle: togglePin } = usePinnedApps();
+  // #695 — client-side sort dropdown. Default is the backend's
+  // `created_at desc` (so it matches the cursor pagination); other
+  // options re-order the currently-loaded page. True cross-page sort
+  // needs a backend `sort_by` parameter — filed as a follow-up; most
+  // orgs fit in one page anyway.
+  const [sortKey, setSortKey] = useState<"recent" | "deployed" | "name">("recent");
   const apps: AstroliftRegisteredApp[] = useMemo(() => {
-    if (pinnedSet.size === 0) return rawApps;
+    let sorted = rawApps;
+    if (sortKey === "deployed") {
+      sorted = [...rawApps].sort((a, b) => {
+        const ta = a.lastDeployedAt ? Date.parse(a.lastDeployedAt) : 0;
+        const tb = b.lastDeployedAt ? Date.parse(b.lastDeployedAt) : 0;
+        return tb - ta;
+      });
+    } else if (sortKey === "name") {
+      sorted = [...rawApps].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (pinnedSet.size === 0) return sorted;
     const pins: AstroliftRegisteredApp[] = [];
     const rest: AstroliftRegisteredApp[] = [];
-    for (const a of rawApps) {
+    for (const a of sorted) {
       if (pinnedSet.has(a.slug)) pins.push(a);
       else rest.push(a);
     }
     return [...pins, ...rest];
-  }, [rawApps, pinnedSet]);
+  }, [rawApps, pinnedSet, sortKey]);
 
   // `/` global shortcut focuses the search input — but only when the
   // user isn't already typing into a form control / contenteditable,
@@ -301,23 +317,40 @@ export function AppsClient() {
       {/* Triage controls: search on top, status pills below. Pills wrap on
           narrow viewports so the row never overflows. */}
       <div className="flex flex-col gap-3">
-        <div className="relative max-w-md">
-          <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-          <Input
-            ref={searchRef}
-            type="search"
-            value={rawSearch}
-            onChange={(e) => setRawSearch(e.target.value)}
-            placeholder={t("search.placeholder")}
-            aria-label={t("search.ariaLabel")}
-            className="pr-12 pl-8"
-          />
-          <kbd
-            aria-hidden="true"
-            className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-[10px] sm:inline-flex"
-          >
-            /
-          </kbd>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative max-w-md flex-1">
+            <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+            <Input
+              ref={searchRef}
+              type="search"
+              value={rawSearch}
+              onChange={(e) => setRawSearch(e.target.value)}
+              placeholder={t("search.placeholder")}
+              aria-label={t("search.ariaLabel")}
+              className="pr-12 pl-8"
+            />
+            <kbd
+              aria-hidden="true"
+              className="border-border bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden h-5 -translate-y-1/2 items-center rounded border px-1.5 font-mono text-[10px] sm:inline-flex"
+            >
+              /
+            </kbd>
+          </div>
+          {/* #695 — client-side sort dropdown. Pinned apps always
+              float to the top regardless of sort key. */}
+          <label className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+            <span>Sort</span>
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
+              className="border-border bg-background h-8 rounded-md border px-2 text-xs"
+              aria-label="Sort apps"
+            >
+              <option value="recent">Recently registered</option>
+              <option value="deployed">Last deployed</option>
+              <option value="name">Name (A→Z)</option>
+            </select>
+          </label>
         </div>
         <div
           className="flex flex-wrap items-center gap-1.5"
