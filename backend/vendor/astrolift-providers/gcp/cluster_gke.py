@@ -8,6 +8,7 @@ API ops. Tokens come from the local default GCP credentials
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -20,7 +21,6 @@ from _sdk.cluster import (
     ClusterContext,
     ClusterDriver,
     DeleteResult,
-    InteractiveExecSession,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -31,10 +31,6 @@ from _sdk.cluster import (
     WorkloadStatus,
 )
 from gcp._errors import NotFoundError, map_api_error
-from k8s_native.interactive_exec import (
-    InteractiveExecBackend,
-    default_interactive_exec_backend,
-)
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -42,6 +38,7 @@ from k8s_native.management import (
     run_bring_into_management,
 )
 from k8s_native.observability import (
+    ClusterAuthError,
     LivePodBackend,
     LogBackend,
     PodBackend,
@@ -51,6 +48,15 @@ from k8s_native.observability import (
 
 class _NotFound(Exception):
     pass
+
+
+# Workload Identity bearer tokens minted via google.auth ADC are
+# valid for ~60 minutes. We cache the synthesized kubeconfig blob
+# slightly under that to absorb clock skew + give the next mint a
+# wide margin before any in-flight k8s call would hit a 401. The
+# cache key is the (project, location, cluster_name) triple — one
+# entry per cluster the driver talks to.
+_WI_KUBECONFIG_TTL_SECONDS = 50 * 60
 
 
 @dataclass(frozen=True)
@@ -72,7 +78,8 @@ class GKEClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
-        exec_backend: InteractiveExecBackend | None = None,
+        credentials_factory: Callable[[], tuple[Any, str | None]] | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         self._config = config
         if config.container_client is not None:
@@ -83,24 +90,32 @@ class GKEClusterDriver(ClusterDriver):
             self._gke = container_v1.ClusterManagerClient()
         self._factory = k8s_client_factory or _build_k8s_client
         self._k8s_cache: dict[str, Any] = {}
-        # Pluggable runtime-observability backends (#299). The listing
-        # + log-streaming path is cloud-neutral as soon as the
-        # ClusterAuth blob is in hand; the GKE-specific Workload
-        # Identity exec_plugin token mint lives in #310 follow-up.
+        # Pluggable runtime-observability backends (#299). The
+        # ``exec_plugin`` row is materialized into a ``kubeconfig``
+        # blob (with a freshly-minted Workload Identity bearer baked
+        # in) before delegating, so the shared k8s_native backend
+        # never has to know about GCP auth specifics (#310).
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
         # Bring-into-management (#316). Inherits k8s_native's body
-        # via the management backend; the GKE Workload Identity
-        # token mint is irrelevant for kubeconfig + service-account
-        # auth, both of which go straight through to ``build_api_client``.
+        # via the management backend; ``exec_plugin`` auth is
+        # materialized into kubeconfig before the backend sees it,
+        # same as the runtime-observability path.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
         )
-        # Interactive exec backend (#423) — see EKS sibling for the
-        # materialize-then-delegate pattern.
-        self._exec_backend: InteractiveExecBackend = (
-            exec_backend if exec_backend is not None else default_interactive_exec_backend()
+        # Workload Identity token mint plumbing (#310). The
+        # credentials factory is injected for tests; production
+        # resolves via ``google.auth.default()`` which picks up the
+        # Workload Identity binding when running inside a GCP-bound
+        # pod and falls back to ADC otherwise. The clock is injected
+        # so cache-expiry tests don't have to sleep.
+        self._credentials_factory: Callable[[], tuple[Any, str | None]] = (
+            credentials_factory or _default_credentials_factory
         )
+        self._clock: Callable[[], float] = clock or time.monotonic
+        # Maps (project, location, cluster_name) → (kubeconfig_yaml, expires_at)
+        self._wi_kubeconfig_cache: dict[tuple[str, str, str], tuple[str, float]] = {}
 
     def apply_manifests(
         self,
@@ -323,12 +338,15 @@ class GKEClusterDriver(ClusterDriver):
         namespace: str,
         app_slug: str,
     ) -> list[PodInfo]:
-        """Listing path is shared with k8s_native — the GKE-specific
-        bit (Workload Identity exec_plugin token mint) lives in #310
-        follow-up. For now, ``auth_method=kubeconfig`` /
-        ``service_account_token`` go through directly."""
+        """List pods on the GKE cluster.
+
+        Materializes ``exec_plugin`` auth into a real bearer token
+        (Workload Identity ADC) before delegating to the shared
+        k8s_native pod backend. ``kubeconfig`` /
+        ``service_account_token`` pass through unchanged.
+        """
         return self._pod_backend.list_pods(
-            auth=auth,
+            auth=self._materialize_gke_auth_auth(auth),
             namespace=namespace,
             app_slug=app_slug,
         )
@@ -343,9 +361,9 @@ class GKEClusterDriver(ClusterDriver):
         tail_lines: int,
         follow: bool,
     ) -> AsyncIterator[PodLogLine]:
-        """See ``list_pods`` — same shared k8s_native path."""
+        """See ``list_pods`` — same materialize-then-delegate pattern."""
         return self._log_backend.stream(
-            auth=auth,
+            auth=self._materialize_gke_auth_auth(auth),
             namespace=namespace,
             pod_name=pod_name,
             container=container,
@@ -353,30 +371,13 @@ class GKEClusterDriver(ClusterDriver):
             follow=follow,
         )
 
-    def interactive_exec(
-        self,
-        *,
-        auth: ClusterAuth,
-        namespace: str,
-        pod_name: str,
-        container: str,
-        command: list[str],
-        tty: bool = True,
-    ) -> InteractiveExecSession:
-        """See ``list_pods`` — same shared k8s_native path."""
-        return self._exec_backend.open(
-            auth=auth,
-            namespace=namespace,
-            pod_name=pod_name,
-            container=container,
-            command=command,
-            tty=tty,
-        )
-
     # ---- bring-into-management (#316) -----------------------------
 
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
-        return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
+        return probe_cluster_capabilities(
+            backend=self._management_backend,
+            cluster=self._materialize_gke_auth_context(cluster),
+        )
 
     def bring_into_management(
         self,
@@ -386,7 +387,7 @@ class GKEClusterDriver(ClusterDriver):
     ) -> ManagementReport:
         return run_bring_into_management(
             backend=self._management_backend,
-            cluster=cluster,
+            cluster=self._materialize_gke_auth_context(cluster),
             run_preflight=run_preflight,
         )
 
@@ -602,6 +603,189 @@ class GKEClusterDriver(ClusterDriver):
         except Exception as exc:
             raise map_api_error(exc) from exc
         return f"https://{cluster.endpoint}", cluster.master_auth.cluster_ca_certificate
+
+    # ---- exec_plugin token materialization (#310) -----------------
+    #
+    # The k8s_native backend's ``build_api_client`` knows how to
+    # handle ``kubeconfig`` + ``service_account_token`` auth but
+    # raises on ``exec_plugin`` — GKE-specific token minting is the
+    # cloud driver's job. We synthesize a kubeconfig blob carrying
+    # the cluster's endpoint + CA + a freshly-minted Workload
+    # Identity bearer (or ADC bearer when running off-cluster) and
+    # rewrite the auth so the shared backend sees a plain
+    # ``kubeconfig`` payload.
+    #
+    # Two helpers because ClusterContext (bring/probe) and
+    # ClusterAuth (list_pods/stream_logs) are different frozen
+    # dataclasses — dataclasses.replace is type-specific. The
+    # kubeconfig synthesis logic is shared via
+    # ``_mint_wi_kubeconfig``.
+
+    def _mint_wi_kubeconfig(
+        self,
+        *,
+        project_id: str | None,
+        location: str | None,
+        cluster_name: str | None,
+    ) -> str:
+        """Synthesize a kubeconfig YAML blob for the target cluster.
+
+        Pulls endpoint + CA via ``container.get_cluster`` and mints a
+        bearer via ``google.auth.default()`` + ``creds.refresh()``.
+        Result is cached per ``(project, location, cluster)`` for
+        ~50 minutes — GCP ADC tokens are typically 60-min valid so
+        the cache absorbs the bulk of back-to-back resolver calls
+        without re-refreshing.
+
+        Raises ``ClusterAuthError`` on any failure (get_cluster 4xx,
+        ADC resolution failure, refresh failure). The resolver layer
+        maps that to an empty UI state.
+        """
+        proj = project_id or self._config.project_id
+        loc = location or self._config.location
+        name = cluster_name or self._config.cluster_name
+        cache_key = (proj, loc, name)
+        cached = self._wi_kubeconfig_cache.get(cache_key)
+        if cached is not None and cached[1] > self._clock():
+            return cached[0]
+
+        # Describe the cluster first so a bogus row fails fast with a
+        # clear error before we burn an ADC refresh round-trip.
+        try:
+            cluster_resp = self._gke.get_cluster(
+                name=f"projects/{proj}/locations/{loc}/clusters/{name}",
+            )
+        except Exception as exc:
+            raise ClusterAuthError(
+                f"GKE get_cluster failed for projects/{proj}/locations/{loc}/clusters/{name}: {exc}",
+            ) from exc
+        endpoint = (
+            f"https://{getattr(cluster_resp, 'endpoint', '') or ''}"
+            if not str(getattr(cluster_resp, "endpoint", "")).startswith("http")
+            else str(cluster_resp.endpoint)
+        )
+        master_auth = getattr(cluster_resp, "master_auth", None)
+        ca_data = getattr(master_auth, "cluster_ca_certificate", "") if master_auth else ""
+
+        try:
+            creds, _project = self._credentials_factory()
+        except Exception as exc:
+            raise ClusterAuthError(
+                f"google.auth.default() failed: {exc}",
+            ) from exc
+        try:
+            _refresh_credentials(creds)
+        except Exception as exc:
+            raise ClusterAuthError(
+                f"credentials refresh failed: {exc}",
+            ) from exc
+        token = getattr(creds, "token", None) or ""
+        if not token:
+            raise ClusterAuthError(
+                "google.auth credentials returned an empty token after refresh",
+            )
+
+        context_name = f"gke_{proj}_{loc}_{name}"
+        kubeconfig_dict = {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "clusters": [
+                {
+                    "name": context_name,
+                    "cluster": {
+                        "server": endpoint,
+                        "certificate-authority-data": ca_data,
+                    },
+                }
+            ],
+            "users": [
+                {
+                    "name": context_name,
+                    "user": {"token": token},
+                }
+            ],
+            "contexts": [
+                {
+                    "name": context_name,
+                    "context": {"cluster": context_name, "user": context_name},
+                }
+            ],
+            "current-context": context_name,
+        }
+        # ``yaml`` is already a transitive dep of the k8s_native
+        # observability layer (used in ``build_api_client``); we
+        # import inside the helper so unit tests for other GCP
+        # drivers don't pay for the import on collection.
+        import yaml
+
+        kubeconfig_blob = yaml.safe_dump(kubeconfig_dict, sort_keys=False)
+        self._wi_kubeconfig_cache[cache_key] = (
+            kubeconfig_blob,
+            self._clock() + _WI_KUBECONFIG_TTL_SECONDS,
+        )
+        return kubeconfig_blob
+
+    def _materialize_gke_auth_auth(self, auth: ClusterAuth) -> ClusterAuth:
+        if auth.auth_method != "exec_plugin":
+            return auth
+        import dataclasses
+
+        cfg = auth.auth_config or {}
+        kubeconfig_blob = self._mint_wi_kubeconfig(
+            project_id=cfg.get("project_id"),
+            location=cfg.get("location"),
+            cluster_name=cfg.get("cluster_name"),
+        )
+        return dataclasses.replace(
+            auth,
+            auth_method="kubeconfig",
+            auth_config={"kubeconfig": kubeconfig_blob},
+        )
+
+    def _materialize_gke_auth_context(self, cluster: ClusterContext) -> ClusterContext:
+        if cluster.auth_method != "exec_plugin":
+            return cluster
+        import dataclasses
+
+        cfg = cluster.auth_config or {}
+        kubeconfig_blob = self._mint_wi_kubeconfig(
+            project_id=cfg.get("project_id"),
+            location=cfg.get("location"),
+            cluster_name=cfg.get("cluster_name"),
+        )
+        return dataclasses.replace(
+            cluster,
+            auth_method="kubeconfig",
+            auth_config={"kubeconfig": kubeconfig_blob},
+        )
+
+
+def _default_credentials_factory() -> tuple[Any, str | None]:
+    """Production credentials factory.
+
+    Resolves ADC via ``google.auth.default()`` — picks up Workload
+    Identity automatically when running inside a GCP-bound pod, and
+    falls back to user / SA-key credentials for off-cluster callers.
+    Scope is the bare-minimum ``cloud-platform`` token the GKE
+    apiserver accepts; broader scopes are forbidden by the WI
+    binding anyway.
+    """
+    import google.auth
+
+    return google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+
+
+def _refresh_credentials(creds: Any) -> None:
+    """Refresh ``creds`` against ``google.auth.transport.requests.Request``.
+
+    Carved out so tests can pass credentials whose ``refresh`` is a
+    plain mock without needing to vendor a fake transport. Imports
+    are kept inside the function so a missing ``google-auth``
+    install only bites at the point of use.
+    """
+    from google.auth.transport.requests import Request
+
+    creds.refresh(Request())
 
 
 def _build_k8s_client(*, endpoint: str, ca_data: str) -> Any:

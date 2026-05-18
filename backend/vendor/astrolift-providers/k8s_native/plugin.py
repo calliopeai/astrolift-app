@@ -22,7 +22,6 @@ Drivers shipped:
 """
 
 from _sdk.base import ProviderPlugin
-
 from k8s_native.cluster import K8sNativeClusterDriver
 from k8s_native.dns_external import ExternalDnsDriver
 from k8s_native.identity_projected import ProjectedSaTokenDriver
@@ -39,7 +38,6 @@ from k8s_native.notification_otlp import WebhookSMTPNotificationDriver
 from k8s_native.registry_oci import OCIRegistryDriver
 from k8s_native.secrets_vault import VaultSecretsBackend
 from k8s_native.tls_certmanager import CertManagerDriver
-
 
 PLUGIN = ProviderPlugin(
     id="k8s_native",
@@ -95,9 +93,7 @@ PLUGIN = ProviderPlugin(
             },
             "oci_registry_url": {
                 "type": "string",
-                "description": (
-                    "Generic OCI registry URL (Harbor/Zot/GHCR)."
-                ),
+                "description": ("Generic OCI registry URL (Harbor/Zot/GHCR)."),
             },
             "cnpg_storage_class": {"type": "string"},
             "cnpg_backup_url": {"type": "string"},

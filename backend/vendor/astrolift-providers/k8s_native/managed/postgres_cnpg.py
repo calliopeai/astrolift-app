@@ -24,7 +24,6 @@ from _sdk.managed_service import (
     BindingSchema,
     DeprovisionResult,
     DeprovisionSpec,
-    Grant,
     ManagedServiceDriver,
     ProvisionResult,
     ProvisionSpec,
@@ -35,7 +34,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "postgres"
 
@@ -103,37 +103,48 @@ class CNPGPostgresDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = f"{spec.organization_slug}-{spec.app_slug}"
         manifest = self._render_cluster(spec=spec, cluster_name=cluster_name)
 
         if self._config.cluster_driver is not None:
-            namespace = f"{spec.organization_slug}-{spec.app_slug}"
             result = self._config.cluster_driver.apply_manifests(
-                spec.tenant_cluster_id, namespace, [manifest],
+                spec.tenant_cluster_id,
+                namespace,
+                [manifest],
             )
             if not result.ok:
                 return ProvisionResult(
-                    ok=False, handle="",
+                    ok=False,
+                    handle="",
                     message=f"failed to apply CNPG Cluster: {result.errors}",
                     errors=result.errors,
                 )
 
+        # 4-segment handle so deprovision can recover the locator
+        # without re-deriving organization_slug/app_slug. The
+        # tenant_cluster_id may be empty in render-only mode but
+        # callers that go on to deprovision must pass the same spec
+        # back through provision first or supply a 4-segment handle.
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{cluster_name}",
-            message=(
-                f"CNPG Cluster {cluster_name} applied; CNPG operator "
-                "reconciles asynchronously"
-            ),
+            handle=handle,
+            message=(f"CNPG Cluster {cluster_name} applied; CNPG operator " "reconciles asynchronously"),
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         # Update path: re-apply the Cluster CRD with new size/config.
         # CNPG operator handles rolling resize + replica scaling.
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message=(
-                "to update CNPG cluster size, call provision again "
-                "with the new size — CNPG handles rolling resize"
+                "to update CNPG cluster size, call provision again " "with the new size — CNPG handles rolling resize"
             ),
         )
 
@@ -147,42 +158,54 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         # force_destroy: in CNPG the only guard is the reclaim policy
         # on the underlying PVCs. Real deletion would patch
         # spec.storage.reclaimPolicy=Delete and override pod-disruption-
-        # budgets before delete; this render-only stub accepts the flag
-        # for Protocol symmetry and lets the workflow proceed.
+        # budgets before delete; this driver accepts the flag for
+        # Protocol symmetry and lets the workflow proceed.
         del force_destroy
-        _, cluster_name = spec.handle.partition("/")[0::2]
+        parsed = _unpack_handle(spec.handle)
         if self._config.cluster_driver is None:
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="render-only mode — caller deletes",
             )
-        # Note: the actual namespace can't be inferred from the
-        # handle alone; caller passes via the workflow's binding
-        # context. Default to the operator namespace as a stub
-        # — production wiring threads it explicitly.
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
         # CNPG's Cluster CRD has reclaim policy: by default the
         # PVCs are kept on Cluster delete. Setting
         # spec.storage.reclaimPolicy=Delete would purge the data.
         stub = {
             "apiVersion": "postgresql.cnpg.io/v1",
             "kind": "Cluster",
-            "metadata": {"name": cluster_name},
+            "metadata": {
+                "name": parsed.name,
+                "namespace": parsed.namespace,
+            },
         }
         result = self._config.cluster_driver.delete_manifests(
-            "default", self._config.operator_namespace, [stub],
+            parsed.cluster_id,
+            parsed.namespace,
+            [stub],
         )
         if result.errors:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete failed: {result.errors}",
                 errors=result.errors,
             )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message=(
-                f"CNPG Cluster {cluster_name} deleted "
-                f"({'with data' if delete_data else 'PVCs retained'})"
-            ),
+            ok=True,
+            handle=spec.handle,
+            message=(f"CNPG Cluster {parsed.name} deleted " f"({'with data' if delete_data else 'PVCs retained'})"),
         )
 
     # ---- read-only -------------------------------------------------
@@ -191,14 +214,11 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         return ServiceStatus(
             handle=handle.handle,
             state="provisioning",
-            message=(
-                "live status requires querying the Cluster CRD's "
-                "status block via cluster_driver"
-            ),
+            message=("live status requires querying the Cluster CRD's " "status block via cluster_driver"),
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        kind, _, cluster_name = handle.handle.partition("/")
+        cluster_name = _unpack_handle(handle.handle).name
         # CNPG operator generates a Secret named
         # <cluster>-app with host/port/user/password/dbname.
         secret_name = f"{cluster_name}-app"
@@ -225,8 +245,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             },
             iam_grants=[],
             notes=(
-                "CNPG generates the app Secret with rotation. The "
-                "platform mounts via envFrom or projected volume."
+                "CNPG generates the app Secret with rotation. The " "platform mounts via envFrom or projected volume."
             ),
         )
 
@@ -244,12 +263,15 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         )
 
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         """CNPG restore creates a new Cluster with bootstrap.recovery
         pointing at the source backup."""
         return ProvisionResult(
-            ok=False, handle="",
+            ok=False,
+            handle="",
             message=(
                 "CNPG restore via Backup-and-Recovery wiring is "
                 "deferred to the in-cluster operator; call "
@@ -270,10 +292,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 "extensions": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": (
-                        "Postgres extensions to enable (pg_trgm, "
-                        "vector, postgis, etc.)."
-                    ),
+                    "description": ("Postgres extensions to enable (pg_trgm, " "vector, postgis, etc.)."),
                 },
                 "storage_size": {
                     "type": "string",
@@ -283,40 +302,44 @@ class CNPGPostgresDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self) -> BindingSchema:
-        return BindingSchema(env_vars={
-            "DATABASE_HOST": "Postgres hostname",
-            "DATABASE_PORT": "Port (5432)",
-            "DATABASE_USER": "Username",
-            "DATABASE_PASSWORD": "Password",
-            "DATABASE_NAME": "Initial database name",
-            "DATABASE_URL": "Full postgresql:// URL",
-        })
+        return BindingSchema(
+            env_vars={
+                "DATABASE_HOST": "Postgres hostname",
+                "DATABASE_PORT": "Port (5432)",
+                "DATABASE_USER": "Username",
+                "DATABASE_PASSWORD": "Password",
+                "DATABASE_NAME": "Initial database name",
+                "DATABASE_URL": "Full postgresql:// URL",
+            }
+        )
 
     # ---- internals ------------------------------------------------
 
     def _cluster_name(self, *, spec: ProvisionSpec) -> str:
         parts = [
-            spec.app_slug, spec.environment_name,
+            spec.app_slug,
+            spec.environment_name,
         ]
         if spec.service_handle_hint:
             parts.append(spec.service_handle_hint)
         raw = "-".join(p for p in parts if p)
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-"
-            for c in raw.lower()
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw.lower())
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:63]
 
     def _render_cluster(
-        self, *, spec: ProvisionSpec, cluster_name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        cluster_name: str,
     ) -> dict[str, Any]:
         size_spec = SIZE_TO_SPEC.get(spec.size, SIZE_TO_SPEC["small"])
         version = spec.config.get("version", "16")
         extensions = spec.config.get("extensions", []) or []
         storage_size = spec.config.get(
-            "storage_size", size_spec["storage_size"],
+            "storage_size",
+            size_spec["storage_size"],
         )
 
         cluster: dict[str, Any] = {
@@ -333,9 +356,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             },
             "spec": {
                 "instances": size_spec["instances"],
-                "imageName": (
-                    f"ghcr.io/cloudnative-pg/postgresql:{version}"
-                ),
+                "imageName": (f"ghcr.io/cloudnative-pg/postgresql:{version}"),
                 "resources": size_spec["resources"],
                 "storage": {
                     "size": storage_size,
@@ -346,9 +367,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             },
         }
         if self._config.storage_class:
-            cluster["spec"]["storage"]["storageClass"] = (
-                self._config.storage_class
-            )
+            cluster["spec"]["storage"]["storageClass"] = self._config.storage_class
         if extensions:
             # CNPG honors postgresql.parameters / managed.roles for
             # extension setup via post-init SQL. Simplest path:
@@ -357,18 +376,13 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 "initdb": {
                     "database": "app",
                     "owner": "app",
-                    "postInitSQL": [
-                        f"CREATE EXTENSION IF NOT EXISTS {ext};"
-                        for ext in extensions
-                    ],
+                    "postInitSQL": [f"CREATE EXTENSION IF NOT EXISTS {ext};" for ext in extensions],
                 },
             }
         if self._config.backup_object_store_url:
             cluster["spec"]["backup"] = {
                 "barmanObjectStore": {
-                    "destinationPath": (
-                        self._config.backup_object_store_url
-                    ),
+                    "destinationPath": (self._config.backup_object_store_url),
                 },
                 "retentionPolicy": "30d",
             }

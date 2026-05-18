@@ -17,9 +17,17 @@ GCP GCS + Pub/Sub):
 - BlobStorageDriver — object_store/blob
 - ServiceBusDriver — queue/servicebus
 
+Managed services (#370 — MySQL across clouds):
+- AzureMySQLFlexibleDriver — mysql/azure_mysql_flex
+
+Managed services (#364 — cross-cloud parity with the GCP
+managed-services completion):
+- AzurePostgresFlexibleDriver — postgres/azure_pg_flex
+- AzureCacheRedisDriver — redis/azure_cache_redis
+- AzureBlobStorageDriver — object_store/azure_blob
+- AzureServiceBusDriver — queue/azure_servicebus
+
 Pending (separate tickets, follow-on managed services):
-- Azure Database for PostgreSQL Flexible Server
-- Azure Cache for Redis
 - Cosmos DB (Mongo / Cassandra / SQL APIs)
 - Azure Files (filesystem)
 - Event Hubs (event-stream)
@@ -27,18 +35,31 @@ Pending (separate tickets, follow-on managed services):
 """
 
 from _sdk.base import ProviderPlugin
-
 from azure.cluster_aks import AKSClusterDriver
 from azure.dns_azuredns import AzureDNSDriver
 from azure.identity_federated import AzureFederatedIdentityDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
-from azure.managed.object_store_blob import BlobStorageDriver
-from azure.managed.queue_servicebus import ServiceBusDriver
+from azure.managed.cache_redis import AzureCacheRedisDriver
+from azure.managed.cosmos import AzureCosmosDriver
+from azure.managed.email_acs import AzureCommunicationEmailDriver
+from azure.managed.model_endpoint_aoai import AzureOpenAIDriver
+from azure.managed.mysql_flexible import AzureMySQLFlexibleDriver
+from azure.managed.object_store_blob import (
+    AzureBlobStorageDriver,
+    BlobStorageDriver,
+)
+from azure.managed.postgres_flexible import AzurePostgresFlexibleDriver
+from azure.managed.queue_servicebus import (
+    AzureServiceBusDriver,
+    ServiceBusDriver,
+)
+from azure.managed.search_aisearch import AzureAISearchFullTextDriver
+from azure.managed.timeseries_monitor import AzureMonitorPrometheusDriver
+from azure.managed.vector_search import AzureAISearchVectorDriver
 from azure.notification_anh import AzureNotificationHubsDriver
 from azure.registry_acr import ACRDriver
 from azure.secrets_keyvault import KeyVaultSecretsBackend
 from azure.tls_appgw import AzureAppGatewayTlsDriver
-
 
 PLUGIN = ProviderPlugin(
     id="azure",
@@ -56,6 +77,17 @@ PLUGIN = ProviderPlugin(
     managed_service_drivers={
         ("object_store", "blob"): BlobStorageDriver,
         ("queue", "servicebus"): ServiceBusDriver,
+        ("mysql", "azure_mysql_flex"): AzureMySQLFlexibleDriver,
+        ("postgres", "azure_pg_flex"): AzurePostgresFlexibleDriver,
+        ("redis", "azure_cache_redis"): AzureCacheRedisDriver,
+        ("object_store", "azure_blob"): AzureBlobStorageDriver,
+        ("queue", "azure_servicebus"): AzureServiceBusDriver,
+        ("kv_store", "cosmos"): AzureCosmosDriver,
+        ("search", "azure_ai_search_fulltext"): AzureAISearchFullTextDriver,
+        ("vector_index", "azure_ai_search_vector"): AzureAISearchVectorDriver,
+        ("time_series", "azure_monitor_prometheus"): AzureMonitorPrometheusDriver,
+        ("email", "azure_acs"): AzureCommunicationEmailDriver,
+        ("model_endpoint", "azure_openai"): AzureOpenAIDriver,
     },
     config_schema={
         "type": "object",
@@ -71,10 +103,7 @@ PLUGIN = ProviderPlugin(
             },
             "resource_group": {
                 "type": "string",
-                "description": (
-                    "Default resource group for platform-managed "
-                    "resources."
-                ),
+                "description": ("Default resource group for platform-managed resources."),
             },
             "location": {
                 "type": "string",
@@ -83,37 +112,23 @@ PLUGIN = ProviderPlugin(
             },
             "cluster_oidc_issuer": {
                 "type": "string",
-                "description": (
-                    "AKS cluster OIDC issuer URL. Required for "
-                    "Workload Identity federated credentials."
-                ),
+                "description": ("AKS cluster OIDC issuer URL. Required for Workload Identity federated credentials."),
             },
             "registry_name": {
                 "type": "string",
-                "description": (
-                    "ACR registry name (without .azurecr.io suffix)."
-                ),
+                "description": ("ACR registry name (without .azurecr.io suffix)."),
             },
             "vault_url": {
                 "type": "string",
-                "description": (
-                    "Key Vault URL "
-                    "(https://<name>.vault.azure.net)."
-                ),
+                "description": ("Key Vault URL (https://<name>.vault.azure.net)."),
             },
             "storage_account": {
                 "type": "string",
-                "description": (
-                    "Storage account name for object_store "
-                    "managed-service binding."
-                ),
+                "description": ("Storage account name for object_store managed-service binding."),
             },
             "servicebus_namespace": {
                 "type": "string",
-                "description": (
-                    "Service Bus namespace name for queue "
-                    "managed-service binding."
-                ),
+                "description": ("Service Bus namespace name for queue managed-service binding."),
             },
             "ingress_variant": {
                 "type": "string",
@@ -122,17 +137,11 @@ PLUGIN = ProviderPlugin(
             },
             "appgw_id": {
                 "type": "string",
-                "description": (
-                    "Application Gateway resource ID — required "
-                    "when ingress_variant=agic."
-                ),
+                "description": ("Application Gateway resource ID — required when ingress_variant=agic."),
             },
             "akv_secret_id_for_tls": {
                 "type": "string",
-                "description": (
-                    "Key Vault secret ID for the TLS cert (PFX). "
-                    "AGIC reads this via SSL profile."
-                ),
+                "description": ("Key Vault secret ID for the TLS cert (PFX). AGIC reads this via SSL profile."),
             },
         },
     },
