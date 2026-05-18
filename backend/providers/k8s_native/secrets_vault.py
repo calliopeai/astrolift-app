@@ -15,7 +15,6 @@ Vault.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -128,34 +127,128 @@ class _VaultNotFound(Exception):
 
 
 def _build_http_client(config: VaultConfig) -> Any:
-    """Default factory builds a thin httpx-backed client.
-    Tests inject a stub via VaultConfig.http_client."""
-    return _RealVaultClient(address=config.address)
+    """Default factory builds an httpx-backed client.
+
+    Closes #569. The previous shape returned a ``_RealVaultClient``
+    whose every method raised ``NotImplementedError`` even though the
+    docstring claimed "thin httpx-backed client" — operators running
+    HashiCorp Vault as the k8s-native secrets backend would die on
+    the first secret read/write.
+    """
+    return _RealVaultClient(
+        address=config.address,
+        timeout_seconds=_VAULT_REQUEST_TIMEOUT_SECONDS,
+    )
+
+
+# Vault HTTP timeout. Tight enough to surface a stuck Vault server in
+# the deploy log within ~10s rather than hanging the workflow; loose
+# enough to absorb a typical cluster-network round-trip + Vault's
+# K8s-auth handshake. KV ops are typically <100ms.
+_VAULT_REQUEST_TIMEOUT_SECONDS = 10.0
 
 
 class _RealVaultClient:
-    """Thin wrapper so tests can inject without httpx."""
+    """Thin httpx-backed Vault HTTP client.
 
-    def __init__(self, *, address: str) -> None:
+    Wraps the four call shapes ``VaultSecretsBackend`` invokes:
+
+      * ``get(path, headers)`` — KV-v2 read (or any GET).
+      * ``post(path, json, headers)`` — KV-v2 write / generic POST.
+      * ``delete(path, headers)`` — KV-v2 metadata delete.
+      * ``list(path, headers)`` — Vault's non-standard ``LIST`` verb.
+
+    All return the same envelope ``VaultSecretsBackend`` consumes:
+    ``{"status_code": int, "body": dict}``. 404 responses raise
+    ``_VaultNotFound`` so the backend's ``except _VaultNotFound:``
+    clauses route to the "secret doesn't exist" branch (returning
+    ``None`` from ``.get`` / ``[]`` from ``.list``).
+
+    Production operators inject a Vault token via ``VaultConfig.token``
+    (or the kubernetes-auth login flow when ``auth_method=kubernetes``).
+    The header construction lives on the backend side; this client
+    only handles HTTP transport + status-code → exception mapping.
+    """
+
+    def __init__(self, *, address: str, timeout_seconds: float = 10.0) -> None:
         self._address = address.rstrip("/")
+        self._timeout = timeout_seconds
+        # The client is created lazily because the module is imported
+        # in unit-test paths that never touch it; httpx pulls in
+        # cryptography on import for TLS, which is a measurable
+        # collection-time cost we'd rather not pay for the k8s_native
+        # tests that mock the SecretsBackend wholesale.
+        self._client: Any = None
+
+    def _http(self) -> Any:
+        if self._client is None:
+            import httpx
+
+            # ``trust_env=True`` so HTTPS_PROXY / NO_PROXY env vars work
+            # for operators behind a corporate proxy. TLS verification
+            # uses the system bundle by default; operators with a
+            # private CA point ``REQUESTS_CA_BUNDLE`` at it.
+            self._client = httpx.Client(
+                base_url=self._address,
+                timeout=self._timeout,
+                trust_env=True,
+            )
+        return self._client
+
+    def _envelope(self, response: Any) -> dict[str, Any]:
+        """Wrap an ``httpx.Response`` in the backend's expected shape.
+
+        Returns ``{"status_code": int, "body": dict}``. Empty / non-JSON
+        bodies return ``body={}`` — Vault's KV write returns ``204
+        No Content`` when soft-deletes are disabled, and the backend
+        consumes only ``body.data.data`` on reads.
+        """
+        try:
+            body = response.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        return {"status_code": response.status_code, "body": body}
 
     def get(self, path: str, headers: dict[str, str]) -> dict[str, Any]:
-        raise NotImplementedError(
-            "real Vault HTTP client not wired — tests inject a stub via "
-            "VaultConfig.http_client; production wiring uses httpx",
-        )
+        response = self._http().get(path, headers=headers)
+        if response.status_code == 404:
+            raise _VaultNotFound(path)
+        response.raise_for_status()
+        return self._envelope(response)
 
     def post(
-        self, path: str, json: dict, headers: dict[str, str],
+        self, path: str, json: dict[str, Any], headers: dict[str, str],
     ) -> dict[str, Any]:
-        raise NotImplementedError("real client requires httpx")
+        response = self._http().post(path, json=json, headers=headers)
+        if response.status_code == 404:
+            raise _VaultNotFound(path)
+        response.raise_for_status()
+        return self._envelope(response)
 
     def delete(
         self, path: str, headers: dict[str, str],
     ) -> dict[str, Any]:
-        raise NotImplementedError("real client requires httpx")
+        response = self._http().delete(path, headers=headers)
+        # Vault returns 204 for a successful delete; 404 means the
+        # metadata was already gone — both are idempotent-OK from the
+        # backend's perspective. We only raise on harder failures.
+        if response.status_code == 404:
+            raise _VaultNotFound(path)
+        response.raise_for_status()
+        return self._envelope(response)
 
     def list(
         self, path: str, headers: dict[str, str],
     ) -> dict[str, Any]:
-        raise NotImplementedError("real client requires httpx")
+        # Vault's list verb is the non-standard "LIST" method. httpx
+        # supports arbitrary verbs via ``request()``. The header
+        # alternative — appending ``?list=true`` to a GET — is
+        # equivalent on the server side but slightly less explicit
+        # in operator-side curl reproductions.
+        response = self._http().request("LIST", path, headers=headers)
+        if response.status_code == 404:
+            raise _VaultNotFound(path)
+        response.raise_for_status()
+        return self._envelope(response)

@@ -39,6 +39,8 @@ from _sdk.cluster import (
     TeardownReport,
     WorkloadStatus,
 )
+from _sdk.k8s_dynamic_client import KubernetesDynamicClient
+from _sdk.k8s_dynamic_client import NotFoundError as _NotFound
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -57,8 +59,10 @@ class K8sNativeError(Exception):
     pass
 
 
-class _NotFound(Exception):
-    """Raised by the k8s client wrapper when a resource doesn't exist."""
+# ``_NotFound`` is aliased to the shared helper's ``NotFoundError`` at
+# the top-of-file imports so existing tests that construct raw
+# ``_NotFound()`` instances keep working AND ``except _NotFound``
+# clauses in this module catch what the wrapper raises after #566.
 
 
 @dataclass(frozen=True)
@@ -693,13 +697,48 @@ class K8sNativeClusterDriver(ClusterDriver):
         return client
 
 
+# ---- Internal client -----------------------------------------------
+#
+# Closes #566: the previous shape of this module was a real factory
+# returning ``_RealK8sClient(api=client)`` whose every method raised
+# ``NotImplementedError``. Operators running the BYOC / on-prem path
+# would hit the first ``server_side_apply`` and die.
+#
+# Fix: wire kubeconfig / in-cluster auth into the shared
+# ``KubernetesDynamicClient`` helper at ``_sdk/k8s_dynamic_client.py``.
+# The shared helper carries the SSA + GET + DELETE + exec + port-
+# forward body; this module's only job is to load the kubeconfig and
+# hand the resulting ``ApiClient`` to ``from_api_client``.
+
+# Re-export so resolver-side code that imports ``_RealK8sClient`` from
+# this module keeps working. The Real class IS the shared helper now.
+_RealK8sClient = KubernetesDynamicClient
+
+
 def _build_k8s_client(
     *,
     kubeconfig_path: str,
     context: str,
     in_cluster: bool,
 ) -> Any:
-    """Default factory using kubernetes Python client."""
+    """Default factory that loads kubeconfig and wires the shared helper.
+
+    Three auth paths:
+      * ``in_cluster=True`` — ``load_incluster_config`` reads the SA
+        token + CA from ``/var/run/secrets/kubernetes.io/serviceaccount``.
+      * ``kubeconfig_path`` set — load from that file, optionally
+        scoped to ``context``.
+      * Neither — fall back to the default kubeconfig (``~/.kube/config``).
+
+    All three paths populate ``client.Configuration().default()`` /
+    pass the same auth shape; we then build an ``ApiClient`` from the
+    resolved configuration and hand it to the shared helper via
+    ``from_api_client``. The kubeconfig already carries the bearer or
+    cert-based auth, so ``token_provider`` is a no-op and the shared
+    helper's ``_refresh_token`` becomes inert (kubeconfig-based auth
+    rotates externally — projected tokens are auto-refreshed by the
+    kubelet, static tokens don't expire).
+    """
     from kubernetes import client, config
 
     if in_cluster:
@@ -711,29 +750,13 @@ def _build_k8s_client(
         )
     else:
         config.load_kube_config(context=context or None)
-    return _RealK8sClient(api=client)
+    # ``load_*_config`` writes onto the singleton default configuration
+    # (the python kubernetes client's convention). Snapshot it so
+    # callers that rebuild a fresh ApiClient with overrides don't
+    # mutate ours mid-flight.
+    api_client = client.ApiClient(
+        configuration=client.Configuration.get_default_copy(),
+    )
+    return KubernetesDynamicClient.from_api_client(api_client=api_client)
 
 
-class _RealK8sClient:
-    def __init__(self, *, api: Any) -> None:
-        self._api = api
-
-    def server_side_apply(self, *, namespace, manifest, dry_run):
-        raise NotImplementedError(
-            "server_side_apply requires kubernetes.dynamic.DynamicClient wiring at deploy time",
-        )
-
-    def get(self, *, kind, namespace, name):
-        raise NotImplementedError("requires live cluster")
-
-    def delete(self, *, kind, namespace, name):
-        raise NotImplementedError("requires live cluster")
-
-    def get_namespace(self, *, name):
-        raise NotImplementedError("requires live cluster")
-
-    def exec_in_pod(self, *, namespace, pod, container, command):
-        raise NotImplementedError("requires live cluster")
-
-    def port_forward(self, *, namespace, pod, ports):
-        raise NotImplementedError("requires live cluster")

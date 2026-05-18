@@ -32,6 +32,12 @@ from _sdk.cluster import (
     TeardownReport,
     WorkloadStatus,
 )
+from _sdk.k8s_dynamic_client import (
+    KubernetesDynamicClient as _RealK8sClient,
+)
+from _sdk.k8s_dynamic_client import (
+    NotFoundError as _NotFound,
+)
 from azure._errors import NotFoundError, map_api_error
 from k8s_native.management import (
     ManagementBackend,
@@ -55,8 +61,9 @@ from k8s_native.observability import (
 _AKS_KUBECONFIG_TTL_SECONDS = 50 * 60
 
 
-class _NotFound(Exception):
-    pass
+# ``_NotFound`` is aliased to the shared helper's ``NotFoundError`` at
+# the top-of-file imports so existing ``except _NotFound`` clauses keep
+# catching what the wrapper raises after the #567 fix.
 
 
 @dataclass(frozen=True)
@@ -764,9 +771,67 @@ class AKSClusterDriver(ClusterDriver):
         )
 
 
-def _build_k8s_client(*, endpoint: str, ca_data: str) -> Any:
-    """Production wires this to kubernetes.dynamic.DynamicClient
-    + Azure CLI / Workload Identity token. Tests inject a stub."""
-    raise NotImplementedError(
-        "requires kubernetes-client wiring at deploy time",
+# AKS apiserver AAD scope. The AKS managed identity registers a
+# server-side AAD application with this fixed app-id; AKS-AAD clusters
+# accept bearer tokens minted for ``<app-id>/.default``. Tokens have a
+# ~5 minute lifetime, which is why ``KubernetesDynamicClient``
+# re-mints via ``token_provider`` before every top-level op.
+_AKS_AAD_SCOPE = "6dae42f8-4368-4678-94ff-3960e28e3630/.default"
+
+
+def _build_k8s_client(
+    *,
+    endpoint: str,
+    ca_data: str,
+    credential_factory: Callable[[], Any] | None = None,
+) -> Any:
+    """Production factory: wire the shared k8s helper for AKS.
+
+    Closes #567. AKS auth is the trickiest of the four clouds because
+    the managed-cluster object doesn't surface the CA on its API model
+    — the CA is embedded inside the kubeconfig blob returned by
+    ``list_cluster_admin_credentials``. The driver's ``_describe_cluster``
+    therefore returns ``(https://<fqdn>, "")`` and we lean on the
+    system trust bundle (Azure-managed certs chain to a public CA the
+    OS already trusts).
+
+    Token minting uses ``azure.identity.DefaultAzureCredential`` with
+    the AKS AAD scope; the credential chain resolves to:
+      * Workload Identity (when running inside an AAD-bound pod),
+      * Managed Identity (when running on an Azure VM with IMDS),
+      * Azure CLI / dev credentials (for off-cluster operator calls).
+
+    The token has a ~5min lifetime; the shared helper's
+    ``token_provider`` hook re-mints via ``credential.get_token`` on
+    each top-level op so long-running workflows can't 401 mid-flight.
+    ``credential_factory`` is injected by tests so we don't talk to
+    real Azure during unit-test runs.
+    """
+    if credential_factory is None:
+        # Import inside the function so a missing ``azure-identity``
+        # install only bites at the point of use — matches the GCP
+        # ``_default_credentials_factory`` pattern below.
+        def credential_factory() -> Any:  # type: ignore[misc]
+            from azure.identity import DefaultAzureCredential
+
+            return DefaultAzureCredential()
+
+    credential = credential_factory()
+
+    def _mint_token() -> str:
+        # ``get_token`` returns ``AccessToken(token=..., expires_on=...)``;
+        # the kubernetes-client config only consumes the bearer string.
+        # ``DefaultAzureCredential.get_token`` caches internally until
+        # ~5min before expiry, so calling on every op is cheap.
+        access_token = credential.get_token(_AKS_AAD_SCOPE)
+        return str(getattr(access_token, "token", ""))
+
+    return _RealK8sClient(
+        endpoint=endpoint,
+        ca_data=ca_data,
+        token_provider=_mint_token,
     )
+
+
+# ``_RealK8sClient`` is the shared helper at top-of-file imports —
+# kept as a comment so future readers find the alias without grep.
