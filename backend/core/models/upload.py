@@ -18,13 +18,27 @@ from storages.utils import clean_name
 
 
 class UploadQuerySet(models.QuerySet):
+    def with_view_permission(self, user):
+        # #537: the prior implementation returned ``self`` with a TODO, so
+        # every caller listing uploads (e.g. ``UploadType.get_queryset``)
+        # received the cross-tenant table. Filter to the caller's active
+        # organization and deny-by-default for anonymous callers or users
+        # whose profile cannot resolve an organization (no membership).
+        # Superusers bypass the org filter for admin / debugging surfaces;
+        # they still respect ``deleted_at`` because the caller layers
+        # ``.alive()`` / ``deleted_at__isnull=True`` on top.
+        if user is None or not getattr(user, "is_authenticated", False):
+            return self.none()
 
-    def with_view_permission(self, user: AUTH_USER_MODEL):
-        # TODO change this to use FieldPermission
-        # user_groups = user.groups.filter(memberships__organization=user.profile.organization())
-        # user_permissions = Permission.objects.filter(group__in=user_groups)
-        # return self.filter(permissions__codename__startswith=f'view_', permissions__in=user_permissions)
-        return self
+        if getattr(user, "is_superuser", False):
+            return self
+
+        profile = getattr(user, "profile", None)
+        organization = profile.organization() if profile is not None else None
+        if organization is None:
+            return self.none()
+
+        return self.filter(organization=organization)
 
     def with_view_permission_info(self, info):
         return self.with_view_permission(info.context.user)
@@ -34,7 +48,6 @@ class UploadQuerySet(models.QuerySet):
 
 
 class Upload(Tracking):
-
     objects = UploadQuerySet.as_manager()
 
     class Location(enum.Enum):
@@ -42,27 +55,14 @@ class Upload(Tracking):
         Enumeration of locations for uploads
         """
 
-        STATIC = 'static'
-        PUBLIC = 'public'
+        STATIC = "static"
+        PUBLIC = "public"
 
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False
-    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    name = models.CharField(
-        max_length=256,
-        null=True,
-        blank=True,
-        help_text='Name of the file.'
-    )
+    name = models.CharField(max_length=256, null=True, blank=True, help_text="Name of the file.")
 
-    description = models.TextField(
-        null=True,
-        blank=True,
-        help_text='Description of the file.'
-    )
+    description = models.TextField(null=True, blank=True, help_text="Description of the file.")
 
     public_url = models.CharField(
         max_length=4096,
@@ -88,7 +88,7 @@ class Upload(Tracking):
         max_length=256,
         null=False,
         blank=False,
-        help_text='Content type of the file. Also known as MIME type.',
+        help_text="Content type of the file. Also known as MIME type.",
     )
 
     target_global_id = models.CharField(
@@ -96,7 +96,7 @@ class Upload(Tracking):
         null=True,
         blank=True,
         db_index=True,
-        help_text='Entity the upload belongs to (i.e. a review, a course, an employee...)'
+        help_text="Entity the upload belongs to (i.e. a review, a course, an employee...)",
     )
 
     metadata = models.JSONField(
@@ -106,43 +106,42 @@ class Upload(Tracking):
     )
 
     organization = models.ForeignKey(
-        'organization.Organization',
-        null=True,
-        on_delete=models.CASCADE,
-        related_name='uploads'
+        "organization.Organization", null=True, on_delete=models.CASCADE, related_name="uploads"
     )
 
     location = models.CharField(
         max_length=32,
         choices=[(location.name, location.value) for location in Location],
-        default=Location.STATIC.value
+        default=Location.STATIC.value,
     )
 
     def __str__(self):
         name = self.name[:50] + "..." if self.name and len(self.name) > 50 else self.name
-        metadata_name = (self.metadata or {}).get('file_name', None)
-        metadata_name = metadata_name[:50] + '...' if metadata_name and len(metadata_name) > 50 else metadata_name
-        return f'{name or metadata_name or ""} ({self.id})'
+        metadata_name = (self.metadata or {}).get("file_name", None)
+        metadata_name = (
+            metadata_name[:50] + "..." if metadata_name and len(metadata_name) > 50 else metadata_name
+        )
+        return f"{name or metadata_name or ''} ({self.id})"
 
     @classmethod
     def media_storage(cls):
-        if not hasattr(cls, '_media_store'):
+        if not hasattr(cls, "_media_store"):
             cls._media_store = default_storage
         return cls._media_store
 
     @classmethod
     def generate_path(
-            cls,
-            location: Location,
-            organization: Organization,
-            target_global_id: str,
-            uuid: uuid.UUID,
-            mimetype: str,
+        cls,
+        location: Location,
+        organization: Organization,
+        target_global_id: str,
+        uuid: uuid.UUID,
+        mimetype: str,
     ) -> str:
         pk_hash = hashlib.sha256(str(target_global_id).encode()).hexdigest()
         org_hash = hashlib.sha256(str(organization.global_id).encode()).hexdigest()
         extension = mimetypes.guess_extension(mimetype, strict=False)
-        path = f'{location.value}/{org_hash}/{pk_hash}/{uuid.hex}{extension}'
+        path = f"{location.value}/{org_hash}/{pk_hash}/{uuid.hex}{extension}"
         return path
 
     @classmethod
@@ -162,7 +161,7 @@ class Upload(Tracking):
             )
 
             if cls.media_storage().querystring_auth and cls.media_storage().cloudfront_signer:
-                print(f'Seconds until expiration {expire}')
+                print(f"Seconds until expiration {expire}")
                 expiration = datetime.utcnow() + timedelta(seconds=expire)
                 return cls.media_storage().cloudfront_signer.generate_presigned_url(
                     url, date_less_than=expiration
@@ -179,8 +178,8 @@ class Upload(Tracking):
             ExpiresIn=expire,
         )
         if custom_url:
-            query_params = url.split('?')[1]
-            url = f'{custom_url}?{query_params}'
+            query_params = url.split("?")[1]
+            url = f"{custom_url}?{query_params}"
         if cls.media_storage().querystring_auth:
             return url
         return cls.media_storage()._strip_signing_parameters(url)
@@ -219,17 +218,21 @@ class Upload(Tracking):
             ExpiresIn=expire,
         )
         if custom_url:
-            query_params = url.split('?')[1]
-            url = f'{custom_url}?{query_params}'
+            query_params = url.split("?")[1]
+            url = f"{custom_url}?{query_params}"
         if cls.media_storage().querystring_auth:
             return url
         return cls.media_storage()._strip_signing_parameters(url)
 
     def get_as_object(self):
-        return self.media_storage().bucket.meta.client.get_object(Bucket=self.media_storage().bucket.name, Key=self.path)
+        return self.media_storage().bucket.meta.client.get_object(
+            Bucket=self.media_storage().bucket.name, Key=self.path
+        )
 
     def delete_s3_object(self):
-        return self.media_storage().bucket.meta.client.delete_object(Bucket=self.media_storage().bucket.name, Key=self.path)
+        return self.media_storage().bucket.meta.client.delete_object(
+            Bucket=self.media_storage().bucket.name, Key=self.path
+        )
 
     def delete(self, *args, **kwargs):
         self.delete_s3_object()
@@ -242,7 +245,7 @@ class FileUpload(Tracking):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
-        related_name='file_uploads',
+        related_name="file_uploads",
     )
 
     @property

@@ -88,6 +88,12 @@ BaseDatabaseOperations.sql_flush = _sql_flush_with_cascade_base
 PostgresDatabaseOperations.sql_flush = _sql_flush_with_cascade_pg
 
 
+# Re-export the reusable two-tenant fixture (#537). Importing it here
+# makes ``two_tenants`` available to every test without per-file
+# ``pytest_plugins`` wiring.
+from core.tests.fixtures.tenants import two_tenants  # noqa: E402, F401
+
+
 @pytest.fixture(autouse=True)
 def _reset_request_id():
     rid = generate_ulid()

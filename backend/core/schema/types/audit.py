@@ -1,10 +1,12 @@
 """GraphQL types and queries for the mutation audit log."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
 
 import strawberry
+from graphql import GraphQLError
 from strawberry.types import Info
 
 
@@ -21,17 +23,30 @@ class AuditLogEntry:
 
 @strawberry.type
 class AuditLogQuery:
-
-    @strawberry.field(description="Query mutation audit logs. Admin only.")
+    @strawberry.field(description="Query mutation audit logs. Superuser only.")
     def audit_logs(
-        self, info: Info,
+        self,
+        info: Info,
         operation: Optional[str] = None,
         user_id: Optional[str] = None,
         limit: int = 50,
     ) -> list[AuditLogEntry]:
+        # #537: the resolver was described as "admin only" but enforced
+        # nothing — any authed user (and even anonymous, since there was
+        # no auth check either) could pull the entire mutation audit log,
+        # which contains variables from every mutation across all
+        # tenants (including, e.g., redacted-but-correlatable input
+        # payloads). Gate on superuser; cross-tenant inspection of the
+        # audit log is an install-operator concern.
+        user = info.context.user
+        if not getattr(user, "is_authenticated", False):
+            raise GraphQLError("Authentication required")
+        if not getattr(user, "is_superuser", False):
+            raise GraphQLError("Audit log access requires superuser")
+
         from core.schema.audit import MutationAuditLog
 
-        qs = MutationAuditLog.objects.select_related('user').order_by('-timestamp')
+        qs = MutationAuditLog.objects.select_related("user").order_by("-timestamp")
         if operation:
             qs = qs.filter(operation__icontains=operation)
         if user_id:
