@@ -542,3 +542,120 @@ class TestDataProcessEntityTypeTenantIsolation:
             _Info(AnonymousUser()),
         )
         assert not qs.exists()
+
+
+def _make_file_upload(*, name: str, user, organization):
+    """Create an ``Upload`` + child ``FileUpload`` row in ``organization``.
+
+    Mirrors ``_make_data_process`` for fixture style — the only thing
+    under test is the queryset's tenant-scope behaviour."""
+    from core.models.upload import FileUpload, Upload
+
+    # public_url has a unique constraint on the Upload table, so each
+    # row needs a distinct value even in tests that don't care about
+    # the URL itself. Use a UUID-derived path to guarantee uniqueness.
+    import uuid
+
+    upload = Upload.objects.create(
+        name=name,
+        content_type="text/plain",
+        location=Upload.Location.STATIC.value,
+        public_url=f"https://test.invalid/{uuid.uuid4()}",
+        organization=organization,
+        created_by=user,
+        updated_by=user,
+    )
+    file_upload = FileUpload.objects.create(
+        upload=upload,
+        created_by=user,
+        updated_by=user,
+    )
+    return file_upload
+
+
+class TestFileUploadTypeTenantIsolation:
+    """The #723 leak: ``FileUploadType.get_queryset`` delegated to
+    ``permission_filtered_queryset`` which only consults the model-wide
+    ``view_fileupload`` permission and never filters by organization.
+
+    The FK path is ``upload__organization`` because ``FileUpload`` is a
+    join row hanging off ``Upload`` (which owns the org column)."""
+
+    def test_user_sees_only_their_org_file_uploads(self, two_tenants):
+        from core.models.upload import FileUpload
+        from core.schema.types.upload import FileUploadType
+
+        fu_a = _make_file_upload(
+            name="a.txt",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        fu_b = _make_file_upload(
+            name="b.txt",
+            user=two_tenants.b.user,
+            organization=two_tenants.b.organization,
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = FileUploadType.get_queryset(FileUpload.objects.all(), _Info(two_tenants.a.user))
+        ids = set(qs.values_list("pk", flat=True))
+        assert fu_a.pk in ids
+        assert fu_b.pk not in ids, (
+            "user-A must not see org-B FileUpload rows — this is the #723 leak"
+        )
+
+    def test_anonymous_caller_sees_nothing(self, two_tenants):
+        from django.contrib.auth.models import AnonymousUser
+
+        from core.models.upload import FileUpload
+        from core.schema.types.upload import FileUploadType
+
+        _make_file_upload(
+            name="a.txt",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = FileUploadType.get_queryset(FileUpload.objects.all(), _Info(AnonymousUser()))
+        assert not qs.exists(), "anonymous callers must see no FileUpload rows"
+
+    def test_superuser_bypass(self, two_tenants):
+        from django.contrib.auth import get_user_model
+
+        from core.models.upload import FileUpload
+        from core.schema.types.upload import FileUploadType
+
+        fu_a = _make_file_upload(
+            name="a.txt",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        fu_b = _make_file_upload(
+            name="b.txt",
+            user=two_tenants.b.user,
+            organization=two_tenants.b.organization,
+        )
+
+        User = get_user_model()
+        superuser = User.objects.create_superuser(
+            username="root@astrolift.dev",
+            email="root@astrolift.dev",
+            password="ignored",
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = FileUploadType.get_queryset(FileUpload.objects.all(), _Info(superuser))
+        ids = set(qs.values_list("pk", flat=True))
+        assert {fu_a.pk, fu_b.pk}.issubset(ids), (
+            "superusers retain cross-tenant read for support / audit access"
+        )
