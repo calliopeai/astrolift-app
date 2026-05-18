@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { LiveRegionProvider } from "@/components/LiveRegion";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
@@ -49,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </main>
             </SidebarInset>
             <CommandPalette />
+            <KeyboardShortcuts />
             <SessionExpiredModal />
             <StepUpPrompt />
           </SidebarProvider>
