@@ -1,8 +1,10 @@
 # Astrolift Providers -- Bootstrap
 
-> **What this file is.** Conventions and layout for the `astrolift-providers` repo. Read it before writing any code. Read the workspace `bootstrap.md` and `specs/02-multi-cloud-k8s-abstraction.md` first.
+> **What this file is.** Conventions and layout for the providers tree at `astrolift-app/backend/providers/`. Read it before writing any code. Read the workspace `bootstrap.md` and `specs/02-multi-cloud-k8s-abstraction.md` first.
 
-> **What this repo does.** Houses the **provider plugin SDK** (typed driver protocols) and the **per-cloud plugin implementations** that let Astrolift's control plane drive workloads on any Kubernetes cluster without cloud-specific code in the core.
+> **What this directory does.** Houses the **provider plugin SDK** (typed driver protocols) and the **per-cloud plugin implementations** that let Astrolift's control plane drive workloads on any Kubernetes cluster without cloud-specific code in the core.
+
+> **History.** This tree used to live in a separate `astrolift-providers` repo that was vendored into `backend/vendor/astrolift-providers/`. As of the consolidation, the standalone repo was subtree-merged here (full history preserved) and the upstream repo was archived. All future work happens here.
 
 ---
 

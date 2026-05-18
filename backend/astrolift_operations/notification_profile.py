@@ -7,7 +7,7 @@ ships to which channel, how multiplexer fan-out is structured,
 and the retention bounds for the per-send delivery audit rows.
 
 The actual ``NotificationDriver`` implementations live under
-``backend/vendor/astrolift-providers/{aws,gcp,azure,k8s_native}/``;
+``backend/providers/{aws,gcp,azure,k8s_native}/``;
 this module is the shape contract orgs configure against.
 
 A NotificationProfile carries:

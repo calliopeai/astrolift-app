@@ -300,7 +300,7 @@ def _capture_platform_cost_snapshot_sync() -> int:
     """Write the daily cost snapshot rows per organization (#502).
 
     For each org, walk its managed clusters and ask each cloud's
-    billing-actuals client (vendor/astrolift-providers/<cloud>/cost.py)
+    billing-actuals client (providers/<cloud>/cost.py)
     for the per-binding spend over the previous calendar day. Each
     row is keyed back to a ``ManagedServiceBinding`` via the
     ``astrolift.io/binding`` tag stamped at provision time (#438);
