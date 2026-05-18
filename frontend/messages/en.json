@@ -2364,6 +2364,8 @@
     "scheduled": {
       "emptyTitle": "No scheduled job runs yet",
       "emptyDescription": "Cronjob workloads land here as soon as the scheduler fires their first run.",
+      "emptyExampleCaption": "Add a [[jobs]] entry to your astrolift.toml to declare a cronjob workload:",
+      "emptyLearnMore": "See astrolift.toml jobs reference",
       "envLabel": "env",
       "workloadLabel": "workload",
       "columns": {

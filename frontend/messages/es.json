@@ -2357,6 +2357,8 @@
     "scheduled": {
       "emptyTitle": "Aún no hay ejecuciones de trabajos programados",
       "emptyDescription": "Los workloads cronjob aparecen aquí cuando el planificador dispara su primera ejecución.",
+      "emptyExampleCaption": "Añade una entrada [[jobs]] a tu astrolift.toml para declarar un workload cronjob:",
+      "emptyLearnMore": "Ver la referencia de jobs en astrolift.toml",
       "envLabel": "env",
       "workloadLabel": "workload",
       "columns": {
