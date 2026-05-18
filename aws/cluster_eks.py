@@ -27,6 +27,7 @@ top of it.
 from __future__ import annotations
 
 import base64
+import contextlib
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -1143,6 +1144,95 @@ def _build_k8s_client(
     )
 
 
+# ---- Bare-kind → apiVersion fallbacks ------------------------------
+#
+# Most call sites pass a bare ``kind`` string ("Deployment", "Pod") and
+# expect the wrapper to know the right apiVersion. CRDs come through
+# as ``group/version/Kind`` (e.g. ``helm.toolkit.fluxcd.io/v2/HelmRelease``)
+# so we split on ``/`` and fall back to this table when it's a single
+# token. Keep this aligned with the manifests emitted from k8s_native/
+# and aws/ — adding a new built-in kind only needs a row here.
+_DEFAULT_API_VERSION_FOR_KIND: dict[str, str] = {
+    "Pod": "v1",
+    "Service": "v1",
+    "ConfigMap": "v1",
+    "Secret": "v1",
+    "Namespace": "v1",
+    "ServiceAccount": "v1",
+    "PersistentVolumeClaim": "v1",
+    "PersistentVolume": "v1",
+    "Endpoints": "v1",
+    "Node": "v1",
+    "Deployment": "apps/v1",
+    "StatefulSet": "apps/v1",
+    "DaemonSet": "apps/v1",
+    "ReplicaSet": "apps/v1",
+    "Job": "batch/v1",
+    "CronJob": "batch/v1",
+    "Ingress": "networking.k8s.io/v1",
+    "NetworkPolicy": "networking.k8s.io/v1",
+    "Role": "rbac.authorization.k8s.io/v1",
+    "RoleBinding": "rbac.authorization.k8s.io/v1",
+    "ClusterRole": "rbac.authorization.k8s.io/v1",
+    "ClusterRoleBinding": "rbac.authorization.k8s.io/v1",
+    "HorizontalPodAutoscaler": "autoscaling/v2",
+    "PodDisruptionBudget": "policy/v1",
+}
+
+
+def _split_kind(kind: str) -> tuple[str, str]:
+    """Resolve caller-supplied ``kind`` into ``(api_version, kind)``.
+
+    Accepts either bare ``"Deployment"`` (looked up in the built-in
+    table) or qualified ``"group/version/Kind"`` for CRDs. Raising
+    KeyError here is intentional — an unknown bare kind is a coding
+    error, not a runtime condition the caller can recover from.
+    """
+    if "/" in kind:
+        parts = kind.split("/")
+        if len(parts) == 3:
+            # group/version/Kind  → apiVersion = group/version
+            return f"{parts[0]}/{parts[1]}", parts[2]
+        if len(parts) == 2:
+            # version/Kind (core group)
+            return parts[0], parts[1]
+        raise ValueError(f"unrecognized kind path: {kind}")
+    api_version = _DEFAULT_API_VERSION_FOR_KIND.get(kind)
+    if api_version is None:
+        raise KeyError(
+            f"no default apiVersion for bare kind {kind!r}; pass "
+            f"'group/version/Kind' for CRDs",
+        )
+    return api_version, kind
+
+
+class _PortForwardHandle:
+    """Concrete ``PortForwardSession`` returned by ``port_forward``.
+
+    Wraps a ``kubernetes.stream.ws_client.PortForward`` instance so
+    callers can ``close()`` the websocket without depending on the
+    kubernetes module shape. ``local_port`` and ``remote_port`` mirror
+    the first port pair the caller asked to forward — multi-port
+    sessions need to inspect ``_pf`` directly via the underlying
+    ``socket(remote_port)`` API.
+    """
+
+    def __init__(self, *, pf: Any, local_port: int, remote_port: int) -> None:
+        self._pf = pf
+        self.local_port = local_port
+        self.remote_port = remote_port
+
+    def close(self) -> None:
+        # The websocket is best-effort — once we're shutting down,
+        # a failed close shouldn't mask the original work.
+        with contextlib.suppress(Exception):
+            self._pf.close()
+
+    def socket(self, port: int) -> Any:
+        """Expose the underlying per-port socket for advanced callers."""
+        return self._pf.socket(port)
+
+
 class _RealK8sClient:
     """Thin wrapper around kubernetes.dynamic + kubernetes.config
     so the rest of the driver doesn't import kubernetes at module
@@ -1177,28 +1267,282 @@ class _RealK8sClient:
         self._config = cfg
         self._client_module = client
         self._k8s_config = config
+        self._dynamic: Any = None
 
-    # The methods below would wrap kubernetes.dynamic +
-    # kubernetes.client to provide server_side_apply / get / delete /
-    # exec / port_forward. Deferred to integration testing against
-    # a real cluster — unit-test path uses the injected factory.
+    # ---- internal helpers ----------------------------------------
 
-    def server_side_apply(self, *, namespace, manifest, dry_run):
-        raise NotImplementedError(
-            "server_side_apply requires live cluster — wire via kubernetes.dynamic.DynamicClient at deploy time",
+    def _refresh_token(self) -> None:
+        """Re-mint the bearer before each top-level op.
+
+        EKS tokens are valid ~15min; long-running workflows that hold
+        a single ``_RealK8sClient`` instance across multiple
+        activities would otherwise 401 mid-flight. Mutating
+        ``cfg.api_key`` updates the live ``ApiClient`` because the
+        kubernetes client reads from the shared configuration object
+        on each call.
+        """
+        self._config.api_key = {
+            "authorization": f"Bearer {self._token_provider()}",
+        }
+
+    def _dyn(self) -> Any:
+        """Lazy-build the DynamicClient once and reuse.
+
+        DynamicClient hits ``/apis`` on construction to discover
+        resources; we pay that cost once per ``_RealK8sClient``
+        instance instead of per call.
+        """
+        if self._dynamic is None:
+            from kubernetes.dynamic import DynamicClient
+
+            self._dynamic = DynamicClient(self._api_client)
+        return self._dynamic
+
+    def _resource_for(self, api_version: str, kind: str) -> Any:
+        """Resolve a (apiVersion, kind) pair to a dynamic Resource."""
+        return self._dyn().resources.get(
+            api_version=api_version,
+            kind=kind,
         )
 
+    @staticmethod
+    def _to_dict(obj: Any) -> dict[str, Any]:
+        """Coerce a ``ResourceInstance`` (or already-a-dict) to dict.
+
+        The dynamic client returns ``ResourceInstance`` objects whose
+        ``.to_dict()`` walks the attribute tree. Tests inject plain
+        dicts; we accept either to keep call-site contracts identical.
+        """
+        if hasattr(obj, "to_dict"):
+            return obj.to_dict()
+        return obj
+
+    # ---- public API ----------------------------------------------
+
+    def server_side_apply(self, *, namespace, manifest, dry_run):
+        """Server-side apply via the dynamic client.
+
+        Returns one of ``"created"`` / ``"updated"`` / ``"unchanged"``.
+        Strategy:
+          1. GET the target object first — a 404 means we're creating.
+          2. Apply with ``field_manager="astrolift"``,
+             ``force_conflicts=False``.
+          3. If the pre-apply GET found nothing → ``"created"``.
+             Otherwise compare ``metadata.generation`` against the
+             pre-apply snapshot — same generation means SSA accepted
+             our intent without changing the resource spec
+             (``"unchanged"``); a bump means ``"updated"``.
+
+        ``dry_run`` is the bool the SDK callers pass; the kubernetes
+        wire takes the literal string ``"All"`` for dry-run.
+        """
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        api_version = manifest.get("apiVersion", "v1")
+        kind = manifest.get("kind")
+        if not kind:
+            raise ValueError("manifest is missing 'kind'")
+        meta = manifest.get("metadata") or {}
+        name = meta.get("name")
+        if not name:
+            raise ValueError(f"manifest for {kind} is missing metadata.name")
+
+        resource = self._resource_for(api_version, kind)
+
+        # Snapshot pre-state so we can classify the outcome.
+        pre_existed = False
+        pre_generation: int | None = None
+        try:
+            current = resource.get(name=name, namespace=namespace)
+            pre_existed = True
+            pre_generation = (
+                self._to_dict(current).get("metadata", {}).get("generation")
+            )
+        except DynNotFound:
+            pre_existed = False
+
+        apply_kwargs: dict[str, Any] = {
+            "body": manifest,
+            "namespace": namespace,
+            "field_manager": "astrolift",
+            "force_conflicts": False,
+        }
+        if dry_run:
+            apply_kwargs["dry_run"] = "All"
+
+        try:
+            applied = resource.server_side_apply(**apply_kwargs)
+        except DynNotFound as exc:
+            # Cluster-scoped resource the dynamic client refuses to
+            # create through SSA — bubble up as our domain NotFound so
+            # callers handle it uniformly.
+            raise _NotFoundError(str(exc)) from exc
+
+        if not pre_existed:
+            return "created"
+
+        post_generation = (
+            self._to_dict(applied).get("metadata", {}).get("generation")
+        )
+        # Resources that don't carry generation (ConfigMap, Secret,
+        # ServiceAccount) can't distinguish updated vs unchanged via
+        # generation. Fall back to resourceVersion comparison.
+        if post_generation is not None and pre_generation is not None:
+            if post_generation == pre_generation:
+                return "unchanged"
+            return "updated"
+        pre_rv = (
+            self._to_dict(current).get("metadata", {}).get("resourceVersion")
+        )
+        post_rv = (
+            self._to_dict(applied).get("metadata", {}).get("resourceVersion")
+        )
+        if pre_rv is not None and pre_rv == post_rv:
+            return "unchanged"
+        return "updated"
+
     def get(self, *, kind, namespace, name):
-        raise NotImplementedError("requires live cluster")
+        """Fetch a resource by ``kind``/``namespace``/``name``.
+
+        Returns the resource as a dict. Returns ``None`` if the
+        resource doesn't exist (a 404 from the apiserver is the only
+        non-error path that yields None — every other failure raises).
+        """
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        api_version, resolved_kind = _split_kind(kind)
+        resource = self._resource_for(api_version, resolved_kind)
+        try:
+            obj = resource.get(name=name, namespace=namespace)
+        except DynNotFound:
+            return None
+        return self._to_dict(obj)
 
     def delete(self, *, kind, namespace, name):
-        raise NotImplementedError("requires live cluster")
+        """Delete a resource by ``kind``/``namespace``/``name``.
+
+        Returns ``True`` if the apiserver accepted the delete,
+        ``False`` if the resource was already gone (404 is swallowed
+        so callers can drive idempotent teardown loops).
+        """
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        api_version, resolved_kind = _split_kind(kind)
+        resource = self._resource_for(api_version, resolved_kind)
+        try:
+            resource.delete(name=name, namespace=namespace)
+        except DynNotFound:
+            return False
+        return True
 
     def get_namespace(self, *, name):
-        raise NotImplementedError("requires live cluster")
+        """Fetch a Namespace by name. Returns dict, or ``None`` if 404."""
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        resource = self._resource_for("v1", "Namespace")
+        try:
+            ns = resource.get(name=name)
+        except DynNotFound:
+            return None
+        return self._to_dict(ns)
 
     def exec_in_pod(self, *, namespace, pod, container, command):
-        raise NotImplementedError("requires live cluster")
+        """Exec ``command`` inside ``container`` of ``pod``.
+
+        Returns ``ExecResult`` with the captured stdout, stderr, and
+        exit code reported by the apiserver's exec channel. Uses
+        ``kubernetes.stream.stream`` with ``_preload_content=False``
+        so we can read stdout + stderr separately and inspect the
+        exit status frame.
+        """
+        self._refresh_token()
+        from kubernetes.stream import stream
+
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        resp = stream(
+            core_v1.connect_get_namespaced_pod_exec,
+            pod,
+            namespace,
+            command=list(command),
+            container=container,
+            stderr=True,
+            stdin=False,
+            stdout=True,
+            tty=False,
+            _preload_content=False,
+        )
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+        while resp.is_open():
+            resp.update(timeout=1)
+            if resp.peek_stdout():
+                stdout_chunks.append(resp.read_stdout())
+            if resp.peek_stderr():
+                stderr_chunks.append(resp.read_stderr())
+
+        exit_code = 0
+        try:
+            err_payload = resp.read_channel(3)
+            if err_payload:
+                # The error channel carries a v1.Status JSON. Non-zero
+                # exit shows up as ``status: "Failure"`` with the exit
+                # code in ``details.causes[].message``.
+                import json
+
+                parsed = json.loads(err_payload)
+                if parsed.get("status") == "Failure":
+                    for cause in parsed.get("details", {}).get("causes", []):
+                        if cause.get("reason") == "ExitCode":
+                            try:
+                                exit_code = int(cause.get("message", "1"))
+                            except (TypeError, ValueError):
+                                exit_code = 1
+                            break
+                    else:
+                        exit_code = 1
+        except Exception:
+            # The error channel is best-effort; the streamed payload
+            # is the authoritative result and we don't want a parse
+            # bug to mask an otherwise-successful exec.
+            pass
+        finally:
+            resp.close()
+
+        return ExecResult(
+            exit_code=exit_code,
+            stdout="".join(stdout_chunks),
+            stderr="".join(stderr_chunks),
+        )
 
     def port_forward(self, *, namespace, pod, ports):
-        raise NotImplementedError("requires live cluster")
+        """Open a port-forward session against ``pod``.
+
+        ``ports`` is a list of ``(local, remote)`` tuples; the
+        kubernetes API multiplexes them all on a single websocket.
+        Returns a ``_PortForwardHandle`` carrying the first pair on
+        ``local_port`` / ``remote_port`` plus a ``close()`` for the
+        websocket and a ``socket(port)`` accessor for callers that
+        need the raw per-port socket.
+        """
+        self._refresh_token()
+        from kubernetes.stream import portforward
+
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        remote_ports = [remote for (_local, remote) in ports]
+        pf = portforward(
+            core_v1.connect_get_namespaced_pod_portforward,
+            pod,
+            namespace,
+            ports=",".join(str(p) for p in remote_ports),
+        )
+        first_local, first_remote = ports[0] if ports else (0, 0)
+        return _PortForwardHandle(
+            pf=pf,
+            local_port=first_local,
+            remote_port=first_remote,
+        )
