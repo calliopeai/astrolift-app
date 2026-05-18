@@ -19,6 +19,7 @@ from astrolift_services.schema.mutations import (
     DeleteAppSecretInput,
     DetachSecretBundleInput,
     RevealAppSecretInput,
+    RotateAppSecretInput,
     ServicesMutation,
     SetAppSecretInput,
 )
@@ -241,6 +242,113 @@ def test_delete_app_secret_missing_key_not_found(permission_resolver):
 
     assert not result.ok
     assert result.errors[0].code == "NOT_FOUND"
+
+
+# ---- rotateAppSecret (#726) --------------------------------------
+
+
+def test_rotate_app_secret_writes_new_value(permission_resolver):
+    """``rotate_app_secret`` stages the new value just like ``set_app_secret``
+    — the lifecycle differs only in the audit action."""
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(
+                app_slug=app.slug,
+                key="API_KEY",
+                value="rotated-1",
+            ),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    parsed = read_app_env(app.manifest_raw_staged)
+    assert parsed["API_KEY"] == "rotated-1"
+    assert parsed["KEEP_ME"] == "yes"  # untouched
+
+
+def test_rotate_app_secret_invalid_key_rejected(permission_resolver):
+    org, app, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(
+                app_slug=app.slug,
+                key="bad-key",
+                value="x",
+            ),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "key"
+
+
+def test_rotate_app_secret_unknown_app_returns_not_found(permission_resolver):
+    org, _, _, _ = _scaffold()
+    permission_resolver.grant(Permission.APP_UPDATE)
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(
+                app_slug="missing",
+                key="K",
+                value="v",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
+def test_rotate_app_secret_requires_permission():
+    org, app, _, _ = _scaffold()
+    with _ctx(org):
+        result = ServicesMutation().rotate_app_secret(
+            _info(),
+            input=RotateAppSecretInput(
+                app_slug=app.slug,
+                key="K",
+                value="v",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+
+
+def test_rotate_app_secret_emits_distinct_audit_action(permission_resolver):
+    """The whole point of #726: SRE can tell rotates apart from sets in
+    the audit timeline. Confirm the resulting ``AuditEvent.action`` row
+    is ``app.secret.rotate`` (not ``app.secret.set``)."""
+    from astrolift_operations.models import AuditEvent
+
+    org, app, _, _ = _scaffold()
+    user = _make_user("rotator")
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
+        result = ServicesMutation().rotate_app_secret(
+            _info(user=user),
+            input=RotateAppSecretInput(
+                app_slug=app.slug,
+                key="API_KEY",
+                value="rotated-2",
+            ),
+        )
+    assert result.ok, result.errors
+
+    events = list(
+        AuditEvent.objects.filter(
+            target_kind="AppSecret",
+            target_id=f"{app.slug}:API_KEY",
+        ).order_by("-occurred_at")
+    )
+    assert events, "expected an AuditEvent for the rotate"
+    assert events[0].action == "app.secret.rotate"
 
 
 # ---- bulkImportAppSecrets ---------------------------------------
