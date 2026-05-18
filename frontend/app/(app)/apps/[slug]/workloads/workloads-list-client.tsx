@@ -27,6 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import {
   GET_APP,
   LIST_WORKLOADS,
@@ -44,6 +46,58 @@ interface AppResp {
 }
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
+}
+interface AppPodsResp {
+  astroliftAppPods: AstroliftAppPod[];
+}
+
+interface WorkloadLiveStatus {
+  ready: number;
+  desired: number;
+  maxRestarts: number;
+}
+
+/**
+ * Aggregate per-workload runtime counts from the flat pod list.
+ *
+ * `ready` = pods in phase `Running` (case-insensitive — the cluster
+ * resolver emits "Running" but we lowercase to defend against driver
+ * drift). `desired` falls through to the manifest-declared replica
+ * count when the pod list yields fewer rows than declared (e.g. a
+ * fresh deploy still spinning up). `maxRestarts` is the **max**
+ * restart_count across pods in the workload — that matches what an
+ * operator wants to see ("which workload is flapping?"), not a sum.
+ */
+function aggregatePodStatus(
+  workloads: AstroliftWorkload[],
+  pods: AstroliftAppPod[],
+): Map<string, WorkloadLiveStatus> {
+  const byWorkload = new Map<string, AstroliftAppPod[]>();
+  for (const p of pods) {
+    const arr = byWorkload.get(p.workload) ?? [];
+    arr.push(p);
+    byWorkload.set(p.workload, arr);
+  }
+  const result = new Map<string, WorkloadLiveStatus>();
+  for (const w of workloads) {
+    const pp = byWorkload.get(w.slug) ?? [];
+    const ready = pp.filter((p) => (p.phase || "").toLowerCase() === "running").length;
+    const maxRestarts = pp.reduce((acc, p) => Math.max(acc, p.restarts ?? 0), 0);
+    result.set(w.slug, {
+      ready,
+      desired: Math.max(w.replicas || 0, pp.length),
+      maxRestarts,
+    });
+  }
+  return result;
+}
+
+function readinessTone(ready: number, desired: number): string {
+  if (desired === 0) return "bg-muted text-muted-foreground";
+  if (ready === desired)
+    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+  if (ready === 0) return "bg-rose-500/15 text-rose-700 dark:text-rose-300";
+  return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
 }
 
 const KIND_ICON: Record<
@@ -69,9 +123,28 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
     variables: { appSlug: slug },
     pollInterval: 60000,
   });
+  // Live pod state for the readiness + restart-count cells. Pulled on a
+  // 30s tick so an operator watching a rollout sees ready/desired
+  // converge without page reloads.
+  const pods = useQuery<AppPodsResp>(LIST_APP_PODS, {
+    variables: { appSlug: slug },
+    pollInterval: 30000,
+    fetchPolicy: "cache-and-network",
+  });
 
   const a = app.data?.astroliftApp;
-  const list = workloads.data?.astroliftWorkloads ?? [];
+  const list = React.useMemo(
+    () => workloads.data?.astroliftWorkloads ?? [],
+    [workloads.data?.astroliftWorkloads],
+  );
+  const podList = React.useMemo(
+    () => pods.data?.astroliftAppPods ?? [],
+    [pods.data?.astroliftAppPods],
+  );
+  const liveStatus = React.useMemo(
+    () => aggregatePodStatus(list, podList),
+    [list, podList],
+  );
 
   if (app.loading && !a) {
     return (
@@ -157,7 +230,8 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Kind</TableHead>
-                  <TableHead>Replicas / HPA</TableHead>
+                  <TableHead>Ready / desired</TableHead>
+                  <TableHead>Restarts</TableHead>
                   <TableHead>Public</TableHead>
                   <TableHead>Resources</TableHead>
                   <TableHead>Schedule</TableHead>
@@ -166,6 +240,11 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
               <TableBody>
                 {list.map((w) => {
                   const Icon = KIND_ICON[w.kind] ?? BoxIcon;
+                  const live = liveStatus.get(w.slug) ?? {
+                    ready: 0,
+                    desired: w.replicas || 0,
+                    maxRestarts: 0,
+                  };
                   return (
                     <TableRow
                       key={w.id}
@@ -195,13 +274,31 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        <div>{w.replicas} replicas</div>
+                        <Badge className={readinessTone(live.ready, live.desired)}>
+                          Ready {live.ready}/{live.desired}
+                        </Badge>
                         {w.hpaMinReplicas && w.hpaMaxReplicas ? (
-                          <div className="text-muted-foreground">
+                          <div className="text-muted-foreground mt-1">
                             HPA {w.hpaMinReplicas}–{w.hpaMaxReplicas} @{" "}
                             {w.hpaTargetCpuPct}% CPU
                           </div>
                         ) : null}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {live.maxRestarts > 0 ? (
+                          <Badge
+                            variant="outline"
+                            className={
+                              live.maxRestarts >= 3
+                                ? "border-rose-500/40 text-rose-700 dark:text-rose-300"
+                                : "border-amber-500/40 text-amber-700 dark:text-amber-300"
+                            }
+                          >
+                            {live.maxRestarts}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {w.isPublic ? (
