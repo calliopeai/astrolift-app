@@ -478,6 +478,17 @@ CONSTANCE_CONFIG = {
         "the worker from runaway exports while still leaving room for multi-year SOC2 "
         "extracts at the default retention.",
     ),
+    "APP_LOG_EXPORT_MAX_LINES": (
+        100000,
+        "Hard cap on the line count a single exportAstroliftAppLogs call serializes "
+        "into the downloadable artifact. Mirrors AUDIT_EXPORT_MAX_ROWS — protects the "
+        "synchronous render path while still covering typical incident bundles.",
+    ),
+    "APP_LOG_EXPORT_TTL_SECONDS": (
+        3600,
+        "How long the token-gated download URL stays valid after exportAstroliftAppLogs "
+        "succeeds (default 1h). Single-use token in addition to the TTL.",
+    ),
     "MAX_SESSIONS_PER_CLIENT_KIND": (
         '{"web": 5, "cli": 3, "mobile": 3, "browser_extension": 2, "api_token": 10}',
         "Per-user concurrent-session cap, JSON-shaped per client kind. When a fresh "
