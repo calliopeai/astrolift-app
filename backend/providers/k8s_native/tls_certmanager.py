@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.tls import Certificate, TlsDriver
 
 
@@ -38,6 +39,7 @@ class CertManagerDriver(TlsDriver):
     def __init__(self, *, config: CertManagerConfig | None = None) -> None:
         self._config = config or CertManagerConfig()
 
+    @driver_op(cloud="k8s_native", driver="tls", audit=True, sensitive_kind="tls.mint")
     def ensure_certificate(
         self,
         domain: str,
@@ -64,7 +66,7 @@ class CertManagerDriver(TlsDriver):
             )
             if not result.ok:
                 raise RuntimeError(
-                    f"failed to apply Certificate: {result.errors}",
+                    f"failed to apply Certificate: {result.summary()}",
                 )
 
         # cert-manager fills in not_before/not_after asynchronously.
@@ -80,16 +82,20 @@ class CertManagerDriver(TlsDriver):
             not_after=None,
         )
 
+    @driver_op(cloud="k8s_native", driver="tls")
     def get_certificate(self, certificate_id: str) -> Certificate:
         """Without a cluster_driver bound, returns a stub with
         status=unknown. With one, queries the actual Certificate
         CRD's status block."""
         if self._config.cluster_driver is None:
             return Certificate(
-                id=certificate_id, domain="", sans=[],
+                id=certificate_id,
+                domain="",
+                sans=[],
                 strategy="letsencrypt",
                 status="unknown",
-                not_before=None, not_after=None,
+                not_before=None,
+                not_after=None,
             )
         try:
             cert = self._config.cluster_driver._k8s("default").get(
@@ -99,10 +105,13 @@ class CertManagerDriver(TlsDriver):
             )
         except Exception:
             return Certificate(
-                id=certificate_id, domain="", sans=[],
+                id=certificate_id,
+                domain="",
+                sans=[],
                 strategy="letsencrypt",
                 status="unknown",
-                not_before=None, not_after=None,
+                not_before=None,
+                not_after=None,
             )
         spec = cert.get("spec", {})
         status = cert.get("status", {})
@@ -116,6 +125,7 @@ class CertManagerDriver(TlsDriver):
             not_after=status.get("notAfter"),
         )
 
+    @driver_op(cloud="k8s_native", driver="tls", audit=True, sensitive_kind="tls.revoke")
     def revoke_certificate(self, certificate_id: str) -> None:
         if self._config.cluster_driver is None:
             return  # render-only mode
@@ -134,16 +144,13 @@ class CertManagerDriver(TlsDriver):
         )
         if result.errors:
             raise RuntimeError(
-                f"failed to delete Certificate: {result.errors}",
+                f"failed to delete Certificate: {result.summary()}",
             )
 
     # ---- internals ------------------------------------------------
 
     def _cert_name(self, *, domain: str) -> str:
-        clean = "".join(
-            c if (c.isalnum() or c == "-") else "-"
-            for c in domain.lower()
-        )
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in domain.lower())
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:253]
@@ -174,7 +181,8 @@ class CertManagerDriver(TlsDriver):
                 "labels": {
                     "astrolift.io/managed-by": "platform",
                     "astrolift.io/domain": domain.replace(
-                        "*", "wildcard",
+                        "*",
+                        "wildcard",
                     ),
                 },
             },

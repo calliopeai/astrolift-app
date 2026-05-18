@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.cost import (
     BillingActualLineItem,
     BillingActualsResult,
@@ -91,9 +92,11 @@ class GCPCostEstimator(CostEstimator):
         self._sku_cache: dict[str, tuple[float, list[Any]]] = {}
         self._sku_lock = threading.Lock()
 
+    @driver_op(cloud="gcp", driver="cost", heartbeat=False)
     def supported(self, *, kind: str, variant: str) -> bool:
         return (kind, variant) in SERVICE_ID_BY_VARIANT
 
+    @driver_op(cloud="gcp", driver="cost")
     def estimate(self, request: CostEstimateRequest) -> CostResult:
         service_id = SERVICE_ID_BY_VARIANT.get(
             (request.kind, request.variant),
@@ -116,6 +119,19 @@ class GCPCostEstimator(CostEstimator):
                 parent=f"services/{service_id}",
             )
         except Exception as exc:
+            # #616 -- log the Catalog API failure so the cost-estimate
+            # dead-zone has a debuggable trace. Without this the
+            # operator only sees "estimate unavailable" on the UI.
+            log.warning(
+                "gcp cost estimate failed",
+                extra={
+                    "service_id": service_id,
+                    "kind": request.kind,
+                    "variant": request.variant,
+                    "exception_type": type(exc).__name__,
+                },
+                exc_info=True,
+            )
             return CostEstimateUnavailable(
                 request=request,
                 reason="api_error",
@@ -504,6 +520,7 @@ class GCPBillingActuals:
 
             self._client = bigquery.Client(project=config.project)
 
+    @driver_op(cloud="gcp", driver="cost")
     def query_actuals_by_binding(
         self,
         *,

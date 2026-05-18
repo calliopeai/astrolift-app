@@ -116,8 +116,8 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 return ProvisionResult(
                     ok=False,
                     handle="",
-                    message=f"failed to apply CNPG Cluster: {result.errors}",
-                    errors=result.errors,
+                    message=f"failed to apply CNPG Cluster: {result.summary()}",
+                    errors=result.summary(),
                 )
 
         # 4-segment handle so deprovision can recover the locator
@@ -199,8 +199,8 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=f"delete failed: {result.errors}",
-                errors=result.errors,
+                message=f"delete failed: {result.summary()}",
+                errors=result.summary(),
             )
         return DeprovisionResult(
             ok=True,

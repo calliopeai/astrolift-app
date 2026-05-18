@@ -18,6 +18,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.identity import IdentityBinding, WorkloadIdentityDriver
 from aws._errors import NotFoundError, map_client_error
 
@@ -46,6 +47,7 @@ class IRSADriver(WorkloadIdentityDriver):
 
             self._iam = boto3.client("iam", region_name=config.region)
 
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(
         self,
         cluster: str,
@@ -65,6 +67,7 @@ class IRSADriver(WorkloadIdentityDriver):
         )
         return {"eks.amazonaws.com/role-arn": role_arn}
 
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.create_role")
     def create_identity_role(
         self,
         name: str,
@@ -79,9 +82,12 @@ class IRSADriver(WorkloadIdentityDriver):
                 RoleName=name,
                 AssumeRolePolicyDocument=json.dumps(trust_policy),
                 Description=f"Astrolift workload identity role for {name}",
-                Tags=[{
-                    "Key": "astrolift.io/managed-by", "Value": "platform",
-                }],
+                Tags=[
+                    {
+                        "Key": "astrolift.io/managed-by",
+                        "Value": "platform",
+                    }
+                ],
             )
         except self._iam.exceptions.EntityAlreadyExistsException:
             # Idempotent — return the existing ARN
@@ -95,16 +101,19 @@ class IRSADriver(WorkloadIdentityDriver):
                 self._iam.put_role_policy(
                     RoleName=name,
                     PolicyName="astrolift-workload-policy",
-                    PolicyDocument=json.dumps({
-                        "Version": "2012-10-17",
-                        "Statement": permissions,
-                    }),
+                    PolicyDocument=json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": permissions,
+                        }
+                    ),
                 )
             except Exception as exc:
                 raise map_client_error(exc) from exc
 
         return response["Role"]["Arn"]
 
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.attach_policy")
     def attach_policy(self, role: str, policy: str) -> None:
         """Attach a managed policy ARN."""
         try:
@@ -117,6 +126,7 @@ class IRSADriver(WorkloadIdentityDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.delete_role")
     def delete_identity_role(self, role: str) -> None:
         """Detach + delete in the right order. AWS rejects role
         deletion when policies still attached."""
@@ -127,7 +137,8 @@ class IRSADriver(WorkloadIdentityDriver):
             )
             for policy_name in attached_inline.get("PolicyNames", []):
                 self._iam.delete_role_policy(
-                    RoleName=role, PolicyName=policy_name,
+                    RoleName=role,
+                    PolicyName=policy_name,
                 )
             # Managed policies
             attached_managed = self._iam.list_attached_role_policies(
@@ -135,7 +146,8 @@ class IRSADriver(WorkloadIdentityDriver):
             )
             for entry in attached_managed.get("AttachedPolicies", []):
                 self._iam.detach_role_policy(
-                    RoleName=role, PolicyArn=entry["PolicyArn"],
+                    RoleName=role,
+                    PolicyArn=entry["PolicyArn"],
                 )
             self._iam.delete_role(RoleName=role)
         except self._iam.exceptions.NoSuchEntityException as exc:
@@ -145,6 +157,7 @@ class IRSADriver(WorkloadIdentityDriver):
 
     # ---- observability reads (#377) -------------------------------
 
+    @driver_op(cloud="aws", driver="identity")
     def describe_identity(self, app_slug: str) -> IdentityBinding | None:
         """Return the IRSA binding for an app, or ``None`` when no role
         named ``astrolift-<app_slug>`` exists.
@@ -172,6 +185,7 @@ class IRSADriver(WorkloadIdentityDriver):
         trust_doc = role.get("AssumeRolePolicyDocument") or {}
         if isinstance(trust_doc, str):
             from urllib.parse import unquote
+
             trust_doc = json.loads(unquote(trust_doc))
 
         last_used = (role.get("RoleLastUsed") or {}).get("LastUsedDate")
@@ -187,7 +201,8 @@ class IRSADriver(WorkloadIdentityDriver):
             kind="irsa",
             role_arn_or_principal=role["Arn"],
             trust_policy_summary=_summarize_trust(
-                trust_doc, self._config.cluster_oidc_issuer,
+                trust_doc,
+                self._config.cluster_oidc_issuer,
             ),
             last_used_at=last_used_iso,
         )
@@ -204,22 +219,22 @@ class IRSADriver(WorkloadIdentityDriver):
         so create_identity_role doesn't need to know which (namespace,
         sa) to bind. bind_service_account adds the subject."""
         oidc_provider_arn = (
-            f"arn:aws:iam::{self._config.account_id}:oidc-provider/"
-            f"{self._config.cluster_oidc_issuer}"
+            f"arn:aws:iam::{self._config.account_id}:oidc-provider/" f"{self._config.cluster_oidc_issuer}"
         )
         return {
             "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Principal": {"Federated": oidc_provider_arn},
-                "Action": "sts:AssumeRoleWithWebIdentity",
-                "Condition": {
-                    "StringEquals": {
-                        f"{self._config.cluster_oidc_issuer}:aud":
-                            "sts.amazonaws.com",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Federated": oidc_provider_arn},
+                    "Action": "sts:AssumeRoleWithWebIdentity",
+                    "Condition": {
+                        "StringEquals": {
+                            f"{self._config.cluster_oidc_issuer}:aud": "sts.amazonaws.com",
+                        },
                     },
-                },
-            }],
+                }
+            ],
         }
 
     def _ensure_trust_includes(
@@ -242,6 +257,7 @@ class IRSADriver(WorkloadIdentityDriver):
         # The doc may arrive as dict (moto) or url-encoded string (real AWS)
         if isinstance(trust_doc, str):
             from urllib.parse import unquote
+
             trust_doc = json.loads(unquote(trust_doc))
 
         sub_key = f"{self._config.cluster_oidc_issuer}:sub"
@@ -250,7 +266,8 @@ class IRSADriver(WorkloadIdentityDriver):
         # Mutate in place
         for statement in trust_doc.get("Statement", []):
             condition = statement.setdefault(
-                "Condition", {},
+                "Condition",
+                {},
             ).setdefault("StringEquals", {})
             existing = condition.get(sub_key)
             if existing is None:

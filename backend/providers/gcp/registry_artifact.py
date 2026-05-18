@@ -7,6 +7,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk import UnsupportedOperationError
+from _sdk._telemetry import driver_op
 from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
 
 from gcp._errors import NotFoundError, map_api_error
@@ -40,6 +42,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
 
             self._client = artifactregistry_v1.ArtifactRegistryClient()
 
+    @driver_op(cloud="gcp", driver="registry")
     def ensure_repo(self, name: str) -> Repo:
         """Artifact Registry repos are flat at the AR level; the
         Astrolift repo name maps to a path WITHIN AR. The driver
@@ -55,10 +58,9 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         except Exception as exc:  # noqa: BLE001
             # GCP NotFound = "Repository not found"; create it
             if type(exc).__name__ == "NotFound":
-                self._create_artifact_registry_repo(parent=(
-                    f"projects/{self._config.project_id}"
-                    f"/locations/{self._config.location}"
-                ))
+                self._create_artifact_registry_repo(
+                    parent=(f"projects/{self._config.project_id}" f"/locations/{self._config.location}")
+                )
             else:
                 raise map_api_error(exc) from exc
 
@@ -69,6 +71,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         )
         return Repo(name=name, uri=uri)
 
+    @driver_op(cloud="gcp", driver="registry", audit=True, sensitive_kind="registry.delete")
     def delete_repo(self, name: str, *, archive: bool = True) -> None:
         """Artifact Registry doesn't have per-image-path deletion
         without listing tags first. archive=True is a no-op
@@ -76,13 +79,21 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         archive=False would require listing + deleting all tags."""
         if archive:
             return
-        raise NotImplementedError(
-            "force-delete of Artifact Registry image paths requires "
-            "listing + per-tag deletion; out of scope for this driver",
+        # #614 -- previously raised bare NotImplementedError, which the
+        # CI no-stub gate didn't distinguish from real partial-stub bugs.
+        # UnsupportedOperationError lets the resolver layer translate to a
+        # "force-delete not supported on this backend" user-facing message.
+        raise UnsupportedOperationError(
+            f"registry.delete_repo({name=}, archive=False) not supported on "
+            "GCP Artifact Registry -- force-delete requires per-tag listing "
+            "+ deletion; out of scope for this driver",
         )
 
+    @driver_op(cloud="gcp", driver="registry", audit=True, sensitive_kind="registry.get_pull_secret")
     def get_pull_secret(
-        self, cluster: str, namespace: str,
+        self,
+        cluster: str,
+        namespace: str,
     ) -> SecretSpec:
         """For GKE, the recommended path is Workload Identity (no
         pull secret needed — node SA grants pull access). For
@@ -117,12 +128,14 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="registry")
     def push(self, local_image: str, repo: str, tag: str) -> str:
         if not local_image:
             raise ValueError("local_image is required")
         ensured = self.ensure_repo(repo)
         return f"{ensured.uri}:{tag}"
 
+    @driver_op(cloud="gcp", driver="registry")
     def list_tags(self, repo: str) -> list[Tag]:
         package_path = (
             f"projects/{self._config.project_id}"
@@ -140,11 +153,13 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         for tag_obj in response:
             tag_name = tag_obj.name.rsplit("/", 1)[-1]
             version = getattr(tag_obj, "version", "") or ""
-            out.append(Tag(
-                name=tag_name,
-                digest=version.rsplit("/", 1)[-1] if version else "",
-                pushed_at=None,
-            ))
+            out.append(
+                Tag(
+                    name=tag_name,
+                    digest=version.rsplit("/", 1)[-1] if version else "",
+                    pushed_at=None,
+                )
+            )
         return out
 
     def _create_artifact_registry_repo(self, *, parent: str) -> None:

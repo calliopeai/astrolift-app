@@ -20,6 +20,7 @@ import base64
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
 
 from aws._errors import ConflictError, NotFoundError, map_client_error
@@ -59,6 +60,7 @@ class ECRDriver(ImageRegistryDriver):
 
             self._client = boto3.client("ecr", region_name=config.region)
 
+    @driver_op(cloud="aws", driver="registry")
     def ensure_repo(self, name: str) -> Repo:
         """Create the repo if absent; return its URI either way."""
         try:
@@ -85,6 +87,7 @@ class ECRDriver(ImageRegistryDriver):
         except Exception as exc:  # noqa: BLE001
             raise map_client_error(exc) from exc
 
+    @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.delete")
     def delete_repo(self, name: str, *, archive: bool = True) -> None:
         """ECR has no archive — when ``archive=True`` we leave the repo
         in place but block new image pushes via the policy. ``archive=False``
@@ -100,6 +103,7 @@ class ECRDriver(ImageRegistryDriver):
         except Exception as exc:  # noqa: BLE001
             raise map_client_error(exc) from exc
 
+    @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.get_pull_secret")
     def get_pull_secret(self, cluster: str, namespace: str) -> SecretSpec:
         """Return a Kubernetes Secret spec dict the workflow layer
         applies into the cluster. The token expires every 12 hours
@@ -120,22 +124,22 @@ class ECRDriver(ImageRegistryDriver):
         decoded = base64.b64decode(token_b64).decode("utf-8")
         # Decoded form is "AWS:<password>"; we re-encode the
         # exact string for the dockerconfigjson auth field.
-        auth_field = base64.b64encode(decoded.encode("utf-8")).decode(
-            "utf-8"
-        )
+        auth_field = base64.b64encode(decoded.encode("utf-8")).decode("utf-8")
         registry = endpoint.replace("https://", "")
 
         # Build dockerconfigjson
         import json
 
-        dockerconfig = json.dumps({
-            "auths": {
-                registry: {
-                    "auth": auth_field,
-                    "email": "noreply@astrolift.local",
+        dockerconfig = json.dumps(
+            {
+                "auths": {
+                    registry: {
+                        "auth": auth_field,
+                        "email": "noreply@astrolift.local",
+                    },
                 },
-            },
-        })
+            }
+        )
         return {
             "apiVersion": "v1",
             "kind": "Secret",
@@ -158,6 +162,7 @@ class ECRDriver(ImageRegistryDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="registry")
     def push(self, local_image: str, repo: str, tag: str) -> str:
         """Returns the canonical ECR image ref the build runner
         should push to. boto3 doesn't push image layers; that's
@@ -169,6 +174,7 @@ class ECRDriver(ImageRegistryDriver):
         registry = self._registry_uri()
         return f"{registry}/{repo}:{tag}"
 
+    @driver_op(cloud="aws", driver="registry")
     def list_tags(self, repo: str) -> list[Tag]:
         try:
             paginator = self._client.get_paginator("describe_images")
@@ -177,15 +183,15 @@ class ECRDriver(ImageRegistryDriver):
                 for image in page.get("imageDetails", []):
                     digest = image.get("imageDigest", "")
                     pushed_raw = image.get("imagePushedAt")
-                    pushed_at = (
-                        pushed_raw.isoformat() if pushed_raw else None
-                    )
+                    pushed_at = pushed_raw.isoformat() if pushed_raw else None
                     for tag_name in image.get("imageTags", []) or []:
-                        tags.append(Tag(
-                            name=tag_name,
-                            digest=digest,
-                            pushed_at=pushed_at,
-                        ))
+                        tags.append(
+                            Tag(
+                                name=tag_name,
+                                digest=digest,
+                                pushed_at=pushed_at,
+                            )
+                        )
             return tags
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {repo} not found") from exc
@@ -215,25 +221,28 @@ class ECRDriver(ImageRegistryDriver):
         until they're torn down."""
         import json
 
-        policy = json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Sid": "DenyPushArchived",
-                    "Effect": "Deny",
-                    "Principal": "*",
-                    "Action": [
-                        "ecr:PutImage",
-                        "ecr:InitiateLayerUpload",
-                        "ecr:UploadLayerPart",
-                        "ecr:CompleteLayerUpload",
-                    ],
-                },
-            ],
-        })
+        policy = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "DenyPushArchived",
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": [
+                            "ecr:PutImage",
+                            "ecr:InitiateLayerUpload",
+                            "ecr:UploadLayerPart",
+                            "ecr:CompleteLayerUpload",
+                        ],
+                    },
+                ],
+            }
+        )
         try:
             self._client.set_repository_policy(
-                repositoryName=name, policyText=policy,
+                repositoryName=name,
+                policyText=policy,
             )
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc

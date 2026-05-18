@@ -18,7 +18,9 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cluster import (
+    ApplyError,
     ApplyResult,
     BootstrapComponent,
     BootstrapOption,
@@ -38,6 +40,7 @@ from _sdk.cluster import (
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
+    classify_apply_error,
 )
 from _sdk.k8s_dynamic_client import KubernetesDynamicClient
 from _sdk.k8s_dynamic_client import NotFoundError as _NotFound
@@ -117,6 +120,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- apply / delete -------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def apply_manifests(
         self,
         cluster: str,
@@ -129,11 +133,11 @@ class K8sNativeClusterDriver(ClusterDriver):
         created: list[str] = []
         updated: list[str] = []
         unchanged: list[str] = []
-        errors: list[str] = []
+        errors: list[ApplyError] = []
         for manifest in manifests:
+            maybe_heartbeat(f"cluster.apply_manifests:{cluster}")
             kind = manifest.get("kind", "")
             name = manifest.get("metadata", {}).get("name", "")
-            ref = f"{kind}/{name}"
             try:
                 outcome = client.server_side_apply(
                     namespace=namespace,
@@ -141,8 +145,18 @@ class K8sNativeClusterDriver(ClusterDriver):
                     dry_run=dry_run,
                 )
             except Exception as exc:
-                errors.append(f"{ref}: {exc}")
+                errors.append(
+                    ApplyError(
+                        kind=kind,
+                        name=name,
+                        namespace=namespace,
+                        exception_type=type(exc).__name__,
+                        exception_message=str(exc),
+                        is_retryable=classify_apply_error(exc),
+                    )
+                )
                 continue
+            ref = f"{kind}/{name}"
             if outcome == "created":
                 created.append(ref)
             elif outcome == "updated":
@@ -156,6 +170,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             errors=errors,
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def delete_manifests(
         self,
         cluster: str,
@@ -185,6 +200,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- namespaces -----------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def get_namespace(
         self,
         cluster: str,
@@ -202,6 +218,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             phase=ns.get("status", {}).get("phase", "Active"),
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def ensure_namespace(
         self,
         cluster: str,
@@ -230,6 +247,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             annotations=dict(annotations),
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster", audit=True, sensitive_kind="cluster.delete_namespace")
     def delete_namespace(
         self,
         cluster: str,
@@ -245,9 +263,12 @@ class K8sNativeClusterDriver(ClusterDriver):
         if not wait:
             return
         # Same finalizer-tolerant polling as EKS — namespaces with
-        # PVCs / webhooks can take minutes
+        # PVCs / webhooks can take minutes. Heartbeat per iteration so
+        # the Temporal activity stays alive across the 10-minute window
+        # (#598).
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:
+            maybe_heartbeat(f"cluster.delete_namespace:{name}")
             if self.get_namespace(cluster=cluster, name=name) is None:
                 return
             time.sleep(2)
@@ -257,6 +278,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- workload status ------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def get_workload_status(
         self,
         cluster: str,
@@ -284,6 +306,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             conditions=status.get("conditions", []) or [],
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def poll_rollout(
         self,
         cluster: str,
@@ -299,6 +322,7 @@ class K8sNativeClusterDriver(ClusterDriver):
         deadline = time.monotonic() + timeout
         last_status: WorkloadStatus | None = None
         while time.monotonic() < deadline:
+            maybe_heartbeat(f"cluster.poll_rollout:{kind}/{name}")
             try:
                 status = self.get_workload_status(
                     cluster=cluster,
@@ -359,6 +383,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- exec / port-forward --------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def exec_in_pod(
         self,
         cluster: str,
@@ -375,6 +400,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             command=command,
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def port_forward(
         self,
         cluster: str,
@@ -391,6 +417,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- runtime observability (#299) -----------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def list_pods(
         self,
         *,
@@ -407,6 +434,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             app_slug=app_slug,
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def stream_logs(
         self,
         *,
@@ -430,12 +458,14 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- bring-into-management (#316) -----------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
         """Read-only capability probe. Used by the refresh path and
         also called from inside ``bring_into_management`` after the
         RBAC apply succeeds. Raises on auth / network failure."""
         return probe_cluster_capabilities(backend=self._management_backend, cluster=cluster)
 
+    @driver_op(cloud="k8s_native", driver="cluster", audit=True, sensitive_kind="cluster.bring_into_management")
     def bring_into_management(
         self,
         cluster: ClusterContext,
@@ -453,6 +483,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- bootstrap recipe ------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster", audit=True, sensitive_kind="cluster.teardown_cluster")
     def teardown_cluster(
         self,
         cluster: ClusterContext,
@@ -479,6 +510,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             ],
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
         """Vanilla k8s recipe — assumes nothing the cloud provides.
 
@@ -623,6 +655,7 @@ class K8sNativeClusterDriver(ClusterDriver):
 
     # ---- Cluster health (#68 slice 1) -----------------------------
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def list_pod_phase_summary(
         self,
         cluster: ClusterContext,
@@ -639,9 +672,11 @@ class K8sNativeClusterDriver(ClusterDriver):
         except Exception:
             return []
         return pod_phase_summary_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def list_events(
         self,
         cluster: ClusterContext,
@@ -663,6 +698,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             limit=limit,
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
     def list_workload_health(
         self,
         cluster: ClusterContext,
@@ -679,7 +715,8 @@ class K8sNativeClusterDriver(ClusterDriver):
         except Exception:
             return []
         return workload_health_from_client(
-            client, namespaces=default_namespaces(namespaces),
+            client,
+            namespaces=default_namespaces(namespaces),
         )
 
     # ---- internals ------------------------------------------------
@@ -758,5 +795,3 @@ def _build_k8s_client(
         configuration=client.Configuration.get_default_copy(),
     )
     return KubernetesDynamicClient.from_api_client(api_client=api_client)
-
-

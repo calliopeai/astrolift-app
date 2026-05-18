@@ -19,7 +19,39 @@ Usage:
 
 from __future__ import annotations
 
+
+class UnsupportedOperationError(NotImplementedError):
+    """The driver does not implement this operation on this backend.
+
+    Distinct from ``NotImplementedError`` so resolvers + the no-stub CI gate
+    can tell a deliberate "not supported on this cloud" from a partial-stub
+    bug. The audit (#586-#623) flagged 14 files with ``raise
+    NotImplementedError`` inside otherwise-real driver methods; the CI gate
+    catches whole-class stubs but missed those because the surrounding
+    class is real. This subtype lets the resolver layer catch the
+    capability-gap case explicitly and translate to a "not supported on
+    this cloud" user-facing message, while a bare ``NotImplementedError``
+    still surfaces as a 500 / bug.
+    """
+
+
+# Exception class is defined ahead of imports on purpose: the SDK submodules
+# below import this class via a deferred ``from _sdk import
+# UnsupportedOperationError`` from inside their methods. Declaring it here
+# at module top means the import resolves the moment ``_sdk`` is loaded.
+
+
 # Catalog + matrix + capability + cluster registry
+# ruff: noqa: E402
+# #586-#623 driver-level telemetry framework. ``@driver_op`` wraps every
+# driver method with structured logging + Prometheus metrics + OTEL spans +
+# Temporal heartbeats + audit emission. ``maybe_heartbeat`` is the loop-
+# inside helper for driver methods whose body takes longer than the
+# decorator's single entry-time heartbeat allows.
+from _sdk._telemetry import (
+    driver_op,
+    maybe_heartbeat,
+)
 from _sdk.availability import (
     OPTIONAL_ROLES,
     REQUIRED_ROLES,
@@ -59,12 +91,15 @@ from _sdk.capabilities import (
 # ``ManagementReport`` join them in the #316 bring-into-management
 # surface for the same reason.
 from _sdk.cluster import (
+    ApplyError,
+    ApplyResult,
     ClusterAuth,
     ClusterContext,
     ContainerStatusInfo,
     ManagementReport,
     PodInfo,
     PodLogLine,
+    classify_apply_error,
 )
 from _sdk.cluster_capabilities import (
     ClusterCapabilities,
@@ -146,6 +181,8 @@ __all__ = [
     "OTEL_COLLECTOR_SIDECAR",
     "REQUIRED_ROLES",
     "VECTOR_SIDECAR",
+    "ApplyError",
+    "ApplyResult",
     "AvailabilityMatrix",
     "BindingValidation",
     "BuildDriver",
@@ -202,14 +239,18 @@ __all__ = [
     "TlsDriver",
     "TlsPolicy",
     "TraceDriver",
+    "UnsupportedOperationError",
     "VariantExtensionPolicy",
     "WafPolicy",
     "WorkloadIdentityDriver",
     "build_simple_chain",
     "check_encryption",
     "check_plugin_parity",
+    "classify_apply_error",
     "compose_instrumentation",
+    "driver_op",
     "inject_sidecar",
+    "maybe_heartbeat",
     "probe_capabilities",
     "probe_connectivity",
     "render_storage_class",

@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.identity import WorkloadIdentityDriver
 
 
@@ -45,13 +46,16 @@ class ProjectedSaTokenConfig:
 
 class ProjectedSaTokenDriver(WorkloadIdentityDriver):
     def __init__(
-        self, *, config: ProjectedSaTokenConfig | None = None,
+        self,
+        *,
+        config: ProjectedSaTokenConfig | None = None,
     ) -> None:
         self._config = config or ProjectedSaTokenConfig()
         self._roles: dict[str, list[dict[str, Any]]] = dict(
             self._config.role_catalog,
         )
 
+    @driver_op(cloud="k8s_native", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(
         self,
         cluster: str,
@@ -75,6 +79,7 @@ class ProjectedSaTokenDriver(WorkloadIdentityDriver):
             ),
         }
 
+    @driver_op(cloud="k8s_native", driver="identity", audit=True, sensitive_kind="identity.create_role")
     def create_identity_role(
         self,
         name: str,
@@ -85,11 +90,13 @@ class ProjectedSaTokenDriver(WorkloadIdentityDriver):
         self._roles[name] = list(permissions)
         return f"{self._config.role_path}/{name}"
 
+    @driver_op(cloud="k8s_native", driver="identity", audit=True, sensitive_kind="identity.attach_policy")
     def attach_policy(self, role: str, policy: str) -> None:
         if role not in self._roles:
             raise KeyError(f"role {role} not registered")
         self._roles[role].append({"managed_policy": policy})
 
+    @driver_op(cloud="k8s_native", driver="identity", audit=True, sensitive_kind="identity.delete_role")
     def delete_identity_role(self, role: str) -> None:
         if role not in self._roles:
             raise KeyError(f"role {role} not registered")

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, Record
 
 from gcp._errors import NotFoundError, map_api_error
@@ -27,6 +28,7 @@ class CloudDNSDriver(DnsDriver):
 
             self._client = dns.Client(project=config.project_id)
 
+    @driver_op(cloud="gcp", driver="dns", audit=True, sensitive_kind="dns.ensure_record")
     def ensure_record(
         self,
         zone: str,
@@ -40,7 +42,10 @@ class CloudDNSDriver(DnsDriver):
         fqdn = self._fqdn(name=name, zone=zone)
         try:
             record_set = managed_zone.resource_record_set(
-                fqdn, type, ttl, [value],
+                fqdn,
+                type,
+                ttl,
+                [value],
             )
             changes = managed_zone.changes()
             # Delete existing record if any (idempotent UPSERT)
@@ -53,16 +58,14 @@ class CloudDNSDriver(DnsDriver):
             raise map_api_error(exc) from exc
         return Record(zone=zone, name=name, type=type, value=value, ttl=ttl)
 
+    @driver_op(cloud="gcp", driver="dns", audit=True, sensitive_kind="dns.delete_record")
     def delete_record(self, zone: str, name: str, type: str) -> None:
         managed_zone = self._resolve_zone(zone=zone)
         fqdn = self._fqdn(name=name, zone=zone)
         try:
             changes = managed_zone.changes()
             target = next(
-                (
-                    rs for rs in managed_zone.list_resource_record_sets()
-                    if rs.name == fqdn and rs.record_type == type
-                ),
+                (rs for rs in managed_zone.list_resource_record_sets() if rs.name == fqdn and rs.record_type == type),
                 None,
             )
             if target is None:
@@ -76,19 +79,22 @@ class CloudDNSDriver(DnsDriver):
         except Exception as exc:  # noqa: BLE001
             raise map_api_error(exc) from exc
 
+    @driver_op(cloud="gcp", driver="dns")
     def list_records(self, zone: str) -> list[Record]:
         managed_zone = self._resolve_zone(zone=zone)
         try:
             out: list[Record] = []
             for rs in managed_zone.list_resource_record_sets():
                 for value in rs.rrdatas or []:
-                    out.append(Record(
-                        zone=zone,
-                        name=self._strip_zone(fqdn=rs.name, zone=zone),
-                        type=rs.record_type,
-                        value=value,
-                        ttl=rs.ttl or 0,
-                    ))
+                    out.append(
+                        Record(
+                            zone=zone,
+                            name=self._strip_zone(fqdn=rs.name, zone=zone),
+                            type=rs.record_type,
+                            value=value,
+                            ttl=rs.ttl or 0,
+                        )
+                    )
             return out
         except Exception as exc:  # noqa: BLE001
             raise map_api_error(exc) from exc

@@ -73,13 +73,17 @@ def driver(fake_k8s_client: Any) -> GKEClusterDriver:
 
 
 def test_apply_aggregates_outcomes(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.server_side_apply.side_effect = [
-        "created", "updated", "unchanged",
+        "created",
+        "updated",
+        "unchanged",
     ]
     result = driver.apply_manifests(
-        "gcp-prod", "ns",
+        "gcp-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "a"}},
             {"kind": "Service", "metadata": {"name": "b"}},
@@ -93,28 +97,35 @@ def test_apply_aggregates_outcomes(
 
 
 def test_apply_collects_errors(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.server_side_apply.side_effect = [
-        "created", Exception("webhook denied"),
+        "created",
+        Exception("webhook denied"),
     ]
     result = driver.apply_manifests(
-        "gcp-prod", "ns",
+        "gcp-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "ok"}},
             {"kind": "Service", "metadata": {"name": "bad"}},
         ],
     )
     assert result.ok is False
-    assert "webhook denied" in result.errors[0]
+    # Structured ApplyError (#603); legacy ``str()`` shape preserved.
+    assert "webhook denied" in str(result.errors[0])
+    assert result.errors[0].kind == "Service"
 
 
 def test_delete_classifies_not_found(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.delete.side_effect = [None, _NotFound()]
     result = driver.delete_manifests(
-        "gcp-prod", "ns",
+        "gcp-prod",
+        "ns",
         [
             {"kind": "Deployment", "metadata": {"name": "exists"}},
             {"kind": "Deployment", "metadata": {"name": "absent"}},
@@ -125,7 +136,8 @@ def test_delete_classifies_not_found(
 
 
 def test_get_namespace_returns_state(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     state = driver.get_namespace("gcp-prod", "ns")
     assert state is not None
@@ -134,17 +146,20 @@ def test_get_namespace_returns_state(
 
 
 def test_get_namespace_missing_returns_none(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get_namespace.side_effect = _NotFound()
     assert driver.get_namespace("gcp-prod", "missing") is None
 
 
 def test_ensure_namespace_apply(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     ns = driver.ensure_namespace(
-        "gcp-prod", "acme-api",
+        "gcp-prod",
+        "acme-api",
         labels={"astrolift.io/managed-by": "platform"},
         annotations={"k": "v"},
     )
@@ -153,48 +168,65 @@ def test_ensure_namespace_apply(
 
 
 def test_workload_status_not_found(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.side_effect = _NotFound()
     with pytest.raises(NotFoundError):
         driver.get_workload_status(
-            "gcp-prod", "ns", "Deployment", "missing",
+            "gcp-prod",
+            "ns",
+            "Deployment",
+            "missing",
         )
 
 
 def test_poll_rollout_success(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     result = driver.poll_rollout(
-        "gcp-prod", "ns", "Deployment", "api", timeout=5,
+        "gcp-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
     )
     assert result.success is True
 
 
 def test_poll_rollout_progressing_false_fails_fast(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     fake_k8s_client.get.return_value = {
         "metadata": {"name": "api"},
         "spec": {"replicas": 3},
         "status": {
             "readyReplicas": 0,
-            "conditions": [{
-                "type": "Progressing",
-                "status": "False",
-                "message": "ProgressDeadlineExceeded",
-            }],
+            "conditions": [
+                {
+                    "type": "Progressing",
+                    "status": "False",
+                    "message": "ProgressDeadlineExceeded",
+                }
+            ],
         },
     }
     result = driver.poll_rollout(
-        "gcp-prod", "ns", "Deployment", "api", timeout=5,
+        "gcp-prod",
+        "ns",
+        "Deployment",
+        "api",
+        timeout=5,
     )
     assert result.success is False
     assert result.timed_out is False
 
 
 def test_k8s_client_caches_per_cluster(
-    driver: GKEClusterDriver, fake_k8s_client,
+    driver: GKEClusterDriver,
+    fake_k8s_client,
 ) -> None:
     driver.apply_manifests("gcp-prod", "ns", [])
     driver.apply_manifests("gcp-prod", "ns", [])

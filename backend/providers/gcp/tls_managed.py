@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.tls import Certificate, TlsDriver
 
 from gcp._errors import NotFoundError, map_api_error
@@ -39,6 +40,7 @@ class GCPManagedCertDriver(TlsDriver):
 
             self._client = compute_v1.SslCertificatesClient()
 
+    @driver_op(cloud="gcp", driver="tls", audit=True, sensitive_kind="tls.mint")
     def ensure_certificate(
         self,
         domain: str,
@@ -78,6 +80,7 @@ class GCPManagedCertDriver(TlsDriver):
             raise map_api_error(exc) from exc
         return self.get_certificate(cert_name)
 
+    @driver_op(cloud="gcp", driver="tls")
     def get_certificate(self, certificate_id: str) -> Certificate:
         try:
             cert = self._client.get(
@@ -95,11 +98,7 @@ class GCPManagedCertDriver(TlsDriver):
         domains = list(managed.domains) if managed else []
         status = "issued"
         if managed:
-            status = (
-                managed.status.lower()
-                if hasattr(managed, "status")
-                else "active"
-            )
+            status = managed.status.lower() if hasattr(managed, "status") else "active"
         return Certificate(
             id=certificate_id,
             domain=domains[0] if domains else "",
@@ -110,6 +109,7 @@ class GCPManagedCertDriver(TlsDriver):
             not_after=None,
         )
 
+    @driver_op(cloud="gcp", driver="tls", audit=True, sensitive_kind="tls.revoke")
     def revoke_certificate(self, certificate_id: str) -> None:
         try:
             operation = self._client.delete(
@@ -125,10 +125,7 @@ class GCPManagedCertDriver(TlsDriver):
             raise map_api_error(exc) from exc
 
     def _cert_name(self, *, domain: str) -> str:
-        clean = "".join(
-            c if c.isalnum() or c == "-" else "-"
-            for c in domain.lower()
-        )
+        clean = "".join(c if c.isalnum() or c == "-" else "-" for c in domain.lower())
         while "--" in clean:
             clean = clean.replace("--", "-")
         return f"{self._config.cert_name_prefix}-{clean.strip('-')[:50]}"

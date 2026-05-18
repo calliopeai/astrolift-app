@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
 
 
@@ -61,6 +62,7 @@ class ALBIngressDriver(IngressDriver):
     def __init__(self, *, config: ALBConfig) -> None:
         self._config = config
 
+    @driver_op(cloud="aws", driver="ingress")
     def render_ingress(
         self,
         app: str,
@@ -86,21 +88,25 @@ class ALBIngressDriver(IngressDriver):
 
         rules = []
         for hostname in hostnames:
-            rules.append({
-                "host": hostname,
-                "http": {
-                    "paths": [{
-                        "path": "/",
-                        "pathType": "Prefix",
-                        "backend": {
-                            "service": {
-                                "name": workload,
-                                "port": {"number": 80},
-                            },
-                        },
-                    }],
-                },
-            })
+            rules.append(
+                {
+                    "host": hostname,
+                    "http": {
+                        "paths": [
+                            {
+                                "path": "/",
+                                "pathType": "Prefix",
+                                "backend": {
+                                    "service": {
+                                        "name": workload,
+                                        "port": {"number": 80},
+                                    },
+                                },
+                            }
+                        ],
+                    },
+                }
+            )
 
         ingress: Manifest = {
             "apiVersion": "networking.k8s.io/v1",
@@ -124,12 +130,15 @@ class ALBIngressDriver(IngressDriver):
         # the alb.ingress.kubernetes.io/certificate-arn annotation
         # when present rather than the ingress.spec.tls block.
         if tls_strategy in ("acm_dns_validated", "provided"):
-            ingress["spec"]["tls"] = [{
-                "hosts": list(hostnames),
-            }]
+            ingress["spec"]["tls"] = [
+                {
+                    "hosts": list(hostnames),
+                }
+            ]
 
         return [ingress]
 
+    @driver_op(cloud="aws", driver="ingress")
     def update_ingress_host(
         self,
         cluster: str,
@@ -151,13 +160,16 @@ class ALBIngressDriver(IngressDriver):
             tls_strategy="acm_dns_validated",
         )
         result = self._config.cluster_driver.apply_manifests(
-            cluster, namespace, manifests,
+            cluster,
+            namespace,
+            manifests,
         )
         if not result.ok:
             raise RuntimeError(
-                f"failed to update ingress: {result.errors}",
+                f"failed to update ingress: {result.summary()}",
             )
 
+    @driver_op(cloud="aws", driver="ingress")
     def delete_ingress(
         self,
         cluster: str,
@@ -180,38 +192,35 @@ class ALBIngressDriver(IngressDriver):
             },
         }
         result = self._config.cluster_driver.delete_manifests(
-            cluster, namespace, [manifest],
+            cluster,
+            namespace,
+            [manifest],
         )
         if not result.ok:
             raise RuntimeError(
-                f"failed to delete ingress: {result.errors}",
+                f"failed to delete ingress: {result.summary()}",
             )
 
     # ---- internals ------------------------------------------------
 
     def _render_annotations(
-        self, *, tls_strategy: str,
+        self,
+        *,
+        tls_strategy: str,
     ) -> dict[str, str]:
         """Translate config + tls strategy into LBC annotations."""
         annotations: dict[str, str] = {
             "alb.ingress.kubernetes.io/scheme": self._config.scheme,
             "alb.ingress.kubernetes.io/target-type": self._config.target_type,
-            "alb.ingress.kubernetes.io/healthcheck-path": (
-                self._config.healthcheck_path
-            ),
+            "alb.ingress.kubernetes.io/healthcheck-path": (self._config.healthcheck_path),
             "alb.ingress.kubernetes.io/listen-ports": _render_listen_ports(
                 self._config.listen_ports,
             ),
         }
         if self._config.ssl_redirect and 443 in self._config.listen_ports:
             annotations["alb.ingress.kubernetes.io/ssl-redirect"] = "443"
-        if (
-            tls_strategy in ("acm_dns_validated", "provided")
-            and self._config.certificate_arn
-        ):
-            annotations[
-                "alb.ingress.kubernetes.io/certificate-arn"
-            ] = self._config.certificate_arn
+        if tls_strategy in ("acm_dns_validated", "provided") and self._config.certificate_arn:
+            annotations["alb.ingress.kubernetes.io/certificate-arn"] = self._config.certificate_arn
         return annotations
 
 
@@ -219,7 +228,4 @@ def _render_listen_ports(ports: tuple[int, ...]) -> str:
     """ALB LBC expects a JSON-encoded list of {protocol: port} maps."""
     import json
 
-    return json.dumps([
-        {"HTTPS" if p == 443 else "HTTP": p}
-        for p in ports
-    ])
+    return json.dumps([{"HTTPS" if p == 443 else "HTTP": p} for p in ports])

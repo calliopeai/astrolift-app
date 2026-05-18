@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.metrics import MetricDatapoint, MetricsDriver, MetricSeries
 
 
@@ -38,6 +39,7 @@ class PrometheusMetricsDriver(MetricsDriver):
                 bearer_token=config.bearer_token,
             )
 
+    @driver_op(driver="prometheus_metrics")
     def query_metric(
         self,
         metric: str,
@@ -55,17 +57,20 @@ class PrometheusMetricsDriver(MetricsDriver):
         }
         response = self._http.get(url, params=params)
         return self._parse_response(
-            response=response, metric=metric, labels=labels,
+            response=response,
+            metric=metric,
+            labels=labels,
         )
 
     def _build_promql(
-        self, *, metric: str, labels: dict[str, str],
+        self,
+        *,
+        metric: str,
+        labels: dict[str, str],
     ) -> str:
         if not labels:
             return metric
-        bits = ",".join(
-            f'{k}="{v}"' for k, v in sorted(labels.items())
-        )
+        bits = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
         return f"{metric}{{{bits}}}"
 
     def _parse_response(
@@ -90,10 +95,7 @@ class PrometheusMetricsDriver(MetricsDriver):
         first = results[0]
         merged_labels = dict(first.get("metric", {}))
         merged_labels.pop("__name__", None)
-        datapoints = [
-            MetricDatapoint(timestamp=str(t), value=float(v))
-            for t, v in first.get("values", [])
-        ]
+        datapoints = [MetricDatapoint(timestamp=str(t), value=float(v)) for t, v in first.get("values", [])]
         return MetricSeries(
             metric=metric,
             labels=merged_labels,
@@ -106,13 +108,19 @@ class _DefaultHttp:
     httpx for connection pooling + SigV4 / GCP-IAM auth."""
 
     def __init__(
-        self, *, timeout: int = 30, bearer_token: str | None = None,
+        self,
+        *,
+        timeout: int = 30,
+        bearer_token: str | None = None,
     ) -> None:
         self._timeout = timeout
         self._token = bearer_token
 
     def get(
-        self, url: str, *, params: dict[str, str] | None = None,
+        self,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
     ) -> Any:
         from urllib.error import HTTPError
         from urllib.parse import urlencode

@@ -55,6 +55,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from _sdk._telemetry import driver_op
 from _sdk.notification import (
     DeliveryTarget,
     DevicePlatform,
@@ -107,6 +108,7 @@ class FCMNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
+    @driver_op(cloud="gcp", driver="notification")
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -128,6 +130,7 @@ class FCMNotificationDriver(NotificationDriver):
             },
         )
 
+    @driver_op(cloud="gcp", driver="notification")
     def revoke_device(self, *, registration_id: str) -> None:
         # FCM has no server-side revoke -- the next send to a stale
         # token returns ``UNREGISTERED`` and the dispatcher marks
@@ -136,6 +139,7 @@ class FCMNotificationDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
+    @driver_op(cloud="gcp", driver="notification")
     def send(
         self,
         *,
@@ -156,6 +160,7 @@ class FCMNotificationDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
+    @driver_op(cloud="gcp", driver="notification")
     def send_bulk(
         self,
         *,
@@ -164,6 +169,7 @@ class FCMNotificationDriver(NotificationDriver):
     ) -> list[SendResult]:
         return [self.send(target=t, payload=payload) for t in targets]
 
+    @driver_op(cloud="gcp", driver="notification", heartbeat=False)
     def healthcheck(self) -> ProviderHealth:
         # FCM doesn't expose a dedicated ping; treat the ability to
         # mint a token as the proxy. Token-mint failures usually

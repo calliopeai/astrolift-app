@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.identity import WorkloadIdentityDriver
 
 from gcp._errors import NotFoundError, map_api_error
@@ -39,6 +40,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
 
             self._iam = iam_admin_v1.IAMClient()
 
+    @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(
         self,
         cluster: str,
@@ -50,19 +52,13 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         roles/iam.workloadIdentityUser binding, then returns the
         annotation the manifest renderer applies."""
         gcp_sa_email = self._sa_email(name=identity_role)
-        member = (
-            f"serviceAccount:{self._config.project_id}.svc.id.goog"
-            f"[{namespace}/{sa_name}]"
-        )
+        member = f"serviceAccount:{self._config.project_id}.svc.id.goog" f"[{namespace}/{sa_name}]"
         try:
             policy = self._iam.get_iam_policy(
                 resource=self._sa_resource(name=identity_role),
             )
             binding = next(
-                (
-                    b for b in policy.bindings
-                    if b.role == "roles/iam.workloadIdentityUser"
-                ),
+                (b for b in policy.bindings if b.role == "roles/iam.workloadIdentityUser"),
                 None,
             )
             if binding is None:
@@ -85,6 +81,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
 
         return {"iam.gke.io/gcp-service-account": gcp_sa_email}
 
+    @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.create_role")
     def create_identity_role(
         self,
         name: str,
@@ -117,10 +114,12 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
                 role = perm.get("role")
                 if role:
                     self._add_project_role(
-                        sa_email=sa.email, role=role,
+                        sa_email=sa.email,
+                        role=role,
                     )
         return sa.email
 
+    @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.attach_policy")
     def attach_policy(self, role: str, policy: str) -> None:
         """For GCP, 'policy' is a roles/* identifier."""
         self._add_project_role(
@@ -128,6 +127,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
             role=policy,
         )
 
+    @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.delete_role")
     def delete_identity_role(self, role: str) -> None:
         try:
             self._iam.delete_service_account(
@@ -142,10 +142,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         return f"{name}@{self._config.project_id}.iam.gserviceaccount.com"
 
     def _sa_resource(self, *, name: str) -> str:
-        return (
-            f"projects/-/serviceAccounts/"
-            f"{self._sa_email(name=name)}"
-        )
+        return f"projects/-/serviceAccounts/" f"{self._sa_email(name=name)}"
 
     def _add_project_role(self, *, sa_email: str, role: str) -> None:
         # Project-level IAM mutation goes through Resource Manager.
