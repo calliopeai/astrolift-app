@@ -7,14 +7,29 @@ import {
   GitCommitIcon,
   KeyRoundIcon,
   RocketIcon,
+  SearchIcon,
   SettingsIcon,
 } from "lucide-react";
 import * as React from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import type { AstroliftEvent } from "@/graphql/operations/operations.types";
+
+// #711 — event-type filter chips. Maps each chip key to a prefix
+// match on `eventType`; chip 'all' bypasses the filter.
+const TYPE_FILTERS: Array<{ key: string; label: string; prefixes: string[] }> = [
+  { key: "all", label: "All", prefixes: [] },
+  { key: "deploy", label: "Deploys", prefixes: ["deployment."] },
+  { key: "config", label: "Config", prefixes: ["manifest.", "config.", "environment.", "app."] },
+  { key: "secret", label: "Secrets", prefixes: ["secret."] },
+  { key: "token", label: "Tokens", prefixes: ["deploy_token.", "app.deploy_token."] },
+  { key: "alert", label: "Alerts", prefixes: ["alert."] },
+];
 
 interface EventsResp {
   astroliftEvents: AstroliftEvent[];
@@ -34,14 +49,40 @@ interface Props {
  */
 export function ActivityTimeline({ appId, limit = 20 }: Props) {
   const fmt = useFormatters();
+  // #711 — local filter state (event type chip + free-text search).
+  // Defaults to 'all' and empty so the existing summary view is
+  // unchanged for operators who never touch the filters.
+  const [typeKey, setTypeKey] = React.useState("all");
+  const [search, setSearch] = React.useState("");
+
   const { data, loading } = useQuery<EventsResp>(LIST_EVENTS, {
     variables: { limit: 100 },
     fetchPolicy: "cache-and-network",
   });
 
-  const events = (data?.astroliftEvents ?? [])
-    .filter((e) => e.registeredAppId === appId)
+  const allForApp = (data?.astroliftEvents ?? []).filter(
+    (e) => e.registeredAppId === appId,
+  );
+
+  const activeFilter = TYPE_FILTERS.find((f) => f.key === typeKey) ?? TYPE_FILTERS[0];
+  const needle = search.trim().toLowerCase();
+
+  const events = allForApp
+    .filter((e) => {
+      if (activeFilter.prefixes.length > 0) {
+        const hit = activeFilter.prefixes.some((p) => e.eventType.startsWith(p));
+        if (!hit) return false;
+      }
+      if (needle) {
+        const summary = summaryFor(e).toLowerCase();
+        const hay = `${summary} ${e.eventType}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    })
     .slice(0, limit);
+
+  const filterActive = typeKey !== "all" || needle.length > 0;
 
   return (
     <section className="rounded-lg border p-5">
@@ -51,8 +92,50 @@ export function ActivityTimeline({ appId, limit = 20 }: Props) {
           Activity
         </h2>
         {events.length > 0 && (
-          <p className="text-muted-foreground text-[11px]">Last {events.length} events</p>
+          <p className="text-muted-foreground text-[11px]">
+            {filterActive
+              ? `${events.length} of ${allForApp.length} events`
+              : `Last ${events.length} events`}
+          </p>
         )}
+      </div>
+
+      {/* #711 — filter chips + search input. Chips are buttons because
+          this isn't form data, just UI state; using buttons keeps the
+          a11y story simple (no aria-checked dance, just aria-pressed). */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {TYPE_FILTERS.map((f) => {
+          const active = f.key === typeKey;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setTypeKey(f.key)}
+              aria-pressed={active}
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
+                active
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+        <div className="relative ml-auto">
+          <SearchIcon
+            aria-hidden
+            className="text-muted-foreground absolute top-1/2 left-2 size-3 -translate-y-1/2"
+          />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search…"
+            className="h-7 w-40 pl-7 text-xs"
+            aria-label="Search activity"
+          />
+        </div>
       </div>
 
       {loading && events.length === 0 ? (
@@ -62,7 +145,20 @@ export function ActivityTimeline({ appId, limit = 20 }: Props) {
           <Skeleton className="h-10 w-full" />
         </div>
       ) : events.length === 0 ? (
-        <p className="text-muted-foreground py-1 text-xs italic">No recent events for this app.</p>
+        <p className="text-muted-foreground py-1 text-xs italic">
+          {filterActive ? (
+            <>
+              No events match{" "}
+              <Badge variant="secondary" className="text-[10px]">
+                {activeFilter.label}
+                {needle ? ` · "${needle}"` : ""}
+              </Badge>
+              .
+            </>
+          ) : (
+            "No recent events for this app."
+          )}
+        </p>
       ) : (
         <ol className="divide-border max-h-80 divide-y overflow-y-auto">
           {events.map((e) => (
