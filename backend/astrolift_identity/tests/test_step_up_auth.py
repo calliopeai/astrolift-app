@@ -21,6 +21,7 @@ import datetime as dt
 from types import SimpleNamespace
 
 import pytest
+from constance.test import override_config
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
@@ -296,10 +297,16 @@ def test_deelevate_when_already_unelevated_is_noop():
 # ---- decorator: requires_elevation gating -----------------------------
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_sensitive_mutation_without_elevation_returns_step_up_required(permission_resolver, audit_capture):
     """grant_role is gated by @requires_elevation; an un-elevated
     session sees a STEP_UP_REQUIRED envelope, the resolver body
     never runs (no RoleBinding row created), and a deny is audited.
+
+    The global REQUIRE_STEP_UP_AUTH Constance flag defaults to False
+    (off) so small / SSO-only installs don't trip on every sensitive
+    mutation. Flip it on for this test since the assertion is the
+    flag-on enforcement path.
     """
     org = Organization.objects.create(name="Acme", slug="acme")
     team = Team.objects.create(organization=org, name="Eng", slug="eng")

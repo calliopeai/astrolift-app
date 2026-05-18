@@ -20,7 +20,6 @@ from _sdk.managed_service import (
     BindingSchema,
     DeprovisionResult,
     DeprovisionSpec,
-    Grant,
     ManagedServiceDriver,
     ProvisionResult,
     ProvisionSpec,
@@ -31,7 +30,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "mysql"
 
@@ -98,40 +98,43 @@ class MySQLOperatorDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = self._namespace_for(spec=spec)
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         manifest = self._render_cluster_crd(spec=spec, name=cluster_name)
         if self._config.cluster_driver is None:
             return ProvisionResult(
                 ok=True,
-                handle=f"{KIND}/{cluster_name}",
-                message=(
-                    f"MySQL CRD rendered (no cluster_driver injected; "
-                    f"manifest dispatched out of band)"
-                ),
+                handle=handle,
+                message=("MySQL CRD rendered (no cluster_driver injected; " "manifest dispatched out of band)"),
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
-            self._namespace_for(spec=spec),
+            namespace,
             [manifest],
         )
         if not result.ok:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message="apply_manifests failed",
                 errors=result.errors,
             )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{cluster_name}",
+            handle=handle,
             message=f"MySQL cluster {cluster_name} provisioned",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
-            message=(
-                "MySQL operator reconciles size/storage updates "
-                "via re-applied CRD spec"
-            ),
+            ok=True,
+            handle=spec.handle,
+            message=("MySQL operator reconciles size/storage updates " "via re-applied CRD spec"),
         )
 
     def deprovision(
@@ -141,39 +144,56 @@ class MySQLOperatorDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        del force_destroy
+        del delete_data, force_destroy
         if self._config.cluster_driver is None:
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="no cluster_driver — manifest deletion skipped",
             )
-        _, _, name = spec.handle.partition("/")
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        stub = self._cluster_crd_stub(name=parsed.name)
+        stub["metadata"]["namespace"] = parsed.namespace
         result = self._config.cluster_driver.delete_manifests(
-            "",  # cluster_id; caller must supply via separate plumbing
-            "",  # namespace
-            [self._cluster_crd_stub(name=name)],
+            parsed.cluster_id,
+            parsed.namespace,
+            [stub],
         )
         if result.errors:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=str(result.errors),
                 errors=result.errors,
             )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message=f"MySQL cluster {name} deleted",
+            ok=True,
+            handle=spec.handle,
+            message=f"MySQL cluster {parsed.name} deleted",
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         # Real status comes from PerconaXtraDBCluster.status.state;
         # platform queries via ClusterDriver.get_workload_status.
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message="status delegated to operator reconciliation loop",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
+        name = _unpack_handle(handle.handle).name
         return Binding(
             env_vars={
                 "MYSQL_HOST": ValueRef(
@@ -207,7 +227,8 @@ class MySQLOperatorDriver(ManagedServiceDriver):
 
     def restore(self, snapshot, target):
         return ProvisionResult(
-            ok=False, handle="",
+            ok=False,
+            handle="",
             message=(
                 "MySQL restore via operator's restore CRD; "
                 "wire the operator-specific restore workflow at "
@@ -231,16 +252,21 @@ class MySQLOperatorDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self):
-        return BindingSchema(env_vars={
-            "MYSQL_HOST": "Host (operator-managed Service)",
-            "MYSQL_PORT": "Port (default 3306)",
-            "MYSQL_DB": "Database name",
-            "MYSQL_USER": "App user (from Secret)",
-            "MYSQL_PASSWORD": "App password (from Secret)",
-        })
+        return BindingSchema(
+            env_vars={
+                "MYSQL_HOST": "Host (operator-managed Service)",
+                "MYSQL_PORT": "Port (default 3306)",
+                "MYSQL_DB": "Database name",
+                "MYSQL_USER": "App user (from Secret)",
+                "MYSQL_PASSWORD": "App password (from Secret)",
+            }
+        )
 
     def _render_cluster_crd(
-        self, *, spec: ProvisionSpec, name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        name: str,
     ) -> dict[str, Any]:
         size_spec = SIZE_TO_SPEC.get(spec.size, SIZE_TO_SPEC["small"])
         if self._config.operator_brand == "percona":
@@ -265,14 +291,10 @@ class MySQLOperatorDriver(ManagedServiceDriver):
                         "resources": size_spec["resources"],
                         "volumeSpec": {
                             "persistentVolumeClaim": {
-                                "storageClassName": (
-                                    self._config.storage_class
-                                ),
+                                "storageClassName": (self._config.storage_class),
                                 "resources": {
                                     "requests": {
-                                        "storage": (
-                                            size_spec["storage_size"]
-                                        ),
+                                        "storage": (size_spec["storage_size"]),
                                     },
                                 },
                             },
@@ -283,18 +305,18 @@ class MySQLOperatorDriver(ManagedServiceDriver):
                         "size": min(size_spec["instances"], 3),
                     },
                     **(
-                        {"backup": {
-                            "storages": {
-                                "default": {
-                                    "type": "s3",
-                                    "s3": {
-                                        "bucket": (
-                                            self._config.backup_url
-                                        ),
+                        {
+                            "backup": {
+                                "storages": {
+                                    "default": {
+                                        "type": "s3",
+                                        "s3": {
+                                            "bucket": (self._config.backup_url),
+                                        },
                                     },
                                 },
-                            },
-                        }}
+                            }
+                        }
                         if self._config.backup_url
                         else {}
                     ),

@@ -27,7 +27,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "document_db"
 
@@ -82,33 +83,42 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = self._namespace_for(spec=spec)
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         manifest = self._render_cluster_crd(spec=spec, name=cluster_name)
         if self._config.cluster_driver is None:
             return ProvisionResult(
                 ok=True,
-                handle=f"{KIND}/{cluster_name}",
+                handle=handle,
                 message="MongoDB CRD rendered (no cluster_driver injected)",
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
-            self._namespace_for(spec=spec),
+            namespace,
             [manifest],
         )
         if not result.ok:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message="apply_manifests failed",
                 errors=result.errors,
             )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{cluster_name}",
+            handle=handle,
             message=f"MongoDB cluster {cluster_name} provisioned",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message="operator reconciles via re-applied CRD",
         )
 
@@ -120,25 +130,63 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data, force_destroy
+        if self._config.cluster_driver is None:
+            return DeprovisionResult(
+                ok=True,
+                handle=spec.handle,
+                message="no cluster_driver — manifest deletion skipped",
+            )
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        stub = {
+            "apiVersion": "psmdb.percona.com/v1",
+            "kind": "PerconaServerMongoDB",
+            "metadata": {
+                "name": parsed.name,
+                "namespace": parsed.namespace,
+            },
+        }
+        result = self._config.cluster_driver.delete_manifests(
+            parsed.cluster_id,
+            parsed.namespace,
+            [stub],
+        )
+        if result.errors:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(result.errors),
+                errors=result.errors,
+            )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message="MongoDB cluster deletion via operator delete CRD",
+            ok=True,
+            handle=spec.handle,
+            message=f"MongoDB cluster {parsed.name} deleted",
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message="status delegated to operator reconciliation",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
+        name = _unpack_handle(handle.handle).name
         return Binding(
             env_vars={
                 "DOCDB_URI": ValueRef(
-                    literal=(
-                        f"mongodb+srv://{name}-rs0/?replicaSet={name}-rs0"
-                    ),
+                    literal=(f"mongodb+srv://{name}-rs0/?replicaSet={name}-rs0"),
                 ),
                 "DOCDB_DB": ValueRef(literal="app"),
                 "DOCDB_USER": ValueRef(
@@ -149,10 +197,7 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
                 ),
             },
             iam_grants=[],
-            notes=(
-                "MongoDB connection via operator-managed replica-set "
-                "Service. Credentials in <cluster>-secrets."
-            ),
+            notes=("MongoDB connection via operator-managed replica-set " "Service. Credentials in <cluster>-secrets."),
         )
 
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
@@ -166,7 +211,8 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
 
     def restore(self, snapshot, target):
         return ProvisionResult(
-            ok=False, handle="",
+            ok=False,
+            handle="",
             message="MongoDB restore via operator's restore CRD",
             errors=["not_implemented"],
         )
@@ -181,15 +227,20 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self):
-        return BindingSchema(env_vars={
-            "DOCDB_URI": "mongodb+srv URI to the replica set",
-            "DOCDB_DB": "Database name",
-            "DOCDB_USER": "Admin user (from Secret)",
-            "DOCDB_PASSWORD": "Admin password (from Secret)",
-        })
+        return BindingSchema(
+            env_vars={
+                "DOCDB_URI": "mongodb+srv URI to the replica set",
+                "DOCDB_DB": "Database name",
+                "DOCDB_USER": "Admin user (from Secret)",
+                "DOCDB_PASSWORD": "Admin password (from Secret)",
+            }
+        )
 
     def _render_cluster_crd(
-        self, *, spec: ProvisionSpec, name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        name: str,
     ) -> dict[str, Any]:
         size_spec = SIZE_TO_SPEC.get(spec.size, SIZE_TO_SPEC["small"])
         return {
@@ -208,33 +259,37 @@ class MongoDBOperatorDriver(ManagedServiceDriver):
                 "crVersion": "1.16.0",
                 "image": "percona/percona-server-mongodb:7.0",
                 "secrets": {"users": f"{name}-secrets"},
-                "replsets": [{
-                    "name": "rs0",
-                    "size": size_spec["replicas"],
-                    "resources": size_spec["resources"],
-                    "volumeSpec": {
-                        "persistentVolumeClaim": {
-                            "storageClassName": self._config.storage_class,
-                            "resources": {
-                                "requests": {
-                                    "storage": size_spec["storage_size"],
+                "replsets": [
+                    {
+                        "name": "rs0",
+                        "size": size_spec["replicas"],
+                        "resources": size_spec["resources"],
+                        "volumeSpec": {
+                            "persistentVolumeClaim": {
+                                "storageClassName": self._config.storage_class,
+                                "resources": {
+                                    "requests": {
+                                        "storage": size_spec["storage_size"],
+                                    },
                                 },
                             },
                         },
-                    },
-                }],
+                    }
+                ],
                 **(
-                    {"backup": {
-                        "enabled": True,
-                        "storages": {
-                            "default": {
-                                "type": "s3",
-                                "s3": {
-                                    "bucket": self._config.backup_url,
+                    {
+                        "backup": {
+                            "enabled": True,
+                            "storages": {
+                                "default": {
+                                    "type": "s3",
+                                    "s3": {
+                                        "bucket": self._config.backup_url,
+                                    },
                                 },
                             },
-                        },
-                    }}
+                        }
+                    }
                     if self._config.backup_url
                     else {}
                 ),

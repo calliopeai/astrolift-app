@@ -81,53 +81,6 @@ class ExecResult:
     stderr: str
 
 
-class InteractiveExecSession(Protocol):
-    """Bidirectional handle for an interactive ``kubectl exec -it``
-    session. Powers the in-browser terminal (#423).
-
-    Lifetime is owned by the caller: open a session via
-    ``ClusterDriver.interactive_exec(...)``, push stdin / resize
-    frames as the operator types, drain ``stdout`` / ``stderr``
-    bytes as the kubelet produces them, and call ``close()`` when
-    the WebSocket disconnects. Implementations MUST tolerate
-    ``close()`` being called concurrently with ``read_*`` /
-    ``write_stdin`` — the WS dispatcher relies on a clean
-    teardown when a subscriber drops mid-stream.
-    """
-
-    async def write_stdin(self, data: str) -> None:
-        """Send a UTF-8 chunk to the pod's stdin."""
-        ...
-
-    async def read_stdout(self) -> str:
-        """Block until the kubelet has fresh stdout. Returns ``""``
-        on a tick with no data. Raises ``StopAsyncIteration`` on
-        clean EOF."""
-        ...
-
-    async def read_stderr(self) -> str:
-        """Same contract as ``read_stdout`` for stderr."""
-        ...
-
-    async def resize(self, rows: int, cols: int) -> None:
-        """Resize the PTY. No-op on backends without TTY support."""
-        ...
-
-    async def wait_exit(self) -> int:
-        """Wait for the remote command to exit and return its code.
-
-        Returning means the remote command has finished; the WS
-        dispatcher emits an ``{"type": "exit"}`` frame and tears
-        the WebSocket down."""
-        ...
-
-    async def close(self) -> None:
-        """Tear down the session. Idempotent. After ``close()`` all
-        ``read_*`` / ``write_stdin`` calls must raise or no-op
-        rather than hang."""
-        ...
-
-
 # ---- Runtime observability (#299) ---------------------------------
 #
 # ``list_pods`` + ``stream_logs`` let resolver-entry surfaces (the
@@ -182,24 +135,6 @@ class ClusterAuth:
 
 
 @dataclass(frozen=True)
-class ContainerResources:
-    """Per-container resource requests + limits, surfaced exactly as
-    the cluster reports them (cores / kubernetes resource-quantity
-    strings — ``"100m"``, ``"512Mi"``, etc.). Empty string means the
-    field wasn't set on the pod spec.
-
-    Surfaced separately from ``ContainerStatusInfo`` so the workload-
-    detail page can show istio-proxy / linkerd-proxy / open-telemetry
-    sidecar resource cost without those numbers blurring into the
-    primary container's budget."""
-
-    cpu_request: str = ""
-    cpu_limit: str = ""
-    memory_request: str = ""
-    memory_limit: str = ""
-
-
-@dataclass(frozen=True)
 class ContainerStatusInfo:
     """One container's status within a Pod.
 
@@ -207,33 +142,7 @@ class ContainerStatusInfo:
     ``terminated`` / ``unknown``. ``waiting_reason`` is populated when
     state is ``waiting`` (CrashLoopBackOff, ImagePullBackOff, etc.);
     ``terminated_reason`` when state is ``terminated`` (Completed,
-    OOMKilled, Error). Empty string when not applicable.
-
-    ``kind`` classifies the container slot:
-      - ``init`` — declared under ``spec.initContainers``.
-      - ``primary`` — the workload's main container (name matches the
-        workload slug or, failing that, the first non-init container
-        in the spec).
-      - ``sidecar`` — every other ``spec.containers`` slot. Service
-        meshes (istio-proxy, linkerd-proxy) and log shippers fall
-        here.
-
-    ``last_restart_reasons`` is the last *up to three* k8s
-    ``lastState.terminated.reason`` values observed by the apiserver
-    (``OOMKilled`` / ``Error`` / ``ContainerCannotRun`` / ``Unhealthy``
-    probe). The k8s API surfaces only the most recent restart on each
-    poll, so a flapping container's history is necessarily
-    best-effort — the surface still gives an operator the *what* of
-    the latest crash, which is the highest-signal datum for incident
-    response.
-
-    ``last_restart_at`` is the timestamp of the most recent restart
-    (``lastState.terminated.finishedAt``); used by the UI to badge
-    flapping pods (count > 5 in the last hour).
-
-    ``resources`` carries the spec-side requests + limits joined into
-    the status payload at backend-build time. We join on container
-    name so the resolver only has to fan out one query per pod."""
+    OOMKilled, Error). Empty string when not applicable."""
 
     name: str
     ready: bool
@@ -242,10 +151,6 @@ class ContainerStatusInfo:
     state: str
     waiting_reason: str = ""
     terminated_reason: str = ""
-    kind: str = "primary"
-    last_restart_reasons: list[str] = field(default_factory=list)
-    last_restart_at: datetime | None = None
-    resources: ContainerResources = field(default_factory=ContainerResources)
 
 
 @dataclass(frozen=True)
@@ -691,29 +596,6 @@ class ClusterDriver(Protocol):
 
         ``tail_lines`` is the initial replay; ``follow=True`` keeps
         the stream open afterwards.
-        """
-        ...
-
-    def interactive_exec(
-        self,
-        *,
-        auth: ClusterAuth,
-        namespace: str,
-        pod_name: str,
-        container: str,
-        command: list[str],
-        tty: bool = True,
-    ) -> InteractiveExecSession:
-        """Open an interactive ``kubectl exec -it`` session against
-        ``pod_name``/``container``. Powers the in-browser console
-        terminal (#423).
-
-        Returns an ``InteractiveExecSession`` the caller drives
-        until the operator disconnects. Implementations MUST
-        tolerate ``InteractiveExecSession.close()`` mid-stream and
-        release the underlying urllib3 / WebSocket connection back
-        to the pool — the exec socket is a finite resource on the
-        kubelet side.
         """
         ...
 

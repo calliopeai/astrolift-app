@@ -10,32 +10,38 @@ Drivers shipped:
 - GCPIngressDriver (#37) — IngressDriver, multi-variant
   (gce_ingress / gateway_api)
 
-Managed services (#41 MVP — symmetry with AWS S3 + SQS):
+Managed services (#363 + #370 GCP slice — full symmetry with AWS):
 - GCSDriver — object_store/gcs
 - PubSubDriver — queue/pubsub
+- CloudSQLPostgresDriver — postgres/cloudsql
+- CloudSQLMySQLDriver — mysql/cloudsql
+- MemorystoreRedisDriver — redis/memorystore
 
 Pending (separate tickets, follow-on managed services):
-- CloudSQL (postgres / mysql)
-- Memorystore (redis / memcached)
 - Filestore (filesystem)
 - Firestore / Bigtable (nosql)
 """
 
 from _sdk.base import ProviderPlugin
-
 from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
+from gcp.managed.bigtable import BigtableDriver
+from gcp.managed.email_thirdparty import GCPEmailStubDriver
+from gcp.managed.model_endpoint_vertex import VertexAIEndpointDriver
+from gcp.managed.mysql_cloudsql import CloudSQLMySQLDriver
 from gcp.managed.object_store_gcs import GCSDriver
 from gcp.managed.postgres_cloudsql import CloudSQLPostgresDriver
 from gcp.managed.queue_pubsub import PubSubDriver
 from gcp.managed.redis_memorystore import MemorystoreRedisDriver
+from gcp.managed.search_elastic_cloud import GCPElasticCloudStubDriver
+from gcp.managed.timeseries_managed_prometheus import GCPManagedPrometheusDriver
+from gcp.managed.vector_vertex import VertexMatchingEngineDriver
 from gcp.notification_fcm import FCMNotificationDriver
 from gcp.registry_artifact import ArtifactRegistryDriver
 from gcp.secrets import GCPSecretsBackend
 from gcp.tls_managed import GCPManagedCertDriver
-
 
 PLUGIN = ProviderPlugin(
     id="gcp",
@@ -54,6 +60,14 @@ PLUGIN = ProviderPlugin(
         ("object_store", "gcs"): GCSDriver,
         ("queue", "pubsub"): PubSubDriver,
         ("postgres", "cloudsql"): CloudSQLPostgresDriver,
+        ("mysql", "cloudsql"): CloudSQLMySQLDriver,
+        ("redis", "memorystore"): MemorystoreRedisDriver,
+        ("kv_store", "bigtable"): BigtableDriver,
+        ("search", "gcp_elastic_cloud"): GCPElasticCloudStubDriver,
+        ("vector_index", "vertex_matching_engine"): VertexMatchingEngineDriver,
+        ("time_series", "gcp_managed_prometheus"): GCPManagedPrometheusDriver,
+        ("email", "gcp_thirdparty"): GCPEmailStubDriver,
+        ("model_endpoint", "vertex_ai"): VertexAIEndpointDriver,
     },
     config_schema={
         "type": "object",
@@ -69,23 +83,15 @@ PLUGIN = ProviderPlugin(
             },
             "zone": {
                 "type": "string",
-                "description": (
-                    "Default GCP zone (e.g. us-central1-a). "
-                    "Required for zonal GKE clusters."
-                ),
+                "description": ("Default GCP zone (e.g. us-central1-a). Required for zonal GKE clusters."),
             },
             "cluster_oidc_issuer": {
                 "type": "string",
-                "description": (
-                    "GKE cluster's workload identity pool URL."
-                ),
+                "description": ("GKE cluster's workload identity pool URL."),
             },
             "artifact_registry_repo": {
                 "type": "string",
-                "description": (
-                    "Pre-created Artifact Registry repository ID. "
-                    "Driver will auto-create if missing."
-                ),
+                "description": ("Pre-created Artifact Registry repository ID. Driver will auto-create if missing."),
             },
             "ingress_variant": {
                 "type": "string",
@@ -95,16 +101,11 @@ PLUGIN = ProviderPlugin(
             "managed_cert_name_prefix": {
                 "type": "string",
                 "default": "astrolift",
-                "description": (
-                    "Prefix for GCP-managed SslCertificate resources."
-                ),
+                "description": ("Prefix for GCP-managed SslCertificate resources."),
             },
             "kms_key": {
                 "type": "string",
-                "description": (
-                    "Optional CMEK KMS key resource for Secret Manager "
-                    "+ Artifact Registry encryption."
-                ),
+                "description": ("Optional CMEK KMS key resource for Secret Manager + Artifact Registry encryption."),
             },
             "bucket_name_prefix": {
                 "type": "string",

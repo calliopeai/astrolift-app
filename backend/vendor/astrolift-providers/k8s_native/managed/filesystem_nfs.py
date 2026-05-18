@@ -34,7 +34,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "filesystem"
 
@@ -68,37 +69,43 @@ class NFSDriver(ManagedServiceDriver):
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         pvc_name = self._pvc_name(spec=spec)
+        namespace = self._namespace_for(spec=spec)
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=pvc_name,
+        )
         manifest = self._render_pvc(spec=spec, name=pvc_name)
         if self._config.cluster_driver is None:
             return ProvisionResult(
                 ok=True,
-                handle=f"{KIND}/{pvc_name}",
+                handle=handle,
                 message="PVC manifest rendered",
             )
         result = self._config.cluster_driver.apply_manifests(
             spec.tenant_cluster_id,
-            self._namespace_for(spec=spec),
+            namespace,
             [manifest],
         )
         if not result.ok:
             return ProvisionResult(
-                ok=False, handle="",
+                ok=False,
+                handle="",
                 message="apply_manifests failed",
                 errors=result.errors,
             )
         return ProvisionResult(
             ok=True,
-            handle=f"{KIND}/{pvc_name}",
+            handle=handle,
             message=f"PVC {pvc_name} provisioned",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
-            message=(
-                "PVC resize via re-applied spec; underlying CSI "
-                "must support volume expansion"
-            ),
+            ok=True,
+            handle=spec.handle,
+            message=("PVC resize via re-applied spec; underlying CSI " "must support volume expansion"),
         )
 
     def deprovision(
@@ -109,22 +116,63 @@ class NFSDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data, force_destroy
+        if self._config.cluster_driver is None:
+            return DeprovisionResult(
+                ok=True,
+                handle=spec.handle,
+                message="no cluster_driver — manifest deletion skipped",
+            )
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        # PVC deletion fans out to the bound PV based on the
+        # StorageClass's reclaimPolicy; the driver doesn't issue a
+        # separate PV delete because dynamically-provisioned PVs are
+        # owned by the StorageClass + CSI controller.
+        stub = {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "name": parsed.name,
+                "namespace": parsed.namespace,
+            },
+        }
+        result = self._config.cluster_driver.delete_manifests(
+            parsed.cluster_id,
+            parsed.namespace,
+            [stub],
+        )
+        if result.errors:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=str(result.errors),
+                errors=result.errors,
+            )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message=(
-                "PVC deletion via standard k8s; data retention "
-                "follows the StorageClass's reclaimPolicy"
-            ),
+            ok=True,
+            handle=spec.handle,
+            message=(f"PVC {parsed.name} deleted (PV reclaim follows " "the StorageClass's reclaimPolicy)"),
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
-            handle=handle.handle, state="available",
+            handle=handle.handle,
+            state="available",
             message="status via PVC.status.phase",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
+        name = _unpack_handle(handle.handle).name
         return Binding(
             env_vars={
                 "FILESYSTEM_HANDLE": ValueRef(literal=name),
@@ -134,22 +182,17 @@ class NFSDriver(ManagedServiceDriver):
                 "FILESYSTEM_TLS": ValueRef(literal="false"),
             },
             iam_grants=[],
-            notes=(
-                "PVC mount; workload manifests must reference the "
-                "PVC by name in volumes + volumeMounts."
-            ),
+            notes=("PVC mount; workload manifests must reference the " "PVC by name in volumes + volumeMounts."),
         )
 
     def snapshot(self, handle):
         raise NotImplementedError(
-            "NFS snapshots are CSI-driver-specific; wire to your "
-            "CSI's VolumeSnapshot CRD",
+            "NFS snapshots are CSI-driver-specific; wire to your " "CSI's VolumeSnapshot CRD",
         )
 
     def restore(self, snapshot, target):
         raise NotImplementedError(
-            "NFS restore from VolumeSnapshot at PVC-create time; "
-            "out of scope for this driver",
+            "NFS restore from VolumeSnapshot at PVC-create time; " "out of scope for this driver",
         )
 
     def config_schema(self):
@@ -164,14 +207,19 @@ class NFSDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self):
-        return BindingSchema(env_vars={
-            "FILESYSTEM_HANDLE": "PVC name",
-            "FILESYSTEM_MOUNT_PATH": "Recommended mount path inside the pod",
-            "FILESYSTEM_TLS": "TLS to NFS (false; NFS doesn't support TLS)",
-        })
+        return BindingSchema(
+            env_vars={
+                "FILESYSTEM_HANDLE": "PVC name",
+                "FILESYSTEM_MOUNT_PATH": "Recommended mount path inside the pod",
+                "FILESYSTEM_TLS": "TLS to NFS (false; NFS doesn't support TLS)",
+            }
+        )
 
     def _render_pvc(
-        self, *, spec: ProvisionSpec, name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        name: str,
     ) -> dict[str, Any]:
         storage_size = SIZE_TO_STORAGE.get(spec.size, "10Gi")
         return {
