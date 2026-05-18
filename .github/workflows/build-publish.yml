@@ -78,17 +78,15 @@ jobs:
             esac
             [ -n "$VERSION" ] && IS_RELEASE="true"
           else
-            # push to main: detect changed paths; rebuild whichever changed
-            CHANGED_BACKEND=$(git diff --name-only HEAD^ HEAD -- backend/ | head -n1 || true)
-            CHANGED_FRONTEND=$(git diff --name-only HEAD^ HEAD -- frontend/ | head -n1 || true)
-            CHANGED_WORKFLOW=$(git diff --name-only HEAD^ HEAD -- .github/workflows/build-publish.yml | head -n1 || true)
-            ITEMS=()
-            if [ -n "$CHANGED_BACKEND" ]  || [ -n "$CHANGED_WORKFLOW" ]; then ITEMS+=("backend"); fi
-            if [ -n "$CHANGED_FRONTEND" ] || [ -n "$CHANGED_WORKFLOW" ]; then ITEMS+=("frontend"); fi
-            # JSON-encode the array
-            if [ ${#ITEMS[@]} -gt 0 ]; then
-              PRODUCTS=$(printf '%s\n' "${ITEMS[@]}" | jq -R . | jq -sc .)
-            fi
+            # push to main: always build both products so every main-<sha>
+            # tag refers to a deployable backend+frontend pair. Skipping a
+            # build on a "backend-only" or "frontend-only" commit creates
+            # mismatched pins in opscode (the missing image can't be
+            # pulled) and forces operators to hunt for the last commit
+            # that happened to touch the other half. The CI cost (a few
+            # minutes of extra arch builds with full cache hits when
+            # nothing changed) is well worth deploy-pair safety.
+            PRODUCTS='["backend","frontend"]'
           fi
 
           echo "products=${PRODUCTS}" >> "$GITHUB_OUTPUT"
