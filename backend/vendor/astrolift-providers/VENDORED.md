@@ -17,5 +17,5 @@ rsync -av --delete \
 
 Then update `SOURCE_COMMIT` below and commit.
 
-- **SOURCE_COMMIT**: `9f0e346` (partial — `_sdk/cost.py`, `aws/cost.py`, `gcp/cost.py`, `azure/cost.py` synced for #502 billing-actuals on top of #490 notification sync at `38c2a29`)
+- **SOURCE_COMMIT**: `ad27a73` (full re-vendor at v0.2.0 + PR #103 EKS `_RealK8sClient` impl)
 - **Upstream repo**: `git@github.com:calliopeai/astrolift-providers.git`

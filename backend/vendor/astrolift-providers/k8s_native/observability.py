@@ -40,7 +40,6 @@ if TYPE_CHECKING:
 
 from _sdk.cluster import (
     ClusterAuth,
-    ContainerResources,
     ContainerStatusInfo,
     PodInfo,
     PodLogLine,
@@ -229,115 +228,8 @@ def _workload_slug_for(metadata: Any, app_slug: str) -> str:
     return ""
 
 
-def _resources_for_spec(spec_container: Any) -> ContainerResources:
-    """Project a ``V1Container.resources`` payload onto the
-    ``ContainerResources`` surface. Falls back to empty strings when
-    a key isn't set — the UI renders empty as ``"—"``."""
-    if spec_container is None:
-        return ContainerResources()
-    resources = getattr(spec_container, "resources", None)
-    if resources is None:
-        return ContainerResources()
-    requests = getattr(resources, "requests", None) or {}
-    limits = getattr(resources, "limits", None) or {}
-    return ContainerResources(
-        cpu_request=str(requests.get("cpu", "") or ""),
-        cpu_limit=str(limits.get("cpu", "") or ""),
-        memory_request=str(requests.get("memory", "") or ""),
-        memory_limit=str(limits.get("memory", "") or ""),
-    )
-
-
-def _last_restart_reasons(cs: Any, restart_count: int) -> tuple[list[str], datetime | None]:
-    """Pull the most recent restart reason + timestamp.
-
-    The kubernetes API only carries ``lastState`` (the previous
-    container instance) — there's no history beyond it. So
-    "last 3 reasons" is best-effort: we return the latest reason at
-    index 0, and pad with the *current* waiting reason if the
-    container is currently in a bad waiting state (so the operator
-    sees both ``CrashLoopBackOff`` and the underlying ``OOMKilled``
-    that drove it). Ordering is
-    ``[last_terminated_reason, current_waiting_reason]`` —
-    most-actionable first."""
-    reasons: list[str] = []
-    last_at: datetime | None = None
-    last_state = getattr(cs, "last_state", None)
-    if last_state is not None:
-        last_term = getattr(last_state, "terminated", None)
-        if last_term is not None:
-            reason = (getattr(last_term, "reason", "") or "").strip()
-            if reason:
-                reasons.append(reason)
-            finished = getattr(last_term, "finished_at", None)
-            if finished is not None:
-                last_at = finished
-    cur_state = getattr(cs, "state", None)
-    if cur_state is not None:
-        waiting = getattr(cur_state, "waiting", None)
-        if waiting is not None:
-            reason = (getattr(waiting, "reason", "") or "").strip()
-            if reason and reason not in reasons:
-                reasons.append(reason)
-    if restart_count == 0 and not last_at:
-        return [], None
-    return reasons[:3], last_at
-
-
-def _kind_for_container(
-    name: str,
-    *,
-    is_init: bool,
-    primary_name: str,
-) -> str:
-    if is_init:
-        return "init"
-    if name and name == primary_name:
-        return "primary"
-    return "sidecar"
-
-
-def _resolve_primary_name(
-    spec_containers: list[Any],
-    *,
-    workload_slug: str,
-    app_slug: str,
-) -> str:
-    """Pick the primary container name.
-
-    Preference order:
-      1. A container whose name matches the workload slug (the
-         manifest renderer names the workload's main container after
-         the workload itself).
-      2. A container whose name matches the app slug (older renders
-         and one-container apps).
-      3. The first container in the spec (typical kubectl convention
-         puts the primary first).
-    """
-    names = [getattr(c, "name", "") or "" for c in spec_containers]
-    if workload_slug and workload_slug in names:
-        return workload_slug
-    if app_slug and app_slug in names:
-        return app_slug
-    return names[0] if names else ""
-
-
-def _to_container_statuses(
-    raw_statuses: Any,
-    *,
-    is_init: bool = False,
-    spec_lookup: dict[str, Any] | None = None,
-    primary_name: str = "",
-) -> list[ContainerStatusInfo]:
-    """Project the k8s container-status payload onto our surface
-    dataclasses.
-
-    ``spec_lookup`` is a ``{name: V1Container}`` map built from the
-    pod spec — joined on container name to pull per-container resource
-    requests/limits + classify init/primary/sidecar without a second
-    apiserver call."""
+def _to_container_statuses(raw_statuses: Any) -> list[ContainerStatusInfo]:
     out: list[ContainerStatusInfo] = []
-    lookup = spec_lookup or {}
     for cs in raw_statuses or []:
         state = "unknown"
         waiting_reason = ""
@@ -359,26 +251,15 @@ def _to_container_statuses(
                     )
                     or ""
                 )
-        name = getattr(cs, "name", "") or ""
-        restart_count = int(getattr(cs, "restart_count", 0) or 0)
-        reasons, last_restart_at = _last_restart_reasons(cs, restart_count)
         out.append(
             ContainerStatusInfo(
-                name=name,
+                name=getattr(cs, "name", "") or "",
                 ready=bool(getattr(cs, "ready", False)),
-                restart_count=restart_count,
+                restart_count=int(getattr(cs, "restart_count", 0) or 0),
                 image=getattr(cs, "image", "") or "",
                 state=state,
                 waiting_reason=waiting_reason,
                 terminated_reason=terminated_reason,
-                kind=_kind_for_container(
-                    name,
-                    is_init=is_init,
-                    primary_name=primary_name,
-                ),
-                last_restart_reasons=reasons,
-                last_restart_at=last_restart_at,
-                resources=_resources_for_spec(lookup.get(name)),
             )
         )
     return out
@@ -417,48 +298,17 @@ class LivePodBackend:
             metadata = getattr(pod, "metadata", None)
             status = getattr(pod, "status", None)
             spec = getattr(pod, "spec", None)
-            workload_slug = _workload_slug_for(metadata, app_slug) if metadata else ""
-
-            spec_main = list(getattr(spec, "containers", None) or []) if spec else []
-            spec_init = list(getattr(spec, "init_containers", None) or []) if spec else []
-            primary_name = _resolve_primary_name(
-                spec_main,
-                workload_slug=workload_slug,
-                app_slug=app_slug,
-            )
-            spec_main_lookup = {(getattr(c, "name", "") or ""): c for c in spec_main}
-            spec_init_lookup = {(getattr(c, "name", "") or ""): c for c in spec_init}
-
-            main_statuses = _to_container_statuses(
+            statuses = _to_container_statuses(
                 getattr(status, "container_statuses", None) if status else None,
-                is_init=False,
-                spec_lookup=spec_main_lookup,
-                primary_name=primary_name,
             )
-            init_statuses = _to_container_statuses(
-                getattr(status, "init_container_statuses", None) if status else None,
-                is_init=True,
-                spec_lookup=spec_init_lookup,
-                primary_name=primary_name,
-            )
-            # Init containers ship in the same status list so the
-            # resolver / UI can iterate once. They sort to the front
-            # because that's the order kubelet starts them in.
-            statuses = init_statuses + main_statuses
-
             phase = (getattr(status, "phase", "") if status else "") or ""
-            # Readiness only considers main containers (init pods are
-            # by definition transient and ``ready=false`` once
-            # complete). Empty ``main_statuses`` (pod still pending /
-            # init-only) reports ``ready=false`` rather than the
-            # vacuously-true ``all([]) == True``.
-            ready = bool(main_statuses) and all(c.ready for c in main_statuses)
-            restarts = sum(c.restart_count for c in main_statuses)
+            ready = bool(statuses) and all(c.ready for c in statuses)
+            restarts = sum(c.restart_count for c in statuses)
             out.append(
                 PodInfo(
                     name=(getattr(metadata, "name", "") or "") if metadata else "",
-                    workload=workload_slug,
-                    status=_classify_status(phase, main_statuses),
+                    workload=(_workload_slug_for(metadata, app_slug) if metadata else ""),
+                    status=_classify_status(phase, statuses),
                     phase=phase,
                     ready=ready,
                     restarts=restarts,

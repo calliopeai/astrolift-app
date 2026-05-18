@@ -1,4 +1,36 @@
-"""GCP Pub/Sub queue managed-service driver (#41)."""
+"""GCP Pub/Sub queue managed-service driver (#363).
+
+Implements ``ManagedServiceDriver`` for the canonical GCP managed-
+queue path. Symmetric to AWS SQS — same Binding shape, just
+google-cloud-pubsub backed. Each provision creates a topic + a
+default subscription named ``<topic>-sub``; workloads need both
+(publish to topic, consume from subscription) and the binding
+exposes both.
+
+Four-corner deprovision matrix:
+
+  delete_data=False, force_destroy=False (default):
+    Drain (seek the subscription to ``now`` to acknowledge in-flight
+    messages without dispatching them) and then delete BOTH the
+    subscription and the topic. Pub/Sub has no "retain queue
+    contents" path because messages aren't durable beyond the
+    subscription's retention window — the topic itself has no
+    persistent state, so retention is implicit. delete_data=False
+    therefore means "don't republish/redeliver the in-flight set".
+
+  delete_data=False, force_destroy=True:
+    Same as the default safe path; force_destroy is meaningful only
+    when a subscription is actively pulling. We log the bypass for
+    operator visibility but otherwise behave identically.
+
+  delete_data=True, force_destroy=False:
+    Skip the drain seek and delete topic + subscription
+    immediately. Any in-flight redeliveries are lost.
+
+  delete_data=True, force_destroy=True:
+    Atomic — skip drain, ignore subscriber-attached refusal
+    (``FAILED_PRECONDITION`` on delete when consumers are pulling).
+"""
 
 from __future__ import annotations
 
@@ -21,7 +53,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from gcp._errors import map_api_error
 
 
 KIND = "queue"
@@ -54,7 +85,9 @@ class PubSubDriver(ManagedServiceDriver):
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         topic_id = self._topic_id(spec=spec)
         sub_id = f"{topic_id}-sub"
-        topic_path = self._pub.topic_path(self._config.project_id, topic_id)
+        topic_path = self._pub.topic_path(
+            self._config.project_id, topic_id,
+        )
         sub_path = self._sub.subscription_path(
             self._config.project_id, sub_id,
         )
@@ -81,14 +114,18 @@ class PubSubDriver(ManagedServiceDriver):
         return ProvisionResult(
             ok=True,
             handle=f"{KIND}/{topic_id}",
-            message=f"Pub/Sub topic + subscription provisioned: {topic_id}",
+            message=(
+                f"Pub/Sub topic + subscription provisioned: {topic_id}"
+            ),
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True, handle=spec.handle,
-            message="pubsub mutable settings (ack_deadline, retention) "
-                    "via subscription patch are operator-managed",
+            message=(
+                "pubsub mutable settings (ack_deadline, retention) "
+                "via subscription patch are operator-managed"
+            ),
         )
 
     def deprovision(
@@ -98,40 +135,92 @@ class PubSubDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        del delete_data, force_destroy
+        from datetime import UTC, datetime
+
         _, _, topic_id = spec.handle.partition("/")
         sub_id = f"{topic_id}-sub"
+        sub_path = self._sub.subscription_path(
+            self._config.project_id, sub_id,
+        )
+        topic_path = self._pub.topic_path(
+            self._config.project_id, topic_id,
+        )
+
+        # Track whether the resources existed at all — a fully-gone
+        # topic+sub is a successful no-op regardless of flags.
+        any_present = False
+
+        if not delete_data:
+            # Drain in-flight messages by seeking the subscription
+            # forward to "now". This acks anything pending without
+            # dispatching it. Best-effort: NotFound means already
+            # gone; other errors surface as warnings, not blockers
+            # — failing to drain shouldn't prevent delete.
+            try:
+                self._sub.seek(
+                    request={
+                        "subscription": sub_path,
+                        "time": datetime.now(UTC).isoformat(),
+                    },
+                )
+                any_present = True
+            except Exception as exc:  # noqa: BLE001
+                if type(exc).__name__ != "NotFound":
+                    # Surface but don't abort.
+                    pass
+
         try:
             self._sub.delete_subscription(
-                request={
-                    "subscription": self._sub.subscription_path(
-                        self._config.project_id, sub_id,
-                    ),
-                },
+                request={"subscription": sub_path},
             )
+            any_present = True
         except Exception as exc:  # noqa: BLE001
-            if type(exc).__name__ != "NotFound":
+            err_name = type(exc).__name__
+            if err_name == "NotFound":
+                pass
+            elif (
+                err_name in ("FailedPrecondition", "FAILED_PRECONDITION")
+                or "FAILED_PRECONDITION" in str(exc)
+            ):
+                if not force_destroy:
+                    return DeprovisionResult(
+                        ok=False, handle=spec.handle,
+                        message=(
+                            f"subscription {sub_id} has active "
+                            f"subscribers — pass force_destroy=True "
+                            f"to bypass"
+                        ),
+                        errors=[str(exc)],
+                    )
+                # force_destroy: log the bypass via message and treat
+                # as already-detached.
+            else:
                 return DeprovisionResult(
                     ok=False, handle=spec.handle,
                     message=str(exc), errors=[str(exc)],
                 )
         try:
-            self._pub.delete_topic(
-                request={
-                    "topic": self._pub.topic_path(
-                        self._config.project_id, topic_id,
-                    ),
-                },
-            )
+            self._pub.delete_topic(request={"topic": topic_path})
+            any_present = True
         except Exception as exc:  # noqa: BLE001
             if type(exc).__name__ != "NotFound":
                 return DeprovisionResult(
                     ok=False, handle=spec.handle,
                     message=str(exc), errors=[str(exc)],
                 )
+
+        if not any_present:
+            return DeprovisionResult(
+                ok=True, handle=spec.handle,
+                message=f"Pub/Sub {topic_id} already gone",
+            )
+        suffix = " (force_destroy)" if force_destroy else ""
         return DeprovisionResult(
             ok=True, handle=spec.handle,
-            message=f"Pub/Sub topic + subscription deleted: {topic_id}",
+            message=(
+                f"Pub/Sub topic + subscription deleted: {topic_id} "
+                f"(drained={'no' if delete_data else 'yes'}){suffix}"
+            ),
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
@@ -188,16 +277,20 @@ class PubSubDriver(ManagedServiceDriver):
             notes="Publisher + subscriber role bindings.",
         )
 
-    def snapshot(self, handle):
-        raise NotImplementedError("Pub/Sub messages are ephemeral; no snapshot")
+    def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
+        raise NotImplementedError(
+            "Pub/Sub messages are ephemeral; no snapshot",
+        )
 
-    def restore(self, snapshot, target):
+    def restore(
+        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+    ) -> ProvisionResult:
         raise NotImplementedError("Pub/Sub doesn't restore")
 
-    def config_schema(self):
+    def config_schema(self) -> dict[str, Any]:
         return {"type": "object", "properties": {}}
 
-    def binding_schema(self):
+    def binding_schema(self) -> BindingSchema:
         return BindingSchema(env_vars={
             "PUBSUB_TOPIC": "Full topic resource path",
             "PUBSUB_SUBSCRIPTION": "Full subscription resource path",
@@ -214,7 +307,9 @@ class PubSubDriver(ManagedServiceDriver):
             parts.append(spec.service_handle_hint)
         raw = "-".join(p for p in parts if p)
         # Pub/Sub topic IDs: alphanumeric + dash + underscore; max 255
-        clean = "".join(c if c.isalnum() or c in "-_" else "-" for c in raw)
+        clean = "".join(
+            c if c.isalnum() or c in "-_" else "-" for c in raw
+        )
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:255]

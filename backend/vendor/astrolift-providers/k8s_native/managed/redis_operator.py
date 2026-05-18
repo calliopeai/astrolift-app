@@ -25,7 +25,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
+from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "redis"
 
@@ -65,34 +66,48 @@ class RedisOperatorConfig:
 
 class RedisOperatorDriver(ManagedServiceDriver):
     def __init__(
-        self, *, config: RedisOperatorConfig | None = None,
+        self,
+        *,
+        config: RedisOperatorConfig | None = None,
     ) -> None:
         self._config = config or RedisOperatorConfig()
 
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
+        namespace = f"{spec.organization_slug}-{spec.app_slug}"
         manifest = self._render_cluster(
-            spec=spec, cluster_name=cluster_name,
+            spec=spec,
+            cluster_name=cluster_name,
         )
         if self._config.cluster_driver is not None:
-            namespace = f"{spec.organization_slug}-{spec.app_slug}"
             result = self._config.cluster_driver.apply_manifests(
-                spec.tenant_cluster_id, namespace, [manifest],
+                spec.tenant_cluster_id,
+                namespace,
+                [manifest],
             )
             if not result.ok:
                 return ProvisionResult(
-                    ok=False, handle="",
+                    ok=False,
+                    handle="",
                     message=f"failed to apply Redis: {result.errors}",
                     errors=result.errors,
                 )
+        handle = _pack_handle(
+            kind=KIND,
+            cluster_id=spec.tenant_cluster_id or "render-only",
+            namespace=namespace,
+            name=cluster_name,
+        )
         return ProvisionResult(
-            ok=True, handle=f"{KIND}/{cluster_name}",
+            ok=True,
+            handle=handle,
             message=f"Redis {cluster_name} applied",
         )
 
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
-            ok=True, handle=spec.handle,
+            ok=True,
+            handle=spec.handle,
             message="re-call provision with new size to update",
         )
 
@@ -103,40 +118,69 @@ class RedisOperatorDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        del force_destroy
+        del delete_data, force_destroy
         if self._config.cluster_driver is None:
             return DeprovisionResult(
-                ok=True, handle=spec.handle,
+                ok=True,
+                handle=spec.handle,
                 message="render-only mode",
             )
-        _, _, name = spec.handle.partition("/")
-        stub = {
-            "apiVersion": "redis.redis.opstreelabs.in/v1beta2",
-            "kind": "Redis",
-            "metadata": {"name": name},
-        }
+        parsed = _unpack_handle(spec.handle)
+        if parsed.is_legacy:
+            return DeprovisionResult(
+                ok=False,
+                handle=spec.handle,
+                message=(
+                    "legacy 2-segment handle cannot be deprovisioned: "
+                    "re-provision to refresh the handle, or pass a "
+                    "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
+                ),
+                errors=["legacy_handle_missing_locator"],
+            )
+        # The operator's reconciler watches both the standalone
+        # ``Redis`` CR and the replicated ``RedisReplication`` CR.
+        # Provision picks one based on size; deprovision emits both
+        # stubs so we don't have to thread the size back through the
+        # handle (the cluster_driver treats not-found as a no-op via
+        # ``DeleteResult.not_found``).
+        stubs = [
+            {
+                "apiVersion": "redis.redis.opstreelabs.in/v1beta2",
+                "kind": kind,
+                "metadata": {
+                    "name": parsed.name,
+                    "namespace": parsed.namespace,
+                },
+            }
+            for kind in ("Redis", "RedisReplication")
+        ]
         result = self._config.cluster_driver.delete_manifests(
-            "default", "redis-operator", [stub],
+            parsed.cluster_id,
+            parsed.namespace,
+            stubs,
         )
         if result.errors:
             return DeprovisionResult(
-                ok=False, handle=spec.handle,
+                ok=False,
+                handle=spec.handle,
                 message=f"delete failed: {result.errors}",
                 errors=result.errors,
             )
         return DeprovisionResult(
-            ok=True, handle=spec.handle,
-            message=f"Redis {name} deleted",
+            ok=True,
+            handle=spec.handle,
+            message=f"Redis {parsed.name} deleted",
         )
 
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
-            handle=handle.handle, state="provisioning",
+            handle=handle.handle,
+            state="provisioning",
             message="query the Redis CRD's status block via cluster_driver",
         )
 
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, name = handle.handle.partition("/")
+        name = _unpack_handle(handle.handle).name
         # Bitnami Redis operator generates a Service named
         # <cluster>-redis on port 6379.
         host = f"{name}-redis"
@@ -153,10 +197,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
                 ),
             },
             iam_grants=[],
-            notes=(
-                "Connect via REDIS_HOST + port; password from "
-                "the operator-generated Secret."
-            ),
+            notes=("Connect via REDIS_HOST + port; password from " "the operator-generated Secret."),
         )
 
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
@@ -170,10 +211,13 @@ class RedisOperatorDriver(ManagedServiceDriver):
         )
 
     def restore(
-        self, snapshot: SnapshotHandle, target: ProvisionSpec,
+        self,
+        snapshot: SnapshotHandle,
+        target: ProvisionSpec,
     ) -> ProvisionResult:
         return ProvisionResult(
-            ok=False, handle="",
+            ok=False,
+            handle="",
             message="redis restore via RDB import is operator-managed",
             errors=["not_implemented_in_driver"],
         )
@@ -188,35 +232,39 @@ class RedisOperatorDriver(ManagedServiceDriver):
         }
 
     def binding_schema(self) -> BindingSchema:
-        return BindingSchema(env_vars={
-            "REDIS_HOST": "Service hostname",
-            "REDIS_PORT": "6379",
-            "REDIS_PASSWORD": "Auth password from operator Secret",
-            "REDIS_URL": "Full redis:// URL",
-        })
+        return BindingSchema(
+            env_vars={
+                "REDIS_HOST": "Service hostname",
+                "REDIS_PORT": "6379",
+                "REDIS_PASSWORD": "Auth password from operator Secret",
+                "REDIS_URL": "Full redis:// URL",
+            }
+        )
 
     def _cluster_name(self, *, spec: ProvisionSpec) -> str:
         parts = [spec.app_slug, spec.environment_name]
         if spec.service_handle_hint:
             parts.append(spec.service_handle_hint)
         raw = "-".join(p for p in parts if p)
-        clean = "".join(
-            c if c.isalnum() or c == "-" else "-"
-            for c in raw.lower()
-        )
+        clean = "".join(c if c.isalnum() or c == "-" else "-" for c in raw.lower())
         while "--" in clean:
             clean = clean.replace("--", "-")
         return clean.strip("-")[:60]
 
     def _render_cluster(
-        self, *, spec: ProvisionSpec, cluster_name: str,
+        self,
+        *,
+        spec: ProvisionSpec,
+        cluster_name: str,
     ) -> dict[str, Any]:
         size_spec = SIZE_TO_SPEC.get(spec.size, SIZE_TO_SPEC["small"])
         memory = spec.config.get(
-            "memory_override", size_spec["memory"],
+            "memory_override",
+            size_spec["memory"],
         )
         persistent = spec.config.get(
-            "persistent", self._config.persistent,
+            "persistent",
+            self._config.persistent,
         )
         manifest: dict[str, Any] = {
             "apiVersion": "redis.redis.opstreelabs.in/v1beta2",
@@ -253,9 +301,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
                 },
             }
             if self._config.storage_class:
-                manifest["spec"]["storage"][
-                    "volumeClaimTemplate"
-                ]["spec"]["storageClassName"] = (
+                manifest["spec"]["storage"]["volumeClaimTemplate"]["spec"]["storageClassName"] = (
                     self._config.storage_class
                 )
         return manifest

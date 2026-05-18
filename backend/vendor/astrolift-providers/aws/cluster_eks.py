@@ -8,10 +8,15 @@ the local AWS-IAM-authenticator helper or direct STS) to get a
 short-lived bearer token. The kubernetes Python client uses
 those to talk to the cluster's API server.
 
-Token refresh: tokens expire every ~14 minutes. The driver
-re-fetches on each operation rather than caching long-term;
-high-frequency callers should reuse a single driver instance
-which keeps the boto3 client warm.
+Token refresh: tokens expire ~15 minutes after signing. The
+apply-manifests path mints fresh on every operation (high
+amortized cost is fine for low-frequency lifecycle activities);
+the runtime-observability path (``list_pods`` / ``stream_logs``,
+#299) mints lazily and caches per (cluster_name, region) for
+~13 minutes so back-to-back resolver calls don't pay the STS
+round trip each time. Cache is in-process on the driver
+instance — long-lived workers benefit; short CLI invocations
+get a single mint anyway.
 
 This module is the platform's authoritative way to apply
 manifests, manage namespaces, and observe rollouts. Other
@@ -22,6 +27,7 @@ top of it.
 from __future__ import annotations
 
 import base64
+import contextlib
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -38,7 +44,6 @@ from _sdk.cluster import (
     ClusterDriver,
     DeleteResult,
     ExecResult,
-    InteractiveExecSession,
     ManagementReport,
     Namespace,
     NamespaceState,
@@ -51,10 +56,6 @@ from _sdk.cluster import (
 )
 from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
-from k8s_native.interactive_exec import (
-    InteractiveExecBackend,
-    default_interactive_exec_backend,
-)
 from k8s_native.management import (
     ManagementBackend,
     default_management_backend,
@@ -85,6 +86,38 @@ class EKSConfig:
     GetToken upper bound and avoids spurious mid-operation auth
     failures on first-rollout deploys (#359)."""
 
+    exec_plugin_token_ttl_seconds: int = 13 * 60
+    """How long the observability-path token cache holds a minted
+    bearer before re-signing. The STS-presigned URL is valid for
+    15 min by EKS protocol; 13 min gives a 2 min safety margin
+    against clock skew + cluster-side acceptance windows."""
+
+
+@dataclass
+class _TokenCacheEntry:
+    """One cached bearer token with its absolute expiry timestamp.
+
+    ``expires_at`` is a monotonic-clock deadline so the cache is
+    immune to wall-clock jumps (DST, NTP slew, container migration).
+    """
+
+    token: str
+    expires_at: float
+
+
+@dataclass
+class _DescribeCacheEntry:
+    """Endpoint + base64-CA cached from EKS DescribeCluster.
+
+    Kept distinct from the bearer-token cache because DescribeCluster
+    output rarely rotates (it changes when the operator rotates the
+    cluster CA, which is rare and out-of-band). Cleared explicitly
+    in ``invalidate_describe_cache`` if a caller ever needs to.
+    """
+
+    endpoint: str
+    ca_data: str
+
 
 class EKSClusterDriver(ClusterDriver):
     """boto3 + kubernetes-client backed EKS driver."""
@@ -99,7 +132,8 @@ class EKSClusterDriver(ClusterDriver):
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
         management_backend: ManagementBackend | None = None,
-        exec_backend: InteractiveExecBackend | None = None,
+        token_minter: Callable[[str, str], str] | None = None,
+        monotonic_clock: Callable[[], float] | None = None,
     ) -> None:
         self._config = config
         if eks_client is not None:
@@ -122,25 +156,40 @@ class EKSClusterDriver(ClusterDriver):
         # as K8sNativeClusterDriver — the listing + log-streaming
         # path is cloud-neutral as soon as the ClusterAuth blob is
         # in hand; what's EKS-specific is *how* the operator's
-        # exec_plugin row gets turned into kubeconfig (#309 follow-up).
+        # exec_plugin row gets turned into kubeconfig (#309).
         self._pod_backend: PodBackend = pod_backend or LivePodBackend()
         self._log_backend: LogBackend = log_backend if log_backend is not None else default_log_backend()
         # Bring-into-management (#316). The RBAC apply + capability
         # probe + preflight Job body is the k8s_native canonical
-        # version; EKS auth is already routed back through the
-        # kubeconfig branch of ``build_api_client`` once the row's
-        # ``auth_config`` carries a kubeconfig blob, so no EKS-side
-        # override is needed today. ``exec_plugin`` auth remains
-        # pending the #309 follow-up.
+        # version; EKS auth is routed through the synthesized
+        # ``kubeconfig`` blob the helpers below build, so the shared
+        # backend's ``build_api_client`` is the only thing the probe
+        # path needs to satisfy.
         self._management_backend: ManagementBackend = (
             management_backend if management_backend is not None else default_management_backend()
         )
-        # Interactive exec backend (#423) — same materialize-then-delegate
-        # auth dance as the log/pod backends; lives behind a separate
-        # constructor kwarg so tests inject a recording session.
-        self._exec_backend: InteractiveExecBackend = (
-            exec_backend if exec_backend is not None else default_interactive_exec_backend()
+        # Token-mint injection lets tests substitute a recording
+        # double for ``mint_eks_token`` without monkey-patching the
+        # module. Default points at the production helper.
+        self._token_minter: Callable[[str, str], str] = token_minter or (
+            lambda cluster_name, region: mint_eks_token(
+                cluster_name=cluster_name,
+                region=region,
+                expires_in_seconds=self._config.sts_token_lifetime_seconds,
+            )
         )
+        # Monotonic clock is parametrized so the cache-TTL tests can
+        # drive expiry without sleeping. ``time.monotonic`` is the
+        # production source — wall-clock-jump-immune.
+        self._clock: Callable[[], float] = monotonic_clock or time.monotonic
+        # Per-(cluster_name, region) bearer-token cache for the
+        # observability path. The apply-manifests path mints
+        # per-operation via ``_eks_token`` and does NOT use this
+        # cache — it's strictly for resolver-side call hot-loops.
+        self._token_cache: dict[tuple[str, str], _TokenCacheEntry] = {}
+        # Per-cluster_name describe-cache for endpoint + CA. Cleared
+        # by ``invalidate_describe_cache`` on the rare CA rotation.
+        self._describe_cache: dict[str, _DescribeCacheEntry] = {}
 
     # ---- apply / delete -------------------------------------------
 
@@ -458,7 +507,7 @@ class EKSClusterDriver(ClusterDriver):
         ``service_account_token`` pass through unchanged.
         """
         return self._pod_backend.list_pods(
-            auth=self._materialize_eks_auth_auth(auth),
+            auth=self._resolve_eks_auth(auth),
             namespace=namespace,
             app_slug=app_slug,
         )
@@ -475,7 +524,7 @@ class EKSClusterDriver(ClusterDriver):
     ) -> AsyncIterator[PodLogLine]:
         """See ``list_pods`` — same materialize-then-delegate pattern."""
         return self._log_backend.stream(
-            auth=self._materialize_eks_auth_auth(auth),
+            auth=self._resolve_eks_auth(auth),
             namespace=namespace,
             pod_name=pod_name,
             container=container,
@@ -483,32 +532,12 @@ class EKSClusterDriver(ClusterDriver):
             follow=follow,
         )
 
-    def interactive_exec(
-        self,
-        *,
-        auth: ClusterAuth,
-        namespace: str,
-        pod_name: str,
-        container: str,
-        command: list[str],
-        tty: bool = True,
-    ) -> InteractiveExecSession:
-        """See ``list_pods`` — same materialize-then-delegate pattern."""
-        return self._exec_backend.open(
-            auth=self._materialize_eks_auth_auth(auth),
-            namespace=namespace,
-            pod_name=pod_name,
-            container=container,
-            command=command,
-            tty=tty,
-        )
-
     # ---- bring-into-management (#316) -----------------------------
 
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
         return probe_cluster_capabilities(
             backend=self._management_backend,
-            cluster=self._materialize_eks_auth_context(cluster),
+            cluster=self._resolve_eks_auth_context(cluster),
         )
 
     def bring_into_management(
@@ -519,7 +548,7 @@ class EKSClusterDriver(ClusterDriver):
     ) -> ManagementReport:
         return run_bring_into_management(
             backend=self._management_backend,
-            cluster=self._materialize_eks_auth_context(cluster),
+            cluster=self._resolve_eks_auth_context(cluster),
             run_preflight=run_preflight,
         )
 
@@ -799,65 +828,190 @@ class EKSClusterDriver(ClusterDriver):
             ),
         ]
 
-    # ---- exec_plugin token materialization -----------------------
+    # ---- exec_plugin token materialization (#309) -----------------
     #
-    # The k8s_native backend's ``build_api_client`` knows how to handle
-    # ``kubeconfig`` + ``service_account_token`` auth but raises on
-    # ``exec_plugin`` — EKS-specific token minting is the cloud
-    # driver's job. We pre-mint the bearer token via the
-    # AWS-IAM-Authenticator protocol and rewrite the auth so the
-    # shared backend sees a plain ``service_account_token`` blob.
+    # The k8s_native backend's ``build_api_client`` handles
+    # ``kubeconfig`` + ``service_account_token`` auth natively but
+    # raises on ``exec_plugin`` — EKS-specific token minting is the
+    # cloud driver's job. We mint the bearer token via the
+    # AWS-IAM-Authenticator protocol, fetch the cluster's endpoint +
+    # CA via DescribeCluster, synthesize an in-memory kubeconfig
+    # blob, and rewrite the auth payload so the shared backend sees
+    # a plain ``kubeconfig`` row. The kubeconfig branch is the more
+    # tolerant path (carries endpoint, CA, and bearer in one YAML
+    # doc) and is what ``aws eks get-token`` users actually consume
+    # via their kubeconfig file — so the resolver path matches the
+    # operator's local kubectl path exactly.
     #
     # Two helpers because ClusterContext (for bring/probe) and
     # ClusterAuth (for list_pods/stream_logs) are different frozen
-    # dataclasses — dataclasses.replace is type-specific. The
-    # token-mint logic is shared via ``_eks_token_for``.
+    # dataclasses — dataclasses.replace is type-specific. Both
+    # converge on ``_synthesize_kubeconfig`` for the actual work.
 
-    def _eks_token_for(self, cluster_name: str | None, region: str | None) -> str:
-        """Mint an EKS bearer token. Falls back to the driver's
-        configured cluster_name / region when the row didn't carry
-        them (legacy rows registered before auto-discover landed)."""
-        name = cluster_name or self._config.cluster_name
-        rgn = region or self._config.region
+    def _resolve_eks_target(
+        self,
+        cluster_name: str | None,
+        region: str | None,
+    ) -> tuple[str, str]:
+        """Resolve the (cluster_name, region) to use for token mint +
+        describe. Falls back to the driver's configured values for
+        legacy TenantCluster rows that pre-date auto-discovery."""
+        return (
+            cluster_name or self._config.cluster_name,
+            region or self._config.region,
+        )
+
+    def _cached_token(self, cluster_name: str, region: str) -> str:
+        """Mint-or-return-cached bearer token for the (cluster, region).
+
+        Tokens are cached for ``exec_plugin_token_ttl_seconds`` (13 min
+        by default) against the monotonic clock so resolver hot-loops
+        don't re-sign on every call. Re-minted on miss / expiry."""
+        key = (cluster_name, region)
+        now = self._clock()
+        entry = self._token_cache.get(key)
+        if entry is not None and entry.expires_at > now:
+            return entry.token
         try:
-            return mint_eks_token(
-                cluster_name=name,
-                region=rgn,
-                expires_in_seconds=self._config.sts_token_lifetime_seconds,
-            )
+            token = self._token_minter(cluster_name, region)
         except Exception as exc:
             raise map_client_error(exc) from exc
+        self._token_cache[key] = _TokenCacheEntry(
+            token=token,
+            expires_at=now + float(self._config.exec_plugin_token_ttl_seconds),
+        )
+        return token
 
-    def _materialize_eks_auth_context(self, cluster: ClusterContext) -> ClusterContext:
+    def _cached_describe(self, cluster_name: str) -> _DescribeCacheEntry:
+        """Endpoint + base64-CA for the cluster, cached after first hit.
+
+        ``ClusterAuthError`` from the shared backend is what the
+        resolver layer expects on auth failure, but at this layer we
+        raise via ``map_client_error`` so the caller sees a typed
+        ``NotFoundError`` / ``ProviderError`` and can decide whether
+        to log + swallow or surface."""
+        cached = self._describe_cache.get(cluster_name)
+        if cached is not None:
+            return cached
+        try:
+            response = self._eks.describe_cluster(name=cluster_name)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        cluster_payload = response["cluster"]
+        entry = _DescribeCacheEntry(
+            endpoint=cluster_payload["endpoint"],
+            ca_data=cluster_payload["certificateAuthority"]["data"],
+        )
+        self._describe_cache[cluster_name] = entry
+        return entry
+
+    def invalidate_describe_cache(self, cluster_name: str | None = None) -> None:
+        """Drop a cached DescribeCluster entry. Operators rotating
+        the cluster CA can call this; the next observability call
+        re-fetches. Passing None clears the whole cache."""
+        if cluster_name is None:
+            self._describe_cache.clear()
+        else:
+            self._describe_cache.pop(cluster_name, None)
+
+    def _synthesize_kubeconfig(
+        self,
+        *,
+        slug: str,
+        cluster_name: str,
+        region: str,
+    ) -> dict[str, Any]:
+        """Build the auth_config blob (``{"kubeconfig": <yaml>}``)
+        a synthesized ``ClusterAuth(auth_method='kubeconfig', ...)``
+        carries through ``build_api_client``.
+
+        The YAML shape is the standard EKS kubeconfig — one cluster,
+        one user, one context — with the bearer token inlined under
+        the user's ``token`` field. We deliberately do NOT emit an
+        ``exec`` stanza pointing at ``aws eks get-token`` because the
+        platform worker container doesn't ship the AWS CLI; inlining
+        the token sidesteps that and matches what ``mint_eks_token``
+        already does for in-process consumption."""
+        import yaml
+
+        describe = self._cached_describe(cluster_name)
+        token = self._cached_token(cluster_name, region)
+        user_name = f"astrolift-{slug}"
+        kubeconfig = {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "current-context": slug,
+            "clusters": [
+                {
+                    "name": cluster_name,
+                    "cluster": {
+                        "server": describe.endpoint,
+                        # CA is delivered base64-encoded by EKS;
+                        # kubeconfig spec also expects base64 under
+                        # ``certificate-authority-data`` — pass through
+                        # unchanged.
+                        "certificate-authority-data": describe.ca_data,
+                    },
+                },
+            ],
+            "users": [
+                {
+                    "name": user_name,
+                    "user": {"token": token},
+                },
+            ],
+            "contexts": [
+                {
+                    "name": slug,
+                    "context": {
+                        "cluster": cluster_name,
+                        "user": user_name,
+                    },
+                },
+            ],
+        }
+        return {"kubeconfig": yaml.safe_dump(kubeconfig, sort_keys=False)}
+
+    def _resolve_eks_auth_context(self, cluster: ClusterContext) -> ClusterContext:
         if cluster.auth_method != "exec_plugin":
             return cluster
         import dataclasses
 
         cfg = cluster.auth_config or {}
-        token = self._eks_token_for(cfg.get("cluster_name"), cfg.get("region"))
+        cluster_name, region = self._resolve_eks_target(
+            cfg.get("cluster_name"),
+            cfg.get("region"),
+        )
+        auth_config = self._synthesize_kubeconfig(
+            slug=cluster.slug,
+            cluster_name=cluster_name,
+            region=region,
+        )
         return dataclasses.replace(
             cluster,
-            auth_method="service_account_token",
-            auth_config={
-                "token": token,
-                "ca_cert": cluster.ca_cert or cfg.get("ca_cert", ""),
-            },
+            auth_method="kubeconfig",
+            auth_config=auth_config,
         )
 
-    def _materialize_eks_auth_auth(self, auth: ClusterAuth) -> ClusterAuth:
+    def _resolve_eks_auth(self, auth: ClusterAuth) -> ClusterAuth:
         if auth.auth_method != "exec_plugin":
             return auth
         import dataclasses
 
         cfg = auth.auth_config or {}
-        token = self._eks_token_for(cfg.get("cluster_name"), cfg.get("region"))
+        cluster_name, region = self._resolve_eks_target(
+            cfg.get("cluster_name"),
+            cfg.get("region"),
+        )
+        auth_config = self._synthesize_kubeconfig(
+            slug=auth.slug,
+            cluster_name=cluster_name,
+            region=region,
+        )
         return dataclasses.replace(
             auth,
-            auth_method="service_account_token",
-            auth_config={
-                "token": token,
-                "ca_cert": auth.ca_cert or cfg.get("ca_cert", ""),
-            },
+            auth_method="kubeconfig",
+            auth_config=auth_config,
         )
 
     # ---- Cluster health (#68 slice 1) -----------------------------
@@ -939,26 +1093,22 @@ class EKSClusterDriver(ClusterDriver):
         return client
 
     def _describe_cluster(self) -> tuple[str, str]:
-        try:
-            response = self._eks.describe_cluster(
-                name=self._config.cluster_name,
-            )
-        except Exception as exc:
-            raise map_client_error(exc) from exc
-        cluster = response["cluster"]
-        endpoint = cluster["endpoint"]
-        ca_data = cluster["certificateAuthority"]["data"]
+        # Shared with the observability path's ``_cached_describe`` so
+        # both the apply-manifests boto3 flow and the synthesize-
+        # kubeconfig flow read the same canonical endpoint + CA pair.
         # ca_data is base64-encoded by EKS; the kubernetes client
         # handles the decode per its config shape.
-        return endpoint, ca_data
+        entry = self._cached_describe(self._config.cluster_name)
+        return entry.endpoint, entry.ca_data
 
     def _eks_token(self) -> str:
         """Generate a short-lived EKS bearer token via the
         AWS-IAM-Authenticator protocol (presigned STS GetCallerIdentity
         URL with ``x-k8s-aws-id`` header). Re-minted per operation
-        rather than cached; the presigned-URL lifetime comes from
-        ``EKSConfig.sts_token_lifetime_seconds`` and caps at the EKS
-        15-minute ceiling."""
+        rather than cached; STS rejects URLs older than 15 minutes,
+        so we ask for the EKS ceiling (``sts_token_lifetime_seconds``,
+        default 900) to avoid spurious mid-operation auth failures
+        on first-rollout deploys (#359)."""
         try:
             return mint_eks_token(
                 cluster_name=self._config.cluster_name,
@@ -992,6 +1142,95 @@ def _build_k8s_client(
         ca_data=ca_data,
         token_provider=token_provider,
     )
+
+
+# ---- Bare-kind → apiVersion fallbacks ------------------------------
+#
+# Most call sites pass a bare ``kind`` string ("Deployment", "Pod") and
+# expect the wrapper to know the right apiVersion. CRDs come through
+# as ``group/version/Kind`` (e.g. ``helm.toolkit.fluxcd.io/v2/HelmRelease``)
+# so we split on ``/`` and fall back to this table when it's a single
+# token. Keep this aligned with the manifests emitted from k8s_native/
+# and aws/ — adding a new built-in kind only needs a row here.
+_DEFAULT_API_VERSION_FOR_KIND: dict[str, str] = {
+    "Pod": "v1",
+    "Service": "v1",
+    "ConfigMap": "v1",
+    "Secret": "v1",
+    "Namespace": "v1",
+    "ServiceAccount": "v1",
+    "PersistentVolumeClaim": "v1",
+    "PersistentVolume": "v1",
+    "Endpoints": "v1",
+    "Node": "v1",
+    "Deployment": "apps/v1",
+    "StatefulSet": "apps/v1",
+    "DaemonSet": "apps/v1",
+    "ReplicaSet": "apps/v1",
+    "Job": "batch/v1",
+    "CronJob": "batch/v1",
+    "Ingress": "networking.k8s.io/v1",
+    "NetworkPolicy": "networking.k8s.io/v1",
+    "Role": "rbac.authorization.k8s.io/v1",
+    "RoleBinding": "rbac.authorization.k8s.io/v1",
+    "ClusterRole": "rbac.authorization.k8s.io/v1",
+    "ClusterRoleBinding": "rbac.authorization.k8s.io/v1",
+    "HorizontalPodAutoscaler": "autoscaling/v2",
+    "PodDisruptionBudget": "policy/v1",
+}
+
+
+def _split_kind(kind: str) -> tuple[str, str]:
+    """Resolve caller-supplied ``kind`` into ``(api_version, kind)``.
+
+    Accepts either bare ``"Deployment"`` (looked up in the built-in
+    table) or qualified ``"group/version/Kind"`` for CRDs. Raising
+    KeyError here is intentional — an unknown bare kind is a coding
+    error, not a runtime condition the caller can recover from.
+    """
+    if "/" in kind:
+        parts = kind.split("/")
+        if len(parts) == 3:
+            # group/version/Kind  → apiVersion = group/version
+            return f"{parts[0]}/{parts[1]}", parts[2]
+        if len(parts) == 2:
+            # version/Kind (core group)
+            return parts[0], parts[1]
+        raise ValueError(f"unrecognized kind path: {kind}")
+    api_version = _DEFAULT_API_VERSION_FOR_KIND.get(kind)
+    if api_version is None:
+        raise KeyError(
+            f"no default apiVersion for bare kind {kind!r}; pass "
+            f"'group/version/Kind' for CRDs",
+        )
+    return api_version, kind
+
+
+class _PortForwardHandle:
+    """Concrete ``PortForwardSession`` returned by ``port_forward``.
+
+    Wraps a ``kubernetes.stream.ws_client.PortForward`` instance so
+    callers can ``close()`` the websocket without depending on the
+    kubernetes module shape. ``local_port`` and ``remote_port`` mirror
+    the first port pair the caller asked to forward — multi-port
+    sessions need to inspect ``_pf`` directly via the underlying
+    ``socket(remote_port)`` API.
+    """
+
+    def __init__(self, *, pf: Any, local_port: int, remote_port: int) -> None:
+        self._pf = pf
+        self.local_port = local_port
+        self.remote_port = remote_port
+
+    def close(self) -> None:
+        # The websocket is best-effort — once we're shutting down,
+        # a failed close shouldn't mask the original work.
+        with contextlib.suppress(Exception):
+            self._pf.close()
+
+    def socket(self, port: int) -> Any:
+        """Expose the underlying per-port socket for advanced callers."""
+        return self._pf.socket(port)
 
 
 class _RealK8sClient:
@@ -1028,28 +1267,282 @@ class _RealK8sClient:
         self._config = cfg
         self._client_module = client
         self._k8s_config = config
+        self._dynamic: Any = None
 
-    # The methods below would wrap kubernetes.dynamic +
-    # kubernetes.client to provide server_side_apply / get / delete /
-    # exec / port_forward. Deferred to integration testing against
-    # a real cluster — unit-test path uses the injected factory.
+    # ---- internal helpers ----------------------------------------
 
-    def server_side_apply(self, *, namespace, manifest, dry_run):
-        raise NotImplementedError(
-            "server_side_apply requires live cluster — wire via kubernetes.dynamic.DynamicClient at deploy time",
+    def _refresh_token(self) -> None:
+        """Re-mint the bearer before each top-level op.
+
+        EKS tokens are valid ~15min; long-running workflows that hold
+        a single ``_RealK8sClient`` instance across multiple
+        activities would otherwise 401 mid-flight. Mutating
+        ``cfg.api_key`` updates the live ``ApiClient`` because the
+        kubernetes client reads from the shared configuration object
+        on each call.
+        """
+        self._config.api_key = {
+            "authorization": f"Bearer {self._token_provider()}",
+        }
+
+    def _dyn(self) -> Any:
+        """Lazy-build the DynamicClient once and reuse.
+
+        DynamicClient hits ``/apis`` on construction to discover
+        resources; we pay that cost once per ``_RealK8sClient``
+        instance instead of per call.
+        """
+        if self._dynamic is None:
+            from kubernetes.dynamic import DynamicClient
+
+            self._dynamic = DynamicClient(self._api_client)
+        return self._dynamic
+
+    def _resource_for(self, api_version: str, kind: str) -> Any:
+        """Resolve a (apiVersion, kind) pair to a dynamic Resource."""
+        return self._dyn().resources.get(
+            api_version=api_version,
+            kind=kind,
         )
 
+    @staticmethod
+    def _to_dict(obj: Any) -> dict[str, Any]:
+        """Coerce a ``ResourceInstance`` (or already-a-dict) to dict.
+
+        The dynamic client returns ``ResourceInstance`` objects whose
+        ``.to_dict()`` walks the attribute tree. Tests inject plain
+        dicts; we accept either to keep call-site contracts identical.
+        """
+        if hasattr(obj, "to_dict"):
+            return obj.to_dict()
+        return obj
+
+    # ---- public API ----------------------------------------------
+
+    def server_side_apply(self, *, namespace, manifest, dry_run):
+        """Server-side apply via the dynamic client.
+
+        Returns one of ``"created"`` / ``"updated"`` / ``"unchanged"``.
+        Strategy:
+          1. GET the target object first — a 404 means we're creating.
+          2. Apply with ``field_manager="astrolift"``,
+             ``force_conflicts=False``.
+          3. If the pre-apply GET found nothing → ``"created"``.
+             Otherwise compare ``metadata.generation`` against the
+             pre-apply snapshot — same generation means SSA accepted
+             our intent without changing the resource spec
+             (``"unchanged"``); a bump means ``"updated"``.
+
+        ``dry_run`` is the bool the SDK callers pass; the kubernetes
+        wire takes the literal string ``"All"`` for dry-run.
+        """
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        api_version = manifest.get("apiVersion", "v1")
+        kind = manifest.get("kind")
+        if not kind:
+            raise ValueError("manifest is missing 'kind'")
+        meta = manifest.get("metadata") or {}
+        name = meta.get("name")
+        if not name:
+            raise ValueError(f"manifest for {kind} is missing metadata.name")
+
+        resource = self._resource_for(api_version, kind)
+
+        # Snapshot pre-state so we can classify the outcome.
+        pre_existed = False
+        pre_generation: int | None = None
+        try:
+            current = resource.get(name=name, namespace=namespace)
+            pre_existed = True
+            pre_generation = (
+                self._to_dict(current).get("metadata", {}).get("generation")
+            )
+        except DynNotFound:
+            pre_existed = False
+
+        apply_kwargs: dict[str, Any] = {
+            "body": manifest,
+            "namespace": namespace,
+            "field_manager": "astrolift",
+            "force_conflicts": False,
+        }
+        if dry_run:
+            apply_kwargs["dry_run"] = "All"
+
+        try:
+            applied = resource.server_side_apply(**apply_kwargs)
+        except DynNotFound as exc:
+            # Cluster-scoped resource the dynamic client refuses to
+            # create through SSA — bubble up as our domain NotFound so
+            # callers handle it uniformly.
+            raise _NotFoundError(str(exc)) from exc
+
+        if not pre_existed:
+            return "created"
+
+        post_generation = (
+            self._to_dict(applied).get("metadata", {}).get("generation")
+        )
+        # Resources that don't carry generation (ConfigMap, Secret,
+        # ServiceAccount) can't distinguish updated vs unchanged via
+        # generation. Fall back to resourceVersion comparison.
+        if post_generation is not None and pre_generation is not None:
+            if post_generation == pre_generation:
+                return "unchanged"
+            return "updated"
+        pre_rv = (
+            self._to_dict(current).get("metadata", {}).get("resourceVersion")
+        )
+        post_rv = (
+            self._to_dict(applied).get("metadata", {}).get("resourceVersion")
+        )
+        if pre_rv is not None and pre_rv == post_rv:
+            return "unchanged"
+        return "updated"
+
     def get(self, *, kind, namespace, name):
-        raise NotImplementedError("requires live cluster")
+        """Fetch a resource by ``kind``/``namespace``/``name``.
+
+        Returns the resource as a dict. Returns ``None`` if the
+        resource doesn't exist (a 404 from the apiserver is the only
+        non-error path that yields None — every other failure raises).
+        """
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        api_version, resolved_kind = _split_kind(kind)
+        resource = self._resource_for(api_version, resolved_kind)
+        try:
+            obj = resource.get(name=name, namespace=namespace)
+        except DynNotFound:
+            return None
+        return self._to_dict(obj)
 
     def delete(self, *, kind, namespace, name):
-        raise NotImplementedError("requires live cluster")
+        """Delete a resource by ``kind``/``namespace``/``name``.
+
+        Returns ``True`` if the apiserver accepted the delete,
+        ``False`` if the resource was already gone (404 is swallowed
+        so callers can drive idempotent teardown loops).
+        """
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        api_version, resolved_kind = _split_kind(kind)
+        resource = self._resource_for(api_version, resolved_kind)
+        try:
+            resource.delete(name=name, namespace=namespace)
+        except DynNotFound:
+            return False
+        return True
 
     def get_namespace(self, *, name):
-        raise NotImplementedError("requires live cluster")
+        """Fetch a Namespace by name. Returns dict, or ``None`` if 404."""
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import NotFoundError as DynNotFound
+
+        resource = self._resource_for("v1", "Namespace")
+        try:
+            ns = resource.get(name=name)
+        except DynNotFound:
+            return None
+        return self._to_dict(ns)
 
     def exec_in_pod(self, *, namespace, pod, container, command):
-        raise NotImplementedError("requires live cluster")
+        """Exec ``command`` inside ``container`` of ``pod``.
+
+        Returns ``ExecResult`` with the captured stdout, stderr, and
+        exit code reported by the apiserver's exec channel. Uses
+        ``kubernetes.stream.stream`` with ``_preload_content=False``
+        so we can read stdout + stderr separately and inspect the
+        exit status frame.
+        """
+        self._refresh_token()
+        from kubernetes.stream import stream
+
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        resp = stream(
+            core_v1.connect_get_namespaced_pod_exec,
+            pod,
+            namespace,
+            command=list(command),
+            container=container,
+            stderr=True,
+            stdin=False,
+            stdout=True,
+            tty=False,
+            _preload_content=False,
+        )
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+        while resp.is_open():
+            resp.update(timeout=1)
+            if resp.peek_stdout():
+                stdout_chunks.append(resp.read_stdout())
+            if resp.peek_stderr():
+                stderr_chunks.append(resp.read_stderr())
+
+        exit_code = 0
+        try:
+            err_payload = resp.read_channel(3)
+            if err_payload:
+                # The error channel carries a v1.Status JSON. Non-zero
+                # exit shows up as ``status: "Failure"`` with the exit
+                # code in ``details.causes[].message``.
+                import json
+
+                parsed = json.loads(err_payload)
+                if parsed.get("status") == "Failure":
+                    for cause in parsed.get("details", {}).get("causes", []):
+                        if cause.get("reason") == "ExitCode":
+                            try:
+                                exit_code = int(cause.get("message", "1"))
+                            except (TypeError, ValueError):
+                                exit_code = 1
+                            break
+                    else:
+                        exit_code = 1
+        except Exception:
+            # The error channel is best-effort; the streamed payload
+            # is the authoritative result and we don't want a parse
+            # bug to mask an otherwise-successful exec.
+            pass
+        finally:
+            resp.close()
+
+        return ExecResult(
+            exit_code=exit_code,
+            stdout="".join(stdout_chunks),
+            stderr="".join(stderr_chunks),
+        )
 
     def port_forward(self, *, namespace, pod, ports):
-        raise NotImplementedError("requires live cluster")
+        """Open a port-forward session against ``pod``.
+
+        ``ports`` is a list of ``(local, remote)`` tuples; the
+        kubernetes API multiplexes them all on a single websocket.
+        Returns a ``_PortForwardHandle`` carrying the first pair on
+        ``local_port`` / ``remote_port`` plus a ``close()`` for the
+        websocket and a ``socket(port)`` accessor for callers that
+        need the raw per-port socket.
+        """
+        self._refresh_token()
+        from kubernetes.stream import portforward
+
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        remote_ports = [remote for (_local, remote) in ports]
+        pf = portforward(
+            core_v1.connect_get_namespaced_pod_portforward,
+            pod,
+            namespace,
+            ports=",".join(str(p) for p in remote_ports),
+        )
+        first_local, first_remote = ports[0] if ports else (0, 0)
+        return _PortForwardHandle(
+            pf=pf,
+            local_port=first_local,
+            remote_port=first_remote,
+        )
