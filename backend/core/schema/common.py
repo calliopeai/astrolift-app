@@ -165,8 +165,8 @@ def scope_to_caller_org(queryset: QuerySet, info: Info, *, fk_path: str) -> Quer
 
     Originally lived inline in `core/schema/types/process.py` as part
     of the #542 fix; moved here so every type that needs cross-tenant
-    scoping at the queryset boundary (FileUpload #723, MetabaseChart
-    #724, future audits) can reuse the same shape. Mirrors
+    scoping at the queryset boundary (FileUpload #723, future audits)
+    can reuse the same shape. Mirrors
     `UploadQuerySet.with_view_permission` semantics, parametrised on
     the FK path because the target model can either own the
     organization column directly or traverse one or more FKs to reach

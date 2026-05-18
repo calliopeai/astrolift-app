@@ -12,7 +12,6 @@ from core.models import (
     GlobalIDLink,
     Interval,
     Link,
-    MetabaseChart,
     Notification,
     PinTransaction,
     Profile,
@@ -969,10 +968,3 @@ class ApprovalPropertyWhitelistAdmin(admin.ModelAdmin):
             from django.contrib.contenttypes.models import ContentType
             kwargs["queryset"] = ContentType.objects.filter(app_label__in=['core'])
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-
-@admin.register(MetabaseChart)
-class MetabaseChartAdmin(admin.ModelAdmin):
-    list_display = 'id', 'type', 'metabase_chart_id', 'title', 'created_at'
-    search_fields = 'id', 'type', 'created_by__username'
-    ordering = '-created_at',
