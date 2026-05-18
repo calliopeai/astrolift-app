@@ -28,14 +28,25 @@ class GoldenSignalKind(enum.Enum):
     """The four SRE golden signals plus their conventional names.
 
     Mirrored as a string-valued enum so the FE can switch on the name
-    without depending on enum ordinals."""
+    without depending on enum ordinals.
+
+    Latency carries four quantiles — p50 (typical user), p90 (legacy),
+    p95 (SLO-canonical, added in #640), and p99 (tail outliers). The
+    FE renders three at a time by default; the fourth is reachable via
+    the PromQL disclosure so operators can paste into Grafana.
+
+    Saturation carries two resources — CPU (in cores) and memory (in
+    bytes); both come from kube-state-metrics + cAdvisor.
+    """
 
     TRAFFIC = "traffic"
     ERRORS = "errors"
     LATENCY_P50 = "latency_p50"
     LATENCY_P90 = "latency_p90"
+    LATENCY_P95 = "latency_p95"
     LATENCY_P99 = "latency_p99"
     SATURATION_CPU = "saturation_cpu"
+    SATURATION_MEMORY = "saturation_memory"
 
 
 @strawberry.type(name="AstroliftAppGoldenSignal")
@@ -189,6 +200,96 @@ class AppLogPage:
     reached_retention: bool
     historical_available: bool
     total_count: int
+
+
+@strawberry.type(name="AstroliftManagedServiceMetricSeries")
+class ManagedServiceMetricSeries:
+    """One metric time-series scoped to a managed service (#645 / #646).
+
+    ``name`` identifies the metric on the wire (``connections`` /
+    ``cpu`` / ``iops`` / ``slow_queries`` / ``replica_lag`` for
+    relational DBs; ``bucket_size`` / ``request_count`` /
+    ``errors_4xx`` / ``errors_5xx`` / ``egress_bytes`` for object
+    stores). The FE switches on the name to pick a card title /
+    formatter — keep the set deterministic so the panel layout stays
+    stable.
+
+    ``unit`` is a hint for the FE formatter (``count`` / ``bytes`` /
+    ``percent`` / ``rps`` / ``seconds`` / ``ms``).
+
+    ``source`` records which provider-side store the resolver queried
+    (``cloudwatch`` / ``cloud_monitoring`` / ``azure_monitor`` /
+    ``prometheus`` / ``unknown``) so an operator can verify in the UI
+    *where* the data came from without re-reading the cluster row.
+    """
+
+    name: str
+    unit: str
+    samples: list[TimeSeriesPoint]
+    source: str
+
+
+@strawberry.type(name="AstroliftManagedServiceMetrics")
+class ManagedServiceMetrics:
+    """Per-managed-service metrics envelope (#645 + #646).
+
+    Returns the family of time-series the FE renders as a side-by-side
+    card grid below the golden-signals panel — driven by the
+    managed-service ``kind`` (``postgres`` ⇒ RDS-style metrics;
+    ``object_store`` ⇒ S3-style metrics).
+
+    Empty ``series`` list means "the kind is supported but the cloud's
+    metrics store had nothing for this resource over the window" — the
+    FE shows the same "metrics not yet flowing" empty state the golden
+    signals use.
+
+    ``None`` from the resolver means "the kind isn't currently
+    supported by the metrics resolver" (anything other than postgres /
+    object_store today); the FE doesn't render a panel in that case.
+    """
+
+    managed_service_id: strawberry.ID
+    kind: str
+    name: str
+    range_seconds: int
+    series: list[ManagedServiceMetricSeries]
+
+
+@strawberry.type(name="AstroliftPodResourceUsagePoint")
+class PodResourceUsagePoint:
+    """One sample on the per-pod CPU+memory sparkline (#713).
+
+    Both values are filled in the same query so the FE can render a
+    twin sparkline without two requests. CPU is in cores (rate over
+    the cpu-seconds counter), memory is in bytes (working-set).
+    """
+
+    ts: dt.datetime
+    cpu_cores: float
+    memory_bytes: float
+
+
+@strawberry.type(name="AstroliftPodResourceUsage")
+class PodResourceUsage:
+    """Per-pod CPU + memory time-series + restart history (#713).
+
+    Powers the per-pod expander on the Observability tab. ``None`` from
+    the resolver means the pod isn't visible to the platform (deleted,
+    wrong tenant, wrong cluster) or the cluster has no Prometheus —
+    the FE renders the "metrics not flowing" empty state in either
+    case.
+
+    ``restart_count`` is the kubelet's per-pod restart counter; the
+    expander surfaces it alongside the last-restart timestamp so an
+    operator scanning a CrashLoopBackOff row sees both "how often" and
+    "when" at a glance.
+    """
+
+    pod_name: str
+    range_seconds: int
+    samples: list[PodResourceUsagePoint]
+    restart_count: int
+    last_restart_at: dt.datetime | None
 
 
 @strawberry.type(name="AstroliftAppUrlHealth")

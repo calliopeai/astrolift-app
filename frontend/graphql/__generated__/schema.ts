@@ -1397,6 +1397,21 @@ export type AstroliftManagedServiceConnectionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftManagedServiceMetricSeries = {
+  name: Scalars['String']['output'];
+  samples: Array<AstroliftTimeSeriesPoint>;
+  source: Scalars['String']['output'];
+  unit: Scalars['String']['output'];
+};
+
+export type AstroliftManagedServiceMetrics = {
+  kind: Scalars['String']['output'];
+  managedServiceId: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  rangeSeconds: Scalars['Int']['output'];
+  series: Array<AstroliftManagedServiceMetricSeries>;
+};
+
 export type AstroliftManagedServiceMutationResult = {
   data?: Maybe<AstroliftManagedService>;
   errors: Array<MutationError>;
@@ -1575,6 +1590,20 @@ export type AstroliftOrganizationMutationResult = {
   data?: Maybe<AstroliftOrganization>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftPodResourceUsage = {
+  lastRestartAt?: Maybe<Scalars['DateTime']['output']>;
+  podName: Scalars['String']['output'];
+  rangeSeconds: Scalars['Int']['output'];
+  restartCount: Scalars['Int']['output'];
+  samples: Array<AstroliftPodResourceUsagePoint>;
+};
+
+export type AstroliftPodResourceUsagePoint = {
+  cpuCores: Scalars['Float']['output'];
+  memoryBytes: Scalars['Float']['output'];
+  ts: Scalars['DateTime']['output'];
 };
 
 export type AstroliftPolicy = {
@@ -2867,8 +2896,10 @@ export type GoldenSignalKind =
   | 'ERRORS'
   | 'LATENCY_P50'
   | 'LATENCY_P90'
+  | 'LATENCY_P95'
   | 'LATENCY_P99'
   | 'SATURATION_CPU'
+  | 'SATURATION_MEMORY'
   | 'TRAFFIC';
 
 export type GrantRoleInput = {
@@ -4517,6 +4548,8 @@ export type PushManifestToRepoInput = {
 };
 
 export type Query = {
+  ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
+  PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   assignableAstroliftProjects: Array<AstroliftProject>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
@@ -4533,6 +4566,7 @@ export type Query = {
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
   astroliftAppLogs: AstroliftAppLogPage;
+  astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
@@ -4592,6 +4626,7 @@ export type Query = {
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
   astroliftPlatformApiUrl: Scalars['String']['output'];
+  astroliftPodResourceUsage?: Maybe<AstroliftPodResourceUsage>;
   astroliftPolicies: Array<AstroliftPolicy>;
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftProjects: Array<AstroliftProject>;
@@ -4627,7 +4662,7 @@ export type Query = {
   astroliftWorkloadResourceUsage?: Maybe<AstroliftWorkloadResourceUsage>;
   astroliftWorkloadScalingStatus?: Maybe<AstroliftWorkloadScalingStatus>;
   astroliftWorkloads: Array<AstroliftWorkload>;
-  /** Query mutation audit logs. Admin only. */
+  /** Query mutation audit logs. Superuser only. */
   auditLogs: Array<AuditLogEntry>;
   /** List all effective permissions for a user, with the groups that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
@@ -4727,6 +4762,12 @@ export type QueryAstroliftAppLogsArgs = {
   since: Scalars['DateTime']['input'];
   until: Scalars['DateTime']['input'];
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppManagedServiceMetricsArgs = {
+  managedServiceId: Scalars['ID']['input'];
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -5004,6 +5045,14 @@ export type QueryAstroliftOrgMembersForApprovalPickerArgs = {
 
 export type QueryAstroliftOrganizationArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftPodResourceUsageArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  podName: Scalars['String']['input'];
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
 };
 
 

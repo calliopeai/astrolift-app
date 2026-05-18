@@ -403,6 +403,7 @@
       "overview": "Overview",
       "deployments": "Deployments",
       "workloads": "Workloads",
+      "topology": "Topology",
       "observability": "Observability",
       "console": "Console",
       "previews": "Previews",
@@ -512,7 +513,8 @@
         "title": "Topology",
         "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
         "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "emptyDescription": "Topology fills in once workloads are registered for this app.",
+        "open": "Open Topology"
       },
       "delete": {
         "title": "Delete {slug}?",
@@ -710,6 +712,27 @@
         "allWorkloads": "All workloads",
         "environmentPlaceholder": "Select an environment",
         "workloadPlaceholder": "Select a workload"
+      }
+    },
+    "topology": {
+      "title": "{name} · Topology",
+      "description": "{slug} · public ingress, services, workloads, and attached managed services",
+      "graphTitle": "Provisioned components",
+      "graphDescription": "Click a node to drill in. Nodes are color-coded by status.",
+      "emptyTitle": "No topology yet",
+      "emptyDescription": "Topology fills in once workloads are registered for this app.",
+      "emptyAction": "Register a workload",
+      "legendTitle": "Legend",
+      "legendDescription": "Node types and what they represent.",
+      "legend": {
+        "ingress": "Ingress",
+        "ingressBody": "The platform-managed public entry point — DNS + TLS terminate here.",
+        "service": "Service",
+        "serviceBody": "Kubernetes ClusterIP that fronts a workload's pods.",
+        "workload": "Workload",
+        "workloadBody": "One process / deployment under the app — owns replicas + scaling.",
+        "status": "Status",
+        "statusBody": "Green = running, amber = provisioning, red = failed."
       }
     },
     "console": {

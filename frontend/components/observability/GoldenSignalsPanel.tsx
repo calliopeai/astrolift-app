@@ -149,10 +149,14 @@ export function GoldenSignalsPanel({
           loading={isLoading}
           lineColor="var(--chart-1)"
         />
+        {/* Latency #640 — renders p50 / p95 / p99 by default; p90 stays
+            on the wire for legacy consumers but moves to the PromQL
+            disclosure to keep the chart legible. */}
         <LatencyCard
           p50={signalsByKind.LATENCY_P50}
-          p90={signalsByKind.LATENCY_P90}
+          p95={signalsByKind.LATENCY_P95}
           p99={signalsByKind.LATENCY_P99}
+          p90={signalsByKind.LATENCY_P90}
           loading={isLoading}
         />
         <SignalCard
@@ -161,6 +165,16 @@ export function GoldenSignalsPanel({
           signal={signalsByKind.SATURATION_CPU}
           loading={isLoading}
           lineColor="var(--chart-4)"
+        />
+        {/* #642 — memory saturation completes the saturation pair.
+            Working-set bytes vs the memory limit; > 100% means an OOM
+            kill is imminent. */}
+        <SignalCard
+          title="Saturation (memory)"
+          description="Working-set memory ÷ requested limit. >100% means OOM is imminent."
+          signal={signalsByKind.SATURATION_MEMORY}
+          loading={isLoading}
+          lineColor="var(--chart-5)"
         />
       </div>
 
@@ -274,15 +288,24 @@ function SignalCard({ title, description, signal, loading, lineColor }: SignalCa
 
 interface LatencyCardProps {
   p50: AstroliftAppGoldenSignal | undefined;
-  p90: AstroliftAppGoldenSignal | undefined;
+  p95: AstroliftAppGoldenSignal | undefined;
   p99: AstroliftAppGoldenSignal | undefined;
+  /** Wire-only — p90 is rendered in the PromQL disclosure but not the
+   *  chart so the three default lines (p50 / p95 / p99) stay readable
+   *  (#640). */
+  p90: AstroliftAppGoldenSignal | undefined;
   loading: boolean;
 }
 
-function LatencyCard({ p50, p90, p99, loading }: LatencyCardProps) {
-  const unit = p50?.unit ?? p90?.unit ?? p99?.unit ?? "seconds";
-  const rows = React.useMemo(() => mergeLatencyRows(p50, p90, p99), [p50, p90, p99]);
-  const promql = [p50?.promql, p90?.promql, p99?.promql].filter(Boolean).join("\n\n");
+function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
+  const unit = p50?.unit ?? p95?.unit ?? p99?.unit ?? "seconds";
+  const rows = React.useMemo(() => mergeLatencyRows(p50, p95, p99), [p50, p95, p99]);
+  // p90 is intentionally exposed via the disclosure only — the chart
+  // renders three lines so the SLO-typical p95 isn't visually crowded
+  // out by a fourth nearby quantile (#640).
+  const promql = [p50?.promql, p95?.promql, p99?.promql, p90?.promql]
+    .filter(Boolean)
+    .join("\n\n");
   const hasData = rows.length > 0;
 
   return (
@@ -291,7 +314,9 @@ function LatencyCard({ p50, p90, p99, loading }: LatencyCardProps) {
         <CardTitle className="flex items-center gap-2 text-sm">
           <ChartSplineIcon className="size-4" /> Latency
         </CardTitle>
-        <CardDescription className="text-xs">p50, p90, p99 request latency.</CardDescription>
+        <CardDescription className="text-xs">
+          p50, p95, p99 request latency. p90 available via the PromQL disclosure.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -328,7 +353,7 @@ function LatencyCard({ p50, p90, p99, loading }: LatencyCardProps) {
                 />
                 <Line
                   type="monotone"
-                  dataKey="p90"
+                  dataKey="p95"
                   stroke="var(--chart-3)"
                   strokeWidth={1.5}
                   dot={false}
@@ -470,19 +495,19 @@ function toChartRows(samples: AstroliftTimeSeriesPoint[], _unit: string): ChartR
 interface LatencyRow {
   ts: string;
   p50: number | null;
-  p90: number | null;
+  p95: number | null;
   p99: number | null;
 }
 
 function mergeLatencyRows(
   p50: AstroliftAppGoldenSignal | undefined,
-  p90: AstroliftAppGoldenSignal | undefined,
+  p95: AstroliftAppGoldenSignal | undefined,
   p99: AstroliftAppGoldenSignal | undefined
 ): LatencyRow[] {
   // The backend hits Prometheus with the same start/end/step for all
   // three quantile queries, so the per-quantile sample arrays line up
   // by index. Take the longest of the three as the baseline.
-  const arrays = [p50?.samples, p90?.samples, p99?.samples];
+  const arrays = [p50?.samples, p95?.samples, p99?.samples];
   const longest = arrays.reduce<AstroliftTimeSeriesPoint[]>(
     (acc, arr) => ((arr?.length ?? 0) > acc.length ? arr! : acc),
     [] as AstroliftTimeSeriesPoint[]
@@ -490,7 +515,7 @@ function mergeLatencyRows(
   return longest.map((point, i) => ({
     ts: new Date(point.ts).toLocaleTimeString(),
     p50: p50?.samples[i]?.value ?? null,
-    p90: p90?.samples[i]?.value ?? null,
+    p95: p95?.samples[i]?.value ?? null,
     p99: p99?.samples[i]?.value ?? null,
   }));
 }

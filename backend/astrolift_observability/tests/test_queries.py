@@ -141,8 +141,13 @@ def test_app_without_prometheus_endpoint_returns_empty_list(permission_resolver)
     assert result == []
 
 
-def test_happy_path_returns_six_signals(permission_resolver):
-    """Six rows: traffic, errors, p50/p90/p99 latency, cpu saturation."""
+def test_happy_path_returns_eight_signals(permission_resolver):
+    """Eight rows: traffic, errors, p50/p90/p95/p99 latency,
+    cpu+memory saturation.
+
+    #640 added p95; #642 added memory saturation. Order is fixed so
+    the FE can render the latency card without re-sorting.
+    """
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
 
@@ -168,15 +173,17 @@ def test_happy_path_returns_six_signals(permission_resolver):
                 range_seconds=60 * 60,
             )
 
-    assert len(result) == 6
+    assert len(result) == 8
     kinds = [r.name for r in result]
     assert kinds == [
         GoldenSignalKind.TRAFFIC,
         GoldenSignalKind.ERRORS,
         GoldenSignalKind.LATENCY_P50,
         GoldenSignalKind.LATENCY_P90,
+        GoldenSignalKind.LATENCY_P95,
         GoldenSignalKind.LATENCY_P99,
         GoldenSignalKind.SATURATION_CPU,
+        GoldenSignalKind.SATURATION_MEMORY,
     ]
     for row in result:
         assert row.range_seconds == 60 * 60
@@ -184,6 +191,43 @@ def test_happy_path_returns_six_signals(permission_resolver):
         assert row.samples[0].value == 1.5
         assert row.samples[1].value == 2.5
         assert row.promql  # non-empty disclosure text
+
+
+def test_p95_promql_carries_quantile_value(permission_resolver):
+    """#640 — the p95 row must carry the literal ``0.95`` quantile in
+    its PromQL so operators pasting into Grafana get the SLO-canonical
+    series, not an off-by-one approximation."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with patch.object(prom_client, "query_range_series", return_value=[]):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_golden_signals(
+                _info(),
+                app_slug=app.slug,
+            )
+
+    p95 = next(r for r in result if r.name == GoldenSignalKind.LATENCY_P95)
+    assert "histogram_quantile(0.95" in p95.promql
+
+
+def test_memory_saturation_uses_working_set_bytes(permission_resolver):
+    """#642 — the memory saturation row must use the working-set bytes
+    gauge (cAdvisor's OOM-accounting metric) over the memory limit,
+    not a guess like RSS or cache."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with patch.object(prom_client, "query_range_series", return_value=[]):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_golden_signals(
+                _info(),
+                app_slug=app.slug,
+            )
+
+    mem = next(r for r in result if r.name == GoldenSignalKind.SATURATION_MEMORY)
+    assert "container_memory_working_set_bytes" in mem.promql
+    assert 'resource="memory"' in mem.promql
 
 
 def test_signal_promql_disclosure_includes_app_label(permission_resolver):
@@ -524,4 +568,231 @@ def test_workload_resource_usage_permission_denied_raises(permission_resolver):
             _info(),
             app_slug=app.slug,
             workload_slug="api",
+        )
+
+
+# ----------------------------------------------------------------------
+# astroliftAppManagedServiceMetrics (#645 + #646)
+# ----------------------------------------------------------------------
+
+
+def _managed_service(*, app, kind, name="primary"):
+    """Mint a ManagedService row for the test scaffolded app.
+
+    The test app has one env (``prod``) hanging off it from the
+    scaffold; reuse that to satisfy the foreign-key constraint.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models.managed_service import ManagedService as MS
+
+    env = AppEnvironment.objects.get(registered_app=app, name="prod")
+    return MS.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=kind,
+        name=name,
+        variant="",
+        config={},
+        status=MS.Status.ACTIVE,
+    )
+
+
+def test_managed_service_metrics_postgres_returns_five_series(permission_resolver):
+    """Postgres kind → five metric series with the canonical names so
+    the FE renders a fixed card grid regardless of how many series
+    actually carry samples."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    svc = _managed_service(app=app, kind="postgres")
+
+    def fake_query(**kwargs):
+        return [("", [(1700000000.0, 3.0), (1700000060.0, 4.0)])]
+
+    with patch.object(prom_client, "query_range_series", side_effect=fake_query):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_managed_service_metrics(
+                _info(),
+                managed_service_id=str(svc.guid),
+                range_seconds=60 * 60,
+            )
+
+    assert result is not None
+    assert result.kind == "postgres"
+    names = [s.name for s in result.series]
+    assert names == ["connections", "cpu", "iops", "slow_queries", "replica_lag"]
+    for s in result.series:
+        assert s.source == "prometheus"
+        assert len(s.samples) == 2
+
+
+def test_managed_service_metrics_object_store_returns_five_series(permission_resolver):
+    """Object-store kind → five metric series with the canonical S3
+    panel names."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    svc = _managed_service(app=app, kind="object_store")
+
+    def fake_query(**kwargs):
+        return [("", [(1700000000.0, 1.0)])]
+
+    with patch.object(prom_client, "query_range_series", side_effect=fake_query):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_app_managed_service_metrics(
+                _info(),
+                managed_service_id=str(svc.guid),
+            )
+
+    assert result is not None
+    assert result.kind == "object_store"
+    names = [s.name for s in result.series]
+    assert names == [
+        "bucket_size",
+        "request_count",
+        "errors_4xx",
+        "errors_5xx",
+        "egress_bytes",
+    ]
+
+
+def test_managed_service_metrics_unsupported_kind_returns_none(permission_resolver):
+    """Anything other than postgres / object_store returns ``None`` so
+    the FE skips the panel entirely (rather than rendering an empty
+    card). Follow-up tickets add coverage for other kinds."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    svc = _managed_service(app=app, kind="redis")
+
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_app_managed_service_metrics(
+            _info(),
+            managed_service_id=str(svc.guid),
+        )
+
+    assert result is None
+
+
+def test_managed_service_metrics_missing_service_returns_none(permission_resolver):
+    """Unknown managed-service guid → ``None``."""
+    org, _ = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_app_managed_service_metrics(
+            _info(),
+            managed_service_id="00000000-0000-0000-0000-000000000000",
+        )
+
+    assert result is None
+
+
+def test_managed_service_metrics_no_prometheus_returns_empty_envelope(permission_resolver):
+    """No ``prometheus_endpoint`` on the cluster → empty series list
+    (not None) so the FE renders the panel header + the "metrics not
+    yet flowing" callout inside it. The kind/name still come through
+    so the operator sees what was supposed to render."""
+    org, app = _scaffold(prometheus_endpoint=None)
+    permission_resolver.grant(Permission.APP_READ)
+    svc = _managed_service(app=app, kind="postgres")
+
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_app_managed_service_metrics(
+            _info(),
+            managed_service_id=str(svc.guid),
+        )
+
+    assert result is not None
+    assert result.series == []
+    assert result.kind == "postgres"
+
+
+def test_managed_service_metrics_permission_denied_raises(permission_resolver):
+    """Same deny path as every observability resolver."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    svc = _managed_service(app=app, kind="postgres")
+    # No grant.
+    with _tenant(org), pytest.raises(PermissionDenied):
+        GoldenSignalsQuery().astrolift_app_managed_service_metrics(
+            _info(),
+            managed_service_id=str(svc.guid),
+        )
+
+
+# ----------------------------------------------------------------------
+# astroliftPodResourceUsage (#713)
+# ----------------------------------------------------------------------
+
+
+def test_pod_resource_usage_returns_paired_cpu_memory_samples(permission_resolver):
+    """Per-pod usage carries CPU + memory in the same point so the FE
+    can render the twin sparkline in one request."""
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+
+    samples_by_metric = {}
+
+    def fake_query(**kwargs):
+        # Two queries fan out — CPU first, memory second.
+        promql = kwargs["promql"]
+        if "cpu_usage_seconds" in promql:
+            samples_by_metric["cpu"] = True
+            return [("", [(1700000000.0, 0.25), (1700000060.0, 0.35)])]
+        if "memory_working_set" in promql:
+            samples_by_metric["mem"] = True
+            return [("", [(1700000000.0, 1024.0), (1700000060.0, 2048.0)])]
+        return []
+
+    with patch.object(prom_client, "query_range_series", side_effect=fake_query):
+        with _tenant(org):
+            result = GoldenSignalsQuery().astrolift_pod_resource_usage(
+                _info(),
+                app_slug=app.slug,
+                pod_name="hello-obs-api-0",
+                range_seconds=60 * 60,
+            )
+
+    assert result is not None
+    assert samples_by_metric == {"cpu": True, "mem": True}
+    assert len(result.samples) == 2
+    assert result.samples[0].cpu_cores == 0.25
+    assert result.samples[0].memory_bytes == 1024.0
+    assert result.samples[1].cpu_cores == 0.35
+    assert result.samples[1].memory_bytes == 2048.0
+
+
+def test_pod_resource_usage_no_endpoint_returns_none(permission_resolver):
+    """No Prometheus endpoint on the cluster → null (FE renders the
+    empty-state callout in the expander)."""
+    org, app = _scaffold(prometheus_endpoint=None)
+    permission_resolver.grant(Permission.APP_READ)
+
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_pod_resource_usage(
+            _info(),
+            app_slug=app.slug,
+            pod_name="hello-obs-api-0",
+        )
+
+    assert result is None
+
+
+def test_pod_resource_usage_unknown_app_returns_none(permission_resolver):
+    org, _ = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    with _tenant(org):
+        result = GoldenSignalsQuery().astrolift_pod_resource_usage(
+            _info(),
+            app_slug="does-not-exist",
+            pod_name="x",
+        )
+    assert result is None
+
+
+def test_pod_resource_usage_permission_denied_raises(permission_resolver):
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    # No grant.
+    with _tenant(org), pytest.raises(PermissionDenied):
+        GoldenSignalsQuery().astrolift_pod_resource_usage(
+            _info(),
+            app_slug=app.slug,
+            pod_name="x",
         )
