@@ -1,1 +1,0 @@
-"""Astrolift GCP provider plugin."""

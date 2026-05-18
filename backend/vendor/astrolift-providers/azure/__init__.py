@@ -1,1 +1,0 @@
-"""Astrolift Azure provider plugin."""
