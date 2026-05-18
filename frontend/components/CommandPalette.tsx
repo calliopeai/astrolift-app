@@ -4,6 +4,8 @@ import { useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -108,6 +110,10 @@ interface AppsResp {
   astroliftApps: AstroliftRegisteredApp[];
 }
 
+interface DeploymentsResp {
+  astroliftDeployments: AstroliftDeployment[];
+}
+
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -121,6 +127,13 @@ export function CommandPalette() {
   // a network-only re-fetch each subsequent open — the list is small
   // (capped at 5 entries shown) so the cost is negligible.
   const apps = useQuery<AppsResp>(LIST_APPS, { skip: !open });
+  // #700 — fetch the 25 most recent deployments lazily so the palette
+  // can match by commit SHA / message / image tag / app slug. Same
+  // lazy pattern as apps — only fires when the palette is open.
+  const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
+    variables: { limit: 25 },
+    skip: !open,
+  });
 
   // Cmd-K / Ctrl-K toggles the palette. Esc closes via the dialog
   // backdrop click handler. The keydown is attached at window scope
@@ -163,9 +176,38 @@ export function CommandPalette() {
     }));
   }, [apps.data?.astroliftApps]);
 
+  // #700 — recent deployments as palette entries. Searchable by short
+  // SHA, full SHA, image tag, commit message, author, app slug. Only
+  // shown when the user has typed something — without a query, the
+  // palette already has plenty without 25 deploy rows.
+  const deploymentEntries = React.useMemo<PaletteEntry[]>(() => {
+    const list = deployments.data?.astroliftDeployments ?? [];
+    return list.map((d) => {
+      const shortSha = (d.commitSha ?? "").slice(0, 7);
+      const label = shortSha
+        ? `${d.registeredAppSlug} · ${shortSha}${d.commitMessage ? ` — ${d.commitMessage.slice(0, 60)}` : ""}`
+        : `${d.registeredAppSlug} · ${d.imageTag || d.id.slice(0, 8)}`;
+      return {
+        label,
+        href: `/deployments/${d.id}`,
+        group: "Recent deploys",
+        hint: d.status,
+        keywords: [
+          d.registeredAppSlug,
+          d.commitSha ?? "",
+          shortSha,
+          d.imageTag ?? "",
+          d.commitMessage ?? "",
+          d.commitAuthor ?? "",
+          d.branch ?? "",
+        ].filter(Boolean),
+      };
+    });
+  }, [deployments.data?.astroliftDeployments]);
+
   const allEntries = React.useMemo<PaletteEntry[]>(
-    () => [...QUICK_ACTIONS, ...appEntries, ...PAGES],
-    [appEntries],
+    () => [...QUICK_ACTIONS, ...appEntries, ...deploymentEntries, ...PAGES],
+    [appEntries, deploymentEntries],
   );
 
   const visible = React.useMemo(
