@@ -8,7 +8,7 @@ from strawberry.types import Info
 
 from core.models import Upload
 from core.models.upload import FileUpload
-from core.schema.common import permission_filtered_queryset
+from core.schema.common import permission_filtered_queryset, scope_to_caller_org
 
 
 @strawberry_django.type(Upload)
@@ -83,4 +83,9 @@ class FileUploadType:
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
-        return permission_filtered_queryset(queryset, info)
+        # #723 — FileUploadType used to delegate to ``permission_filtered_queryset``
+        # which only consults the model-wide ``view_fileupload`` permission, leaving
+        # the rows themselves cross-tenant readable to anyone holding that codename.
+        # FileUpload joins to Upload (which holds the organization FK) so the filter
+        # path is ``upload__organization``. Matches the #542 / #543 fix shape.
+        return scope_to_caller_org(queryset, info, fk_path="upload__organization")
