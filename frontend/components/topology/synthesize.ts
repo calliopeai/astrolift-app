@@ -38,6 +38,10 @@ export function appTopology(
       sublabel: app.subdomain,
       status: appStatus,
       hostnames: publicWorkloads.map((w) => `${w.slug}.${app.subdomain}`),
+      // #706 — drill into the domains tab (TLS, custom-domain mapping,
+      // alternate hostnames). The ingress IS the rendered ALB / nginx
+      // routing layer; the domains tab is where the operator manages it.
+      href: `/apps/${app.slug}/domains`,
     });
   }
 
@@ -52,6 +56,11 @@ export function appTopology(
         label: w.slug,
         sublabel: "ClusterIP",
         status: wlStatus,
+        // #706 — Service is the routing layer between ingress and the
+        // workload's pods. Drill straight to the workload detail —
+        // operators investigating a "why isn't this responding" almost
+        // always need the pod list + restart count, not the bare svc.
+        href: `/apps/${app.slug}/workloads/${w.slug}`,
       });
       edges.push({ id: `e-ingress-${svcId}`, source: "ingress", target: svcId });
       edges.push({
