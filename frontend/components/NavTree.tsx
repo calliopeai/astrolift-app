@@ -338,7 +338,7 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
       <SidebarMenuSubItem>
         <SidebarMenuSubButton
           asChild
-          className="group/team !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+          className="group/team !w-full !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
         >
           <div className="flex w-full items-start">
             <Link
@@ -415,7 +415,7 @@ function ProjectNode({
       <SidebarMenuSubItem>
         <SidebarMenuSubButton
           asChild
-          className="group/project !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
+          className="group/project !w-full !h-auto !min-h-7 !overflow-visible py-1 [&_span]:!whitespace-normal [&_span]:!overflow-visible"
         >
           <div className="flex w-full items-start">
             <Link
@@ -471,7 +471,7 @@ function AppLeaf({ app, active }: AppLeafProps) {
       <SidebarMenuSubButton
         asChild
         isActive={active}
-        className="!h-auto !min-h-7 !overflow-visible py-1 [&>span:last-child]:!whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip"
+        className="!w-full !h-auto !min-h-7 !overflow-visible py-1 [&>span:last-child]:!whitespace-normal [&>span:last-child]:!overflow-visible [&>span:last-child]:!text-clip"
       >
         <Link
           href={`/apps/${app.slug}`}
