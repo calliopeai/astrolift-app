@@ -49,6 +49,32 @@ class OrganizationMutationResult(MutationResult):
 # Mutations
 # ---------------------------------------------------------------------------
 
+def _require_caller_in_org(info: Info, org_pk) -> None:
+    """Reject the mutation unless the caller is an active member of org_pk.
+
+    #537 (tenant-isolation sweep): the organization-side mutations
+    previously accepted any logged-in caller — including users with no
+    relation to the target org — and could be used to edit websites,
+    upsert org rows, or toggle other-tenants' membership statuses.
+    Superusers retain cross-tenant write privileges.
+    """
+    from organization.models import OrganizationMember
+
+    user = info.context.user
+    if not getattr(user, 'is_authenticated', False):
+        raise GraphQLError('Authentication required')
+    if getattr(user, 'is_superuser', False):
+        return
+    is_member = OrganizationMember.objects.filter(
+        member=user,
+        organization_id=org_pk,
+        is_active=True,
+        deleted_at__isnull=True,
+    ).exists()
+    if not is_member:
+        raise GraphQLError('Caller is not a member of the target organization')
+
+
 @strawberry.type
 class Mutation:
 
@@ -59,6 +85,8 @@ class Mutation:
         from organization.schema.mutations.organization import OrganizationForm
 
         user = info.context.user
+        if not getattr(user, 'is_authenticated', False):
+            raise GraphQLError('Authentication required')
 
         instance = None
         form_data = {}
@@ -68,6 +96,8 @@ class Mutation:
             instance = Organization.objects.filter(pk=pk).first()
             if not instance:
                 raise GraphQLError(f'Organization {input.id} not found')
+            # #537: editing an existing org requires membership in it.
+            _require_caller_in_org(info, instance.pk)
             form_data['created_by'] = instance.created_by_id
         else:
             form_data['created_by'] = user.pk
@@ -92,6 +122,17 @@ class Mutation:
     def upsert_organization(self, info: Info, input: UpsertOrganizationInput) -> OrganizationMutationResult:
         """Upsert an Organization using UtilityForm.apply_forms."""
         from core.schema.mutations.common import UtilityForm
+
+        user = info.context.user
+        if not getattr(user, 'is_authenticated', False):
+            raise GraphQLError('Authentication required')
+        # #537: editing an existing org requires membership in it. Creates
+        # (no id supplied) are still allowed for any authed user, matching
+        # the pre-existing create flow.
+        if input.id is not None:
+            target_pk = GlobalIDUtils.get_pk_flexible(input.id)
+            if target_pk is not None:
+                _require_caller_in_org(info, target_pk)
 
         # Build a dict matching the Graphene InputObjectType shape
         input_data = {}
@@ -121,10 +162,12 @@ class Mutation:
         self, info: Info, input: OrganizationMemberStatusInput
     ) -> MutationResult:
         """Activate or deactivate an organization member."""
-        from organization.models import Organization, OrganizationMember
+        from organization.models import OrganizationMember
         from organization.serializers.organization_member import OrganizationMemberSerializer
 
         user = info.context.user
+        if not getattr(user, 'is_authenticated', False):
+            raise GraphQLError('Authentication required')
 
         # Resolve user_id from global ID
         user_pk = GlobalIDUtils.get_pk_flexible(input.user_id)
@@ -137,6 +180,11 @@ class Mutation:
             org_id = str(user.profile.organization().id)
         else:
             org_id = GlobalIDUtils.get_pk_flexible(org_id) or org_id
+
+        # #537: caller must be a member of the target org to flip another
+        # member's status. Without this gate any authed user could flip
+        # is_active on any membership row in any tenant.
+        _require_caller_in_org(info, org_id)
 
         # Look up the membership
         instance = OrganizationMember.objects.filter(
