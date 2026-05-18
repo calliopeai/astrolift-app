@@ -31,12 +31,15 @@ export const UPDATE_SOURCE_CONNECTION = gql`
       errors {
         code
         message
+        field
       }
       data {
         id
         displayName
         repoVisibilityScopes
         isActive
+        appClientId
+        needsClientId
       }
     }
   }

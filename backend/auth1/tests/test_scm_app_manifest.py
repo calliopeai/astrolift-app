@@ -199,7 +199,10 @@ def test_manifest_callback_persists_credentials_and_redirects_to_install(org_use
 
     # Row updated in place
     pending.refresh_from_db()
-    assert pending.oauth_client_id == "12345"  # app_id
+    assert pending.oauth_client_id == "12345"  # numeric App ID
+    # OAuth Client ID lands in its own column (#525) — the OAuth dance
+    # at scm_oauth.github_start reads from here, not oauth_client_id.
+    assert pending.app_client_id == "Iv1.fake"
     assert pending.account_login == "acme-corp"
     assert pending.display_name == "GitHub App: astrolift-test"
     plain = decrypt(
