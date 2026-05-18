@@ -258,6 +258,25 @@ class FileLoader:
 
     @classmethod
     def _create_data_process(cls, file_type, upload, **kwargs):
+        # #542: anchor each DataProcess to an Organization so
+        # DataProcessType.get_queryset can filter by tenant. The upload
+        # the import was kicked off from already carries the resolved
+        # tenant (set in core.schema.mutations.upload.create_upload);
+        # use it when present. ``organization`` may be passed in kwargs
+        # too — that's the path for callers that build a DataProcess
+        # outside the upload flow (e.g. ``EntityType.API`` data imports
+        # that have no upload row at all).
+        organization_id = kwargs.get('organization_id')
+        if organization_id is None and upload is not None:
+            from core.models.upload import Upload as _Upload
+
+            # ``upload`` is an Upload PK (uuid) by the time this lands
+            # — the caller passes ``upload.id``. Defensive: only resolve
+            # when the row exists; missing FK means we keep
+            # organization_id=None and the resolver will deny-by-default.
+            organization_id = (
+                _Upload.objects.filter(pk=upload).values_list('organization_id', flat=True).first()
+            )
         return DataProcess.objects.create(
             created_by_id=kwargs.get('created_by_id', None),
             entity_type=kwargs.get('entity_type', None),
@@ -266,6 +285,7 @@ class FileLoader:
             status=ProcessStatus.PENDING,
             updated_by_id=kwargs.get('created_by_id', None),
             uploaded_file_id=upload,
+            organization_id=organization_id,
         )
 
 
