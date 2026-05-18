@@ -78,6 +78,22 @@ def requires_elevation(
             # session freshness, not authorization.
             if request is not None and getattr(request, "_api_token", None) is not None:
                 return fn(self, info, *args, **kwargs)
+            # Global step-up off-switch (default OFF). Installs that want
+            # the SOC2 / SOX recency gate flip
+            # ``REQUIRE_STEP_UP_AUTH = True`` in Constance. Default-off so
+            # small / SSO-only / single-operator installs don't trip on
+            # every sensitive mutation — they opt in when their
+            # compliance posture demands it.
+            try:
+                from constance import config as constance_config
+
+                if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
+                    return fn(self, info, *args, **kwargs)
+            except Exception:
+                # Constance unavailable (early-boot test path) — fall
+                # through to the existing gate so prod behavior isn't
+                # silently disabled by a config-load failure.
+                pass
             # Direct-call path (pytest mutations bypassing HTTP).
             # A real HTTP request always carries a session attribute
             # because SessionMiddleware runs before the GraphQL view

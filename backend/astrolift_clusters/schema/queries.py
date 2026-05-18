@@ -74,9 +74,16 @@ class ClustersQuery:
         return [domain_to_type(d) for d in qs]
 
     @strawberry.field
-    @require_permission(Permission.PROVIDER_PLUGIN_READ)
-    @tenant_scoped()
     def astrolift_provider_plugins(self, info: Info) -> list[ProviderPluginType]:
+        # Driver reference is platform-level public info — surfaced on
+        # /resources/drivers to any authed operator so they can see what
+        # the install's capability surface looks like. No permission
+        # gate (everyone needs to see what's supported); no @tenant_scoped
+        # because ProviderPlugin is a platform-level resource, not
+        # tenant-scoped — tenant_scoped() filtered it to nothing.
+        user = getattr(info.context.request, "user", None)
+        if not user or not user.is_authenticated:
+            return []
         qs = ProviderPlugin.objects.order_by("slug")[:100]
         return [plugin_to_type(p) for p in qs]
 
