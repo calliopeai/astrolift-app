@@ -1,9 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { DatabaseIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { DatabaseIcon, MailIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+
+import { EmailDetailSheet } from "./email-detail-sheet";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
@@ -100,6 +102,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
   const [deprovisionTarget, setDeprovisionTarget] = React.useState<ManagedService | null>(null);
   const [deleteData, setDeleteData] = React.useState(false);
   const [forceDestroy, setForceDestroy] = React.useState(false);
+  const [emailDetailTarget, setEmailDetailTarget] = React.useState<ManagedService | null>(null);
   React.useEffect(() => {
     if (deprovisionTarget === null) {
       setDeleteData(false);
@@ -234,7 +237,19 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="capitalize">{s.status}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="flex justify-end gap-1 text-right">
+                      {s.kind === "email" && s.status !== "deleted" ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8"
+                          onClick={() => setEmailDetailTarget(s)}
+                          title="Email deliverability details"
+                        >
+                          <MailIcon className="size-4" />
+                          <span className="sr-only">Email details</span>
+                        </Button>
+                      ) : null}
                       {s.status !== "deleted" && (
                         <Can permission="app.deploy">
                           <Button
@@ -368,6 +383,17 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {emailDetailTarget ? (
+        <EmailDetailSheet
+          managedServiceId={emailDetailTarget.id}
+          serviceName={emailDetailTarget.name || emailDetailTarget.kind}
+          open={emailDetailTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setEmailDetailTarget(null);
+          }}
+        />
+      ) : null}
     </PageShell>
   );
 }

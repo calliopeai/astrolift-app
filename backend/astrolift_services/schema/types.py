@@ -227,6 +227,132 @@ class ManagedServiceTestEmailResultType:
     to confirm which provider received the call."""
 
 
+# ---- Email observability surface (#629, #631, #632, #633, #634) ------
+
+
+@strawberry.type(name="AstroliftEmailSendQuota")
+class EmailSendQuotaType:
+    """SES-style send-rate + 24h volume ceiling.
+
+    Renders as the headroom tile on the email-detail page.
+    ``sent_last_24h`` divided by ``max_24_hour_send`` is the daily
+    progress bar; warn at 80% and red at 95%."""
+
+    max_send_rate: float
+    max_24_hour_send: float
+    sent_last_24h: float
+
+
+@strawberry.type(name="AstroliftEmailAccountStatus")
+class EmailAccountStatusType:
+    """Sandbox / production mode + reputation snapshot."""
+
+    sending_enabled: bool
+    production_access: bool
+    """``False`` = sandbox (can only send to verified recipients).
+    ``True`` = production access granted."""
+
+    reputation_score: float | None = None
+    """0.0-1.0; ``None`` until the account has sent enough to be
+    meaningful (~1000 attempts)."""
+
+    bounce_rate_pct: float | None = None
+    complaint_rate_pct: float | None = None
+
+
+@strawberry.type(name="AstroliftEmailDkimToken")
+class EmailDkimTokenType:
+    token: str
+    cname_host: str
+    cname_target: str
+
+
+@strawberry.type(name="AstroliftEmailIdentityVerification")
+class EmailIdentityVerificationType:
+    """Identity-side verification details.
+
+    ``status`` is ``Pending`` / ``Success`` / ``Failed``. UI shows a
+    green badge on Success and a "Verify now" affordance otherwise."""
+
+    identity: str
+    is_domain: bool
+    status: str
+    verification_token: str = ""
+    dkim_tokens: list[EmailDkimTokenType] = strawberry.field(default_factory=list)
+
+
+@strawberry.type(name="AstroliftEmailDnsAuthCheck")
+class EmailDnsAuthCheckType:
+    """One row of the DKIM/SPF/DMARC panel."""
+
+    protocol: str
+    """``DKIM`` / ``SPF`` / ``DMARC``."""
+
+    outcome: str
+    """``GREEN`` / ``YELLOW`` / ``RED`` / ``UNKNOWN``."""
+
+    records: list[str] = strawberry.field(default_factory=list)
+    message: str = ""
+
+
+@strawberry.type(name="AstroliftEmailDnsAuthStatus")
+class EmailDnsAuthStatusType:
+    identity: str
+    checked_at: dt.datetime
+    overall: str
+    """Worst-of for the panel header."""
+
+    dkim: EmailDnsAuthCheckType
+    spf: EmailDnsAuthCheckType
+    dmarc: EmailDnsAuthCheckType
+
+
+@strawberry.type(name="AstroliftEmailSuppressionEntry")
+class EmailSuppressionEntryType:
+    address: str
+    reason: str
+    """``BOUNCE`` / ``COMPLAINT`` / ``MANUAL`` — uppercase for ergonomic
+    enum match on the frontend's Strawberry codegen output."""
+
+    suppressed_at: dt.datetime
+    detail: str = ""
+
+
+@strawberry.type(name="AstroliftEmailServiceDetail")
+class EmailServiceDetailType:
+    """Composite read-surface for the email-detail page.
+
+    One round-trip carries the quota, account status, identity
+    verification, DNS auth status, and a slice of the suppression
+    list. Each field is independently nullable so the resolver can
+    partially-populate when one backend call fails — the UI shades
+    just the broken tile, the rest stays usable.
+    """
+
+    managed_service_id: GUID
+    plugin_slug: str
+    """``aws`` / ``gcp`` / ``azure`` — the cloud the resolver routed to.
+    UI inspects this to decide which "unsupported" copy to show when
+    a tile is null."""
+
+    region: str
+    identity: str
+
+    quota: EmailSendQuotaType | None = None
+    account_status: EmailAccountStatusType | None = None
+    identity_verification: EmailIdentityVerificationType | None = None
+    dns_auth_status: EmailDnsAuthStatusType | None = None
+    suppression_entries: list[EmailSuppressionEntryType] = strawberry.field(
+        default_factory=list
+    )
+
+    unsupported_notes: list[str] = strawberry.field(default_factory=list)
+    """Free-form messages from drivers that raised UnsupportedOperationError;
+    the UI surfaces these next to the empty tiles so operators see WHY
+    the surface is empty (e.g. "GCP has no first-party transactional
+    email observability — use the third-party vendor's console")."""
+
+
 @strawberry.type(name="AstroliftSecretChangeApproval")
 class SecretChangeApprovalType:
     """One approver's vote on a secret-change proposal (#488)."""
