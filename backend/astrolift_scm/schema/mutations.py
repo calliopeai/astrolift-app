@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import strawberry
 from django.db import transaction
 from strawberry.types import Info
@@ -36,6 +38,24 @@ from core.tenancy import get_current_tenant
 _KIND_CHOICES = {k.value for k in SourceConnection.Kind}
 _VISIBILITY_CHOICES = {k.value for k in SourceConnection.VisibilityScope}
 
+# GitHub App Client ID shape (e.g. ``Iv23lic8662KXwe4XKEI``) — the
+# Iv-prefixed form GitHub now mints for App registrations. The legacy
+# OAuth-App Client ID is a 20-char lowercase hex string. Both are
+# accepted; anything else is operator paste-error and we reject early
+# so the OAuth dance doesn't 404 at GitHub later.
+_GITHUB_CLIENT_ID_NEW = re.compile(r"^Iv\d+[A-Za-z0-9]+$")
+_GITHUB_CLIENT_ID_LEGACY = re.compile(r"^[a-f0-9]{20}$")
+# Kinds that require ``app_client_id`` (the GitHub OAuth dance reads
+# from this column; see scm_oauth.github_start).
+_KINDS_REQUIRING_APP_CLIENT_ID = {
+    SourceConnection.Kind.GITHUB_OAUTH_APP.value,
+    SourceConnection.Kind.GITHUB_APP_INSTALL.value,
+}
+
+
+def _looks_like_github_client_id(value: str) -> bool:
+    return bool(_GITHUB_CLIENT_ID_NEW.match(value) or _GITHUB_CLIENT_ID_LEGACY.match(value))
+
 
 @strawberry.input
 class ConnectSourceInput:
@@ -55,6 +75,11 @@ class ConnectSourceInput:
     api_base_url: str | None = None
     secret_plaintext: str  # PAT, OAuth client secret, or GitHub App PEM
     oauth_client_id: str | None = None
+    # GitHub App OAuth Client ID (e.g. ``Iv23lic8662KXwe4XKEI``).
+    # Distinct from ``oauth_client_id`` which on github_app_install rows
+    # carries the numeric App ID. Required for github_oauth_app +
+    # github_app_install kinds; ignored otherwise. See #525.
+    app_client_id: str | None = None
     oauth_redirect_uri: str | None = None
     repo_visibility_scopes: list[str] | None = None
 
@@ -66,6 +91,10 @@ class UpdateSourceConnectionInput:
     repo_visibility_scopes: list[str] | None = None
     is_active: bool | None = None
     rotate_secret_plaintext: str | None = None
+    # Letting operators add the Client ID to an existing connection
+    # without rotating credentials — the prod-blocker recovery path
+    # for connections that pre-date the column.
+    app_client_id: str | None = None
 
 
 @strawberry.input
@@ -185,6 +214,26 @@ def _validate_connect(input: ConnectSourceInput):
                 "oauth_client_id is required for OAuth-app config",
                 field="oauthClientId",
             )
+    if input.kind in _KINDS_REQUIRING_APP_CLIENT_ID:
+        # GitHub OAuth dance + JWT iss claim both want the Client ID
+        # (e.g. ``Iv23lic8662KXwe4XKEI``). Per #525 we require it
+        # up-front so the connection works end-to-end instead of
+        # 404-ing at github.com when the user clicks "Connect my
+        # GitHub".
+        if not input.app_client_id:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"app_client_id (GitHub App Client ID) is required for {input.kind!r}",
+                field="appClientId",
+            )
+        if not _looks_like_github_client_id(input.app_client_id.strip()):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "app_client_id doesn't look like a GitHub App Client ID "
+                "(expected Iv… for new Apps or 20-char hex for legacy "
+                "OAuth Apps)",
+                field="appClientId",
+            )
     return None
 
 
@@ -226,6 +275,7 @@ class ScmMutation:
                 installation_id=(input.installation_id or "")[:64],
                 api_base_url=input.api_base_url or "",
                 oauth_client_id=input.oauth_client_id or "",
+                app_client_id=(input.app_client_id or "").strip()[:64],
                 oauth_redirect_uri=input.oauth_redirect_uri or "",
                 repo_visibility_scopes=list(input.repo_visibility_scopes or []),
                 secret_backend_kind=encrypted.backend_kind,
@@ -262,6 +312,22 @@ class ScmMutation:
             encrypted = encrypt_at_rest(input.rotate_secret_plaintext.encode("utf-8"))
             conn.secret_backend_kind = encrypted.backend_kind
             conn.secret_ciphertext = encrypted.backend_ref
+        if input.app_client_id is not None:
+            # ``""`` is a valid update target (clearing) — but if the
+            # row is a GitHub kind, validate the shape before saving so
+            # we surface paste-errors at edit time rather than at the
+            # next OAuth click.
+            new_client_id = input.app_client_id.strip()
+            if new_client_id and conn.kind in _KINDS_REQUIRING_APP_CLIENT_ID:
+                if not _looks_like_github_client_id(new_client_id):
+                    return gql_failure(
+                        ErrorCode.VALIDATION.value,
+                        "app_client_id doesn't look like a GitHub App "
+                        "Client ID (expected Iv… for new Apps or "
+                        "20-char hex for legacy OAuth Apps)",
+                        field="appClientId",
+                    )
+            conn.app_client_id = new_client_id[:64]
         conn.save()
         return gql_success(source_connection_to_type(conn))
 

@@ -19,6 +19,14 @@ class SourceConnectionType:
     installation_id: str
     api_base_url: str
     oauth_client_id: str
+    # GitHub App OAuth Client ID — see SourceConnection.app_client_id
+    # docstring. Empty for non-GitHub kinds; empty on GitHub rows that
+    # pre-date #525 (the FE flags those via ``needs_client_id``).
+    app_client_id: str
+    # True when this row REQUIRES ``app_client_id`` for the OAuth flow
+    # but it's empty — drives the "Action required: add Client ID"
+    # inline banner on the source-providers settings page.
+    needs_client_id: bool
     oauth_redirect_uri: str
     repo_visibility_scopes: list[str]
     is_oauth_app_config: bool
@@ -154,6 +162,8 @@ def source_connection_to_type(c) -> SourceConnectionType:
         installation_id=c.installation_id or "",
         api_base_url=c.api_base_url or "",
         oauth_client_id=c.oauth_client_id or "",
+        app_client_id=c.app_client_id or "",
+        needs_client_id=c.needs_client_id,
         oauth_redirect_uri=c.oauth_redirect_uri or "",
         repo_visibility_scopes=list(c.repo_visibility_scopes or []),
         is_oauth_app_config=c.is_oauth_app_config,

@@ -119,6 +119,10 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
   const [apiBaseUrl, setApiBaseUrl] = React.useState("");
   const [secret, setSecret] = React.useState("");
   const [oauthClientId, setOauthClientId] = React.useState("");
+  // GitHub App OAuth Client ID — distinct from the numeric App ID for
+  // github_app_install rows. Required for the user-to-server OAuth
+  // dance + JWT iss claim. See #525.
+  const [appClientId, setAppClientId] = React.useState("");
   const [oauthRedirectUri, setOauthRedirectUri] = React.useState("");
   const [scopes, setScopes] = React.useState<ScmVisibilityScope[]>([]);
 
@@ -131,6 +135,7 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
       setApiBaseUrl("");
       setSecret("");
       setOauthClientId("");
+      setAppClientId("");
       setOauthRedirectUri("");
       setScopes([]);
     }
@@ -145,6 +150,17 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
   const isOauthApp = meta?.takesOauthApp ?? false;
   const isGithub = kind.startsWith("github_");
   const isGitlab = kind.startsWith("gitlab_");
+  // Both github_oauth_app + github_app_install need the user-to-server
+  // OAuth Client ID for the "Connect my GitHub" dance to work.
+  const needsAppClientId = kind === "github_oauth_app" || kind === "github_app_install";
+  // Client ID format check (UX hint only — backend re-validates).
+  // ``Iv…`` for new GitHub Apps; 20-char lowercase hex for legacy
+  // OAuth Apps. Empty string is allowed here (the submit button
+  // disables itself when needsAppClientId + empty).
+  const appClientIdOk =
+    appClientId === "" ||
+    /^Iv\d+[A-Za-z0-9]+$/.test(appClientId.trim()) ||
+    /^[a-f0-9]{20}$/.test(appClientId.trim());
 
   // OAuth-app config rows need a redirect URI that matches the host
   // — the placeholder hints the operator at the correct backend path
@@ -163,6 +179,7 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!secret) return;
+    if (needsAppClientId && (!appClientId.trim() || !appClientIdOk)) return;
     const { data } = await connect({
       variables: {
         input: {
@@ -173,6 +190,7 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
           apiBaseUrl: apiBaseUrl || null,
           secretPlaintext: secret,
           oauthClientId: oauthClientId || null,
+          appClientId: appClientId.trim() || null,
           oauthRedirectUri: oauthRedirectUri || null,
           repoVisibilityScopes: scopes,
         },
@@ -281,14 +299,26 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
           {isOauthApp && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="oauth-client-id">OAuth Client ID</Label>
+                <Label htmlFor="oauth-client-id">
+                  {isGithub
+                    ? "GitHub App ID (numeric — webhook payload lookups)"
+                    : "OAuth Client ID"}
+                </Label>
                 <Input
                   id="oauth-client-id"
                   value={oauthClientId}
                   onChange={(e) => setOauthClientId(e.target.value)}
+                  placeholder={isGithub ? "3705068" : ""}
                   className="font-mono text-xs"
                   required
                 />
+                {isGithub && (
+                  <p className="text-muted-foreground text-xs">
+                    The numeric App ID GitHub shows on your App settings page. Used
+                    for webhook-payload App lookups; the user-to-server OAuth
+                    Client ID is separate (below).
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="oauth-redirect">OAuth redirect URI</Label>
@@ -306,6 +336,40 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
                 </p>
               </div>
             </>
+          )}
+
+          {needsAppClientId && (
+            <div className="space-y-2">
+              <Label htmlFor="app-client-id">GitHub App Client ID</Label>
+              <Input
+                id="app-client-id"
+                value={appClientId}
+                onChange={(e) => setAppClientId(e.target.value)}
+                placeholder="Iv23lic8662KXwe4XKEI"
+                className="font-mono text-xs"
+                autoComplete="off"
+                required
+              />
+              <p className="text-muted-foreground text-xs">
+                Find this on your GitHub App settings page — looks like{" "}
+                <code>Iv23l...</code> for new GitHub Apps or a 20-char hex string
+                for legacy OAuth Apps.{" "}
+                <a
+                  href="https://github.com/settings/apps"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline"
+                >
+                  Open GitHub App settings →
+                </a>
+              </p>
+              {!appClientIdOk && appClientId !== "" && (
+                <p className="text-destructive text-xs">
+                  Doesn&apos;t look like a GitHub App Client ID — expected{" "}
+                  <code>Iv…</code> or a 20-char hex string.
+                </p>
+              )}
+            </div>
           )}
 
           <div className="space-y-2">
@@ -365,7 +429,14 @@ export function ConnectSourceDialog({ open, onOpenChange }: Props) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !secret}>
+            <Button
+              type="submit"
+              disabled={
+                loading ||
+                !secret ||
+                (needsAppClientId && (!appClientId.trim() || !appClientIdOk))
+              }
+            >
               {loading ? "Connecting…" : "Connect"}
             </Button>
           </SheetFooter>
