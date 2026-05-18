@@ -170,9 +170,9 @@ def test_sdk_protocol_default_list_keys_returns_sorted_keys():
     import sys
     from pathlib import Path
 
-    vendor = Path(__file__).resolve().parents[3] / "vendor" / "astrolift-providers"
-    if str(vendor) not in sys.path:
-        sys.path.insert(0, str(vendor))
+    providers_root = Path(__file__).resolve().parents[3] / "providers"
+    if str(providers_root) not in sys.path:
+        sys.path.insert(0, str(providers_root))
     from _sdk.secrets import SecretsBackend
 
     class _Concrete(SecretsBackend):

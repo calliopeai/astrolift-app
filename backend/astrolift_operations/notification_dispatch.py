@@ -26,7 +26,7 @@ Pipeline:
 #519 reconciliation: the local ``NotificationDriver`` Protocol that
 shipped with #476/#499 has been removed; this module now consumes
 the canonical Protocol from
-``vendor/astrolift-providers/_sdk/notification.py``. The
+``providers/_sdk/notification.py``. The
 in-memory fallback driver that lived here moved to
 ``tests/fixtures/notification_driver.py`` and is **test-only** --
 the production driver resolver does not know about it. Tests

@@ -267,7 +267,7 @@ def estimate_daily_cost_usd(
       - the aggregate has no CPU + memory (nothing to cost)
 
     NEVER falls back to a hard-coded SKU rate — workspace rule
-    (see ``vendor/astrolift-providers/_sdk/cost.py``). The UI renders
+    (see ``providers/_sdk/cost.py``). The UI renders
     the missing number as a dash with a tooltip; a fabricated estimate
     would erode operator trust in the column."""
     if aggregate.cpu_cores <= 0 and aggregate.memory_bytes <= 0:
