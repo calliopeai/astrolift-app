@@ -30,6 +30,12 @@ from _sdk.cluster import (
     TeardownReport,
     WorkloadStatus,
 )
+from _sdk.k8s_dynamic_client import (
+    KubernetesDynamicClient as _RealK8sClient,
+)
+from _sdk.k8s_dynamic_client import (
+    NotFoundError as _NotFound,
+)
 from gcp._errors import NotFoundError, map_api_error
 from k8s_native.management import (
     ManagementBackend,
@@ -45,9 +51,9 @@ from k8s_native.observability import (
     default_log_backend,
 )
 
-
-class _NotFound(Exception):
-    pass
+# ``_NotFound`` is aliased to the shared helper's ``NotFoundError`` at
+# the top-of-file imports so existing ``except _NotFound`` clauses keep
+# catching what the wrapper raises after the #568 fix.
 
 
 # Workload Identity bearer tokens minted via google.auth ADC are
@@ -788,7 +794,56 @@ def _refresh_credentials(creds: Any) -> None:
     creds.refresh(Request())
 
 
-def _build_k8s_client(*, endpoint: str, ca_data: str) -> Any:
-    """Production wires this to kubernetes.dynamic.DynamicClient
-    + google ADC for token. Tests inject a stub."""
-    raise NotImplementedError("requires kubernetes-client wiring at deploy time")
+def _build_k8s_client(
+    *,
+    endpoint: str,
+    ca_data: str,
+    credentials_factory: Callable[[], tuple[Any, str | None]] | None = None,
+) -> Any:
+    """Production factory: wire the shared k8s helper for GKE.
+
+    Closes #568. GKE auth uses Workload Identity (or ADC for
+    off-cluster callers); the existing ``_default_credentials_factory``
+    + ``_refresh_credentials`` helpers below already resolve creds
+    with the right scope. We wrap them into a ``token_provider``
+    closure that refreshes creds and returns ``creds.token`` on each
+    op so a single helper instance can survive across activities
+    (GKE ADC tokens are typically 60-min valid; the refresh path is
+    a cheap local rotation against ``google.auth.transport.requests``).
+
+    ``ca_data`` here is the base64-encoded PEM ``get_cluster`` returns
+    on ``master_auth.cluster_ca_certificate``; the shared helper
+    decodes it. ``credentials_factory`` is injected by tests so we
+    don't talk to real Google during unit-test runs.
+    """
+    factory = credentials_factory or _default_credentials_factory
+    # Resolve creds once at construction so any auth misconfiguration
+    # surfaces immediately rather than on the first op.
+    creds, _project = factory()
+    _refresh_credentials(creds)
+
+    def _mint_token() -> str:
+        # google-auth's ``creds.refresh`` rotates the cached token in
+        # place; we re-call on every op to make sure the cached value
+        # is fresh. The refresh is a single HTTP request against the
+        # metadata server (inside GCP) or stsservice.googleapis.com
+        # (off-cluster), so it's cheap to over-refresh.
+        try:
+            _refresh_credentials(creds)
+        except Exception:
+            # On a transient refresh failure, fall back to the existing
+            # cached token rather than failing the op. The kubernetes
+            # client will surface the 401 if the token is genuinely
+            # expired, which the resolver layer renders as an empty UI.
+            pass
+        return str(getattr(creds, "token", "") or "")
+
+    return _RealK8sClient(
+        endpoint=endpoint,
+        ca_data=ca_data,
+        token_provider=_mint_token,
+    )
+
+
+# ``_RealK8sClient`` is the shared helper at top-of-file imports —
+# kept as a comment so future readers find the alias without grep.
