@@ -17,6 +17,13 @@ input AddAppDomainInput {
   validationMethod: String = null
 }
 
+input AddEmailSuppressionEntryInput {
+  managedServiceId: GUID!
+  address: String!
+  reason: String! = "MANUAL"
+  note: String! = ""
+}
+
 input AddOrganizationAllowlistDomainInput {
   domain: String!
   defaultRoleSlug: String = null
@@ -939,6 +946,9 @@ type AstroliftDeployment {
   commitMessage: String!
   commitAuthor: String!
   repoUrl: String!
+  prNumber: Int!
+  prUrl: String!
+  commitAuthorAvatarUrl: String!
   abortedReason: String!
   triggeredByUserId: String
   triggeredByMe: Boolean!
@@ -1111,6 +1121,70 @@ type AstroliftElevationStatus {
   secondsRemaining: Int!
   method: String
   requiredFor: [String!]!
+}
+
+type AstroliftEmailAccountStatus {
+  sendingEnabled: Boolean!
+  productionAccess: Boolean!
+  reputationScore: Float
+  bounceRatePct: Float
+  complaintRatePct: Float
+}
+
+type AstroliftEmailDkimToken {
+  token: String!
+  cnameHost: String!
+  cnameTarget: String!
+}
+
+type AstroliftEmailDnsAuthCheck {
+  protocol: String!
+  outcome: String!
+  records: [String!]!
+  message: String!
+}
+
+type AstroliftEmailDnsAuthStatus {
+  identity: String!
+  checkedAt: DateTime!
+  overall: String!
+  dkim: AstroliftEmailDnsAuthCheck!
+  spf: AstroliftEmailDnsAuthCheck!
+  dmarc: AstroliftEmailDnsAuthCheck!
+}
+
+type AstroliftEmailIdentityVerification {
+  identity: String!
+  isDomain: Boolean!
+  status: String!
+  verificationToken: String!
+  dkimTokens: [AstroliftEmailDkimToken!]!
+}
+
+type AstroliftEmailSendQuota {
+  maxSendRate: Float!
+  max24HourSend: Float!
+  sentLast24h: Float!
+}
+
+type AstroliftEmailServiceDetail {
+  managedServiceId: GUID!
+  pluginSlug: String!
+  region: String!
+  identity: String!
+  quota: AstroliftEmailSendQuota
+  accountStatus: AstroliftEmailAccountStatus
+  identityVerification: AstroliftEmailIdentityVerification
+  dnsAuthStatus: AstroliftEmailDnsAuthStatus
+  suppressionEntries: [AstroliftEmailSuppressionEntry!]!
+  unsupportedNotes: [String!]!
+}
+
+type AstroliftEmailSuppressionEntry {
+  address: String!
+  reason: String!
+  suppressedAt: DateTime!
+  detail: String!
 }
 
 type AstroliftEnrollmentQrPayload {
@@ -2026,6 +2100,20 @@ type AstroliftSecretEditor {
   displayName: String!
 }
 
+type AstroliftSecretHistoryActor {
+  id: String!
+  username: String!
+}
+
+type AstroliftSecretHistoryEntry {
+  timestamp: DateTime!
+  actor: AstroliftSecretHistoryActor!
+  action: String!
+  success: Boolean!
+  errorCode: String!
+  sourceIp: String!
+}
+
 type AstroliftSecurityPolicy {
   blockOnCriticalCves: Boolean!
   blockOnMissingSignature: Boolean!
@@ -2740,6 +2828,28 @@ input ElevateAdminSessionInput {
   ttlSeconds: Int = null
 }
 
+type Emailsuppressionaddpayload {
+  address: String!
+  reason: String!
+}
+
+type EmailsuppressionaddpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Emailsuppressionaddpayload
+}
+
+type Emailsuppressionremovepayload {
+  address: String!
+  removed: Boolean!
+}
+
+type EmailsuppressionremovepayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Emailsuppressionremovepayload
+}
+
 type EmployeeAvatarType {
   publicPermanentUrl: String
 }
@@ -3112,9 +3222,6 @@ type Mutation {
   """
   generateRocketChatToken: String!
 
-  """Create or update a Metabase chart via MetabaseChartSerializer."""
-  metabaseChart(input: JSON!): MutationResult!
-
   """
   Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property.
   """
@@ -3286,6 +3393,7 @@ type Mutation {
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
   pushCiWorkflow(input: PushCiWorkflowInput!): AstroliftScmPushCiWorkflowResultMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
+  rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
   revealAppSecret(input: RevealAppSecretInput!): AstroliftRevealedSecretMutationResult!
@@ -3297,6 +3405,8 @@ type Mutation {
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
+  addEmailSuppressionEntry(input: AddEmailSuppressionEntryInput!): EmailsuppressionaddpayloadMutationResult!
+  removeEmailSuppressionEntry(input: RemoveEmailSuppressionEntryInput!): EmailsuppressionremovepayloadMutationResult!
   proposeSecretChange(input: ProposeSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
@@ -3656,11 +3766,13 @@ type Query {
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
   astroliftAppSecrets(appSlug: String!, environmentName: String = null): [AstroliftAppSecret!]!
+  astroliftAppSecretHistory(appSlug: String!, key: String!): [AstroliftSecretHistoryEntry!]!
   astroliftSecretBundles: [AstroliftSecretBundle!]!
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
+  astroliftEmailServiceDetail(managedServiceId: GUID!): AstroliftEmailServiceDetail
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   PostgresMetrics: [[String!]!]!
@@ -3770,6 +3882,11 @@ input RemoveAppDomainInput {
   id: GUID!
 }
 
+input RemoveEmailSuppressionEntryInput {
+  managedServiceId: GUID!
+  address: String!
+}
+
 input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
 }
@@ -3866,6 +3983,13 @@ type RevokemobiledevicepayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Revokemobiledevicepayload
+}
+
+input RotateAppSecretInput {
+  appSlug: String!
+  key: String!
+  value: String!
+  ifMatchVersion: Int = null
 }
 
 input RotateDeployTokenInput {
@@ -3966,6 +4090,8 @@ input StartDeploymentInput {
   ciProvider: String = null
   commitMessage: String = null
   commitAuthor: String = null
+  prNumber: Int = null
+  commitAuthorAvatarUrl: String = null
 }
 
 type StartWorkflowResult {

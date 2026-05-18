@@ -342,9 +342,7 @@ class EmailServiceDetailType:
     account_status: EmailAccountStatusType | None = None
     identity_verification: EmailIdentityVerificationType | None = None
     dns_auth_status: EmailDnsAuthStatusType | None = None
-    suppression_entries: list[EmailSuppressionEntryType] = strawberry.field(
-        default_factory=list
-    )
+    suppression_entries: list[EmailSuppressionEntryType] = strawberry.field(default_factory=list)
 
     unsupported_notes: list[str] = strawberry.field(default_factory=list)
     """Free-form messages from drivers that raised UnsupportedOperationError;
@@ -544,6 +542,47 @@ def attachment_to_type(
         merge_order=merge_order,
         attached_at=ref.created_at,
     )
+
+
+@strawberry.type(name="AstroliftSecretHistoryActor")
+class SecretHistoryActorType:
+    """Compact actor reference for one row of secret-history (#725).
+
+    ``id`` is the Django auth user pk stringified, mirroring the rest of
+    the actor surfaces in the schema. ``username`` is empty for
+    ``system`` actors (no associated user row); the FE renders that as
+    'system' in the timeline."""
+
+    id: str
+    username: str
+
+
+@strawberry.type(name="AstroliftSecretHistoryEntry")
+class SecretHistoryEntryType:
+    """One row of per-key secret-history audit timeline (#725).
+
+    Returned newest-first, capped at 50. Sourced from ``AuditEvent``
+    rows whose ``action`` is one of ``app.secret.set``,
+    ``app.secret.delete``, ``app.secret.rotate`` and whose ``target_id``
+    encodes ``<app_slug>:<key>``. The plaintext value is never returned —
+    the audit row never carries it in the first place.
+    """
+
+    timestamp: dt.datetime
+    actor: SecretHistoryActorType
+    action: str
+    """``set`` | ``delete`` | ``rotate`` — the trailing segment of
+    ``app.secret.<action>`` so the FE can switch on a stable string
+    without re-parsing the dotted prefix."""
+
+    success: bool
+    error_code: str = ""
+    """Empty on success; set to the resolver-emitted code on failure
+    (e.g. ``PERMISSION_DENIED``, ``VALIDATION``, ``INTERNAL``)."""
+
+    source_ip: str = ""
+    """Best-effort client IP captured at mutation time; empty when the
+    request didn't carry one (system actors, scheduled jobs)."""
 
 
 def managed_service_to_type(svc) -> ManagedServiceType:

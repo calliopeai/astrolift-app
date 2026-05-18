@@ -33,6 +33,8 @@ from astrolift_services.schema.types import (
     ManagedServiceType,
     SecretBundleType,
     SecretChangeProposalType,
+    SecretHistoryActorType,
+    SecretHistoryEntryType,
     attachment_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
@@ -76,7 +78,8 @@ def _build_email_detail(
 
     try:
         driver = driver_for_plugin_slug(
-            plugin_slug=plugin_slug, region=region,
+            plugin_slug=plugin_slug,
+            region=region,
         )
     except LookupError as exc:
         return EmailServiceDetailType(
@@ -337,6 +340,105 @@ class ServicesQuery:
             if not env_names:
                 env_names = ["preview"]
         return _list_app_secrets(app=app, env_names=env_names)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_secret_history(
+        self,
+        info: Info,
+        app_slug: str,
+        key: str,
+    ) -> list[SecretHistoryEntryType]:
+        """Per-key audit timeline for one app's secrets (#725).
+
+        Returns the 50 most-recent ``AuditEvent`` rows whose ``action``
+        is one of ``app.secret.set`` / ``app.secret.delete`` /
+        ``app.secret.rotate`` and whose ``target_id`` encodes
+        ``<app_slug>:<key>``. The plaintext value never appears — the
+        audit row doesn't carry it.
+
+        Tenant-scoped via ``@tenant_scoped`` + ``APP_READ``. An app the
+        caller can't see produces an empty list (rather than a NOT_FOUND
+        envelope) because queries don't carry the MutationResult shape;
+        the FE renders 'no history' indistinguishably from 'app gone'.
+        """
+        from astrolift_operations.models import AuditEvent
+
+        app = RegisteredApp.objects.filter(slug=app_slug).only("id", "slug").first()
+        if app is None:
+            return []
+
+        # Compose the same composite target id the mutation writer
+        # stores. Older audit rows pre-date this targeting and won't
+        # carry it — they were untargetable per-key in the first place,
+        # so this query intentionally omits them rather than returning
+        # rows from a different (app, key) pair.
+        target_id = f"{app.slug}:{key}"
+
+        rows = list(
+            AuditEvent.objects.filter(
+                action__in=(
+                    "app.secret.set",
+                    "app.secret.delete",
+                    "app.secret.rotate",
+                ),
+                target_kind="AppSecret",
+                target_id=target_id,
+            ).order_by("-occurred_at")[:50]
+        )
+
+        # Hydrate actor user-rows in one round trip (rather than N
+        # FK fetches inside the loop). Actor ids on AuditEvent are
+        # stringified pks; system/api-token actors won't parse to int.
+        actor_ids: list[int] = []
+        for row in rows:
+            if row.actor_kind != "user" or not row.actor_id:
+                continue
+            try:
+                actor_ids.append(int(row.actor_id))
+            except (TypeError, ValueError):
+                continue
+        users_by_id: dict[int, object] = {}
+        if actor_ids:
+            from django.contrib.auth import get_user_model
+
+            User = get_user_model()
+            for u in User.objects.filter(pk__in=actor_ids).only("pk", "username"):
+                users_by_id[u.pk] = u
+
+        out: list[SecretHistoryEntryType] = []
+        for row in rows:
+            data = row.data or {}
+            error_code = (data.get("error_code") or "") if isinstance(data, dict) else ""
+            # AuditEvent stores the full dotted action; surface only the
+            # trailing segment so the FE switches on a stable token.
+            short_action = row.action.rsplit(".", 1)[-1]
+
+            # Resolve actor. ``actor_id`` is a stringified pk for user
+            # actors; system actors (e.g. cron, workflow) carry an
+            # empty actor_id — surface them as id='0' / username=''.
+            actor_id_str = row.actor_id or "0"
+            username = ""
+            if row.actor_kind == "user" and row.actor_id:
+                try:
+                    user = users_by_id.get(int(row.actor_id))
+                except (TypeError, ValueError):
+                    user = None
+                if user is not None:
+                    username = getattr(user, "username", "") or ""
+
+            out.append(
+                SecretHistoryEntryType(
+                    timestamp=row.occurred_at,
+                    actor=SecretHistoryActorType(id=actor_id_str, username=username),
+                    action=short_action,
+                    success=row.decision != "DENY" and not error_code,
+                    error_code=error_code,
+                    source_ip=row.request_ip or "",
+                )
+            )
+        return out
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -622,10 +724,7 @@ class ServicesQuery:
         # configured identity / from-address when present.
         config = svc.config or {}
         identity = (
-            config.get("identity")
-            or config.get("email_identity")
-            or config.get("EMAIL_FROM_ADDRESS")
-            or ""
+            config.get("identity") or config.get("email_identity") or config.get("EMAIL_FROM_ADDRESS") or ""
         )
         # The handle the lifecycle driver returned carries the identity
         # too — use that when nothing's in config (handle format is

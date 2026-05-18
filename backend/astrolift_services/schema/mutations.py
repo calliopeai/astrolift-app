@@ -76,6 +76,22 @@ class SetAppSecretInput:
 
 
 @strawberry.input
+class RotateAppSecretInput:
+    """Rotate an app-level [env] literal (#726).
+
+    Wire-identical to ``SetAppSecretInput`` and resolves through the
+    same staging + proposal pipeline. The only difference is the audit
+    action — rotations emit ``app.secret.rotate`` so SRE can answer
+    'has anyone rotated this key in the last 90 days' as a distinct
+    question from 'has anyone touched it'."""
+
+    app_slug: str
+    key: str
+    value: str
+    if_match_version: int | None = None
+
+
+@strawberry.input
 class DeleteAppSecretInput:
     app_slug: str
     key: str
@@ -427,6 +443,26 @@ def _proposal_target_from_input(*args, **kwargs):
     return "SecretChangeProposal", str(pid)
 
 
+def _app_secret_target_from_input(*args, **kwargs):
+    """``@mutation_audit`` target hook for secret writes.
+
+    Stores the audit row's ``target_id`` as ``<app_slug>:<key>`` so the
+    per-key history query (#725) can filter precisely. ``target_kind``
+    is ``AppSecret``. Returning ``None`` skips targeting — happens when
+    the resolver is invoked through a path that doesn't carry a normal
+    input (test scaffolding, etc.)."""
+    inp = kwargs.get("input")
+    if inp is None and len(args) >= 3:
+        inp = args[2]
+    if inp is None:
+        return None
+    app_slug = getattr(inp, "app_slug", None)
+    key = getattr(inp, "key", None)
+    if not app_slug or not key:
+        return None
+    return "AppSecret", f"{app_slug}:{key}"
+
+
 def _maybe_create_proposal_for_write(
     *,
     app: RegisteredApp,
@@ -566,7 +602,7 @@ def _stage_manifest(app, new_text: str, *, actor=None) -> str:
 @strawberry.type
 class ServicesMutation:
     @strawberry.field
-    @mutation_audit(action="app.secret.set")
+    @mutation_audit(action="app.secret.set", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.set")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
@@ -632,7 +668,72 @@ class ServicesMutation:
         )
 
     @strawberry.field
-    @mutation_audit(action="app.secret.delete")
+    @mutation_audit(action="app.secret.rotate", target=_app_secret_target_from_input)
+    @requires_elevation(action_label="app.secret.rotate")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def rotate_app_secret(
+        self,
+        info: Info,
+        input: RotateAppSecretInput,
+    ) -> MutationResultType[_AppSecretWritePayload]:
+        """Rotate one literal env value on the staged manifest (#726).
+
+        Wire-identical to :meth:`set_app_secret`: same staging buffer,
+        same validation, same optimistic-concurrency gate, same proposal
+        flow when the app requires secret approval. Differs only in the
+        audit action (``app.secret.rotate`` vs ``app.secret.set``) so
+        SRE can distinguish credential lifecycle events from edits in
+        the audit timeline.
+        """
+        validation_msg = _validate_env_key(input.key)
+        if validation_msg:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                validation_msg,
+                field="key",
+            )
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        mismatch = _check_version_match(app, if_match_version=input.if_match_version, kind="App")
+        if mismatch is not None:
+            return mismatch
+        proposal = _maybe_create_proposal_for_write(
+            app=app,
+            op=SecretChangeProposal.Op.SET.value,
+            payload={"key": input.key, "value": input.value},
+            info=info,
+        )
+        if proposal is not None:
+            return gql_success(
+                _AppSecretWritePayload(
+                    app_slug=app.slug,
+                    key=input.key,
+                    raw_manifest_staged=app.manifest_raw_staged or "",
+                    pending_proposal_id=GUID(str(proposal.guid)),
+                )
+            )
+        source = app.manifest_raw_staged or app.manifest_raw or ""
+        new_text = set_app_env_keys(source, {input.key: input.value})
+        try:
+            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
+        except ManifestError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"manifest parse failed after rotate: {exc}",
+                field="rawManifest",
+            )
+        return gql_success(
+            _AppSecretWritePayload(
+                app_slug=app.slug,
+                key=input.key,
+                raw_manifest_staged=staged,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.secret.delete", target=_app_secret_target_from_input)
     @requires_elevation(action_label="app.secret.delete")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
@@ -1635,7 +1736,8 @@ class ServicesMutation:
         region = svc.app_environment.tenant_cluster.region or ""
         try:
             driver = driver_for_plugin_slug(
-                plugin_slug=plugin_slug, region=region,
+                plugin_slug=plugin_slug,
+                region=region,
             )
         except LookupError as exc:
             return gql_failure(
@@ -1744,7 +1846,8 @@ class ServicesMutation:
         region = svc.app_environment.tenant_cluster.region or ""
         try:
             driver = driver_for_plugin_slug(
-                plugin_slug=plugin_slug, region=region,
+                plugin_slug=plugin_slug,
+                region=region,
             )
         except LookupError as exc:
             return gql_failure(
@@ -1795,7 +1898,8 @@ class ServicesMutation:
 
         return gql_success(
             _EmailSuppressionRemovePayload(
-                address=address, removed=removed,
+                address=address,
+                removed=removed,
             )
         )
 
