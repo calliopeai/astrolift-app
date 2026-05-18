@@ -9,6 +9,7 @@ import {
   RefreshCcwIcon,
   RocketIcon,
   SearchIcon,
+  StarIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -72,6 +73,50 @@ const STATUS_FILTER_TO_PILL: Record<AppListStatusFilter, Pill> = {
 
 const PAGE_SIZE = 50;
 
+// #697 — pinned apps persist in localStorage so operators who work
+// with the same 2-3 apps daily can keep them at the top across
+// sessions. The pin set is per-browser, not synced server-side
+// (no privacy implications, just a personal sort preference).
+const PINNED_APPS_KEY = "astrolift.apps.pinned.v1";
+
+function loadPinned(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(PINNED_APPS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((x) => typeof x === "string")) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function savePinned(pinned: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PINNED_APPS_KEY, JSON.stringify(Array.from(pinned)));
+  } catch {
+    // localStorage might be disabled (private mode, quota) — degrade silently
+  }
+}
+
+function usePinnedApps() {
+  const [pinned, setPinned] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setPinned(loadPinned());
+  }, []);
+  const toggle = useCallback((slug: string) => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      savePinned(next);
+      return next;
+    });
+  }, []);
+  return { pinned, toggle };
+}
+
 function pillFromParam(value: string | null): Pill {
   if (!value) return "all";
   const upper = value.toUpperCase() as AppListStatusFilter;
@@ -134,9 +179,22 @@ export function AppsClient() {
   });
 
   const page = data?.astroliftAppsPage;
-  const apps: AstroliftRegisteredApp[] = useMemo(() => page?.items ?? [], [page]);
+  const rawApps: AstroliftRegisteredApp[] = useMemo(() => page?.items ?? [], [page]);
   const totalCount = page?.totalCount ?? 0;
   const nextCursor = page?.nextCursor ?? null;
+
+  // #697 — pinned apps sort to the top of the grid.
+  const { pinned: pinnedSet, toggle: togglePin } = usePinnedApps();
+  const apps: AstroliftRegisteredApp[] = useMemo(() => {
+    if (pinnedSet.size === 0) return rawApps;
+    const pins: AstroliftRegisteredApp[] = [];
+    const rest: AstroliftRegisteredApp[] = [];
+    for (const a of rawApps) {
+      if (pinnedSet.has(a.slug)) pins.push(a);
+      else rest.push(a);
+    }
+    return [...pins, ...rest];
+  }, [rawApps, pinnedSet]);
 
   // `/` global shortcut focuses the search input — but only when the
   // user isn't already typing into a form control / contenteditable,
@@ -338,9 +396,33 @@ export function AppsClient() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {apps.map((app) => (
+            {apps.map((app) => {
+              const isPinned = pinnedSet.has(app.slug);
+              return (
               <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
-                <Card className="hover:bg-accent/30 group transition-colors">
+                <Card className="hover:bg-accent/30 group relative transition-colors">
+                  {/* #697 — Pin / unpin toggle. Positioned absolutely so
+                      it can sit inside the card without breaking the
+                      <Link> parent's whole-card click target. The
+                      button stops both default + propagation so a
+                      click on the star doesn't navigate to the app. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      togglePin(app.slug);
+                    }}
+                    className="text-muted-foreground hover:text-amber-500 absolute top-3 right-12 z-10 size-7 rounded-md p-1 transition-colors"
+                    title={isPinned ? "Unpin app" : "Pin to top"}
+                    aria-pressed={isPinned}
+                  >
+                    <StarIcon
+                      className={isPinned ? "size-4 fill-amber-500 text-amber-500" : "size-4"}
+                      aria-hidden
+                    />
+                    <span className="sr-only">{isPinned ? "Unpin app" : "Pin to top"}</span>
+                  </button>
                   <CardContent className="flex flex-col gap-3 p-5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -386,7 +468,8 @@ export function AppsClient() {
                   </CardContent>
                 </Card>
               </Link>
-            ))}
+              );
+            })}
           </div>
           {nextCursor && (
             <div className="flex justify-center pt-2">
