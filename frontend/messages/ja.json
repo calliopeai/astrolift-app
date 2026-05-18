@@ -1295,6 +1295,11 @@
         "duration": "Duration",
         "ci": "CI"
       },
+      "row": {
+        "prMissing": "PR —",
+        "authorBy": "by {name}",
+        "authorMissing": "by —"
+      },
       "emptyTitle": "No deployments match your filters",
       "emptyNever": "This app hasn't been deployed yet.",
       "emptyTryAgain": "Loosen the filters or clear the search to see more results.",

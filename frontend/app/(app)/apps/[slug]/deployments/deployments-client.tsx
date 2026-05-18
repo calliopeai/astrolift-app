@@ -334,6 +334,23 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                           )}
                         </div>
                       )}
+                      {/*
+                        Stacked author / PR line. `prNumber` + `prUrl` are
+                        not yet on the deployment payload (see
+                        backend follow-on issue) so we render a dash
+                        placeholder until the schema lands; `commitAuthor`
+                        is available and rendered when non-empty.
+                      */}
+                      <div className="text-muted-foreground/80 mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
+                        <span>
+                          {t("row.prMissing")}
+                        </span>
+                        <span className="font-mono">
+                          {d.commitAuthor
+                            ? t("row.authorBy", { name: d.commitAuthor })
+                            : t("row.authorMissing")}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs capitalize">
