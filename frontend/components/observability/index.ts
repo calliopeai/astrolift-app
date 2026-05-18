@@ -12,6 +12,8 @@ export {
   SUPPORTED_KINDS as MANAGED_SERVICE_METRIC_KINDS,
 } from "./ManagedServiceMetricsPanel";
 export type { ManagedServiceBindingLite } from "./ManagedServiceMetricsPanel";
+export { PodExpander } from "./PodExpander";
+export type { PodExpanderProps } from "./PodExpander";
 export { LogViewer, classifyLogLevel } from "./LogViewer";
 export type { LogLevel, LogLevelFilter, LogViewerProps } from "./LogViewer";
 export { AppLogExportDialog } from "./AppLogExportDialog";
