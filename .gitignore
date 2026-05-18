@@ -51,3 +51,4 @@ credentials.json
 # docker/.env holds host-port overrides for the local stack;
 # kept untracked so different operators can pick non-colliding values.
 docker/.env
+.claude/worktrees/
