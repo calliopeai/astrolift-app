@@ -3311,6 +3311,7 @@ type MutationError {
   requiresAttestation: Boolean
   currentVersion: Int
   requestedVersion: Int
+  supportedMethods: [String!]
 }
 
 """Standard mutation result with ok flag and validation errors."""

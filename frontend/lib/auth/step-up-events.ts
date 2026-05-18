@@ -20,9 +20,26 @@ export const STEP_UP_EVENT = "astrolift:step-up-required" as const;
 export const ELEVATED_EVENT = "astrolift:elevated" as const;
 export const DEELEVATED_EVENT = "astrolift:deelevated" as const;
 
+/**
+ * Credential families the FE can use to satisfy step-up. Mirrors the
+ * backend's ``METHOD_*`` constants in
+ * ``astrolift_identity.session_elevation``. The deny envelope from a
+ * ``@requires_elevation``-gated mutation lists which one(s) apply to
+ * the current session — SSO-only installs surface ``"sso"``,
+ * local-login installs surface ``"password"`` (#526).
+ */
+export type StepUpMethod = "password" | "sso" | "webauthn" | "magic_link";
+
 export type StepUpEventDetail = {
   operationName: string;
   message: string;
+  /**
+   * Credential families the current session can use to satisfy this
+   * step-up gate (#526). Undefined for legacy denies issued before
+   * the backend started populating ``supported_methods`` — the modal
+   * falls back to the password form in that case.
+   */
+  supportedMethods?: StepUpMethod[];
 };
 
 export type ElevatedEventDetail = {

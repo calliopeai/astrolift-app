@@ -47,6 +47,26 @@ class ClientKind(models.TextChoices):
     API_TOKEN = "api_token", "API token"
 
 
+class LoginMethod(models.TextChoices):
+    """How the session's initial authentication was completed (#526).
+
+    Drives which step-up verifier the platform offers when a sensitive
+    mutation hits ``@requires_elevation``. SSO-only installs can't
+    satisfy a password prompt (the User row carries an unusable
+    password hash), so the FE has to be told which credential to
+    re-collect — that's what this column powers.
+
+    Stored lowercase; choices kept open enough that a future
+    enrolment flow (passkey-only sign-up, magic-link) can land its
+    own value without forcing every prior install to backfill.
+    """
+
+    PASSWORD = "password", "Username + password"
+    SSO = "sso", "External IdP (Auth0 / Cognito / OIDC)"
+    MAGIC_LINK = "magic_link", "Magic link / one-time email"
+    WEBAUTHN = "webauthn", "Passkey / WebAuthn"
+
+
 # Per-kind defaults for ``MAX_SESSIONS_PER_CLIENT_KIND``. Surfaced as
 # constants so tests + the per-user enforcer have a single source of
 # truth for "what should happen on a fresh install where the operator
@@ -159,6 +179,21 @@ class AstroliftSession(BaseCoreModel):
         max_length=32,
         choices=ClientKind.choices,
         default=ClientKind.WEB.value,
+        db_index=True,
+    )
+
+    # How the operator authenticated to mint this session (#526). The
+    # default ``password`` matches the pre-#526 world where every
+    # local-login / dev-login row was implicitly password-backed; the
+    # session-tracking middleware overrides it from the session bag
+    # whenever the IdP login path set the key. ``@requires_elevation``
+    # reads this back to tell the FE which credential to re-collect
+    # for step-up — SSO sessions can't satisfy a password prompt
+    # because the User row has an unusable password hash.
+    login_method = models.CharField(
+        max_length=32,
+        choices=LoginMethod.choices,
+        default=LoginMethod.PASSWORD.value,
         db_index=True,
     )
 
