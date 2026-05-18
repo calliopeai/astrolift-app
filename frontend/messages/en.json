@@ -2477,5 +2477,23 @@
       "moAgo": "{n}mo ago",
       "yAgo": "{n}y ago"
     }
+  },
+  "stepUp": {
+    "title": "Confirm your identity",
+    "description": "Sensitive operation — please re-enter your credentials to continue.",
+    "passwordLabel": "Password",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "elevating": "Verifying…",
+    "errors": {
+      "passwordRequired": "Password is required.",
+      "generic": "Verification failed. Try again.",
+      "network": "Couldn't reach the server. Try again."
+    }
+  },
+  "elevation": {
+    "active": "Admin elevated",
+    "expires": "Expires {time}",
+    "deelevate": "Drop elevation"
   }
 }
