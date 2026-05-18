@@ -28,6 +28,7 @@ from astrolift_scm.providers.github import (
     fetch_github_file,
     install_github_webhook,
     list_github_repos,
+    open_github_pull_request,
     put_github_file,
 )
 from astrolift_scm.providers.gitlab import (
@@ -35,6 +36,7 @@ from astrolift_scm.providers.gitlab import (
     fetch_gitlab_file,
     install_gitlab_webhook,
     list_gitlab_projects,
+    open_gitlab_merge_request,
     put_gitlab_file,
 )
 
@@ -273,6 +275,93 @@ def install_webhook(
     raise ProviderError(
         "UNSUPPORTED",
         f"webhook install for {connection.kind!r} not implemented yet",
+    )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PullRequestResult:
+    """Outcome of opening a pull request / merge request on a SCM host.
+
+    ``url`` is the operator-clickable PR page; ``number`` is the
+    host-side integer identifier (GitHub PR number / GitLab MR iid)
+    surfaced for downstream automation (status posts, retries). Both
+    GitHub and GitLab use integers — we normalize to ``str`` so callers
+    don't need to know which host originated it."""
+
+    url: str
+    number: str
+    head_branch: str
+    base_branch: str
+
+
+def open_pull_request(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    head_branch: str,
+    base_branch: str,
+    title: str,
+    body: str,
+) -> PullRequestResult:
+    """Open a PR (GitHub) / MR (GitLab) from ``head_branch`` into
+    ``base_branch``. Returns the host-side URL + identifier.
+
+    Per host:
+
+    - **GitHub** — ``POST /repos/{owner}/{repo}/pulls`` with the
+      connection's token. App-installation tokens attribute the PR to
+      the App's bot identity; user-bearer tokens attribute to the
+      token owner.
+    - **GitLab** — ``POST /projects/{id}/merge_requests`` (the project
+      id is URL-encoded ``path_with_namespace``). Same auth shape as
+      ``put_file`` — Bearer over PRIVATE-TOKEN for parity.
+
+    Errors bubble up as :class:`ProviderError` consistent with the
+    rest of the dispatcher; the mutation layer is expected to catch
+    and translate to a clean ``MutationResult`` envelope rather than
+    raising through GraphQL.
+    """
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            result = open_github_pull_request(
+                connection,
+                repo_full_name=repo_full_name,
+                head_branch=head_branch,
+                base_branch=base_branch,
+                title=title,
+                body=body,
+            )
+            return PullRequestResult(
+                url=result.url,
+                number=result.number,
+                head_branch=head_branch,
+                base_branch=base_branch,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITLAB_KINDS:
+        try:
+            result = open_gitlab_merge_request(
+                connection,
+                repo_full_name=repo_full_name,
+                head_branch=head_branch,
+                base_branch=base_branch,
+                title=title,
+                body=body,
+            )
+            return PullRequestResult(
+                url=result.url,
+                number=result.number,
+                head_branch=head_branch,
+                base_branch=base_branch,
+            )
+        except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"pull-request open for {connection.kind!r} not implemented yet",
     )
 
 

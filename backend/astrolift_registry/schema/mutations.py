@@ -1163,36 +1163,46 @@ class RegistryMutation:
         Discards any staged edits — sync is destructive on purpose,
         the UI is expected to confirm before calling.
 
-        Production wires this into the SCM provider's read-file path
-        (GitHub Contents API, GitLab files, etc.). Until that flow is
-        connected at this resolver, the mutation simply re-anchors
-        ``last_synced_hash`` to the current ``manifest_hash`` so the
-        sync_state classifier reads as IN_SYNC.
+        Delegates the SCM-side fetch + parse + apply to
+        :func:`resync_app_manifest_from_repo` so the diff-and-apply
+        path stays a single implementation. The service already
+        handles the four outcome shapes (``in_sync`` / ``applied`` /
+        ``diverged`` / ``fetch_failed``); this resolver maps them
+        onto the GraphQL envelope.
         """
         from astrolift_manifest.sync_state import (
             SyncSnapshot,
             classify_state,
+        )
+        from astrolift_registry.services.manifest_sync import (
+            resync_app_manifest_from_repo,
         )
 
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
-        # TODO: wire SCM provider .read_file(source_repo, manifest_path)
-        # via astrolift_scm.providers when the SCM activity is exposed.
-        # For now we drop the staging buffer + reset the anchor so the
-        # UI's sync state is consistent.
-        app.manifest_raw_staged = ""
-        app.last_synced_hash = app.manifest_hash or ""
-        app.save(
-            update_fields=[
-                "manifest_raw_staged",
-                "last_synced_hash",
-                "updated_at",
-                "version",
-            ]
-        )
+        # Old behaviour: drop staged buffer + reset the anchor without
+        # re-reading the repo. Replaced with a real fetch via the SCM
+        # provider so the manifest_raw + hash actually mirror the
+        # repo's content. Issue #536.
+        result = resync_app_manifest_from_repo(app)
+        if result.status == "fetch_failed":
+            return gql_failure(
+                "SCM_FETCH_FAILED",
+                result.error or "couldn't reach the source repo",
+            )
+        if result.status == "diverged":
+            return gql_failure(
+                "SCM_DIVERGED",
+                result.error
+                or "staged drafts would be clobbered by repo content; push or discard first",
+            )
 
+        # ``applied`` / ``in_sync`` both leave the DB in a coherent
+        # state. ``resync_app_manifest_from_repo`` already cleared the
+        # staging buffer where appropriate; mirror its final view.
+        app.refresh_from_db()
         sync_state = classify_state(
             SyncSnapshot(
                 db_hash=app.manifest_hash or "",
@@ -1205,7 +1215,7 @@ class RegistryMutation:
                 id=input.id,
                 sync_state=sync_state.value,
                 raw_manifest=app.manifest_raw or "",
-                raw_manifest_staged="",
+                raw_manifest_staged=app.manifest_raw_staged or "",
             )
         )
 
@@ -1221,11 +1231,24 @@ class RegistryMutation:
         """Open a PR with the staged manifest.
 
         Returns ok + ``note='nothing_to_push'`` when there's no
-        staged change. The actual PR creation goes through the SCM
-        provider; until that flow is wired here, returns
-        ``note='scm_pending'`` with an empty pr_url so the UI can
-        show 'PR opening...' state without exploding.
+        staged change. On success, writes the staged TOML to a fresh
+        branch on the source repo and opens a PR / MR against the
+        base branch; the payload carries the operator-clickable URL
+        + the host-side identifier.
+
+        Never raises; SCM failures are translated to a
+        ``SCM_PUSH_FAILED`` envelope per the MutationResult contract.
+        Issue #535.
         """
+        from astrolift_registry.services.manifest_sync import (
+            _pick_source_connection,
+        )
+        from astrolift_scm.providers import (
+            ProviderError,
+            open_pull_request,
+            put_file,
+        )
+
         app = RegisteredApp.objects.filter(guid=str(input.id)).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
@@ -1241,17 +1264,59 @@ class RegistryMutation:
                 )
             )
 
-        branch = input.branch_name or f"astrolift/manifest-{app.slug}"
-        # TODO: wire astrolift_scm.providers.<source_kind>.open_pull_request
-        # to take (source_repo, branch, base=default_branch, file_changes,
-        # title, body) and return the PR URL. The SCM-side abstraction
-        # already exists for status posts; PR creation is a sibling.
+        if not app.source_repo:
+            return gql_failure(
+                "SCM_PUSH_FAILED",
+                "app has no source_repo configured; can't open a PR",
+            )
+
+        connection = _pick_source_connection(app)
+        if connection is None:
+            return gql_failure(
+                "SCM_PUSH_FAILED",
+                "no active source connection found for this organization — "
+                "reconnect the source host under Settings -> Source connections",
+            )
+
+        head_branch = input.branch_name or f"astrolift/manifest-{app.slug}"
+        base_branch = app.default_branch or "main"
+        manifest_path = app.manifest_path or "astrolift.toml"
+        commit_message = input.pr_title or f"Astrolift: update manifest for {app.slug}"
+        pr_title = input.pr_title or commit_message
+        pr_body = input.pr_body or (
+            f"Update `{manifest_path}` for **{app.name or app.slug}**.\n\n"
+            "Opened by the Astrolift manifest editor."
+        )
+
+        try:
+            put_file(
+                connection,
+                repo_full_name=app.source_repo,
+                path=manifest_path,
+                branch=head_branch,
+                content=staged,
+                commit_message=commit_message,
+            )
+            pr = open_pull_request(
+                connection,
+                repo_full_name=app.source_repo,
+                head_branch=head_branch,
+                base_branch=base_branch,
+                title=pr_title,
+                body=pr_body,
+            )
+        except ProviderError as exc:
+            return gql_failure(
+                "SCM_PUSH_FAILED",
+                f"{exc.code}: {exc.message}",
+            )
+
         return gql_success(
             _ManifestPushPayload(
                 id=input.id,
-                pr_url="",
-                branch_name=branch,
-                note="scm_pending",
+                pr_url=pr.url,
+                branch_name=head_branch,
+                note="pushed",
             )
         )
 
