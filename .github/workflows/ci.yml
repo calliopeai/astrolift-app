@@ -105,13 +105,13 @@ jobs:
         run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
         run: pipenv install --dev --deploy
-      - name: Install vendored provider plugins
-        # The lifecycle observability surface dispatches through
-        # astrolift-providers (#299) — install the vendored snapshot
-        # into the same pipenv venv so `_sdk` + `k8s_native` + the
-        # cloud plugins resolve at import time. The Docker image
+      - name: Install in-tree provider plugins
+        # The lifecycle observability surface dispatches through the
+        # provider drivers (#299) — install the in-tree providers
+        # tree into the same pipenv venv so `_sdk` + `k8s_native` +
+        # the cloud plugins resolve at import time. The Docker image
         # does this in its build step; CI mirrors it.
-        run: pipenv run pip install ./vendor/astrolift-providers[aws,gcp,azure,k8s]
+        run: pipenv run pip install ./providers[aws,gcp,azure,k8s]
       - name: Run migrations
         run: pipenv run python manage.py migrate --noinput
       - name: Run tests
@@ -136,13 +136,122 @@ jobs:
         run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
         run: pipenv install --dev --deploy
-      - name: Install vendored provider plugins
+      - name: Install in-tree provider plugins
         # Mirrors the test job — mypy follows imports into
         # core.cluster_observability which references _sdk.cluster
-        # from the vendored astrolift-providers package.
-        run: pipenv run pip install ./vendor/astrolift-providers[aws,gcp,azure,k8s]
+        # from the providers tree.
+        run: pipenv run pip install ./providers[aws,gcp,azure,k8s]
       - name: Run mypy on the platform core
         run: pipenv run mypy core config || true
+
+  providers-test:
+    # Runs the providers test suite at backend/providers/tests/.
+    # Before consolidation the providers code lived in its own repo with
+    # no CI — 5 deploy-blocker stubs shipped to prod because the unit-test
+    # path used mock factories and the 1870-test suite never ran on PRs.
+    # This job makes that mistake structurally impossible going forward.
+    name: test (providers)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/providers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install providers + test extras
+        run: pip install -e ".[aws,gcp,azure,k8s,dev]"
+      - name: Lint (providers)
+        run: ruff check .
+      - name: Format check (providers)
+        run: ruff format --check .
+      - name: Run tests (providers)
+        run: pytest -x
+
+  providers-no-stub-factory-gate:
+    # Audit-recommended CI gate: assert that no "real" client factory in
+    # backend/providers/ returns an object whose public methods all raise
+    # NotImplementedError. This would have caught the EKS _RealK8sClient
+    # bug (production install crashed on server_side_apply) at PR time.
+    name: no-stub-factory gate (providers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Detect "real-but-stubbed" client classes
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          # Scan backend/providers/ for class definitions whose name
+          # contains "Real" or ends in "Client", and whose public methods
+          # (excluding __init__/_helpers) are all `raise NotImplementedError`.
+          # That pattern means the production path returns an object that
+          # crashes on first use — the test path injects a fake so unit
+          # tests never exercise the default. This was the exact shape of
+          # 5 deploy-blockers in the May 18 audit; we never want to ship
+          # one again.
+          import ast
+          import pathlib
+          import sys
+
+          ROOT = pathlib.Path("backend/providers")
+          offenders: list[tuple[str, str]] = []
+
+          def is_raise_not_implemented(stmt: ast.stmt) -> bool:
+              if isinstance(stmt, ast.Raise):
+                  exc = stmt.exc
+                  if isinstance(exc, ast.Call) and isinstance(exc.func, ast.Name):
+                      return exc.func.id == "NotImplementedError"
+                  if isinstance(exc, ast.Name):
+                      return exc.id == "NotImplementedError"
+              return False
+
+          def body_only_raises_not_impl(body: list[ast.stmt]) -> bool:
+              # Tolerate a leading docstring.
+              stmts = [s for s in body if not (
+                  isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant) and isinstance(s.value.value, str)
+              )]
+              if not stmts:
+                  return False
+              return all(is_raise_not_implemented(s) for s in stmts)
+
+          for path in ROOT.rglob("*.py"):
+              if "/tests/" in path.as_posix():
+                  continue
+              try:
+                  tree = ast.parse(path.read_text(), filename=str(path))
+              except SyntaxError:
+                  continue
+              for node in ast.walk(tree):
+                  if not isinstance(node, ast.ClassDef):
+                      continue
+                  name = node.name
+                  if "Real" not in name and not name.endswith("Client"):
+                      continue
+                  pub_methods = [
+                      m for m in node.body
+                      if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
+                      and not m.name.startswith("_")
+                  ]
+                  if len(pub_methods) < 2:
+                      continue
+                  if all(body_only_raises_not_impl(m.body) for m in pub_methods):
+                      offenders.append((str(path), name))
+
+          if offenders:
+              print("Found 'real-but-stubbed' factory classes:")
+              for path, name in offenders:
+                  print(f"  {path}: class {name} — all public methods raise NotImplementedError")
+              print()
+              print("Fix: implement the class against the live backend, OR")
+              print("rename to make the stub-only shape explicit (e.g. _StubXClient")
+              print("alongside _RealXClient).")
+              sys.exit(1)
+          print("OK — no real-but-stubbed factory classes found.")
+          PY
 
   frontend-lint:
     name: lint (frontend)
