@@ -100,6 +100,12 @@ class StartDeploymentInput:
     # manual-UI path keeps working.
     commit_message: str | None = None
     commit_author: str | None = None
+    # GitHub PR + avatar provenance (#722) — populated by the push
+    # webhook when the deploy was triggered from a PR; manual UI
+    # deploys leave these unset (pr_number defaults to 0, FE renders
+    # a dash).
+    pr_number: int | None = None
+    commit_author_avatar_url: str | None = None
 
 
 @strawberry.input
@@ -1103,6 +1109,8 @@ class LifecycleMutation:
                 ci_provider=(input.ci_provider or "").strip(),
                 commit_message=(input.commit_message or "").strip(),
                 commit_author=(input.commit_author or "").strip(),
+                pr_number=int(input.pr_number or 0),
+                commit_author_avatar_url=(input.commit_author_avatar_url or "").strip(),
             )
 
             if approval_token_plaintext:
