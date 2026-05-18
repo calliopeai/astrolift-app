@@ -292,6 +292,42 @@ export const WITHDRAW_SECRET_CHANGE = gql`
   }
 `;
 
+// Email suppression list (#631) ---------------------------------------
+
+export const ADD_EMAIL_SUPPRESSION_ENTRY = gql`
+  mutation AddEmailSuppressionEntry($input: AddEmailSuppressionEntryInput!) {
+    addEmailSuppressionEntry(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        address
+        reason
+      }
+    }
+  }
+`;
+
+export const REMOVE_EMAIL_SUPPRESSION_ENTRY = gql`
+  mutation RemoveEmailSuppressionEntry($input: RemoveEmailSuppressionEntryInput!) {
+    removeEmailSuppressionEntry(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        address
+        removed
+      }
+    }
+  }
+`;
+
 export const SEND_MANAGED_SERVICE_TEST_EMAIL = gql`
   mutation SendManagedServiceTestEmail($input: SendManagedServiceTestEmailInput!) {
     sendManagedServiceTestEmail(input: $input) {

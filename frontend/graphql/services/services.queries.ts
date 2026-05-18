@@ -121,6 +121,72 @@ export const GET_MANAGED_SERVICE_QUEUE_DEPTH = gql`
   }
 `;
 
+// Email observability surface (#629, #631, #632, #633, #634) -----------
+
+export const GET_EMAIL_SERVICE_DETAIL = gql`
+  query GetEmailServiceDetail($managedServiceId: GUID!) {
+    astroliftEmailServiceDetail(managedServiceId: $managedServiceId) {
+      managedServiceId
+      pluginSlug
+      region
+      identity
+      quota {
+        maxSendRate
+        max24HourSend
+        sentLast24h
+      }
+      accountStatus {
+        sendingEnabled
+        productionAccess
+        reputationScore
+        bounceRatePct
+        complaintRatePct
+      }
+      identityVerification {
+        identity
+        isDomain
+        status
+        verificationToken
+        dkimTokens {
+          token
+          cnameHost
+          cnameTarget
+        }
+      }
+      dnsAuthStatus {
+        identity
+        checkedAt
+        overall
+        dkim {
+          protocol
+          outcome
+          records
+          message
+        }
+        spf {
+          protocol
+          outcome
+          records
+          message
+        }
+        dmarc {
+          protocol
+          outcome
+          records
+          message
+        }
+      }
+      suppressionEntries {
+        address
+        reason
+        suppressedAt
+        detail
+      }
+      unsupportedNotes
+    }
+  }
+`;
+
 // #488 Secret-change approval workflow ---------------------------------
 
 const SECRET_CHANGE_PROPOSAL_FIELDS = gql`
