@@ -319,3 +319,226 @@ class TestUploadTypeResolverIsolation:
         qs = UploadType.get_queryset(Upload.objects.all(), _Info(two_tenants.a.user))
         ids = set(qs.values_list("id", flat=True))
         assert upload_b.id not in ids
+
+
+# ---------------------------------------------------------------------------
+# DataProcess — the bug from #542.
+#
+# Filed during the #537 audit-sweep and held back because the fix
+# requires a data-model migration (DataProcess had no ``organization``
+# FK). Tests mirror the Upload shape above: queryset isolation,
+# resolver isolation, anonymous deny, no-org deny, superuser bypass,
+# and entity-row symmetric coverage via the ``process__organization``
+# traversal.
+# ---------------------------------------------------------------------------
+
+
+def _make_data_process(*, name: str, user, organization):
+    """Create a DataProcess row in ``organization`` with the given
+    creator. ``entity_type`` / ``file_type`` are not under test here,
+    they're populated to satisfy the NOT-NULL constraints with stable
+    values that show up in error messages."""
+    from core.models.process import DataProcess, EntityType, FileType
+
+    return DataProcess.objects.create(
+        file_name=name,
+        file_type=FileType.CSV,
+        entity_type=EntityType.EMPLOYEE,
+        created_by=user,
+        updated_by=user,
+        organization=organization,
+    )
+
+
+def _make_data_process_entity(*, process):
+    """Create a child DataProcessEntity. The entity-type's queryset
+    filter traverses ``process__organization`` so we don't need to
+    pass an organization at the entity row itself."""
+    from core.models.process import DataProcessEntity
+
+    return DataProcessEntity.objects.create(
+        process=process,
+        line_number=1,
+        data={"k": "v"},
+    )
+
+
+@pytest.mark.django_db
+class TestDataProcessTypeTenantIsolation:
+    """The #542 leak: DataProcessType.get_queryset returned the
+    unfiltered table via ``permission_filtered_queryset`` (model-wide
+    permission only, no row filter)."""
+
+    def test_user_sees_only_their_org_data_processes(self, two_tenants):
+        from core.models.process import DataProcess
+        from core.schema.types.process import DataProcessType
+
+        proc_a = _make_data_process(
+            name="a.csv",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        proc_b = _make_data_process(
+            name="b.csv",
+            user=two_tenants.b.user,
+            organization=two_tenants.b.organization,
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessType.get_queryset(DataProcess.objects.all(), _Info(two_tenants.a.user))
+        ids = set(qs.values_list("pk", flat=True))
+        assert proc_a.pk in ids
+        assert proc_b.pk not in ids, "user-A must not see org-B DataProcess rows — this is the #542 leak"
+
+    def test_anonymous_caller_sees_nothing(self, two_tenants):
+        from django.contrib.auth.models import AnonymousUser
+
+        from core.models.process import DataProcess
+        from core.schema.types.process import DataProcessType
+
+        _make_data_process(
+            name="a.csv",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessType.get_queryset(DataProcess.objects.all(), _Info(AnonymousUser()))
+        assert not qs.exists()
+
+    def test_user_with_no_organization_sees_nothing(self, two_tenants):
+        from core.models.process import DataProcess
+        from core.schema.types.process import DataProcessType
+
+        _make_data_process(
+            name="a.csv",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        stray = User.objects.create_user(
+            username="stray-542",
+            email="stray-542@example.test",
+            password="x",
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessType.get_queryset(DataProcess.objects.all(), _Info(stray))
+        assert not qs.exists(), "deny-by-default: no-org caller sees zero DataProcess rows"
+
+    def test_superuser_sees_all(self, two_tenants):
+        from core.models.process import DataProcess
+        from core.schema.types.process import DataProcessType
+
+        proc_a = _make_data_process(
+            name="a.csv",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        proc_b = _make_data_process(
+            name="b.csv",
+            user=two_tenants.b.user,
+            organization=two_tenants.b.organization,
+        )
+        su = User.objects.create_superuser(
+            username="root-542",
+            email="root-542@example.test",
+            password="x",
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessType.get_queryset(DataProcess.objects.all(), _Info(su))
+        ids = set(qs.values_list("pk", flat=True))
+        assert {proc_a.pk, proc_b.pk}.issubset(ids)
+
+    def test_row_with_null_organization_is_denied(self, two_tenants):
+        """A DataProcess row whose ``organization`` is NULL (e.g. a
+        legacy row the backfill couldn't resolve) is invisible to
+        every non-superuser caller. Better than leaking it to the
+        first user who happens to query the table."""
+        from core.models.process import DataProcess
+        from core.schema.types.process import DataProcessType
+
+        orphan = _make_data_process(
+            name="orphan.csv",
+            user=two_tenants.a.user,
+            organization=None,
+        )
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessType.get_queryset(DataProcess.objects.all(), _Info(two_tenants.a.user))
+        assert orphan.pk not in set(qs.values_list("pk", flat=True))
+
+
+@pytest.mark.django_db
+class TestDataProcessEntityTypeTenantIsolation:
+    """The entity rows reach the org via ``process__organization``.
+
+    Same isolation requirement as DataProcessType; same fix shape but
+    via a one-hop FK traversal."""
+
+    def test_user_sees_only_their_org_entities(self, two_tenants):
+        from core.models.process import DataProcessEntity
+        from core.schema.types.process import DataProcessEntityType
+
+        proc_a = _make_data_process(
+            name="a.csv",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        proc_b = _make_data_process(
+            name="b.csv",
+            user=two_tenants.b.user,
+            organization=two_tenants.b.organization,
+        )
+        ent_a = _make_data_process_entity(process=proc_a)
+        ent_b = _make_data_process_entity(process=proc_b)
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessEntityType.get_queryset(
+            DataProcessEntity.objects.all(),
+            _Info(two_tenants.a.user),
+        )
+        ids = set(qs.values_list("pk", flat=True))
+        assert ent_a.pk in ids
+        assert ent_b.pk not in ids, "user-A must not see entities of org-B's DataProcess"
+
+    def test_anonymous_caller_sees_no_entities(self, two_tenants):
+        from django.contrib.auth.models import AnonymousUser
+
+        from core.models.process import DataProcessEntity
+        from core.schema.types.process import DataProcessEntityType
+
+        proc_a = _make_data_process(
+            name="a.csv",
+            user=two_tenants.a.user,
+            organization=two_tenants.a.organization,
+        )
+        _make_data_process_entity(process=proc_a)
+
+        class _Info:
+            def __init__(self, user):
+                self.context = _ctx(user)
+
+        qs = DataProcessEntityType.get_queryset(
+            DataProcessEntity.objects.all(),
+            _Info(AnonymousUser()),
+        )
+        assert not qs.exists()
