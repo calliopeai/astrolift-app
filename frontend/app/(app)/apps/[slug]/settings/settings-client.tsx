@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   CANCEL_DEREGISTER,
   DEREGISTER_APP,
@@ -428,14 +429,19 @@ function ResyncSourceSection({
           <p className="text-muted-foreground mt-0.5 text-xs">{t("description")}</p>
         </div>
         <Can permission="app.update">
-          <Button size="sm" variant="outline" onClick={handleResync} disabled={loading}>
-            {loading ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="size-3.5" />
-            )}
-            {loading ? t("syncing") : t("button")}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="sm" variant="outline" onClick={handleResync} disabled={loading}>
+                {loading ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCwIcon className="size-3.5" />
+                )}
+                {loading ? t("syncing") : t("button")}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm">{t("buttonTooltip")}</TooltipContent>
+          </Tooltip>
         </Can>
       </div>
       <p className="text-muted-foreground text-[11px]">
@@ -988,14 +994,19 @@ function ForceRedeploySection({ appSlug }: { appSlug: string }) {
       <CardContent>
         <Can permission="app.deploy">
           <Can permission="app.update">
-            <Button variant="destructive" onClick={() => setOpen(true)} disabled={loading}>
-              {loading ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <FlameIcon className="size-4" />
-              )}
-              {t("button")}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="destructive" onClick={() => setOpen(true)} disabled={loading}>
+                  {loading ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <FlameIcon className="size-4" />
+                  )}
+                  {t("button")}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm">{t("buttonTooltip")}</TooltipContent>
+            </Tooltip>
           </Can>
         </Can>
         <p className="text-muted-foreground mt-2 text-[11px]">{t("hint")}</p>

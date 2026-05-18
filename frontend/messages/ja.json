@@ -1002,7 +1002,7 @@
         "decreaseReplica": "Decrease replicas",
         "increaseReplica": "Increase replicas",
         "rollingRestart": "Rolling restart",
-        "rollingRestartTooltip": "Recycle pods without changing the image — drains long-running connections, propagates sidecar updates.",
+        "rollingRestartTooltip": "Pod is wedged. Replace pods one-by-one without changing the image. Same image tag, same env, same secrets.",
         "ariaDecrease": "Decrease replicas",
         "ariaIncrease": "Increase replicas",
         "ariaWorkloadActions": "Workload actions for {workload}",
@@ -1028,7 +1028,8 @@
         "button": "今すぐ再同期",
         "syncing": "同期中…",
         "last": "最終同期",
-        "never": "まだ同期されていません。"
+        "never": "まだ同期されていません。",
+        "buttonTooltip": "Manifest drifted from the repo, or your push webhook didn't fire. Pull astrolift.toml fresh and reconcile workloads + bindings. Image is unchanged."
       },
       "ingress": {
         "title": "イングレス制御",
@@ -1081,7 +1082,8 @@
           "noInflight": "Nothing in flight — the recovery path is safe to fire.",
           "triggeredBy": "{actor} · {when}",
           "ciRun": "CI run"
-        }
+        },
+        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate."
       },
       "dangerZone": {
         "title": "危険ゾーン",
