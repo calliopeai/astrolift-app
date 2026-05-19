@@ -1,5 +1,17 @@
 import { gql } from "@apollo/client";
 
+/**
+ * Set or update an app secret.
+ *
+ * ``input.scope`` (#679) controls which deploy targets see the value:
+ *   - ``"all"`` — every environment (default)
+ *   - ``"production"`` — only production deploys
+ *   - ``"preview"`` — every preview deploy
+ *   - ``"preview:<branch>"`` — only the named preview branch
+ *
+ * The field is non-nullable on the backend (defaults to ``"all"``);
+ * call sites must always pass a value in ``variables.input.scope``.
+ */
 export const SET_APP_SECRET = gql`
   mutation SetAppSecret($input: SetAppSecretInput!) {
     setAppSecret(input: $input) {
@@ -26,6 +38,9 @@ export const SET_APP_SECRET = gql`
  * emits action='app.secret.rotate' in the audit log so credential
  * rotations are filterable from generic edits (#726). FE renders a
  * Rotate button distinct from Edit on revealed-secret rows (#714).
+ *
+ * ``input.scope`` (#679) follows the same rules as setAppSecret — the
+ * rotated value lands on the requested scope only.
  */
 export const ROTATE_APP_SECRET = gql`
   mutation RotateAppSecret($input: RotateAppSecretInput!) {

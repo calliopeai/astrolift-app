@@ -104,6 +104,11 @@ interface AppSecret {
   // the platform has never tagged.
   expiresAt?: string | null;
   setVia?: string;
+  // #679 — deploy-target scope. "all" | "production" | "preview" |
+  // "preview:<branch>". Optional in the local type because the
+  // LIST_APP_SECRETS query selection set may not include scope on
+  // older builds; treat missing/empty as "all".
+  scope?: string | null;
 }
 
 interface AppSecretBundleAttachment {
@@ -160,6 +165,43 @@ const SET_VIA_LABEL: Record<string, string> = {
   bundle: "bundle sync",
   managed_service: "managed service",
 };
+
+// #679 — per-environment scope sentinel for the "preview:<branch>"
+// option in the scope <Select>. The literal value is replaced with
+// "preview:" + branch input when the form is submitted; the sentinel
+// is never sent to the server.
+const SCOPE_PREVIEW_BRANCH = "preview:<branch>";
+
+/** #679 — short label for the scope badge on each secret row. */
+function scopeBadgeLabel(scope: string): string {
+  if (scope === "production") return "prod";
+  if (scope === "preview") return "preview";
+  if (scope.startsWith("preview:")) {
+    const branch = scope.slice("preview:".length);
+    return branch ? `preview:${branch}` : "preview";
+  }
+  return scope;
+}
+
+/** #679 — inline scope chip next to the secret key cell. Hidden for
+ *  the default "all" scope so the table stays quiet for the common
+ *  case; renders for production / preview / preview:branch. */
+function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
+  if (!scope || scope === "all") return null;
+  const isProd = scope === "production";
+  return (
+    <Badge
+      variant="outline"
+      className={
+        isProd
+          ? "ml-2 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+          : "ml-2 border-sky-500/40 bg-sky-500/10 text-[10px] text-sky-700 dark:text-sky-300"
+      }
+    >
+      {scopeBadgeLabel(scope)}
+    </Badge>
+  );
+}
 
 /** #677 — small inline expiry chip for the secret key cell. Hidden when
  *  no rotation deadline is set; warning < 14d; destructive < 7d / past. */
@@ -390,11 +432,14 @@ export function SecretsClient({ slug }: { slug: string }) {
   async function handleInlineSave(s: AppSecret, nextValue: string) {
     // #714 — rotate vs set picks the mutation; both share the same
     // input shape + optimistic-concurrency check.
+    // #679 — inline edits preserve the row's existing scope; the
+    // dialog is the surface for changing scope.
     const isRotate = rotatingId === s.id;
     const input = {
       appSlug: slug,
       key: s.key,
       value: nextValue,
+      scope: s.scope || "all",
       ifMatchVersion: appVersion.data?.astroliftApp?.version ?? null,
     };
     if (isRotate) {
@@ -580,19 +625,20 @@ export function SecretsClient({ slug }: { slug: string }) {
         open={setOpen}
         onOpenChange={setSetOpen}
         slug={slug}
-        onSubmit={async (key, value) => {
+        onSubmit={async (key, value, scope) => {
           const { data } = await setSecret({
             variables: {
               input: {
                 appSlug: slug,
                 key,
                 value,
+                scope,
                 ifMatchVersion: appVersion.data?.astroliftApp?.version ?? null,
               },
             },
           });
           if (data?.setAppSecret.ok) {
-            toast.success(`Set ${key}`);
+            toast.success(`Set ${key}${scope !== "all" ? ` (${scopeBadgeLabel(scope)})` : ""}`);
             setSetOpen(false);
             return true;
           }
@@ -724,6 +770,7 @@ function SecretRow({
     <TableRow>
       <TableCell className="font-mono text-xs">
         {s.key}
+        <SecretScopeBadge scope={s.scope} />
         <SecretExpiryBadge expiresAt={s.expiresAt} />
       </TableCell>
       <TableCell className="font-mono text-xs">
@@ -1185,20 +1232,32 @@ function SetSecretSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   slug: string;
-  onSubmit: (key: string, value: string) => Promise<boolean>;
+  onSubmit: (key: string, value: string, scope: string) => Promise<boolean>;
   busy: boolean;
 }) {
   const t = useTranslations("apps.secrets.setSheet");
   const tCommon = useTranslations("apps.common");
   const [key, setKey] = React.useState("");
   const [value, setValue] = React.useState("");
+  // #679 — scope selector. "all" (default) | "production" | "preview"
+  // | SCOPE_PREVIEW_BRANCH (sentinel → "preview:<branch>" on submit).
+  const [scope, setScope] = React.useState<string>("all");
+  const [previewBranch, setPreviewBranch] = React.useState("");
 
   React.useEffect(() => {
     if (!open) {
       setKey("");
       setValue("");
+      setScope("all");
+      setPreviewBranch("");
     }
   }, [open]);
+
+  const needsBranchInput = scope === SCOPE_PREVIEW_BRANCH;
+  const effectiveScope = needsBranchInput
+    ? `preview:${previewBranch.trim()}`
+    : scope;
+  const scopeReady = !needsBranchInput || previewBranch.trim().length > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -1210,8 +1269,8 @@ function SetSecretSheet({
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!key.trim() || !value) return;
-            await onSubmit(key.trim(), value);
+            if (!key.trim() || !value || !scopeReady) return;
+            await onSubmit(key.trim(), value, effectiveScope);
           }}
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
@@ -1241,11 +1300,50 @@ function SetSecretSheet({
             />
             <p className="text-muted-foreground text-xs">{t("valueHint")}</p>
           </div>
+          {/* #679 — scope selector. Default "all" matches the historic
+              behavior; production / preview / preview:<branch> let
+              operators carve preview branches off from prod values. */}
+          <div className="space-y-2">
+            <Label htmlFor="secret-scope">Scope</Label>
+            <Select value={scope} onValueChange={setScope}>
+              <SelectTrigger id="secret-scope">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All environments (default)</SelectItem>
+                <SelectItem value="production">Production only</SelectItem>
+                <SelectItem value="preview">All previews</SelectItem>
+                <SelectItem value={SCOPE_PREVIEW_BRANCH}>
+                  Specific preview branch…
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {needsBranchInput && (
+              <Input
+                id="secret-scope-branch"
+                value={previewBranch}
+                onChange={(e) => setPreviewBranch(e.target.value)}
+                placeholder="feature/login-redesign"
+                spellCheck={false}
+                className="font-mono"
+                required
+              />
+            )}
+            <p className="text-muted-foreground text-xs">
+              {scope === "all"
+                ? "Visible to every deploy of this app."
+                : scope === "production"
+                  ? "Only production deploys can read this value."
+                  : scope === "preview"
+                    ? "Only preview deploys can read this value."
+                    : "Only the named preview branch can read this value."}
+            </p>
+          </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {tCommon("cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !key || !value}>
+            <Button type="submit" disabled={busy || !key || !value || !scopeReady}>
               {busy ? t("submitting") : t("submit")}
             </Button>
           </SheetFooter>
