@@ -56,6 +56,26 @@ class AstroliftAppSourceKindFilter(enum.Enum):
 
 
 @strawberry.enum
+class AppsListSortKey(enum.Enum):
+    """Sort axis for ``astroliftAppsPage`` / ``astroliftMyAppsPage`` (#729).
+
+    ``CREATED_DESC`` is the legacy default — identical to the pre-#729
+    behaviour.  ``DEPLOYED_DESC`` annotates each row with its most
+    recent *successful* deploy timestamp and sorts on that, NULLs last.
+    ``NAME_ASC`` is a case-insensitive alphabetical sort on the app name.
+
+    Cursor tokens are keyed to the active sort so seek-pagination stays
+    consistent.  Presenting a cursor whose embedded sort key doesn't
+    match the current request restarts the walk from page 1 rather than
+    producing a corrupt page.
+    """
+
+    CREATED_DESC = "created_desc"
+    DEPLOYED_DESC = "deployed_desc"
+    NAME_ASC = "name_asc"
+
+
+@strawberry.enum
 class AstroliftAppHealthPulseStatus(enum.Enum):
     """Coarse freshness signal for the apps list (#405).
 
@@ -389,6 +409,9 @@ class RegisteredAppType:
     # 0 is rendered as plain text; > 0 surfaces the badge. Computed in
     # one bulk-aggregate query per page rather than N FK fetches.
     active_preview_count: int = 0
+    # Retention policy overrides per signal (#742). Populated lazily by
+    # the single-app detail resolver; empty list on list resolvers.
+    retention_policies: list["RetentionPolicyType"] = strawberry.field(default_factory=list)
 
 
 @strawberry.type(name="AstroliftAppTeamAccess")
@@ -634,6 +657,7 @@ def app_to_type(
     settings_last_modified: AppSettingsLastModifiedType | None = None,
     viewer_permissions: Iterable[str] | None = None,
     active_preview_count: int | None = None,
+    include_retention_policies: bool = False,
 ) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
@@ -715,6 +739,11 @@ def app_to_type(
         viewer_permissions=sorted(viewer_permissions) if viewer_permissions is not None else [],
         active_preview_count=(
             int(active_preview_count) if active_preview_count is not None else _fallback_preview_count(app)
+        ),
+        retention_policies=(
+            [retention_policy_to_type(rp) for rp in app.retention_policies.filter(deleted_at__isnull=True)]
+            if include_retention_policies
+            else []
         ),
     )
 
@@ -1191,4 +1220,23 @@ def container_to_type(container) -> ContainerType:
         healthcheck_value=container.healthcheck_value or "",
         healthcheck_port=container.healthcheck_port,
         workload_slug=container.workload.slug,
+    )
+
+
+@strawberry.type(name="AstroliftRetentionPolicy")
+class RetentionPolicyType:
+    id: GUID
+    signal: str
+    retention_days: int
+    registered_app_slug: str
+    created_at: dt.datetime
+
+
+def retention_policy_to_type(rp) -> RetentionPolicyType:
+    return RetentionPolicyType(
+        id=GUID(str(rp.guid)),
+        signal=rp.signal,
+        retention_days=rp.retention_days,
+        registered_app_slug=rp.registered_app.slug,
+        created_at=rp.created_at,
     )

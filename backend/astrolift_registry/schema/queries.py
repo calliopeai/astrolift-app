@@ -11,7 +11,8 @@ from collections.abc import Iterable
 import strawberry
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
+from django.db.models.functions import Lower
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -21,6 +22,7 @@ from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, W
 from astrolift_registry.schema.types import (
     AppFreshness,
     AppHealthPulseType,
+    AppsListSortKey,
     AppTeamAccessType,
     AstroliftAppHealthPulseStatus,
     AstroliftAppListStatusFilter,
@@ -48,9 +50,9 @@ from core.tenancy import get_current_tenant
 # Apps-list filters + cursor pagination (#481)
 # ---------------------------------------------------------------------------
 #
-# Cursor format: base64-JSON of ``[created_at_iso, guid_str]``. Same
-# seek-key shape the operations / audit queries use; this keeps the FE
-# cursor handling uniform across surfaces.
+# Cursor format: base64-JSON of ``[sort_key, ...sort-specific fields]``.
+# The sort key is embedded so a mid-walk sort change restarts from page
+# 1 rather than producing a corrupt page.  See ``_encode_apps_cursor``.
 #
 # Filter rules in one place so ``astrolift_apps``, ``astrolift_my_apps``,
 # and their page variants stay aligned. Status filtering relies on the
@@ -63,23 +65,32 @@ _APPS_LIST_PAGE_DEFAULT_LIMIT = 50
 _APPS_LIST_PAGE_MAX_LIMIT = 200
 
 
-def _encode_apps_cursor(created_at: dt.datetime, guid: str) -> str:
-    payload = json.dumps([created_at.isoformat(), guid], separators=(",", ":")).encode()
+def _encode_apps_cursor(sort_by: AppsListSortKey, *values: object) -> str:
+    """Encode a sort-keyed cursor.
+
+    Payload: ``[sort_key_value, ...sort-specific fields]``.  The sort
+    key is stored so ``_decode_apps_cursor`` can reject tokens whose
+    embedded sort doesn't match the current request — stale cross-sort
+    cursors restart from page 1 instead of producing a corrupt page.
+    """
+    payload = json.dumps([sort_by.value, *values], separators=(",", ":")).encode()
     return base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
 
 
-def _decode_apps_cursor(token: str) -> tuple[dt.datetime, str] | None:
-    """Decode a cursor or return ``None`` on garbage.
+def _decode_apps_cursor(token: str, sort_by: AppsListSortKey) -> tuple | None:
+    """Decode a cursor or return ``None`` on garbage / sort-key mismatch.
 
-    We swallow malformed tokens so a stale share-link restarts from
-    the top instead of erroring — the audit / events queries take the
-    same line. New cursors are always re-issued on the new page so
-    the caller transparently recovers."""
+    Swallowing bad tokens lets a stale share-link restart from page 1
+    instead of erroring.  Sort-key mismatch (client changed ``sort_by``
+    mid-walk) also returns ``None`` so the walk restarts cleanly.
+    """
     pad = "=" * (-len(token) % 4)
     try:
         raw = base64.urlsafe_b64decode(token + pad)
-        ts, guid = json.loads(raw)
-        return dt.datetime.fromisoformat(ts), guid
+        data = json.loads(raw)
+        if not isinstance(data, list) or not data or data[0] != sort_by.value:
+            return None
+        return tuple(data[1:])
     except (binascii.Error, ValueError, TypeError, json.JSONDecodeError):
         return None
 
@@ -176,38 +187,108 @@ def _clamp_page_limit(limit: int) -> int:
     return max(1, min(int(limit or _APPS_LIST_PAGE_DEFAULT_LIMIT), _APPS_LIST_PAGE_MAX_LIMIT))
 
 
+def _apply_apps_sort(qs, sort_by: AppsListSortKey):
+    """Return ``(ordered_qs, annotated_qs)`` with the sort applied.
+
+    ``DEPLOYED_DESC`` annotates each row with its most-recent successful
+    deploy timestamp via a correlated subquery, then sorts on that with
+    NULLs last.  ``NAME_ASC`` annotates with ``Lower(name)`` for a
+    case-insensitive sort.  ``CREATED_DESC`` is the legacy default and
+    needs no annotation.
+    """
+    if sort_by is AppsListSortKey.DEPLOYED_DESC:
+        last_deploy_sq = (
+            Deployment.objects.filter(
+                registered_app=OuterRef("pk"),
+                status=Deployment.Status.RUNNING.value,
+                deleted_at__isnull=True,
+            )
+            .order_by("-created_at")
+            .values("created_at")[:1]
+        )
+        qs = qs.annotate(_last_deployed_at=Subquery(last_deploy_sq))
+        return qs.order_by(
+            models.F("_last_deployed_at").desc(nulls_last=True),
+            "-created_at",
+        )
+    if sort_by is AppsListSortKey.NAME_ASC:
+        qs = qs.annotate(_name_lower=Lower("name"))
+        return qs.order_by("_name_lower", "guid")
+    # CREATED_DESC (default)
+    return qs.order_by("-created_at", "-guid")
+
+
+def _seek_apps(qs, sort_by: AppsListSortKey, cursor_vals: tuple):
+    """Apply the seek-key WHERE clause for the given sort mode.
+
+    ``cursor_vals`` is whatever ``_decode_apps_cursor`` returned (the
+    payload after stripping the sort-key prefix).
+    """
+    if sort_by is AppsListSortKey.DEPLOYED_DESC:
+        deployed_str, created_str = cursor_vals
+        cursor_created = dt.datetime.fromisoformat(created_str)
+        if deployed_str:
+            cursor_deployed = dt.datetime.fromisoformat(deployed_str)
+            # Rows that come *after* this cursor with NULLS LAST ordering:
+            # deployed < cursor, OR same deployed + earlier created, OR NULL deployed
+            return qs.filter(
+                Q(_last_deployed_at__lt=cursor_deployed)
+                | (Q(_last_deployed_at=cursor_deployed) & Q(created_at__lt=cursor_created))
+                | Q(_last_deployed_at__isnull=True)
+            )
+        else:
+            # Cursor is in the NULL-deployed tail — only rows with NULL deployed
+            # that were created before the cursor created_at
+            return qs.filter(Q(_last_deployed_at__isnull=True) & Q(created_at__lt=cursor_created))
+
+    if sort_by is AppsListSortKey.NAME_ASC:
+        name_lower, guid_str = cursor_vals
+        return qs.filter(Q(_name_lower__gt=name_lower) | (Q(_name_lower=name_lower) & Q(guid__gt=guid_str)))
+
+    # CREATED_DESC
+    created_str, guid_str = cursor_vals
+    cursor_at = dt.datetime.fromisoformat(created_str)
+    return qs.filter(Q(created_at__lt=cursor_at) | (Q(created_at=cursor_at) & Q(guid__lt=guid_str)))
+
+
+def _cursor_for_row(sort_by: AppsListSortKey, row: RegisteredApp) -> str:
+    """Emit the next-cursor token for a given row + sort mode."""
+    if sort_by is AppsListSortKey.DEPLOYED_DESC:
+        deployed = getattr(row, "_last_deployed_at", None)
+        deployed_str = deployed.isoformat() if deployed is not None else ""
+        return _encode_apps_cursor(sort_by, deployed_str, row.created_at.isoformat())
+    if sort_by is AppsListSortKey.NAME_ASC:
+        name_lower = getattr(row, "_name_lower", row.name.lower())
+        return _encode_apps_cursor(sort_by, name_lower, str(row.guid))
+    # CREATED_DESC
+    return _encode_apps_cursor(sort_by, row.created_at.isoformat(), str(row.guid))
+
+
 def _paginate_apps(
     qs,
     *,
     cursor: str | None,
     limit: int,
+    sort_by: AppsListSortKey = AppsListSortKey.CREATED_DESC,
 ) -> tuple[list[RegisteredApp], str | None, int]:
     """Materialise a (page, next_cursor, total_count) triple from ``qs``.
 
-    Orders by ``(-created_at, -guid)`` for a stable seek key — guid is
-    a UUID so the tie-breaker is globally unique and won't repeat
-    across delete / re-insert cycles. ``total_count`` is the filtered
-    total (not the table total) so the FE can show "N of M" without a
-    second aggregate query.
+    Supports three sort modes via ``sort_by`` (#729).  The cursor encodes
+    the active sort key so a mid-walk sort change silently restarts from
+    page 1 rather than producing a corrupt page.  ``total_count`` is the
+    filtered total so the FE can render "N of M" without a second query.
     """
     page_size = _clamp_page_limit(limit)
-    ordered = qs.order_by("-created_at", "-guid")
+    ordered = _apply_apps_sort(qs, sort_by)
     total_count = ordered.count()
     if cursor:
-        decoded = _decode_apps_cursor(cursor)
+        decoded = _decode_apps_cursor(cursor, sort_by)
         if decoded is not None:
-            cursor_at, cursor_guid = decoded
-            ordered = ordered.filter(
-                Q(created_at__lt=cursor_at) | (Q(created_at=cursor_at) & Q(guid__lt=cursor_guid))
-            )
+            ordered = _seek_apps(ordered, sort_by, decoded)
     # Fetch one extra to detect end-of-stream cheaply.
     rows = list(ordered[: page_size + 1])
     items = rows[:page_size]
-    next_cursor = (
-        _encode_apps_cursor(items[-1].created_at, str(items[-1].guid))
-        if len(rows) > page_size and items
-        else None
-    )
+    next_cursor = _cursor_for_row(sort_by, items[-1]) if len(rows) > page_size and items else None
     return items, next_cursor, total_count
 
 
@@ -218,6 +299,7 @@ def _build_apps_page(
     limit: int,
     include_freshness: bool,
     status: AstroliftAppListStatusFilter,
+    sort_by: AppsListSortKey = AppsListSortKey.CREATED_DESC,
 ) -> RegisteredAppPageType:
     """Materialise a :class:`RegisteredAppPageType` from a filtered queryset.
 
@@ -246,7 +328,7 @@ def _build_apps_page(
     qs = qs.prefetch_related("approver_users")
 
     if not _status_filter_active(status):
-        items, next_cursor, total_count = _paginate_apps(qs, cursor=cursor, limit=page_size)
+        items, next_cursor, total_count = _paginate_apps(qs, cursor=cursor, limit=page_size, sort_by=sort_by)
         freshness_by_app = _freshness_for_apps(items) if effective_freshness else {}
         preview_counts = _active_preview_counts(items)
         return RegisteredAppPageType(
@@ -265,15 +347,12 @@ def _build_apps_page(
     # Status-filtered path: walk the queryset under the cursor,
     # roll freshness in batches, keep matches until we have a full
     # page (or hit the scan cap).
-    ordered = qs.order_by("-created_at", "-guid")
+    ordered = _apply_apps_sort(qs, sort_by)
     total_count = ordered.count()
     if cursor:
-        decoded = _decode_apps_cursor(cursor)
+        decoded = _decode_apps_cursor(cursor, sort_by)
         if decoded is not None:
-            cursor_at, cursor_guid = decoded
-            ordered = ordered.filter(
-                Q(created_at__lt=cursor_at) | (Q(created_at=cursor_at) & Q(guid__lt=cursor_guid))
-            )
+            ordered = _seek_apps(ordered, sort_by, decoded)
 
     scan_cap = max(page_size * 4, page_size + 1)
     scanned = list(ordered[:scan_cap])
@@ -284,7 +363,7 @@ def _build_apps_page(
     has_more_unscanned = len(scanned) == scan_cap and not has_more_in_scan
     if items and (has_more_in_scan or has_more_unscanned):
         anchor = items[-1] if has_more_in_scan else scanned[-1]
-        next_cursor: str | None = _encode_apps_cursor(anchor.created_at, str(anchor.guid))
+        next_cursor: str | None = _cursor_for_row(sort_by, anchor)
     else:
         next_cursor = None
     preview_counts = _active_preview_counts(items)
@@ -633,10 +712,11 @@ class RegistryQuery:
         project_slug: str | None = None,
         status: AstroliftAppListStatusFilter | None = None,
         source_kind: AstroliftAppSourceKindFilter | None = None,
+        sort_by: AppsListSortKey = AppsListSortKey.CREATED_DESC,
         cursor: str | None = None,
         limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
     ) -> RegisteredAppPageType:
-        """Cursor-paginated org-scoped apps list (#481).
+        """Cursor-paginated org-scoped apps list (#481, #729).
 
         Same filter axes as :func:`astrolift_apps` plus cursor +
         limit. Returns a ``next_cursor`` of null when the caller has
@@ -644,11 +724,16 @@ class RegistryQuery:
         filtered total so the FE can render "N of M" without a second
         aggregate query.
 
+        ``sort_by`` controls the ordering and seek-key shape (#729):
+        ``CREATED_DESC`` (default), ``DEPLOYED_DESC`` (most-recently
+        deployed first, NULLs last), or ``NAME_ASC`` (case-insensitive
+        alphabetical).  The cursor encodes the active sort key so a
+        mid-walk sort change restarts from page 1 rather than producing
+        a corrupt page.
+
         Status filtering forces the freshness rollup on regardless of
         ``include_freshness`` — without the rollup the resolver has no
-        signal to filter on. Pagination still operates on
-        ``(-created_at, -guid)`` so the seek key stays stable across
-        deletes.
+        signal to filter on.
 
         When ``status`` is set the page is built by:
           1. Scan the queryset under the cursor.
@@ -680,6 +765,7 @@ class RegistryQuery:
             limit=limit,
             include_freshness=include_freshness,
             status=status,
+            sort_by=sort_by,
         )
 
     @strawberry.field
@@ -768,10 +854,11 @@ class RegistryQuery:
         project_slug: str | None = None,
         status: AstroliftAppListStatusFilter | None = None,
         source_kind: AstroliftAppSourceKindFilter | None = None,
+        sort_by: AppsListSortKey = AppsListSortKey.CREATED_DESC,
         cursor: str | None = None,
         limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
     ) -> RegisteredAppPageType:
-        """Cursor-paginated viewer-scoped apps list (#481).
+        """Cursor-paginated viewer-scoped apps list (#481, #729).
 
         Same shape as :func:`astrolift_apps_page` but the queryset is
         first narrowed to apps the viewer's RoleBindings reach. EXEMPT
@@ -805,6 +892,7 @@ class RegistryQuery:
             limit=limit,
             include_freshness=include_freshness,
             status=status,
+            sort_by=sort_by,
         )
 
     @strawberry.field
@@ -837,6 +925,7 @@ class RegistryQuery:
             app,
             drift=drift,
             settings_last_modified=settings_last_modified,
+            include_retention_policies=True,
         )
 
     @strawberry.field
