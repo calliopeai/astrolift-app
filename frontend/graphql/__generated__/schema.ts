@@ -323,6 +323,7 @@ export type AstroliftAppDomain = {
   lastCertificateError: Scalars['String']['output'];
   lastCheckedAt?: Maybe<Scalars['DateTime']['output']>;
   lastValidationError: Scalars['String']['output'];
+  pathRoutes: Array<AstroliftDomainPathRoute>;
   redirectRules: Array<AstroliftDomainRedirectRule>;
   registeredAppSlug: Scalars['String']['output'];
   requiredDnsRecords: Array<AstroliftAppDomainRequiredRecord>;
@@ -1174,6 +1175,15 @@ export type AstroliftDisconnectUserSourceProviderPayloadMutationResult = {
   data?: Maybe<AstroliftDisconnectUserSourceProviderPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftDomainPathRoute = {
+  id: Scalars['GUID']['output'];
+  pathPrefix: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  stripPrefix: Scalars['Boolean']['output'];
+  targetPort: Scalars['Int']['output'];
+  targetWorkloadSlug: Scalars['String']['output'];
 };
 
 export type AstroliftDomainRedirectRule = {
@@ -2990,6 +3000,14 @@ export type DisconnectUserSourceProviderInput = {
   providerConfigId: Scalars['GUID']['input'];
 };
 
+export type DomainPathRouteInput = {
+  pathPrefix: Scalars['String']['input'];
+  priority: Scalars['Int']['input'];
+  stripPrefix: Scalars['Boolean']['input'];
+  targetPort: Scalars['Int']['input'];
+  targetWorkloadSlug: Scalars['String']['input'];
+};
+
 export type DomainRedirectRuleInput = {
   destinationUrl: Scalars['String']['input'];
   httpStatus: Scalars['Int']['input'];
@@ -3500,6 +3518,7 @@ export type Mutation = {
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
+  setDomainPathRoutes: AstroliftAppDomainMutationResult;
   setDomainRedirects: AstroliftAppDomainMutationResult;
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
@@ -4393,6 +4412,11 @@ export type MutationSetAppSecretMetadataArgs = {
 
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
+};
+
+
+export type MutationSetDomainPathRoutesArgs = {
+  input: SetDomainPathRoutesInput;
 };
 
 
@@ -5931,6 +5955,11 @@ export type SetAppSecretMetadataInput = {
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
+};
+
+export type SetDomainPathRoutesInput = {
+  domainId: Scalars['GUID']['input'];
+  routes: Array<DomainPathRouteInput>;
 };
 
 export type SetDomainRedirectsInput = {

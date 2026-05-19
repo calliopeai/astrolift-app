@@ -5,6 +5,7 @@ from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.environment_setting import EnvironmentSetting
 from astrolift_lifecycle.models.ingress import (
     CustomDomain,
+    DomainPathRoute,
     DomainRedirectRule,
     IngressRule,
     ProjectIngress,
@@ -19,6 +20,7 @@ __all__ = [
     "DeployToken",
     "Deployment",
     "DeploymentLog",
+    "DomainPathRoute",
     "DomainRedirectRule",
     "EnvironmentSetting",
     "IngressRule",

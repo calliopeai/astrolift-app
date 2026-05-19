@@ -40,6 +40,7 @@ from astrolift_lifecycle.models import (
     CustomDomain,
     Deployment,
     DeployToken,
+    DomainPathRoute,
     DomainRedirectRule,
     EnvironmentSetting,
     PreviewEnvironment,
@@ -303,6 +304,27 @@ class DomainRedirectRuleInput:
 class SetDomainRedirectsInput:
     domain_id: GUID
     rules: list[DomainRedirectRuleInput]
+
+
+# Domain path routes (#740) ------------------------------------------
+
+
+@strawberry.input
+class DomainPathRouteInput:
+    """One path-prefix routing rule on the replace-all
+    ``setDomainPathRoutes`` payload (#740)."""
+
+    path_prefix: str
+    target_workload_slug: str
+    target_port: int
+    strip_prefix: bool = False
+    priority: int = 0
+
+
+@strawberry.input
+class SetDomainPathRoutesInput:
+    domain_id: GUID
+    routes: list[DomainPathRouteInput]
 
 
 # Deploy token CRUD (#281) -------------------------------------------
@@ -2371,6 +2393,83 @@ class LifecycleMutation:
                         priority=int(row.priority),
                     )
                     for row in input.rules
+                ],
+            )
+        return gql_success(app_domain_to_type(domain))
+
+    @strawberry.field
+    @mutation_audit(action="app.domain.path_routes_updated")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def set_domain_path_routes(
+        self,
+        info: Info,
+        input: SetDomainPathRoutesInput,
+    ) -> MutationResultType[AppDomainType]:
+        """Replace the path-routing rule set on a custom domain (#740).
+
+        Accepts the new full route set and atomically:
+
+        1. Soft-deletes every active row on the domain.
+        2. Bulk-creates the new rows from ``input.routes``.
+
+        ``path_prefix`` must start with ``/``.  ``target_port`` must be
+        in [1, 65535].  ``target_workload_slug`` is validated for
+        non-emptiness here; workload existence is checked by the renderer
+        at reconcile time.
+        """
+        for idx, row in enumerate(input.routes):
+            if not (row.path_prefix or "").startswith("/"):
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"routes[{idx}].pathPrefix must start with '/'",
+                    field="routes",
+                )
+            if not (1 <= int(row.target_port) <= 65535):
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"routes[{idx}].targetPort must be in [1, 65535]",
+                    field="routes",
+                )
+            if not (row.target_workload_slug or "").strip():
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"routes[{idx}].targetWorkloadSlug is required",
+                    field="routes",
+                )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        domain_qs = CustomDomain.objects.filter(
+            guid=str(input.domain_id),
+            deleted_at__isnull=True,
+        )
+        if org_id is not None:
+            domain_qs = domain_qs.filter(registered_app__organization_id=org_id)
+        domain = domain_qs.select_related("registered_app").first()
+        if domain is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+
+        now = timezone.now()
+        with transaction.atomic():
+            DomainPathRoute.objects.filter(
+                custom_domain=domain,
+                deleted_at__isnull=True,
+            ).update(
+                deleted_at=now,
+                updated_at=now,
+            )
+            DomainPathRoute.objects.bulk_create(
+                [
+                    DomainPathRoute(
+                        custom_domain=domain,
+                        path_prefix=row.path_prefix.strip(),
+                        target_workload_slug=row.target_workload_slug.strip(),
+                        target_port=int(row.target_port),
+                        strip_prefix=bool(row.strip_prefix),
+                        priority=int(row.priority),
+                    )
+                    for row in input.routes
                 ],
             )
         return gql_success(app_domain_to_type(domain))

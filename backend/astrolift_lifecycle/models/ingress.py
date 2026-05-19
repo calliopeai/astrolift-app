@@ -310,3 +310,38 @@ class DomainRedirectRule(BaseCoreModel):
                 name="redirect_domain_priority_idx",
             ),
         ]
+
+
+class DomainPathRoute(BaseCoreModel):
+    """Path-prefix routing rule on a ``CustomDomain`` (#740).
+
+    Backs the path-based routing sub-section of the Domains page (#686).
+    The renderer expands the domain's active route set into multiple
+    Ingress rules ordered by ``priority`` (low → high; longest-prefix /
+    most-specific first wins) and the per-cloud ingress driver maps them
+    onto the cluster's ingress controller (nginx ``location`` blocks, ALB
+    listener rules, traefik router rules).
+
+    ``setDomainPathRoutes`` replaces the full set atomically — the FE
+    never edits individual rows.  Soft-delete via ``deleted_at``.
+    """
+
+    custom_domain = models.ForeignKey(
+        CustomDomain,
+        related_name="path_routes",
+        on_delete=models.CASCADE,
+    )
+    path_prefix = models.CharField(max_length=512)
+    target_workload_slug = models.CharField(max_length=128)
+    target_port = models.PositiveIntegerField()
+    strip_prefix = models.BooleanField(default=False)
+    priority = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["priority"]
+        indexes = [
+            models.Index(
+                fields=["custom_domain", "priority"],
+                name="path_route_domain_priority_idx",
+            ),
+        ]
