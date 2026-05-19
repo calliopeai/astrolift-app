@@ -30,6 +30,20 @@ from core.mixins import AppendOnlyMixin
 
 
 class Event(AppendOnlyMixin, models.Model):
+    class Severity(models.TextChoices):
+        """Operator-visible severity bucket.
+
+        Sourced at emit time from the same heuristic the mobile client
+        applies at render time (#540): explicit ``payload.severity`` /
+        ``payload.level`` win, then the ``status`` field, finally a
+        fallback that buckets ``*.failed`` / ``*error*`` as ``error``
+        and ``*.warned`` / ``*warn*`` as ``warn``. Everything else lands
+        in ``info``."""
+
+        INFO = "info", "info"
+        WARN = "warn", "warn"
+        ERROR = "error", "error"
+
     guid = UUIDv7Field(unique=True, db_index=True)
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
@@ -72,6 +86,13 @@ class Event(AppendOnlyMixin, models.Model):
     resource_id = models.CharField(max_length=128, blank=True, default="")
     request_id = models.CharField(max_length=64, blank=True, default="")
     trace_id = models.CharField(max_length=64, blank=True, default="")
+    severity = models.CharField(
+        max_length=16,
+        blank=True,
+        default=Severity.INFO,
+        choices=Severity.choices,
+        db_index=True,
+    )
 
     class Meta:
         indexes = [
@@ -82,6 +103,10 @@ class Event(AppendOnlyMixin, models.Model):
             models.Index(
                 fields=["resource_kind", "resource_id"],
                 name="event_resource_idx",
+            ),
+            models.Index(
+                fields=["organization", "-occurred_at", "severity"],
+                name="event_org_time_sev_idx",
             ),
         ]
 

@@ -34,6 +34,14 @@ class EventType:
     """The identifier (slug or guid) of the resource named by
     ``resource_kind``. Empty when unknown."""
 
+    severity: str
+    """``info`` | ``warn`` | ``error``. Stamped at emit time by the
+    writer using the same heuristic the mobile client previously
+    applied at render time (#540) — explicit ``payload.severity`` /
+    ``payload.level`` win, then ``payload.status`` mapping, then the
+    ``event_type`` shape (``*.failed`` / ``*error*`` → ``error``;
+    ``*.warned`` / ``*warn*`` → ``warn``); ``info`` otherwise."""
+
 
 @strawberry.type(name="AstroliftEventPage")
 class EventPageType:
@@ -227,6 +235,7 @@ def event_to_type(e) -> EventType:
         occurred_at=e.occurred_at,
         resource_kind=e.resource_kind or "",
         resource_id=e.resource_id or "",
+        severity=getattr(e, "severity", None) or "info",
     )
 
 

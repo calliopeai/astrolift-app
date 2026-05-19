@@ -89,10 +89,13 @@ class OperationsQuery:
         info: Info,
         limit: int = 100,
         event_type: str | None = None,
+        severity: str | None = None,
     ) -> list[EventType]:
         qs = Event.objects.order_by("-occurred_at")
         if event_type:
             qs = qs.filter(event_type=event_type)
+        if severity:
+            qs = qs.filter(severity=severity)
         return [event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
@@ -103,6 +106,7 @@ class OperationsQuery:
         info: Info,
         limit: int = 100,
         event_type: str | None = None,
+        severity: str | None = None,
         aggregate_window_seconds: int = 300,
     ) -> list[AggregatedEventType]:
         """Roll up the raw event stream into ``(event_type,
@@ -131,6 +135,8 @@ class OperationsQuery:
         qs = Event.objects.order_by("-occurred_at")
         if event_type:
             qs = qs.filter(event_type=event_type)
+        if severity:
+            qs = qs.filter(severity=severity)
         rows = list(qs[:scan_cap])
         return _aggregate_events(
             rows,
@@ -147,6 +153,7 @@ class OperationsQuery:
         limit: int = 100,
         after: str | None = None,
         event_type: str | None = None,
+        severity: str | None = None,
     ) -> EventPageType:
         """Cursor-paginated event stream.
 
@@ -155,11 +162,18 @@ class OperationsQuery:
         of ``[occurred_at_iso, guid_str]`` so the (occurred_at, guid)
         composite is the seek key — guid is a UUIDv7 so the secondary
         sort is also time-ordered, eliminating tie-break churn.
+
+        ``severity`` (``info`` | ``warn`` | ``error``) is an optional
+        server-side filter (#540); it rides the composite
+        (organization, occurred_at, severity) index so a narrow filter
+        remains O(page) rather than scanning the full stream.
         """
         page_size = max(1, min(limit, 500))
         qs = Event.objects.order_by("-occurred_at", "-guid")
         if event_type:
             qs = qs.filter(event_type=event_type)
+        if severity:
+            qs = qs.filter(severity=severity)
         if after:
             decoded = _decode_event_cursor(after)
             if decoded is not None:
