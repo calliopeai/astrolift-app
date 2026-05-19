@@ -18,6 +18,7 @@ export const LIST_APP_SECRETS = gql`
       }
       expiresAt
       setVia
+      scope
     }
   }
 `;

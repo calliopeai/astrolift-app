@@ -295,6 +295,8 @@ export const LIST_APP_DOMAINS = gql`
         stripPrefix
         priority
       }
+      isWildcard
+      sniCertRef
     }
   }
 `;
