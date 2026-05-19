@@ -498,6 +498,10 @@ class WorkloadType:
     # without an organization, which only happens in malformed
     # fixtures).
     in_cluster_service_fqdn: str
+    # Volume declarations from the manifest (#739). Each item mirrors
+    # the TOML ``[[workloads.<name>.volumes]]`` shape as parsed and
+    # stored on the row. Empty list when no volumes are declared.
+    volumes: JSON
 
 
 @strawberry.type(name="AstroliftContainer")
@@ -516,6 +520,12 @@ class ContainerType:
     healthcheck_value: str
     healthcheck_port: int | None
     workload_slug: str
+    # Kubernetes probe configs (#739). Stored as arbitrary JSON matching
+    # the K8s probe spec shape so the UI can render them without a
+    # typed schema on the platform side. Null when not configured.
+    startup_probe: JSON | None = None
+    readiness_probe: JSON | None = None
+    liveness_probe: JSON | None = None
 
 
 # Pulse thresholds (#405). Pulled out as module-level constants so
@@ -1124,6 +1134,7 @@ def workload_to_type(workload) -> WorkloadType:
         storage_size=workload.storage_size or "",
         registered_app_slug=workload.registered_app.slug,
         in_cluster_service_fqdn=_in_cluster_service_fqdn(workload),
+        volumes=list(workload.volumes or []),
     )
 
 
@@ -1240,6 +1251,9 @@ def container_to_type(container) -> ContainerType:
         healthcheck_value=container.healthcheck_value or "",
         healthcheck_port=container.healthcheck_port,
         workload_slug=container.workload.slug,
+        startup_probe=container.startup_probe,
+        readiness_probe=container.readiness_probe,
+        liveness_probe=container.liveness_probe,
     )
 
 

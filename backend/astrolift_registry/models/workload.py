@@ -67,6 +67,12 @@ class Workload(NamedBaseCoreModel):
     storage_class = models.CharField(max_length=64, blank=True, default="")
     storage_size = models.CharField(max_length=32, blank=True, default="")
 
+    # Volume declarations from the manifest (#739). Stored as the raw
+    # list of volume-config dicts so the workload-detail page can render
+    # volume cards without re-parsing the TOML. Each dict mirrors the
+    # TOML ``[[workloads.<name>.volumes]]`` shape.
+    volumes = models.JSONField(default=list, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

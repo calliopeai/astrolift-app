@@ -123,6 +123,7 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
                 hpa_target_cpu_pct=m.hpa_target_cpu_pct,
                 storage_class=m.storage_class or "",
                 storage_size=m.storage_size or "",
+                volumes=list(m.volumes),
             )
             result.workloads_created += 1
         elif _workload_changed(row, m):
@@ -140,6 +141,7 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
             row.hpa_target_cpu_pct = m.hpa_target_cpu_pct
             row.storage_class = m.storage_class or ""
             row.storage_size = m.storage_size or ""
+            row.volumes = list(m.volumes)
             row.save()
             result.workloads_updated += 1
 
@@ -225,6 +227,7 @@ def _workload_changed(row, m: WorkloadManifest) -> bool:
         or row.hpa_target_cpu_pct != m.hpa_target_cpu_pct
         or (row.storage_class or "") != (m.storage_class or "")
         or (row.storage_size or "") != (m.storage_size or "")
+        or list(row.volumes or []) != list(m.volumes)
     )
 
 

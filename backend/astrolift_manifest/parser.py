@@ -11,6 +11,7 @@ from __future__ import annotations
 import tomllib
 from typing import Any
 
+from astrolift_manifest.security_volumes import parse_volume
 from astrolift_manifest.types import (
     ContainerManifest,
     ManagedServiceManifest,
@@ -122,6 +123,8 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         _parse_container(item, f"{path}.containers[{i}]") for i, item in enumerate(d.get("containers", []))
     )
 
+    volumes = _parse_volumes(d.get("volumes", []), path)
+
     return WorkloadManifest(
         name=name,
         kind=kind,
@@ -139,6 +142,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         storage_class=d.get("storage_class"),
         storage_size=d.get("storage_size"),
         containers=containers,
+        volumes=volumes,
     )
 
 
@@ -227,6 +231,36 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
         storage_size=None,
         containers=(container,),
     )
+
+
+def _parse_volumes(raw_list: list, workload_path: str) -> tuple[dict, ...]:
+    """Parse ``[[workloads.<name>.volumes]]`` entries, validate each via
+    ``parse_volume()``, and return as plain dicts so ``WorkloadManifest``
+    stays independent of the ``security_volumes`` types."""
+    from astrolift_drivers.storage_tiers import StorageError
+
+    out: list[dict] = []
+    for i, raw in enumerate(raw_list):
+        path = f"{workload_path}.volumes[{i}]"
+        try:
+            vd = parse_volume(raw)
+        except StorageError as exc:
+            raise ManifestError(str(exc), path=path) from exc
+        out.append(
+            {
+                "name": vd.name,
+                "kind": str(vd.kind),
+                "mount_path": vd.mount_path,
+                "size": vd.size,
+                "storage_class": vd.storage_class,
+                "access_mode": vd.access_mode,
+                "performance_tier": str(vd.performance_tier),
+                "durability": str(vd.durability),
+                "source_name": vd.source_name,
+                "size_limit": vd.size_limit,
+            }
+        )
+    return tuple(out)
 
 
 def _parse_managed_service(d: dict[str, Any], path: str) -> ManagedServiceManifest:
