@@ -296,7 +296,7 @@ class LifecycleQuery:
     def astrolift_environments(self, info: Info, app_slug: str | None = None) -> list[AppEnvironmentType]:
         qs = AppEnvironment.objects.select_related(
             "registered_app", "tenant_cluster", "managed_domain"
-        ).order_by("registered_app__slug", "name")
+        ).prefetch_related("settings").order_by("registered_app__slug", "name")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         return [app_env_to_type(e) for e in qs[:300]]
