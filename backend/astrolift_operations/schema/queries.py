@@ -90,12 +90,15 @@ class OperationsQuery:
         limit: int = 100,
         event_type: str | None = None,
         severity: str | None = None,
+        app_slug: str | None = None,
     ) -> list[EventType]:
         qs = Event.objects.order_by("-occurred_at")
         if event_type:
             qs = qs.filter(event_type=event_type)
         if severity:
             qs = qs.filter(severity=severity)
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
         return [event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
@@ -107,6 +110,7 @@ class OperationsQuery:
         limit: int = 100,
         event_type: str | None = None,
         severity: str | None = None,
+        app_slug: str | None = None,
         aggregate_window_seconds: int = 300,
     ) -> list[AggregatedEventType]:
         """Roll up the raw event stream into ``(event_type,
@@ -137,6 +141,8 @@ class OperationsQuery:
             qs = qs.filter(event_type=event_type)
         if severity:
             qs = qs.filter(severity=severity)
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
         rows = list(qs[:scan_cap])
         return _aggregate_events(
             rows,
@@ -154,6 +160,7 @@ class OperationsQuery:
         after: str | None = None,
         event_type: str | None = None,
         severity: str | None = None,
+        app_slug: str | None = None,
     ) -> EventPageType:
         """Cursor-paginated event stream.
 
@@ -167,6 +174,18 @@ class OperationsQuery:
         server-side filter (#540); it rides the composite
         (organization, occurred_at, severity) index so a narrow filter
         remains O(page) rather than scanning the full stream.
+
+        ``app_slug`` (#539) scopes to events whose ``registered_app``
+        FK points at the named app — the canonical per-app feed for
+        the mobile + web app-detail event tabs. The slug-based filter
+        replaces the previous client-side narrowing on
+        ``resourceKind`` / ``payload.appSlug``; only events that
+        carried a ``RegisteredApp`` link at emit time are returned, so
+        narrowly-scoped emits (deploys, config syncs, secret rotations,
+        scale ops) are visible end-to-end while infra-wide noise
+        (cluster bootstrap, org-level audit) is excluded as intended.
+        Tenancy is preserved by the existing ``@tenant_scoped``
+        decorator on the resolver.
         """
         page_size = max(1, min(limit, 500))
         qs = Event.objects.order_by("-occurred_at", "-guid")
@@ -174,6 +193,8 @@ class OperationsQuery:
             qs = qs.filter(event_type=event_type)
         if severity:
             qs = qs.filter(severity=severity)
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
         if after:
             decoded = _decode_event_cursor(after)
             if decoded is not None:
