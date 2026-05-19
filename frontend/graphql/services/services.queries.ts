@@ -191,6 +191,85 @@ export const GET_EMAIL_SERVICE_DETAIL = gql`
   }
 `;
 
+// Email templates + message log + engagement (#624, #625, #626, #628, #635)
+
+export const GET_EMAIL_TEMPLATES = gql`
+  query GetEmailTemplates($managedServiceId: GUID!) {
+    astroliftEmailTemplates(managedServiceId: $managedServiceId) {
+      name
+      subject
+      htmlBody
+      textBody
+      createdAt
+    }
+  }
+`;
+
+export const GET_EMAIL_TEMPLATE_STATS = gql`
+  query GetEmailTemplateStats(
+    $managedServiceId: GUID!
+    $name: String!
+    $days: Int
+  ) {
+    astroliftEmailTemplateStats(
+      managedServiceId: $managedServiceId
+      name: $name
+      days: $days
+    ) {
+      timestamp
+      sends
+      deliveries
+      bounces
+      complaints
+    }
+  }
+`;
+
+export const GET_EMAIL_MESSAGES = gql`
+  query GetEmailMessages(
+    $managedServiceId: GUID!
+    $limit: Int
+    $eventKind: String
+    $recipient: String
+  ) {
+    astroliftEmailMessages(
+      managedServiceId: $managedServiceId
+      limit: $limit
+      eventKind: $eventKind
+      recipient: $recipient
+    ) {
+      id
+      messageId
+      recipient
+      subject
+      eventKind
+      occurredAt
+      metadata
+    }
+  }
+`;
+
+export const GET_EMAIL_ENGAGEMENT_METRICS = gql`
+  query GetEmailEngagementMetrics($managedServiceId: GUID!, $days: Int) {
+    astroliftEmailEngagementMetrics(
+      managedServiceId: $managedServiceId
+      days: $days
+    ) {
+      totalSends
+      totalDeliveries
+      totalBounces
+      totalComplaints
+      totalOpens
+      totalClicks
+      bounceRatePct
+      complaintRatePct
+      openRatePct
+      clickRatePct
+      windowDays
+    }
+  }
+`;
+
 // #488 Secret-change approval workflow ---------------------------------
 
 const SECRET_CHANGE_PROPOSAL_FIELDS = gql`

@@ -395,6 +395,64 @@ export const REMOVE_EMAIL_SUPPRESSION_ENTRY = gql`
   }
 `;
 
+// Email template CRUD (#635) ------------------------------------------
+
+const EMAIL_TEMPLATE_FIELDS = `
+  name
+  subject
+  htmlBody
+  textBody
+  createdAt
+`;
+
+export const CREATE_EMAIL_TEMPLATE = gql`
+  mutation CreateEmailTemplate($input: CreateEmailTemplateInput!) {
+    createEmailTemplate(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${EMAIL_TEMPLATE_FIELDS}
+      }
+    }
+  }
+`;
+
+export const UPDATE_EMAIL_TEMPLATE = gql`
+  mutation UpdateEmailTemplate($input: UpdateEmailTemplateInput!) {
+    updateEmailTemplate(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        ${EMAIL_TEMPLATE_FIELDS}
+      }
+    }
+  }
+`;
+
+export const DELETE_EMAIL_TEMPLATE = gql`
+  mutation DeleteEmailTemplate($input: DeleteEmailTemplateInput!) {
+    deleteEmailTemplate(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
+    }
+  }
+`;
+
 export const SEND_MANAGED_SERVICE_TEST_EMAIL = gql`
   mutation SendManagedServiceTestEmail($input: SendManagedServiceTestEmailInput!) {
     sendManagedServiceTestEmail(input: $input) {

@@ -5,6 +5,7 @@ const ALERT_RULE_FIELDS = `
   name
   target
   targetId
+  managedServiceId
   severity
   predicate
   notifyChannels
