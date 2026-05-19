@@ -349,3 +349,47 @@ export const RESYNC_MANIFEST_FROM_REPO = gql`
     }
   }
 `;
+
+/**
+ * Archive an app: zero workload replicas, suppress deploys (#743).
+ */
+export const ARCHIVE_APP = gql`
+  mutation ArchiveApp($input: ArchiveAppInput!) {
+    archiveApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        isArchived
+        archivedAt
+      }
+    }
+  }
+`;
+
+/**
+ * Restore an archived app to its pre-archive replica counts (#743).
+ */
+export const RESTORE_APP = gql`
+  mutation RestoreApp($input: RestoreAppInput!) {
+    restoreApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        isArchived
+        archivedAt
+      }
+    }
+  }
+`;

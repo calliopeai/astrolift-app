@@ -95,6 +95,10 @@ type AppsecretwritepayloadMutationResult {
   data: Appsecretwritepayload
 }
 
+input ArchiveAppInput {
+  appSlug: String!
+}
+
 input ArchiveAppRegistryRepoInput {
   appId: GUID!
   archive: Boolean! = true
@@ -1889,6 +1893,9 @@ type AstroliftRegisteredApp {
   cronPaused: Boolean!
   deployBranch: String!
   previewScreenshotUrl: String!
+  isArchived: Boolean!
+  archivedAt: DateTime
+  archivedByEmail: String
   webhookDeploysPaused: Boolean!
   webhookDeploysPausedAt: DateTime
   webhookDeploysPausedByEmail: String
@@ -3427,6 +3434,8 @@ type Mutation {
   pauseAstroliftAppWebhookDeploys(input: PauseAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
   resumeAstroliftAppWebhookDeploys(input: ResumeAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
   setRetentionPolicy(input: SetRetentionPolicyInput!): AstroliftRetentionPolicyMutationResult!
+  archiveApp(input: ArchiveAppInput!): AstroliftRegisteredAppMutationResult!
+  restoreApp(input: RestoreAppInput!): AstroliftRegisteredAppMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -4021,6 +4030,10 @@ input RequestQuotaIncreaseInput {
 
 input RestartWorkloadInput {
   workloadId: GUID!
+}
+
+input RestoreAppInput {
+  appSlug: String!
 }
 
 input ResumeAppWebhookDeploysInput {

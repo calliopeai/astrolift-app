@@ -51,6 +51,10 @@ class Workload(NamedBaseCoreModel):
     notify_on_failure = models.BooleanField(default=True)
 
     replicas = models.PositiveIntegerField(default=1)
+    # Replica count snapshotted when the app is archived (#743) so
+    # restoreApp can bring workloads back to their pre-archive state.
+    # Null means this workload was never archived.
+    pre_archive_replicas = models.PositiveIntegerField(null=True, blank=True)
     cpu_request = models.CharField(max_length=32, blank=True, default="")
     cpu_limit = models.CharField(max_length=32, blank=True, default="")
     memory_request = models.CharField(max_length=64, blank=True, default="")

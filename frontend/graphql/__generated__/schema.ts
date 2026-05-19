@@ -119,6 +119,10 @@ export type AppsecretwritepayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ArchiveAppInput = {
+  appSlug: Scalars['String']['input'];
+};
+
 export type ArchiveAppRegistryRepoInput = {
   appId: Scalars['GUID']['input'];
   archive: Scalars['Boolean']['input'];
@@ -1875,6 +1879,8 @@ export type AstroliftRegisteredApp = {
   activePreviewCount: Scalars['Int']['output'];
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
+  archivedAt?: Maybe<Scalars['DateTime']['output']>;
+  archivedByEmail?: Maybe<Scalars['String']['output']>;
   configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
@@ -1889,6 +1895,7 @@ export type AstroliftRegisteredApp = {
   healthPulse?: Maybe<AstroliftAppHealthPulse>;
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
+  isArchived: Scalars['Boolean']['output'];
   k8sNamespace: Scalars['String']['output'];
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   lastResyncAt?: Maybe<Scalars['DateTime']['output']>;
@@ -3270,6 +3277,7 @@ export type Mutation = {
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
+  archiveApp: AstroliftRegisteredAppMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
   archiveForm: AstroliftFormDefinitionMutationResult;
   assertSession: AstroliftAttestationResultMutationResult;
@@ -3417,6 +3425,7 @@ export type Mutation = {
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
+  restoreApp: AstroliftRegisteredAppMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
@@ -3559,6 +3568,11 @@ export type MutationApproveDeploymentByTokenArgs = {
 
 export type MutationApproveSecretChangeArgs = {
   input: ApproveSecretChangeInput;
+};
+
+
+export type MutationArchiveAppArgs = {
+  input: ArchiveAppInput;
 };
 
 
@@ -4176,6 +4190,11 @@ export type MutationRequestQuotaIncreaseArgs = {
 
 export type MutationRestartAstroliftWorkloadArgs = {
   input: RestartWorkloadInput;
+};
+
+
+export type MutationRestoreAppArgs = {
+  input: RestoreAppInput;
 };
 
 
@@ -5666,6 +5685,10 @@ export type RequestQuotaIncreaseInput = {
 
 export type RestartWorkloadInput = {
   workloadId: Scalars['GUID']['input'];
+};
+
+export type RestoreAppInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 export type ResumeAppWebhookDeploysInput = {

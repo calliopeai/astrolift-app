@@ -119,6 +119,18 @@ class RegisteredApp(NamedBaseCoreModel):
     # ``paused_at`` / ``paused_by`` are stamped on the off→on
     # transition so the Settings UI can render "Paused by <user>,
     # <relative time> — reason: <reason>" without joining the audit log.
+    # Archive state (#743). When archived, all workload replicas are scaled
+    # to zero and webhook/cron deploys are suppressed. ``archived_by`` is
+    # the user who triggered the archive (audit trail; not a permission gate).
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="archived_apps",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
     webhook_deploys_paused = models.BooleanField(default=False)
     webhook_deploys_paused_at = models.DateTimeField(null=True, blank=True)
     webhook_deploys_paused_by = models.ForeignKey(

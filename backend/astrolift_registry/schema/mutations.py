@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_clusters.models import TenantCluster
@@ -12,7 +13,7 @@ from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project, Team
 from astrolift_identity.step_up import requires_elevation
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
-from astrolift_registry.models import AppTeamAccess, RegisteredApp, RetentionPolicy
+from astrolift_registry.models import AppTeamAccess, RegisteredApp, RetentionPolicy, Workload
 from astrolift_registry.schema.types import (
     AppTeamAccessType,
     RegisteredAppType,
@@ -613,6 +614,16 @@ class SetRetentionPolicyInput:
     app_slug: str
     signal: str
     retention_days: int
+
+
+@strawberry.input
+class ArchiveAppInput:
+    app_slug: str
+
+
+@strawberry.input
+class RestoreAppInput:
+    app_slug: str
 
 
 @strawberry.type
@@ -1871,3 +1882,73 @@ class RegistryMutation:
             updated_by=actor,
         )
         return gql_success(retention_policy_to_type(policy))
+
+    @strawberry.mutation
+    @mutation_audit(action="app.archive")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def archive_app(self, info: Info, input: ArchiveAppInput) -> MutationResultType[RegisteredAppType]:
+        """Scale all workloads to zero and suppress deploys. Idempotent."""
+        tenant = get_current_tenant()
+        app = RegisteredApp.objects.filter(
+            organization_id=tenant.organization_id,
+            slug=input.app_slug,
+            deleted_at__isnull=True,
+        ).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        if app.archived_at is not None:
+            return gql_success(app_to_type(app))
+
+        actor = info.context.request.user
+        app.archived_at = timezone.now()
+        app.archived_by = actor
+        app.updated_by = actor
+        app.save(update_fields=["archived_at", "archived_by", "updated_by", "updated_at", "version"])
+
+        workloads = Workload.objects.filter(registered_app=app, deleted_at__isnull=True)
+        for wl in workloads:
+            wl.pre_archive_replicas = wl.replicas
+            wl.replicas = 0
+            wl.updated_by = actor
+            wl.save(update_fields=["replicas", "pre_archive_replicas", "updated_by", "updated_at", "version"])
+
+        return gql_success(app_to_type(app))
+
+    @strawberry.mutation
+    @mutation_audit(action="app.restore")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def restore_app(self, info: Info, input: RestoreAppInput) -> MutationResultType[RegisteredAppType]:
+        """Restore archived app: un-archive and return workloads to pre-archive replicas."""
+        tenant = get_current_tenant()
+        app = RegisteredApp.objects.filter(
+            organization_id=tenant.organization_id,
+            slug=input.app_slug,
+            deleted_at__isnull=True,
+        ).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        if app.archived_at is None:
+            return gql_success(app_to_type(app))
+
+        actor = info.context.request.user
+        app.archived_at = None
+        app.archived_by = None
+        app.updated_by = actor
+        app.save(update_fields=["archived_at", "archived_by", "updated_by", "updated_at", "version"])
+
+        workloads = Workload.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+            pre_archive_replicas__isnull=False,
+        )
+        for wl in workloads:
+            wl.replicas = wl.pre_archive_replicas
+            wl.pre_archive_replicas = None
+            wl.updated_by = actor
+            wl.save(update_fields=["replicas", "pre_archive_replicas", "updated_by", "updated_at", "version"])
+
+        return gql_success(app_to_type(app))
