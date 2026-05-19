@@ -32,10 +32,12 @@ from astrolift_lifecycle.schema.types import (
     DeploymentApprovalHistoryEntryType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
+    DeploymentComparisonType,
     DeploymentType,
     DeployTokenType,
     DeregisterPreviewType,
     ForceRedeployPreviewType,
+    ManifestDiffEntryType,
     PreviewEnvironmentType,
     ReleaseNotesType,
     ScheduledJobRunType,
@@ -63,6 +65,7 @@ from core.cluster_observability import (
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
+from core.tenancy import get_current_tenant
 
 # Audit-log ``action`` values that make up the approval timeline for a
 # deployment (#419). Kept here (rather than scraping all
@@ -288,6 +291,40 @@ def _bucket_pods_by_status(pods: list) -> list[WorkloadPodStatusBucketType]:
     return buckets
 
 
+def _compute_manifest_diff(
+    snap_a: dict, snap_b: dict
+) -> list[ManifestDiffEntryType]:
+    """Flat JSON-patch list for the manifest diff surface (#737).
+
+    Walks the top-level keys of both snapshots.  For each key:
+    - missing in A, present in B → ``add``
+    - present in A, missing in B → ``remove``
+    - different value → ``replace``
+
+    Sub-document diffing is deferred to a future iteration; the FE
+    renders the per-key diff in a ``<pre>`` block for now."""
+    entries: list[ManifestDiffEntryType] = []
+    all_keys = sorted(set(snap_a) | set(snap_b))
+    for key in all_keys:
+        in_a = key in snap_a
+        in_b = key in snap_b
+        if in_a and not in_b:
+            entries.append(
+                ManifestDiffEntryType(op="remove", path=key, before=snap_a[key], after=None)
+            )
+        elif not in_a and in_b:
+            entries.append(
+                ManifestDiffEntryType(op="add", path=key, before=None, after=snap_b[key])
+            )
+        elif snap_a[key] != snap_b[key]:
+            entries.append(
+                ManifestDiffEntryType(
+                    op="replace", path=key, before=snap_a[key], after=snap_b[key]
+                )
+            )
+    return entries
+
+
 @strawberry.type
 class LifecycleQuery:
     @strawberry.field
@@ -467,6 +504,83 @@ class LifecycleQuery:
 
         rn = fetch_release_notes(connection, app=app, base_sha=base_sha, head_sha=head_sha)
         return release_notes_to_type(rn) if rn else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_compare_deployments(
+        self, info: Info, id_a: str, id_b: str
+    ) -> DeploymentComparisonType | None:
+        """Commit range + manifest diff + image diff between two deploys (#737).
+
+        Both deployments must belong to the same app (within the caller's
+        tenant).  Returns None when either deployment is not found.
+
+        Commit range / compare URL require both deploys to have a
+        ``commit_sha``; falls back to empty strings when not available.
+
+        Manifest diff is a JSON-patch list derived from the
+        ``rendered_manifest_snapshot`` fields (null on pre-#737 rows →
+        empty diff).
+
+        Image diff summary is best-effort: compared ``image_tag`` +
+        ``image_digest`` values from both deployments."""
+        from astrolift_lifecycle.models import Deployment
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+
+        def _get_deploy(guid: str) -> Deployment | None:
+            qs = Deployment.objects.filter(guid=guid, deleted_at__isnull=True).select_related(
+                "registered_app", "app_environment"
+            )
+            if org_id is not None:
+                qs = qs.filter(registered_app__organization_id=org_id)
+            return qs.first()
+
+        dep_a = _get_deploy(id_a)
+        dep_b = _get_deploy(id_b)
+        if dep_a is None or dep_b is None:
+            return None
+
+        # Commit range -----------------------------------------------
+        base_sha = dep_a.commit_sha or ""
+        head_sha = dep_b.commit_sha or ""
+        compare_url = ""
+        if base_sha and head_sha:
+            from astrolift_registry.services.manifest_sync import _pick_source_connection
+
+            conn = _pick_source_connection(dep_a.registered_app)
+            if conn is not None and hasattr(conn, "compare_url"):
+                try:
+                    compare_url = conn.compare_url(base_sha=base_sha, head_sha=head_sha) or ""
+                except Exception:  # noqa: BLE001
+                    compare_url = ""
+
+        # Manifest diff ----------------------------------------------
+        snap_a: dict = dep_a.rendered_manifest_snapshot or {}
+        snap_b: dict = dep_b.rendered_manifest_snapshot or {}
+        manifest_diff = _compute_manifest_diff(snap_a, snap_b)
+
+        # Image diff summary -----------------------------------------
+        image_diff_summary = ""
+        if dep_a.image_digest or dep_b.image_digest:
+            a_tag = dep_a.image_tag or dep_a.image_digest or "(unknown)"
+            b_tag = dep_b.image_tag or dep_b.image_digest or "(unknown)"
+            if a_tag != b_tag:
+                image_diff_summary = f"{a_tag} → {b_tag}"
+            else:
+                image_diff_summary = f"same image ({a_tag})"
+
+        return DeploymentComparisonType(
+            deployment_a_id=GUID(str(dep_a.guid)),
+            deployment_b_id=GUID(str(dep_b.guid)),
+            base_sha=base_sha,
+            head_sha=head_sha,
+            compare_url=compare_url,
+            manifest_diff=manifest_diff,
+            image_diff_summary=image_diff_summary,
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

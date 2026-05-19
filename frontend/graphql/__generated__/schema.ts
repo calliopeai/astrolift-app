@@ -1047,6 +1047,16 @@ export type AstroliftDeploymentApprover = {
   userId: Scalars['String']['output'];
 };
 
+export type AstroliftDeploymentComparison = {
+  baseSha: Scalars['String']['output'];
+  compareUrl: Scalars['String']['output'];
+  deploymentAId: Scalars['GUID']['output'];
+  deploymentBId: Scalars['GUID']['output'];
+  headSha: Scalars['String']['output'];
+  imageDiffSummary: Scalars['String']['output'];
+  manifestDiff: Array<AstroliftManifestDiffEntry>;
+};
+
 export type AstroliftDeploymentLifecycleEvent = {
   deploymentId: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -1613,6 +1623,13 @@ export type AstroliftManagedServiceTestEmailResultMutationResult = {
   data?: Maybe<AstroliftManagedServiceTestEmailResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManifestDiffEntry = {
+  after: Scalars['JSON']['output'];
+  before: Scalars['JSON']['output'];
+  op: Scalars['String']['output'];
+  path: Scalars['String']['output'];
 };
 
 export type AstroliftMarkOnboardingCompletePayload = {
@@ -5008,6 +5025,7 @@ export type Query = {
   astroliftClusterWorkloadHealth: Array<AstroliftClusterWorkloadHealth>;
   astroliftClusters: Array<AstroliftTenantCluster>;
   astroliftCommandRuns: Array<AstroliftCommandRun>;
+  astroliftCompareDeployments?: Maybe<AstroliftDeploymentComparison>;
   astroliftContainers: Array<AstroliftContainer>;
   astroliftCostByBinding: AstroliftCostAttribution;
   astroliftCostForecast: AstroliftCostForecast;
@@ -5328,6 +5346,12 @@ export type QueryAstroliftClusterWorkloadHealthArgs = {
 export type QueryAstroliftCommandRunsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftCompareDeploymentsArgs = {
+  idA: Scalars['String']['input'];
+  idB: Scalars['String']['input'];
 };
 
 

@@ -169,6 +169,12 @@ class Deployment(BaseCoreModel):
     approval_token_expires_at = models.DateTimeField(null=True, blank=True)
     approval_token_used_at = models.DateTimeField(null=True, blank=True)
 
+    # Snapshot of the resolved manifest JSON captured at deploy-creation
+    # time (#737). Used by compareDeployments to diff two deploys without
+    # re-rendering. Null on deployments created before this field landed;
+    # the comparison query falls back to an empty dict.
+    rendered_manifest_snapshot = models.JSONField(null=True, blank=True)
+
     started_at = models.DateTimeField(null=True, blank=True)
     succeeded_at = models.DateTimeField(null=True, blank=True)
     failed_at = models.DateTimeField(null=True, blank=True)
