@@ -124,6 +124,50 @@ export interface AstroliftEmailServiceDetail {
   unsupportedNotes: string[];
 }
 
+// Email template management (#635, #628) -----------------------------
+
+export interface AstroliftEmailTemplate {
+  name: string;
+  subject: string;
+  htmlBody: string;
+  textBody: string;
+  createdAt: string | null;
+}
+
+export interface AstroliftTemplateSendStatPoint {
+  timestamp: string;
+  sends: number;
+  deliveries: number;
+  bounces: number;
+  complaints: number;
+}
+
+// Email message log + engagement (#624, #625, #626) ------------------
+
+export interface AstroliftEmailMessage {
+  id: string;
+  messageId: string;
+  recipient: string;
+  subject: string;
+  eventKind: string;
+  occurredAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AstroliftEmailEngagementMetrics {
+  totalSends: number;
+  totalDeliveries: number;
+  totalBounces: number;
+  totalComplaints: number;
+  totalOpens: number;
+  totalClicks: number;
+  bounceRatePct: number;
+  complaintRatePct: number;
+  openRatePct: number;
+  clickRatePct: number;
+  windowDays: number;
+}
+
 // #488 Secret-change approval workflow --------------------------------
 
 export type AstroliftSecretChangeApproval = Pick<
