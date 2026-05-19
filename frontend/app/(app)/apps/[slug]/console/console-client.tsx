@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useSubscription } from "@apollo/client/react";
+import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
@@ -8,11 +8,15 @@ import {
   CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
+  FileCode2Icon,
+  Loader2Icon,
   PauseIcon,
   PlayIcon,
   ScrollTextIcon,
   TerminalIcon,
   Trash2Icon,
+  UploadIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -38,6 +42,8 @@ import { ON_APP_LOG } from "@/graphql/lifecycle/lifecycle.subscriptions";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { UPLOAD_FILE } from "@/graphql/uploads/uploads.mutations";
+import type { FileUploadResult } from "@/graphql/__generated__/schema";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -178,6 +184,72 @@ export function ConsoleClient({ slug }: { slug: string }) {
       });
     },
   });
+
+  // #673 — script upload. Operator picks a .py/.sh/.sql/etc. file; we
+  // mint a pre-signed PUT URL via fileUpload, push the bytes to object
+  // storage, and surface the public URL + a paste-ready `curl`/run pair
+  // so the next `astro exec` lands the file at /tmp and runs it.
+  const [uploadFile, uploadState] = useMutation<{ fileUpload: FileUploadResult }>(UPLOAD_FILE);
+  const [uploadedFile, setUploadedFile] = React.useState<{
+    name: string;
+    publicUrl: string;
+  } | null>(null);
+  const [putInFlight, setPutInFlight] = React.useState(false);
+  const uploadInputRef = React.useRef<HTMLInputElement | null>(null);
+  const uploading = uploadState.loading || putInFlight;
+
+  const onPickScript = async (file: File) => {
+    setUploadedFile(null);
+    setPutInFlight(false);
+    const mimetype = file.type || "text/plain";
+    try {
+      const res = await uploadFile({ variables: { mimetype, name: file.name } });
+      const result = res.data?.fileUpload;
+      const url = result?.preSignedUrl;
+      const publicUrl = result?.publicUrl;
+      if (!url || !publicUrl) {
+        toast.error(t("upload.failed", { error: t("upload.noUrl") }));
+        return;
+      }
+      setPutInFlight(true);
+      const put = await fetch(url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": mimetype },
+      });
+      if (!put.ok) {
+        toast.error(t("upload.failed", { error: `HTTP ${put.status}` }));
+        return;
+      }
+      setUploadedFile({ name: file.name, publicUrl });
+      toast.success(t("upload.success", { name: file.name }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(t("upload.failed", { error: msg }));
+    } finally {
+      setPutInFlight(false);
+    }
+  };
+
+  const uploadedCommand = React.useMemo(() => {
+    if (!uploadedFile) return null;
+    const name = uploadedFile.name;
+    const lower = name.toLowerCase();
+    const path = `/tmp/${name}`;
+    if (lower.endsWith(".py")) return `python ${path}`;
+    if (lower.endsWith(".sh")) return `bash ${path}`;
+    if (lower.endsWith(".sql")) return `psql "$DATABASE_URL" < ${path}`;
+    if (lower.endsWith(".rb")) return `ruby ${path}`;
+    if (lower.endsWith(".js")) return `node ${path}`;
+    if (lower.endsWith(".ts")) return `npx tsx ${path}`;
+    if (lower.endsWith(".go")) return `go run ${path}`;
+    return path;
+  }, [uploadedFile]);
+
+  const fetchCommand = React.useMemo(() => {
+    if (!uploadedFile) return null;
+    return `curl -fsSL -o /tmp/${uploadedFile.name} '${uploadedFile.publicUrl}'`;
+  }, [uploadedFile]);
 
   // #674 — prefilled command palette. Each shortcut is a frequent
   // operator action; clicking the row copies the command. Grouped by
@@ -472,6 +544,78 @@ export function ConsoleClient({ slug }: { slug: string }) {
               </Link>
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileCode2Icon className="size-4" />
+              {t("upload.title")}
+            </CardTitle>
+            <CardDescription>{t("upload.description")}</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".py,.sql,.sh,.ts,.js,.rb,.go,text/plain"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onPickScript(f);
+                // Reset so re-uploading the same filename refires onChange.
+                e.target.value = "";
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <Loader2Icon className="size-3 animate-spin" />
+              ) : (
+                <UploadIcon className="size-3" />
+              )}
+              {uploading ? t("upload.uploading") : t("upload.pick")}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {uploadedFile ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="font-mono text-xs">
+                  {uploadedFile.name}
+                  <button
+                    type="button"
+                    aria-label={t("upload.clear")}
+                    onClick={() => setUploadedFile(null)}
+                    className="hover:bg-background/60 ml-1 rounded-sm p-0.5"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                </Badge>
+                <span className="text-muted-foreground text-xs">
+                  {t("upload.path", { path: `/tmp/${uploadedFile.name}` })}
+                </span>
+              </div>
+              {uploadedCommand && (
+                <CopyableCommand label={t("upload.runLabel")} command={uploadedCommand} />
+              )}
+              {fetchCommand && (
+                <CopyableCommand label={t("upload.fetchLabel")} command={fetchCommand} />
+              )}
+              <p className="text-muted-foreground text-xs">{t("upload.note")}</p>
+            </>
+          ) : (
+            <div className="text-muted-foreground bg-muted/40 rounded-md border border-dashed p-4 text-center text-xs">
+              {t("upload.empty")}
+            </div>
+          )}
         </CardContent>
       </Card>
 

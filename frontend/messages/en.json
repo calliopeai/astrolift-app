@@ -787,7 +787,22 @@
       },
       "copy": "Copy command",
       "copied": "Copied to clipboard",
-      "copyFailed": "Couldn't copy — clipboard access blocked"
+      "copyFailed": "Couldn't copy — clipboard access blocked",
+      "upload": {
+        "title": "Upload script",
+        "description": "Drop a .py / .sql / .sh / .ts / .js / .rb / .go file. We mint a pre-signed URL, push the bytes, and hand you a paste-ready curl + run pair.",
+        "pick": "Upload script",
+        "uploading": "Uploading…",
+        "clear": "Clear uploaded file",
+        "empty": "No file uploaded yet — the command palette below runs unchanged.",
+        "path": "Will land at {path}",
+        "runLabel": "Run command",
+        "fetchLabel": "Fetch into the pod first",
+        "note": "The pre-signed URL is scoped to this upload. Run the fetch command inside the pod before the run command; the bytes are fetched over HTTPS and dropped at /tmp.",
+        "success": "Uploaded {name}",
+        "failed": "Upload failed: {error}",
+        "noUrl": "no pre-signed URL returned"
+      }
     },
     "previews": {
       "title": "{name} · Previews",
