@@ -2,28 +2,22 @@
 
 Companion to ``astrolift_scm.services.workflows`` (#387): where that
 module's :func:`dispatch_astrolift_ci_workflow` *triggers* the workflow,
-this one *materializes the YAML* into ``.github/workflows/astrolift-ci.yml``
-on the configured deploy branch so the dispatch endpoint actually has
-a workflow file to run against. The pairing exists because a fresh app
+this one *materializes the YAML* into the conventional CI file path on
+the configured deploy branch so the dispatch endpoint actually has a
+workflow file to run against. The pairing exists because a fresh app
 won't have the workflow yet on the operator's side, and the inline
 "paste this YAML" affordance on the Settings page is friction we'd
 rather skip when we already hold a SourceConnection that can write.
 
-Render → fetch existing → compare → write-or-skip. The render is a
-small string-substitution pass against
-``astrolift_lifecycle/templates/astrolift-ci.yml.j2``; full Jinja2 isn't
-in the runtime image, and the substitution surface here is five fixed
-variables with no logic, so we keep the template loadable as a
-``.j2``-suffixed asset (so an operator's editor highlights it sensibly)
-and do the substitution by hand. If template logic ever grows past
-``{{ var }}`` we'll graduate the package to a real Jinja env.
-
-Branch-protection handling: a "compliant" GitHub repo will gate direct
-pushes to the deploy branch. We probe the protections endpoint before
-PUT-ing the file; when the branch is protected, we land the file on
-a side branch and open a PR instead so the change goes through the
-repo's review path. The mutation surface returns
-``status="pr_opened"`` with the PR URL for that case.
+Render → fetch existing → compare → write-or-skip. The GitHub renderer
+does a small string-substitution pass against
+``astrolift_lifecycle/templates/astrolift-ci.yml.j2``; the GitLab
+renderer (#735) builds the equivalent document inline using the same
+five variables. Branch-protection handling: a "compliant" repo will
+gate direct pushes to the deploy branch. We probe the protections
+endpoint before PUT-ing; when the branch is protected, we land the
+file on a side branch and open a PR/MR so the change goes through the
+repo's review path. ``status="pr_opened"`` is returned in that case.
 """
 
 from __future__ import annotations
@@ -41,13 +35,17 @@ from django.conf import settings
 
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
-from astrolift_scm.providers import ProviderError, fetch_file, put_file
+from astrolift_scm.providers import ProviderError, fetch_file, open_pull_request, put_file
 from astrolift_scm.providers.github import GITHUB_API_DEFAULT, GithubProviderError, _token
+from astrolift_scm.providers.gitlab import (
+    GitlabProviderError,
+    _api_base as _gitlab_api_base,
+    _token as _gitlab_token,
+)
 
-# Path the operator's deploy webhook expects on disk. Matches the
-# convention referenced from #387's dispatch service so the dispatch
-# endpoint and the sync endpoint key off the same filename.
+# Conventional CI workflow paths per host.
 WORKFLOW_PATH: Final = ".github/workflows/astrolift-ci.yml"
+GITLAB_WORKFLOW_PATH: Final = ".gitlab-ci.yml"
 
 # Connection-kind preference order — same shape as #387 so a single
 # active connection drives both the dispatch and the push.
@@ -56,6 +54,10 @@ _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
         "github_app_install",
         "github_oauth_user",
         "github_pat",
+    ),
+    "gitlab": (
+        "gitlab_oauth_user",
+        "gitlab_pat",
     ),
 }
 
@@ -157,6 +159,73 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
         return values[name]
 
     return _VAR_RE.sub(_replace, template)
+
+
+def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
+    """Render the GitLab CI equivalent of the GitHub Actions template (#735).
+
+    Uses docker:24-dind to build and push to ECR. Static AWS credentials
+    are expected as ``ASTROLIFT_AWS_ACCESS_KEY_ID``,
+    ``ASTROLIFT_AWS_SECRET_ACCESS_KEY``, and ``ASTROLIFT_AWS_DEFAULT_REGION``
+    GitLab CI variables (set by the variables-push mutation, #531). OIDC is
+    not assumed here because GitLab runner OIDC with AWS requires additional
+    runner-level config the operator may not have.
+    """
+    api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+    ecr_uri = app.registry_repo_uri or ""
+    # ECR login endpoint is just the registry host, not the repo path.
+    ecr_registry = ecr_uri.split("/")[0] if ecr_uri else ""
+    deploy_branch = (app.deploy_branch or "main").strip() or "main"
+    slug_literal = json.dumps(app.slug)
+    api_url_literal = json.dumps(api_url)
+    rules_line = f"    - if: '$CI_COMMIT_REF_NAME == \"{deploy_branch}\"'"
+    return (
+        "# Managed by Astrolift — do not edit by hand."
+        " Re-sync via Settings → CI setup → Sync workflow file.\n"
+        "stages:\n"
+        "  - build\n"
+        "  - deploy\n"
+        "\n"
+        "variables:\n"
+        f"  ASTROLIFT_IMAGE: \"{ecr_uri}:$CI_COMMIT_SHA\"\n"
+        "\n"
+        "build-image:\n"
+        "  stage: build\n"
+        "  image: docker:24-dind\n"
+        "  services:\n"
+        "    - docker:24-dind\n"
+        "  variables:\n"
+        "    DOCKER_TLS_CERTDIR: /certs\n"
+        "    AWS_ACCESS_KEY_ID: $ASTROLIFT_AWS_ACCESS_KEY_ID\n"
+        "    AWS_SECRET_ACCESS_KEY: $ASTROLIFT_AWS_SECRET_ACCESS_KEY\n"
+        "    AWS_DEFAULT_REGION: $ASTROLIFT_AWS_DEFAULT_REGION\n"
+        "  rules:\n"
+        f"{rules_line}\n"
+        "  script:\n"
+        "    - apk add --no-cache aws-cli\n"
+        f"    - aws ecr get-login-password | docker login --username AWS --password-stdin \"{ecr_registry}\"\n"
+        "    - docker build -t \"$ASTROLIFT_IMAGE\" .\n"
+        "    - docker push \"$ASTROLIFT_IMAGE\"\n"
+        "\n"
+        "notify-astrolift:\n"
+        "  stage: deploy\n"
+        "  image: ubuntu:24.04\n"
+        "  needs: [build-image]\n"
+        "  variables:\n"
+        f"    ASTROLIFT_API_URL: {api_url_literal}\n"
+        f"    ASTROLIFT_APP_SLUG: {slug_literal}\n"
+        "  rules:\n"
+        f"{rules_line}\n"
+        "  script:\n"
+        "    - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
+        "    - |\n"
+        "      curl --fail-with-body -sS -X POST \"$ASTROLIFT_API_URL/api/v1/deploys\" \\\n"
+        "        -H \"Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN\" \\\n"
+        "        -H \"Content-Type: application/json\" \\\n"
+        "        -d \"{\\\"appSlug\\\":\\\"$ASTROLIFT_APP_SLUG\\\","
+        "\\\"image\\\":\\\"$ASTROLIFT_IMAGE\\\","
+        "\\\"commitSha\\\":\\\"$CI_COMMIT_SHA\\\"}\"\n"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -438,12 +507,98 @@ def _github_find_existing_pr(
 
 
 def _side_branch_for(app_slug: str) -> str:
-    """Deterministic side branch when the deploy branch is protected.
-
-    Same slug on every run → reopening the workflow PR after a no-op
-    edit on the same operator reuses the existing PR instead of
-    fanning out review noise."""
+    """Deterministic side branch when the deploy branch is protected."""
     return f"astrolift/ci-workflow-{app_slug}"
+
+
+# ---------------------------------------------------------------------------
+# GitLab-specific helpers (#735)
+# ---------------------------------------------------------------------------
+
+
+def _is_gitlab_branch_protected(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    branch: str,
+) -> bool:
+    """GET /projects/{id}/protected_branches/{branch}.
+
+    200 → protected; 404 → not protected; auth/network errors → treat
+    as not protected so the write path runs and surfaces any real error.
+    """
+    token = _gitlab_token(connection)
+    base = _gitlab_api_base(connection)
+    project = urllib.parse.quote(repo_full_name, safe="")
+    branch_q = urllib.parse.quote(branch, safe="")
+    url = f"{base}/api/v4/projects/{project}/protected_branches/{branch_q}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            _ = resp.read()
+            return True
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        return False
+    except urllib.error.URLError:
+        return False
+
+
+def _gitlab_create_branch(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    new_branch: str,
+    from_branch: str,
+) -> None:
+    """POST /projects/{id}/repository/branches.
+
+    Idempotent on 400 "Branch already exists".
+    """
+    token = _gitlab_token(connection)
+    base = _gitlab_api_base(connection)
+    project = urllib.parse.quote(repo_full_name, safe="")
+    url = f"{base}/api/v4/projects/{project}/repository/branches"
+    body = json.dumps({"branch": new_branch, "ref": from_branch}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            _ = resp.read()
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:200]
+        except Exception:
+            pass
+        already = exc.code in (409, 422) or (
+            exc.code == 400 and "already exists" in body_text.lower()
+        )
+        if already:
+            return
+        raise GitlabProviderError(
+            "API_ERROR",
+            f"couldn't create branch {new_branch!r}: {exc.code} {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"couldn't reach GitLab: {exc.reason}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -467,17 +622,18 @@ def sync_workflow_file_to_repo(
             "NO_SOURCE_REPO",
             "app has no source repo configured; cannot push the CI workflow",
         )
-    if app.source_kind in {"gitlab", "bitbucket", "gitea", "git_url"}:
-        raise NotImplementedError(
-            "Pushing the Astrolift CI workflow is GitHub-only for now; "
-            "see the inline reference YAML in Settings → CI setup for non-GitHub hosts."
-        )
-    if app.source_kind != "github":
-        raise WorkflowSyncError(
-            "UNSUPPORTED_SOURCE",
-            f"unsupported source_kind {app.source_kind!r} for workflow push",
-        )
+    if app.source_kind == "github":
+        return _sync_github(app)
+    if app.source_kind == "gitlab":
+        return _sync_gitlab(app)
+    raise WorkflowSyncError(
+        "UNSUPPORTED_SOURCE",
+        f"CI workflow push is not yet supported for source_kind={app.source_kind!r}; "
+        "supported hosts: github, gitlab.",
+    )
 
+
+def _sync_github(app: RegisteredApp) -> WorkflowSyncResult:
     connection = _pick_source_connection(app)
     if connection is None:
         raise WorkflowSyncError(
@@ -490,7 +646,6 @@ def sync_workflow_file_to_repo(
     rendered_size = len(rendered.encode("utf-8"))
     deploy_branch = (app.deploy_branch or "main").strip() or "main"
 
-    # 1. Read existing file. None → create path; equal → no-op.
     try:
         existing = fetch_file(
             connection,
@@ -506,14 +661,8 @@ def sync_workflow_file_to_repo(
         )
 
     if existing is not None and existing == rendered:
-        return WorkflowSyncResult(
-            status="in_sync",
-            rendered_size=rendered_size,
-        )
+        return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
 
-    # 2. Protection probe — only on the update / create path, where
-    # we're actually about to write. Read-only branches will land here
-    # rather than auth-error on the write.
     protected = _is_github_branch_protected(
         connection,
         repo_full_name=app.source_repo,
@@ -527,8 +676,6 @@ def sync_workflow_file_to_repo(
     )
 
     if protected:
-        # PR path: branch from the deploy branch's head, write the
-        # file there, open a PR back into the deploy branch.
         side_branch = _side_branch_for(app.slug)
         try:
             head_sha = _github_get_branch_sha(
@@ -576,18 +723,132 @@ def sync_workflow_file_to_repo(
                 rendered_size=rendered_size,
                 error=f"{exc.code}: {exc.message}",
             )
-        return WorkflowSyncResult(
-            status="pr_opened",
-            pr_url=pr_url,
-            rendered_size=rendered_size,
-        )
+        return WorkflowSyncResult(status="pr_opened", pr_url=pr_url, rendered_size=rendered_size)
 
-    # 3. Direct write path.
     try:
         put_result = put_file(
             connection,
             repo_full_name=app.source_repo,
             path=WORKFLOW_PATH,
+            branch=deploy_branch,
+            content=rendered,
+            commit_message=commit_message,
+        )
+    except ProviderError as exc:
+        return WorkflowSyncResult(
+            status="fetch_failed",
+            rendered_size=rendered_size,
+            error=f"{exc.code}: {exc.message}",
+        )
+
+    return WorkflowSyncResult(
+        status="created" if existing is None else "updated",
+        commit_sha=put_result.commit_sha,
+        rendered_size=rendered_size,
+    )
+
+
+def _sync_gitlab(app: RegisteredApp) -> WorkflowSyncResult:
+    """GitLab equivalent of ``_sync_github`` (#735).
+
+    Probes ``/protected_branches`` instead of GitHub's branch-protection
+    endpoint; opens an MR (via the providers layer) instead of a PR.
+    """
+    connection = _pick_source_connection(app)
+    if connection is None:
+        raise WorkflowSyncError(
+            "NO_CONNECTION",
+            "no active source connection for this app's org. "
+            "Connect a GitLab identity under Settings → Source connections, then retry.",
+        )
+
+    rendered = render_astrolift_gitlab_ci_workflow(app)
+    rendered_size = len(rendered.encode("utf-8"))
+    deploy_branch = (app.deploy_branch or "main").strip() or "main"
+
+    try:
+        existing = fetch_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=GITLAB_WORKFLOW_PATH,
+            ref=deploy_branch,
+        )
+    except ProviderError as exc:
+        return WorkflowSyncResult(
+            status="fetch_failed",
+            rendered_size=rendered_size,
+            error=f"{exc.code}: {exc.message}",
+        )
+
+    if existing is not None and existing == rendered:
+        return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
+
+    protected = _is_gitlab_branch_protected(
+        connection,
+        repo_full_name=app.source_repo,
+        branch=deploy_branch,
+    )
+
+    commit_message = (
+        f"chore(astrolift): sync CI workflow for {app.slug}"
+        if existing is None
+        else f"chore(astrolift): update CI workflow for {app.slug}"
+    )
+
+    if protected:
+        side_branch = _side_branch_for(app.slug)
+        try:
+            _gitlab_create_branch(
+                connection,
+                repo_full_name=app.source_repo,
+                new_branch=side_branch,
+                from_branch=deploy_branch,
+            )
+            put_file(
+                connection,
+                repo_full_name=app.source_repo,
+                path=GITLAB_WORKFLOW_PATH,
+                branch=side_branch,
+                content=rendered,
+                commit_message=commit_message,
+            )
+            mr_result = open_pull_request(
+                connection,
+                repo_full_name=app.source_repo,
+                head_branch=side_branch,
+                base_branch=deploy_branch,
+                title=f"Astrolift: sync CI workflow for {app.slug}",
+                body=(
+                    "This MR was opened by Astrolift to keep "
+                    f"`{GITLAB_WORKFLOW_PATH}` in sync with the platform's "
+                    f"current settings for **{app.slug}**.\n\n"
+                    "Merge to enable platform-driven deploys against "
+                    f"`{deploy_branch}`."
+                ),
+            )
+        except GitlabProviderError as exc:
+            return WorkflowSyncResult(
+                status="fetch_failed",
+                rendered_size=rendered_size,
+                error=f"{exc.code}: {exc.message}",
+            )
+        except ProviderError as exc:
+            return WorkflowSyncResult(
+                status="fetch_failed",
+                rendered_size=rendered_size,
+                error=f"{exc.code}: {exc.message}",
+            )
+        return WorkflowSyncResult(
+            status="pr_opened",
+            pr_url=mr_result.url,
+            rendered_size=rendered_size,
+        )
+
+    try:
+        put_result = put_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=GITLAB_WORKFLOW_PATH,
             branch=deploy_branch,
             content=rendered,
             commit_message=commit_message,

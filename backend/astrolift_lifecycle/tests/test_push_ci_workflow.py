@@ -1,18 +1,21 @@
-"""Tests for ``pushAstroliftCiWorkflowToRepo`` (#384).
+"""Tests for ``pushAstroliftCiWorkflowToRepo`` (#384, #735).
 
 End-to-end coverage of the mutation surface: every host HTTP call
-(fetch existing file, branch-protection probe, PUT contents, PR
+(fetch existing file, branch-protection probe, PUT contents, PR/MR
 create) is stubbed at ``urllib.request.urlopen``; everything above
 the wire (connection picker, template rendering, status discrimination,
 permission gate, error mapping) runs against real Postgres rows.
 
 Matrix:
-  * file-missing → ``created`` with commit_sha
-  * file diverged → ``updated`` with commit_sha
-  * file matches → ``in_sync`` (no PUT issued)
-  * protected branch → ``pr_opened`` with pr_url (PR path exercised end-to-end)
+  * GitHub: file-missing → ``created`` with commit_sha
+  * GitHub: file diverged → ``updated`` with commit_sha
+  * GitHub: file matches → ``in_sync`` (no PUT issued)
+  * GitHub: protected branch → ``pr_opened`` with pr_url
+  * GitLab: file-missing → ``created`` with commit_sha
+  * GitLab: protected branch → ``pr_opened`` (MR) with pr_url
+  * GitLab: rendered template substitutes all variables
   * no connection in org → PRECONDITION
-  * GitLab-sourced app → PRECONDITION (NotImplementedError surfaces clean)
+  * unsupported host → PRECONDITION (WorkflowSyncError)
   * permission denied → PERMISSION_DENIED, no network touched
 """
 
@@ -30,7 +33,10 @@ from astrolift_lifecycle.schema.mutations import (
     PushCiWorkflowToRepoInput,
 )
 from astrolift_scm.models import SourceConnection
-from astrolift_scm.services.workflow_sync import render_astrolift_ci_workflow
+from astrolift_scm.services.workflow_sync import (
+    render_astrolift_ci_workflow,
+    render_astrolift_gitlab_ci_workflow,
+)
 from core.permissions import Permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import TenantContext, tenant_context
@@ -110,6 +116,44 @@ def github_connection(org):
     )
 
 
+@pytest.fixture
+def app_with_gitlab_repo(app):
+    """GitLab-sourced variant of app_with_repo."""
+    app.source_kind = "gitlab"
+    app.source_repo = "acme/api"
+    app.default_branch = "main"
+    app.deploy_branch = "main"
+    app.registry_repo_uri = "111111111111.dkr.ecr.us-west-2.amazonaws.com/acme/api"
+    app.push_role_ref = ""
+    app.save(
+        update_fields=[
+            "source_kind",
+            "source_repo",
+            "default_branch",
+            "deploy_branch",
+            "registry_repo_uri",
+            "push_role_ref",
+            "updated_at",
+            "version",
+        ]
+    )
+    return app
+
+
+@pytest.fixture
+def gitlab_connection(org):
+    encrypted = encrypt_at_rest(b"glat-test-token-never-hits-the-network")
+    return SourceConnection.objects.create(
+        organization=org,
+        kind=SourceConnection.Kind.GITLAB_OAUTH_USER,
+        display_name="GitLab: org",
+        account_login="org",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
+
+
 class _Router:
     """Records every urlopen call and dispatches to a per-route handler.
 
@@ -123,7 +167,7 @@ class _Router:
         self.calls: list[tuple[str, str]] = []  # (method, url)
         self.bodies: list[bytes | None] = []
 
-    def install(self, monkeypatch, handler):
+    def install(self, monkeypatch, handler, *, host: str = "github"):
         def fake(req, timeout=15):
             self.calls.append((req.get_method(), req.full_url))
             self.bodies.append(req.data)
@@ -132,17 +176,20 @@ class _Router:
                 raise value
             return _Response(body=value if isinstance(value, (bytes, bytearray)) else b"")
 
-        # workflow_sync uses urlopen via its module-level import.
         monkeypatch.setattr(
             "astrolift_scm.services.workflow_sync.urllib.request.urlopen",
             fake,
         )
-        # Provider-side PUT / GET (for fetch_file, put_file) goes through
-        # the github provider; patch its urlopen too.
-        monkeypatch.setattr(
-            "astrolift_scm.providers.github.urllib.request.urlopen",
-            fake,
-        )
+        if host == "github":
+            monkeypatch.setattr(
+                "astrolift_scm.providers.github.urllib.request.urlopen",
+                fake,
+            )
+        else:
+            monkeypatch.setattr(
+                "astrolift_scm.providers.gitlab.urllib.request.urlopen",
+                fake,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -407,15 +454,16 @@ def test_no_source_connection_returns_precondition(
     assert "connection" in result.errors[0].message.lower()
 
 
-def test_gitlab_source_returns_precondition(
+def test_unsupported_source_returns_precondition(
     monkeypatch,
     permission_resolver,
     org,
     app_with_repo,
     github_connection,
 ):
+    """Bitbucket / Gitea / other unsupported sources surface PRECONDITION."""
     permission_resolver.grant(Permission.APP_UPDATE)
-    app_with_repo.source_kind = "gitlab"
+    app_with_repo.source_kind = "bitbucket"
     app_with_repo.save(update_fields=["source_kind", "updated_at", "version"])
 
     with _ctx(org):
@@ -426,7 +474,6 @@ def test_gitlab_source_returns_precondition(
 
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    assert "github" in result.errors[0].message.lower()
 
 
 def test_permission_denied_without_app_update(
@@ -523,3 +570,149 @@ def test_render_substitutes_all_variables(settings, app_with_repo):
     assert "${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}" in rendered
     # Header marker so downstream operators don't hand-edit.
     assert "Managed by Astrolift" in rendered
+
+
+# ---------------------------------------------------------------------------
+# GitLab CI renderer + sync (#735)
+# ---------------------------------------------------------------------------
+
+
+def test_render_gitlab_substitutes_all_variables(settings, app_with_gitlab_repo):
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com/"
+    rendered = render_astrolift_gitlab_ci_workflow(app_with_gitlab_repo)
+    assert "Managed by Astrolift" in rendered
+    assert app_with_gitlab_repo.slug in rendered
+    assert "111111111111.dkr.ecr.us-west-2.amazonaws.com/acme/api" in rendered
+    assert "111111111111.dkr.ecr.us-west-2.amazonaws.com" in rendered
+    assert "api.astrolift.example.com" in rendered
+    assert "docker:24-dind" in rendered
+    assert "$CI_COMMIT_SHA" in rendered
+    assert "$ASTROLIFT_DEPLOY_TOKEN" in rendered
+    assert "$ASTROLIFT_AWS_ACCESS_KEY_ID" in rendered
+    assert ".gitlab-ci.yml" not in rendered  # path not embedded in the YAML body
+
+
+def test_gitlab_creates_workflow_file_when_missing(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_gitlab_repo,
+    gitlab_connection,
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    router = _Router()
+
+    def handler(req):
+        method = req.get_method()
+        url = req.full_url
+        # fetch_file: HEAD check for file → 404 (missing)
+        if method == "HEAD" and ".gitlab-ci.yml" in url and "raw" not in url:
+            return "error", _http_error(404, b"", url)
+        # fetch_gitlab_file (raw): 404 → file missing
+        if method == "GET" and "repository/files" in url and "raw" in url:
+            return "error", _http_error(404, b"", url)
+        # _is_gitlab_branch_protected: 404 → not protected
+        if method == "GET" and "protected_branches" in url:
+            return "error", _http_error(404, b"", url)
+        # PUT HEAD: file doesn't exist yet on target branch
+        if method == "HEAD" and ".gitlab-ci.yml" in url:
+            return "error", _http_error(404, b"", url)
+        # POST (create file)
+        if method == "POST" and "repository/files" in url:
+            return "response", json.dumps({"file_path": ".gitlab-ci.yml", "branch": "main"}).encode()
+        # GET branch head for commit SHA
+        if method == "GET" and "repository/branches/main" in url:
+            return "response", json.dumps({"commit": {"id": "cafe1234abcd"}}).encode()
+        raise AssertionError(f"unexpected request {method} {url}")
+
+    router.install(monkeypatch, handler, host="gitlab")
+
+    with _ctx(org):
+        result = LifecycleMutation().push_astrolift_ci_workflow_to_repo(
+            _info(),
+            input=PushCiWorkflowToRepoInput(app_slug=app_with_gitlab_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == "created"
+    assert result.data.commit_sha == "cafe1234abcd"
+    assert result.data.pr_url is None
+
+
+def test_gitlab_protected_branch_opens_mr(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_gitlab_repo,
+    gitlab_connection,
+):
+    permission_resolver.grant(Permission.APP_UPDATE)
+    router = _Router()
+
+    def handler(req):
+        method = req.get_method()
+        url = req.full_url
+        # fetch_gitlab_file (raw): 404 → file missing
+        if method == "GET" and "repository/files" in url and "raw" in url:
+            return "error", _http_error(404, b"", url)
+        # _is_gitlab_branch_protected: 200 → protected
+        if method == "GET" and "protected_branches" in url:
+            return "response", json.dumps({"name": "main"}).encode()
+        # _gitlab_create_branch
+        if method == "POST" and "repository/branches" in url:
+            return "response", json.dumps({"name": "astrolift/ci-workflow-hello-app"}).encode()
+        # HEAD file on side branch: missing → POST
+        if method == "HEAD" and "repository/files" in url:
+            return "error", _http_error(404, b"", url)
+        # POST create file on side branch
+        if method == "POST" and "repository/files" in url:
+            return "response", json.dumps({"file_path": ".gitlab-ci.yml", "branch": "astrolift/ci-workflow-hello-app"}).encode()
+        # GET branch head SHA (for put_file's follow-up SHA fetch)
+        if method == "GET" and "repository/branches" in url:
+            return "response", json.dumps({"commit": {"id": "sidesha999"}}).encode()
+        # POST merge_requests (open MR)
+        if method == "POST" and "merge_requests" in url:
+            payload = json.loads(req.data.decode("utf-8"))
+            assert payload["target_branch"] == "main"
+            assert "astrolift/ci-workflow-" in payload["source_branch"]
+            return "response", json.dumps({"web_url": "https://gitlab.com/acme/api/-/merge_requests/7", "iid": 7}).encode()
+        raise AssertionError(f"unexpected request {method} {url}")
+
+    router.install(monkeypatch, handler, host="gitlab")
+
+    with _ctx(org):
+        result = LifecycleMutation().push_astrolift_ci_workflow_to_repo(
+            _info(),
+            input=PushCiWorkflowToRepoInput(app_slug=app_with_gitlab_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == "pr_opened"
+    assert result.data.pr_url == "https://gitlab.com/acme/api/-/merge_requests/7"
+    assert result.data.commit_sha is None
+
+
+def test_gitlab_no_connection_returns_precondition(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_gitlab_repo,
+):
+    """No GitLab connection in org → PRECONDITION (no network hit)."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    def boom(*a, **kw):
+        raise AssertionError("must not hit the network without a connection")
+
+    monkeypatch.setattr("astrolift_scm.services.workflow_sync.urllib.request.urlopen", boom)
+    monkeypatch.setattr("astrolift_scm.providers.gitlab.urllib.request.urlopen", boom)
+
+    with _ctx(org):
+        result = LifecycleMutation().push_astrolift_ci_workflow_to_repo(
+            _info(),
+            input=PushCiWorkflowToRepoInput(app_slug=app_with_gitlab_repo.slug),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert "connection" in result.errors[0].message.lower()
