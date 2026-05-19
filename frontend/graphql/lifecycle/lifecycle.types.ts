@@ -55,6 +55,31 @@ export type PreviewStatus = "building" | "running" | "failed" | "torn_down";
 
 export type AstroliftAppEnvironment = GeneratedAppEnvironment;
 
+// #738 — release notes between consecutive deployments.
+export interface AstroliftReleaseNotesCommit {
+  sha: string;
+  subject: string;
+  author: string;
+  isMerge: boolean;
+}
+
+export interface AstroliftReleaseNotesPR {
+  number: number;
+  title: string;
+  body: string;
+  author: string;
+  mergedAt: string | null;
+  prUrl: string;
+}
+
+export interface AstroliftReleaseNotes {
+  baseSha: string;
+  headSha: string;
+  compareUrl: string;
+  commits: AstroliftReleaseNotesCommit[];
+  pullRequests: AstroliftReleaseNotesPR[];
+}
+
 // #419 — approval decision-context fields are added to the backend
 // `AstroliftDeployment` type in the same commit; this facade pre-
 // declares them so the FE typechecks before `make codegen` has been

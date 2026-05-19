@@ -158,6 +158,11 @@ export const GET_APP = gql`
         members
         observability
       }
+      retentionPolicies {
+        id
+        signal
+        retentionDays
+      }
     }
   }
 `;

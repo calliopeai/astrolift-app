@@ -27,6 +27,7 @@ import {
   GET_DEPLOYMENT,
   GET_DEPLOYMENT_APPROVAL_HISTORY,
   GET_DEPLOYMENT_LOG,
+  GET_DEPLOYMENT_RELEASE_NOTES,
 } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
@@ -34,6 +35,7 @@ import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subsc
 import type {
   AstroliftDeployment,
   AstroliftDeploymentLogEntry,
+  AstroliftReleaseNotes,
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -155,6 +157,17 @@ export function DeploymentDetailClient({ id }: { id: string }) {
     skip: !deployment,
     fetchPolicy: "cache-and-network",
   });
+
+  // #738 — release notes: diff between prev-successful deploy SHA and
+  // this deploy's SHA. Fetched lazily after the deployment row lands.
+  const releaseNotesQuery = useQuery<{
+    astroliftDeploymentReleaseNotes: AstroliftReleaseNotes | null;
+  }>(GET_DEPLOYMENT_RELEASE_NOTES, {
+    variables: { deploymentId: id },
+    skip: !deployment,
+    fetchPolicy: "cache-and-network",
+  });
+  const releaseNotes = releaseNotesQuery.data?.astroliftDeploymentReleaseNotes ?? null;
 
   // Live push: any lifecycle event triggers both refetches when the
   // event is for this deployment. Unrelated org events don't churn
@@ -421,25 +434,85 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      {/* #657 — commit message as an inline changelog. Minimum cut:
-          renders this deploy's commit message in a collapsible
-          expander.  Full PR-range-between-deploys notes track in
-          backend issue #738 (will populate \`releaseNotes\` field). */}
-      {d.commitMessage && (
+      {/* #657 / #738 — Release notes block. When the backend resolver
+          returns content (PR descriptions + commit subjects between the
+          previous successful deploy and this one), we render the full
+          structured block; otherwise fall back to the raw commit message
+          expander so the card is always non-empty when there's text. */}
+      {(releaseNotes || d.commitMessage) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Release notes</CardTitle>
           </CardHeader>
-          <CardContent>
-            <details className="text-sm">
-              <summary className="text-muted-foreground cursor-pointer text-xs">
-                {d.commitMessage.split("\n")[0].slice(0, 120)}
-                {d.commitMessage.length > 120 && "…"}
-              </summary>
-              <pre className="bg-muted mt-2 max-h-64 overflow-auto rounded p-3 font-mono text-xs whitespace-pre-wrap">
-                {d.commitMessage}
-              </pre>
-            </details>
+          <CardContent className="text-sm space-y-3">
+            {releaseNotes ? (
+              <>
+                {releaseNotes.pullRequests.length > 0 && (
+                  <ul className="space-y-2">
+                    {releaseNotes.pullRequests.map((pr) => (
+                      <li key={pr.number} className="border-l-2 border-muted pl-3">
+                        <span className="font-medium">{pr.title}</span>
+                        {pr.prUrl && (
+                          <a
+                            href={pr.prUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-muted-foreground ml-2 text-xs hover:underline"
+                          >
+                            #{pr.number}
+                          </a>
+                        )}
+                        {pr.body && (
+                          <p className="text-muted-foreground mt-1 text-xs whitespace-pre-wrap">
+                            {pr.body.slice(0, 400)}
+                            {pr.body.length > 400 && "…"}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {releaseNotes.commits.filter((c) => !c.isMerge).length > 0 && (
+                  <details>
+                    <summary className="text-muted-foreground cursor-pointer text-xs">
+                      {releaseNotes.commits.filter((c) => !c.isMerge).length} commits
+                    </summary>
+                    <ul className="mt-2 space-y-1">
+                      {releaseNotes.commits
+                        .filter((c) => !c.isMerge)
+                        .map((c) => (
+                          <li key={c.sha} className="text-muted-foreground font-mono text-xs">
+                            <span className="text-foreground">{c.sha.slice(0, 7)}</span>{" "}
+                            {c.subject}
+                          </li>
+                        ))}
+                    </ul>
+                  </details>
+                )}
+                {releaseNotes.compareUrl && (
+                  <a
+                    href={releaseNotes.compareUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground text-xs hover:underline"
+                  >
+                    View full diff →
+                  </a>
+                )}
+              </>
+            ) : (
+              d.commitMessage && (
+                <details>
+                  <summary className="text-muted-foreground cursor-pointer text-xs">
+                    {d.commitMessage.split("\n")[0].slice(0, 120)}
+                    {d.commitMessage.length > 120 && "…"}
+                  </summary>
+                  <pre className="bg-muted mt-2 max-h-64 overflow-auto rounded p-3 font-mono text-xs whitespace-pre-wrap">
+                    {d.commitMessage}
+                  </pre>
+                </details>
+              )
+            )}
           </CardContent>
         </Card>
       )}

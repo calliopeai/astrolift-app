@@ -119,6 +119,30 @@ export const GET_DEPLOYMENT = gql`
   }
 `;
 
+export const GET_DEPLOYMENT_RELEASE_NOTES = gql`
+  query GetDeploymentReleaseNotes($deploymentId: String!) {
+    astroliftDeploymentReleaseNotes(deploymentId: $deploymentId) {
+      baseSha
+      headSha
+      compareUrl
+      commits {
+        sha
+        subject
+        author
+        isMerge
+      }
+      pullRequests {
+        number
+        title
+        body
+        author
+        mergedAt
+        prUrl
+      }
+    }
+  }
+`;
+
 export const GET_DEPLOYMENT_APPROVAL_HISTORY = gql`
   query GetDeploymentApprovalHistory($deploymentId: String!) {
     astroliftDeploymentApprovalHistory(deploymentId: $deploymentId) {

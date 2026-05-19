@@ -37,6 +37,7 @@ from astrolift_lifecycle.schema.types import (
     DeregisterPreviewType,
     ForceRedeployPreviewType,
     PreviewEnvironmentType,
+    ReleaseNotesType,
     ScheduledJobRunType,
     WorkloadPodStatusBucketType,
     WorkloadPodSummaryType,
@@ -51,6 +52,7 @@ from astrolift_lifecycle.schema.types import (
     identity_binding_to_type,
     pod_info_to_type,
     preview_to_type,
+    release_notes_to_type,
     scheduled_job_run_to_type,
 )
 from astrolift_registry.models import RegisteredApp
@@ -406,6 +408,65 @@ class LifecycleQuery:
                 )
             )
         return out
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_deployment_release_notes(
+        self, info: Info, deployment_id: str
+    ) -> ReleaseNotesType | None:
+        """Merged-PR descriptions + non-merge commit subjects between the
+        previous-successful deploy's SHA and this deploy's SHA (#738).
+
+        Returns None when:
+        - the deployment has no commit_sha
+        - there is no prior successful deployment to diff against
+        - the app has no usable source connection
+        - the SCM call fails (logged; caller falls back to commitMessage)
+        """
+        deployment = (
+            Deployment.objects.select_related(
+                "registered_app",
+                "registered_app__organization",
+                "app_environment",
+            )
+            .filter(guid=deployment_id, deleted_at__isnull=True)
+            .first()
+        )
+        if deployment is None or not deployment.commit_sha:
+            return None
+
+        head_sha = deployment.commit_sha
+        app = deployment.registered_app
+        env = deployment.app_environment
+
+        prior = (
+            Deployment.objects.filter(
+                registered_app=app,
+                app_environment=env,
+                status=Deployment.Status.RUNNING,
+                commit_sha__gt="",
+                succeeded_at__lt=deployment.created_at,
+                deleted_at__isnull=True,
+            )
+            .exclude(guid=deployment.guid)
+            .order_by("-succeeded_at")
+            .values_list("commit_sha", flat=True)
+            .first()
+        )
+        if not prior:
+            return None
+        base_sha = prior
+
+        from astrolift_registry.services.manifest_sync import _pick_source_connection
+        from astrolift_scm.providers.release_notes import fetch_release_notes
+
+        connection = _pick_source_connection(app)
+        if connection is None:
+            return None
+
+        rn = fetch_release_notes(connection, app=app, base_sha=base_sha, head_sha=head_sha)
+        return release_notes_to_type(rn) if rn else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)

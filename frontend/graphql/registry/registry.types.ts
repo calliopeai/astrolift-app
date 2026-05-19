@@ -13,8 +13,14 @@ import type {
   AstroliftAppTeamAccess as GeneratedAppTeamAccess,
   AstroliftContainer as GeneratedContainer,
   AstroliftRegisteredApp as GeneratedRegisteredApp,
+  AstroliftRetentionPolicy as GeneratedRetentionPolicy,
   AstroliftWorkload as GeneratedWorkload,
 } from "@/graphql/__generated__/schema";
+
+export type AstroliftRetentionPolicy = Pick<
+  GeneratedRetentionPolicy,
+  "id" | "signal" | "retentionDays"
+>;
 
 export type AstroliftGuid = string;
 

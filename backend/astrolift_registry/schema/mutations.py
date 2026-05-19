@@ -12,12 +12,14 @@ from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project, Team
 from astrolift_identity.step_up import requires_elevation
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
-from astrolift_registry.models import AppTeamAccess, RegisteredApp
+from astrolift_registry.models import AppTeamAccess, RegisteredApp, RetentionPolicy
 from astrolift_registry.schema.types import (
     AppTeamAccessType,
     RegisteredAppType,
+    RetentionPolicyType,
     app_team_access_to_type,
     app_to_type,
+    retention_policy_to_type,
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -604,6 +606,13 @@ class ResyncManifestPayload:
     managed_services_removed: list[str]
     env_keys_changed: int
     schedules_changed: int
+
+
+@strawberry.input
+class SetRetentionPolicyInput:
+    app_slug: str
+    signal: str
+    retention_days: int
 
 
 @strawberry.type
@@ -1809,3 +1818,56 @@ class RegistryMutation:
             ]
         )
         return gql_success(app_to_type(app))
+
+    @strawberry.mutation
+    @mutation_audit(action="app.retention_policy.set")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def set_retention_policy(
+        self, info: Info, input: SetRetentionPolicyInput
+    ) -> MutationResultType[RetentionPolicyType]:
+        tenant = get_current_tenant()
+        app = RegisteredApp.objects.filter(
+            organization_id=tenant.organization_id,
+            slug=input.app_slug,
+            deleted_at__isnull=True,
+        ).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+
+        valid_signals = {s.value for s in RetentionPolicy.Signal}
+        if input.signal not in valid_signals:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"signal must be one of: {', '.join(sorted(valid_signals))}",
+                field="signal",
+            )
+        if input.retention_days < 1:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "retentionDays must be at least 1",
+                field="retentionDays",
+            )
+
+        actor = info.context.request.user
+
+        existing = RetentionPolicy.objects.filter(
+            registered_app=app,
+            signal=input.signal,
+            deleted_at__isnull=True,
+        ).first()
+
+        if existing is not None:
+            existing.retention_days = input.retention_days
+            existing.updated_by = actor
+            existing.save(update_fields=["retention_days", "updated_by", "updated_at", "version"])
+            return gql_success(retention_policy_to_type(existing))
+
+        policy = RetentionPolicy.objects.create(
+            registered_app=app,
+            signal=input.signal,
+            retention_days=input.retention_days,
+            created_by=actor,
+            updated_by=actor,
+        )
+        return gql_success(retention_policy_to_type(policy))
