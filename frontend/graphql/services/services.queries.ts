@@ -235,3 +235,28 @@ export const GET_SECRET_CHANGE_PROPOSAL = gql`
     }
   }
 `;
+
+/**
+ * Per-key audit timeline for an app secret (#725). Reads the
+ * MutationAuditLog filtered by operation in {setAppSecret,
+ * deleteAppSecret, rotateAppSecret} and variables__input
+ * matching the app + key. Newest first, capped at 50.
+ *
+ * Powers the History popover on revealed-secret rows in the
+ * Secrets tab (#714 FE).
+ */
+export const GET_APP_SECRET_HISTORY = gql`
+  query GetAppSecretHistory($appSlug: String!, $key: String!) {
+    astroliftAppSecretHistory(appSlug: $appSlug, key: $key) {
+      timestamp
+      action
+      success
+      errorCode
+      sourceIp
+      actor {
+        id
+        username
+      }
+    }
+  }
+`;

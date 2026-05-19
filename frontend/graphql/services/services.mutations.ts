@@ -21,6 +21,33 @@ export const SET_APP_SECRET = gql`
   }
 `;
 
+/**
+ * Rotate an app secret — same shape + behavior as setAppSecret but
+ * emits action='app.secret.rotate' in the audit log so credential
+ * rotations are filterable from generic edits (#726). FE renders a
+ * Rotate button distinct from Edit on revealed-secret rows (#714).
+ */
+export const ROTATE_APP_SECRET = gql`
+  mutation RotateAppSecret($input: RotateAppSecretInput!) {
+    rotateAppSecret(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+        currentVersion
+        requestedVersion
+      }
+      data {
+        appSlug
+        key
+        rawManifestStaged
+        pendingProposalId
+      }
+    }
+  }
+`;
+
 export const DELETE_APP_SECRET = gql`
   mutation DeleteAppSecret($input: DeleteAppSecretInput!) {
     deleteAppSecret(input: $input) {
