@@ -552,6 +552,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
         <EmailDetailSheet
           managedServiceId={emailDetailTarget.id}
           serviceName={emailDetailTarget.name || emailDetailTarget.kind}
+          appSlug={slug}
           open={emailDetailTarget !== null}
           onOpenChange={(next) => {
             if (!next) setEmailDetailTarget(null);

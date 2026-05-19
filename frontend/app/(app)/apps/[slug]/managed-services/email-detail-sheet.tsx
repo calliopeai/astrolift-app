@@ -24,6 +24,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import {
 	AlertTriangleIcon,
 	CheckCircle2Icon,
+	CoinsIcon,
 	CopyIcon,
 	GaugeIcon,
 	HelpCircleIcon,
@@ -74,6 +75,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { GET_COST_BY_BINDING } from "@/graphql/billing/billing.queries";
+import type { AstroliftCostAttribution } from "@/graphql/billing/billing.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
 	ADD_EMAIL_SUPPRESSION_ENTRY,
@@ -89,6 +92,10 @@ import type {
 
 interface DetailResp {
 	astroliftEmailServiceDetail: AstroliftEmailServiceDetail | null;
+}
+
+interface CostByBindingResp {
+	astroliftCostByBinding: AstroliftCostAttribution;
 }
 
 interface AddResp {
@@ -136,9 +143,18 @@ function formatNumber(value: number, digits = 0): string {
 	});
 }
 
+function formatMoney(cents: number, currency: string): string {
+	return new Intl.NumberFormat(undefined, {
+		style: "currency",
+		currency,
+		maximumFractionDigits: 2,
+	}).format(cents / 100);
+}
+
 interface EmailDetailSheetProps {
 	managedServiceId: string;
 	serviceName: string;
+	appSlug: string;
 	open: boolean;
 	onOpenChange: (next: boolean) => void;
 }
@@ -146,6 +162,7 @@ interface EmailDetailSheetProps {
 export function EmailDetailSheet({
 	managedServiceId,
 	serviceName,
+	appSlug,
 	open,
 	onOpenChange,
 }: EmailDetailSheetProps) {
@@ -180,6 +197,11 @@ export function EmailDetailSheet({
 					<div className="space-y-6 p-1">
 						<ReputationPanel detail={detail} />
 						<QuotaPanel detail={detail} />
+						<CostPanel
+							managedServiceId={detail.managedServiceId}
+							appSlug={appSlug}
+							open={open}
+						/>
 						<IdentityPanel detail={detail} />
 						<DnsAuthPanel detail={detail} />
 						<SuppressionPanel
@@ -376,6 +398,102 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
 			</div>
 		</Card>
 	);
+}
+
+// ── Cost-per-period tile (#630) ────────────────────────────────────
+
+function CostPanel({
+	managedServiceId,
+	appSlug,
+	open,
+}: {
+	managedServiceId: string;
+	appSlug: string;
+	open: boolean;
+}) {
+	const mtdQuery = useQuery<CostByBindingResp>(GET_COST_BY_BINDING, {
+		variables: { window: "MTD", registeredAppSlug: appSlug },
+		skip: !open || !appSlug,
+		fetchPolicy: "cache-and-network",
+	});
+	const trailingQuery = useQuery<CostByBindingResp>(GET_COST_BY_BINDING, {
+		variables: { days: 30, registeredAppSlug: appSlug },
+		skip: !open || !appSlug,
+		fetchPolicy: "cache-and-network",
+	});
+
+	const mtdSum = React.useMemo(
+		() => sumForService(mtdQuery.data, managedServiceId),
+		[mtdQuery.data, managedServiceId],
+	);
+	const trailingSum = React.useMemo(
+		() => sumForService(trailingQuery.data, managedServiceId),
+		[trailingQuery.data, managedServiceId],
+	);
+
+	const currency =
+		mtdQuery.data?.astroliftCostByBinding?.currency ??
+		trailingQuery.data?.astroliftCostByBinding?.currency ??
+		"USD";
+
+	const loading = mtdQuery.loading || trailingQuery.loading;
+	const haveAny =
+		(mtdSum !== null && mtdSum > 0) ||
+		(trailingSum !== null && trailingSum > 0);
+
+	return (
+		<Card className="p-4">
+			<h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+				<CoinsIcon className="size-4" />
+				Cost
+			</h3>
+			{loading && !haveAny ? (
+				<div className="grid grid-cols-2 gap-4">
+					<Skeleton className="h-12 w-full" />
+					<Skeleton className="h-12 w-full" />
+				</div>
+			) : !haveAny && mtdSum === null && trailingSum === null ? (
+				<p className="text-muted-foreground text-xs">
+					No cost data attributed to this service yet. Costs appear after the
+					cost driver runs its next reconciliation pass.
+				</p>
+			) : (
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<p className="text-muted-foreground text-[11px] uppercase">
+							This month
+						</p>
+						<p className="font-mono text-lg tabular-nums">
+							{mtdSum === null ? "—" : formatMoney(mtdSum, currency)}
+						</p>
+						<p className="text-muted-foreground text-[10px]">Month-to-date</p>
+					</div>
+					<div>
+						<p className="text-muted-foreground text-[11px] uppercase">
+							Last 30 days
+						</p>
+						<p className="font-mono text-lg tabular-nums">
+							{trailingSum === null ? "—" : formatMoney(trailingSum, currency)}
+						</p>
+						<p className="text-muted-foreground text-[10px]">
+							Trailing 30-day spend
+						</p>
+					</div>
+				</div>
+			)}
+		</Card>
+	);
+}
+
+function sumForService(
+	data: CostByBindingResp | undefined,
+	managedServiceId: string,
+): number | null {
+	const rows = data?.astroliftCostByBinding?.attributedRows;
+	if (!rows) return null;
+	const matches = rows.filter((r) => r.managedServiceId === managedServiceId);
+	if (matches.length === 0) return 0;
+	return matches.reduce((sum, r) => sum + r.amountCents, 0);
 }
 
 // ── Identity verification badge (#634) ─────────────────────────────
