@@ -323,6 +323,7 @@ export type AstroliftAppDomain = {
   lastCertificateError: Scalars['String']['output'];
   lastCheckedAt?: Maybe<Scalars['DateTime']['output']>;
   lastValidationError: Scalars['String']['output'];
+  redirectRules: Array<AstroliftDomainRedirectRule>;
   registeredAppSlug: Scalars['String']['output'];
   requiredDnsRecords: Array<AstroliftAppDomainRequiredRecord>;
   txtChallengeToken: Scalars['String']['output'];
@@ -1173,6 +1174,16 @@ export type AstroliftDisconnectUserSourceProviderPayloadMutationResult = {
   data?: Maybe<AstroliftDisconnectUserSourceProviderPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftDomainRedirectRule = {
+  destinationUrl: Scalars['String']['output'];
+  httpStatus: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  preserveQueryString: Scalars['Boolean']['output'];
+  priority: Scalars['Int']['output'];
+  sourcePattern: Scalars['String']['output'];
 };
 
 export type AstroliftElevatePayload = {
@@ -2415,6 +2426,20 @@ export type AstroliftUser = {
   username: Scalars['String']['output'];
 };
 
+export type AstroliftUserAlertSubscription = {
+  alertKind: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  channel: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+};
+
+export type AstroliftUserAlertSubscriptionMutationResult = {
+  data?: Maybe<AstroliftUserAlertSubscription>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftValidateCiSecretsPayload = {
   repo: Scalars['String']['output'];
   results: Array<AstroliftCiSecretValidation>;
@@ -2722,6 +2747,10 @@ export type CancelDeregisterInput = {
   workflowId: Scalars['String']['input'];
 };
 
+export type ClearAlertSubscriptionInput = {
+  id: Scalars['GUID']['input'];
+};
+
 export type ClearEnvironmentSettingInput = {
   environmentId: Scalars['GUID']['input'];
   key: Scalars['String']['input'];
@@ -2959,6 +2988,15 @@ export type DisconnectSourceInput = {
 export type DisconnectUserSourceProviderInput = {
   confirmAccountLogin: Scalars['String']['input'];
   providerConfigId: Scalars['GUID']['input'];
+};
+
+export type DomainRedirectRuleInput = {
+  destinationUrl: Scalars['String']['input'];
+  httpStatus: Scalars['Int']['input'];
+  kind: Scalars['String']['input'];
+  preserveQueryString: Scalars['Boolean']['input'];
+  priority: Scalars['Int']['input'];
+  sourcePattern: Scalars['String']['input'];
 };
 
 export type ElevateAdminSessionInput = {
@@ -3301,6 +3339,7 @@ export type Mutation = {
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   cancelWorkflowInstance: MutationResult;
+  clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
@@ -3457,9 +3496,11 @@ export type Mutation = {
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
+  setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
+  setDomainRedirects: AstroliftAppDomainMutationResult;
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
@@ -3665,6 +3706,11 @@ export type MutationCancelAstroliftDeregisterArgs = {
 
 export type MutationCancelWorkflowInstanceArgs = {
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationClearAlertSubscriptionArgs = {
+  input: ClearAlertSubscriptionInput;
 };
 
 
@@ -4330,6 +4376,11 @@ export type MutationSetActiveIdentityProviderArgs = {
 };
 
 
+export type MutationSetAlertSubscriptionArgs = {
+  input: SetAlertSubscriptionInput;
+};
+
+
 export type MutationSetAppSecretArgs = {
   input: SetAppSecretInput;
 };
@@ -4342,6 +4393,11 @@ export type MutationSetAppSecretMetadataArgs = {
 
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
+};
+
+
+export type MutationSetDomainRedirectsArgs = {
+  input: SetDomainRedirectsInput;
 };
 
 
@@ -4907,6 +4963,7 @@ export type Query = {
   astroliftManagedServiceQueueDepth?: Maybe<AstroliftManagedServiceQueueDepth>;
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftMembers: Array<AstroliftMember>;
+  astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
   astroliftMyConnectedAccounts: Array<AstroliftMyConnectedAccount>;
@@ -5322,6 +5379,11 @@ export type QueryAstroliftManagedServicesArgs = {
 
 export type QueryAstroliftMembersArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMyAlertSubscriptionsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -5842,6 +5904,13 @@ export type SetActiveIdentityProviderInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type SetAlertSubscriptionInput = {
+  alertKind: Scalars['String']['input'];
+  appSlug: Scalars['String']['input'];
+  channel: Scalars['String']['input'];
+  enabled: Scalars['Boolean']['input'];
+};
+
 export type SetAppSecretInput = {
   appSlug: Scalars['String']['input'];
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
@@ -5862,6 +5931,11 @@ export type SetAppSecretMetadataInput = {
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
+};
+
+export type SetDomainRedirectsInput = {
+  domainId: Scalars['GUID']['input'];
+  rules: Array<DomainRedirectRuleInput>;
 };
 
 export type SetEnvironmentSettingInput = {

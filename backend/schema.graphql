@@ -304,6 +304,7 @@ type AstroliftAppDomain {
   certExpiresAt: DateTime
   certIssuerSerial: String!
   certObservabilityStatus: String!
+  redirectRules: [AstroliftDomainRedirectRule!]!
 }
 
 type AstroliftAppDomainMutationResult {
@@ -1152,6 +1153,16 @@ type AstroliftDisconnectUserSourceProviderPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftDisconnectUserSourceProviderPayload
+}
+
+type AstroliftDomainRedirectRule {
+  id: GUID!
+  kind: String!
+  sourcePattern: String!
+  destinationUrl: String!
+  httpStatus: Int!
+  preserveQueryString: Boolean!
+  priority: Int!
 }
 
 type AstroliftElevatePayload {
@@ -2394,6 +2405,20 @@ type AstroliftUser {
   isActive: Boolean!
 }
 
+type AstroliftUserAlertSubscription {
+  id: GUID!
+  appSlug: String!
+  alertKind: String!
+  channel: String!
+  enabled: Boolean!
+}
+
+type AstroliftUserAlertSubscriptionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftUserAlertSubscription
+}
+
 type AstroliftValidateCiSecretsPayload {
   repo: String!
   results: [AstroliftCiSecretValidation!]!
@@ -2701,6 +2726,10 @@ input CancelDeregisterInput {
   reason: String = null
 }
 
+input ClearAlertSubscriptionInput {
+  id: GUID!
+}
+
 input ClearEnvironmentSettingInput {
   environmentId: GUID!
   key: String!
@@ -2945,6 +2974,15 @@ input DisconnectSourceInput {
 input DisconnectUserSourceProviderInput {
   providerConfigId: GUID!
   confirmAccountLogin: String!
+}
+
+input DomainRedirectRuleInput {
+  kind: String!
+  sourcePattern: String! = ""
+  destinationUrl: String! = ""
+  httpStatus: Int! = 301
+  preserveQueryString: Boolean! = true
+  priority: Int! = 0
 }
 
 input ElevateAdminSessionInput {
@@ -3461,6 +3499,8 @@ type Mutation {
   unmuteAlertRule(input: UnmuteAlertRuleInput!): AstroliftAlertRuleMutationResult!
   exportAuditEvents(input: ExportAuditEventsInput!): AstroliftAuditExportMutationResult!
   exportAstroliftAppLogs(input: ExportAppLogsInput!): AstroliftAppLogExportMutationResult!
+  setAlertSubscription(input: SetAlertSubscriptionInput!): AstroliftUserAlertSubscriptionMutationResult!
+  clearAlertSubscription(input: ClearAlertSubscriptionInput!): AstroliftUserAlertSubscriptionMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
@@ -3494,6 +3534,7 @@ type Mutation {
   removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!
   recheckDomainValidation(input: RecheckDomainValidationInput!): AstroliftAppDomainMutationResult!
   uploadCustomDomainCertificate(input: UploadCustomDomainCertificateInput!): AstroliftAppDomainMutationResult!
+  setDomainRedirects(input: SetDomainRedirectsInput!): AstroliftAppDomainMutationResult!
   createDeployToken(input: CreateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
   rotateDeployToken(input: RotateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
   revokeDeployToken(input: RevokeDeployTokenInput!): DeploytokenrevokedpayloadMutationResult!
@@ -3842,6 +3883,7 @@ type Query {
   astroliftMyMobileDevices: [AstroliftDeviceRegistration!]!
   astroliftMyNotificationPreferences(channel: String = null): [AstroliftNotificationPreference!]!
   astroliftMyDevices: [AstroliftDeviceRegistration!]!
+  astroliftMyAlertSubscriptions(appSlug: String = null): [AstroliftUserAlertSubscription!]!
   astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
@@ -4174,6 +4216,13 @@ input SetActiveIdentityProviderInput {
   id: GUID!
 }
 
+input SetAlertSubscriptionInput {
+  appSlug: String!
+  alertKind: String!
+  channel: String!
+  enabled: Boolean!
+}
+
 input SetAppSecretInput {
   appSlug: String!
   key: String!
@@ -4194,6 +4243,11 @@ input SetAppSecretMetadataInput {
 input SetAppSubdomainInput {
   id: GUID!
   subdomain: String!
+}
+
+input SetDomainRedirectsInput {
+  domainId: GUID!
+  rules: [DomainRedirectRuleInput!]!
 }
 
 input SetEnvironmentSettingInput {
