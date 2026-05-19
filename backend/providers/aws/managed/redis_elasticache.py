@@ -35,6 +35,7 @@ import string
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -127,6 +128,12 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="redis_elasticache",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         rg_id = self._replication_group_id_for(spec=spec)
         cfg = spec.config or {}
@@ -231,6 +238,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="redis_elasticache")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, rg_id = parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -274,6 +282,12 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             message=f"replication group {rg_id} update queued",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="redis_elasticache",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -344,6 +358,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="redis_elasticache")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, rg_id = parse_handle(handle.handle)
         existing = self._describe(rg_id)
@@ -359,6 +374,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             message=f"elasticache reports {ec_state}",
         )
 
+    @driver_op(cloud="aws", driver="redis_elasticache")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, rg_id = parse_handle(handle.handle)
         existing = self._describe(rg_id)
@@ -415,6 +431,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="redis_elasticache")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -438,6 +455,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="redis_elasticache")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -467,6 +485,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="redis_elasticache", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -490,6 +509,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="redis_elasticache", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

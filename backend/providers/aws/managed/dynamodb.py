@@ -40,6 +40,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -119,6 +120,12 @@ class DynamoDBDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="kv_store_dynamodb",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         table_name = self._table_name_for(spec=spec)
         cfg = spec.config or {}
@@ -250,6 +257,7 @@ class DynamoDBDriver(ManagedServiceDriver):
             message=f"dynamodb table {table_name} provisioning",
         )
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, table_name = parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -339,6 +347,12 @@ class DynamoDBDriver(ManagedServiceDriver):
             message=f"dynamodb table {table_name} update queued",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="kv_store_dynamodb",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -421,6 +435,7 @@ class DynamoDBDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, table_name = parse_handle(handle.handle)
         existing = self._describe(table_name)
@@ -437,6 +452,7 @@ class DynamoDBDriver(ManagedServiceDriver):
             message=f"dynamodb reports {ddb_state}",
         )
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, table_name = parse_handle(handle.handle)
         existing = self._describe(table_name)
@@ -491,6 +507,7 @@ class DynamoDBDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -514,6 +531,7 @@ class DynamoDBDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -538,6 +556,7 @@ class DynamoDBDriver(ManagedServiceDriver):
             message=(f"dynamodb restore from {snapshot.snapshot_id} queued into {target_table}"),
         )
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -569,6 +588,7 @@ class DynamoDBDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="kv_store_dynamodb", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

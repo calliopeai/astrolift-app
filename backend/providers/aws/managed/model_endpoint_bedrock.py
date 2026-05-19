@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -140,6 +141,12 @@ class AmazonBedrockDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="model_endpoint_bedrock",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         record_id = self._record_id_for(spec=spec)
         cfg = spec.config or {}
@@ -210,6 +217,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, record_id = parse_handle(spec.handle)
         existing = self._describe(record_id)
@@ -256,6 +264,12 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="model_endpoint_bedrock",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -327,6 +341,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, record_id = parse_handle(handle.handle)
         existing = self._describe(record_id)
@@ -371,6 +386,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, record_id = parse_handle(handle.handle)
         existing = self._describe(record_id)
@@ -420,6 +436,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         # Foundation-model endpoints have no snapshot primitive --
         # state is the provisioned-throughput commitment + the
@@ -439,6 +456,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -457,6 +475,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -470,6 +489,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="model_endpoint_bedrock", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -79,6 +80,12 @@ class SQSDriver(ManagedServiceDriver):
 
     # ---- lifecycle ------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="queue_sqs",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         queue_name = self._queue_name_for(spec=spec)
         is_fifo = bool(
@@ -142,6 +149,7 @@ class SQSDriver(ManagedServiceDriver):
             message=f"queue {queue_name} provisioned at {queue_url}",
         )
 
+    @driver_op(cloud="aws", driver="queue_sqs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, queue_name = parse_handle(spec.handle)
         try:
@@ -186,6 +194,12 @@ class SQSDriver(ManagedServiceDriver):
             message=f"queue {queue_name} updated",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="queue_sqs",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -224,6 +238,7 @@ class SQSDriver(ManagedServiceDriver):
 
     # ---- read-only ops --------------------------------------------
 
+    @driver_op(cloud="aws", driver="queue_sqs")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, queue_name = parse_handle(handle.handle)
         try:
@@ -238,6 +253,7 @@ class SQSDriver(ManagedServiceDriver):
             message=f"queue {queue_name} reachable",
         )
 
+    @driver_op(cloud="aws", driver="queue_sqs")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, queue_name = parse_handle(handle.handle)
         # Construct the ARN deterministically — derivable from
@@ -286,6 +302,7 @@ class SQSDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="queue_sqs")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """SQS doesn't support snapshots — in-flight messages are
         ephemeral by definition. Per platform-side #87/#127 policy:
@@ -295,6 +312,7 @@ class SQSDriver(ManagedServiceDriver):
             "have no recovery value (per platform-side #87/#127)",
         )
 
+    @driver_op(cloud="aws", driver="queue_sqs")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -302,6 +320,7 @@ class SQSDriver(ManagedServiceDriver):
             "SQS does not support snapshots, hence no restore",
         )
 
+    @driver_op(cloud="aws", driver="queue_sqs", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -323,6 +342,7 @@ class SQSDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="queue_sqs", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(env_vars={
             "SQS_QUEUE_NAME": "Queue name",

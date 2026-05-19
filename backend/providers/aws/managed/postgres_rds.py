@@ -38,6 +38,7 @@ import string
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -150,6 +151,12 @@ class RDSPostgresDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="postgres_rds",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         instance_id = self._instance_id_for(spec=spec)
         cfg = spec.config or {}
@@ -243,6 +250,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="postgres_rds")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, instance_id = parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -294,6 +302,12 @@ class RDSPostgresDriver(ManagedServiceDriver):
             message=f"db instance {instance_id} update queued",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="postgres_rds",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -373,6 +387,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="postgres_rds")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, instance_id = parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -388,6 +403,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             message=f"rds reports {rds_state}",
         )
 
+    @driver_op(cloud="aws", driver="postgres_rds")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, instance_id = parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -429,6 +445,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="postgres_rds")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -452,6 +469,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="postgres_rds")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -482,6 +500,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="postgres_rds", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -501,6 +520,7 @@ class RDSPostgresDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="postgres_rds", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

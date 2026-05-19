@@ -52,6 +52,7 @@ import string
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -151,6 +152,12 @@ class AmazonSESDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="email_ses",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         try:
             identity = self._identity_for(spec=spec)
@@ -222,6 +229,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="email_ses")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, identity = parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -243,6 +251,12 @@ class AmazonSESDriver(ManagedServiceDriver):
             message="no modifiable attributes provided -- no-op",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="email_ses",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -312,6 +326,7 @@ class AmazonSESDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="email_ses")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, identity = parse_handle(handle.handle)
         state = self._identity_verified_state(identity)
@@ -346,6 +361,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             message=f"ses identity {identity} reports {state}",
         )
 
+    @driver_op(cloud="aws", driver="email_ses")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, identity = parse_handle(handle.handle)
         state = self._identity_verified_state(identity)
@@ -408,6 +424,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="email_ses")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         # SES has no built-in identity / configuration-set snapshot
         # primitive. Surface a deterministic id so the workflow layer
@@ -428,6 +445,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="email_ses")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -444,6 +462,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="email_ses", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -461,6 +480,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="email_ses", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
