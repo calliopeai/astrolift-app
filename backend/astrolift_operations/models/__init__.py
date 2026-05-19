@@ -18,6 +18,7 @@ from astrolift_operations.models.notification_profile import NotificationProfile
 from astrolift_operations.models.webhook_delivery import WebhookDelivery
 from astrolift_operations.models.webhook_subscription import WebhookSubscription
 from astrolift_operations.models.workflow_run import WorkflowRun
+from astrolift_operations.models.user_alert_subscription import UserAlertSubscription
 from astrolift_operations.models.workload_identity_role import WorkloadIdentityRole
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "NotificationProfile",
     "WebhookDelivery",
     "WebhookSubscription",
+    "UserAlertSubscription",
     "WorkflowRun",
     "WorkloadIdentityRole",
     "default_enabled",

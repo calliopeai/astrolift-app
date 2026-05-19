@@ -23,6 +23,7 @@ from astrolift_operations.models import (
     Notification,
     NotificationChannel,
     NotificationPreference,
+    UserAlertSubscription,
     WebhookDelivery,
     WebhookSubscription,
     WorkflowRun,
@@ -43,6 +44,7 @@ from astrolift_operations.schema.types import (
     EventType,
     NotificationPreferenceType,
     NotificationType,
+    UserAlertSubscriptionType,
     WebhookDeliveryType,
     WebhookSubscriptionType,
     WorkflowRunType,
@@ -55,6 +57,7 @@ from astrolift_operations.schema.types import (
     notification_to_type,
     shape_activity_item,
     synthetic_preference_type,
+    user_alert_subscription_to_type,
     webhook_delivery_to_type,
     webhook_to_type,
     workflow_run_to_type,
@@ -593,6 +596,30 @@ class OperationsQuery:
             .order_by("-last_used_at", "-created_at")
         )
         return [device_registration_to_type(d) for d in qs]
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_alert_subscriptions(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+    ) -> list[UserAlertSubscriptionType]:
+        """Caller's per-app alert notification subscriptions (#747).
+
+        Filters to a single app when ``app_slug`` is provided.
+        Returns only active (non-deleted) rows; absent rows mean the
+        dispatcher uses its noisy-fallback default.
+        """
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return []
+        qs = UserAlertSubscription.objects.filter(
+            user_id=tenant.actor_user_id,
+            deleted_at__isnull=True,
+        ).select_related("registered_app")
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        return [user_alert_subscription_to_type(s) for s in qs]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)

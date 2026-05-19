@@ -923,3 +923,22 @@ def synthetic_preference_type(*, channel: str, event_kind: str, enabled: bool) -
         event_kind=event_kind,
         enabled=enabled,
     )
+
+
+@strawberry.type(name="AstroliftUserAlertSubscription")
+class UserAlertSubscriptionType:
+    id: GUID
+    app_slug: str
+    alert_kind: str
+    channel: str
+    enabled: bool
+
+
+def user_alert_subscription_to_type(s) -> UserAlertSubscriptionType:
+    return UserAlertSubscriptionType(
+        id=GUID(str(s.guid)),
+        app_slug=s.registered_app.slug,
+        alert_kind=s.alert_kind,
+        channel=s.channel,
+        enabled=s.enabled,
+    )

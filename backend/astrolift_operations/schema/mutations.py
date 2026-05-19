@@ -26,6 +26,7 @@ from astrolift_operations.models import (
     AuditEvent,
     AuditExport,
     Notification,
+    UserAlertSubscription,
     WebhookSubscription,
 )
 from astrolift_operations.schema.types import (
@@ -36,6 +37,7 @@ from astrolift_operations.schema.types import (
     DeviceRegistrationType,
     NotificationPreferenceType,
     NotificationType,
+    UserAlertSubscriptionType,
     WebhookSubscriptionType,
     WebhookTestResultType,
     alert_event_to_type,
@@ -43,6 +45,7 @@ from astrolift_operations.schema.types import (
     app_log_export_to_type,
     audit_export_to_type,
     notification_to_type,
+    user_alert_subscription_to_type,
     webhook_to_type,
 )
 from astrolift_operations.webhook_delivery import build_headers, sign_payload
@@ -308,6 +311,28 @@ class ExportAppLogsInput:
     regex: str | None = None
     """Python regex over the message. Invalid patterns return
     VALIDATION failure with ``field='regex'``."""
+
+
+# Alert subscriptions (#747) -----------------------------------------
+
+
+@strawberry.input
+class SetAlertSubscriptionInput:
+    app_slug: str
+    alert_kind: str
+    """One of: deploy_success / deploy_failure / error_spike /
+    email_bounce_threshold / preview_created / preview_destroyed /
+    cert_renewal_failed"""
+
+    channel: str
+    """email | web | both"""
+
+    enabled: bool
+
+
+@strawberry.input
+class ClearAlertSubscriptionInput:
+    id: GUID
 
 
 @strawberry.type
@@ -1604,6 +1629,98 @@ class OperationsMutation:
             token=plaintext_token,
         )
         return gql_success(app_log_export_to_type(export, download_url=download_url))
+
+    # ---- Alert subscriptions (#747) --------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="alert_subscription.set")
+    @tenant_scoped()
+    def set_alert_subscription(
+        self,
+        info: Info,
+        input: SetAlertSubscriptionInput,
+    ) -> MutationResultType[UserAlertSubscriptionType]:
+        """Upsert the caller's per-app alert notification preference (#747).
+
+        Creates a new subscription row or updates the existing active
+        one for the same (user, app, alert_kind) tuple. Soft-deletes
+        the previous row when upserting so the audit trail is intact.
+        """
+        from astrolift_registry.models import RegisteredApp
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "authentication required")
+
+        valid_kinds = {k for k, _ in UserAlertSubscription.AlertKind.choices}
+        if input.alert_kind not in valid_kinds:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"alert_kind must be one of {sorted(valid_kinds)}",
+                field="alert_kind",
+            )
+        valid_channels = {c for c, _ in UserAlertSubscription.Channel.choices}
+        if input.channel not in valid_channels:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"channel must be one of {sorted(valid_channels)}",
+                field="channel",
+            )
+
+        app = RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, f"app '{input.app_slug}' not found")
+
+        existing = UserAlertSubscription.objects.filter(
+            user_id=tenant.actor_user_id,
+            registered_app=app,
+            alert_kind=input.alert_kind,
+            deleted_at__isnull=True,
+        ).first()
+        if existing is not None:
+            existing.channel = input.channel
+            existing.enabled = input.enabled
+            existing.save(update_fields=["channel", "enabled", "updated_at", "version"])
+            return gql_success(user_alert_subscription_to_type(existing))
+
+        sub = UserAlertSubscription.objects.create(
+            user_id=tenant.actor_user_id,
+            registered_app=app,
+            alert_kind=input.alert_kind,
+            channel=input.channel,
+            enabled=input.enabled,
+        )
+        return gql_success(user_alert_subscription_to_type(sub))
+
+    @strawberry.field
+    @mutation_audit(action="alert_subscription.clear")
+    @tenant_scoped()
+    def clear_alert_subscription(
+        self,
+        info: Info,
+        input: ClearAlertSubscriptionInput,
+    ) -> MutationResultType[UserAlertSubscriptionType]:
+        """Soft-delete a per-app alert subscription (#747).
+
+        Reverts the (user, app, alert_kind) slot to the dispatcher's
+        noisy-fallback default. Uses the GUID returned by
+        ``setAlertSubscription`` or ``myAlertSubscriptions``.
+        """
+        tenant = get_current_tenant()
+        if tenant is None or tenant.actor_user_id is None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "authentication required")
+
+        sub = UserAlertSubscription.objects.filter(
+            guid=input.id,
+            user_id=tenant.actor_user_id,
+            deleted_at__isnull=True,
+        ).first()
+        if sub is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "subscription not found")
+
+        snapshot = user_alert_subscription_to_type(sub)
+        sub.soft_delete()
+        return gql_success(snapshot)
 
 
 def _materialize_app_log_lines(

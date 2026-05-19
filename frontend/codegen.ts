@@ -67,10 +67,6 @@ const config: CodegenConfig = {
       },
     },
     "graphql/__generated__/operations.ts": {
-      preset: "import-types",
-      presetConfig: {
-        typesPath: "./schema",
-      },
       plugins: ["typescript-operations"],
       config: {
         scalars: {
@@ -80,6 +76,9 @@ const config: CodegenConfig = {
         },
         skipTypename: true,
         avoidOptionals: { field: false, inputValue: true },
+        // Import base types from schema.ts rather than duplicating them.
+        importTypesFrom: "./schema",
+        onlyOperationTypes: true,
       },
     },
   },
