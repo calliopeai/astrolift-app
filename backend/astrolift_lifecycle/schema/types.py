@@ -944,6 +944,31 @@ class ContainerStatusType:
     resources: ContainerResourcesType
 
 
+@strawberry.type(name="AstroliftAppPodEvent")
+class AppPodEventType:
+    """Most-recent Kubernetes Warning event surfaced for a pod (#666).
+
+    Lifted from ``ClusterEvent`` so the FE has a structured shape to
+    render rather than a free-form message blob.  ``reason`` is the
+    short K8s event reason (``ImagePullBackOff``, ``CrashLoopBackOff``,
+    ``OOMKilled``, ``FailedScheduling``) — the FE switches on that
+    to colour the badge.  ``message`` is the long-form text the
+    operator reads to triage."""
+
+    reason: str
+    message: str
+    type: str
+    """``Warning`` / ``Normal`` — events surfaced on this field are
+    Warning by default but the type is carried so the FE can choose
+    to render Normal events differently if the cluster's noise floor
+    is high."""
+
+    count: int
+    last_seen: str
+    """RFC 3339 timestamp from the K8s API.  String rather than
+    datetime so we don't re-parse on a flaky timestamp."""
+
+
 @strawberry.type(name="AstroliftAppPod")
 class AppPodType:
     """A single pod from the runtime cluster, namespace-scoped to
@@ -964,6 +989,12 @@ class AppPodType:
     age: dt.datetime | None
     node: str
     container_statuses: list[ContainerStatusType]
+
+    recent_error_event: AppPodEventType | None = None
+    """Most-recent Warning event for this pod (#666).  Null when no
+    Warning events exist OR the cluster driver couldn't list events
+    (best-effort; failure degrades the chip but never the row).  FE
+    renders an inline error chip when populated."""
 
 
 def container_status_to_type(c) -> ContainerStatusType:
@@ -995,7 +1026,7 @@ def container_status_to_type(c) -> ContainerStatusType:
     )
 
 
-def pod_info_to_type(p) -> AppPodType:
+def pod_info_to_type(p, *, recent_error_event: AppPodEventType | None = None) -> AppPodType:
     return AppPodType(
         name=p.name,
         workload=p.workload,
@@ -1006,6 +1037,7 @@ def pod_info_to_type(p) -> AppPodType:
         age=p.age,
         node=p.node,
         container_statuses=[container_status_to_type(c) for c in p.container_statuses],
+        recent_error_event=recent_error_event,
     )
 
 
