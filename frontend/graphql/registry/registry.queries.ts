@@ -46,6 +46,8 @@ const APP_FIELDS = `
   manifestSyncState
   lastResyncAt
   sourceWebhookInstalledAt
+  isArchived
+  archivedAt
   webhookDeploysPaused
   webhookDeploysPausedAt
   webhookDeploysPausedByEmail

@@ -316,6 +316,12 @@ class RegisteredAppType:
     # by the Settings card as "Paused by <email>"; null when no actor
     # was captured (e.g. system-initiated automation). The reason
     # string is empty unless the operator supplied one on pause.
+    # Archive state (#743). ``is_archived`` is True while ``archived_at`` is set;
+    # ``archived_by_email`` is the audit trail actor.
+    is_archived: bool
+    archived_at: dt.datetime | None
+    archived_by_email: str | None
+
     webhook_deploys_paused: bool
     webhook_deploys_paused_at: dt.datetime | None
     webhook_deploys_paused_by_email: str | None
@@ -712,6 +718,9 @@ def app_to_type(
         cron_paused=bool(app.cron_paused),
         deploy_branch=app.deploy_branch,
         preview_screenshot_url=app.preview_screenshot_url or "",
+        is_archived=bool(app.archived_at),
+        archived_at=app.archived_at,
+        archived_by_email=_archived_by_email(app),
         webhook_deploys_paused=bool(app.webhook_deploys_paused),
         webhook_deploys_paused_at=app.webhook_deploys_paused_at,
         webhook_deploys_paused_by_email=_paused_by_email(app),
@@ -763,6 +772,17 @@ def _fallback_preview_count(app) -> int:
         torn_down_at__isnull=True,
         deleted_at__isnull=True,
     ).count()
+
+
+def _archived_by_email(app) -> str | None:
+    user_id = getattr(app, "archived_by_id", None)
+    if user_id is None:
+        return None
+    user = app.archived_by
+    if user is None:
+        return None
+    email = getattr(user, "email", "") or getattr(user, "username", "")
+    return email or None
 
 
 def _paused_by_email(app) -> str | None:

@@ -62,11 +62,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   CANCEL_DEREGISTER,
+  CLEAR_ENVIRONMENT_SETTING,
   DEREGISTER_APP,
   FORCE_REDEPLOY,
   PAUSE_APP_INGRESS,
   RESUME_APP_INGRESS,
   RUN_JOB_ONCE,
+  SET_ENVIRONMENT_SETTING,
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import {
   LIST_ENVIRONMENTS,
@@ -76,20 +78,14 @@ import {
 import type {
   AstroliftAppEnvironment,
   AstroliftDeregisterPreview,
+  AstroliftEnvironmentSetting,
   AstroliftForceRedeployPreview,
 } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
-  CLEAR_ENVIRONMENT_SETTING,
-  SET_ENVIRONMENT_SETTING,
-} from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import type {
-  AstroliftAppEnvironment,
-  AstroliftEnvironmentSetting,
-} from "@/graphql/lifecycle/lifecycle.types";
-import {
+  ARCHIVE_APP,
   PAUSE_APP_WEBHOOK_DEPLOYS,
+  RESTORE_APP,
   RESUME_APP_WEBHOOK_DEPLOYS,
   RESYNC_MANIFEST_FROM_REPO,
   SET_RETENTION_POLICY,
@@ -296,6 +292,8 @@ export function SettingsClient({ slug }: { slug: string }) {
       <RetentionPolicySection appSlug={a.slug} policies={a.retentionPolicies ?? []} />
 
       <EnvironmentSettingsSection appSlug={a.slug} />
+
+      <ArchiveSection appSlug={a.slug} isArchived={a.isArchived} archivedAt={a.archivedAt ?? null} />
 
       {/* Inline deploy-strategy badge + edit affordance (#400). Replaces
           the link-card to /config for the strategy itself — the manifest
@@ -2038,6 +2036,98 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
           </Button>
         </div>
       </Can>
+    </section>
+  );
+}
+
+// ─── archive / restore ───────────────────────────────────────────────────────
+
+interface ArchiveAppResp {
+  archiveApp: MutationResult<{ id: string; slug: string; isArchived: boolean; archivedAt: string | null }>;
+}
+interface RestoreAppResp {
+  restoreApp: MutationResult<{ id: string; slug: string; isArchived: boolean; archivedAt: string | null }>;
+}
+
+function ArchiveSection({
+  appSlug,
+  isArchived,
+  archivedAt,
+}: {
+  appSlug: string;
+  isArchived: boolean;
+  archivedAt: string | null;
+}) {
+  const fmt = useFormatters();
+  const refetch = [{ query: GET_APP, variables: { slug: appSlug } }];
+  const [archive, { loading: archiving }] = useMutation<ArchiveAppResp>(ARCHIVE_APP, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+  const [restore, { loading: restoring }] = useMutation<RestoreAppResp>(RESTORE_APP, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+
+  async function handleArchive() {
+    try {
+      const { data } = await archive({ variables: { input: { appSlug } } });
+      const env = data?.archiveApp;
+      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Archive failed."); return; }
+      toast.success("App archived — workloads scaled to zero.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Archive failed.");
+    }
+  }
+
+  async function handleRestore() {
+    try {
+      const { data } = await restore({ variables: { input: { appSlug } } });
+      const env = data?.restoreApp;
+      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Restore failed."); return; }
+      toast.success("App restored — workloads returning to pre-archive replicas.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Restore failed.");
+    }
+  }
+
+  return (
+    <section className="rounded-lg border p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">App archive</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {isArchived
+              ? archivedAt
+                ? `Archived ${fmt.relativeTime(new Date(archivedAt))}. Workloads are at zero replicas; deploys are suppressed.`
+                : "App is archived. Workloads are at zero replicas."
+              : "Archiving scales all workloads to zero and suppresses deploys. Restore returns replicas to their pre-archive counts."}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isArchived ? (
+            <Badge
+              variant="outline"
+              className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            >
+              Archived
+            </Badge>
+          ) : null}
+          <Can permission="app.update">
+            {isArchived ? (
+              <Button size="sm" variant="default" disabled={restoring} onClick={handleRestore}>
+                {restoring ? <Loader2Icon className="size-3.5 animate-spin" /> : <PlayCircleIcon className="size-3.5" />}
+                Restore
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" disabled={archiving} onClick={handleArchive}>
+                {archiving ? <Loader2Icon className="size-3.5 animate-spin" /> : <Trash2Icon className="size-3.5" />}
+                Archive
+              </Button>
+            )}
+          </Can>
+        </div>
+      </div>
     </section>
   );
 }
