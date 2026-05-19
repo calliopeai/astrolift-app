@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -96,6 +97,12 @@ class MySQLOperatorDriver(ManagedServiceDriver):
     def __init__(self, *, config: MySQLOperatorConfig) -> None:
         self._config = config
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="mysql_operator",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
         namespace = self._namespace_for(spec=spec)
@@ -130,6 +137,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             message=f"MySQL cluster {cluster_name} provisioned",
         )
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -137,6 +145,12 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             message=("MySQL operator reconciles size/storage updates " "via re-applied CRD spec"),
         )
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="mysql_operator",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -183,6 +197,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             message=f"MySQL cluster {parsed.name} deleted",
         )
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         # Real status comes from PerconaXtraDBCluster.status.state;
         # platform queries via ClusterDriver.get_workload_status.
@@ -192,6 +207,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             message="status delegated to operator reconciliation loop",
         )
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator")
     def binding(self, handle: ServiceHandle) -> Binding:
         name = _unpack_handle(handle.handle).name
         return Binding(
@@ -216,6 +232,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -225,6 +242,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator")
     def restore(self, snapshot, target):
         return ProvisionResult(
             ok=False,
@@ -237,6 +255,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             errors=["not_implemented"],
         )
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator", heartbeat=False)
     def config_schema(self):
         return {
             "type": "object",
@@ -251,6 +270,7 @@ class MySQLOperatorDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="mysql_operator", heartbeat=False)
     def binding_schema(self):
         return BindingSchema(
             env_vars={
