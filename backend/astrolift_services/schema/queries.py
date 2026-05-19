@@ -29,6 +29,7 @@ from astrolift_services.schema.types import (
     EmailSendQuotaType,
     EmailServiceDetailType,
     EmailSuppressionEntryType,
+    EmailTemplateType,
     ManagedServiceObjectsType,
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
@@ -37,6 +38,7 @@ from astrolift_services.schema.types import (
     SecretChangeProposalType,
     SecretHistoryActorType,
     SecretHistoryEntryType,
+    TemplateSendStatPointType,
     attachment_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
@@ -203,6 +205,47 @@ def _build_email_detail(
         suppression_entries=suppression_entries,
         unsupported_notes=unsupported,
     )
+
+
+def _resolve_email_driver(managed_service_id):
+    """Walk the ``ManagedService`` FK chain to a populated
+    ``EmailObservabilityDriver`` instance + the email identity (#635,
+    #628).
+
+    Returns ``(driver, identity, error_message)``. On any failure the
+    first two slots are ``None`` and the third carries a UI-facing
+    string the resolver wraps in an empty list — the email-template
+    surfaces are read-mostly, so a missing driver renders as "no
+    templates" rather than a 500.
+
+    Co-located with the queries module so the two new template
+    resolvers + the existing detail resolver stay one cohesive surface.
+    """
+    from astrolift_services.email_observability import driver_for_plugin_slug
+    from astrolift_services.models import ManagedService
+
+    svc = (
+        ManagedService.objects.select_related(
+            "app_environment",
+            "app_environment__tenant_cluster",
+            "app_environment__tenant_cluster__provider_plugin",
+        )
+        .filter(guid=str(managed_service_id), deleted_at__isnull=True)
+        .first()
+    )
+    if svc is None or svc.kind != ManagedService.Kind.EMAIL:
+        return None, "", "managed service not found or not an email service"
+    plugin_slug = svc.app_environment.tenant_cluster.provider_plugin.slug
+    region = svc.app_environment.tenant_cluster.region or ""
+    config = svc.config or {}
+    identity = (
+        config.get("identity") or config.get("email_identity") or config.get("EMAIL_FROM_ADDRESS") or ""
+    )
+    try:
+        driver = driver_for_plugin_slug(plugin_slug=plugin_slug, region=region)
+    except LookupError as exc:
+        return None, identity, str(exc)
+    return driver, identity, ""
 
 
 def _bundle_key_count(bundle) -> int:
@@ -806,6 +849,116 @@ class ServicesQuery:
             region=region,
             identity=identity,
         )
+
+    # ---- Email templates (#635, #628) --------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def astrolift_email_templates(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+    ) -> list[EmailTemplateType]:
+        """List transactional-email templates for one email managed
+        service (#635).
+
+        Backed by the per-cloud :class:`EmailObservabilityDriver`. On a
+        missing managed service / unsupported backend / cloud-side
+        transient failure, returns an empty list so the
+        template-management UI renders the empty state with the
+        "Create template" CTA rather than a 500."""
+        from _sdk import UnsupportedOperationError
+
+        driver, _identity, err = _resolve_email_driver(managed_service_id)
+        if driver is None or err:
+            return []
+        try:
+            templates = driver.list_templates()
+        except UnsupportedOperationError:
+            return []
+        except Exception:  # noqa: BLE001 -- cloud-side transient
+            return []
+        return [
+            EmailTemplateType(
+                name=t.name,
+                subject=t.subject,
+                html_body=t.html_body,
+                text_body=t.text_body,
+                created_at=t.created_at,
+            )
+            for t in templates
+        ]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def astrolift_email_template(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+        name: str,
+    ) -> EmailTemplateType | None:
+        """Single template detail by name (#635). Returns ``None`` when
+        the template doesn't exist on the backend (UI renders a 404
+        page rather than a partial)."""
+        from _sdk import UnsupportedOperationError
+
+        driver, _identity, err = _resolve_email_driver(managed_service_id)
+        if driver is None or err:
+            return None
+        try:
+            template = driver.get_template(name=name)
+        except UnsupportedOperationError:
+            return None
+        except Exception:  # noqa: BLE001 -- cloud-side / not found
+            return None
+        return EmailTemplateType(
+            name=template.name,
+            subject=template.subject,
+            html_body=template.html_body,
+            text_body=template.text_body,
+            created_at=template.created_at,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def astrolift_email_template_stats(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+        name: str,
+        days: int = 14,
+    ) -> list[TemplateSendStatPointType]:
+        """Per-template send/delivery/bounce/complaint sparkline data
+        (#628).
+
+        Empty list when the cloud has no metrics for this template
+        yet (zero sends in the window, or the configuration set
+        doesn't publish per-template counters). 15-minute granularity,
+        oldest-first; ``days`` caps the lookback window (default 14)."""
+        from _sdk import UnsupportedOperationError
+
+        driver, _identity, err = _resolve_email_driver(managed_service_id)
+        if driver is None or err:
+            return []
+        try:
+            points = driver.get_template_send_statistics(name=name, days=days)
+        except UnsupportedOperationError:
+            return []
+        except Exception:  # noqa: BLE001 -- cloud-side transient
+            return []
+        return [
+            TemplateSendStatPointType(
+                timestamp=p.timestamp,
+                sends=p.sends,
+                deliveries=p.deliveries,
+                bounces=p.bounces,
+                complaints=p.complaints,
+            )
+            for p in points
+        ]
 
     # ---- Secret-change proposals (#488) ------------------------------
 

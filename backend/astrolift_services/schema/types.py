@@ -378,6 +378,40 @@ class EmailServiceDetailType:
     email observability — use the third-party vendor's console")."""
 
 
+# ---- Email template management (#635, #628) --------------------------
+
+
+@strawberry.type(name="AstroliftEmailTemplate")
+class EmailTemplateType:
+    """One transactional-email template (#635).
+
+    Mirrors :class:`_sdk.email.EmailTemplate`. ``createdAt`` is null
+    when the backend doesn't surface a creation timestamp on the
+    per-template fetch (SES only carries it on the list metadata);
+    the UI falls back to the "—" placeholder."""
+
+    name: str
+    subject: str
+    html_body: str
+    text_body: str
+    created_at: dt.datetime | None = None
+
+
+@strawberry.type(name="AstroliftTemplateSendStatPoint")
+class TemplateSendStatPointType:
+    """One 15-minute interval of per-template send counters (#628).
+
+    Sourced from the cloud's metrics pipeline (SES → CloudWatch on
+    the ``ses2:TemplateName`` dimension). UI renders an empty list as
+    a "no metrics yet" hint rather than a flat zero-line."""
+
+    timestamp: dt.datetime
+    sends: int
+    deliveries: int
+    bounces: int
+    complaints: int
+
+
 @strawberry.type(name="AstroliftSecretChangeApproval")
 class SecretChangeApprovalType:
     """One approver's vote on a secret-change proposal (#488)."""

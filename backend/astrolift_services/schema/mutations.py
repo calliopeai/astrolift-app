@@ -33,6 +33,7 @@ from astrolift_services.models import (
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
+    EmailTemplateType,
     ManagedServiceConnectionKeyType,
     ManagedServiceConnectionType,
     ManagedServiceTestEmailResultType,
@@ -396,6 +397,55 @@ class _EmailSuppressionRemovePayload:
     removed: bool
     """``True`` if the address was on the list and has been removed;
     ``False`` if the address wasn't on the list (idempotent)."""
+
+
+@strawberry.input
+class CreateEmailTemplateInput:
+    """Create a new transactional-email template (#635).
+
+    ``name`` is the unique identifier the workload references on the
+    backend's ``SendTemplatedEmail`` call. ``subject`` / ``htmlBody`` /
+    ``textBody`` carry the template contents (backend-side substitution
+    syntax, e.g. SES's ``{{handlebar}}``)."""
+
+    managed_service_id: GUID
+    name: str
+    subject: str
+    html_body: str
+    text_body: str = ""
+    """Optional plaintext fallback; backends accept an empty body when
+    the workload always sends multipart-alternative HTML."""
+
+
+@strawberry.input
+class UpdateEmailTemplateInput:
+    """Update an existing template in-place (#635).
+
+    Replaces every field on the named template; backends don't support
+    partial-update portably (SES, SendGrid, Postmark each require the
+    full body on update)."""
+
+    managed_service_id: GUID
+    name: str
+    subject: str
+    html_body: str
+    text_body: str = ""
+
+
+@strawberry.input
+class DeleteEmailTemplateInput:
+    """Delete a template by name (#635)."""
+
+    managed_service_id: GUID
+    name: str
+
+
+@strawberry.type
+class _EmailTemplateDeletedPayload:
+    name: str
+    deleted: bool
+    """``True`` when the template was deleted; ``False`` when it wasn't
+    found (idempotent)."""
 
 
 @strawberry.input
@@ -2230,6 +2280,343 @@ class ServicesMutation:
                 removed=removed,
             )
         )
+
+    # ---- Email templates (#635) --------------------------------------
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.email.template.create",
+        extras=lambda result: {"name": result.data.name} if result.ok and result.data is not None else None,
+    )
+    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def create_email_template(
+        self,
+        info: Info,
+        input: CreateEmailTemplateInput,
+    ) -> MutationResultType[EmailTemplateType]:
+        """Create a new transactional-email template on the backend
+        (#635).
+
+        Sensitive op — template content can leak personal data into the
+        audit trail, so the audit row carries the template name only
+        (not the body). Subject + bodies are routed through the
+        backend's storage path and never persisted in the platform DB."""
+        from _sdk import UnsupportedOperationError
+
+        from astrolift_services.email_observability import driver_for_plugin_slug
+
+        svc = _resolve_email_service(input.managed_service_id)
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found or not an email service",
+                field="managedServiceId",
+            )
+        name = (input.name or "").strip()
+        if not name:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "name is required",
+                field="name",
+            )
+        subject = (input.subject or "").strip()
+        if not subject:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "subject is required",
+                field="subject",
+            )
+        html_body = input.html_body or ""
+        text_body = input.text_body or ""
+        if not html_body and not text_body:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "at least one of htmlBody or textBody is required",
+                field="htmlBody",
+            )
+
+        plugin_slug = svc.app_environment.tenant_cluster.provider_plugin.slug
+        region = svc.app_environment.tenant_cluster.region or ""
+        try:
+            driver = driver_for_plugin_slug(
+                plugin_slug=plugin_slug,
+                region=region,
+            )
+        except LookupError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="managedServiceId",
+            )
+
+        try:
+            template = driver.create_template(
+                name=name,
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
+            )
+        except UnsupportedOperationError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="managedServiceId",
+            )
+        except Exception as exc:  # noqa: BLE001 -- cloud-side transient
+            # ManagedServiceError on duplicate name surfaces as a clean
+            # PRECONDITION; everything else collapses to INTERNAL.
+            msg = str(exc)
+            code = (
+                ErrorCode.PRECONDITION.value if "already exists" in msg.lower() else ErrorCode.INTERNAL.value
+            )
+            return gql_failure(
+                code,
+                f"{type(exc).__name__}: {msg}",
+                field="name",
+            )
+
+        ip = _client_ip(info)
+        tenant = get_current_tenant()
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="managed_service.email.template.create.disclosure",
+                decision="ALLOW",
+                target_kind="managed_service",
+                target_id=str(svc.guid),
+                duration_ms=0,
+                permissions=(
+                    Permission.APP_UPDATE.value,
+                    Permission.MANAGED_SERVICE_UPDATE.value,
+                ),
+                extra={
+                    "name": template.name,
+                    "plugin_slug": plugin_slug,
+                    "region": region,
+                    "client_ip": ip,
+                },
+            )
+        )
+        return gql_success(
+            EmailTemplateType(
+                name=template.name,
+                subject=template.subject,
+                html_body=template.html_body,
+                text_body=template.text_body,
+                created_at=template.created_at,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.email.template.update",
+        extras=lambda result: {"name": result.data.name} if result.ok and result.data is not None else None,
+    )
+    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def update_email_template(
+        self,
+        info: Info,
+        input: UpdateEmailTemplateInput,
+    ) -> MutationResultType[EmailTemplateType]:
+        """Update an existing template (#635). Replaces every field;
+        partial updates aren't portable across backends."""
+        from _sdk import UnsupportedOperationError
+
+        from astrolift_services.email_observability import driver_for_plugin_slug
+
+        svc = _resolve_email_service(input.managed_service_id)
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found or not an email service",
+                field="managedServiceId",
+            )
+        name = (input.name or "").strip()
+        if not name:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "name is required",
+                field="name",
+            )
+        subject = (input.subject or "").strip()
+        if not subject:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "subject is required",
+                field="subject",
+            )
+        html_body = input.html_body or ""
+        text_body = input.text_body or ""
+        if not html_body and not text_body:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "at least one of htmlBody or textBody is required",
+                field="htmlBody",
+            )
+
+        plugin_slug = svc.app_environment.tenant_cluster.provider_plugin.slug
+        region = svc.app_environment.tenant_cluster.region or ""
+        try:
+            driver = driver_for_plugin_slug(
+                plugin_slug=plugin_slug,
+                region=region,
+            )
+        except LookupError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="managedServiceId",
+            )
+
+        try:
+            template = driver.update_template(
+                name=name,
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
+            )
+        except UnsupportedOperationError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="managedServiceId",
+            )
+        except Exception as exc:  # noqa: BLE001 -- cloud-side / not found
+            msg = str(exc)
+            code = ErrorCode.NOT_FOUND.value if "not found" in msg.lower() else ErrorCode.INTERNAL.value
+            return gql_failure(
+                code,
+                f"{type(exc).__name__}: {msg}",
+                field="name",
+            )
+
+        ip = _client_ip(info)
+        tenant = get_current_tenant()
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="managed_service.email.template.update.disclosure",
+                decision="ALLOW",
+                target_kind="managed_service",
+                target_id=str(svc.guid),
+                duration_ms=0,
+                permissions=(
+                    Permission.APP_UPDATE.value,
+                    Permission.MANAGED_SERVICE_UPDATE.value,
+                ),
+                extra={
+                    "name": template.name,
+                    "plugin_slug": plugin_slug,
+                    "region": region,
+                    "client_ip": ip,
+                },
+            )
+        )
+        return gql_success(
+            EmailTemplateType(
+                name=template.name,
+                subject=template.subject,
+                html_body=template.html_body,
+                text_body=template.text_body,
+                created_at=template.created_at,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="managed_service.email.template.delete",
+        extras=lambda result: (
+            {"name": result.data.name, "deleted": result.data.deleted}
+            if result.ok and result.data is not None
+            else None
+        ),
+    )
+    @require_permission(Permission.APP_UPDATE, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def delete_email_template(
+        self,
+        info: Info,
+        input: DeleteEmailTemplateInput,
+    ) -> MutationResultType[_EmailTemplateDeletedPayload]:
+        """Delete a template by name (#635). Idempotent — deleting a
+        missing template returns ``ok=True`` with ``data.deleted=False``."""
+        from _sdk import UnsupportedOperationError
+
+        from astrolift_services.email_observability import driver_for_plugin_slug
+
+        svc = _resolve_email_service(input.managed_service_id)
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found or not an email service",
+                field="managedServiceId",
+            )
+        name = (input.name or "").strip()
+        if not name:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "name is required",
+                field="name",
+            )
+
+        plugin_slug = svc.app_environment.tenant_cluster.provider_plugin.slug
+        region = svc.app_environment.tenant_cluster.region or ""
+        try:
+            driver = driver_for_plugin_slug(
+                plugin_slug=plugin_slug,
+                region=region,
+            )
+        except LookupError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="managedServiceId",
+            )
+
+        try:
+            deleted = driver.delete_template(name=name)
+        except UnsupportedOperationError as exc:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                str(exc),
+                field="managedServiceId",
+            )
+        except Exception as exc:  # noqa: BLE001 -- cloud-side transient
+            return gql_failure(
+                ErrorCode.INTERNAL.value,
+                f"{type(exc).__name__}: {exc}",
+                field="name",
+            )
+
+        ip = _client_ip(info)
+        tenant = get_current_tenant()
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="managed_service.email.template.delete.disclosure",
+                decision="ALLOW",
+                target_kind="managed_service",
+                target_id=str(svc.guid),
+                duration_ms=0,
+                permissions=(
+                    Permission.APP_UPDATE.value,
+                    Permission.MANAGED_SERVICE_UPDATE.value,
+                ),
+                extra={
+                    "name": name,
+                    "deleted": deleted,
+                    "plugin_slug": plugin_slug,
+                    "region": region,
+                    "client_ip": ip,
+                },
+            )
+        )
+        return gql_success(_EmailTemplateDeletedPayload(name=name, deleted=deleted))
 
     # ---- Secret-change proposals (#488) ------------------------------
 

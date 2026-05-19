@@ -77,3 +77,45 @@ def test_remove_suppression_entry_raises(
 ) -> None:
     with pytest.raises(UnsupportedOperationError):
         driver.remove_suppression_entry(address="bouncy@example.com")
+
+
+def test_list_templates_raises(driver: GcpEmailObservabilityDriver) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        driver.list_templates()
+
+
+def test_get_template_raises(driver: GcpEmailObservabilityDriver) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        driver.get_template(name="welcome")
+
+
+def test_create_template_raises(driver: GcpEmailObservabilityDriver) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        driver.create_template(
+            name="welcome",
+            subject="s",
+            html_body="h",
+            text_body="t",
+        )
+
+
+def test_update_template_raises(driver: GcpEmailObservabilityDriver) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        driver.update_template(
+            name="welcome",
+            subject="s",
+            html_body="h",
+            text_body="t",
+        )
+
+
+def test_delete_template_raises(driver: GcpEmailObservabilityDriver) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        driver.delete_template(name="welcome")
+
+
+def test_get_template_send_statistics_raises(
+    driver: GcpEmailObservabilityDriver,
+) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        driver.get_template_send_statistics(name="welcome")

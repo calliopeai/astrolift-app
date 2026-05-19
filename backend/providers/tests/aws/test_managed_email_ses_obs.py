@@ -460,3 +460,245 @@ def test_verify_dns_authentication_for_email_identity_dkim_is_yellow(
     # reflect that (YELLOW, since SPF + DMARC are green).
     assert status.dkim.outcome == DnsCheckOutcome.YELLOW
     assert status.overall == DnsCheckOutcome.YELLOW
+
+
+# ---- template management (#635) -------------------------------------
+
+
+def test_list_templates_empty(driver: AmazonSESObservabilityDriver) -> None:
+    assert driver.list_templates() == []
+
+
+def test_create_then_list_template_round_trip(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    created = driver.create_template(
+        name="welcome-v1",
+        subject="Welcome {{name}}",
+        html_body="<p>Hi {{name}}</p>",
+        text_body="Hi {{name}}",
+    )
+    assert created.name == "welcome-v1"
+    assert created.subject == "Welcome {{name}}"
+
+    listed = driver.list_templates()
+    assert len(listed) == 1
+    assert listed[0].name == "welcome-v1"
+    assert listed[0].html_body == "<p>Hi {{name}}</p>"
+    assert listed[0].text_body == "Hi {{name}}"
+
+
+def test_create_template_duplicate_name_raises(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    from aws.managed._base import ManagedServiceError
+
+    driver.create_template(
+        name="dup",
+        subject="s",
+        html_body="h",
+        text_body="t",
+    )
+    with pytest.raises(ManagedServiceError, match="already exists"):
+        driver.create_template(
+            name="dup",
+            subject="s2",
+            html_body="h2",
+            text_body="t2",
+        )
+
+
+def test_get_template_returns_bodies(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    driver.create_template(
+        name="invoice",
+        subject="Your invoice",
+        html_body="<p>Total: {{amount}}</p>",
+        text_body="Total: {{amount}}",
+    )
+    tmpl = driver.get_template(name="invoice")
+    assert tmpl.name == "invoice"
+    assert tmpl.subject == "Your invoice"
+    assert tmpl.html_body == "<p>Total: {{amount}}</p>"
+    assert tmpl.text_body == "Total: {{amount}}"
+
+
+def test_get_template_missing_raises_managed_service_error(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    from aws.managed._base import ManagedServiceError
+
+    with pytest.raises(ManagedServiceError, match="not found"):
+        driver.get_template(name="ghost")
+
+
+def test_update_template_replaces_body(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    driver.create_template(
+        name="alert",
+        subject="v1",
+        html_body="<p>v1</p>",
+        text_body="v1",
+    )
+    updated = driver.update_template(
+        name="alert",
+        subject="v2",
+        html_body="<p>v2</p>",
+        text_body="v2",
+    )
+    assert updated.subject == "v2"
+    fetched = driver.get_template(name="alert")
+    assert fetched.subject == "v2"
+    assert fetched.html_body == "<p>v2</p>"
+
+
+def test_update_template_missing_raises(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    from aws.managed._base import ManagedServiceError
+
+    with pytest.raises(ManagedServiceError, match="not found"):
+        driver.update_template(
+            name="never-there",
+            subject="s",
+            html_body="h",
+            text_body="t",
+        )
+
+
+def test_delete_template_returns_true_when_present(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    driver.create_template(
+        name="trash",
+        subject="s",
+        html_body="h",
+        text_body="t",
+    )
+    assert driver.delete_template(name="trash") is True
+    assert driver.list_templates() == []
+
+
+def test_delete_template_returns_false_when_missing(
+    driver: AmazonSESObservabilityDriver,
+) -> None:
+    # moto raises KeyError on delete-missing; the driver's helper must
+    # map that to False so the operator's idempotent retry doesn't 500.
+    assert driver.delete_template(name="never-existed") is False
+
+
+# ---- per-template send statistics (#628) ----------------------------
+
+
+class _FakeCloudWatch:
+    """In-memory CloudWatch fake that returns canned datapoints for the
+    four SES per-template metrics.
+
+    Mirrors the boto3 ``get_metric_statistics`` response shape. Tests
+    pre-populate ``self.data[metric]`` with ``{timestamp: sum}`` so
+    each call returns the requested metric's series."""
+
+    def __init__(self, data: dict[str, dict[datetime, int]]) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._data = data
+
+    def get_metric_statistics(self, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append(kwargs)
+        metric = kwargs["MetricName"]
+        series = self._data.get(metric, {})
+        datapoints = [{"Timestamp": ts, "Sum": float(value)} for ts, value in series.items()]
+        return {"Datapoints": datapoints}
+
+
+@pytest.fixture
+def cloudwatch_driver(aws_mock) -> AmazonSESObservabilityDriver:
+    fake_cw = _FakeCloudWatch({})
+    drv = AmazonSESObservabilityDriver(
+        config=SESEmailConfig(
+            region="us-east-1",
+            base_domain="astrolift.test",
+        ),
+        ses_client=aws_mock["ses"],
+        sesv2_client=aws_mock["sesv2"],
+        cloudwatch_client=fake_cw,
+    )
+    drv._fake_cw = fake_cw  # type: ignore[attr-defined]
+    return drv
+
+
+def test_template_send_statistics_empty_when_no_data(
+    cloudwatch_driver: AmazonSESObservabilityDriver,
+) -> None:
+    points = cloudwatch_driver.get_template_send_statistics(name="welcome-v1")
+    assert points == []
+
+
+def test_template_send_statistics_merges_four_metrics(
+    cloudwatch_driver: AmazonSESObservabilityDriver,
+) -> None:
+    ts1 = datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
+    ts2 = datetime(2026, 1, 1, 10, 15, tzinfo=UTC)
+    cloudwatch_driver._fake_cw._data = {  # type: ignore[attr-defined]
+        "Send": {ts1: 10, ts2: 20},
+        "Delivery": {ts1: 9, ts2: 19},
+        "Bounce": {ts2: 1},
+        "Complaint": {},
+    }
+    points = cloudwatch_driver.get_template_send_statistics(
+        name="welcome-v1",
+        days=7,
+    )
+    assert len(points) == 2
+    # Oldest-first per the protocol contract.
+    assert points[0].timestamp == ts1
+    assert points[1].timestamp == ts2
+    assert points[0].sends == 10
+    assert points[0].deliveries == 9
+    assert points[0].bounces == 0
+    assert points[0].complaints == 0
+    assert points[1].sends == 20
+    assert points[1].bounces == 1
+
+
+def test_template_send_statistics_uses_template_dimension(
+    cloudwatch_driver: AmazonSESObservabilityDriver,
+) -> None:
+    cloudwatch_driver.get_template_send_statistics(name="welcome-v1")
+    calls = cloudwatch_driver._fake_cw.calls  # type: ignore[attr-defined]
+    # Four metric calls (Send, Delivery, Bounce, Complaint).
+    assert len(calls) == 4
+    metrics = {c["MetricName"] for c in calls}
+    assert metrics == {"Send", "Delivery", "Bounce", "Complaint"}
+    for call in calls:
+        assert call["Namespace"] == "AWS/SES"
+        assert call["Period"] == 900
+        assert call["Statistics"] == ["Sum"]
+        dims = call["Dimensions"]
+        assert dims == [
+            {"Name": "ses2:TemplateName", "Value": "welcome-v1"},
+        ]
+
+
+def test_template_send_statistics_swallow_cloudwatch_failure(
+    cloudwatch_driver: AmazonSESObservabilityDriver,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _boom(**_: Any) -> dict[str, Any]:
+        raise RuntimeError("cloudwatch throttled")
+
+    fake_cw = cloudwatch_driver._fake_cw  # type: ignore[attr-defined]
+    monkeypatch.setattr(fake_cw, "get_metric_statistics", _boom)
+    # Cloud-side failure -> empty list, not a raised exception. The
+    # resolver layer renders "no metrics yet" rather than a 500.
+    assert cloudwatch_driver.get_template_send_statistics(name="t") == []
+
+
+def test_template_send_statistics_clamps_days(
+    cloudwatch_driver: AmazonSESObservabilityDriver,
+) -> None:
+    # Out-of-range days collapse to the [1, 14] range; the test
+    # confirms the call doesn't raise on either bound.
+    assert cloudwatch_driver.get_template_send_statistics(name="t", days=0) == []
+    assert cloudwatch_driver.get_template_send_statistics(name="t", days=999) == []
