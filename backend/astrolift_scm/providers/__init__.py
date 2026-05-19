@@ -22,6 +22,15 @@ import dataclasses
 from collections.abc import Iterable
 
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.providers.gitea import (
+    GiteaProviderError,
+    delete_gitea_webhook,
+    fetch_gitea_file,
+    install_gitea_webhook,
+    list_gitea_repos,
+    open_gitea_pull_request,
+    put_gitea_file,
+)
 from astrolift_scm.providers.github import (
     GithubProviderError,
     delete_github_webhook,
@@ -79,6 +88,11 @@ _GITLAB_KINDS = {
     "gitlab_oauth_user",
     "gitlab_oauth_app",
 }
+_GITEA_KINDS = {
+    "gitea_pat",
+    "gitea_oauth_user",
+    "gitea_oauth_app",
+}
 
 
 def list_repos(
@@ -98,6 +112,12 @@ def list_repos(
         try:
             return list_gitlab_projects(connection, search=search, limit=limit)
         except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITEA_KINDS:
+        try:
+            return list_gitea_repos(connection, search=search, limit=limit)
+        except GiteaProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     raise ProviderError(
@@ -136,6 +156,17 @@ def fetch_file(
                 ref=ref,
             )
         except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITEA_KINDS:
+        try:
+            return fetch_gitea_file(
+                connection,
+                repo_full_name=repo_full_name,
+                path=path,
+                ref=ref,
+            )
+        except GiteaProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     raise ProviderError(
@@ -210,6 +241,24 @@ def put_file(
         except GitlabProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
+    if connection.kind in _GITEA_KINDS:
+        try:
+            result = put_gitea_file(
+                connection,
+                repo_full_name=repo_full_name,
+                path=path,
+                branch=branch,
+                content=content,
+                commit_message=commit_message,
+            )
+            return PutFileResult(
+                commit_sha=result.commit_sha,
+                file_path=result.file_path,
+                web_url=result.web_url,
+            )
+        except GiteaProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
     raise ProviderError(
         "UNSUPPORTED",
         f"file write for {connection.kind!r} not implemented yet",
@@ -270,6 +319,18 @@ def install_webhook(
             )
             return InstallWebhookResult(hook_id=result.hook_id, webhook_url=result.webhook_url)
         except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITEA_KINDS:
+        try:
+            result = install_gitea_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                target_url=target_url,
+                secret=secret,
+            )
+            return InstallWebhookResult(hook_id=result.hook_id, webhook_url=result.webhook_url)
+        except GiteaProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     raise ProviderError(
@@ -359,6 +420,25 @@ def open_pull_request(
         except GitlabProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
+    if connection.kind in _GITEA_KINDS:
+        try:
+            result = open_gitea_pull_request(
+                connection,
+                repo_full_name=repo_full_name,
+                head_branch=head_branch,
+                base_branch=base_branch,
+                title=title,
+                body=body,
+            )
+            return PullRequestResult(
+                url=result.url,
+                number=result.number,
+                head_branch=head_branch,
+                base_branch=base_branch,
+            )
+        except GiteaProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
     raise ProviderError(
         "UNSUPPORTED",
         f"pull-request open for {connection.kind!r} not implemented yet",
@@ -387,6 +467,17 @@ def delete_webhook(
             )
             return
         except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITEA_KINDS:
+        try:
+            delete_gitea_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                hook_id=hook_id,
+            )
+            return
+        except GiteaProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     raise ProviderError(
