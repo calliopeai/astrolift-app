@@ -807,10 +807,16 @@
       "copyHostname": "Copy preview hostname",
       "filterEmpty": "No previews match the current filter.",
       "filters": {
-        "active": "Active",
-        "running": "Running",
+        "active": "Deployed",
+        "running": "Healthy",
         "failed": "Failed",
-        "all": "All"
+        "all": "All (incl. torn down)"
+      },
+      "filterTooltips": {
+        "active": "Previews that still exist in the cluster (not torn down)",
+        "running": "Previews whose pods are passing readiness checks",
+        "failed": "Previews that errored during deploy or have crashed pods",
+        "all": "Every preview ever, including ones already torn down"
       },
       "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
       "columns": {

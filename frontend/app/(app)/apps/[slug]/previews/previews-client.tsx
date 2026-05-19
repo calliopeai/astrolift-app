@@ -282,6 +282,7 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                   size="sm"
                   onClick={() => setStatusFilter(f)}
                   className="h-7 text-xs"
+                  title={t(`filterTooltips.${f}`)}
                 >
                   {t(`filters.${f}`)}
                   <span className="text-muted-foreground ml-1">
