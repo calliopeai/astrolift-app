@@ -318,3 +318,44 @@ class AppUrlHealth:
     latency_ms: int | None
     last_checked: dt.datetime
     message: str
+
+
+@strawberry.type(name="AstroliftPromqlSeries")
+class PromqlSeries:
+    """One series (matrix row) from a raw PromQL execution (#750).
+
+    ``metric_labels`` is the label dict the Prometheus engine attached
+    to the series — for aggregated expressions it will be empty; for
+    ``sum by (code) (...)`` it will carry ``{"code": "200"}`` etc.
+    It is serialised as a JSON scalar so the FE doesn't need a fixed
+    schema per-query.
+
+    ``values`` is a list of ``[ts_unix, value]`` pairs — the same
+    shape Prometheus's ``query_range`` returns.  ``ts`` is UNIX seconds
+    as a float; ``value`` is the numeric sample (NaN is coerced to 0).
+    """
+
+    metric_labels: strawberry.scalars.JSON
+    """Label dict from the Prometheus engine — serialised as JSON."""
+
+    values: list[TimeSeriesPoint]
+    """Ordered list of (timestamp, value) samples."""
+
+
+@strawberry.type(name="AstroliftExecutePromqlResult")
+class ExecutePromqlResult:
+    """Envelope returned by ``astroliftExecutePromql`` (#750).
+
+    ``ok`` is ``False`` when the cluster has no Prometheus endpoint
+    configured or the PromQL expression was rejected by Prometheus.
+    ``error`` carries the operator-facing reason; ``series`` is empty
+    in the error case.
+
+    The caller is expected to show a "metrics unavailable" state when
+    ``ok`` is ``False`` rather than bubbling the error through a
+    GraphQL error field.
+    """
+
+    ok: bool
+    error: str
+    series: list[PromqlSeries]

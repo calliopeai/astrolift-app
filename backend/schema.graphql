@@ -1326,6 +1326,12 @@ type AstroliftEventPage {
   nextCursor: String
 }
 
+type AstroliftExecutePromqlResult {
+  ok: Boolean!
+  error: String!
+  series: [AstroliftPromqlSeries!]!
+}
+
 type AstroliftForceRedeployPayload {
   deploymentsCancelled: Int!
   k8sObjectsDeleted: Int!
@@ -1844,6 +1850,11 @@ type AstroliftProjectMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftProject
+}
+
+type AstroliftPromqlSeries {
+  metricLabels: JSON!
+  values: [AstroliftTimeSeriesPoint!]!
 }
 
 type AstroliftProviderPlugin {
@@ -4047,6 +4058,7 @@ type Query {
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
   astroliftAppManagedServiceMetrics(managedServiceId: ID!, rangeSeconds: Int = null): AstroliftManagedServiceMetrics
   astroliftPodResourceUsage(appSlug: String!, podName: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftPodResourceUsage
+  astroliftExecutePromql(appSlug: String!, query: String!, startUnix: Int!, endUnix: Int!, stepSeconds: Int!, environmentName: String = null): AstroliftExecutePromqlResult!
   astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail

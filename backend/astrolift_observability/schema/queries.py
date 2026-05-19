@@ -37,11 +37,13 @@ from astrolift_observability import prom_client, prom_queries, url_probe, url_re
 from astrolift_observability.schema.types import (
     AppGoldenSignal,
     AppUrlHealth,
+    ExecutePromqlResult,
     GoldenSignalKind,
     ManagedServiceMetrics,
     ManagedServiceMetricSeries,
     PodResourceUsage,
     PodResourceUsagePoint,
+    PromqlSeries,
     StatusCodeBreakdown,
     StatusCodeSeries,
     TimeSeriesPoint,
@@ -904,3 +906,88 @@ class GoldenSignalsQuery:
             restart_count=restart_count,
             last_restart_at=last_restart_at,
         )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_execute_promql(
+        self,
+        info: Info,
+        app_slug: str,
+        query: str,
+        start_unix: int,
+        end_unix: int,
+        step_seconds: int,
+        environment_name: str | None = None,
+    ) -> ExecutePromqlResult:
+        """Execute a raw PromQL expression against the cluster Prometheus (#750).
+
+        Proxies ``query_range`` to the Prometheus endpoint configured on the
+        app's cluster (``TenantCluster.provider_config['prometheus_endpoint']``).
+        Returns ``ok=False`` when no endpoint is configured or when Prometheus
+        rejects the expression — the FE shows a "metrics unavailable" state and
+        never surfaces the raw error to end-users.
+
+        ``start_unix`` / ``end_unix`` are UNIX seconds; ``step_seconds`` is the
+        resolution step. The caller is responsible for keeping the step value
+        sane — ``pick_step_seconds`` in ``prom_queries`` provides a standard
+        helper.
+
+        Permission: ``APP_READ`` — same gate as the golden-signals queries.
+        No PromQL allow-list: the query is passed verbatim. Operators with
+        ``APP_READ`` already have full read access to the cluster's metric stream
+        via the golden-signals surface; this query adds free-form expression
+        capability without widening the permission boundary.
+        """
+        if not query or not query.strip():
+            return ExecutePromqlResult(ok=False, error="query is required", series=[])
+        if step_seconds <= 0:
+            return ExecutePromqlResult(ok=False, error="step_seconds must be positive", series=[])
+        if end_unix <= start_unix:
+            return ExecutePromqlResult(ok=False, error="end_unix must be greater than start_unix", series=[])
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "slug")
+            .first()
+        )
+        if app is None:
+            return ExecutePromqlResult(ok=False, error="app not found", series=[])
+
+        endpoint = prom_client.resolve_prometheus_endpoint(
+            app=app, environment_name=environment_name
+        )
+        if endpoint is None:
+            return ExecutePromqlResult(
+                ok=False,
+                error="no Prometheus endpoint configured for this app's cluster",
+                series=[],
+            )
+
+        try:
+            rows = prometheus_client.query_range(
+                endpoint=endpoint,
+                query=query.strip(),
+                start_unix=start_unix,
+                end_unix=end_unix,
+                step_seconds=step_seconds,
+            )
+        except PrometheusError as exc:
+            return ExecutePromqlResult(ok=False, error=str(exc), series=[])
+
+        series: list[PromqlSeries] = []
+        for row in rows:
+            points = [
+                TimeSeriesPoint(
+                    ts=dt.datetime.fromtimestamp(ts_unix, tz=dt.UTC),
+                    value=value,
+                )
+                for ts_unix, value in row.values
+            ]
+            series.append(
+                PromqlSeries(
+                    metric_labels=dict(row.metric_labels),
+                    values=points,
+                )
+            )
+        return ExecutePromqlResult(ok=True, error="", series=series)
