@@ -101,6 +101,12 @@ interface AppDomain {
   certificateState: string;
   lastCertificateError: string;
   byoCertificateUploadedAt?: string | null;
+  // #731 cert observability — populated by the cached sidecar refresh
+  // worker. certExpiresAt is null when the cert hasn't been minted
+  // yet or the backend can't read the upstream provider's API.
+  certExpiresAt?: string | null;
+  certIssuerSerial?: string;
+  certObservabilityStatus?: string;
 }
 
 interface Resp {
@@ -125,6 +131,62 @@ const CERT_LABEL_KEYS: Record<string, string> = {
   validated: "validated",
   failed: "failed",
 };
+
+/**
+ * #731 — small inline badge surfacing the cert expiry window so an
+ * operator scanning the domains list sees a stale cert before they
+ * have to drill in. Renders nothing when the backend hasn't read the
+ * cert yet (`expiresAt` null). When the observability worker reports
+ * `failed` we show "Renewal failed" in destructive tone regardless of
+ * the days-remaining count.
+ */
+function CertExpiryBadge({
+  expiresAt,
+  status,
+}: {
+  expiresAt: string | null;
+  status: string;
+}) {
+  if (status === "failed") {
+    return (
+      <Badge variant="destructive" className="text-[10px]">
+        Renewal failed
+      </Badge>
+    );
+  }
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days < 0) {
+    return (
+      <Badge variant="destructive" className="text-[10px]">
+        Expired {Math.abs(days)}d ago
+      </Badge>
+    );
+  }
+  if (days <= 7) {
+    return (
+      <Badge variant="destructive" className="text-[10px]">
+        Expires in {days}d
+      </Badge>
+    );
+  }
+  if (days <= 14) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+      >
+        Expires in {days}d
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-muted-foreground text-[10px]">
+      Expires in {days}d
+    </Badge>
+  );
+}
 
 export function AppDomainsClient({ slug }: { slug: string }) {
   const t = useTranslations("apps.domains");
@@ -541,6 +603,10 @@ function DomainHandshakeCard({
               {t("platformZone")}
             </Badge>
           )}
+          {/* #731 — cert expiry badge. Hidden when the backend hasn't
+              read the cert yet (certExpiresAt null). Warning tone when
+              within 14d of expiry; danger tone when within 7d. */}
+          <CertExpiryBadge expiresAt={domain.certExpiresAt ?? null} status={domain.certObservabilityStatus ?? ""} />
           <span className="text-muted-foreground ml-auto text-xs">
             {domain.lastCheckedAt
               ? t("lastChecked", { at: new Date(domain.lastCheckedAt).toLocaleString() })

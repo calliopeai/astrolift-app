@@ -232,6 +232,9 @@ export const LIST_APP_DOMAINS = gql`
       certificateState
       lastCertificateError
       byoCertificateUploadedAt
+      certExpiresAt
+      certIssuerSerial
+      certObservabilityStatus
       requiredDnsRecords {
         kind
         name
