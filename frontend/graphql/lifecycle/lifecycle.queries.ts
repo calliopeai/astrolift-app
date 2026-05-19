@@ -25,6 +25,7 @@ export const LIST_DEPLOYMENTS = gql`
       environmentName
       workloadSlug
       triggerKind
+      strategy
       status
       imageTag
       imageDigest
@@ -75,6 +76,7 @@ export const GET_DEPLOYMENT = gql`
       environmentName
       workloadSlug
       triggerKind
+      strategy
       status
       imageTag
       imageDigest

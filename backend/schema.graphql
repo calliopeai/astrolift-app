@@ -959,6 +959,7 @@ type AstroliftDeployment {
   environmentName: String!
   workloadSlug: String
   triggerKind: String!
+  strategy: String!
   status: String!
   imageTag: String!
   imageDigest: String!
@@ -4154,6 +4155,7 @@ input StartDeploymentInput {
   commitAuthor: String = null
   prNumber: Int = null
   commitAuthorAvatarUrl: String = null
+  strategy: String = null
 }
 
 type StartWorkflowResult {

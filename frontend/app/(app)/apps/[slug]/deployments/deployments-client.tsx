@@ -470,6 +470,11 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                         <Badge variant="outline" className="text-xs capitalize">
                           {rep.triggerKind}
                         </Badge>
+                        {rep.strategy && rep.strategy !== "unknown" && (
+                          <div className="text-muted-foreground mt-1 text-[10px] capitalize">
+                            {rep.strategy.replace(/_/g, " ")}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <DeploymentStatusPill status={aggStatus} />

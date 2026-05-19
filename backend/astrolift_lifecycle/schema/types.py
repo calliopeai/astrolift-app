@@ -55,6 +55,11 @@ class DeploymentType:
     environment_name: str
     workload_slug: str | None
     trigger_kind: str
+    strategy: str
+    """Rollout strategy captured at deploy-creation time (#736).
+    One of ``rolling | blue_green | canary | recreate | unknown``.
+    Back-fill rows return ``unknown`` so the FE can render a neutral
+    pill instead of erroring on a missing value."""
     status: str
     image_tag: str
     image_digest: str
@@ -282,6 +287,7 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         environment_name=d.app_environment.name,
         workload_slug=d.workload.slug if d.workload_id else None,
         trigger_kind=d.trigger_kind,
+        strategy=getattr(d, "strategy", "") or "unknown",
         status=d.status,
         image_tag=d.image_tag or "",
         image_digest=d.image_digest or "",

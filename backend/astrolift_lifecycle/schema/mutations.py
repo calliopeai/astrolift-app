@@ -106,6 +106,10 @@ class StartDeploymentInput:
     # a dash).
     pr_number: int | None = None
     commit_author_avatar_url: str | None = None
+    # Rollout strategy (#736).  The Temporal workflow's rollout-policy
+    # step decides this; manual deploys default to "rolling" (the
+    # safest k8s default).  Accepted values mirror Deployment.Strategy.
+    strategy: str | None = None
 
 
 @strawberry.input
@@ -1090,11 +1094,20 @@ class LifecycleMutation:
                 approval_token_plaintext = issued.plaintext_token
                 approval_token_hash = issued.token_hash
                 approval_token_expires_at = issued.expires_at
+            # #736 — clamp strategy to known choices; treat anything
+            # else (including "") as "rolling" so the FE always renders
+            # a meaningful pill.  The workflow can override later if it
+            # decides on canary / blue-green.
+            strategy_in = (input.strategy or "rolling").strip().lower()
+            if strategy_in not in {s.value for s in Deployment.Strategy}:
+                strategy_in = "rolling"
+
             deployment = Deployment.objects.create(
                 registered_app=app,
                 app_environment=env,
                 triggered_by_user_id=actor.user_id,
                 trigger_kind=input.trigger_kind,
+                strategy=strategy_in,
                 status=initial_status.value,
                 image_tag=input.image_tag,
                 image_digest=input.image_digest or "",
@@ -1580,6 +1593,10 @@ class LifecycleMutation:
                 workload_id=deployment.workload_id,
                 triggered_by_user_id=actor.user_id,
                 trigger_kind=Deployment.TriggerKind.ROLLBACK.value,
+                # #736 — rollback inherits the prior known-good
+                # deploy's strategy so the operator gets the same kind
+                # of rollout they last had working.
+                strategy=(prior.strategy or "rolling"),
                 status=Deployment.Status.PENDING.value,
                 image_tag=prior.image_tag,
                 image_digest=prior.image_digest,
@@ -1648,6 +1665,8 @@ class LifecycleMutation:
                 workload_id=source.workload_id,
                 triggered_by_user_id=actor.user_id,
                 trigger_kind=Deployment.TriggerKind.MANUAL.value,
+                # #736 — redeploy keeps the source deploy's strategy.
+                strategy=(source.strategy or "rolling"),
                 status=initial_status.value,
                 image_tag=source.image_tag,
                 image_digest=source.image_digest,
