@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { LiveRegionProvider } from "@/components/LiveRegion";
+import { PlatformIncidentBanner } from "@/components/PlatformIncidentBanner";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { StepUpPrompt } from "@/components/StepUpPrompt";
@@ -39,22 +40,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <PreloadQuery query={GET_ME}>
       <PreloadQuery query={GET_MY_PERMISSIONS}>
         <PreloadQuery query={LIST_ORGANIZATIONS}>
-        <LiveRegionProvider>
-          <SkipToContent />
-          <SidebarProvider>
-            <AppSidebar ssrUser={ssrUser} />
-            <SidebarInset>
-              <PageHeader />
-              <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
-                {children}
-              </main>
-            </SidebarInset>
-            <CommandPalette />
-            <KeyboardShortcuts />
-            <SessionExpiredModal />
-            <StepUpPrompt />
-          </SidebarProvider>
-        </LiveRegionProvider>
+          <LiveRegionProvider>
+            <SkipToContent />
+            <div className="flex min-h-svh flex-col">
+              <PlatformIncidentBanner />
+              <SidebarProvider className="flex-1">
+                <AppSidebar ssrUser={ssrUser} />
+                <SidebarInset>
+                  <PageHeader />
+                  <main
+                    id="main-content"
+                    tabIndex={-1}
+                    className="flex flex-1 flex-col outline-none"
+                  >
+                    {children}
+                  </main>
+                </SidebarInset>
+                <CommandPalette />
+                <KeyboardShortcuts />
+                <SessionExpiredModal />
+                <StepUpPrompt />
+              </SidebarProvider>
+            </div>
+          </LiveRegionProvider>
         </PreloadQuery>
       </PreloadQuery>
     </PreloadQuery>
