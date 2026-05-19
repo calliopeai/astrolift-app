@@ -47,6 +47,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -193,6 +194,12 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="timeseries_monitor",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         workspace_name = self._workspace_name_for(spec=spec)
         cfg = spec.config or {}
@@ -363,6 +370,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="timeseries_monitor")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         workspace_name = self._workspace_name_from_handle(spec.handle)
         cfg = spec.config or {}

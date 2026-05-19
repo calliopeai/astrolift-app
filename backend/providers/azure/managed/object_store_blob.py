@@ -40,6 +40,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -85,6 +86,12 @@ class BlobStorageDriver(ManagedServiceDriver):
                 credential=DefaultAzureCredential(),
             )
 
+    @driver_op(
+        cloud="azure",
+        driver="object_store_blob",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         container_name = self._container_name_for(spec=spec)
         try:
@@ -117,6 +124,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             message=f"Blob container {container_name} provisioned",
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -124,6 +132,12 @@ class BlobStorageDriver(ManagedServiceDriver):
             message="Blob container access tier / lifecycle policies " "are operator-managed",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="object_store_blob",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -166,6 +180,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             message=f"container {container_name} deleted with data",
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, _, container_name = handle.handle.partition("/")
         try:
@@ -191,6 +206,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             message=f"container {container_name} reachable",
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, _, container_name = handle.handle.partition("/")
         return Binding(
@@ -219,6 +235,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -228,6 +245,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob")
     def restore(self, snapshot, target):
         return ProvisionResult(
             ok=False,
@@ -236,6 +254,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             errors=["not_implemented"],
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob", heartbeat=False)
     def config_schema(self):
         return {
             "type": "object",
@@ -247,6 +266,7 @@ class BlobStorageDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="object_store_blob", heartbeat=False)
     def binding_schema(self):
         return BindingSchema(
             env_vars={
@@ -335,6 +355,12 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="object_store_blob_v2",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         container_name = self._container_name_for(spec=spec)
         try:
@@ -362,6 +388,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             message=f"Blob container {container_name} provisioned",
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -372,6 +399,12 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="object_store_blob_v2",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -461,6 +494,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         container_name = self._container_name_from_handle(handle.handle)
         container_client = self._client.get_container_client(container_name)
@@ -484,6 +518,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             message=f"container {container_name} reachable",
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2")
     def binding(self, handle: ServiceHandle) -> Binding:
         container_name = self._container_name_from_handle(handle.handle)
         endpoint = f"https://{self._config.storage_account}" f".blob.core.windows.net/{container_name}"
@@ -515,6 +550,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         # Azure Blob versioning is account-level, not container-level;
         # the snapshot here is a marker the workflow layer can use to
@@ -528,6 +564,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -543,6 +580,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             errors=["not_implemented"],
         )
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -558,6 +596,7 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="object_store_blob_v2", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

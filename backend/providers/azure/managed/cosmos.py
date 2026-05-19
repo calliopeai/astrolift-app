@@ -36,6 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -198,6 +199,12 @@ class AzureCosmosDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="cosmos",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
@@ -323,6 +330,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             message=(f"cosmos account {account_name} provisioning (api={api_kind}, db={database_name})"),
         )
 
+    @driver_op(cloud="azure", driver="cosmos")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         account_name = self._account_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -384,6 +392,12 @@ class AzureCosmosDriver(ManagedServiceDriver):
             message=f"cosmos account {account_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="cosmos",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -475,6 +489,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="cosmos")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         account_name = self._account_name_from_handle(handle.handle)
         existing = self._describe(account_name)
@@ -494,6 +509,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="cosmos")
     def binding(self, handle: ServiceHandle) -> Binding:
         account_name = self._account_name_from_handle(handle.handle)
         existing = self._describe(account_name)
@@ -548,6 +564,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="cosmos")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """Cosmos's restore story is continuous-backup point-in-time
         restore, not snapshot-per-call. We surface a SnapshotHandle
@@ -575,6 +592,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             created_at=now.isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="cosmos")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -627,6 +645,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             message=(f"cosmos restore from {snapshot.snapshot_id} queued"),
         )
 
+    @driver_op(cloud="azure", driver="cosmos", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -653,6 +672,7 @@ class AzureCosmosDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="cosmos", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

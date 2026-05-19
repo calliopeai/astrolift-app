@@ -37,6 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -87,6 +88,12 @@ class ServiceBusDriver(ManagedServiceDriver):
                 subscription_id=config.subscription_id,
             )
 
+    @driver_op(
+        cloud="azure",
+        driver="queue_servicebus",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         queue_name = self._queue_name(spec=spec)
         try:
@@ -116,6 +123,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             message=f"Service Bus queue {queue_name} provisioned",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -125,6 +133,12 @@ class ServiceBusDriver(ManagedServiceDriver):
             "are operator-managed",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="queue_servicebus",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -159,6 +173,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             message=f"queue {queue_name} deleted",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, _, queue_name = handle.handle.partition("/")
         try:
@@ -185,6 +200,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             message=f"queue {queue_name} reachable",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, _, queue_name = handle.handle.partition("/")
         endpoint = f"sb://{self._config.namespace_name}.servicebus.windows.net/"
@@ -213,6 +229,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             notes=("Workload Identity grants sender + receiver roles via " "Microsoft.Authorization/roleAssignments."),
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus")
     def snapshot(self, handle):
         from _sdk import UnsupportedOperationError
 
@@ -221,6 +238,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             "Bus messages are ephemeral; no snapshot (#618)",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus")
     def restore(self, snapshot, target):
         from _sdk import UnsupportedOperationError
 
@@ -228,6 +246,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             "managed_service.restore(ServiceBus) not supported -- Service " "Bus doesn't restore from snapshot (#618)",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus", heartbeat=False)
     def config_schema(self):
         return {
             "type": "object",
@@ -240,6 +259,7 @@ class ServiceBusDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="queue_servicebus", heartbeat=False)
     def binding_schema(self):
         return BindingSchema(
             env_vars={
@@ -345,6 +365,12 @@ class AzureServiceBusDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="queue_servicebus_v2",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         topic_name = self._topic_name(spec=spec)
         sub_name = self._default_sub_name(topic_name=topic_name)
@@ -419,6 +445,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             message=(f"Service Bus topic {topic_name} + subscription " f"{sub_name} provisioned"),
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         topic_name = self._topic_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -456,6 +483,12 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             message=f"topic {topic_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="queue_servicebus_v2",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -558,6 +591,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         topic_name = self._topic_name_from_handle(handle.handle)
         topic = self._topic_state(topic_name)
@@ -574,6 +608,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             message=f"azure reports {sb_status}",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def binding(self, handle: ServiceHandle) -> Binding:
         topic_name = self._topic_name_from_handle(handle.handle)
         sub_name = self._default_sub_name(topic_name=topic_name)
@@ -611,11 +646,13 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         raise AzureServiceBusError(
             "Service Bus messages are ephemeral; no snapshot support",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -625,6 +662,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             "Service Bus has no restore counterpart -- in-flight " "messages have no recovery value",
         )
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -651,6 +689,7 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="queue_servicebus_v2", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

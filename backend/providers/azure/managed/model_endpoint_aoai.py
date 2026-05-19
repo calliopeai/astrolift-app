@@ -37,6 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -190,6 +191,12 @@ class AzureOpenAIDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="model_endpoint_aoai",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
@@ -294,6 +301,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         deployment_name = self._deployment_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -365,6 +373,12 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             message=f"aoai deployment {deployment_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="model_endpoint_aoai",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -440,6 +454,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         deployment_name = self._deployment_name_from_handle(handle.handle)
         existing = self._describe(deployment_name)
@@ -458,6 +473,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai")
     def binding(self, handle: ServiceHandle) -> Binding:
         deployment_name = self._deployment_name_from_handle(handle.handle)
         existing = self._describe(deployment_name)
@@ -528,6 +544,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         # Azure OpenAI deployments have no service-side snapshot;
         # the deployment config is itself the "snapshot" (cheap to
@@ -548,6 +565,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -566,6 +584,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -589,6 +608,7 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="model_endpoint_aoai", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
