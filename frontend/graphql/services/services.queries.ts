@@ -16,6 +16,8 @@ export const LIST_APP_SECRETS = gql`
         username
         displayName
       }
+      expiresAt
+      setVia
     }
   }
 `;

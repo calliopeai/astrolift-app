@@ -99,6 +99,11 @@ interface AppSecret {
   isMasked: boolean;
   lastEditedAt?: string | null;
   lastEditedBy?: SecretEditor | null;
+  // #677 / #678 — sidecar metadata. expiresAt is null when no
+  // explicit rotation deadline; setVia falls back to "web" for rows
+  // the platform has never tagged.
+  expiresAt?: string | null;
+  setVia?: string;
 }
 
 interface AppSecretBundleAttachment {
@@ -145,6 +150,53 @@ const SOURCE_TONE: Record<string, "secondary" | "outline" | "default"> = {
   bundle: "outline",
   managed_service: "default",
 };
+
+// #678 — provenance of the most recent set/rotate write. Keep these in
+// sync with `AppSecretType.set_via` valid values in the backend.
+const SET_VIA_LABEL: Record<string, string> = {
+  web: "web",
+  cli: "CLI",
+  env_paste: ".env paste",
+  bundle: "bundle sync",
+  managed_service: "managed service",
+};
+
+/** #677 — small inline expiry chip for the secret key cell. Hidden when
+ *  no rotation deadline is set; warning < 14d; destructive < 7d / past. */
+function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined }) {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days < 0) {
+    return (
+      <Badge variant="destructive" className="ml-2 text-[10px]">
+        Expired {Math.abs(days)}d ago
+      </Badge>
+    );
+  }
+  if (days <= 7) {
+    return (
+      <Badge variant="destructive" className="ml-2 text-[10px]">
+        Rotate — expires in {days}d
+      </Badge>
+    );
+  }
+  if (days <= 14) {
+    return (
+      <Badge
+        variant="outline"
+        className="ml-2 border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+      >
+        Expires in {days}d
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-muted-foreground ml-2 text-[10px]">
+      Expires in {days}d
+    </Badge>
+  );
+}
 
 export function SecretsClient({ slug }: { slug: string }) {
   const t = useTranslations("apps.secrets");
@@ -660,15 +712,20 @@ function SecretRow({
   const t = useTranslations("apps.secrets");
   const isRevealed = revealed !== null;
   const canEdit = s.source === "literal" && isRevealed;
-  const lastEditedTooltip = s.lastEditedBy
-    ? t("lastEditedBy", {
-        name: s.lastEditedBy.displayName || s.lastEditedBy.username,
-      })
-    : t("lastEditedByUnknown");
+  const editorName = s.lastEditedBy?.displayName || s.lastEditedBy?.username;
+  const setViaLabel = SET_VIA_LABEL[s.setVia ?? "web"] ?? s.setVia ?? "web";
+  // Build a multi-line tooltip: "edited by X — set via Y". Drops the
+  // "by X" half when the writer is unknown (e.g. backfilled rows).
+  const lastEditedTooltip = editorName
+    ? `${t("lastEditedBy", { name: editorName })} · set via ${setViaLabel}`
+    : `${t("lastEditedByUnknown")} · set via ${setViaLabel}`;
 
   return (
     <TableRow>
-      <TableCell className="font-mono text-xs">{s.key}</TableCell>
+      <TableCell className="font-mono text-xs">
+        {s.key}
+        <SecretExpiryBadge expiresAt={s.expiresAt} />
+      </TableCell>
       <TableCell className="font-mono text-xs">
         {editing && canEdit ? (
           <InlineValueEditor
