@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from datetime import timedelta
 
 import strawberry
@@ -24,6 +25,7 @@ from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import (
     AppSecretBundleRef,
+    AppSecretMetadata,
     ManagedService,
     SecretBundle,
     SecretChangeApproval,
@@ -74,6 +76,44 @@ class SetAppSecretInput:
     # skip the check (back-compat).
     if_match_version: int | None = None
 
+    # ---- sidecar metadata (#677 / #678) -----------------------------
+    expires_at: dt.datetime | None = None
+    """Operator-declared rotation deadline (#677).  When supplied,
+    the resolver upserts an ``AppSecretMetadata`` row for the (app,
+    env, key) triple.  Omitted/null preserves whatever the previous
+    metadata row held (no clobber)."""
+
+    set_via: str | None = None
+    """Provenance tag (#678).  Defaults to ``web`` for set/rotate
+    writes that don't supply it; a CLI / env-paste / managed-service
+    integration may pass an explicit value so the FE can render
+    'Set via CLI on May 12' in the secret-row's last-edited tooltip."""
+
+
+@strawberry.input
+class SetAppSecretMetadataInput:
+    """Standalone metadata edit (#677 / #678).
+
+    Lets the FE edit expiry / provenance without re-writing the
+    underlying secret value — operators sometimes annotate metadata
+    after the value was set by an integration that didn't tag it.
+    """
+
+    app_slug: str
+    key: str
+    environment_name: str | None = None
+    """Empty / None means 'applies to every env that surfaces this
+    key' — used by the FE's wildcard editor.  A concrete env-name
+    creates a per-env override row."""
+
+    expires_at: dt.datetime | None = None
+    """Null clears the deadline.  A concrete datetime sets it."""
+
+    set_via: str | None = None
+    """One of ``web | cli | env_paste | bundle | managed_service``.
+    None preserves the existing value when the row already exists;
+    on first creation defaults to ``web``."""
+
 
 @strawberry.input
 class RotateAppSecretInput:
@@ -89,6 +129,14 @@ class RotateAppSecretInput:
     key: str
     value: str
     if_match_version: int | None = None
+
+    # ---- sidecar metadata (#677 / #678) -----------------------------
+    # Same shape as ``SetAppSecretInput``.  A rotation is naturally a
+    # moment to refresh expiry; the FE pre-fills the existing value
+    # so an operator's "rotate" click without changing the expiry
+    # carries the previous value back through.
+    expires_at: dt.datetime | None = None
+    set_via: str | None = None
 
 
 @strawberry.input
@@ -370,6 +418,22 @@ class _BulkImportPayload:
 
 
 @strawberry.type
+class _AppSecretMetadataPayload:
+    """Return shape for ``setAppSecretMetadata`` (#677 / #678).
+
+    Carries the resolved row contents so the FE can update the
+    expires-at chip + provenance tooltip without a refetch round-trip.
+    """
+
+    app_slug: str
+    key: str
+    environment_name: str
+    expires_at: dt.datetime | None
+    set_via: str
+    set_at: dt.datetime | None
+
+
+@strawberry.type
 class _AttachmentRemovedPayload:
     attachment_id: GUID
     deleted: bool
@@ -506,6 +570,70 @@ def _maybe_create_proposal_for_write(
         updated_by=actor,
     )
     return proposal
+
+
+_VALID_SECRET_SOURCES = {s.value for s in AppSecretMetadata.Source}
+
+
+def _upsert_app_secret_metadata(
+    *,
+    app: RegisteredApp,
+    key: str,
+    environment_name: str = "",
+    expires_at: dt.datetime | None = None,
+    set_via: str | None = None,
+    actor=None,
+) -> AppSecretMetadata:
+    """Upsert the operator-facing metadata sidecar for a secret literal.
+
+    Idempotent on (registered_app, environment_name, key).  Each call
+    refreshes ``set_at`` to ``timezone.now()`` so the FE can render a
+    'set on <date>' tooltip independent of the underlying audit row.
+
+    ``expires_at=None`` + ``set_via=None`` is a no-op on the timestamp /
+    expiry but still touches ``set_at`` — operators sometimes want a
+    'last-touched' refresh without changing the data, and the cost of
+    one UPDATE per literal write is negligible against the platform's
+    overall throughput.
+    """
+    if set_via is not None and set_via not in _VALID_SECRET_SOURCES:
+        # Reject unknown sources up front so a typo doesn't silently
+        # land an out-of-band value on the column.
+        set_via = AppSecretMetadata.Source.WEB.value
+    row = AppSecretMetadata.objects.filter(
+        registered_app=app,
+        environment_name=environment_name or "",
+        key=key,
+        deleted_at__isnull=True,
+    ).first()
+    if row is None:
+        row = AppSecretMetadata.objects.create(
+            registered_app=app,
+            environment_name=environment_name or "",
+            key=key,
+            expires_at=expires_at,
+            source=(set_via or AppSecretMetadata.Source.WEB.value),
+            set_at=timezone.now(),
+            created_by=actor,
+            updated_by=actor,
+        )
+        return row
+    # Apply optional updates atomically.  We don't clear
+    # ``expires_at`` to None unless the caller explicitly passes a
+    # value — `None` means "don't touch" per the input contract.
+    updates: dict = {"set_at": timezone.now()}
+    if expires_at is not None:
+        updates["expires_at"] = expires_at
+    if set_via is not None:
+        updates["source"] = set_via
+    for k, v in updates.items():
+        setattr(row, k, v)
+    if actor is not None:
+        row.updated_by = actor
+    row.save(
+        update_fields=[*updates.keys(), "updated_by", "updated_at"],
+    )
+    return row
 
 
 def _validate_env_key(key: str) -> str | None:
@@ -659,6 +787,18 @@ class ServicesMutation:
                 f"manifest parse failed after edit: {exc}",
                 field="rawManifest",
             )
+        # #677 / #678 — refresh sidecar metadata on every direct write.
+        # The metadata row is keyed at the wildcard env scope ('') for
+        # set/rotate writes since the mutation itself isn't env-bound;
+        # operators add per-env overrides via setAppSecretMetadata.
+        _upsert_app_secret_metadata(
+            app=app,
+            key=input.key,
+            environment_name="",
+            expires_at=input.expires_at,
+            set_via=input.set_via,
+            actor=_actor_user(info),
+        )
         return gql_success(
             _AppSecretWritePayload(
                 app_slug=app.slug,
@@ -724,6 +864,15 @@ class ServicesMutation:
                 f"manifest parse failed after rotate: {exc}",
                 field="rawManifest",
             )
+        # #677 / #678 — refresh sidecar metadata on rotate as well.
+        _upsert_app_secret_metadata(
+            app=app,
+            key=input.key,
+            environment_name="",
+            expires_at=input.expires_at,
+            set_via=input.set_via,
+            actor=_actor_user(info),
+        )
         return gql_success(
             _AppSecretWritePayload(
                 app_slug=app.slug,
@@ -780,11 +929,75 @@ class ServicesMutation:
                 f"manifest parse failed after delete: {exc}",
                 field="rawManifest",
             )
+        # #677 / #678 — soft-delete metadata rows for the removed key so
+        # a re-add later doesn't silently re-use stale expiry / source.
+        # Soft delete keeps the row available for the audit trail.
+        actor = _actor_user(info)
+        for row in AppSecretMetadata.objects.filter(
+            registered_app=app,
+            key=input.key,
+            deleted_at__isnull=True,
+        ):
+            row.soft_delete(by=actor)
         return gql_success(
             _AppSecretWritePayload(
                 app_slug=app.slug,
                 key=input.key,
                 raw_manifest_staged=staged,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="app.secret.metadata.set", target=_app_secret_target_from_input)
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def set_app_secret_metadata(
+        self,
+        info: Info,
+        input: SetAppSecretMetadataInput,
+    ) -> MutationResultType[_AppSecretMetadataPayload]:
+        """Set / clear operator-facing metadata for one secret literal
+        (#677 / #678).
+
+        The underlying value is never touched — this mutation only
+        edits the sidecar ``AppSecretMetadata`` row.  Permission gate
+        is ``app.update`` (same as set/rotate) since the metadata feeds
+        the secret-row UI and an operator who can edit the app should
+        be allowed to annotate its secrets.
+
+        ``expires_at=null`` on an existing row preserves the current
+        deadline.  To clear the deadline pass a value of ``None`` with
+        ``set_via='clear'`` — reserved for future expansion when an
+        explicit clear semantics is needed (current FE only sets +
+        refreshes; it never clears)."""
+        msg = _validate_env_key(input.key)
+        if msg:
+            return gql_failure(ErrorCode.VALIDATION.value, msg, field="key")
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        if input.set_via is not None and input.set_via not in _VALID_SECRET_SOURCES:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown set_via value {input.set_via!r}; allowed: {sorted(_VALID_SECRET_SOURCES)}",
+                field="setVia",
+            )
+        row = _upsert_app_secret_metadata(
+            app=app,
+            key=input.key,
+            environment_name=(input.environment_name or ""),
+            expires_at=input.expires_at,
+            set_via=input.set_via,
+            actor=_actor_user(info),
+        )
+        return gql_success(
+            _AppSecretMetadataPayload(
+                app_slug=app.slug,
+                key=row.key,
+                environment_name=row.environment_name,
+                expires_at=row.expires_at,
+                set_via=row.source,
+                set_at=row.set_at,
             )
         )
 
@@ -827,6 +1040,19 @@ class ServicesMutation:
                 ErrorCode.VALIDATION.value,
                 f"manifest parse failed after bulk import: {exc}",
                 field="rawManifest",
+            )
+        # #678 — tag every imported key as `env_paste` so the secret-row
+        # tooltip can render "Set via .env paste on <date>".  Operators
+        # then bulk-rotate via the dedicated UI; the source flips on
+        # the next set/rotate.
+        actor = _actor_user(info)
+        for key in kvs:
+            _upsert_app_secret_metadata(
+                app=app,
+                key=key,
+                environment_name="",
+                set_via=AppSecretMetadata.Source.ENV_PASTE.value,
+                actor=actor,
             )
         return gql_success(
             _BulkImportPayload(

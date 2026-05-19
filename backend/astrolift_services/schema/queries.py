@@ -12,6 +12,7 @@ from astrolift_manifest.env_injection import envelope_keys_for
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import (
     AppSecretBundleRef,
+    AppSecretMetadata,
     ManagedService,
     SecretBundle,
     SecretChangeProposal,
@@ -225,6 +226,13 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
       from the secrets backend; we surface the bundle slug + prefix
       so the UI shows 'attached')
     - per-env ManagedService bindings (envelope keys per binding)
+
+    Each literal row is decorated with the operator-facing metadata
+    from ``AppSecretMetadata`` when present (#677 / #678).  Metadata
+    is looked up by ``(env_name, key)`` with empty env_name as a
+    fallback for the 'applies to every env' default — a per-env row
+    wins over the wildcard.  Missing metadata defaults to no expiry +
+    ``set_via='web'`` so older rows render identically.
     """
     out: list[AppSecretType] = []
 
@@ -234,8 +242,23 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     raw_text = app.manifest_raw_staged or app.manifest_raw or ""
     literals = read_app_env(raw_text)
     literal_editor = secret_editor_from_user(app.updated_by)
+
+    # Pre-fetch metadata for this app's literal keys so the resolver
+    # is one round-trip rather than N.  The lookup table maps
+    # ``(env_name, key)`` → row.  An empty env_name acts as the
+    # wildcard fallback when no per-env row exists.
+    meta_qs = AppSecretMetadata.objects.filter(
+        registered_app=app,
+        key__in=list(literals.keys()) or [""],
+        deleted_at__isnull=True,
+    )
+    meta_index: dict[tuple[str, str], AppSecretMetadata] = {}
+    for m in meta_qs:
+        meta_index[(m.environment_name, m.key)] = m
+
     for env_name in env_names:
         for key in sorted(literals):
+            meta = meta_index.get((env_name, key)) or meta_index.get(("", key))
             out.append(
                 AppSecretType(
                     id=_secret_id(source="literal", key=key, env=env_name),
@@ -247,6 +270,8 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
                     is_masked=True,
                     last_edited_at=app.updated_at,
                     last_edited_by=literal_editor,
+                    expires_at=meta.expires_at if meta else None,
+                    set_via=(meta.source if meta else "web"),
                 )
             )
 
@@ -276,6 +301,8 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
                 is_masked=True,
                 last_edited_at=ref.updated_at,
                 last_edited_by=secret_editor_from_user(ref.updated_by),
+                expires_at=None,
+                set_via="bundle",
             )
         )
 
@@ -304,6 +331,8 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
                     is_masked=True,
                     last_edited_at=svc.updated_at,
                     last_edited_by=svc_editor,
+                    expires_at=None,
+                    set_via="managed_service",
                 )
             )
 

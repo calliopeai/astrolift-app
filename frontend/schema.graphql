@@ -61,6 +61,21 @@ input ApproveSecretChangeInput {
   reason: String = null
 }
 
+type Appsecretmetadatapayload {
+  appSlug: String!
+  key: String!
+  environmentName: String!
+  expiresAt: DateTime
+  setVia: String!
+  setAt: DateTime
+}
+
+type AppsecretmetadatapayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Appsecretmetadatapayload
+}
+
 type Appsecretwritepayload {
   appSlug: String!
   key: String!
@@ -453,6 +468,8 @@ type AstroliftAppSecret {
   isMasked: Boolean!
   lastEditedAt: DateTime
   lastEditedBy: AstroliftSecretEditor
+  expiresAt: DateTime
+  setVia: String!
 }
 
 type AstroliftAppSecretBundleAttachment {
@@ -3396,6 +3413,7 @@ type Mutation {
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
+  setAppSecretMetadata(input: SetAppSecretMetadataInput!): AppsecretmetadatapayloadMutationResult!
   bulkImportAppSecrets(input: BulkImportAppSecretsInput!): BulkimportpayloadMutationResult!
   revealAppSecret(input: RevealAppSecretInput!): AstroliftRevealedSecretMutationResult!
   attachSecretBundle(input: AttachSecretBundleInput!): AstroliftAppSecretBundleAttachmentMutationResult!
@@ -3991,6 +4009,8 @@ input RotateAppSecretInput {
   key: String!
   value: String!
   ifMatchVersion: Int = null
+  expiresAt: DateTime = null
+  setVia: String = null
 }
 
 input RotateDeployTokenInput {
@@ -4036,6 +4056,16 @@ input SetAppSecretInput {
   key: String!
   value: String!
   ifMatchVersion: Int = null
+  expiresAt: DateTime = null
+  setVia: String = null
+}
+
+input SetAppSecretMetadataInput {
+  appSlug: String!
+  key: String!
+  environmentName: String = null
+  expiresAt: DateTime = null
+  setVia: String = null
 }
 
 input SetAppSubdomainInput {
