@@ -2715,6 +2715,12 @@ export type BringClusterIntoManagementInputType = {
   clusterId: Scalars['GUID']['input'];
 };
 
+export type BulkAppResultItem = {
+  appSlug: Scalars['String']['output'];
+  errors: Array<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type BulkApproveDeploymentsInput = {
   deploymentIds: Array<Scalars['GUID']['input']>;
   reason: InputMaybe<Scalars['String']['input']>;
@@ -2731,13 +2737,34 @@ export type BulkImportAppSecretsInput = {
   dotenvText: Scalars['String']['input'];
 };
 
+export type BulkOperationResult = {
+  failedCount: Scalars['Int']['output'];
+  okCount: Scalars['Int']['output'];
+  perApp: Array<BulkAppResultItem>;
+};
+
+export type BulkPushSecretsInput = {
+  appSlugs: Array<Scalars['String']['input']>;
+  bundleSlug: Scalars['String']['input'];
+  environmentName: InputMaybe<Scalars['String']['input']>;
+};
+
 export type BulkRejectDeploymentsInput = {
   deploymentIds: Array<Scalars['GUID']['input']>;
   reason: Scalars['String']['input'];
 };
 
+export type BulkResyncManifestInput = {
+  appSlugs: Array<Scalars['String']['input']>;
+};
+
 export type BulkRevokeRoleBindingsInput = {
   bindingIds: Array<Scalars['GUID']['input']>;
+};
+
+export type BulkRollingRestartInput = {
+  appSlugs: Array<Scalars['String']['input']>;
+  environmentName: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Bulkimportpayload = {
@@ -3353,8 +3380,11 @@ export type Mutation = {
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   bulkAssignAstroliftTeamMemberRoles: AstroliftBulkAssignTeamMemberRolesPayloadMutationResult;
   bulkImportAppSecrets: BulkimportpayloadMutationResult;
+  bulkPushSecrets: BulkOperationResult;
   bulkRejectDeployments: AstroliftBulkDeploymentResultDataMutationResult;
+  bulkResyncManifest: BulkOperationResult;
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
+  bulkRollingRestart: BulkOperationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   cancelWorkflowInstance: MutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
@@ -3708,13 +3738,28 @@ export type MutationBulkImportAppSecretsArgs = {
 };
 
 
+export type MutationBulkPushSecretsArgs = {
+  input: BulkPushSecretsInput;
+};
+
+
 export type MutationBulkRejectDeploymentsArgs = {
   input: BulkRejectDeploymentsInput;
 };
 
 
+export type MutationBulkResyncManifestArgs = {
+  input: BulkResyncManifestInput;
+};
+
+
 export type MutationBulkRevokeAstroliftRoleBindingsArgs = {
   input: BulkRevokeRoleBindingsInput;
+};
+
+
+export type MutationBulkRollingRestartArgs = {
+  input: BulkRollingRestartInput;
 };
 
 
