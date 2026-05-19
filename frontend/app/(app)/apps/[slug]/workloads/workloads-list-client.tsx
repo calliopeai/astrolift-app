@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
@@ -8,16 +8,23 @@ import {
   GlobeIcon,
   HardDriveIcon,
   LayersIcon,
+  Loader2Icon,
   RocketIcon,
+  ScalingIcon,
   WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { toast } from "sonner";
 
+import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -27,6 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SCALE_WORKLOAD } from "@/graphql/lifecycle/lifecycle.mutations";
+import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import {
@@ -274,9 +283,25 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        <Badge className={readinessTone(live.ready, live.desired)}>
-                          Ready {live.ready}/{live.desired}
-                        </Badge>
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <Badge className={readinessTone(live.ready, live.desired)}>
+                            Ready {live.ready}/{live.desired}
+                          </Badge>
+                          {/* #668 — inline scale popover so operators
+                              can bump replicas during an incident
+                              without navigating to the detail page.
+                              HPA-bound workloads skip the affordance
+                              (HPA owns the replica count). */}
+                          {!w.hpaMinReplicas && !w.hpaMaxReplicas ? (
+                            <Can permission="app.deploy">
+                              <ScalePopover
+                                workloadId={w.id}
+                                workloadName={w.name}
+                                currentDesired={live.desired}
+                              />
+                            </Can>
+                          ) : null}
+                        </div>
                         {w.hpaMinReplicas && w.hpaMaxReplicas ? (
                           <div className="text-muted-foreground mt-1">
                             HPA {w.hpaMinReplicas}–{w.hpaMaxReplicas} @{" "}
@@ -332,6 +357,90 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+function ScalePopover({
+  workloadId,
+  workloadName,
+  currentDesired,
+}: {
+  workloadId: string;
+  workloadName: string;
+  currentDesired: number;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [value, setValue] = React.useState(String(currentDesired));
+  React.useEffect(() => {
+    if (open) setValue(String(currentDesired));
+  }, [open, currentDesired]);
+  const [scale, { loading }] = useMutation<{
+    scaleAstroliftWorkload: MutationResult<unknown>;
+  }>(SCALE_WORKLOAD);
+
+  async function apply() {
+    const next = Number.parseInt(value, 10);
+    if (Number.isNaN(next) || next < 0 || next > 50) {
+      toast.error("Replicas must be a number between 0 and 50");
+      return;
+    }
+    if (next === currentDesired) {
+      setOpen(false);
+      return;
+    }
+    try {
+      const { data } = await scale({
+        variables: { input: { workloadId, replicas: next } },
+      });
+      if (data?.scaleAstroliftWorkload.ok) {
+        toast.success(`${workloadName} → ${next} replicas`);
+        setOpen(false);
+      } else {
+        toast.error(data?.scaleAstroliftWorkload.errors?.[0]?.message ?? "Scale failed");
+      }
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          title={`Scale ${workloadName}`}
+        >
+          <ScalingIcon className="size-3" />
+          <span className="sr-only">Scale</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-3" align="start">
+        <p className="mb-2 text-xs font-medium">Scale {workloadName}</p>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={0}
+            max={50}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="h-8"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void apply();
+              if (e.key === "Escape") setOpen(false);
+            }}
+            autoFocus
+          />
+          <Button size="sm" onClick={() => void apply()} disabled={loading}>
+            {loading ? <Loader2Icon className="size-3 animate-spin" /> : "Apply"}
+          </Button>
+        </div>
+        <p className="text-muted-foreground mt-2 text-[11px]">
+          Current: {currentDesired}. Takes effect immediately.
+        </p>
+      </PopoverContent>
+    </Popover>
   );
 }
 
