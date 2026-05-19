@@ -358,6 +358,15 @@ export type AstroliftAppDomainRequiredRecord = {
   value: Scalars['String']['output'];
 };
 
+export type AstroliftAppEndpointMetric = {
+  errorRateRatio: Scalars['Float']['output'];
+  p50Ms?: Maybe<Scalars['Float']['output']>;
+  p90Ms?: Maybe<Scalars['Float']['output']>;
+  p99Ms?: Maybe<Scalars['Float']['output']>;
+  requestRate: Scalars['Float']['output'];
+  route: Scalars['String']['output'];
+};
+
 export type AstroliftAppEnvironment = {
   clusterSlug?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
@@ -5059,6 +5068,7 @@ export type Query = {
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
   astroliftAppDnsRecords: Array<AstroliftAppDnsRecord>;
   astroliftAppDomains: Array<AstroliftAppDomain>;
+  astroliftAppEndpointMetrics: Array<AstroliftAppEndpointMetric>;
   astroliftAppGoldenSignals: Array<AstroliftAppGoldenSignal>;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding?: Maybe<AstroliftAppIdentityBinding>;
@@ -5240,6 +5250,14 @@ export type QueryAstroliftAppDnsRecordsArgs = {
 
 export type QueryAstroliftAppDomainsArgs = {
   appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppEndpointMetricsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
