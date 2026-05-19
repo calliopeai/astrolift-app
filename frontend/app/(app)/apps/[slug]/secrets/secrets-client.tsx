@@ -5,11 +5,13 @@ import {
   CheckIcon,
   EyeIcon,
   EyeOffIcon,
+  HistoryIcon,
   KeyIcon,
   LayersIcon,
   Loader2Icon,
   PencilIcon,
   PlusIcon,
+  RotateCwIcon,
   Trash2Icon,
   UploadIcon,
   XIcon,
@@ -43,6 +45,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -62,9 +65,11 @@ import {
   DELETE_APP_SECRET,
   DETACH_SECRET_BUNDLE,
   REVEAL_APP_SECRET,
+  ROTATE_APP_SECRET,
   SET_APP_SECRET,
 } from "@/graphql/services/services.mutations";
 import {
+  GET_APP_SECRET_HISTORY,
   GET_APP_VERSION,
   LIST_APP_SECRETS,
   LIST_APP_SECRET_BUNDLE_ATTACHMENTS,
@@ -152,6 +157,15 @@ export function SecretsClient({ slug }: { slug: string }) {
   const [revealedValues, setRevealedValues] = React.useState<Record<string, string>>({});
   // editingId: which row is in inline-edit mode (must be revealed first).
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  // #714 — rotatingId: which row is in inline-rotate mode. Same UI as
+  // edit (reuses InlineValueEditor) but the save handler routes to
+  // rotateAppSecret so the audit log carries action='app.secret.rotate'.
+  const [rotatingId, setRotatingId] = React.useState<string | null>(null);
+  // #714 — historyKey: which (id, key) pair's audit popover is open.
+  const [historyTarget, setHistoryTarget] = React.useState<{
+    secretId: string;
+    key: string;
+  } | null>(null);
   // revealingId: which row's reveal mutation is currently in flight.
   // Tracked locally because Apollo's useMutation result doesn't expose
   // the in-flight input variables in a typed way across SDK versions.
@@ -208,6 +222,17 @@ export function SecretsClient({ slug }: { slug: string }) {
       rawManifestStaged: string;
     }>;
   }>(SET_APP_SECRET, { refetchQueries: refetch, awaitRefetchQueries: true });
+  // #714 — same shape as set; mutation differs only in the audit
+  // action it emits (`app.secret.rotate` vs `app.secret.set`). Sharing
+  // a single InlineValueEditor + handleInlineSave; the parent picks
+  // the right mutation based on rotatingId.
+  const [rotateSecret, rotateState] = useMutation<{
+    rotateAppSecret: MutationResult<{
+      appSlug: string;
+      key: string;
+      rawManifestStaged: string;
+    }>;
+  }>(ROTATE_APP_SECRET, { refetchQueries: refetch, awaitRefetchQueries: true });
   const [deleteSecret, deleteState] = useMutation<{
     deleteAppSecret: MutationResult<{
       appSlug: string;
@@ -311,16 +336,30 @@ export function SecretsClient({ slug }: { slug: string }) {
   }
 
   async function handleInlineSave(s: AppSecret, nextValue: string) {
-    const { data } = await setSecret({
-      variables: {
-        input: {
-          appSlug: slug,
-          key: s.key,
-          value: nextValue,
-          ifMatchVersion: appVersion.data?.astroliftApp?.version ?? null,
-        },
-      },
-    });
+    // #714 — rotate vs set picks the mutation; both share the same
+    // input shape + optimistic-concurrency check.
+    const isRotate = rotatingId === s.id;
+    const input = {
+      appSlug: slug,
+      key: s.key,
+      value: nextValue,
+      ifMatchVersion: appVersion.data?.astroliftApp?.version ?? null,
+    };
+    if (isRotate) {
+      const { data } = await rotateSecret({ variables: { input } });
+      if (data?.rotateAppSecret.ok) {
+        toast.success(t("edit.toastSaved", { key: s.key }));
+        setRevealedValues((prev) => ({ ...prev, [s.id]: nextValue }));
+        setRotatingId(null);
+        return true;
+      }
+      if (handleVersionMismatch(data?.rotateAppSecret, { label: "app", onRefresh: () => appVersion.refetch() })) {
+        return false;
+      }
+      toast.error(data?.rotateAppSecret.errors?.[0]?.message ?? "Rotate failed");
+      return false;
+    }
+    const { data } = await setSecret({ variables: { input } });
     if (data?.setAppSecret.ok) {
       toast.success(t("edit.toastSaved", { key: s.key }));
       setRevealedValues((prev) => ({ ...prev, [s.id]: nextValue }));
@@ -449,14 +488,32 @@ export function SecretsClient({ slug }: { slug: string }) {
                     <SecretRow
                       key={s.id}
                       secret={s}
+                      appSlug={slug}
                       revealed={s.id in revealedValues ? revealedValues[s.id] : null}
-                      editing={editingId === s.id}
+                      editing={editingId === s.id || rotatingId === s.id}
+                      isRotateMode={rotatingId === s.id}
                       onToggleReveal={() => handleReveal(s)}
-                      onStartEdit={() => setEditingId(s.id)}
-                      onCancelEdit={() => setEditingId(null)}
+                      onStartEdit={() => {
+                        setRotatingId(null);
+                        setEditingId(s.id);
+                      }}
+                      onStartRotate={() => {
+                        setEditingId(null);
+                        setRotatingId(s.id);
+                      }}
+                      onCancelEdit={() => {
+                        setEditingId(null);
+                        setRotatingId(null);
+                      }}
                       onSave={(value) => handleInlineSave(s, value)}
                       onRequestDelete={() => requestDelete(s)}
-                      busy={busy}
+                      historyOpen={historyTarget?.secretId === s.id}
+                      onToggleHistory={() =>
+                        setHistoryTarget((prev) =>
+                          prev?.secretId === s.id ? null : { secretId: s.id, key: s.key },
+                        )
+                      }
+                      busy={busy || rotateState.loading}
                       revealing={revealingId === s.id}
                     />
                   ))}
@@ -567,28 +624,38 @@ export function SecretsClient({ slug }: { slug: string }) {
 
 interface SecretRowProps {
   secret: AppSecret;
+  appSlug: string;
   revealed: string | null;
   editing: boolean;
+  isRotateMode: boolean;
   busy: boolean;
   revealing: boolean;
+  historyOpen: boolean;
   onToggleReveal: () => void;
   onStartEdit: () => void;
+  onStartRotate: () => void;
   onCancelEdit: () => void;
   onSave: (value: string) => Promise<boolean>;
   onRequestDelete: () => void;
+  onToggleHistory: () => void;
 }
 
 function SecretRow({
   secret: s,
+  appSlug,
   revealed,
   editing,
+  isRotateMode,
   busy,
   revealing,
+  historyOpen,
   onToggleReveal,
   onStartEdit,
+  onStartRotate,
   onCancelEdit,
   onSave,
   onRequestDelete,
+  onToggleHistory,
 }: SecretRowProps) {
   const t = useTranslations("apps.secrets");
   const isRevealed = revealed !== null;
@@ -678,6 +745,61 @@ function SecretRow({
               </Tooltip>
             </Can>
           )}
+          {/* #714 — Rotate button. Same flow as Edit (opens
+              InlineValueEditor) but routes save → rotateAppSecret so
+              the audit log carries action='app.secret.rotate'. Only
+              shown for revealed literal secrets to match Edit's
+              precondition. */}
+          {canEdit && (
+            <Can permission="app.deploy">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={onStartRotate}
+                    disabled={busy || editing}
+                    aria-pressed={isRotateMode}
+                  >
+                    <RotateCwIcon className="size-4" />
+                    <span className="sr-only">Rotate</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Rotate (distinct from edit in the audit log)</TooltipContent>
+              </Tooltip>
+            </Can>
+          )}
+          {/* #714 — History popover. Lazily fetches the per-key audit
+              timeline on open; renders newest-first list with actor,
+              action, timestamp. */}
+          {s.source === "literal" && (
+            <Can permission="secret.read">
+              <Popover open={historyOpen} onOpenChange={onToggleHistory}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        aria-pressed={historyOpen}
+                      >
+                        <HistoryIcon className="size-4" />
+                        <span className="sr-only">History</span>
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Audit history for this key</TooltipContent>
+                </Tooltip>
+                <PopoverContent align="end" className="w-96 p-0">
+                  {historyOpen && (
+                    <SecretHistoryPanel appSlug={appSlug} secretKey={s.key} />
+                  )}
+                </PopoverContent>
+              </Popover>
+            </Can>
+          )}
           {s.source === "literal" && (
             <Can permission="app.deploy">
               <Tooltip>
@@ -700,6 +822,73 @@ function SecretRow({
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+interface SecretHistoryEntry {
+  timestamp: string;
+  action: string;
+  success: boolean;
+  errorCode: string | null;
+  sourceIp: string | null;
+  actor: { id: string; username: string } | null;
+}
+
+interface SecretHistoryResp {
+  astroliftAppSecretHistory: SecretHistoryEntry[];
+}
+
+function SecretHistoryPanel({ appSlug, secretKey }: { appSlug: string; secretKey: string }) {
+  const { data, loading, error } = useQuery<SecretHistoryResp>(GET_APP_SECRET_HISTORY, {
+    variables: { appSlug, key: secretKey },
+    fetchPolicy: "cache-and-network",
+  });
+  const entries = data?.astroliftAppSecretHistory ?? [];
+  return (
+    <div className="flex flex-col">
+      <div className="border-b px-3 py-2">
+        <p className="text-xs font-medium">Audit history</p>
+        <p className="text-muted-foreground font-mono text-[11px]">{secretKey}</p>
+      </div>
+      <div className="max-h-80 overflow-y-auto">
+        {loading && entries.length === 0 ? (
+          <div className="p-3">
+            <Skeleton className="mb-2 h-3 w-full" />
+            <Skeleton className="mb-2 h-3 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        ) : error ? (
+          <p className="text-muted-foreground p-3 text-xs">Couldn&apos;t load history.</p>
+        ) : entries.length === 0 ? (
+          <p className="text-muted-foreground p-3 text-xs italic">No audit entries yet.</p>
+        ) : (
+          <ol className="divide-border divide-y">
+            {entries.map((e, i) => (
+              <li key={i} className="flex items-start gap-2 px-3 py-2 text-xs">
+                <Badge
+                  variant={e.success ? "secondary" : "destructive"}
+                  className="mt-0.5 text-[10px]"
+                >
+                  {e.action}
+                </Badge>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">
+                    {e.actor?.username ?? "system"}
+                    {e.sourceIp ? (
+                      <span className="text-muted-foreground font-mono"> · {e.sourceIp}</span>
+                    ) : null}
+                  </p>
+                  <p className="text-muted-foreground text-[11px]">
+                    {new Date(e.timestamp).toLocaleString()}
+                    {!e.success && e.errorCode ? ` · ${e.errorCode}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
   );
 }
 
