@@ -818,6 +818,45 @@ class AppDomainRequiredRecordType:
     message: str
 
 
+@strawberry.type(name="AstroliftDomainRedirectRule")
+class DomainRedirectRuleType:
+    """One redirect rule on an ``AstroliftAppDomain`` (#742).
+
+    Backs the Redirects sub-section under Domains (#685). The FE renders
+    rows ordered by ``priority`` (low → high; first match wins) and the
+    full set is replaced atomically via ``setDomainRedirects`` — there
+    are no per-row mutations.
+
+    ``kind`` is one of ``http_to_https | apex_to_www | www_to_apex |
+    alias | custom`` (mirrors ``DomainRedirectRule.Kind``).
+    ``source_pattern`` is empty for the well-known kinds (the renderer
+    derives the source from the parent domain's hostname) and a regex /
+    path-prefix string for ``custom``.  ``destination_url`` is the full
+    target URL the cluster's ingress redirects to. ``http_status`` is
+    one of 301/302/307/308.  ``preserve_query_string`` makes the
+    renderer append the inbound query to the redirect target."""
+
+    id: GUID
+    kind: str
+    source_pattern: str
+    destination_url: str
+    http_status: int
+    preserve_query_string: bool
+    priority: int
+
+
+def domain_redirect_rule_to_type(r) -> DomainRedirectRuleType:
+    return DomainRedirectRuleType(
+        id=GUID(str(r.guid)),
+        kind=r.kind,
+        source_pattern=r.source_pattern or "",
+        destination_url=r.destination_url or "",
+        http_status=int(r.http_status),
+        preserve_query_string=bool(r.preserve_query_string),
+        priority=int(r.priority),
+    )
+
+
 @strawberry.type(name="AstroliftAppDomain")
 class AppDomainType:
     """A custom domain bound to a registered app. ``cert_state``
@@ -885,6 +924,12 @@ class AppDomainType:
     machine; this is what the cloud cert lifecycle says about the
     cert today."""
 
+    redirect_rules: list[DomainRedirectRuleType] = strawberry.field(default_factory=list)
+    """Active redirect rules on the domain (#742), ordered by
+    ``priority`` ascending.  Empty when the operator hasn't configured
+    any rules.  The full set is replaced atomically via
+    ``setDomainRedirects`` — there are no per-row mutations."""
+
 
 def app_domain_to_type(d) -> AppDomainType:
     return AppDomainType(
@@ -919,6 +964,10 @@ def app_domain_to_type(d) -> AppDomainType:
         cert_expires_at=d.cert_expires_at,
         cert_issuer_serial=d.cert_issuer_serial or "",
         cert_observability_status=d.cert_observability_status or "",
+        redirect_rules=[
+            domain_redirect_rule_to_type(r)
+            for r in d.redirect_rules.filter(deleted_at__isnull=True).order_by("priority")
+        ],
     )
 
 
