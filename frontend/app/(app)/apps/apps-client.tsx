@@ -482,6 +482,16 @@ export function AppsClient() {
                       <Badge variant={app.isActive ? "default" : "secondary"}>
                         {app.provisioningStatus}
                       </Badge>
+                      {/* #696 — live preview count badge. Hidden when 0
+                          to keep the card tight; visible badge tells
+                          operators "this app has N previews up right
+                          now without leaving the list to find out". */}
+                      {app.activePreviewCount > 0 && (
+                        <Badge variant="outline" className="gap-1">
+                          {app.activePreviewCount} preview
+                          {app.activePreviewCount === 1 ? "" : "s"}
+                        </Badge>
+                      )}
                     </div>
 
                     <AppFreshnessRow

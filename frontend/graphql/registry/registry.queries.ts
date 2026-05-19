@@ -50,6 +50,7 @@ const APP_FIELDS = `
   webhookDeploysPausedAt
   webhookDeploysPausedByEmail
   webhookDeploysPauseReason
+  activePreviewCount
   createdAt
   updatedAt
   deletedAt

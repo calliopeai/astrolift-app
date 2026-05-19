@@ -129,6 +129,12 @@ export type AstroliftRegisteredApp = Omit<
   reprovision: AstroliftAppReprovisionState;
   configDrift: AstroliftAppConfigDrift | null;
   settingsLastModified: AstroliftAppSettingsLastModified | null;
+  /**
+   * Count of currently-live preview environments for this app
+   * (#730). Manual entry until `make codegen` regenerates the
+   * generated TypeScript types from the updated schema.graphql.
+   */
+  activePreviewCount: number;
 };
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {
