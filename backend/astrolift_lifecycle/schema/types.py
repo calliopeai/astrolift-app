@@ -782,6 +782,32 @@ class AppDomainType:
     last_certificate_error: str
     byo_certificate_uploaded_at: dt.datetime | None
 
+    # ---- cert observability metadata (#731) -----------------------
+    # Cached snapshot of the TLS driver's ``CertificateInfo``.  All
+    # fields are nullable / empty by default because a fresh domain
+    # has no certificate yet — the FE hides the chip until the first
+    # refresh lands.
+
+    cert_expires_at: dt.datetime | None
+    """ACM / Let's Encrypt ``not_after`` carried from the TLS
+    driver.  Null when the cert hasn't been issued or the driver
+    declined to surface a value.  FE renders 'expires in N days'
+    off this field; warning when < 14 days."""
+
+    cert_issuer_serial: str
+    """Stable identifier for the current cert across renewals (ACM
+    ARN, LE serial).  Empty string until the first refresh.  Lets
+    the FE distinguish a renewal landing (serial changes) from the
+    same cert lingering past its issued date."""
+
+    cert_observability_status: str
+    """Driver-reported renewal status — ``auto`` / ``manual`` /
+    ``failed`` / ``unknown``.  Empty string until first refresh; FE
+    renders the chip neutral in that case.  Distinct from
+    ``certificate_state`` above: that's the platform's own state
+    machine; this is what the cloud cert lifecycle says about the
+    cert today."""
+
 
 def app_domain_to_type(d) -> AppDomainType:
     return AppDomainType(
@@ -813,6 +839,9 @@ def app_domain_to_type(d) -> AppDomainType:
         certificate_state=d.certificate_state or "not_requested",
         last_certificate_error=d.last_certificate_error or "",
         byo_certificate_uploaded_at=d.byo_certificate_uploaded_at,
+        cert_expires_at=d.cert_expires_at,
+        cert_issuer_serial=d.cert_issuer_serial or "",
+        cert_observability_status=d.cert_observability_status or "",
     )
 
 
