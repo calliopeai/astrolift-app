@@ -81,6 +81,17 @@ class AppSecretMetadata(BaseCoreModel):
             "other values when they call setAppSecretMetadata explicitly."
         ),
     )
+    scope = models.CharField(
+        max_length=48,
+        default="all",
+        help_text=(
+            "Audience scope for this secret row. 'all' = every environment "
+            "(default); 'production' = non-preview envs only; 'preview' = "
+            "any active preview env; 'preview:<branch>' = one specific "
+            "preview branch. Resolution-time filtering drops rows whose "
+            "scope doesn't match the env being queried."
+        ),
+    )
     set_at = models.DateTimeField(
         null=True,
         blank=True,

@@ -195,7 +195,7 @@ export type ListDeploymentsQueryVariables = Exact<{
 }>;
 
 
-export type ListDeploymentsQuery = { astroliftDeployments: Array<{ id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, commitSha: string, commitMessage: string, commitAuthor: string, branch: string, ciActorKind: string, ciProvider: string, ciRunUrl: string, repoUrl: string, abortedReason: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> }> };
+export type ListDeploymentsQuery = { astroliftDeployments: Array<{ id: string, registeredAppSlug: string, environmentName: string, workloadSlug?: string | null, triggerKind: string, strategy: string, status: string, imageTag: string, imageDigest: string, clusterRevision: string, approvalsRequired: number, approvalsReceived: number, requiredApproverCount: number, startedAt?: string | null, succeededAt?: string | null, failedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, createdAt: string, commitSha: string, commitMessage: string, commitAuthor: string, commitAuthorAvatarUrl: string, branch: string, prNumber: number, prUrl: string, ciActorKind: string, ciProvider: string, ciRunUrl: string, repoUrl: string, abortedReason: string, triggeredByUserId?: string | null, triggeredByMe: boolean, approvedBy: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }>, awaitingApprovers: Array<{ userId: string, displayName: string, email: string, approvedAt?: string | null, mailtoUrl: string }> }> };
 
 export type GetDeploymentQueryVariables = Exact<{
   id: Scalars['String']['input'];
@@ -259,7 +259,7 @@ export type ListAppDomainsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppDomainsQuery = { astroliftAppDomains: Array<{ id: string, hostname: string, certState: string, validationMethod: string, validationToken: string, lastCheckedAt?: string | null, isActive: boolean, registeredAppSlug: string, createdAt: string, txtChallengeToken: string, expectedCnameTarget: string, isPlatformManagedZone: boolean, lastValidationError: string, certificateState: string, lastCertificateError: string, byoCertificateUploadedAt?: string | null, certExpiresAt?: string | null, certIssuerSerial: string, certObservabilityStatus: string, requiredDnsRecords: Array<{ kind: string, name: string, value: string, ttl: number, propagated: boolean, lastCheckedAt?: string | null, message: string }> }> };
+export type ListAppDomainsQuery = { astroliftAppDomains: Array<{ id: string, hostname: string, certState: string, validationMethod: string, validationToken: string, lastCheckedAt?: string | null, isActive: boolean, registeredAppSlug: string, createdAt: string, txtChallengeToken: string, expectedCnameTarget: string, isPlatformManagedZone: boolean, lastValidationError: string, certificateState: string, lastCertificateError: string, byoCertificateUploadedAt?: string | null, certExpiresAt?: string | null, certIssuerSerial: string, certObservabilityStatus: string, requiredDnsRecords: Array<{ kind: string, name: string, value: string, ttl: number, propagated: boolean, lastCheckedAt?: string | null, message: string }>, redirectRules: Array<{ id: string, kind: string, sourcePattern: string, destinationUrl: string, httpStatus: number, preserveQueryString: boolean, priority: number }>, pathRoutes: Array<{ id: string, pathPrefix: string, targetWorkloadSlug: string, targetPort: number, stripPrefix: boolean, priority: number }> }> };
 
 export type ListAppDeployTokensQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -330,6 +330,21 @@ export type PreviewForceRedeployQueryVariables = Exact<{
 
 
 export type PreviewForceRedeployQuery = { previewAstroliftForceRedeploy?: { appSlug: string, environmentName?: string | null, inFlightDeployments: Array<{ id: string, environmentName: string, workloadSlug?: string | null, status: string, imageTag: string, startedAt?: string | null, createdAt: string, triggerKind: string, triggeredByDisplay: string, ciActorKind: string, ciRunUrl: string }> } | null };
+
+export type CompareDeploymentsQueryVariables = Exact<{
+  idA: Scalars['String']['input'];
+  idB: Scalars['String']['input'];
+}>;
+
+
+export type CompareDeploymentsQuery = { astroliftCompareDeployments?: { deploymentAId: string, deploymentBId: string, baseSha: string, headSha: string, compareUrl: string, imageDiffSummary: string, manifestDiff: Array<{ op: string, path: string, before: Record<string, unknown>, after: Record<string, unknown> }> } | null };
+
+export type ListMyAlertSubscriptionsQueryVariables = Exact<{
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListMyAlertSubscriptionsQuery = { astroliftMyAlertSubscriptions: Array<{ id: string, appSlug: string, alertKind: string, channel: string, enabled: boolean }> };
 
 export type DeploymentLifecycleStreamSubscriptionVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -645,6 +660,14 @@ export type GetAppSecretHistoryQueryVariables = Exact<{
 
 
 export type GetAppSecretHistoryQuery = { astroliftAppSecretHistory: Array<{ timestamp: string, action: string, success: boolean, errorCode: string, sourceIp: string, actor: { id: string, username: string } }> };
+
+export type UploadFileMutationVariables = Exact<{
+  mimetype: Scalars['String']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type UploadFileMutation = { fileUpload: { id?: string | null, preSignedUrl?: string | null, publicUrl?: string | null } };
 
 export type CreateWorkflowDefinitionMutationVariables = Exact<{
   name: Scalars['String']['input'];

@@ -89,6 +89,12 @@ class SetAppSecretInput:
     integration may pass an explicit value so the FE can render
     'Set via CLI on May 12' in the secret-row's last-edited tooltip."""
 
+    scope: str = "all"
+    """Audience scope (#752).  One of ``all`` / ``production`` /
+    ``preview`` / ``preview:<branch>``.  Persisted on the sidecar
+    metadata row; resolution-time filtering drops the secret for envs
+    that don't match."""
+
 
 @strawberry.input
 class SetAppSecretMetadataInput:
@@ -114,6 +120,9 @@ class SetAppSecretMetadataInput:
     None preserves the existing value when the row already exists;
     on first creation defaults to ``web``."""
 
+    scope: str = "all"
+    """Audience scope (#752).  Defaults to ``all``."""
+
 
 @strawberry.input
 class RotateAppSecretInput:
@@ -130,13 +139,14 @@ class RotateAppSecretInput:
     value: str
     if_match_version: int | None = None
 
-    # ---- sidecar metadata (#677 / #678) -----------------------------
+    # ---- sidecar metadata (#677 / #678 / #752) ----------------------
     # Same shape as ``SetAppSecretInput``.  A rotation is naturally a
     # moment to refresh expiry; the FE pre-fills the existing value
     # so an operator's "rotate" click without changing the expiry
     # carries the previous value back through.
     expires_at: dt.datetime | None = None
     set_via: str | None = None
+    scope: str = "all"
 
 
 @strawberry.input
@@ -444,6 +454,7 @@ class _AppSecretMetadataPayload:
     expires_at: dt.datetime | None
     set_via: str
     set_at: dt.datetime | None
+    scope: str = "all"
 
 
 @strawberry.type
@@ -595,6 +606,7 @@ def _upsert_app_secret_metadata(
     environment_name: str = "",
     expires_at: dt.datetime | None = None,
     set_via: str | None = None,
+    scope: str = "all",
     actor=None,
 ) -> AppSecretMetadata:
     """Upsert the operator-facing metadata sidecar for a secret literal.
@@ -626,6 +638,7 @@ def _upsert_app_secret_metadata(
             key=key,
             expires_at=expires_at,
             source=(set_via or AppSecretMetadata.Source.WEB.value),
+            scope=scope,
             set_at=timezone.now(),
             created_by=actor,
             updated_by=actor,
@@ -634,7 +647,7 @@ def _upsert_app_secret_metadata(
     # Apply optional updates atomically.  We don't clear
     # ``expires_at`` to None unless the caller explicitly passes a
     # value — `None` means "don't touch" per the input contract.
-    updates: dict = {"set_at": timezone.now()}
+    updates: dict = {"set_at": timezone.now(), "scope": scope}
     if expires_at is not None:
         updates["expires_at"] = expires_at
     if set_via is not None:
@@ -800,9 +813,9 @@ class ServicesMutation:
                 f"manifest parse failed after edit: {exc}",
                 field="rawManifest",
             )
-        # #677 / #678 — refresh sidecar metadata on every direct write.
-        # The metadata row is keyed at the wildcard env scope ('') for
-        # set/rotate writes since the mutation itself isn't env-bound;
+        # #677 / #678 / #752 — refresh sidecar metadata on every direct
+        # write.  The metadata row is keyed at the wildcard env scope ('')
+        # for set/rotate writes since the mutation itself isn't env-bound;
         # operators add per-env overrides via setAppSecretMetadata.
         _upsert_app_secret_metadata(
             app=app,
@@ -810,6 +823,7 @@ class ServicesMutation:
             environment_name="",
             expires_at=input.expires_at,
             set_via=input.set_via,
+            scope=input.scope,
             actor=_actor_user(info),
         )
         return gql_success(
@@ -877,13 +891,14 @@ class ServicesMutation:
                 f"manifest parse failed after rotate: {exc}",
                 field="rawManifest",
             )
-        # #677 / #678 — refresh sidecar metadata on rotate as well.
+        # #677 / #678 / #752 — refresh sidecar metadata on rotate as well.
         _upsert_app_secret_metadata(
             app=app,
             key=input.key,
             environment_name="",
             expires_at=input.expires_at,
             set_via=input.set_via,
+            scope=input.scope,
             actor=_actor_user(info),
         )
         return gql_success(
@@ -1001,6 +1016,7 @@ class ServicesMutation:
             environment_name=(input.environment_name or ""),
             expires_at=input.expires_at,
             set_via=input.set_via,
+            scope=input.scope,
             actor=_actor_user(info),
         )
         return gql_success(
@@ -1011,6 +1027,7 @@ class ServicesMutation:
                 expires_at=row.expires_at,
                 set_via=row.source,
                 set_at=row.set_at,
+                scope=row.scope,
             )
         )
 
@@ -1492,10 +1509,14 @@ class ServicesMutation:
         info: Info,
         input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
-        svc = ManagedService.objects.select_related(
-            "app_environment__tenant_cluster__provider_plugin",
-            "registered_app",
-        ).filter(guid=str(input.id), deleted_at__isnull=True).first()
+        svc = (
+            ManagedService.objects.select_related(
+                "app_environment__tenant_cluster__provider_plugin",
+                "registered_app",
+            )
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
         if svc is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1509,7 +1530,8 @@ class ServicesMutation:
                 incoming_keys = set(dict(input.config).keys())
                 current_keys = set((svc.config or {}).keys())
                 changed_keys = {
-                    k for k in incoming_keys | current_keys
+                    k
+                    for k in incoming_keys | current_keys
                     if dict(input.config).get(k) != (svc.config or {}).get(k)
                 }
                 blocked = changed_keys - set(editable)
@@ -1555,10 +1577,14 @@ class ServicesMutation:
         NOT in ``editable_fields`` (i.e., changes that require tearing
         down and re-creating the backing cloud resource).
         """
-        svc = ManagedService.objects.select_related(
-            "app_environment__tenant_cluster__provider_plugin",
-            "registered_app",
-        ).filter(guid=str(input.managed_service_id), deleted_at__isnull=True).first()
+        svc = (
+            ManagedService.objects.select_related(
+                "app_environment__tenant_cluster__provider_plugin",
+                "registered_app",
+            )
+            .filter(guid=str(input.managed_service_id), deleted_at__isnull=True)
+            .first()
+        )
         if svc is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,

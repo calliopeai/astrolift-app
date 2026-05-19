@@ -74,6 +74,7 @@ type Appsecretmetadatapayload {
   expiresAt: DateTime
   setVia: String!
   setAt: DateTime
+  scope: String!
 }
 
 type AppsecretmetadatapayloadMutationResult {
@@ -495,6 +496,7 @@ type AstroliftAppSecret {
   lastEditedBy: AstroliftSecretEditor
   expiresAt: DateTime
   setVia: String!
+  scope: String!
 }
 
 type AstroliftAppSecretBundleAttachment {
@@ -4243,6 +4245,7 @@ input RotateAppSecretInput {
   ifMatchVersion: Int = null
   expiresAt: DateTime = null
   setVia: String = null
+  scope: String! = "all"
 }
 
 input RotateDeployTokenInput {
@@ -4297,6 +4300,7 @@ input SetAppSecretInput {
   ifMatchVersion: Int = null
   expiresAt: DateTime = null
   setVia: String = null
+  scope: String! = "all"
 }
 
 input SetAppSecretMetadataInput {
@@ -4305,6 +4309,7 @@ input SetAppSecretMetadataInput {
   environmentName: String = null
   expiresAt: DateTime = null
   setVia: String = null
+  scope: String! = "all"
 }
 
 input SetAppSubdomainInput {

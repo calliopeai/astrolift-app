@@ -7,6 +7,7 @@ from strawberry.types import Info
 
 from astrolift_graphql import GUID
 from astrolift_lifecycle.models import AppEnvironment
+from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_manifest.env_injection import envelope_keys_for
 from astrolift_registry.models import RegisteredApp
@@ -219,6 +220,20 @@ def _bundle_key_count(bundle) -> int:
     return known_key_count(bundle)
 
 
+def _allowed_scopes_for_env(env_name: str, preview_env_branches: dict[str, str]) -> frozenset[str]:
+    """Compute the set of scope values that a secret must have to be
+    visible in ``env_name``.
+
+    Preview envs accept ``all``, ``preview``, and ``preview:<branch>``.
+    All other envs (production, staging, …) accept ``all`` and
+    ``production``.
+    """
+    if env_name in preview_env_branches:
+        branch = preview_env_branches[env_name]
+        return frozenset({"all", "preview", f"preview:{branch}"})
+    return frozenset({"all", "production"})
+
+
 def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     """Compose the merged secret view across:
     - manifest [env] literals (app-wide → repeated per env)
@@ -228,11 +243,16 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     - per-env ManagedService bindings (envelope keys per binding)
 
     Each literal row is decorated with the operator-facing metadata
-    from ``AppSecretMetadata`` when present (#677 / #678).  Metadata
-    is looked up by ``(env_name, key)`` with empty env_name as a
-    fallback for the 'applies to every env' default — a per-env row
+    from ``AppSecretMetadata`` when present (#677 / #678 / #752).
+    Metadata is looked up by ``(env_name, key)`` with empty env_name as
+    a fallback for the 'applies to every env' default — a per-env row
     wins over the wildcard.  Missing metadata defaults to no expiry +
-    ``set_via='web'`` so older rows render identically.
+    ``set_via='web'`` + ``scope='all'`` so older rows render identically.
+
+    Secrets whose ``scope`` doesn't match the queried env are filtered
+    out (#752).  Preview envs accept ``all``, ``preview``, and
+    ``preview:<branch>``; all other envs accept ``all`` and
+    ``production``.
     """
     out: list[AppSecretType] = []
 
@@ -256,9 +276,26 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     for m in meta_qs:
         meta_index[(m.environment_name, m.key)] = m
 
+    # Build preview-env → branch mapping for scope filtering (#752).
+    # One extra query per _list_app_secrets call; avoids N+1 over envs.
+    preview_env_branches: dict[str, str] = dict(
+        PreviewEnvironment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+            status__in=(
+                PreviewEnvironment.Status.BUILDING,
+                PreviewEnvironment.Status.RUNNING,
+            ),
+        ).values_list("app_environment__name", "branch")
+    )
+
     for env_name in env_names:
+        allowed = _allowed_scopes_for_env(env_name, preview_env_branches)
         for key in sorted(literals):
             meta = meta_index.get((env_name, key)) or meta_index.get(("", key))
+            secret_scope = meta.scope if meta else "all"
+            if secret_scope not in allowed:
+                continue
             out.append(
                 AppSecretType(
                     id=_secret_id(source="literal", key=key, env=env_name),
@@ -272,6 +309,7 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
                     last_edited_by=literal_editor,
                     expires_at=meta.expires_at if meta else None,
                     set_via=(meta.source if meta else "web"),
+                    scope=secret_scope,
                 )
             )
 

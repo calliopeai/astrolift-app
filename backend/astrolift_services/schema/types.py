@@ -76,6 +76,11 @@ class AppSecretType:
     ``web | cli | env_paste | bundle | managed_service``.  Defaults
     to ``web`` for back-fill and rows the platform never tagged."""
 
+    scope: str = "all"
+    """Audience scope for this secret (#752).  One of ``all`` /
+    ``production`` / ``preview`` / ``preview:<branch>``.  Resolution-time
+    filtering drops rows whose scope doesn't match the queried env."""
+
 
 @strawberry.type(name="AstroliftSecretBundle")
 class SecretBundleType:
