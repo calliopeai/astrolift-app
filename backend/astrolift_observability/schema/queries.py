@@ -36,6 +36,7 @@ from strawberry.types import Info
 from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
 from astrolift_observability.schema.types import (
     AppGoldenSignal,
+    AppTrace,
     AppUrlHealth,
     ExecutePromqlResult,
     GoldenSignalKind,
@@ -47,6 +48,7 @@ from astrolift_observability.schema.types import (
     StatusCodeBreakdown,
     StatusCodeSeries,
     TimeSeriesPoint,
+    TraceSpan,
     WorkloadResourceGauge,
     WorkloadResourceUsage,
 )
@@ -991,3 +993,122 @@ class GoldenSignalsQuery:
                 )
             )
         return ExecutePromqlResult(ok=True, error="", series=series)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_traces(
+        self,
+        info: Info,
+        app_slug: str,
+        since: str,
+        until: str,
+        environment_name: str | None = None,
+        service: str | None = None,
+        operation: str | None = None,
+        min_duration_ms: float | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+    ) -> list[AppTrace]:
+        """List distributed traces for an app (#749).
+
+        Queries the trace backend configured on the app's cluster
+        (``TenantCluster.provider_config['trace_driver']`` + ``trace_config``).
+        Currently supports Tempo; the protocol allows for Jaeger, X-Ray, etc.
+
+        ``since`` / ``until`` are ISO-8601 timestamps or UNIX seconds as
+        strings — the format accepted by Tempo's HTTP API.
+
+        Returns ``[]`` when the cluster has no trace backend configured or
+        the backend is unreachable — same empty-state convention as the other
+        observability resolvers.
+        """
+        from astrolift_observability import trace_client
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "slug")
+            .first()
+        )
+        if app is None:
+            return []
+
+        driver = trace_client.resolve_trace_driver(app=app, environment_name=environment_name)
+        if driver is None:
+            return []
+
+        try:
+            summaries = driver.list_traces(
+                service=service,
+                operation=operation,
+                min_duration_ms=min_duration_ms,
+                status=status,
+                since=since,
+                until=until,
+                limit=limit or 50,
+            )
+        except Exception:
+            return []
+
+        return [
+            AppTrace(
+                trace_id=s.trace_id,
+                root_service=s.root_service,
+                root_operation=s.root_operation,
+                span_count=s.span_count,
+                duration_ms=s.duration_ms,
+                status_code=s.status_code,
+            )
+            for s in summaries
+        ]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_trace_spans(
+        self,
+        info: Info,
+        app_slug: str,
+        trace_id: str,
+        environment_name: str | None = None,
+    ) -> list[TraceSpan]:
+        """Fetch all spans for a single trace (#749).
+
+        ``trace_id`` is the trace identifier returned by ``astroliftAppTraces``.
+
+        Returns ``[]`` when the cluster has no trace backend configured, the
+        trace doesn't exist, or the backend is unreachable.
+        """
+        from astrolift_observability import trace_client
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "slug")
+            .first()
+        )
+        if app is None:
+            return []
+
+        driver = trace_client.resolve_trace_driver(app=app, environment_name=environment_name)
+        if driver is None:
+            return []
+
+        try:
+            spans = driver.get_trace(trace_id)
+        except Exception:
+            return []
+
+        return [
+            TraceSpan(
+                trace_id=span.trace_id,
+                span_id=span.span_id,
+                parent_span_id=span.parent_span_id,
+                operation=span.operation,
+                service=span.service,
+                start_time=span.start_time,
+                duration_ms=span.duration_ms,
+                status_code=span.status_code,
+                attributes=dict(span.attributes),
+            )
+            for span in spans
+        ]
