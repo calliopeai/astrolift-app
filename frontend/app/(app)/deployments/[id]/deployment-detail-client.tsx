@@ -333,6 +333,11 @@ export function DeploymentDetailClient({ id }: { id: string }) {
             <Badge variant="outline" className="font-mono">
               {d.triggerKind}
             </Badge>
+            {d.strategy && d.strategy !== "unknown" && (
+              <Badge variant="outline" className="font-mono capitalize">
+                {d.strategy.replace(/_/g, " ")}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">

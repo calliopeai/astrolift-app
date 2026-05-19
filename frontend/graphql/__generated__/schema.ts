@@ -42,6 +42,13 @@ export type AddAppDomainInput = {
   validationMethod: InputMaybe<Scalars['String']['input']>;
 };
 
+export type AddEmailSuppressionEntryInput = {
+  address: Scalars['String']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+  note: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
+};
+
 export type AddOrganizationAllowlistDomainInput = {
   defaultRoleSlug: InputMaybe<Scalars['String']['input']>;
   domain: Scalars['String']['input'];
@@ -77,6 +84,21 @@ export type ApproveByTokenInput = {
 export type ApproveSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
   reason: InputMaybe<Scalars['String']['input']>;
+};
+
+export type Appsecretmetadatapayload = {
+  appSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  key: Scalars['String']['output'];
+  setAt?: Maybe<Scalars['DateTime']['output']>;
+  setVia: Scalars['String']['output'];
+};
+
+export type AppsecretmetadatapayloadMutationResult = {
+  data?: Maybe<Appsecretmetadatapayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type Appsecretwritepayload = {
@@ -278,6 +300,9 @@ export type AstroliftAppDnsRecord = {
 
 export type AstroliftAppDomain = {
   byoCertificateUploadedAt?: Maybe<Scalars['DateTime']['output']>;
+  certExpiresAt?: Maybe<Scalars['DateTime']['output']>;
+  certIssuerSerial: Scalars['String']['output'];
+  certObservabilityStatus: Scalars['String']['output'];
   certState: Scalars['String']['output'];
   certificateState: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -447,9 +472,18 @@ export type AstroliftAppPod = {
   node: Scalars['String']['output'];
   phase: Scalars['String']['output'];
   ready: Scalars['Boolean']['output'];
+  recentErrorEvent?: Maybe<AstroliftAppPodEvent>;
   restarts: Scalars['Int']['output'];
   status: Scalars['String']['output'];
   workload: Scalars['String']['output'];
+};
+
+export type AstroliftAppPodEvent = {
+  count: Scalars['Int']['output'];
+  lastSeen: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  type: Scalars['String']['output'];
 };
 
 export type AstroliftAppReprovisionState = {
@@ -462,12 +496,14 @@ export type AstroliftAppReprovisionState = {
 export type AstroliftAppSecret = {
   bundleSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
   isMasked: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
   lastEditedAt?: Maybe<Scalars['DateTime']['output']>;
   lastEditedBy?: Maybe<AstroliftSecretEditor>;
   managedServiceKind: Scalars['String']['output'];
+  setVia: Scalars['String']['output'];
   source: Scalars['String']['output'];
 };
 
@@ -704,6 +740,13 @@ export type AstroliftCapabilityDeprovisionPayloadMutationResult = {
   data?: Maybe<AstroliftCapabilityDeprovisionPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftCiSecretValidation = {
+  isCurrent?: Maybe<Scalars['Boolean']['output']>;
+  isSet: Scalars['Boolean']['output'];
+  secretName: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
 };
 
 export type AstroliftClusterBootstrapComponent = {
@@ -944,6 +987,7 @@ export type AstroliftDeployment = {
   ciRunUrl: Scalars['String']['output'];
   clusterRevision: Scalars['String']['output'];
   commitAuthor: Scalars['String']['output'];
+  commitAuthorAvatarUrl: Scalars['String']['output'];
   commitMessage: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -954,11 +998,14 @@ export type AstroliftDeployment = {
   id: Scalars['GUID']['output'];
   imageDigest: Scalars['String']['output'];
   imageTag: Scalars['String']['output'];
+  prNumber: Scalars['Int']['output'];
+  prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   repoUrl: Scalars['String']['output'];
   requiredApproverCount: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  strategy: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
   triggerKind: Scalars['String']['output'];
   triggeredByMe: Scalars['Boolean']['output'];
@@ -1133,6 +1180,70 @@ export type AstroliftElevationStatus = {
   method?: Maybe<Scalars['String']['output']>;
   requiredFor: Array<Scalars['String']['output']>;
   secondsRemaining: Scalars['Int']['output'];
+};
+
+export type AstroliftEmailAccountStatus = {
+  bounceRatePct?: Maybe<Scalars['Float']['output']>;
+  complaintRatePct?: Maybe<Scalars['Float']['output']>;
+  productionAccess: Scalars['Boolean']['output'];
+  reputationScore?: Maybe<Scalars['Float']['output']>;
+  sendingEnabled: Scalars['Boolean']['output'];
+};
+
+export type AstroliftEmailDkimToken = {
+  cnameHost: Scalars['String']['output'];
+  cnameTarget: Scalars['String']['output'];
+  token: Scalars['String']['output'];
+};
+
+export type AstroliftEmailDnsAuthCheck = {
+  message: Scalars['String']['output'];
+  outcome: Scalars['String']['output'];
+  protocol: Scalars['String']['output'];
+  records: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftEmailDnsAuthStatus = {
+  checkedAt: Scalars['DateTime']['output'];
+  dkim: AstroliftEmailDnsAuthCheck;
+  dmarc: AstroliftEmailDnsAuthCheck;
+  identity: Scalars['String']['output'];
+  overall: Scalars['String']['output'];
+  spf: AstroliftEmailDnsAuthCheck;
+};
+
+export type AstroliftEmailIdentityVerification = {
+  dkimTokens: Array<AstroliftEmailDkimToken>;
+  identity: Scalars['String']['output'];
+  isDomain: Scalars['Boolean']['output'];
+  status: Scalars['String']['output'];
+  verificationToken: Scalars['String']['output'];
+};
+
+export type AstroliftEmailSendQuota = {
+  max24HourSend: Scalars['Float']['output'];
+  maxSendRate: Scalars['Float']['output'];
+  sentLast24h: Scalars['Float']['output'];
+};
+
+export type AstroliftEmailServiceDetail = {
+  accountStatus?: Maybe<AstroliftEmailAccountStatus>;
+  dnsAuthStatus?: Maybe<AstroliftEmailDnsAuthStatus>;
+  identity: Scalars['String']['output'];
+  identityVerification?: Maybe<AstroliftEmailIdentityVerification>;
+  managedServiceId: Scalars['GUID']['output'];
+  pluginSlug: Scalars['String']['output'];
+  quota?: Maybe<AstroliftEmailSendQuota>;
+  region: Scalars['String']['output'];
+  suppressionEntries: Array<AstroliftEmailSuppressionEntry>;
+  unsupportedNotes: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftEmailSuppressionEntry = {
+  address: Scalars['String']['output'];
+  detail: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  suppressedAt: Scalars['DateTime']['output'];
 };
 
 export type AstroliftEnrollmentQrPayload = {
@@ -1743,6 +1854,7 @@ export type AstroliftQuotaIncreaseRequestMutationResult = {
 };
 
 export type AstroliftRegisteredApp = {
+  activePreviewCount: Scalars['Int']['output'];
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
   configDrift?: Maybe<AstroliftAppConfigDrift>;
@@ -2048,6 +2160,20 @@ export type AstroliftSecretEditor = {
   username: Scalars['String']['output'];
 };
 
+export type AstroliftSecretHistoryActor = {
+  id: Scalars['String']['output'];
+  username: Scalars['String']['output'];
+};
+
+export type AstroliftSecretHistoryEntry = {
+  action: Scalars['String']['output'];
+  actor: AstroliftSecretHistoryActor;
+  errorCode: Scalars['String']['output'];
+  sourceIp: Scalars['String']['output'];
+  success: Scalars['Boolean']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
 export type AstroliftSecurityPolicy = {
   blockOnCriticalCves: Scalars['Boolean']['output'];
   blockOnHighCveThreshold?: Maybe<Scalars['Int']['output']>;
@@ -2218,6 +2344,17 @@ export type AstroliftUser = {
   id: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
   username: Scalars['String']['output'];
+};
+
+export type AstroliftValidateCiSecretsPayload = {
+  repo: Scalars['String']['output'];
+  results: Array<AstroliftCiSecretValidation>;
+};
+
+export type AstroliftValidateCiSecretsPayloadMutationResult = {
+  data?: Maybe<AstroliftValidateCiSecretsPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftWebhookDelivery = {
@@ -2755,6 +2892,28 @@ export type ElevateAdminSessionInput = {
   ttlSeconds: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type Emailsuppressionaddpayload = {
+  address: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type EmailsuppressionaddpayloadMutationResult = {
+  data?: Maybe<Emailsuppressionaddpayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type Emailsuppressionremovepayload = {
+  address: Scalars['String']['output'];
+  removed: Scalars['Boolean']['output'];
+};
+
+export type EmailsuppressionremovepayloadMutationResult = {
+  data?: Maybe<Emailsuppressionremovepayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type EmployeeAvatarType = {
   publicPermanentUrl?: Maybe<Scalars['String']['output']>;
 };
@@ -3044,6 +3203,7 @@ export type Mutation = {
   /** Activate or deactivate an object by its global ID. */
   activate: Scalars['Boolean']['output'];
   addAppDomain: AstroliftAppDomainMutationResult;
+  addEmailSuppressionEntry: EmailsuppressionaddpayloadMutationResult;
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
@@ -3139,8 +3299,6 @@ export type Mutation = {
   markAllNotificationsRead: MarkallreadpayloadMutationResult;
   markNotificationRead: AstroliftNotificationMutationResult;
   markOnboardingComplete: AstroliftMarkOnboardingCompletePayloadMutationResult;
-  /** Create or update a Metabase chart via MetabaseChartSerializer. */
-  metabaseChart: MutationResult;
   migrateAppToCluster: AstroliftAppEnvironmentMutationResult;
   moveAppToTeam: AstroliftRegisteredAppMutationResult;
   muteAlertRule: AstroliftAlertRuleMutationResult;
@@ -3191,6 +3349,7 @@ export type Mutation = {
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
+  removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
@@ -3210,6 +3369,7 @@ export type Mutation = {
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
+  rotateAppSecret: AppsecretwritepayloadMutationResult;
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
   rotateOutboundWebhookSecret: WebhookSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
@@ -3219,6 +3379,7 @@ export type Mutation = {
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
+  setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
@@ -3280,6 +3441,7 @@ export type Mutation = {
   upsertOrganization: OrganizationMutationResult;
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
+  validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
 
@@ -3307,6 +3469,11 @@ export type MutationActivateArgs = {
 
 export type MutationAddAppDomainArgs = {
   input: AddAppDomainInput;
+};
+
+
+export type MutationAddEmailSuppressionEntryArgs = {
+  input: AddEmailSuppressionEntryInput;
 };
 
 
@@ -3712,11 +3879,6 @@ export type MutationMarkOnboardingCompleteArgs = {
 };
 
 
-export type MutationMetabaseChartArgs = {
-  input: Scalars['JSON']['input'];
-};
-
-
 export type MutationMigrateAppToClusterArgs = {
   input: MigrateAppInputGql;
 };
@@ -3922,6 +4084,11 @@ export type MutationRemoveAppDomainArgs = {
 };
 
 
+export type MutationRemoveEmailSuppressionEntryArgs = {
+  input: RemoveEmailSuppressionEntryInput;
+};
+
+
 export type MutationRemoveOrganizationAllowlistDomainArgs = {
   input: RemoveOrganizationAllowlistDomainInput;
 };
@@ -4017,6 +4184,11 @@ export type MutationRollbackDeploymentArgs = {
 };
 
 
+export type MutationRotateAppSecretArgs = {
+  input: RotateAppSecretInput;
+};
+
+
 export type MutationRotateDeployTokenArgs = {
   input: RotateDeployTokenInput;
 };
@@ -4059,6 +4231,11 @@ export type MutationSetActiveIdentityProviderArgs = {
 
 export type MutationSetAppSecretArgs = {
   input: SetAppSecretInput;
+};
+
+
+export type MutationSetAppSecretMetadataArgs = {
+  input: SetAppSecretMetadataInput;
 };
 
 
@@ -4340,6 +4517,11 @@ export type MutationUpsertUserArgs = {
 };
 
 
+export type MutationValidateAstroliftCiSecretsArgs = {
+  input: ValidateAstroliftCiSecretsInput;
+};
+
+
 export type MutationWithdrawSecretChangeArgs = {
   input: WithdrawSecretChangeInput;
 };
@@ -4570,6 +4752,7 @@ export type Query = {
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
+  astroliftAppSecretHistory: Array<AstroliftSecretHistoryEntry>;
   astroliftAppSecrets: Array<AstroliftAppSecret>;
   astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
@@ -4600,6 +4783,7 @@ export type Query = {
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
   astroliftDeployments: Array<AstroliftDeployment>;
   astroliftElevationStatus: AstroliftElevationStatus;
+  astroliftEmailServiceDetail?: Maybe<AstroliftEmailServiceDetail>;
   astroliftEnvironments: Array<AstroliftAppEnvironment>;
   astroliftEvents: Array<AstroliftEvent>;
   astroliftEventsAggregated: Array<AstroliftAggregatedEvent>;
@@ -4789,6 +4973,12 @@ export type QueryAstroliftAppSecretBundleAttachmentsArgs = {
 };
 
 
+export type QueryAstroliftAppSecretHistoryArgs = {
+  appSlug: Scalars['String']['input'];
+  key: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftAppSecretsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -4950,6 +5140,11 @@ export type QueryAstroliftDeploymentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftEmailServiceDetailArgs = {
+  managedServiceId: Scalars['GUID']['input'];
 };
 
 
@@ -5362,6 +5557,11 @@ export type RemoveAppDomainInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type RemoveEmailSuppressionEntryInput = {
+  address: Scalars['String']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+};
+
 export type RemoveOrganizationAllowlistDomainInput = {
   id: Scalars['GUID']['input'];
 };
@@ -5460,6 +5660,15 @@ export type RevokemobiledevicepayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type RotateAppSecretInput = {
+  appSlug: Scalars['String']['input'];
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
+  key: Scalars['String']['input'];
+  setVia: InputMaybe<Scalars['String']['input']>;
+  value: Scalars['String']['input'];
+};
+
 export type RotateDeployTokenInput = {
   id: Scalars['GUID']['input'];
 };
@@ -5500,9 +5709,19 @@ export type SetActiveIdentityProviderInput = {
 
 export type SetAppSecretInput = {
   appSlug: Scalars['String']['input'];
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   key: Scalars['String']['input'];
+  setVia: InputMaybe<Scalars['String']['input']>;
   value: Scalars['String']['input'];
+};
+
+export type SetAppSecretMetadataInput = {
+  appSlug: Scalars['String']['input'];
+  environmentName: InputMaybe<Scalars['String']['input']>;
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  key: Scalars['String']['input'];
+  setVia: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SetAppSubdomainInput = {
@@ -5551,11 +5770,14 @@ export type StartDeploymentInput = {
   ciProvider: InputMaybe<Scalars['String']['input']>;
   ciRunUrl: InputMaybe<Scalars['String']['input']>;
   commitAuthor: InputMaybe<Scalars['String']['input']>;
+  commitAuthorAvatarUrl: InputMaybe<Scalars['String']['input']>;
   commitMessage: InputMaybe<Scalars['String']['input']>;
   commitSha: InputMaybe<Scalars['String']['input']>;
   environmentName: Scalars['String']['input'];
   imageDigest: InputMaybe<Scalars['String']['input']>;
   imageTag: Scalars['String']['input'];
+  prNumber: InputMaybe<Scalars['Int']['input']>;
+  strategy: InputMaybe<Scalars['String']['input']>;
   triggerKind: Scalars['String']['input'];
   workloadSlug: InputMaybe<Scalars['String']['input']>;
 };
@@ -5846,6 +6068,10 @@ export type UserType = {
   memberships: Array<Scalars['JSON']['output']>;
   profile?: Maybe<ProfileType>;
   username: Scalars['String']['output'];
+};
+
+export type ValidateAstroliftCiSecretsInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 /** A field-level validation error. */

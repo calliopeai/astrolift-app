@@ -47,6 +47,20 @@ class Deployment(BaseCoreModel):
         ROLLBACK = "rollback"
         PROMOTION = "promotion"
 
+    class Strategy(models.TextChoices):
+        """Rollout strategy captured at deploy-creation time (#736).
+
+        ``unknown`` is the back-fill default for rows that pre-date the
+        column.  The Temporal workflow's rollout-policy decision sets
+        the canonical value when the deploy is created.
+        """
+
+        ROLLING = "rolling"
+        BLUE_GREEN = "blue_green"
+        CANARY = "canary"
+        RECREATE = "recreate"
+        UNKNOWN = "unknown"
+
     registered_app = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="deployments",
@@ -93,6 +107,16 @@ class Deployment(BaseCoreModel):
     image_digest = models.CharField(max_length=256, blank=True, default="")
     config_snapshot = models.JSONField(default=dict, blank=True)
     cluster_revision = models.CharField(max_length=128, blank=True, default="")
+    # Rollout strategy captured at deploy-creation time (#736).  The
+    # workflow's rollout-policy decision writes this once; never
+    # mutated after.  Back-fill rows default to ``unknown`` so the FE
+    # can render a neutral pill instead of erroring on a missing field.
+    strategy = models.CharField(
+        max_length=32,
+        choices=Strategy.choices,
+        default=Strategy.UNKNOWN,
+        blank=True,
+    )
 
     # CI / VCS provenance — captured at deployment creation, never
     # updated thereafter (treat as append-only). Per spec 14 §18.
