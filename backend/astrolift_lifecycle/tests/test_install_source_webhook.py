@@ -243,28 +243,103 @@ def test_install_no_connection_returns_precondition(
 
 
 # ---------------------------------------------------------------------------
-# GitLab gap
+# GitLab branch (#533)
 # ---------------------------------------------------------------------------
 
 
-def test_install_gitlab_source_returns_precondition(
+def test_install_gitlab_source_creates_hook(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_repo,
+    settings,
+):
+    """GitLab-sourced app installs a hook against the GitLab projects
+    hooks API. Same envelope shape as the GitHub branch."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
+
+    app_with_repo.source_kind = "gitlab"
+    app_with_repo.save(update_fields=["source_kind", "updated_at", "version"])
+
+    # GitLab OAuth-user connection. The provider's _token() decrypts a
+    # bearer token from secret_ciphertext; matches the shape used by
+    # the SCM tests for GitLab.
+    encrypted = encrypt_at_rest(b"glpat_test_token")
+    SourceConnection.objects.create(
+        organization=org,
+        kind=SourceConnection.Kind.GITLAB_OAUTH_USER,
+        display_name="GitLab: alice",
+        account_login="alice",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
+
+    captured: dict = {}
+
+    class _CM:
+        def __init__(self, req):
+            self._body = json.dumps({"id": 7777, "url": req.full_url, "active": True}).encode("utf-8")
+            captured["url"] = req.full_url
+            captured["method"] = req.get_method()
+            captured["body"] = json.loads(req.data.decode("utf-8"))
+
+        def __enter__(self):
+            return SimpleNamespace(read=lambda: self._body, status=201)
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.gitlab.urllib.request.urlopen",
+        lambda req, timeout=15: _CM(req),
+    )
+
+    with _ctx(org):
+        result = LifecycleMutation().install_astrolift_source_webhook(
+            _info(),
+            input=InstallSourceWebhookInput(app_slug=app_with_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == "created"
+    assert result.data.hook_id == "7777"
+    expected_url = f"https://api.astrolift.example.com/api/webhooks/gitlab/{app_with_repo.guid}/"
+    assert result.data.receiver_url == expected_url
+    # Routed via the GitLab projects/hooks endpoint with the right
+    # event flags.
+    assert "/api/v4/projects/" in captured["url"]
+    assert captured["url"].endswith("/hooks")
+    assert captured["method"] == "POST"
+    assert captured["body"]["push_events"] is True
+    # HMAC secret carried through as the ``token`` field (GitLab's
+    # naming) and persisted on the connection's webhook_secret column.
+    assert captured["body"]["token"]
+
+
+def test_install_bitbucket_source_returns_precondition(
     monkeypatch,
     permission_resolver,
     org,
     app_with_repo,
     github_connection,
 ):
-    """A GitLab-sourced app surfaces a clean PRECONDITION (not a
-    500) explaining the GitHub-only scope."""
+    """A Bitbucket-sourced app still surfaces a clean PRECONDITION until
+    the Bitbucket driver lands. Sibling of the old GitLab gap test."""
     permission_resolver.grant(Permission.APP_UPDATE)
-    app_with_repo.source_kind = "gitlab"
+    app_with_repo.source_kind = "bitbucket"
     app_with_repo.save(update_fields=["source_kind", "updated_at", "version"])
 
     def boom(*a, **kw):
-        raise AssertionError("must not call GitHub for a GitLab-sourced app")
+        raise AssertionError("must not call any provider for a bitbucket-sourced app")
 
     monkeypatch.setattr(
         "astrolift_scm.providers.github.urllib.request.urlopen",
+        boom,
+    )
+    monkeypatch.setattr(
+        "astrolift_scm.providers.gitlab.urllib.request.urlopen",
         boom,
     )
 
@@ -276,7 +351,7 @@ def test_install_gitlab_source_returns_precondition(
 
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    assert "github" in result.errors[0].message.lower()
+    assert "bitbucket" in result.errors[0].message.lower()
 
 
 # ---------------------------------------------------------------------------
