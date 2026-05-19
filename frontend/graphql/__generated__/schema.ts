@@ -55,6 +55,13 @@ export type AddOrganizationAllowlistDomainInput = {
   requiresReview: Scalars['Boolean']['input'];
 };
 
+export type AddWildcardDomainInput = {
+  appSlug: Scalars['String']['input'];
+  hostname: Scalars['String']['input'];
+  sniCertRef: Scalars['String']['input'];
+  validationMethod: Scalars['String']['input'];
+};
+
 export type Alertruledeletedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -321,6 +328,7 @@ export type AstroliftAppDomain = {
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   isPlatformManagedZone: Scalars['Boolean']['output'];
+  isWildcard: Scalars['Boolean']['output'];
   lastCertificateError: Scalars['String']['output'];
   lastCheckedAt?: Maybe<Scalars['DateTime']['output']>;
   lastValidationError: Scalars['String']['output'];
@@ -328,6 +336,7 @@ export type AstroliftAppDomain = {
   redirectRules: Array<AstroliftDomainRedirectRule>;
   registeredAppSlug: Scalars['String']['output'];
   requiredDnsRecords: Array<AstroliftAppDomainRequiredRecord>;
+  sniCertRef: Scalars['String']['output'];
   txtChallengeToken: Scalars['String']['output'];
   validationMethod: Scalars['String']['output'];
   validationToken: Scalars['String']['output'];
@@ -1338,6 +1347,12 @@ export type AstroliftEventPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftExecutePromqlResult = {
+  error: Scalars['String']['output'];
+  ok: Scalars['Boolean']['output'];
+  series: Array<AstroliftPromqlSeries>;
+};
+
 export type AstroliftForceRedeployPayload = {
   deploymentsCancelled: Scalars['Int']['output'];
   dispatchMessage?: Maybe<Scalars['String']['output']>;
@@ -1823,6 +1838,7 @@ export type AstroliftPreviewEnvironment = {
   estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  isManual: Scalars['Boolean']['output'];
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   namespace: Scalars['String']['output'];
   prNumber: Scalars['Int']['output'];
@@ -1855,6 +1871,11 @@ export type AstroliftProjectMutationResult = {
   data?: Maybe<AstroliftProject>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftPromqlSeries = {
+  metricLabels: Scalars['JSON']['output'];
+  values: Array<AstroliftTimeSeriesPoint>;
 };
 
 export type AstroliftProviderPlugin = {
@@ -2914,6 +2935,12 @@ export type CreatePolicyInput = {
   slug: Scalars['String']['input'];
 };
 
+export type CreatePreviewEnvironmentInput = {
+  appSlug: Scalars['String']['input'];
+  branch: Scalars['String']['input'];
+  environmentName: Scalars['String']['input'];
+};
+
 export type CreateProjectInput = {
   description: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
@@ -3382,6 +3409,7 @@ export type Mutation = {
   addAppDomain: AstroliftAppDomainMutationResult;
   addEmailSuppressionEntry: EmailsuppressionaddpayloadMutationResult;
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
+  addWildcardDomain: AstroliftAppDomainMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
@@ -3421,6 +3449,7 @@ export type Mutation = {
   createManagedDomain: AstroliftManagedDomainMutationResult;
   createOrganization: AstroliftOrganizationMutationResult;
   createPolicy: AstroliftPolicyMutationResult;
+  createPreviewEnvironment: AstroliftPreviewEnvironmentMutationResult;
   createProject: AstroliftProjectMutationResult;
   createRole: AstroliftRoleMutationResult;
   createTeam: AstroliftTeamMutationResult;
@@ -3672,6 +3701,11 @@ export type MutationAddOrganizationAllowlistDomainArgs = {
 };
 
 
+export type MutationAddWildcardDomainArgs = {
+  input: AddWildcardDomainInput;
+};
+
+
 export type MutationApproveDeploymentArgs = {
   input: DeploymentByIdInput;
 };
@@ -3863,6 +3897,11 @@ export type MutationCreateOrganizationArgs = {
 
 export type MutationCreatePolicyArgs = {
   input: CreatePolicyInput;
+};
+
+
+export type MutationCreatePreviewEnvironmentArgs = {
+  input: CreatePreviewEnvironmentInput;
 };
 
 
@@ -5045,6 +5084,7 @@ export type Query = {
   astroliftEvents: Array<AstroliftEvent>;
   astroliftEventsAggregated: Array<AstroliftAggregatedEvent>;
   astroliftEventsPage: AstroliftEventPage;
+  astroliftExecutePromql: AstroliftExecutePromqlResult;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
@@ -5447,6 +5487,16 @@ export type QueryAstroliftEventsPageArgs = {
   eventType?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   severity?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftExecutePromqlArgs = {
+  appSlug: Scalars['String']['input'];
+  endUnix: Scalars['Int']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  query: Scalars['String']['input'];
+  startUnix: Scalars['Int']['input'];
+  stepSeconds: Scalars['Int']['input'];
 };
 
 
