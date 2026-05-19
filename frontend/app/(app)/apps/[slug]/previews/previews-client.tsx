@@ -1,7 +1,13 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import { AlertTriangleIcon, CalendarClockIcon, GitPullRequestIcon, TrashIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CalendarClockIcon,
+  GitBranchIcon,
+  GitPullRequestIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -15,6 +21,16 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -25,7 +41,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { EXTEND_PREVIEW_TTL, TEAR_DOWN_PREVIEW } from "@/graphql/lifecycle/lifecycle.mutations";
+import {
+  CREATE_PREVIEW_ENVIRONMENT,
+  EXTEND_PREVIEW_TTL,
+  TEAR_DOWN_PREVIEW,
+} from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_PREVIEW_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftPreviewEnvironment,
@@ -133,6 +153,82 @@ function formatCpuCores(cores: number): string {
 // the platform. Lives in the in-app resources index (not an external
 // site) so operators stay inside the app.
 const DOCS_PREVIEWS_HREF = "/resources/docs#previews";
+
+// #659 — manual preview spin-up. Operators provision a preview from
+// any branch without opening a PR; the backend uses the same workflow
+// as the auto-preview path so TTL + resource limits are identical.
+// Gated client-side on `app.deploy`; the resolver also enforces.
+function CreatePreviewSheet({ appSlug, disabled }: { appSlug: string; disabled: boolean }) {
+  const [open, setOpen] = React.useState(false);
+  const [branch, setBranch] = React.useState("");
+
+  const [createPreview, { loading }] = useMutation<{
+    createPreviewEnvironment: MutationResultLite;
+  }>(CREATE_PREVIEW_ENVIRONMENT, {
+    refetchQueries: [{ query: LIST_PREVIEW_ENVIRONMENTS, variables: { appSlug } }],
+  });
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const b = branch.trim();
+    if (!b) return;
+    const { data } = await createPreview({
+      variables: { input: { appSlug, branch: b } },
+    });
+    const r = data?.createPreviewEnvironment;
+    if (r?.ok) {
+      toast.success(`Preview for "${b}" is provisioning`);
+      setOpen(false);
+      setBranch("");
+    } else {
+      toast.error(r?.errors[0]?.message ?? "Failed to create preview");
+    }
+  }
+
+  return (
+    <>
+      <Can permission="app.deploy">
+        <Button size="sm" onClick={() => setOpen(true)} disabled={disabled}>
+          <GitBranchIcon className="size-3" /> Create preview
+        </Button>
+      </Can>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Create preview environment</SheetTitle>
+            <SheetDescription>
+              Provision a preview from any branch without opening a pull request.
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="preview-branch">Branch name</Label>
+              <Input
+                id="preview-branch"
+                placeholder="feature/my-branch"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                autoFocus
+              />
+              <p className="text-muted-foreground text-xs">
+                The branch must exist in the connected repository. The environment will use the
+                same TTL and resource limits as auto-preview environments.
+              </p>
+            </div>
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading || !branch.trim()}>
+                {loading ? "Creating…" : "Create preview"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
 
 export function AppPreviewsClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
@@ -274,6 +370,10 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
       }
     >
       <AppTabs slug={a.slug} active="previews" />
+
+      <div className="flex justify-end">
+        <CreatePreviewSheet appSlug={a.slug} disabled={!a.previewEnabled} />
+      </div>
 
       {!a.previewEnabled && (
         <Card className="border-amber-500/30 bg-amber-500/5">
@@ -493,24 +593,33 @@ function PreviewRow({
         <StatusDot status={statusToDot[p.status]} />
       </TableCell>
       <TableCell>
-        {p.prUrl ? (
-          <a
-            href={p.prUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium hover:underline"
-            title={t("openPr", { pr: p.prNumber })}
-          >
-            #{p.prNumber}
-          </a>
+        {p.prNumber > 0 ? (
+          p.prUrl ? (
+            <a
+              href={p.prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium hover:underline"
+              title={t("openPr", { pr: p.prNumber })}
+            >
+              #{p.prNumber}
+            </a>
+          ) : (
+            <span className="font-medium">#{p.prNumber}</span>
+          )
         ) : (
-          <span className="font-medium">#{p.prNumber}</span>
+          <span className="font-medium">{p.branch}</span>
         )}
-        <span className="text-muted-foreground"> · {p.branch}</span>
+        {p.prNumber > 0 && <span className="text-muted-foreground"> · {p.branch}</span>}
         <div className="text-muted-foreground font-mono text-xs">
           ns {p.namespace}
           {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
         </div>
+        {p.isManual && (
+          <Badge variant="outline" className="mt-1 text-[10px] uppercase">
+            manual
+          </Badge>
+        )}
       </TableCell>
       <TableCell>
         {p.status === "running" ? (

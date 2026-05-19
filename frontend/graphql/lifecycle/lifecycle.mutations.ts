@@ -338,6 +338,31 @@ export const EXTEND_PREVIEW_TTL = gql`
   }
 `;
 
+// #659 — manual preview spin-up from any branch (no PR required). The
+// backend uses the same provisioning workflow as auto-previews; the
+// only divergence is the lack of a PR number / URL on the resulting
+// row. `isManual` on the result lets the list view tag the row.
+export const CREATE_PREVIEW_ENVIRONMENT = gql`
+  mutation CreatePreviewEnvironment($input: CreatePreviewEnvironmentInput!) {
+    createPreviewEnvironment(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        branch
+        status
+        hostname
+        namespace
+        isManual
+      }
+    }
+  }
+`;
+
 const ENVIRONMENT_FIELDS = `
   id
   name
