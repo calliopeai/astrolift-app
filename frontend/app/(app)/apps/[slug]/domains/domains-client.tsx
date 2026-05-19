@@ -62,11 +62,14 @@ import {
   RECHECK_DOMAIN_VALIDATION,
   REMOVE_APP_DOMAIN,
   RESUME_APP_INGRESS,
+  SET_DOMAIN_PATH_ROUTES,
+  SET_DOMAIN_REDIRECTS,
   UPLOAD_CUSTOM_DOMAIN_CERTIFICATE,
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_APP_DOMAINS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import { DOC_LINKS } from "@/lib/docs/urls";
 
 import { AppTabs } from "../components/app-tabs";
@@ -79,6 +82,25 @@ interface RequiredDnsRecord {
   propagated: boolean;
   lastCheckedAt?: string | null;
   message: string;
+}
+
+interface DomainRedirectRule {
+  id: string;
+  kind: string;
+  sourcePattern: string;
+  destinationUrl: string;
+  httpStatus: number;
+  preserveQueryString: boolean;
+  priority: number;
+}
+
+interface DomainPathRoute {
+  id: string;
+  pathPrefix: string;
+  targetWorkloadSlug: string;
+  targetPort: number;
+  stripPrefix: boolean;
+  priority: number;
 }
 
 interface AppDomain {
@@ -107,6 +129,18 @@ interface AppDomain {
   certExpiresAt?: string | null;
   certIssuerSerial?: string;
   certObservabilityStatus?: string;
+  // #685 / #686 — redirect & path-route config
+  redirectRules: DomainRedirectRule[];
+  pathRoutes: DomainPathRoute[];
+}
+
+interface WorkloadOption {
+  slug: string;
+  name: string;
+}
+
+interface WorkloadsResp {
+  astroliftWorkloads: WorkloadOption[];
 }
 
 interface Resp {
@@ -237,6 +271,22 @@ export function AppDomainsClient({ slug }: { slug: string }) {
     refetchQueries: refetch,
     awaitRefetchQueries: true,
   });
+  const [setRedirects, setRedirectsState] = useMutation<{
+    setDomainRedirects: MutationResult<AppDomain>;
+  }>(SET_DOMAIN_REDIRECTS, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+  const [setPathRoutes, setPathRoutesState] = useMutation<{
+    setDomainPathRoutes: MutationResult<AppDomain>;
+  }>(SET_DOMAIN_PATH_ROUTES, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+  const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
+    variables: { appSlug: slug },
+    fetchPolicy: "cache-and-network",
+  });
 
   const busy =
     addState.loading ||
@@ -244,7 +294,9 @@ export function AppDomainsClient({ slug }: { slug: string }) {
     recheckState.loading ||
     uploadCertState.loading ||
     pauseIngressState.loading ||
-    resumeIngressState.loading;
+    resumeIngressState.loading ||
+    setRedirectsState.loading ||
+    setPathRoutesState.loading;
   const list = domains.data?.astroliftAppDomains ?? [];
   const envList = envs.data?.astroliftEnvironments ?? [];
   const [removeTarget, setRemoveTarget] = React.useState<AppDomain | null>(null);
@@ -284,6 +336,56 @@ export function AppDomainsClient({ slug }: { slug: string }) {
     } else {
       toast.error(data?.recheckDomainValidation.errors?.[0]?.message ?? "Recheck failed");
     }
+  }
+
+  async function handleSaveRedirects(d: AppDomain, rules: DomainRedirectRule[]): Promise<boolean> {
+    const { data } = await setRedirects({
+      variables: {
+        input: {
+          domainId: d.id,
+          rules: rules.map((r) => ({
+            kind: r.kind,
+            sourcePattern: r.sourcePattern,
+            destinationUrl: r.destinationUrl,
+            httpStatus: r.httpStatus,
+            preserveQueryString: r.preserveQueryString,
+            priority: r.priority,
+          })),
+        },
+      },
+    });
+    if (data?.setDomainRedirects.ok) {
+      toast.success(`Redirects updated for ${d.hostname}`);
+      return true;
+    }
+    toast.error(data?.setDomainRedirects.errors?.[0]?.message ?? "Save failed");
+    return false;
+  }
+
+  async function handleSavePathRoutes(
+    d: AppDomain,
+    routes: DomainPathRoute[]
+  ): Promise<boolean> {
+    const { data } = await setPathRoutes({
+      variables: {
+        input: {
+          domainId: d.id,
+          routes: routes.map((r) => ({
+            pathPrefix: r.pathPrefix,
+            targetWorkloadSlug: r.targetWorkloadSlug,
+            targetPort: r.targetPort,
+            stripPrefix: r.stripPrefix,
+            priority: r.priority,
+          })),
+        },
+      },
+    });
+    if (data?.setDomainPathRoutes.ok) {
+      toast.success(`Path routes updated for ${d.hostname}`);
+      return true;
+    }
+    toast.error(data?.setDomainPathRoutes.errors?.[0]?.message ?? "Save failed");
+    return false;
   }
 
   async function handleToggleIngress(env: AstroliftAppEnvironment) {
@@ -374,9 +476,12 @@ export function AppDomainsClient({ slug }: { slug: string }) {
                 key={d.id}
                 domain={d}
                 busy={busy}
+                workloadOptions={workloads.data?.astroliftWorkloads ?? []}
                 onRecheck={() => handleRecheck(d)}
                 onRemove={() => setRemoveTarget(d)}
                 onUploadCert={() => setByoTarget(d)}
+                onSaveRedirects={(rules) => handleSaveRedirects(d, rules)}
+                onSavePathRoutes={(routes) => handleSavePathRoutes(d, routes)}
               />
             ))}
           </div>
@@ -574,15 +679,21 @@ function AddDomainSheet({
 function DomainHandshakeCard({
   domain,
   busy,
+  workloadOptions,
   onRecheck,
   onRemove,
   onUploadCert,
+  onSaveRedirects,
+  onSavePathRoutes,
 }: {
   domain: AppDomain;
   busy: boolean;
+  workloadOptions: WorkloadOption[];
   onRecheck: () => void;
   onRemove: () => void;
   onUploadCert: () => void;
+  onSaveRedirects: (rules: DomainRedirectRule[]) => Promise<boolean>;
+  onSavePathRoutes: (routes: DomainPathRoute[]) => Promise<boolean>;
 }) {
   const t = useTranslations("apps.domains.cert");
   const tone = CERT_TONE[domain.certState] ?? "pending";
@@ -694,8 +805,538 @@ function DomainHandshakeCard({
         ) : (
           <p className="text-muted-foreground text-sm">{t("noHandshake")}</p>
         )}
+
+        <DomainRedirectsSection
+          domain={domain}
+          busy={busy}
+          onSave={onSaveRedirects}
+        />
+        <DomainPathRoutesSection
+          domain={domain}
+          busy={busy}
+          workloadOptions={workloadOptions}
+          onSave={onSavePathRoutes}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+// ─── DomainRedirectsSection (#685) ──────────────────────────────────────
+// Replace-all UX: edits stay local to the section until the operator
+// clicks "Save" — at that point the entire updated rules array is sent
+// in one mutation and the backend swaps the persisted list. The
+// per-row delete is a local mutation only until Save is pressed.
+
+const REDIRECT_KINDS = [
+  { value: "http_to_https", label: "HTTP → HTTPS" },
+  { value: "apex_to_www", label: "Apex → www" },
+  { value: "custom", label: "Custom" },
+] as const;
+
+type RedirectKind = (typeof REDIRECT_KINDS)[number]["value"];
+
+function DomainRedirectsSection({
+  domain,
+  busy,
+  onSave,
+}: {
+  domain: AppDomain;
+  busy: boolean;
+  onSave: (rules: DomainRedirectRule[]) => Promise<boolean>;
+}) {
+  const [rules, setRules] = React.useState<DomainRedirectRule[]>(domain.redirectRules ?? []);
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [dirty, setDirty] = React.useState(false);
+
+  // Sync local state when the upstream domain data changes (e.g. a
+  // refetch after Save lands). Comparing by id-set is enough because
+  // the backend re-emits the full list on every mutation.
+  React.useEffect(() => {
+    setRules(domain.redirectRules ?? []);
+    setDirty(false);
+  }, [domain.redirectRules]);
+
+  const [draft, setDraft] = React.useState<{
+    kind: RedirectKind;
+    sourcePattern: string;
+    destinationUrl: string;
+    httpStatus: number;
+    preserveQueryString: boolean;
+  }>({
+    kind: "http_to_https",
+    sourcePattern: "",
+    destinationUrl: "",
+    httpStatus: 301,
+    preserveQueryString: true,
+  });
+
+  function resetDraft() {
+    setDraft({
+      kind: "http_to_https",
+      sourcePattern: "",
+      destinationUrl: "",
+      httpStatus: 301,
+      preserveQueryString: true,
+    });
+  }
+
+  function addRule() {
+    const newRule: DomainRedirectRule = {
+      id: `local-${Math.random().toString(36).slice(2, 10)}`,
+      kind: draft.kind,
+      sourcePattern: draft.kind === "custom" ? draft.sourcePattern : "",
+      destinationUrl: draft.kind === "custom" ? draft.destinationUrl : "",
+      httpStatus: draft.httpStatus,
+      preserveQueryString: draft.preserveQueryString,
+      priority: rules.length,
+    };
+    setRules([...rules, newRule]);
+    setDirty(true);
+    setAddOpen(false);
+    resetDraft();
+  }
+
+  function deleteRule(id: string) {
+    setRules(rules.filter((r) => r.id !== id));
+    setDirty(true);
+  }
+
+  async function save() {
+    const ok = await onSave(rules);
+    if (ok) setDirty(false);
+  }
+
+  return (
+    <section className="border-border space-y-2 rounded-md border p-3">
+      <div className="flex items-center gap-2">
+        <h4 className="text-sm font-semibold">Redirects</h4>
+        <Badge variant="outline" className="text-[10px]">
+          {rules.length}
+        </Badge>
+        <div className="ml-auto flex items-center gap-2">
+          {dirty && (
+            <Can permission="app.deploy">
+              <Button size="sm" onClick={save} disabled={busy}>
+                Save
+              </Button>
+            </Can>
+          )}
+          <Can permission="app.deploy">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddOpen((v) => !v)}
+              disabled={busy}
+            >
+              <PlusIcon className="size-3.5" />
+              Add redirect
+            </Button>
+          </Can>
+        </div>
+      </div>
+
+      {rules.length > 0 ? (
+        <div className="border-border rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-32">Kind</TableHead>
+                <TableHead>Source pattern</TableHead>
+                <TableHead>Destination</TableHead>
+                <TableHead className="w-16">Status</TableHead>
+                <TableHead className="w-20">Query string</TableHead>
+                <TableHead className="w-10"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rules.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-mono text-xs">{r.kind}</TableCell>
+                  <TableCell className="font-mono text-xs break-all">
+                    {r.sourcePattern || "—"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs break-all">
+                    {r.destinationUrl || "—"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{r.httpStatus}</TableCell>
+                  <TableCell className="text-xs">{r.preserveQueryString ? "preserve" : "drop"}</TableCell>
+                  <TableCell>
+                    <Can permission="app.deploy">
+                      <button
+                        type="button"
+                        onClick={() => deleteRule(r.id)}
+                        className="hover:bg-muted text-muted-foreground hover:text-destructive rounded p-1"
+                        title="Remove rule"
+                        disabled={busy}
+                      >
+                        <Trash2Icon className="size-3.5" />
+                      </button>
+                    </Can>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        !addOpen && (
+          <p className="text-muted-foreground text-xs">
+            No redirects configured. Add one to send HTTP traffic to HTTPS or fold an apex into www.
+          </p>
+        )
+      )}
+
+      {addOpen && (
+        <div className="bg-muted/30 border-border space-y-2 rounded-md border p-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Kind</Label>
+              <Select
+                value={draft.kind}
+                onValueChange={(v) => setDraft((d) => ({ ...d, kind: v as RedirectKind }))}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REDIRECT_KINDS.map((k) => (
+                    <SelectItem key={k.value} value={k.value}>
+                      {k.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Status code</Label>
+              <Select
+                value={String(draft.httpStatus)}
+                onValueChange={(v) =>
+                  setDraft((d) => ({ ...d, httpStatus: Number(v) }))
+                }
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="301">301 (permanent)</SelectItem>
+                  <SelectItem value="302">302 (temporary)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {draft.kind === "custom" && (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-xs">Source pattern</Label>
+                  <Input
+                    value={draft.sourcePattern}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, sourcePattern: e.target.value }))
+                    }
+                    placeholder="/old-path"
+                    className="h-8 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Destination URL</Label>
+                  <Input
+                    value={draft.destinationUrl}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, destinationUrl: e.target.value }))
+                    }
+                    placeholder="https://example.com/new"
+                    className="h-8 font-mono text-xs"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <label className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={draft.preserveQueryString}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, preserveQueryString: e.target.checked }))
+              }
+            />
+            Preserve query string
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setAddOpen(false);
+                resetDraft();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={addRule}
+              disabled={
+                draft.kind === "custom" &&
+                (!draft.sourcePattern.trim() || !draft.destinationUrl.trim())
+              }
+            >
+              Add to list
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-[10px]">
+            New rules apply after you click Save above.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── DomainPathRoutesSection (#686) ─────────────────────────────────────
+// Same replace-all UX as redirects. Workload dropdown is populated from
+// the app's registered workloads so we don't accept arbitrary slugs that
+// the manifest renderer will reject downstream.
+
+function DomainPathRoutesSection({
+  domain,
+  busy,
+  workloadOptions,
+  onSave,
+}: {
+  domain: AppDomain;
+  busy: boolean;
+  workloadOptions: WorkloadOption[];
+  onSave: (routes: DomainPathRoute[]) => Promise<boolean>;
+}) {
+  const [routes, setRoutes] = React.useState<DomainPathRoute[]>(domain.pathRoutes ?? []);
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [dirty, setDirty] = React.useState(false);
+
+  React.useEffect(() => {
+    setRoutes(domain.pathRoutes ?? []);
+    setDirty(false);
+  }, [domain.pathRoutes]);
+
+  const [draft, setDraft] = React.useState<{
+    pathPrefix: string;
+    targetWorkloadSlug: string;
+    targetPort: number;
+    stripPrefix: boolean;
+    priority: number;
+  }>({
+    pathPrefix: "",
+    targetWorkloadSlug: "",
+    targetPort: 80,
+    stripPrefix: false,
+    priority: 0,
+  });
+
+  function resetDraft() {
+    setDraft({
+      pathPrefix: "",
+      targetWorkloadSlug: "",
+      targetPort: 80,
+      stripPrefix: false,
+      priority: 0,
+    });
+  }
+
+  function addRoute() {
+    const newRoute: DomainPathRoute = {
+      id: `local-${Math.random().toString(36).slice(2, 10)}`,
+      pathPrefix: draft.pathPrefix,
+      targetWorkloadSlug: draft.targetWorkloadSlug,
+      targetPort: draft.targetPort,
+      stripPrefix: draft.stripPrefix,
+      priority: draft.priority,
+    };
+    setRoutes([...routes, newRoute]);
+    setDirty(true);
+    setAddOpen(false);
+    resetDraft();
+  }
+
+  function deleteRoute(id: string) {
+    setRoutes(routes.filter((r) => r.id !== id));
+    setDirty(true);
+  }
+
+  async function save() {
+    const ok = await onSave(routes);
+    if (ok) setDirty(false);
+  }
+
+  const canAdd = draft.pathPrefix.trim() !== "" && draft.targetWorkloadSlug !== "";
+
+  return (
+    <section className="border-border space-y-2 rounded-md border p-3">
+      <div className="flex items-center gap-2">
+        <h4 className="text-sm font-semibold">Path routing</h4>
+        <Badge variant="outline" className="text-[10px]">
+          {routes.length}
+        </Badge>
+        <div className="ml-auto flex items-center gap-2">
+          {dirty && (
+            <Can permission="app.deploy">
+              <Button size="sm" onClick={save} disabled={busy}>
+                Save
+              </Button>
+            </Can>
+          )}
+          <Can permission="app.deploy">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAddOpen((v) => !v)}
+              disabled={busy}
+            >
+              <PlusIcon className="size-3.5" />
+              Add route
+            </Button>
+          </Can>
+        </div>
+      </div>
+
+      {routes.length > 0 ? (
+        <div className="border-border rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Path prefix</TableHead>
+                <TableHead>Workload</TableHead>
+                <TableHead className="w-16">Port</TableHead>
+                <TableHead className="w-20">Strip</TableHead>
+                <TableHead className="w-20">Priority</TableHead>
+                <TableHead className="w-10"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {routes.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-mono text-xs break-all">{r.pathPrefix}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.targetWorkloadSlug}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.targetPort}</TableCell>
+                  <TableCell className="text-xs">{r.stripPrefix ? "yes" : "no"}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.priority}</TableCell>
+                  <TableCell>
+                    <Can permission="app.deploy">
+                      <button
+                        type="button"
+                        onClick={() => deleteRoute(r.id)}
+                        className="hover:bg-muted text-muted-foreground hover:text-destructive rounded p-1"
+                        title="Remove route"
+                        disabled={busy}
+                      >
+                        <Trash2Icon className="size-3.5" />
+                      </button>
+                    </Can>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        !addOpen && (
+          <p className="text-muted-foreground text-xs">
+            All traffic falls through to the default workload. Add a path prefix to send /api or /static elsewhere.
+          </p>
+        )
+      )}
+
+      {addOpen && (
+        <div className="bg-muted/30 border-border space-y-2 rounded-md border p-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Path prefix</Label>
+              <Input
+                value={draft.pathPrefix}
+                onChange={(e) => setDraft((d) => ({ ...d, pathPrefix: e.target.value }))}
+                placeholder="/api"
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Workload</Label>
+              <Select
+                value={draft.targetWorkloadSlug}
+                onValueChange={(v) =>
+                  setDraft((d) => ({ ...d, targetWorkloadSlug: v }))
+                }
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Select workload" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workloadOptions.length === 0 ? (
+                    <SelectItem value="__empty" disabled>
+                      No workloads registered
+                    </SelectItem>
+                  ) : (
+                    workloadOptions.map((w) => (
+                      <SelectItem key={w.slug} value={w.slug} className="font-mono text-xs">
+                        {w.slug}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Target port</Label>
+              <Input
+                type="number"
+                value={draft.targetPort}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, targetPort: Number(e.target.value) || 0 }))
+                }
+                min={1}
+                max={65535}
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Priority</Label>
+              <Input
+                type="number"
+                value={draft.priority}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, priority: Number(e.target.value) || 0 }))
+                }
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+          </div>
+          <label className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={draft.stripPrefix}
+              onChange={(e) => setDraft((d) => ({ ...d, stripPrefix: e.target.checked }))}
+            />
+            Strip prefix before forwarding to workload
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setAddOpen(false);
+                resetDraft();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={addRoute} disabled={!canAdd}>
+              Add to list
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-[10px]">
+            New routes apply after you click Save above.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

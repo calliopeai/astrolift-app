@@ -754,3 +754,132 @@ export const CLEAR_ENVIRONMENT_SETTING = gql`
     }
   }
 `;
+
+// --- Domain redirect rules (#685) ---
+export const SET_DOMAIN_REDIRECTS = gql`
+  mutation SetDomainRedirects($input: SetDomainRedirectsInput!) {
+    setDomainRedirects(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        id
+        hostname
+        redirectRules {
+          id
+          kind
+          sourcePattern
+          destinationUrl
+          httpStatus
+          preserveQueryString
+          priority
+        }
+        pathRoutes {
+          id
+          pathPrefix
+          targetWorkloadSlug
+          targetPort
+          stripPrefix
+          priority
+        }
+      }
+    }
+  }
+`;
+
+// --- Domain path-based routing (#686) ---
+export const SET_DOMAIN_PATH_ROUTES = gql`
+  mutation SetDomainPathRoutes($input: SetDomainPathRoutesInput!) {
+    setDomainPathRoutes(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        id
+        hostname
+        redirectRules {
+          id
+          kind
+          sourcePattern
+          destinationUrl
+          httpStatus
+          preserveQueryString
+          priority
+        }
+        pathRoutes {
+          id
+          pathPrefix
+          targetWorkloadSlug
+          targetPort
+          stripPrefix
+          priority
+        }
+      }
+    }
+  }
+`;
+
+// --- Bulk rolling restart (#698) ---
+export const BULK_ROLLING_RESTART = gql`
+  mutation BulkRollingRestart($input: BulkRollingRestartInput!) {
+    bulkRollingRestart(input: $input) {
+      okCount
+      failedCount
+      perApp { appSlug ok errors }
+    }
+  }
+`;
+
+// --- Bulk push secrets (#698) ---
+export const BULK_PUSH_SECRETS = gql`
+  mutation BulkPushSecrets($input: BulkPushSecretsInput!) {
+    bulkPushSecrets(input: $input) {
+      okCount
+      failedCount
+      perApp { appSlug ok errors }
+    }
+  }
+`;
+
+// --- Bulk resync manifest (#698) ---
+export const BULK_RESYNC_MANIFEST = gql`
+  mutation BulkResyncManifest($input: BulkResyncManifestInput!) {
+    bulkResyncManifest(input: $input) {
+      okCount
+      failedCount
+      perApp { appSlug ok errors }
+    }
+  }
+`;
+
+// --- Alert subscription set (#703) ---
+export const SET_ALERT_SUBSCRIPTION = gql`
+  mutation SetAlertSubscription($input: SetAlertSubscriptionInput!) {
+    setAlertSubscription(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        id
+        appSlug
+        alertKind
+        channel
+        enabled
+      }
+    }
+  }
+`;
+
+// --- Alert subscription clear (#703) ---
+export const CLEAR_ALERT_SUBSCRIPTION = gql`
+  mutation ClearAlertSubscription($input: ClearAlertSubscriptionInput!) {
+    clearAlertSubscription(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        id
+        appSlug
+        alertKind
+        channel
+        enabled
+      }
+    }
+  }
+`;

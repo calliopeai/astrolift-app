@@ -1,20 +1,25 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertCircleIcon,
   ExternalLinkIcon,
   GitBranchIcon,
+  KeyIcon,
   PlusIcon,
   RefreshCcwIcon,
+  RefreshCwIcon,
   RocketIcon,
+  RotateCcwIcon,
   SearchIcon,
   StarIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
@@ -23,8 +28,23 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  BULK_PUSH_SECRETS,
+  BULK_RESYNC_MANIFEST,
+  BULK_ROLLING_RESTART,
+} from "@/graphql/lifecycle/lifecycle.mutations";
+import type { BulkOperationResult } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_APPS_PAGE } from "@/graphql/registry/registry.queries";
 import type {
   AppListStatusFilter,
@@ -185,6 +205,83 @@ export function AppsClient() {
 
   // #697 — pinned apps sort to the top of the grid.
   const { pinned: pinnedSet, toggle: togglePin } = usePinnedApps();
+
+  // #698 — bulk-action selection. Tracks slugs (not ids) because the
+  // bulk mutations are keyed on slug.
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+  const [pushSecretsOpen, setPushSecretsOpen] = useState(false);
+
+  const [bulkRollingRestart, rollingRestartState] = useMutation<{
+    bulkRollingRestart: BulkOperationResult;
+  }>(BULK_ROLLING_RESTART);
+  const [bulkPushSecrets, pushSecretsState] = useMutation<{
+    bulkPushSecrets: BulkOperationResult;
+  }>(BULK_PUSH_SECRETS);
+  const [bulkResyncManifest, resyncManifestState] = useMutation<{
+    bulkResyncManifest: BulkOperationResult;
+  }>(BULK_RESYNC_MANIFEST);
+
+  const bulkBusy =
+    rollingRestartState.loading ||
+    pushSecretsState.loading ||
+    resyncManifestState.loading;
+
+  const toggleSelect = useCallback((slug: string) => {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedSlugs(new Set()), []);
+
+  function reportBulkResult(label: string, result: BulkOperationResult) {
+    const total = result.okCount + result.failedCount;
+    toast.success(`${label}: ${result.okCount}/${total} apps succeeded`);
+    if (result.failedCount > 0) {
+      const failedSlugs = result.perApp
+        .filter((p) => !p.ok)
+        .map((p) => p.appSlug)
+        .join(", ");
+      toast.error(`${label} failed for: ${failedSlugs}`);
+    }
+  }
+
+  async function handleRollingRestart() {
+    const appSlugs = Array.from(selectedSlugs);
+    const { data } = await bulkRollingRestart({
+      variables: { input: { appSlugs, environmentName: null } },
+    });
+    if (data?.bulkRollingRestart) {
+      reportBulkResult("Rolling restart", data.bulkRollingRestart);
+      clearSelection();
+    }
+  }
+
+  async function handlePushSecrets(bundleSlug: string, environmentName: string | null) {
+    const appSlugs = Array.from(selectedSlugs);
+    const { data } = await bulkPushSecrets({
+      variables: { input: { appSlugs, bundleSlug, environmentName } },
+    });
+    if (data?.bulkPushSecrets) {
+      reportBulkResult("Push secrets", data.bulkPushSecrets);
+      clearSelection();
+      setPushSecretsOpen(false);
+    }
+  }
+
+  async function handleResyncManifest() {
+    const appSlugs = Array.from(selectedSlugs);
+    const { data } = await bulkResyncManifest({
+      variables: { input: { appSlugs } },
+    });
+    if (data?.bulkResyncManifest) {
+      reportBulkResult("Resync manifest", data.bulkResyncManifest);
+      clearSelection();
+    }
+  }
   // #695 — client-side sort dropdown. Default is the backend's
   // `created_at desc` (so it matches the cursor pagination); other
   // options re-order the currently-loaded page. True cross-page sort
@@ -393,6 +490,49 @@ export function AppsClient() {
         )}
       </div>
 
+      {/* #698 — bulk-action toolbar. Shows when at least one app is
+          selected. Each action fans out server-side; the toast reports
+          aggregate okCount/total plus a separate destructive toast
+          listing failed slugs. */}
+      {selectedSlugs.size > 0 && (
+        <Can permission="app.deploy">
+          <div className="bg-accent/30 border-border flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+            <Badge variant="secondary">{selectedSlugs.size} selected</Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRollingRestart}
+              disabled={bulkBusy}
+            >
+              <RotateCcwIcon className="size-3.5" />
+              Rolling restart
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPushSecretsOpen(true)}
+              disabled={bulkBusy}
+            >
+              <KeyIcon className="size-3.5" />
+              Push secrets
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleResyncManifest}
+              disabled={bulkBusy}
+            >
+              <RefreshCwIcon className="size-3.5" />
+              Resync manifest
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearSelection} className="ml-auto">
+              <XIcon className="size-3.5" />
+              Clear
+            </Button>
+          </div>
+        </Can>
+      )}
+
       {loading && !data ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-44 w-full" />
@@ -431,9 +571,27 @@ export function AppsClient() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {apps.map((app) => {
               const isPinned = pinnedSet.has(app.slug);
+              const isSelected = selectedSlugs.has(app.slug);
               return (
               <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
                 <Card className="hover:bg-accent/30 group relative transition-colors">
+                  {/* #698 — multi-select checkbox. Same stop-propagation
+                      pattern as the pin button so a checkbox click
+                      never navigates into the app. */}
+                  <label
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-3 left-3 z-10 inline-flex cursor-pointer items-center"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleSelect(app.slug);
+                      }}
+                      aria-label={`Select ${app.name}`}
+                    />
+                  </label>
                   {/* #697 — Pin / unpin toggle. Positioned absolutely so
                       it can sit inside the card without breaking the
                       <Link> parent's whole-card click target. The
@@ -456,7 +614,7 @@ export function AppsClient() {
                     />
                     <span className="sr-only">{isPinned ? "Unpin app" : "Pin to top"}</span>
                   </button>
-                  <CardContent className="flex flex-col gap-3 p-5">
+                  <CardContent className="flex flex-col gap-3 p-5 pl-9">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h3 className="truncate text-lg font-semibold">{app.name}</h3>
@@ -528,7 +686,96 @@ export function AppsClient() {
           )}
         </>
       )}
+
+      <PushSecretsDialog
+        open={pushSecretsOpen}
+        onOpenChange={setPushSecretsOpen}
+        appCount={selectedSlugs.size}
+        busy={bulkBusy}
+        onSubmit={handlePushSecrets}
+      />
     </PageShell>
+  );
+}
+
+// #698 — push-secrets dialog. Bundle slug is required; environment
+// name is optional (null fans the bundle out to every environment the
+// bundle is bound to on each app).
+function PushSecretsDialog({
+  open,
+  onOpenChange,
+  appCount,
+  busy,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+  appCount: number;
+  busy: boolean;
+  onSubmit: (bundleSlug: string, environmentName: string | null) => Promise<void>;
+}) {
+  const [bundleSlug, setBundleSlug] = useState("");
+  const [environmentName, setEnvironmentName] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setBundleSlug("");
+      setEnvironmentName("");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Push secrets to {appCount} app{appCount === 1 ? "" : "s"}</DialogTitle>
+          <DialogDescription>
+            Project the named secret bundle onto every selected app. Leave environment blank to fan out to every environment the bundle is bound to.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!bundleSlug.trim()) return;
+            await onSubmit(bundleSlug.trim(), environmentName.trim() || null);
+          }}
+          className="space-y-3"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="bundle-slug">Bundle slug</Label>
+            <Input
+              id="bundle-slug"
+              value={bundleSlug}
+              onChange={(e) => setBundleSlug(e.target.value)}
+              placeholder="shared-prod"
+              autoFocus
+              required
+              spellCheck={false}
+              className="font-mono"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="environment-name">Environment (optional)</Label>
+            <Input
+              id="environment-name"
+              value={environmentName}
+              onChange={(e) => setEnvironmentName(e.target.value)}
+              placeholder="prod"
+              spellCheck={false}
+              className="font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !bundleSlug.trim()}>
+              {busy ? "Pushing..." : `Push to ${appCount} app${appCount === 1 ? "" : "s"}`}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
