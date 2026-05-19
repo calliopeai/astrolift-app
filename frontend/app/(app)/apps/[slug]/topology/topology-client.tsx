@@ -15,6 +15,7 @@ import type {
   AstroliftRegisteredApp,
   AstroliftWorkload,
 } from "@/graphql/registry/registry.types";
+import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -23,6 +24,16 @@ interface AppResp {
 }
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
+}
+interface ManagedServicesResp {
+  astroliftManagedServices: Array<{
+    id: string;
+    name: string;
+    kind: string;
+    variant: string | null;
+    status: string;
+    environmentName: string;
+  }>;
 }
 
 /**
@@ -38,6 +49,11 @@ export function TopologyClient({ slug }: { slug: string }) {
   const t = useTranslations("apps.topology");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
+    variables: { appSlug: slug },
+  });
+  // #727 — fetch managed-service bindings so the topology renders
+  // RDS / S3 / SES / etc nodes hanging off the workload layer.
+  const managedServices = useQuery<ManagedServicesResp>(LIST_MANAGED_SERVICES, {
     variables: { appSlug: slug },
   });
 
@@ -65,7 +81,8 @@ export function TopologyClient({ slug }: { slug: string }) {
   }
 
   const wlList = workloads.data?.astroliftWorkloads ?? [];
-  const { nodes, edges } = appTopology(a, wlList);
+  const msList = managedServices.data?.astroliftManagedServices ?? [];
+  const { nodes, edges } = appTopology(a, wlList, msList);
 
   return (
     <PageShell
