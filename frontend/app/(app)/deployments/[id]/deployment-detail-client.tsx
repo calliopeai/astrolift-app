@@ -416,6 +416,29 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         </CardContent>
       </Card>
 
+      {/* #657 — commit message as an inline changelog. Minimum cut:
+          renders this deploy's commit message in a collapsible
+          expander.  Full PR-range-between-deploys notes track in
+          backend issue #738 (will populate \`releaseNotes\` field). */}
+      {d.commitMessage && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Release notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <details className="text-sm">
+              <summary className="text-muted-foreground cursor-pointer text-xs">
+                {d.commitMessage.split("\n")[0].slice(0, 120)}
+                {d.commitMessage.length > 120 && "…"}
+              </summary>
+              <pre className="bg-muted mt-2 max-h-64 overflow-auto rounded p-3 font-mono text-xs whitespace-pre-wrap">
+                {d.commitMessage}
+              </pre>
+            </details>
+          </CardContent>
+        </Card>
+      )}
+
       {/* #653 — approval/review trail. Shows the full audit chain
           (proposed → reviewed → approved → deployed) when the deploy
           gated through quorum; collapses to a single triggered-by row
