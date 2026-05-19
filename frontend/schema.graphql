@@ -2694,6 +2694,12 @@ input BringClusterIntoManagementInputType {
   clusterId: GUID!
 }
 
+type BulkAppResultItem {
+  appSlug: String!
+  ok: Boolean!
+  errors: [String!]!
+}
+
 input BulkApproveDeploymentsInput {
   deploymentIds: [GUID!]!
   reason: String = null
@@ -2710,13 +2716,34 @@ input BulkImportAppSecretsInput {
   dotenvText: String!
 }
 
+type BulkOperationResult {
+  okCount: Int!
+  failedCount: Int!
+  perApp: [BulkAppResultItem!]!
+}
+
+input BulkPushSecretsInput {
+  appSlugs: [String!]!
+  bundleSlug: String!
+  environmentName: String = null
+}
+
 input BulkRejectDeploymentsInput {
   deploymentIds: [GUID!]!
   reason: String!
 }
 
+input BulkResyncManifestInput {
+  appSlugs: [String!]!
+}
+
 input BulkRevokeRoleBindingsInput {
   bindingIds: [GUID!]!
+}
+
+input BulkRollingRestartInput {
+  appSlugs: [String!]!
+  environmentName: String = null
 }
 
 type Bulkimportpayload {
@@ -3519,6 +3546,9 @@ type Mutation {
   exportAstroliftAppLogs(input: ExportAppLogsInput!): AstroliftAppLogExportMutationResult!
   setAlertSubscription(input: SetAlertSubscriptionInput!): AstroliftUserAlertSubscriptionMutationResult!
   clearAlertSubscription(input: ClearAlertSubscriptionInput!): AstroliftUserAlertSubscriptionMutationResult!
+  bulkRollingRestart(input: BulkRollingRestartInput!): BulkOperationResult!
+  bulkPushSecrets(input: BulkPushSecretsInput!): BulkOperationResult!
+  bulkResyncManifest(input: BulkResyncManifestInput!): BulkOperationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
