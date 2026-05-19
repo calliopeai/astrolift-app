@@ -191,7 +191,27 @@ class ManagedServiceDriver(Protocol):
 
     def status(self, handle: ServiceHandle) -> ServiceStatus: ...
 
-    def binding(self, handle: ServiceHandle) -> Binding: ...
+    def binding(
+        self,
+        handle: ServiceHandle,
+        config: dict[str, Any] | None = None,
+    ) -> Binding:
+        """Emit connection material (env vars, IAM grants, volume mounts)
+        for a provisioned managed service.
+
+        ``handle`` carries the opaque per-driver resource identifier.
+
+        ``config`` is the operator-supplied ``ManagedService.config``
+        dict (the same shape ``provision`` / ``update`` accept). Drivers
+        that surface header-style customization -- e.g. the SES driver's
+        ``from_name`` / ``reply_to`` / ``return_path`` / ``env_senders``
+        keys -- read those values here and fold them into the rendered
+        binding. Drivers that don't need config-driven binding fields
+        ignore the argument; the default of ``None`` (also tolerated as
+        an empty dict via ``cfg = config or {}``) keeps every existing
+        driver implementation backwards-compatible.
+        """
+        ...
 
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle: ...
 

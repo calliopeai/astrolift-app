@@ -362,13 +362,18 @@ class AmazonSESDriver(ManagedServiceDriver):
         )
 
     @driver_op(cloud="aws", driver="email_ses")
-    def binding(self, handle: ServiceHandle) -> Binding:
+    def binding(
+        self,
+        handle: ServiceHandle,
+        config: dict[str, Any] | None = None,
+    ) -> Binding:
         _, identity = parse_handle(handle.handle)
         state = self._identity_verified_state(identity)
         if state is None:
             raise ManagedServiceError(
                 f"binding requested for missing identity {identity}",
             )
+        cfg = config or {}
         from_address = _from_address_for(identity=identity)
         smtp_endpoint = _smtp_endpoint_for(self._config.region)
         access_key_secret = self._smtp_access_key_secret_name(
@@ -378,7 +383,7 @@ class AmazonSESDriver(ManagedServiceDriver):
             identity=identity,
         )
 
-        env_vars = {
+        env_vars: dict[str, ValueRef] = {
             # Canonical contract envs (managed_service_kinds.py)
             "EMAIL_PROVIDER": ValueRef(literal="ses"),
             "EMAIL_API_KEY": ValueRef(secret_ref=secret_key_secret),
@@ -391,6 +396,44 @@ class AmazonSESDriver(ManagedServiceDriver):
             "SES_SMTP_USER": ValueRef(secret_ref=access_key_secret),
             "SES_SMTP_PASSWORD": ValueRef(secret_ref=secret_key_secret),
         }
+
+        # Operator-supplied sender envelope fields (#637/#639). Each
+        # is emitted only when the operator has set a non-empty value
+        # so workloads can ``os.getenv(..., default)`` cleanly. We
+        # coerce missing-or-``None`` to ``""`` *before* str() so a
+        # cleared-form ``None`` doesn't become the literal string
+        # ``"None"`` (which is truthy).
+        from_name = str(cfg.get("from_name") or "").strip()
+        reply_to = str(cfg.get("reply_to") or "").strip()
+        return_path = str(cfg.get("return_path") or "").strip()
+        if from_name:
+            env_vars["EMAIL_FROM_NAME"] = ValueRef(literal=from_name)
+        if reply_to:
+            env_vars["EMAIL_REPLY_TO"] = ValueRef(literal=reply_to)
+        if return_path:
+            env_vars["EMAIL_RETURN_PATH"] = ValueRef(literal=return_path)
+
+        # Per-environment sender overrides (#638). The operator
+        # supplies a ``env_senders`` map keyed by AppEnvironment name
+        # (``production`` / ``preview``). Missing keys fall through
+        # to the identity-derived EMAIL_FROM_ADDRESS above.
+        env_senders = cfg.get("env_senders", {})
+        if isinstance(env_senders, dict):
+            prod_sender = str(
+                env_senders.get("production") or "",
+            ).strip()
+            preview_sender = str(
+                env_senders.get("preview") or "",
+            ).strip()
+            if prod_sender:
+                env_vars["EMAIL_FROM_ADDRESS_PRODUCTION"] = ValueRef(
+                    literal=prod_sender,
+                )
+            if preview_sender:
+                env_vars["EMAIL_FROM_ADDRESS_PREVIEW"] = ValueRef(
+                    literal=preview_sender,
+                )
+
         identity_arn = (
             f"arn:aws:ses:{self._config.region}:*:identity/{identity}"
         )
@@ -477,6 +520,40 @@ class AmazonSESDriver(ManagedServiceDriver):
                     ),
                 },
                 "deletion_protection": {"type": "boolean"},
+                "from_name": {
+                    "type": "string",
+                    "description": (
+                        "Optional display name folded into the From: "
+                        "header (emitted as EMAIL_FROM_NAME) (#637)."
+                    ),
+                },
+                "reply_to": {
+                    "type": "string",
+                    "description": (
+                        "Optional Reply-To: address (emitted as "
+                        "EMAIL_REPLY_TO) (#637)."
+                    ),
+                },
+                "return_path": {
+                    "type": "string",
+                    "description": (
+                        "Optional Return-Path: (bounce) address "
+                        "(emitted as EMAIL_RETURN_PATH) (#639)."
+                    ),
+                },
+                "env_senders": {
+                    "type": "object",
+                    "description": (
+                        "Per-environment From: overrides keyed by "
+                        "AppEnvironment name; supported keys are "
+                        "``production`` and ``preview`` -- each emits "
+                        "EMAIL_FROM_ADDRESS_<ENV> when set (#638)."
+                    ),
+                    "properties": {
+                        "production": {"type": "string"},
+                        "preview": {"type": "string"},
+                    },
+                },
             },
         }
 
@@ -494,6 +571,33 @@ class AmazonSESDriver(ManagedServiceDriver):
                 ),
                 "EMAIL_REGION": (
                     "AWS region hosting the SES identity"
+                ),
+                "EMAIL_FROM_NAME": (
+                    "Optional human-readable display name for the From: "
+                    "header. Sourced from ``ManagedService.config."
+                    "from_name``; emitted only when non-empty (#637)."
+                ),
+                "EMAIL_REPLY_TO": (
+                    "Optional Reply-To: address. Sourced from "
+                    "``ManagedService.config.reply_to``; emitted only "
+                    "when non-empty (#637)."
+                ),
+                "EMAIL_RETURN_PATH": (
+                    "Optional Return-Path: (bounce) address. Sourced "
+                    "from ``ManagedService.config.return_path``; emitted "
+                    "only when non-empty (#639)."
+                ),
+                "EMAIL_FROM_ADDRESS_PRODUCTION": (
+                    "Optional per-environment From: override for the "
+                    "``production`` AppEnvironment. Sourced from "
+                    "``ManagedService.config.env_senders.production``; "
+                    "emitted only when non-empty (#638)."
+                ),
+                "EMAIL_FROM_ADDRESS_PREVIEW": (
+                    "Optional per-environment From: override for the "
+                    "``preview`` AppEnvironment. Sourced from "
+                    "``ManagedService.config.env_senders.preview``; "
+                    "emitted only when non-empty (#638)."
                 ),
                 "SES_FROM_ADDRESS": "Alias for EMAIL_FROM_ADDRESS",
                 "SES_REGION": "Alias for EMAIL_REGION",

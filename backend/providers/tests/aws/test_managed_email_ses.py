@@ -446,6 +446,158 @@ def test_binding_for_missing_raises(
         )
 
 
+# ---- binding: config-driven header envs (#637/#638/#639) --------
+
+
+def test_binding_without_config_omits_optional_envs(
+    driver: AmazonSESDriver,
+) -> None:
+    """Default ``config=None`` must not emit any of the optional
+    header / per-env-sender env vars -- workloads rely on
+    ``os.getenv(...)`` returning ``None`` for fallback semantics."""
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(ServiceHandle(handle=provisioned.handle))
+    for key in (
+        "EMAIL_FROM_NAME",
+        "EMAIL_REPLY_TO",
+        "EMAIL_RETURN_PATH",
+        "EMAIL_FROM_ADDRESS_PRODUCTION",
+        "EMAIL_FROM_ADDRESS_PREVIEW",
+    ):
+        assert key not in binding.env_vars
+
+
+def test_binding_emits_from_name_reply_to_return_path(
+    driver: AmazonSESDriver,
+) -> None:
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(
+        ServiceHandle(handle=provisioned.handle),
+        config={
+            "from_name": "Acme Notifications",
+            "reply_to": "support@acme.example",
+            "return_path": "bounces@acme.example",
+        },
+    )
+    env = binding.env_vars
+    assert env["EMAIL_FROM_NAME"].literal == "Acme Notifications"
+    assert env["EMAIL_REPLY_TO"].literal == "support@acme.example"
+    assert env["EMAIL_RETURN_PATH"].literal == "bounces@acme.example"
+
+
+def test_binding_emits_per_environment_senders(
+    driver: AmazonSESDriver,
+) -> None:
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(
+        ServiceHandle(handle=provisioned.handle),
+        config={
+            "env_senders": {
+                "production": "prod-bot@acme.example",
+                "preview": "preview-bot@acme.example",
+            },
+        },
+    )
+    env = binding.env_vars
+    assert (
+        env["EMAIL_FROM_ADDRESS_PRODUCTION"].literal
+        == "prod-bot@acme.example"
+    )
+    assert (
+        env["EMAIL_FROM_ADDRESS_PREVIEW"].literal
+        == "preview-bot@acme.example"
+    )
+    # identity-derived EMAIL_FROM_ADDRESS still emitted as the fallback
+    assert env["EMAIL_FROM_ADDRESS"].literal.startswith("noreply@")
+
+
+def test_binding_skips_blank_and_whitespace_only_values(
+    driver: AmazonSESDriver,
+) -> None:
+    """Operators clearing a field through the UI typically send
+    ``""`` or whitespace; those must not produce an empty env var
+    that overrides a workload-side default."""
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(
+        ServiceHandle(handle=provisioned.handle),
+        config={
+            "from_name": "   ",
+            "reply_to": "",
+            "return_path": None,
+            "env_senders": {
+                "production": "  ",
+                "preview": "",
+            },
+        },
+    )
+    for key in (
+        "EMAIL_FROM_NAME",
+        "EMAIL_REPLY_TO",
+        "EMAIL_RETURN_PATH",
+        "EMAIL_FROM_ADDRESS_PRODUCTION",
+        "EMAIL_FROM_ADDRESS_PREVIEW",
+    ):
+        assert key not in binding.env_vars
+
+
+def test_binding_tolerates_non_dict_env_senders(
+    driver: AmazonSESDriver,
+) -> None:
+    """Defensive: a malformed ``env_senders`` (list, string, None)
+    must not crash the binding render -- the driver simply skips
+    the per-environment emit path."""
+    provisioned = driver.provision(_spec())
+    for bad in (None, "production", ["production"], 42):
+        binding = driver.binding(
+            ServiceHandle(handle=provisioned.handle),
+            config={"env_senders": bad},
+        )
+        assert "EMAIL_FROM_ADDRESS_PRODUCTION" not in binding.env_vars
+        assert "EMAIL_FROM_ADDRESS_PREVIEW" not in binding.env_vars
+
+
+def test_binding_partial_env_senders_emits_only_set_keys(
+    driver: AmazonSESDriver,
+) -> None:
+    provisioned = driver.provision(_spec())
+    binding = driver.binding(
+        ServiceHandle(handle=provisioned.handle),
+        config={"env_senders": {"production": "prod@acme.example"}},
+    )
+    env = binding.env_vars
+    assert (
+        env["EMAIL_FROM_ADDRESS_PRODUCTION"].literal
+        == "prod@acme.example"
+    )
+    assert "EMAIL_FROM_ADDRESS_PREVIEW" not in env
+
+
+def test_binding_schema_documents_config_driven_envs(
+    driver: AmazonSESDriver,
+) -> None:
+    schema = driver.binding_schema()
+    for key in (
+        "EMAIL_FROM_NAME",
+        "EMAIL_REPLY_TO",
+        "EMAIL_RETURN_PATH",
+        "EMAIL_FROM_ADDRESS_PRODUCTION",
+        "EMAIL_FROM_ADDRESS_PREVIEW",
+    ):
+        assert key in schema.env_vars
+
+
+def test_config_schema_documents_new_keys(
+    driver: AmazonSESDriver,
+) -> None:
+    schema = driver.config_schema()
+    props = schema["properties"]
+    for key in ("from_name", "reply_to", "return_path", "env_senders"):
+        assert key in props
+    env_senders_props = props["env_senders"]["properties"]
+    assert "production" in env_senders_props
+    assert "preview" in env_senders_props
+
+
 # ---- snapshot + restore -----------------------------------------
 
 
