@@ -614,6 +614,12 @@ class AlertRuleType:
     is non-null; the alert still produces an ``AlertEvent`` row so the
     incident timeline stays intact."""
 
+    managed_service_id: GUID | None
+    """GUID of the bound ManagedService instance — non-null for
+    per-service predicate kinds (e.g. ``ses_bounce_rate``,
+    ``ses_complaint_rate``). ``null`` for app/env/global rules that
+    fire against PromQL or org-wide signals."""
+
 
 @strawberry.type(name="AstroliftAlertEvent")
 class AlertEventType:
@@ -631,6 +637,12 @@ def alert_rule_to_type(r) -> AlertRuleType:
     from astrolift_operations.alert_mute import active_mute_for_rule
 
     mute = active_mute_for_rule(r)
+    # ``managed_service`` is a nullable FK; avoid a join when it's null.
+    managed_service_id: GUID | None
+    if r.managed_service_id is None:
+        managed_service_id = None
+    else:
+        managed_service_id = GUID(str(r.managed_service.guid))
     return AlertRuleType(
         id=GUID(str(r.guid)),
         name=r.name,
@@ -644,6 +656,7 @@ def alert_rule_to_type(r) -> AlertRuleType:
         created_at=r.created_at,
         updated_at=r.updated_at,
         active_mute=alert_mute_to_type(mute) if mute is not None else None,
+        managed_service_id=managed_service_id,
     )
 
 

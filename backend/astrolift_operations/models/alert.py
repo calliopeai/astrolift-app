@@ -53,6 +53,21 @@ class AlertRule(BaseCoreModel):
         default="",
         help_text=("Slug or guid of the target object. Empty when target=global."),
     )
+    managed_service = models.ForeignKey(
+        "astrolift_services.ManagedService",
+        related_name="alert_rules",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        help_text=(
+            "Optional binding to a specific ManagedService instance. "
+            "Required for per-service predicate kinds (e.g. "
+            "ses_bounce_rate, ses_complaint_rate) so the evaluator "
+            "knows which driver instance to pull live metrics from. "
+            "Cascades on service delete — when an operator removes the "
+            "service, its rules go with it."
+        ),
+    )
     predicate = models.JSONField(
         default=dict,
         blank=True,

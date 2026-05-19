@@ -290,3 +290,182 @@ def test_acknowledge_is_idempotent(permission_resolver):
     assert result.ok
     event.refresh_from_db()
     assert event.acknowledged_at == first_ack
+
+
+# ---- managed_service binding (#757) ------------------------------
+
+
+def _make_email_service_for(org):
+    """Build the dependency chain needed to attach a ManagedService
+    to an AlertRule. Same shape as test_email_observability._scaffold,
+    inlined here so the alert-mutation tests stay self-contained."""
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_identity.models import Project
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_services.models import ManagedService
+
+    team = org.teams.first()
+    project = Project.objects.create(
+        organization=org,
+        team=team,
+        name="Demo",
+        slug=f"demo-msvc-{org.slug}",
+    )
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="AWS",
+                slug="aws",
+                version="0.0.1",
+                capabilities_manifest={},
+                config_schema={},
+            )
+        ],
+        ignore_conflicts=True,
+    )
+    plugin = ProviderPlugin.objects.get(slug="aws")
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        slug=f"cluster-msvc-{org.slug}",
+        name="Cluster",
+        provider_plugin=plugin,
+        endpoint="http://localhost:8443",
+        region="us-east-1",
+    )
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="App",
+        slug=f"app-msvc-{org.slug}",
+        provisioning_status="ready",
+        manifest_raw='astrolift_version = 1\nname = "app"\n',
+    )
+    env = AppEnvironment.objects.create(
+        registered_app=app,
+        name="production",
+        tenant_cluster=cluster,
+    )
+    return ManagedService.objects.create(
+        registered_app=app,
+        app_environment=env,
+        kind=ManagedService.Kind.EMAIL,
+        variant="ses",
+        name="ses",
+        status=ManagedService.Status.ACTIVE,
+        config={"region": "us-east-1", "identity": "mail.example.com"},
+    )
+
+
+def test_create_alert_rule_with_managed_service_id(permission_resolver):
+    org = _scaffold()
+    permission_resolver.grant(Permission.WEBHOOK_CREATE)
+    service = _make_email_service_for(org)
+
+    with _ctx(org):
+        result = OperationsMutation().create_alert_rule(
+            _info(),
+            input=CreateAlertRuleInput(
+                name="SES bounce alert",
+                target="app",
+                target_id=service.registered_app.slug,
+                severity="critical",
+                predicate={
+                    "kind": "ses_bounce_rate",
+                    "threshold_pct": 5.0,
+                },
+                managed_service_id=str(service.guid),
+            ),
+        )
+    assert result.ok, result.errors
+    rule = AlertRule.objects.get(name="SES bounce alert")
+    assert rule.managed_service_id == service.pk
+    # And the response carries the GUID for the FE.
+    assert str(result.data.managed_service_id) == str(service.guid)
+
+
+def test_create_alert_rule_unknown_managed_service_returns_not_found(
+    permission_resolver,
+):
+    org = _scaffold()
+    permission_resolver.grant(Permission.WEBHOOK_CREATE)
+
+    with _ctx(org):
+        result = OperationsMutation().create_alert_rule(
+            _info(),
+            input=CreateAlertRuleInput(
+                name="bogus",
+                target="app",
+                managed_service_id="00000000-0000-0000-0000-000000000000",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].field == "managedServiceId"
+
+
+def test_create_alert_rule_cross_org_managed_service_rejected(
+    permission_resolver,
+):
+    """A ManagedService owned by org B cannot be bound to a rule on
+    org A. Cross-tenant lookups must NOT_FOUND, not pass."""
+    org_a = _scaffold()
+    permission_resolver.grant(Permission.WEBHOOK_CREATE)
+    other_org = Organization.objects.create(name="Other", slug="other")
+    Team.objects.create(organization=other_org, name="Eng", slug="eng-other")
+    foreign_service = _make_email_service_for(other_org)
+
+    with _ctx(org_a):
+        result = OperationsMutation().create_alert_rule(
+            _info(),
+            input=CreateAlertRuleInput(
+                name="evil",
+                target="app",
+                managed_service_id=str(foreign_service.guid),
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
+def test_update_alert_rule_repoints_managed_service(permission_resolver):
+    org = _scaffold()
+    permission_resolver.grant(Permission.WEBHOOK_UPDATE)
+    svc_a = _make_email_service_for(org)
+    rule = AlertRule.objects.create(
+        organization=org,
+        name="ses-rule",
+        target="app",
+        managed_service=svc_a,
+    )
+    # A second managed service to repoint to.
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models import ManagedService
+
+    env_b = AppEnvironment.objects.create(
+        registered_app=svc_a.registered_app,
+        name="staging",
+        tenant_cluster=svc_a.app_environment.tenant_cluster,
+    )
+    svc_b = ManagedService.objects.create(
+        registered_app=svc_a.registered_app,
+        app_environment=env_b,
+        kind=ManagedService.Kind.EMAIL,
+        variant="ses",
+        name="ses-staging",
+        status=ManagedService.Status.ACTIVE,
+        config={"region": "us-east-1"},
+    )
+
+    with _ctx(org):
+        result = OperationsMutation().update_alert_rule(
+            _info(),
+            input=UpdateAlertRuleInput(
+                id=str(rule.guid),
+                managed_service_id=str(svc_b.guid),
+            ),
+        )
+    assert result.ok, result.errors
+    rule.refresh_from_db()
+    assert rule.managed_service_id == svc_b.pk
