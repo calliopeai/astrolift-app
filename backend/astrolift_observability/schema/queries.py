@@ -35,6 +35,7 @@ from strawberry.types import Info
 
 from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
 from astrolift_observability.schema.types import (
+    AppEndpointMetric,
     AppGoldenSignal,
     AppTrace,
     AppUrlHealth,
@@ -1112,3 +1113,120 @@ class GoldenSignalsQuery:
             )
             for span in spans
         ]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_endpoint_metrics(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        range_seconds: int | None = None,
+        workload_slug: str | None = None,
+    ) -> list[AppEndpointMetric]:
+        """Per-HTTP-route golden-signal snapshot (#748).
+
+        Queries Prometheus for the ``http_route`` dimension of the standard
+        OTEL metrics (``http_requests_total``,
+        ``http_request_duration_seconds_bucket``) and returns one row per
+        unique route label.
+
+        Latency values are in milliseconds. Routes with no histogram samples
+        carry ``None`` latency fields. Routes with zero total traffic are
+        excluded (they appear when the counter series is stale but not yet
+        expired from Prometheus; the FE doesn't need them).
+
+        Degrades to ``[]`` when the cluster has no Prometheus endpoint or the
+        backend is unreachable — same empty-state convention as the other
+        observability resolvers.
+        """
+        seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .only("id", "slug")
+            .first()
+        )
+        if app is None:
+            return []
+
+        endpoint = prom_client.resolve_prometheus_endpoint(
+            app=app, environment_name=environment_name
+        )
+        if endpoint is None:
+            return []
+
+        now = _now_utc()
+        end_unix = int(now.timestamp())
+        start_unix = end_unix - seconds
+        step = prom_queries.pick_step_seconds(seconds)
+
+        rate_plan = prom_queries.build_endpoint_request_rate_query(
+            app_slug=app.slug,
+            environment_name=environment_name,
+            range_seconds=seconds,
+            workload_slug=workload_slug,
+        )
+        err_plan = prom_queries.build_endpoint_error_rate_query(
+            app_slug=app.slug,
+            environment_name=environment_name,
+            range_seconds=seconds,
+            workload_slug=workload_slug,
+        )
+        lat_plans = {
+            q: prom_queries.build_endpoint_latency_quantile_query(
+                app_slug=app.slug,
+                environment_name=environment_name,
+                range_seconds=seconds,
+                quantile=q,
+                workload_slug=workload_slug,
+            )
+            for q in (0.5, 0.9, 0.99)
+        }
+
+        def _query_by_route(plan) -> dict[str, float]:
+            """Run query, return {http_route: last_sample_value}."""
+            try:
+                rows = prom_client.query_range_series(
+                    endpoint=endpoint,
+                    promql=plan.promql,
+                    start_unix=start_unix,
+                    end_unix=end_unix,
+                    step_seconds=step,
+                    label_key="http_route",
+                )
+            except PrometheusError:
+                return {}
+            out: dict[str, float] = {}
+            for route, values in rows:
+                if values:
+                    out[route] = values[-1][1]  # last sample in window
+            return out
+
+        rates = _query_by_route(rate_plan)
+        errors = _query_by_route(err_plan)
+        lat_by_q: dict[float, dict[str, float]] = {}
+        for q, plan in lat_plans.items():
+            lat_by_q[q] = _query_by_route(plan)
+
+        all_routes = set(rates) | set(errors) | set(lat_by_q.get(0.5, {}))
+        out: list[AppEndpointMetric] = []
+        for route in sorted(all_routes):
+            rps = rates.get(route, 0.0)
+            if rps <= 0.0:
+                continue
+            err_ratio = errors.get(route, 0.0)
+            p50 = lat_by_q[0.5].get(route)
+            p90 = lat_by_q[0.9].get(route)
+            p99 = lat_by_q[0.99].get(route)
+            out.append(
+                AppEndpointMetric(
+                    route=route,
+                    request_rate=rps,
+                    error_rate_ratio=err_ratio,
+                    p50_ms=p50 * 1000 if p50 is not None else None,
+                    p90_ms=p90 * 1000 if p90 is not None else None,
+                    p99_ms=p99 * 1000 if p99 is not None else None,
+                )
+            )
+        return out

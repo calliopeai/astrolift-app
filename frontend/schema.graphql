@@ -334,6 +334,15 @@ type AstroliftAppDomainRequiredRecord {
   message: String!
 }
 
+type AstroliftAppEndpointMetric {
+  route: String!
+  requestRate: Float!
+  errorRateRatio: Float!
+  p50Ms: Float
+  p90Ms: Float
+  p99Ms: Float
+}
+
 type AstroliftAppEnvironment {
   id: GUID!
   name: String!
@@ -4082,6 +4091,7 @@ type Query {
   astroliftExecutePromql(appSlug: String!, query: String!, startUnix: Int!, endUnix: Int!, stepSeconds: Int!, environmentName: String = null): AstroliftExecutePromqlResult!
   astroliftAppTraces(appSlug: String!, since: String!, until: String!, environmentName: String = null, service: String = null, operation: String = null, minDurationMs: Float = null, status: String = null, limit: Int = null): [AstroliftAppTrace!]!
   astroliftTraceSpans(appSlug: String!, traceId: String!, environmentName: String = null): [AstroliftTraceSpan!]!
+  astroliftAppEndpointMetrics(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppEndpointMetric!]!
   astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail

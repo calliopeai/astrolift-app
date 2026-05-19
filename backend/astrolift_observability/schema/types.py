@@ -398,3 +398,30 @@ class AppTrace:
     duration_ms: float
     status_code: str
     """OK | ERROR | UNSET"""
+
+
+@strawberry.type(name="AstroliftAppEndpointMetric")
+class AppEndpointMetric:
+    """Per-HTTP-route golden-signal snapshot (#748).
+
+    Returned by ``astroliftAppEndpointMetrics`` — one row per unique
+    ``http_route`` label seen in Prometheus over the requested window.
+
+    ``http_route`` is the OpenTelemetry semantic-convention label for
+    the matched URL template (e.g. ``GET /api/users/{id}``).
+    Instrumentation libraries populate it automatically.
+
+    Latency values are in milliseconds; error rate is a ratio in
+    [0.0, 1.0+] (>1 = pathological; the FE clips the bar at 100%).
+    A ``None`` latency value means no histogram data arrived yet (the
+    app hasn't sent a histogram metric for that route).
+    """
+
+    route: str
+    request_rate: float
+    """Requests / second over the queried window."""
+    error_rate_ratio: float
+    """5xx / total rate ratio. 0.0 when no errors."""
+    p50_ms: float | None
+    p90_ms: float | None
+    p99_ms: float | None

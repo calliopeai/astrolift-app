@@ -609,3 +609,98 @@ def build_workload_resource_limit_query(
     match = _render_label_match_with_extra(labels, f'resource="{resource}"')
     expr = f"sum(kube_pod_container_resource_limits{match})"
     return QueryPlan(promql=expr, labels=labels, rate_window="instant")
+
+
+# ----------------------------------------------------------------------
+# Per-endpoint (http_route) metric builders (#748)
+# ----------------------------------------------------------------------
+#
+# These builders emit ``sum by (http_route)`` queries that fan out the
+# golden-signal metrics by HTTP route label.  The ``http_route``
+# label is the OpenTelemetry semantic convention for the matched URL
+# template (e.g. ``GET /api/users/{id}``) — instrumentation libraries
+# (OpenTelemetry SDK, otelhttp middleware, etc.) populate it
+# automatically so no per-app config is needed.
+#
+# The queries use the same label-matcher sanitization and rate-window
+# rules as the golden-signals builders to keep behaviour consistent.
+
+
+def build_endpoint_request_rate_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    range_seconds: int,
+    workload_slug: str | None = None,
+) -> QueryPlan:
+    """Per-route traffic — requests / second grouped by ``http_route``.
+
+    ``sum by (http_route) (rate(http_requests_total{...}[<w>]))``
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+    expr = f"sum by (http_route) (rate(http_requests_total{match}[{rate_window}]))"
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+def build_endpoint_error_rate_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    range_seconds: int,
+    workload_slug: str | None = None,
+) -> QueryPlan:
+    """Per-route error rate — ratio of 5xx to total, grouped by ``http_route``.
+
+    ``sum by (http_route) (rate(http_requests_total{...,code=~"5.."}[<w>]))
+    / clamp_min(sum by (http_route) (rate(http_requests_total{...}[<w>])), 1e-9)``
+    """
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    rate_window = pick_rate_window(range_seconds)
+    base_match = _render_label_match(labels)
+    err_match = _render_label_match_with_extra(labels, 'code=~"5.."')
+    expr = (
+        f"sum by (http_route) (rate(http_requests_total{err_match}[{rate_window}])) "
+        f"/ clamp_min(sum by (http_route) (rate(http_requests_total{base_match}[{rate_window}])), 1e-9)"
+    )
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
+
+
+def build_endpoint_latency_quantile_query(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    range_seconds: int,
+    quantile: float,
+    workload_slug: str | None = None,
+) -> QueryPlan:
+    """Per-route latency quantile, grouped by ``http_route``.
+
+    ``histogram_quantile(q, sum by (http_route, le)
+        (rate(http_request_duration_seconds_bucket{...}[<w>])))``
+
+    Multiplied by 1000 at the resolver layer to produce milliseconds.
+    """
+    if not 0.0 < quantile < 1.0:
+        raise ValueError(f"quantile must be in (0, 1); got {quantile}")
+    labels = _build_labels(
+        app_slug=app_slug,
+        environment_name=environment_name,
+        workload_slug=workload_slug,
+    )
+    rate_window = pick_rate_window(range_seconds)
+    match = _render_label_match(labels)
+    expr = (
+        f"histogram_quantile({quantile:g}, "
+        f"sum by (http_route, le)(rate(http_request_duration_seconds_bucket{match}[{rate_window}])))"
+    )
+    return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
