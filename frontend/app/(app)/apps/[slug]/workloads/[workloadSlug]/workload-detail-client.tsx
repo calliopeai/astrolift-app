@@ -7,12 +7,15 @@ import {
   BoxIcon,
   ChevronRightIcon,
   CopyIcon,
+  DatabaseIcon,
   GitBranchIcon,
   GlobeIcon,
+  HardDriveIcon,
   LayersIcon,
   PackageIcon,
   PuzzleIcon,
   RotateCwIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -20,6 +23,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { PageShell } from "@/components/PageShell";
+import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -430,6 +434,32 @@ export function WorkloadDetailClient({
           memReqLimit: t("containers.memReqLimit"),
           restarts: t("containers.restarts"),
           empty: t("containers.empty"),
+        }}
+      />
+
+      <ProbesCard
+        containers={containers}
+        labels={{
+          title: t("probes.title"),
+          description: t("probes.description"),
+          startup: t("probes.startup"),
+          readiness: t("probes.readiness"),
+          liveness: t("probes.liveness"),
+          notConfigured: t("probes.notConfigured"),
+          container: t("probes.container"),
+          empty: t("probes.empty"),
+        }}
+      />
+
+      <VolumesCard
+        volumes={w.volumes}
+        labels={{
+          title: t("volumes.title"),
+          description: t("volumes.description"),
+          columnName: t("volumes.columnName"),
+          columnKind: t("volumes.columnKind"),
+          columnMount: t("volumes.columnMount"),
+          columnDetail: t("volumes.columnDetail"),
         }}
       />
 
@@ -988,6 +1018,13 @@ function ContainerCard({
   const cpuLim = res?.cpuLimit;
   const memReq = res?.memoryRequest;
   const memLim = res?.memoryLimit;
+  // Init-container debuggability needs the live container state alongside
+  // the image so an operator looking at the Init group can immediately tell
+  // whether the init has Completed (good), is Waiting on an image pull, or
+  // is Terminated with a non-zero exit. Reuses the same colour vocabulary
+  // as the pod-status grid above so the surface reads coherently.
+  const liveState = live?.state;
+  const liveReason = live?.waitingReason || live?.terminatedReason || "";
   return (
     <div className="border-muted rounded-md border p-3 text-sm">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -995,6 +1032,15 @@ function ContainerCard({
         {manifest?.port && manifest.port > 0 && (
           <Badge variant="outline" className="font-mono text-xs">
             :{manifest.port}
+          </Badge>
+        )}
+        {liveState && (
+          <Badge className={cn("gap-1 text-xs", containerStateClass(liveState, live?.ready))}>
+            <StatusDot status={containerStateDot(liveState, live?.ready)} />
+            <span className="capitalize">{liveState}</span>
+            {liveReason && (
+              <span className="text-muted-foreground ml-1 font-mono">{liveReason}</span>
+            )}
           </Badge>
         )}
         {manifest && (
@@ -1022,6 +1068,31 @@ function ContainerCard({
       </dl>
     </div>
   );
+}
+
+// Live container `state` → coloured badge. `running` + ready is the only
+// "everything's fine" path; `running` without ready means the readiness
+// probe is still failing (operator needs to know). `terminated` is success
+// for init containers (Completed exit 0) and failure for primary containers
+// — we surface the raw state and let the operator dig into the reason
+// string for terminal failure modes (OOMKilled, Error, …).
+function containerStateClass(state: string, ready?: boolean): string {
+  if (state === "running" && ready) return STATUS_VARIANT.Running;
+  if (state === "running") return STATUS_VARIANT.Pending;
+  if (state === "terminated") return STATUS_VARIANT.Succeeded;
+  if (state === "waiting") return STATUS_VARIANT.ContainerCreating;
+  return "bg-muted text-muted-foreground";
+}
+
+function containerStateDot(
+  state: string,
+  ready?: boolean
+): "ok" | "warn" | "error" | "muted" | "pending" {
+  if (state === "running" && ready) return "ok";
+  if (state === "running") return "warn";
+  if (state === "terminated") return "ok";
+  if (state === "waiting") return "pending";
+  return "muted";
 }
 
 // ---------------------------------------------------------------------------
@@ -1087,5 +1158,301 @@ function Field({ label, value, mono }: { label: string; value: React.ReactNode; 
       <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
       <dd className={mono ? "font-mono text-sm" : "text-sm"}>{value}</dd>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scope E — Volumes (manifest-declared) (#669)
+//
+// Reads ``astroliftWorkload.volumes`` — a JSON array carrying the parsed
+// VolumeDecl dict shape from the manifest parser. Snake-case keys
+// (``mount_path``, ``storage_class``, ``source_name``, …) because the
+// backend persists them through ``persist_manifest`` as-is. Hidden when
+// the workload declares no volumes.
+// ---------------------------------------------------------------------------
+
+interface VolumesLabels {
+  title: string;
+  description: string;
+  columnName: string;
+  columnKind: string;
+  columnMount: string;
+  columnDetail: string;
+}
+
+type VolumeDeclDict = {
+  name?: string;
+  kind?: string;
+  mount_path?: string;
+  size?: string;
+  storage_class?: string;
+  access_mode?: string;
+  source_name?: string;
+  size_limit?: string;
+  [key: string]: unknown;
+};
+
+const VOLUME_KIND_LABEL: Record<string, string> = {
+  pvc: "PVC",
+  empty_dir: "emptyDir",
+  config_map: "ConfigMap",
+  secret: "Secret",
+};
+
+const VOLUME_KIND_VARIANT: Record<string, string> = {
+  pvc: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
+  empty_dir: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  config_map: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  secret: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+};
+
+function volumeDetail(v: VolumeDeclDict): string {
+  if (v.kind === "pvc") {
+    const sc = v.storage_class || "default";
+    const mode = v.access_mode || "ReadWriteOnce";
+    return `${sc} · ${emptyOrValue(v.size)} · ${mode}`;
+  }
+  if (v.kind === "empty_dir") {
+    return v.size_limit ? `sizeLimit ${v.size_limit}` : "ephemeral";
+  }
+  if (v.kind === "config_map" || v.kind === "secret") {
+    return v.source_name ? `source ${v.source_name}` : "—";
+  }
+  return "—";
+}
+
+function VolumesCard({
+  volumes,
+  labels,
+}: {
+  volumes: unknown;
+  labels: VolumesLabels;
+}) {
+  const rows: VolumeDeclDict[] = Array.isArray(volumes)
+    ? (volumes as VolumeDeclDict[]).filter((v) => v && typeof v === "object")
+    : [];
+  if (rows.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HardDriveIcon className="size-4" />
+          {labels.title}
+          <Badge variant="outline" className="ml-2">
+            {rows.length}
+          </Badge>
+        </CardTitle>
+        <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{labels.columnName}</TableHead>
+              <TableHead>{labels.columnKind}</TableHead>
+              <TableHead>{labels.columnMount}</TableHead>
+              <TableHead>{labels.columnDetail}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((v, i) => {
+              const kindKey = (v.kind || "").toLowerCase();
+              return (
+                <TableRow key={`${v.name || "vol"}-${i}`}>
+                  <TableCell className="font-mono text-xs">{emptyOrValue(v.name)}</TableCell>
+                  <TableCell>
+                    <Badge className={cn("font-mono text-xs", VOLUME_KIND_VARIANT[kindKey] ?? "")}>
+                      <DatabaseIcon className="size-3" />
+                      {VOLUME_KIND_LABEL[kindKey] ?? (kindKey || "—")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {emptyOrValue(v.mount_path)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">
+                    {volumeDetail(v)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scope F — Probe configs (read-only) (#669)
+//
+// One row per probe slot (startup / readiness / liveness) per container.
+// Probe JSON mirrors the Kubernetes probe shape — ``httpGet`` / ``exec`` /
+// ``tcpSocket`` is the action, the rest of the fields tune timings. We
+// render the action inline + the three knobs an operator actually reads
+// when a probe is flapping: initialDelaySeconds, periodSeconds,
+// failureThreshold. Edits live in the manifest, not here — this is
+// debuggability only.
+// ---------------------------------------------------------------------------
+
+interface ProbesLabels {
+  title: string;
+  description: string;
+  startup: string;
+  readiness: string;
+  liveness: string;
+  notConfigured: string;
+  container: string;
+  empty: string;
+}
+
+type KubeProbe = {
+  httpGet?: { path?: string; port?: number | string; scheme?: string };
+  exec?: { command?: string[] };
+  tcpSocket?: { port?: number | string };
+  initialDelaySeconds?: number;
+  periodSeconds?: number;
+  timeoutSeconds?: number;
+  successThreshold?: number;
+  failureThreshold?: number;
+  [key: string]: unknown;
+};
+
+function describeProbe(probe: KubeProbe | null | undefined): string {
+  if (!probe) return "";
+  if (probe.httpGet) {
+    const scheme = (probe.httpGet.scheme || "HTTP").toUpperCase();
+    const path = probe.httpGet.path || "/";
+    const port = probe.httpGet.port ?? "";
+    return `${scheme} GET ${path}${port !== "" ? `:${port}` : ""}`;
+  }
+  if (probe.exec) {
+    const cmd = Array.isArray(probe.exec.command) ? probe.exec.command.join(" ") : "";
+    return cmd ? `Exec ${cmd}` : "Exec";
+  }
+  if (probe.tcpSocket) {
+    return `TCP ${probe.tcpSocket.port ?? ""}`.trim();
+  }
+  return "—";
+}
+
+function probeTimings(probe: KubeProbe | null | undefined): string {
+  if (!probe) return "";
+  const parts: string[] = [];
+  if (probe.initialDelaySeconds != null) parts.push(`initial ${probe.initialDelaySeconds}s`);
+  if (probe.periodSeconds != null) parts.push(`every ${probe.periodSeconds}s`);
+  if (probe.failureThreshold != null) parts.push(`fail × ${probe.failureThreshold}`);
+  return parts.join(" · ");
+}
+
+function ProbeRow({
+  label,
+  probe,
+  notConfigured,
+}: {
+  label: string;
+  probe: KubeProbe | null | undefined;
+  notConfigured: string;
+}) {
+  if (!probe) {
+    return (
+      <TableRow>
+        <TableCell className="font-medium">{label}</TableCell>
+        <TableCell colSpan={2} className="text-muted-foreground text-xs">
+          <Badge variant="outline" className="text-muted-foreground">
+            {notConfigured}
+          </Badge>
+        </TableCell>
+      </TableRow>
+    );
+  }
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{label}</TableCell>
+      <TableCell className="font-mono text-xs">{describeProbe(probe)}</TableCell>
+      <TableCell className="text-muted-foreground font-mono text-xs">
+        {probeTimings(probe) || "—"}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ProbesCard({
+  containers,
+  labels,
+}: {
+  containers: AstroliftContainer[];
+  labels: ProbesLabels;
+}) {
+  // Render probes for every manifest container that declares at least one.
+  // Primary is the canonical case; init containers can also declare probes
+  // (rare but legal in Kubernetes), so we don't hard-filter to primary.
+  const rows = containers.filter(
+    (c) => c.startupProbe || c.readinessProbe || c.livenessProbe
+  );
+  if (rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheckIcon className="size-4" />
+            {labels.title}
+          </CardTitle>
+          <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-xs">{labels.empty}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheckIcon className="size-4" />
+          {labels.title}
+          <Badge variant="outline" className="ml-2">
+            {rows.length}
+          </Badge>
+        </CardTitle>
+        <p className="text-muted-foreground mt-1 text-xs">{labels.description}</p>
+      </CardHeader>
+      <CardContent className="space-y-4 p-4">
+        {rows.map((c) => (
+          <div key={c.id} className="space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground uppercase tracking-wide">
+                {labels.container}
+              </span>
+              <span className="font-mono">{c.name}</span>
+              {c.isPrimary && (
+                <Badge variant="secondary" className="text-xs">
+                  primary
+                </Badge>
+              )}
+            </div>
+            <Table>
+              <TableBody>
+                <ProbeRow
+                  label={labels.startup}
+                  probe={c.startupProbe as KubeProbe | null}
+                  notConfigured={labels.notConfigured}
+                />
+                <ProbeRow
+                  label={labels.readiness}
+                  probe={c.readinessProbe as KubeProbe | null}
+                  notConfigured={labels.notConfigured}
+                />
+                <ProbeRow
+                  label={labels.liveness}
+                  probe={c.livenessProbe as KubeProbe | null}
+                  notConfigured={labels.notConfigured}
+                />
+              </TableBody>
+            </Table>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

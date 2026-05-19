@@ -510,6 +510,24 @@
         "copyToast": "Copied service FQDN to clipboard",
         "copyError": "Couldn't copy — select the text and copy manually",
         "unavailable": "FQDN unavailable — the app row is missing an organization."
+      },
+      "probes": {
+        "title": "Health probes",
+        "description": "Startup, readiness, and liveness probes declared in the manifest. Read-only — edit in astrolift.toml.",
+        "startup": "Startup",
+        "readiness": "Readiness",
+        "liveness": "Liveness",
+        "notConfigured": "not configured",
+        "container": "Container",
+        "empty": "No probes declared in the manifest. The workload runs without explicit startup/readiness/liveness gates."
+      },
+      "volumes": {
+        "title": "Volumes",
+        "description": "Persistent and ephemeral volumes declared in the manifest, plus their mount paths.",
+        "columnName": "Name",
+        "columnKind": "Kind",
+        "columnMount": "Mount path",
+        "columnDetail": "Detail"
       }
     },
     "previews": {
