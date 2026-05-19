@@ -29,7 +29,34 @@ import urllib.request
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.ci_templates import default_workflow_path_for
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.providers.bitbucket import (
+    BitbucketProviderError,
+)
+from astrolift_scm.providers.bitbucket import (
+    _auth_header as _bb_auth_header,
+)
+from astrolift_scm.providers.bitbucket import (
+    _split_workspace_repo as _bb_split,
+)
+from astrolift_scm.providers.gitea import (
+    GiteaProviderError,
+)
+from astrolift_scm.providers.gitea import (
+    _api_base as _gitea_api_base,
+)
+from astrolift_scm.providers.gitea import (
+    _token as _gitea_token,
+)
 from astrolift_scm.providers.github import GITHUB_API_DEFAULT, GithubProviderError, _token
+from astrolift_scm.providers.gitlab import (
+    GitlabProviderError,
+)
+from astrolift_scm.providers.gitlab import (
+    _api_base as _gitlab_api_base,
+)
+from astrolift_scm.providers.gitlab import (
+    _token as _gitlab_token,
+)
 
 # ---------------------------------------------------------------------------
 # Result + error codes
@@ -88,6 +115,18 @@ _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
         "github_app_install",
         "github_oauth_user",
         "github_pat",
+    ),
+    "gitlab": (
+        "gitlab_oauth_user",
+        "gitlab_pat",
+    ),
+    "bitbucket": (
+        "bitbucket_oauth_user",
+        "bitbucket_pat",
+    ),
+    "gitea": (
+        "gitea_oauth_user",
+        "gitea_pat",
     ),
 }
 
@@ -250,6 +289,300 @@ def _dispatch_github_workflow(
 
 
 # ---------------------------------------------------------------------------
+# GitLab pipeline trigger (#532)
+# ---------------------------------------------------------------------------
+
+
+def _gitlab_runs_url(connection: SourceConnection, repo_full_name: str) -> str:
+    base = _gitlab_api_base(connection).rstrip("/")
+    # Strip the /api prefix to get the web base (self-hosted GitLab keeps the
+    # same host; api_base_url stores the API root, e.g. https://gl.example.com).
+    web_base = base.split("/api")[0].rstrip("/")
+    return f"{web_base}/{repo_full_name}/-/pipelines"
+
+
+def _dispatch_gitlab_pipeline(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    branch: str,
+) -> WorkflowDispatchResult:
+    """POST /api/v4/projects/{encoded_path}/pipeline.
+
+    Creates a new pipeline on ``branch`` using the SourceConnection
+    Bearer/PAT token. Returns the pipeline's web URL on success.
+    GitLab returns 400 when the ``.gitlab-ci.yml`` file is absent or
+    invalid; that maps to ``WORKFLOW_FILE_MISSING`` so the UI can
+    surface the sync hint.
+    """
+    try:
+        token = _gitlab_token(connection)
+    except GitlabProviderError as exc:
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code=exc.code,
+            error_message=exc.message,
+        )
+
+    base = _gitlab_api_base(connection).rstrip("/")
+    encoded_path = urllib.parse.quote(repo_full_name, safe="")
+    url = f"{base}/api/v4/projects/{encoded_path}/pipeline"
+    body = json.dumps({"ref": branch}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="AUTH_FAILED",
+                error_message=f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+            )
+        if exc.code == 404:
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="NOT_FOUND",
+                error_message=f"GitLab couldn't find {repo_full_name!r}. Check the connection's repo access.",
+            )
+        if exc.code == 400:
+            body_lower = body_text.lower()
+            if any(kw in body_lower for kw in ("config", "yaml", "ci file", "gitlab-ci")):
+                return WorkflowDispatchResult(
+                    ok=False,
+                    error_code="WORKFLOW_FILE_MISSING",
+                    error_message=(
+                        f"GitLab refused the pipeline ({exc.code}): {body_text or 'missing or invalid .gitlab-ci.yml'}. "
+                        "Click 'Sync workflow file' on the app's CI setup section, then retry."
+                    ),
+                )
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="API_ERROR",
+                error_message=f"GitLab returned {exc.code}: {body_text}",
+            )
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code="API_ERROR",
+            error_message=f"GitLab returned {exc.code}: {body_text}",
+        )
+    except urllib.error.URLError as exc:
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code="NETWORK",
+            error_message=f"Couldn't reach GitLab: {exc.reason}",
+        )
+
+    web_url = (data or {}).get("web_url") or _gitlab_runs_url(connection, repo_full_name)
+    return WorkflowDispatchResult(ok=True, run_url=web_url)
+
+
+# ---------------------------------------------------------------------------
+# Bitbucket pipeline trigger (#532)
+# ---------------------------------------------------------------------------
+
+_BITBUCKET_API_BASE = "https://api.bitbucket.org"
+_BITBUCKET_WEB_BASE = "https://bitbucket.org"
+
+
+def _dispatch_bitbucket_pipeline(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    branch: str,
+) -> WorkflowDispatchResult:
+    """POST /2.0/repositories/{workspace}/{slug}/pipelines/.
+
+    Triggers a Bitbucket Pipelines run against ``branch``. Auth via the
+    SourceConnection credential (Bearer for oauth_user; Basic for pat).
+    Returns the pipeline's Bitbucket web URL.
+    """
+    try:
+        auth_header = _bb_auth_header(connection)
+        workspace, slug = _bb_split(repo_full_name)
+    except BitbucketProviderError as exc:
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code=exc.code,
+            error_message=exc.message,
+        )
+
+    url = f"{_BITBUCKET_API_BASE}/2.0/repositories/{workspace}/{slug}/pipelines/"
+    body = json.dumps(
+        {
+            "target": {
+                "ref_type": "branch",
+                "type": "pipeline_ref_target",
+                "ref_name": branch,
+            }
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": auth_header,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="AUTH_FAILED",
+                error_message=f"Bitbucket rejected the token ({exc.code}). Reconnect or rotate.",
+            )
+        if exc.code == 404:
+            body_lower = body_text.lower()
+            if any(kw in body_lower for kw in ("pipeline", "config", "bitbucket-pipelines")):
+                return WorkflowDispatchResult(
+                    ok=False,
+                    error_code="WORKFLOW_FILE_MISSING",
+                    error_message=(
+                        "Bitbucket Pipelines is not enabled or bitbucket-pipelines.yml is missing. "
+                        "Click 'Sync workflow file' on the app's CI setup section, then retry."
+                    ),
+                )
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="NOT_FOUND",
+                error_message=f"Bitbucket couldn't find {repo_full_name!r}. Check the connection's repo access.",
+            )
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code="API_ERROR",
+            error_message=f"Bitbucket returned {exc.code}: {body_text}",
+        )
+    except urllib.error.URLError as exc:
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code="NETWORK",
+            error_message=f"Couldn't reach Bitbucket: {exc.reason}",
+        )
+
+    build_number = (data or {}).get("build_number")
+    if build_number:
+        run_url = f"{_BITBUCKET_WEB_BASE}/{workspace}/{slug}/pipelines/{build_number}"
+    else:
+        run_url = f"{_BITBUCKET_WEB_BASE}/{workspace}/{slug}/pipelines"
+    return WorkflowDispatchResult(ok=True, run_url=run_url)
+
+
+# ---------------------------------------------------------------------------
+# Gitea workflow dispatch (#532)
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_gitea_workflow(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    workflow_path: str,
+    branch: str,
+) -> WorkflowDispatchResult:
+    """POST /api/v1/repos/{owner}/{repo}/actions/workflows/{filename}/dispatches.
+
+    Gitea Actions uses GitHub Actions syntax. The endpoint returns 204
+    on success. Falls back gracefully when Gitea Actions is disabled
+    on the instance (404 → WORKFLOW_FILE_MISSING).
+    """
+    try:
+        token = _gitea_token(connection)
+        base = _gitea_api_base(connection).rstrip("/")
+    except GiteaProviderError as exc:
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code=exc.code,
+            error_message=exc.message,
+        )
+
+    owner, repo = repo_full_name.split("/", 1)
+    file_name = workflow_path.rsplit("/", 1)[-1]
+    safe_owner = urllib.parse.quote(owner, safe="")
+    safe_repo = urllib.parse.quote(repo, safe="")
+    safe_file = urllib.parse.quote(file_name, safe="")
+    url = f"{base}/api/v1/repos/{safe_owner}/{safe_repo}/actions/workflows/{safe_file}/dispatches"
+
+    body = json.dumps({"ref": branch}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            _ = resp.read()
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="AUTH_FAILED",
+                error_message=f"Gitea rejected the token ({exc.code}). Reconnect or rotate.",
+            )
+        if exc.code == 404:
+            return WorkflowDispatchResult(
+                ok=False,
+                error_code="WORKFLOW_FILE_MISSING",
+                error_message=(
+                    f"Gitea couldn't find {workflow_path!r} on {repo_full_name!r}. "
+                    "Actions may be disabled on this Gitea instance, or the workflow file is missing. "
+                    "Click 'Sync workflow file' on the app's CI setup section, then retry."
+                ),
+            )
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code="API_ERROR",
+            error_message=f"Gitea returned {exc.code}: {body_text}",
+        )
+    except urllib.error.URLError as exc:
+        return WorkflowDispatchResult(
+            ok=False,
+            error_code="NETWORK",
+            error_message=f"Couldn't reach Gitea: {exc.reason}",
+        )
+
+    run_url = f"{base}/{owner}/{repo}/actions"
+    return WorkflowDispatchResult(ok=True, run_url=run_url)
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -279,37 +612,50 @@ def dispatch_astrolift_ci_workflow(
             "app has no source repo configured; cannot dispatch a workflow",
         )
 
-    if app.source_kind in {"gitlab", "bitbucket", "gitea", "git_url"}:
-        raise NotImplementedError(
-            "Workflow dispatch is GitHub-only for now; " "use a manual pipeline trigger on GitLab."
-        )
-    if app.source_kind != "github":
+    supported = {"github", "gitlab", "bitbucket", "gitea"}
+    if app.source_kind not in supported:
         raise WorkflowDispatchError(
             "UNSUPPORTED_SOURCE",
-            f"unsupported source_kind {app.source_kind!r} for workflow dispatch",
+            f"unsupported source_kind {app.source_kind!r} for workflow dispatch; "
+            f"supported: {', '.join(sorted(supported))}",
         )
 
     connection = _pick_source_connection(app)
     if connection is None:
         raise WorkflowDispatchError(
             "NO_CONNECTION",
-            ("no active source connection for this app's org. " "Connect a GitHub identity, then retry."),
+            f"no active source connection for this app's org. "
+            f"Connect a {app.source_kind.title()} identity, then retry.",
         )
 
-    resolved_branch = (branch or app.deploy_branch or "main").strip()
-    if not resolved_branch:
-        resolved_branch = "main"
+    resolved_branch = (branch or app.deploy_branch or "main").strip() or "main"
 
-    resolved_path = (workflow_path or default_workflow_path_for(app.source_kind)).lstrip("/")
-    # Spec calls out ``.github/workflows/astrolift-ci.yml`` as the
-    # convention here, distinct from the deploy-workflow path used by
-    # #384's pushCiWorkflow. The default helper returns the deploy
-    # path; substitute the CI path unless the caller passed an
-    # explicit override.
-    if app.source_kind == "github" and workflow_path is None:
-        resolved_path = ".github/workflows/astrolift-ci.yml"
+    if app.source_kind == "github":
+        resolved_path = (workflow_path or ".github/workflows/astrolift-ci.yml").lstrip("/")
+        return _dispatch_github_workflow(
+            connection,
+            repo_full_name=app.source_repo,
+            workflow_path=resolved_path,
+            branch=resolved_branch,
+        )
 
-    return _dispatch_github_workflow(
+    if app.source_kind == "gitlab":
+        return _dispatch_gitlab_pipeline(
+            connection,
+            repo_full_name=app.source_repo,
+            branch=resolved_branch,
+        )
+
+    if app.source_kind == "bitbucket":
+        return _dispatch_bitbucket_pipeline(
+            connection,
+            repo_full_name=app.source_repo,
+            branch=resolved_branch,
+        )
+
+    # gitea
+    resolved_path = (workflow_path or default_workflow_path_for("gitea")).lstrip("/")
+    return _dispatch_gitea_workflow(
         connection,
         repo_full_name=app.source_repo,
         workflow_path=resolved_path,
