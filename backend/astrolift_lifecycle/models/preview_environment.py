@@ -54,8 +54,26 @@ class PreviewEnvironment(BaseCoreModel):
         related_name="preview_environments",
         on_delete=models.CASCADE,
     )
-    pr_number = models.PositiveIntegerField()
+    pr_number = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            "PR number that opened this preview. Null when the preview "
+            "was created via ``createPreviewEnvironment`` (manual branch "
+            "spin-up) rather than auto-triggered from a PR webhook."
+        ),
+    )
     branch = models.CharField(max_length=255)
+    is_manual = models.BooleanField(
+        default=False,
+        help_text=(
+            "True when this preview was created via the "
+            "``createPreviewEnvironment`` mutation rather than auto-"
+            "triggered from a PR webhook. Manual previews have a null "
+            "``pr_number`` and are keyed for uniqueness on ``branch`` "
+            "instead."
+        ),
+    )
     commit_sha = models.CharField(max_length=64, blank=True, default="")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.BUILDING)
     hostname = models.CharField(max_length=255)
@@ -88,8 +106,13 @@ class PreviewEnvironment(BaseCoreModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["registered_app", "pr_number"],
-                condition=models.Q(deleted_at__isnull=True),
+                condition=models.Q(deleted_at__isnull=True) & models.Q(is_manual=False),
                 name="preview_pr_unique_active_per_app",
+            ),
+            models.UniqueConstraint(
+                fields=["registered_app", "branch"],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(is_manual=True),
+                name="preview_manual_branch_unique_active_per_app",
             ),
         ]
 

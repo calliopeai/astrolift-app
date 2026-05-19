@@ -22,6 +22,7 @@ and post-condition state.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC
 
 import strawberry
@@ -68,6 +69,7 @@ from astrolift_workflows.client import (
 )
 from astrolift_workflows.inputs import (
     Actor,
+    BuildPreviewInput,
     DeployAppInput,
     MigrateAppInput,
     RollbackInput,
@@ -226,6 +228,28 @@ class ExtendPreviewTtlInputGql:
 
     id: GUID
     days: int
+
+
+@strawberry.input
+class CreatePreviewEnvironmentInput:
+    """Manually spin up a preview from a branch — no PR required (#751).
+
+    The auto path (PR-opened webhook → BuildPreviewWorkflow) keys on
+    ``(registered_app, pr_number)``; this manual path keys on
+    ``(registered_app, branch)`` so re-running the mutation on the same
+    branch returns the existing preview rather than racing two
+    namespaces in.
+
+    ``environment_name`` is the AppEnvironment name carved out for the
+    preview deploy. Defaults to ``preview-<branch-slug>`` when the
+    caller doesn't pin a value; explicit names let operators run
+    parallel previews with distinct deploy_config overrides on the same
+    branch (e.g., a perf-tuned variant vs. baseline).
+    """
+
+    app_slug: str
+    branch: str
+    environment_name: str = ""
 
 
 @strawberry.input
@@ -597,6 +621,57 @@ def _migrate_workflow_id(env_guid: str) -> str:
 
 def _teardown_workflow_id(preview_guid: str) -> str:
     return f"TearDownPreviewWorkflow-{preview_guid}"
+
+
+_BRANCH_SLUG_BAD_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify_branch(branch: str) -> str:
+    """Squash a branch name into a k8s-namespace-safe label fragment.
+
+    Lowercases, replaces any run of non-``[a-z0-9]`` with ``-``, trims
+    leading/trailing ``-``. Truncates to 40 chars to leave room for the
+    ``<org>-<app>-`` prefix when composing the full namespace (k8s caps
+    namespaces at 63 chars).  Returns empty string when the branch
+    contains nothing slugifiable — the resolver rejects that.
+    """
+    slug = _BRANCH_SLUG_BAD_CHARS.sub("-", branch.lower()).strip("-")
+    return slug[:40].strip("-")
+
+
+def _manual_preview_namespace(*, org_slug: str, app_slug: str, branch_slug: str) -> str:
+    """Compose ``<org>-<app>-<branch_slug>`` and truncate to fit k8s'
+    63-char namespace ceiling. Mirrors the auto-preview namer
+    (``<org>-<app>-pr-<n>``) so namespace audits group the two paths
+    under one shape.
+    """
+    raw = f"{org_slug}-{app_slug}-{branch_slug}"
+    if len(raw) <= 63:
+        return raw
+    # Truncate the app segment first since org tends to be stable.
+    suffix = f"-{branch_slug}"
+    budget = 63 - len(org_slug) - 1 - len(suffix)
+    if budget <= 0:
+        # org_slug + branch_slug already > 63; clip the branch instead.
+        room_for_branch = 63 - len(org_slug) - 1 - len(app_slug) - 1
+        clipped_branch = branch_slug[: max(1, room_for_branch)].strip("-") or "preview"
+        return f"{org_slug}-{app_slug}-{clipped_branch}"
+    truncated_app = app_slug[:budget].rstrip("-")
+    return f"{org_slug}-{truncated_app}{suffix}"
+
+
+def _build_preview_workflow_id(preview_guid: str) -> str:
+    """Workflow id for the manual ``createPreviewEnvironment`` path
+    (#751).
+
+    Keyed on the preview row's guid (which is stable for the lifetime
+    of the row) so re-firing the mutation against an existing manual
+    preview joins the in-flight build rather than starting a parallel
+    namespace.  Distinct ID-shape from the SCM-webhook dispatch
+    (``build-preview-<repo>-<pr>-<sha>``) so the two paths can't
+    collide on Temporal's workflow-id index even when the same app has
+    both a PR-triggered and a manual preview running."""
+    return f"BuildPreviewWorkflow-{preview_guid}"
 
 
 def _record_workflow_run(
@@ -1983,6 +2058,147 @@ class LifecycleMutation:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
 
         preview.save(update_fields=["ttl_until", "updated_at", "version"])
+        return gql_success(preview_to_type(preview))
+
+    @strawberry.field
+    @mutation_audit(action="preview.create_manual")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def create_preview_environment(
+        self,
+        info: Info,
+        input: CreatePreviewEnvironmentInput,
+    ) -> MutationResultType[PreviewEnvironmentType]:
+        """Manually spin up a preview environment from a branch (#751).
+
+        Companion to the auto path (PR webhook → BuildPreviewWorkflow).
+        Operators hit this from the Previews page when they want to
+        burn a preview for a long-lived branch, a force-pushed fork, or
+        a draft PR the webhook isn't watching.
+
+        Idempotent on ``(app, branch)``: a re-fire when an active
+        manual preview already exists for the branch returns that row
+        as success (matches ``addAppDomain``'s idempotent re-add).
+
+        Refuses to start when:
+
+        * The app's ``preview_enabled`` flag is off (operator already
+          opted out of previews at the app level).
+        * The deploy pipeline feature is gated off.
+        * The app isn't bound to a tenant cluster (no place to land
+          the namespace).
+        * ``branch`` doesn't shake out to a non-empty RFC 1123 label
+          (k8s namespace constraint).
+        """
+        if _deploy_pipeline_disabled():
+            return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization", "default_tenant_cluster")
+            .first()
+        )
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        if not app.preview_enabled:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"app {app.slug!r} has preview environments disabled",
+            )
+
+        branch = (input.branch or "").strip()
+        if not branch:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "branch is required",
+                field="branch",
+            )
+
+        branch_slug = _slugify_branch(branch)
+        if not branch_slug:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"branch {branch!r} does not contain any RFC 1123 label characters",
+                field="branch",
+            )
+
+        cluster = app.default_tenant_cluster
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"app {app.slug!r} has no default tenant cluster bound — provision one first",
+            )
+
+        # Idempotent re-fire: existing active manual preview for the
+        # same (app, branch) returns success rather than racing a
+        # second namespace through the unique index.
+        existing = (
+            PreviewEnvironment.objects.select_related("registered_app")
+            .filter(
+                registered_app=app,
+                branch=branch,
+                is_manual=True,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if existing is not None:
+            return gql_success(preview_to_type(existing))
+
+        environment_name = (input.environment_name or "").strip() or f"preview-{branch_slug}"
+        org_slug = (
+            getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
+        ).lower()
+        namespace = _manual_preview_namespace(org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug)
+        # Hostname follows the platform's preview wildcard convention
+        # but keyed on the branch slug (no PR number). The cluster's
+        # ingress-target resolution happens at apply time in the
+        # BuildPreviewWorkflow; here we just record the stable name
+        # the operator-facing surfaces (#751 FE, audit log) cite.
+        hostname = f"preview-{branch_slug}.{app.slug}.{org_slug}".lower()
+
+        with transaction.atomic():
+            env = AppEnvironment.objects.create(
+                registered_app=app,
+                tenant_cluster=cluster,
+                name=environment_name,
+                url=f"https://{hostname}",
+                required_approvals=0,
+            )
+            preview = PreviewEnvironment.objects.create(
+                registered_app=app,
+                pr_number=None,
+                branch=branch,
+                is_manual=True,
+                status=PreviewEnvironment.Status.BUILDING,
+                hostname=hostname,
+                namespace=namespace,
+                app_environment=env,
+            )
+
+        actor = _actor_from_request(info)
+        tenant = get_current_tenant()
+        handle = start_workflow(
+            "BuildPreviewWorkflow",
+            args=[
+                BuildPreviewInput(
+                    preview_environment_id=preview.pk,
+                    actor=actor,
+                ),
+            ],
+            workflow_id=_build_preview_workflow_id(str(preview.guid)),
+        )
+        if handle.enqueued:
+            _record_workflow_run(
+                kind="BuildPreviewWorkflow",
+                workflow_id=handle.workflow_id,
+                run_id=handle.run_id,
+                organization_id=tenant.organization_id if tenant else None,
+                registered_app_id=preview.registered_app_id,
+                app_environment_id=env.pk,
+                actor=actor,
+            )
+
         return gql_success(preview_to_type(preview))
 
     # ---- App migration -------------------------------------------

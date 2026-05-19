@@ -303,6 +303,18 @@ class PreviewEnvironmentType:
     id: GUID
     registered_app_slug: str
     pr_number: int
+    """PR number that opened this preview. ``0`` when the preview was
+    created via ``createPreviewEnvironment`` (manual branch spin-up) —
+    pair with ``is_manual`` to distinguish 'no PR' from a real PR #0.
+    The FE renders 0 as ``—`` to mirror the manual-deploy treatment."""
+
+    is_manual: bool
+    """True when the preview was created via the
+    ``createPreviewEnvironment`` mutation (#751) rather than auto-
+    triggered from a PR webhook. The FE uses this to swap the PR-link
+    cell for a branch chip and hide PR-specific actions (re-comment,
+    re-validate webhook)."""
+
     branch: str
     commit_sha: str
     status: str
@@ -799,10 +811,15 @@ def preview_to_type(
             memory_bytes=0.0,
             pod_count=0,
         )
+    # Manual previews (#751) have ``pr_number=NULL``; the GraphQL type
+    # surfaces a non-nullable ``int`` (no contract change), so coerce
+    # to 0 here. The FE renders 0 as "—" (the same fallback used for
+    # manual deploys without PR provenance).
     return PreviewEnvironmentType(
         id=GUID(str(p.guid)),
         registered_app_slug=p.registered_app.slug,
-        pr_number=p.pr_number,
+        pr_number=p.pr_number or 0,
+        is_manual=bool(getattr(p, "is_manual", False)),
         branch=p.branch,
         commit_sha=p.commit_sha or "",
         status=p.status,
