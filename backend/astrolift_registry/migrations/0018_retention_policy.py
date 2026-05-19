@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
             model_name="retentionpolicy",
             index=models.Index(
                 fields=["registered_app", "signal"],
-                name="retention_policy_app_signal_idx",
+                name="ret_pol_app_signal_idx",
             ),
         ),
         migrations.AddConstraint(

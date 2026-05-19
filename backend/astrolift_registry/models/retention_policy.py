@@ -31,5 +31,5 @@ class RetentionPolicy(BaseCoreModel):
             )
         ]
         indexes = [
-            models.Index(fields=["registered_app", "signal"], name="retention_policy_app_signal_idx"),
+            models.Index(fields=["registered_app", "signal"], name="ret_pol_app_signal_idx"),
         ]
