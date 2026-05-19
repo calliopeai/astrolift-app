@@ -176,6 +176,34 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
     [list]
   );
 
+  // #660 — monthly preview-spend roll-up. estimatedDailyCostUsd is
+  // null for previews the cost driver can't price (e.g. clusters
+  // without a billing plugin), so we sum only what's available and
+  // surface the count of unpriced rows next to the dollar figure.
+  const spend = React.useMemo(() => {
+    const live = list.filter((p) => p.status !== "torn_down");
+    let dailySum = 0;
+    let priced = 0;
+    let unpriced = 0;
+    for (const p of live) {
+      if (typeof p.estimatedDailyCostUsd === "number") {
+        dailySum += p.estimatedDailyCostUsd;
+        priced += 1;
+      } else {
+        unpriced += 1;
+      }
+    }
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    return {
+      dailyTotal: dailySum,
+      monthlyProjection: dailySum * daysInMonth,
+      priced,
+      unpriced,
+      liveCount: live.length,
+    };
+  }, [list]);
+
   const stale = list.filter((p) => p.status !== "torn_down").filter(isStale);
   const [tearDownTarget, setTearDownTarget] = React.useState<AstroliftPreviewEnvironment | null>(
     null
@@ -268,6 +296,35 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
               <CardDescription>{t("stale.description", { days: STALE_DAYS })}</CardDescription>
             </div>
           </CardHeader>
+        </Card>
+      )}
+
+      {/* #660 — monthly preview spend roll-up.  Only renders when at
+          least one live preview is priced.  Surfaces dailyTotal +
+          monthly projection + an unpriced-count caveat so the
+          operator knows the figure is partial when drivers haven't
+          returned a price. */}
+      {spend.liveCount > 0 && (spend.priced > 0 || spend.unpriced > 0) && (
+        <Card className="border-muted">
+          <CardContent className="flex flex-wrap items-baseline gap-x-6 gap-y-2 px-6 py-4 text-sm">
+            <div>
+              <span className="text-muted-foreground text-xs">Daily spend</span>
+              <div className="font-mono text-lg">
+                ${spend.dailyTotal.toFixed(2)}
+                <span className="text-muted-foreground ml-1 text-xs">/ day</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-xs">This month (projected)</span>
+              <div className="font-mono text-lg">
+                ${spend.monthlyProjection.toFixed(2)}
+              </div>
+            </div>
+            <div className="text-muted-foreground ml-auto text-xs">
+              {spend.priced} of {spend.liveCount} previews priced
+              {spend.unpriced > 0 && ` · ${spend.unpriced} not priced by this cluster's driver`}
+            </div>
+          </CardContent>
         </Card>
       )}
 
