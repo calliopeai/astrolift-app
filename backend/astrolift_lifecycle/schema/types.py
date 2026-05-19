@@ -1012,6 +1012,20 @@ class AppDomainType:
     ``priority`` ascending.  Empty when no path routing is configured.
     The full set is replaced atomically via ``setDomainPathRoutes``."""
 
+    # ---- wildcard + SNI (#753) ------------------------------------
+
+    is_wildcard: bool = False
+    """True when this domain covers ``*.hostname`` (wildcard TLS).
+    Created via ``addWildcardDomain``; the issued certificate
+    carries both the apex and the ``*.<hostname>`` SAN. Wildcard
+    domains always validate via DNS-01."""
+
+    sni_cert_ref: str = ""
+    """Provider-specific certificate identifier the renderer pins
+    for SNI on this hostname (ACM ARN, GCP managed-cert resource
+    name, Azure Key Vault cert URI). Empty when the platform
+    auto-picks. Operator-set for multi-cert SNI scenarios."""
+
 
 def app_domain_to_type(d) -> AppDomainType:
     return AppDomainType(
@@ -1054,6 +1068,8 @@ def app_domain_to_type(d) -> AppDomainType:
             domain_path_route_to_type(r)
             for r in d.path_routes.filter(deleted_at__isnull=True).order_by("priority")
         ],
+        is_wildcard=bool(getattr(d, "is_wildcard", False)),
+        sni_cert_ref=getattr(d, "sni_cert_ref", "") or "",
     )
 
 

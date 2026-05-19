@@ -245,6 +245,36 @@ class CustomDomain(BaseCoreModel):
         ),
     )
 
+    # ---- wildcard + SNI (#753) -------------------------------------
+
+    is_wildcard = models.BooleanField(
+        default=False,
+        help_text=(
+            "True when this domain covers ``*.hostname`` (wildcard TLS). "
+            "Issued certificate must carry both the apex and the "
+            "``*.<hostname>`` SAN. Wildcard issuance requires DNS-01 "
+            "validation — HTTP-01 / DNS-TXT can't satisfy CA wildcard "
+            "policy, so the ``addWildcardDomain`` mutation pins "
+            "``validation_method`` to ``dns_01``."
+        ),
+    )
+    sni_cert_ref = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=(
+            "Provider-specific certificate identifier the renderer "
+            "presents for SNI on this hostname (ACM ARN, GCP managed-"
+            "cert resource name, Azure Key Vault cert URI, etc.). Empty "
+            "when the platform manages cert selection automatically — "
+            "the renderer falls back to its default cert-matching "
+            "rules. Operators set this when they need to pin a "
+            "specific cert across multi-domain SNI scenarios "
+            "(e.g., an EV cert on the apex with a wildcard cert on "
+            "subdomains)."
+        ),
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

@@ -276,6 +276,29 @@ class AddAppDomainInput:
 
 
 @strawberry.input
+class AddWildcardDomainInput:
+    """Add a ``*.hostname`` wildcard domain (#753).
+
+    ``hostname`` is the apex (e.g. ``example.com``); the platform
+    issues a cert covering both the apex and ``*.<hostname>`` SANs.
+    Wildcard issuance requires DNS-01 by CA policy — HTTP-01 / DNS-TXT
+    can't authorize wildcards — so ``validation_method`` is restricted
+    to ``dns_01`` (defaulted; rejected at the resolver if overridden
+    to anything else).
+
+    ``sni_cert_ref`` lets the operator pin a provider-specific cert
+    identifier for SNI on this hostname. Empty defaults to the
+    renderer's auto-pick; populated for multi-cert SNI scenarios
+    (e.g., EV on apex + wildcard on subdomains).
+    """
+
+    app_slug: str
+    hostname: str
+    validation_method: str = "dns_01"
+    sni_cert_ref: str = ""
+
+
+@strawberry.input
 class RemoveAppDomainInput:
     id: GUID
 
@@ -2393,6 +2416,141 @@ class LifecycleMutation:
         # Fire the validation workflow on creation so platform-managed
         # zones auto-create their records + first DNS probe runs
         # without the operator having to click Recheck.
+        _kick_validate_custom_domain(domain)
+        return gql_success(app_domain_to_type(domain))
+
+    @strawberry.field
+    @mutation_audit(action="app.domain.add_wildcard")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def add_wildcard_domain(
+        self,
+        info: Info,
+        input: AddWildcardDomainInput,
+    ) -> MutationResultType[AppDomainType]:
+        """Add a wildcard custom domain (``*.hostname``) for an app (#753).
+
+        Same handshake shape as ``addAppDomain`` but pins the row as
+        ``is_wildcard=True``, forces ``validation_method=dns_01`` (CA
+        policy on wildcards), and persists an optional
+        ``sni_cert_ref`` so the renderer can pick a specific cert
+        for SNI on this hostname.
+
+        Idempotent on hostname: an existing active row for the same
+        apex bound to the same app is returned as success (matches
+        ``addAppDomain``). A row bound to a different app returns
+        CONFLICT — wildcard ownership is exclusive per apex.
+        """
+        app = RegisteredApp.objects.filter(slug=input.app_slug).first()
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        host = (input.hostname or "").strip().lower()
+        if not host or "." not in host:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "hostname must be a fully-qualified domain (apex; the platform adds the ``*.`` prefix)",
+                field="hostname",
+            )
+        # Defensive: refuse a leading ``*.`` — the apex is what we
+        # store, and the wildcard SAN is implied. Otherwise we'd end
+        # up persisting ``*.example.com`` as the hostname and the
+        # renderer would emit ``*.*.example.com`` SANs.
+        if host.startswith("*."):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "hostname must be the apex (e.g. ``example.com``); the wildcard ``*.`` prefix is implied",
+                field="hostname",
+            )
+
+        method = (input.validation_method or "dns_01").lower()
+        if method != "dns_01":
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "wildcard domains must use dns_01 validation (CA policy); HTTP-01 / DNS-TXT can't authorize wildcards",
+                field="validationMethod",
+            )
+
+        sni_cert_ref = (input.sni_cert_ref or "").strip()
+
+        existing = CustomDomain.objects.filter(hostname=host, deleted_at__isnull=True).first()
+        if existing is not None:
+            if existing.registered_app_id != app.id:
+                return gql_failure(
+                    ErrorCode.CONFLICT.value,
+                    f"domain {host!r} already bound to another app",
+                    field="hostname",
+                )
+            # Idempotent re-add: same app, same hostname. Promote to
+            # wildcard if the existing row was a single-host (so a
+            # caller upgrading from ``addAppDomain`` → ``addWildcard...``
+            # converges on the wildcard contract). sni_cert_ref is
+            # rewritten when the caller passes a non-empty value;
+            # empty leaves the previous pin untouched (the resolver
+            # has no surface for clearing a pin — that's intentional;
+            # operators clear via ``removeAppDomain`` + re-add).
+            update_fields: list[str] = []
+            if not existing.is_wildcard:
+                existing.is_wildcard = True
+                update_fields.append("is_wildcard")
+            if existing.validation_method != method:
+                existing.validation_method = method
+                update_fields.append("validation_method")
+            if sni_cert_ref and existing.sni_cert_ref != sni_cert_ref:
+                existing.sni_cert_ref = sni_cert_ref
+                update_fields.append("sni_cert_ref")
+            if update_fields:
+                update_fields.extend(["updated_at", "version"])
+                existing.save(update_fields=update_fields)
+            return gql_success(app_domain_to_type(existing))
+
+        from astrolift_clusters.models import ManagedDomain
+        from astrolift_lifecycle.custom_domain_handshake import (
+            build_handshake,
+            hostname_parent_zone,
+            resolve_cluster_ingress_target,
+        )
+
+        parent_zone = hostname_parent_zone(host)
+        managed_zone = ManagedDomain.objects.filter(
+            zone=parent_zone,
+            deleted_at__isnull=True,
+        ).first()
+        cluster = getattr(app, "default_tenant_cluster", None)
+        cluster_slug = cluster.slug if cluster is not None else "default"
+        cname_target = resolve_cluster_ingress_target(
+            cluster_slug=cluster_slug,
+            managed_domain_zone=managed_zone.zone if managed_zone else None,
+        )
+        handshake = build_handshake(
+            hostname=host,
+            cluster_ingress_target=cname_target,
+            is_platform_managed_zone=managed_zone is not None,
+            validation_method=method,
+        )
+
+        domain = CustomDomain.objects.create(
+            registered_app=app,
+            hostname=host,
+            validation_method=method,
+            txt_challenge_token=handshake.txt_challenge_token,
+            expected_cname_target=handshake.expected_cname_target,
+            required_dns_records=[
+                {
+                    "kind": r.kind,
+                    "name": r.name,
+                    "value": r.value,
+                    "ttl": r.ttl,
+                    "propagated": r.propagated,
+                    "last_checked_at": r.last_checked_at,
+                    "message": r.message,
+                }
+                for r in handshake.required_records
+            ],
+            is_platform_managed_zone=handshake.is_platform_managed_zone,
+            is_wildcard=True,
+            sni_cert_ref=sni_cert_ref,
+        )
         _kick_validate_custom_domain(domain)
         return gql_success(app_domain_to_type(domain))
 

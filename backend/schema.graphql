@@ -30,6 +30,13 @@ input AddOrganizationAllowlistDomainInput {
   requiresReview: Boolean! = false
 }
 
+input AddWildcardDomainInput {
+  appSlug: String!
+  hostname: String!
+  validationMethod: String! = "dns_01"
+  sniCertRef: String! = ""
+}
+
 type Alertruledeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -307,6 +314,8 @@ type AstroliftAppDomain {
   certObservabilityStatus: String!
   redirectRules: [AstroliftDomainRedirectRule!]!
   pathRoutes: [AstroliftDomainPathRoute!]!
+  isWildcard: Boolean!
+  sniCertRef: String!
 }
 
 type AstroliftAppDomainMutationResult {
@@ -3606,6 +3615,7 @@ type Mutation {
   createPreviewEnvironment(input: CreatePreviewEnvironmentInput!): AstroliftPreviewEnvironmentMutationResult!
   migrateAppToCluster(input: MigrateAppInputGql!): AstroliftAppEnvironmentMutationResult!
   addAppDomain(input: AddAppDomainInput!): AstroliftAppDomainMutationResult!
+  addWildcardDomain(input: AddWildcardDomainInput!): AstroliftAppDomainMutationResult!
   removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!
   recheckDomainValidation(input: RecheckDomainValidationInput!): AstroliftAppDomainMutationResult!
   uploadCustomDomainCertificate(input: UploadCustomDomainCertificateInput!): AstroliftAppDomainMutationResult!
