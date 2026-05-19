@@ -1,15 +1,18 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   CalendarClockIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   ClockIcon,
+  Loader2Icon,
+  PlayIcon,
   TerminalIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { ConcurrencyBadge } from "@/components/jobs/ConcurrencyBadge";
 import { CronSchedulePreview } from "@/components/jobs/CronSchedulePreview";
@@ -20,6 +23,13 @@ import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -29,8 +39,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LIST_COMMAND_RUNS, LIST_SCHEDULED_JOB_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { RUN_JOB_ONCE } from "@/graphql/lifecycle/lifecycle.mutations";
+import {
+  LIST_COMMAND_RUNS,
+  LIST_ENVIRONMENTS,
+  LIST_SCHEDULED_JOB_RUNS,
+} from "@/graphql/lifecycle/lifecycle.queries";
 import type {
+  AstroliftAppEnvironment,
   AstroliftCommandRun,
   AstroliftScheduledJobRun,
 } from "@/graphql/lifecycle/lifecycle.types";
@@ -237,6 +253,50 @@ function CronWorkloadsCard({
   workloads: WorkloadCronCardData[];
 }) {
   const t = useTranslations("jobs.workloadCard");
+  // #670 — environments + run-now mutation. Defaults to the first env
+  // (typically 'production'); operator can switch via the per-row
+  // select if they want to fire the job into a preview env instead.
+  const envs = useQuery<{ astroliftEnvironments: AstroliftAppEnvironment[] }>(LIST_ENVIRONMENTS, {
+    variables: { appSlug },
+    fetchPolicy: "cache-and-network",
+  });
+  const envList = envs.data?.astroliftEnvironments ?? [];
+  const defaultEnv = envList[0]?.name ?? "";
+  const [perRowEnv, setPerRowEnv] = React.useState<Record<string, string>>({});
+  const [pendingSlug, setPendingSlug] = React.useState<string | null>(null);
+
+  const [runOnce] = useMutation<{
+    runAstroliftJobOnce: {
+      ok: boolean;
+      errors: { code: string; message: string }[];
+      data: { runName: string; namespace: string; logsUrl: string } | null;
+    };
+  }>(RUN_JOB_ONCE, {
+    refetchQueries: [{ query: LIST_SCHEDULED_JOB_RUNS, variables: { appSlug, limit: 100 } }],
+  });
+
+  async function handleRun(jobSlug: string) {
+    const envName = perRowEnv[jobSlug] ?? defaultEnv;
+    if (!envName) {
+      toast.error("Pick an environment first.");
+      return;
+    }
+    setPendingSlug(jobSlug);
+    try {
+      const { data } = await runOnce({
+        variables: { input: { appSlug, environmentName: envName, jobSlug } },
+      });
+      const res = data?.runAstroliftJobOnce;
+      if (res?.ok) {
+        toast.success(`${jobSlug} dispatched as ${res.data?.runName ?? "manual run"} (${envName})`);
+      } else {
+        toast.error(res?.errors?.[0]?.message ?? "Run failed");
+      }
+    } finally {
+      setPendingSlug(null);
+    }
+  }
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-6">
@@ -247,23 +307,61 @@ function CronWorkloadsCard({
           </span>
         </div>
         <ul className="divide-border divide-y">
-          {workloads.map((w) => (
-            <li
-              key={w.id}
-              className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <code className="font-mono text-sm font-medium">{w.slug}</code>
-                  <ConcurrencyBadge policy={w.concurrencyPolicy} />
+          {workloads.map((w) => {
+            const envName = perRowEnv[w.slug] ?? defaultEnv;
+            const isPending = pendingSlug === w.slug;
+            return (
+              <li
+                key={w.id}
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <code className="font-mono text-sm font-medium">{w.slug}</code>
+                    <ConcurrencyBadge policy={w.concurrencyPolicy} />
+                  </div>
+                  <CronSchedulePreview schedule={w.schedule} />
                 </div>
-                <CronSchedulePreview schedule={w.schedule} />
-              </div>
-              <Button asChild size="sm" variant="outline">
-                <a href={`/apps/${appSlug}/logs?workload=${w.slug}`}>{t("openLogs")}</a>
-              </Button>
-            </li>
-          ))}
+                <div className="flex items-center gap-2">
+                  {envList.length > 1 && (
+                    <Select
+                      value={envName}
+                      onValueChange={(v) =>
+                        setPerRowEnv((prev) => ({ ...prev, [w.slug]: v }))
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-32 text-xs">
+                        <SelectValue placeholder="env" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {envList.map((e) => (
+                          <SelectItem key={e.id} value={e.name}>
+                            {e.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleRun(w.slug)}
+                    disabled={isPending || !envName}
+                  >
+                    {isPending ? (
+                      <Loader2Icon className="size-4 animate-spin" />
+                    ) : (
+                      <PlayIcon className="size-4" />
+                    )}
+                    Run now
+                  </Button>
+                  <Button asChild size="sm" variant="ghost">
+                    <a href={`/apps/${appSlug}/logs?workload=${w.slug}`}>{t("openLogs")}</a>
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </CardContent>
     </Card>
