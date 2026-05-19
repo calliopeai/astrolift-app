@@ -41,6 +41,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -153,6 +154,12 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="gcp",
+        driver="vector_vertex_matching_engine",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         base_name = self._base_name_for(spec=spec)
         cfg = spec.config or {}
@@ -309,6 +316,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         base_name = self._base_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -364,6 +372,12 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             message=f"matching engine {base_name} update queued",
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="vector_vertex_matching_engine",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -457,6 +471,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         base_name = self._base_name_from_handle(handle.handle)
         existing = self._describe_endpoint(base_name)
@@ -474,6 +489,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             message=(f"matching engine reports {len(deployed)} deployed index(es)"),
         )
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine")
     def binding(self, handle: ServiceHandle) -> Binding:
         base_name = self._base_name_from_handle(handle.handle)
         existing = self._describe_endpoint(base_name)
@@ -517,6 +533,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """Vertex Matching Engine has no first-party snapshot API.
         Snapshots are taken by copying the shard bucket contents to
@@ -540,6 +557,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -556,6 +574,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
         rebuilt = replace(target, config=cfg)
         return self.provision(rebuilt)
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -595,6 +614,7 @@ class VertexMatchingEngineDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="vector_vertex_matching_engine", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

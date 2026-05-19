@@ -37,6 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -82,6 +83,12 @@ class PubSubDriver(ManagedServiceDriver):
 
             self._sub = pubsub_v1.SubscriberClient()
 
+    @driver_op(
+        cloud="gcp",
+        driver="queue_pubsub",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         topic_id = self._topic_id(spec=spec)
         sub_id = f"{topic_id}-sub"
@@ -121,6 +128,7 @@ class PubSubDriver(ManagedServiceDriver):
             message=(f"Pub/Sub topic + subscription provisioned: {topic_id}"),
         )
 
+    @driver_op(cloud="gcp", driver="queue_pubsub")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -130,6 +138,12 @@ class PubSubDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="queue_pubsub",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -229,6 +243,7 @@ class PubSubDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="queue_pubsub")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, _, topic_id = handle.handle.partition("/")
         try:
@@ -258,6 +273,7 @@ class PubSubDriver(ManagedServiceDriver):
             message=f"topic {topic_id} reachable",
         )
 
+    @driver_op(cloud="gcp", driver="queue_pubsub")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, _, topic_id = handle.handle.partition("/")
         topic_path = f"projects/{self._config.project_id}/topics/{topic_id}"
@@ -283,6 +299,7 @@ class PubSubDriver(ManagedServiceDriver):
             notes="Publisher + subscriber role bindings.",
         )
 
+    @driver_op(cloud="gcp", driver="queue_pubsub")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from _sdk import UnsupportedOperationError
 
@@ -290,6 +307,7 @@ class PubSubDriver(ManagedServiceDriver):
             "managed_service.snapshot(Pub/Sub) not supported -- Pub/Sub " "messages are ephemeral; no snapshot (#618)",
         )
 
+    @driver_op(cloud="gcp", driver="queue_pubsub")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -301,9 +319,11 @@ class PubSubDriver(ManagedServiceDriver):
             "managed_service.restore(Pub/Sub) not supported -- Pub/Sub " "doesn't restore from snapshot (#618)",
         )
 
+    @driver_op(cloud="gcp", driver="queue_pubsub", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {"type": "object", "properties": {}}
 
+    @driver_op(cloud="gcp", driver="queue_pubsub", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

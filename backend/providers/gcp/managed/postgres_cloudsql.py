@@ -37,6 +37,7 @@ import string
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -131,6 +132,12 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="gcp",
+        driver="postgres_cloudsql",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         instance_id = self._instance_id_for(spec=spec)
         cfg = spec.config or {}
@@ -234,6 +241,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         instance_id = _parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -278,6 +286,12 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             message=f"cloudsql {instance_id} update queued",
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="postgres_cloudsql",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -366,6 +380,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -381,6 +396,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             message=f"cloudsql reports {state}",
         )
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql")
     def binding(self, handle: ServiceHandle) -> Binding:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -426,6 +442,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -447,6 +464,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -475,6 +493,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             message=f"cloudsql clone from {source_id} queued",
         )
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -492,6 +511,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="postgres_cloudsql", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

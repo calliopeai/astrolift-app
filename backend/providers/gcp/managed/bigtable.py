@@ -40,6 +40,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -130,6 +131,12 @@ class BigtableDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="gcp",
+        driver="bigtable",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         instance_id = self._instance_id_for(spec=spec)
         cfg = spec.config or {}
@@ -206,6 +213,7 @@ class BigtableDriver(ManagedServiceDriver):
             message=(f"bigtable instance {instance_id} provisioning (table {_DEFAULT_TABLE_NAME} created)"),
         )
 
+    @driver_op(cloud="gcp", driver="bigtable")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         instance_id = _parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -261,6 +269,12 @@ class BigtableDriver(ManagedServiceDriver):
             message=f"bigtable instance {instance_id} update queued",
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="bigtable",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -336,6 +350,7 @@ class BigtableDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="gcp", driver="bigtable")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe_instance(instance_id)
@@ -352,6 +367,7 @@ class BigtableDriver(ManagedServiceDriver):
             message=f"bigtable reports {state}",
         )
 
+    @driver_op(cloud="gcp", driver="bigtable")
     def binding(self, handle: ServiceHandle) -> Binding:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe_instance(instance_id)
@@ -391,6 +407,7 @@ class BigtableDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="bigtable")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -417,6 +434,7 @@ class BigtableDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="gcp", driver="bigtable")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -451,6 +469,7 @@ class BigtableDriver(ManagedServiceDriver):
             message=f"bigtable restore from {snapshot.snapshot_id} queued",
         )
 
+    @driver_op(cloud="gcp", driver="bigtable", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -464,6 +483,7 @@ class BigtableDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="bigtable", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
