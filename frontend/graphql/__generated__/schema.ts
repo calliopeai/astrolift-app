@@ -1296,6 +1296,7 @@ export type AstroliftEvent = {
   registeredAppId?: Maybe<Scalars['String']['output']>;
   resourceId: Scalars['String']['output'];
   resourceKind: Scalars['String']['output'];
+  severity: Scalars['String']['output'];
   teamId?: Maybe<Scalars['String']['output']>;
 };
 
@@ -5272,22 +5273,28 @@ export type QueryAstroliftEnvironmentsArgs = {
 
 
 export type QueryAstroliftEventsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   eventType?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  severity?: InputMaybe<Scalars['String']['input']>;
 };
 
 
 export type QueryAstroliftEventsAggregatedArgs = {
   aggregateWindowSeconds?: Scalars['Int']['input'];
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   eventType?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  severity?: InputMaybe<Scalars['String']['input']>;
 };
 
 
 export type QueryAstroliftEventsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   eventType?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  severity?: InputMaybe<Scalars['String']['input']>;
 };
 
 

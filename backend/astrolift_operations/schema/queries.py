@@ -98,7 +98,7 @@ class OperationsQuery:
         if severity:
             qs = qs.filter(severity=severity)
         if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
+            qs = _filter_by_app_slug(qs, app_slug)
         return [event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
@@ -142,7 +142,7 @@ class OperationsQuery:
         if severity:
             qs = qs.filter(severity=severity)
         if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
+            qs = _filter_by_app_slug(qs, app_slug)
         rows = list(qs[:scan_cap])
         return _aggregate_events(
             rows,
@@ -194,7 +194,7 @@ class OperationsQuery:
         if severity:
             qs = qs.filter(severity=severity)
         if app_slug:
-            qs = qs.filter(registered_app__slug=app_slug)
+            qs = _filter_by_app_slug(qs, app_slug)
         if after:
             decoded = _decode_event_cursor(after)
             if decoded is not None:
@@ -726,6 +726,30 @@ class OperationsQuery:
             qs = qs.filter(resolved_at__isnull=True)
         qs = qs.order_by("-fired_at")[: max(1, min(limit, 500))]
         return [alert_event_to_type(e) for e in qs]
+
+
+# ---------------------------------------------------------------------------
+# App-slug filter helper (#539)
+# ---------------------------------------------------------------------------
+
+
+def _filter_by_app_slug(qs, app_slug: str):
+    """Narrow an Event queryset to a specific app within the caller's
+    organization.
+
+    Filters on ``registered_app__slug`` *and* the caller's
+    ``organization_id`` so the slug collision case (two orgs holding
+    the same app slug — slugs are unique per-org, not global) never
+    leaks rows across tenants. The caller is already past the
+    ``@tenant_scoped`` gate, so ``get_current_tenant()`` resolves; if
+    it doesn't (unexpected), short-circuit to an empty queryset rather
+    than fall back to the cross-tenant match.
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    if org_id is None:
+        return qs.none()
+    return qs.filter(registered_app__slug=app_slug, organization_id=org_id)
 
 
 # ---------------------------------------------------------------------------

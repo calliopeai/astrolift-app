@@ -1276,6 +1276,7 @@ type AstroliftEvent {
   occurredAt: DateTime!
   resourceKind: String!
   resourceId: String!
+  severity: String!
 }
 
 type AstroliftEventPage {
@@ -3827,9 +3828,9 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
-  astroliftEvents(limit: Int! = 100, eventType: String = null): [AstroliftEvent!]!
-  astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]!
-  astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null): AstroliftEventPage!
+  astroliftEvents(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null): [AstroliftEvent!]!
+  astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]!
+  astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null): AstroliftEventPage!
   astroliftRecentActivity(limit: Int! = 20, cursor: String = null): AstroliftActivityPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null): [AstroliftAuditEvent!]!
   astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false): AstroliftAuditEventPage!
