@@ -186,6 +186,82 @@ def test_provision_creates_configuration_set(
     assert desc["ConfigurationSet"]["Name"] == cset_name
 
 
+def test_provision_wires_sns_event_destination_when_arn_configured(
+    aws_mock,
+) -> None:
+    """#756: when ``SESEmailConfig.sns_event_destination_arn`` is set,
+    provision wires a ``platform-sns`` configuration-set event
+    destination so SES publishes the six event kinds through SNS."""
+    arn = "arn:aws:sns:us-east-1:123456789012:astrolift-ses-events"
+    d = AmazonSESDriver(
+        config=SESEmailConfig(
+            region="us-east-1",
+            base_domain="astrolift.test",
+            sns_event_destination_arn=arn,
+        ),
+        ses_client=aws_mock["ses"],
+        secrets_client=aws_mock["sm"],
+    )
+    result = d.provision(_spec())
+    _, identity = parse_handle(result.handle)
+    cset_name = d._configuration_set_name_for(identity)  # type: ignore[attr-defined]
+
+    desc = aws_mock["ses"].describe_configuration_set(
+        ConfigurationSetName=cset_name,
+        ConfigurationSetAttributeNames=["eventDestinations"],
+    )
+    destinations = desc.get("EventDestinations") or []
+    matching = [d for d in destinations if d.get("Name") == "platform-sns"]
+    assert len(matching) == 1
+    sns = matching[0].get("SNSDestination") or {}
+    assert sns.get("TopicARN") == arn
+    expected_event_types = {"send", "delivery", "bounce", "complaint", "open", "click"}
+    assert set(matching[0].get("MatchingEventTypes") or []) == expected_event_types
+
+
+def test_provision_is_idempotent_for_sns_event_destination(aws_mock) -> None:
+    """Calling provision twice with the same SNS ARN must not throw —
+    EventDestinationAlreadyExists is the happy path."""
+    arn = "arn:aws:sns:us-east-1:123456789012:astrolift-ses-events"
+    d = AmazonSESDriver(
+        config=SESEmailConfig(
+            region="us-east-1",
+            base_domain="astrolift.test",
+            sns_event_destination_arn=arn,
+        ),
+        ses_client=aws_mock["ses"],
+        secrets_client=aws_mock["sm"],
+    )
+    first = d.provision(_spec())
+    second = d.provision(_spec())
+    assert first.ok is True
+    assert second.ok is True
+
+
+def test_provision_skips_sns_destination_when_arn_blank(aws_mock) -> None:
+    """When neither the dataclass field nor the Django setting carries
+    an ARN, provision must NOT wire an event destination."""
+    d = AmazonSESDriver(
+        config=SESEmailConfig(
+            region="us-east-1",
+            base_domain="astrolift.test",
+            sns_event_destination_arn="",
+        ),
+        ses_client=aws_mock["ses"],
+        secrets_client=aws_mock["sm"],
+    )
+    result = d.provision(_spec())
+    _, identity = parse_handle(result.handle)
+    cset_name = d._configuration_set_name_for(identity)  # type: ignore[attr-defined]
+
+    desc = aws_mock["ses"].describe_configuration_set(
+        ConfigurationSetName=cset_name,
+        ConfigurationSetAttributeNames=["eventDestinations"],
+    )
+    destinations = desc.get("EventDestinations") or []
+    assert not any(d.get("Name") == "platform-sns" for d in destinations)
+
+
 def test_provision_records_deletion_protection_marker_default_on(
     driver: AmazonSESDriver, sm_client,
 ) -> None:

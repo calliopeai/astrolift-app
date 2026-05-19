@@ -412,6 +412,70 @@ class TemplateSendStatPointType:
     complaints: int
 
 
+# ---- Per-message SES event log (#756, unblocks #624 / #625 / #626) ----
+
+
+@strawberry.type(name="AstroliftEmailMessage")
+class EmailMessageType:
+    """One per-message SES event row sourced from ``EmailEvent`` (#624).
+
+    Surfaces the message envelope (id, recipient, subject) and the
+    event kind plus the raw SES notification metadata blob. The FE
+    renders these as a paginated table on the email service's
+    "Messages" tab; ``metadata`` lets the row expander show the
+    underlying SES reason chain (bounce code, complaint feedback type)
+    without a follow-up round-trip."""
+
+    id: GUID
+    message_id: str
+    """SES ``messageId`` — the same id shows up across multiple rows
+    when the message moves through several lifecycle kinds."""
+
+    recipient: str
+    subject: str
+    event_kind: str
+    """One of ``send`` / ``delivery`` / ``bounce`` / ``complaint`` /
+    ``open`` / ``click``. Stored lowercase to match the SES wire format."""
+
+    occurred_at: dt.datetime
+    metadata: JSON
+    """Raw SES notification body so the row expander can render
+    bounce / complaint specifics without re-reading the SNS message.
+    The exact shape varies by ``notificationType``; the FE narrows on
+    ``metadata.bounce`` / ``metadata.complaint`` / etc."""
+
+
+@strawberry.type(name="AstroliftEmailEngagementMetrics")
+class EmailEngagementMetricsType:
+    """Aggregate engagement counters for one email service over a
+    rolling window (#626).
+
+    The four percentage fields are derived from the raw counts:
+    bounce/complaint are expressed as a percentage of ``total_sends``
+    (matches the SES reputation surface), open/click as a percentage
+    of ``total_deliveries`` (per industry convention — opens against
+    sends understates engagement because bounces never had a chance to
+    open). Zero-denominator cases return 0.0 rather than divide-by-
+    zero so the FE doesn't need null-guards on every tile."""
+
+    total_sends: int
+    total_deliveries: int
+    total_bounces: int
+    total_complaints: int
+    total_opens: int
+    total_clicks: int
+
+    bounce_rate_pct: float
+    complaint_rate_pct: float
+    open_rate_pct: float
+    click_rate_pct: float
+
+    window_days: int
+    """Lookback window the resolver used (echoed from the query
+    argument). Lets the FE label the tile "Last 30 days" without
+    keeping the query's variable in component state."""
+
+
 @strawberry.type(name="AstroliftSecretChangeApproval")
 class SecretChangeApprovalType:
     """One approver's vote on a secret-change proposal (#488)."""

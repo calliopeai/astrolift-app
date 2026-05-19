@@ -63,6 +63,12 @@ urls = [
     # Token-gated audit-log export downloads (#433). Lives off the
     # operations app so the route stays close to the model it serves.
     path("", include("astrolift_operations.urls")),
+    # SES → SNS event webhook receiver (#756). Mounted off the
+    # services app so the route stays close to the EmailEvent model
+    # it appends to. Unauthenticated by design — SNS posts without
+    # bearer auth; the trust model is that this URL is only
+    # subscribed to a platform-owned SNS topic.
+    path("", include("astrolift_services.urls")),
     # CLI / mobile device-flow approval page (#475). Mounted under
     # /app/ so auth1's @login_required redirects unauth'd browsers
     # into the IdP just like every other operator surface.

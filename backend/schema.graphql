@@ -1265,12 +1265,36 @@ type AstroliftEmailDnsAuthStatus {
   dmarc: AstroliftEmailDnsAuthCheck!
 }
 
+type AstroliftEmailEngagementMetrics {
+  totalSends: Int!
+  totalDeliveries: Int!
+  totalBounces: Int!
+  totalComplaints: Int!
+  totalOpens: Int!
+  totalClicks: Int!
+  bounceRatePct: Float!
+  complaintRatePct: Float!
+  openRatePct: Float!
+  clickRatePct: Float!
+  windowDays: Int!
+}
+
 type AstroliftEmailIdentityVerification {
   identity: String!
   isDomain: Boolean!
   status: String!
   verificationToken: String!
   dkimTokens: [AstroliftEmailDkimToken!]!
+}
+
+type AstroliftEmailMessage {
+  id: GUID!
+  messageId: String!
+  recipient: String!
+  subject: String!
+  eventKind: String!
+  occurredAt: DateTime!
+  metadata: JSON!
 }
 
 type AstroliftEmailSendQuota {
@@ -4131,6 +4155,8 @@ type Query {
   astroliftEmailTemplates(managedServiceId: GUID!): [AstroliftEmailTemplate!]!
   astroliftEmailTemplate(managedServiceId: GUID!, name: String!): AstroliftEmailTemplate
   astroliftEmailTemplateStats(managedServiceId: GUID!, name: String!, days: Int! = 14): [AstroliftTemplateSendStatPoint!]!
+  astroliftEmailMessages(managedServiceId: GUID!, limit: Int! = 50, eventKind: String = null, recipient: String = null): [AstroliftEmailMessage!]!
+  astroliftEmailEngagementMetrics(managedServiceId: GUID!, days: Int! = 30): AstroliftEmailEngagementMetrics
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   PostgresMetrics: [[String!]!]!

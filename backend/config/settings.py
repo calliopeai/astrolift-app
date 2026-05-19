@@ -178,6 +178,17 @@ EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
 
+# SES → SNS event publishing (#756). When set, the AmazonSES driver
+# wires a ``CreateConfigurationSetEventDestination`` with this topic ARN
+# at provision time, and the SNS webhook receiver at
+# ``/app/webhooks/ses-events/`` will accept SubscriptionConfirmation
+# and Notification POSTs from the same topic. Empty (the default)
+# leaves event publishing disabled — the platform still provisions
+# SES identities, but no per-message log accrues. The opscode module
+# that creates the topic + subscribes the webhook lives in
+# ``astrolift-opscode``; this var carries the ARN it returns.
+SES_EVENTS_SNS_TOPIC_ARN = env_str("ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN", "")
+
 # Public URL the frontend is reachable at — used to build absolute
 # links inside outbound mail (invitation accept URLs, etc.) AND to
 # embed the public webhook URL in the GitHub App manifest. Default

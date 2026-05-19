@@ -25,7 +25,9 @@ from astrolift_services.schema.types import (
     EmailDkimTokenType,
     EmailDnsAuthCheckType,
     EmailDnsAuthStatusType,
+    EmailEngagementMetricsType,
     EmailIdentityVerificationType,
+    EmailMessageType,
     EmailSendQuotaType,
     EmailServiceDetailType,
     EmailSuppressionEntryType,
@@ -959,6 +961,152 @@ class ServicesQuery:
             )
             for p in points
         ]
+
+    # ---- Per-message SES event log (#756, unblocks #624/#626) -------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def astrolift_email_messages(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+        limit: int = 50,
+        event_kind: str | None = None,
+        recipient: str | None = None,
+    ) -> list[EmailMessageType]:
+        """Per-message SES event log scoped to one managed service (#624).
+
+        Backed by ``EmailEvent`` rows the SNS webhook receiver appends
+        as SES publishes notifications. Each call returns the
+        ``limit`` newest rows (default 50, max 500), filtered by
+        ``event_kind`` and/or substring-matched ``recipient`` when
+        supplied. Returns ``[]`` when the service can't be resolved or
+        is the wrong kind — same posture as the rest of the
+        email-detail surfaces.
+        """
+        from astrolift_services.models import EmailEvent, EmailEventKind
+
+        if limit < 1:
+            limit = 1
+        if limit > 500:
+            limit = 500
+
+        svc = (
+            ManagedService.objects.filter(
+                guid=str(managed_service_id),
+                deleted_at__isnull=True,
+            )
+            .only("id", "kind")
+            .first()
+        )
+        if svc is None or svc.kind != ManagedService.Kind.EMAIL:
+            return []
+
+        qs = EmailEvent.objects.filter(managed_service=svc)
+        if event_kind:
+            # Reject unknown kinds rather than silently returning
+            # everything — typo in the FE filter would otherwise look
+            # like "all rows".
+            valid = {k.value for k in EmailEventKind}
+            kind_lc = event_kind.lower()
+            if kind_lc not in valid:
+                return []
+            qs = qs.filter(event_kind=kind_lc)
+        if recipient:
+            qs = qs.filter(recipient__icontains=recipient)
+
+        return [
+            EmailMessageType(
+                id=GUID(str(ev.guid)),
+                message_id=ev.message_id,
+                recipient=ev.recipient,
+                subject=ev.subject,
+                event_kind=ev.event_kind,
+                occurred_at=ev.occurred_at,
+                metadata=ev.metadata or {},
+            )
+            for ev in qs[:limit]
+        ]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, Permission.MANAGED_SERVICE_UPDATE)
+    @tenant_scoped()
+    def astrolift_email_engagement_metrics(
+        self,
+        info: Info,
+        managed_service_id: GUID,
+        days: int = 30,
+    ) -> EmailEngagementMetricsType | None:
+        """Engagement aggregate over the last ``days`` (default 30) for
+        one email managed service (#626).
+
+        Computes the six raw counters + four derived percentages from
+        the ``EmailEvent`` rows whose ``occurred_at`` falls in the
+        window. Bounce/complaint rates are scaled to ``total_sends``;
+        open/click rates are scaled to ``total_deliveries``. Returns
+        ``None`` when the service can't be resolved or is the wrong
+        kind."""
+        import datetime as dt
+
+        from django.db.models import Count
+
+        from astrolift_services.models import EmailEvent
+
+        if days < 1:
+            days = 1
+        if days > 365:
+            days = 365
+
+        svc = (
+            ManagedService.objects.filter(
+                guid=str(managed_service_id),
+                deleted_at__isnull=True,
+            )
+            .only("id", "kind")
+            .first()
+        )
+        if svc is None or svc.kind != ManagedService.Kind.EMAIL:
+            return None
+
+        from django.utils import timezone as _tz
+
+        since = _tz.now() - dt.timedelta(days=days)
+        rows = (
+            EmailEvent.objects.filter(
+                managed_service=svc,
+                occurred_at__gte=since,
+            )
+            .values("event_kind")
+            .annotate(n=Count("id"))
+        )
+        counts: dict[str, int] = {row["event_kind"]: int(row["n"]) for row in rows}
+
+        sends = counts.get("send", 0)
+        deliveries = counts.get("delivery", 0)
+        bounces = counts.get("bounce", 0)
+        complaints = counts.get("complaint", 0)
+        opens = counts.get("open", 0)
+        clicks = counts.get("click", 0)
+
+        def _pct(num: int, denom: int) -> float:
+            if denom <= 0:
+                return 0.0
+            return round((num / denom) * 100, 2)
+
+        return EmailEngagementMetricsType(
+            total_sends=sends,
+            total_deliveries=deliveries,
+            total_bounces=bounces,
+            total_complaints=complaints,
+            total_opens=opens,
+            total_clicks=clicks,
+            bounce_rate_pct=_pct(bounces, sends),
+            complaint_rate_pct=_pct(complaints, sends),
+            open_rate_pct=_pct(opens, deliveries),
+            click_rate_pct=_pct(clicks, deliveries),
+            window_days=days,
+        )
 
     # ---- Secret-change proposals (#488) ------------------------------
 
