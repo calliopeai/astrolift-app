@@ -818,6 +818,32 @@ class AppDomainRequiredRecordType:
     message: str
 
 
+@strawberry.type(name="AstroliftDomainPathRoute")
+class DomainPathRouteType:
+    """One path-prefix routing rule on an ``AstroliftAppDomain`` (#740).
+
+    Backs the path routing sub-section under Domains (#686). The full set
+    is replaced atomically via ``setDomainPathRoutes``."""
+
+    id: GUID
+    path_prefix: str
+    target_workload_slug: str
+    target_port: int
+    strip_prefix: bool
+    priority: int
+
+
+def domain_path_route_to_type(r) -> DomainPathRouteType:
+    return DomainPathRouteType(
+        id=GUID(str(r.guid)),
+        path_prefix=r.path_prefix,
+        target_workload_slug=r.target_workload_slug,
+        target_port=int(r.target_port),
+        strip_prefix=bool(r.strip_prefix),
+        priority=int(r.priority),
+    )
+
+
 @strawberry.type(name="AstroliftDomainRedirectRule")
 class DomainRedirectRuleType:
     """One redirect rule on an ``AstroliftAppDomain`` (#742).
@@ -930,6 +956,11 @@ class AppDomainType:
     any rules.  The full set is replaced atomically via
     ``setDomainRedirects`` — there are no per-row mutations."""
 
+    path_routes: list[DomainPathRouteType] = strawberry.field(default_factory=list)
+    """Active path-prefix routing rules on the domain (#740), ordered by
+    ``priority`` ascending.  Empty when no path routing is configured.
+    The full set is replaced atomically via ``setDomainPathRoutes``."""
+
 
 def app_domain_to_type(d) -> AppDomainType:
     return AppDomainType(
@@ -967,6 +998,10 @@ def app_domain_to_type(d) -> AppDomainType:
         redirect_rules=[
             domain_redirect_rule_to_type(r)
             for r in d.redirect_rules.filter(deleted_at__isnull=True).order_by("priority")
+        ],
+        path_routes=[
+            domain_path_route_to_type(r)
+            for r in d.path_routes.filter(deleted_at__isnull=True).order_by("priority")
         ],
     )
 

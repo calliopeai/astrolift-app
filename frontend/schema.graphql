@@ -305,6 +305,7 @@ type AstroliftAppDomain {
   certIssuerSerial: String!
   certObservabilityStatus: String!
   redirectRules: [AstroliftDomainRedirectRule!]!
+  pathRoutes: [AstroliftDomainPathRoute!]!
 }
 
 type AstroliftAppDomainMutationResult {
@@ -1153,6 +1154,15 @@ type AstroliftDisconnectUserSourceProviderPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftDisconnectUserSourceProviderPayload
+}
+
+type AstroliftDomainPathRoute {
+  id: GUID!
+  pathPrefix: String!
+  targetWorkloadSlug: String!
+  targetPort: Int!
+  stripPrefix: Boolean!
+  priority: Int!
 }
 
 type AstroliftDomainRedirectRule {
@@ -2976,6 +2986,14 @@ input DisconnectUserSourceProviderInput {
   confirmAccountLogin: String!
 }
 
+input DomainPathRouteInput {
+  pathPrefix: String!
+  targetWorkloadSlug: String!
+  targetPort: Int!
+  stripPrefix: Boolean! = false
+  priority: Int! = 0
+}
+
 input DomainRedirectRuleInput {
   kind: String!
   sourcePattern: String! = ""
@@ -3535,6 +3553,7 @@ type Mutation {
   recheckDomainValidation(input: RecheckDomainValidationInput!): AstroliftAppDomainMutationResult!
   uploadCustomDomainCertificate(input: UploadCustomDomainCertificateInput!): AstroliftAppDomainMutationResult!
   setDomainRedirects(input: SetDomainRedirectsInput!): AstroliftAppDomainMutationResult!
+  setDomainPathRoutes(input: SetDomainPathRoutesInput!): AstroliftAppDomainMutationResult!
   createDeployToken(input: CreateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
   rotateDeployToken(input: RotateDeployTokenInput!): DeployTokenSecretRevealMutationResult!
   revokeDeployToken(input: RevokeDeployTokenInput!): DeploytokenrevokedpayloadMutationResult!
@@ -4243,6 +4262,11 @@ input SetAppSecretMetadataInput {
 input SetAppSubdomainInput {
   id: GUID!
   subdomain: String!
+}
+
+input SetDomainPathRoutesInput {
+  domainId: GUID!
+  routes: [DomainPathRouteInput!]!
 }
 
 input SetDomainRedirectsInput {
