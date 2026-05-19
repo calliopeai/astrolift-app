@@ -22,6 +22,15 @@ import dataclasses
 from collections.abc import Iterable
 
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.providers.bitbucket import (
+    BitbucketProviderError,
+    delete_bitbucket_webhook,
+    fetch_bitbucket_file,
+    install_bitbucket_webhook,
+    list_bitbucket_repos,
+    open_bitbucket_pull_request,
+    put_bitbucket_file,
+)
 from astrolift_scm.providers.gitea import (
     GiteaProviderError,
     delete_gitea_webhook,
@@ -88,6 +97,11 @@ _GITLAB_KINDS = {
     "gitlab_oauth_user",
     "gitlab_oauth_app",
 }
+_BITBUCKET_KINDS = {
+    "bitbucket_pat",
+    "bitbucket_oauth_user",
+    "bitbucket_oauth_app",
+}
 _GITEA_KINDS = {
     "gitea_pat",
     "gitea_oauth_user",
@@ -112,6 +126,12 @@ def list_repos(
         try:
             return list_gitlab_projects(connection, search=search, limit=limit)
         except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _BITBUCKET_KINDS:
+        try:
+            return list_bitbucket_repos(connection, search=search, limit=limit)
+        except BitbucketProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     if connection.kind in _GITEA_KINDS:
@@ -156,6 +176,17 @@ def fetch_file(
                 ref=ref,
             )
         except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _BITBUCKET_KINDS:
+        try:
+            return fetch_bitbucket_file(
+                connection,
+                repo_full_name=repo_full_name,
+                path=path,
+                ref=ref,
+            )
+        except BitbucketProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     if connection.kind in _GITEA_KINDS:
@@ -241,6 +272,24 @@ def put_file(
         except GitlabProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
+    if connection.kind in _BITBUCKET_KINDS:
+        try:
+            result = put_bitbucket_file(
+                connection,
+                repo_full_name=repo_full_name,
+                path=path,
+                branch=branch,
+                content=content,
+                commit_message=commit_message,
+            )
+            return PutFileResult(
+                commit_sha=result.commit_sha,
+                file_path=result.file_path,
+                web_url=result.web_url,
+            )
+        except BitbucketProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
     if connection.kind in _GITEA_KINDS:
         try:
             result = put_gitea_file(
@@ -319,6 +368,18 @@ def install_webhook(
             )
             return InstallWebhookResult(hook_id=result.hook_id, webhook_url=result.webhook_url)
         except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _BITBUCKET_KINDS:
+        try:
+            result = install_bitbucket_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                target_url=target_url,
+                secret=secret,
+            )
+            return InstallWebhookResult(hook_id=result.hook_id, webhook_url=result.webhook_url)
+        except BitbucketProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     if connection.kind in _GITEA_KINDS:
@@ -420,6 +481,25 @@ def open_pull_request(
         except GitlabProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
+    if connection.kind in _BITBUCKET_KINDS:
+        try:
+            result = open_bitbucket_pull_request(
+                connection,
+                repo_full_name=repo_full_name,
+                head_branch=head_branch,
+                base_branch=base_branch,
+                title=title,
+                body=body,
+            )
+            return PullRequestResult(
+                url=result.url,
+                number=result.number,
+                head_branch=head_branch,
+                base_branch=base_branch,
+            )
+        except BitbucketProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
     if connection.kind in _GITEA_KINDS:
         try:
             result = open_gitea_pull_request(
@@ -467,6 +547,17 @@ def delete_webhook(
             )
             return
         except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _BITBUCKET_KINDS:
+        try:
+            delete_bitbucket_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                hook_id=hook_id,
+            )
+            return
+        except BitbucketProviderError as exc:
             raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
 
     if connection.kind in _GITEA_KINDS:
