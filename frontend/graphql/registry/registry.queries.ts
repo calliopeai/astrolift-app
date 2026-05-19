@@ -189,6 +189,7 @@ export const LIST_WORKLOADS = gql`
       hpaTargetCpuPct
       storageClass
       storageSize
+      volumes
       registeredAppSlug
     }
   }
@@ -234,6 +235,7 @@ export const GET_WORKLOAD = gql`
       hpaTargetCpuPct
       storageClass
       storageSize
+      volumes
       registeredAppSlug
       inClusterServiceFqdn
     }
@@ -256,6 +258,9 @@ export const LIST_CONTAINERS = gql`
       healthcheckKind
       healthcheckValue
       healthcheckPort
+      startupProbe
+      readinessProbe
+      livenessProbe
       workloadSlug
     }
   }

@@ -154,10 +154,15 @@ export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {
    * workload detail page typesafe until then.
    */
   inClusterServiceFqdn: string;
+  /** Volume declarations from the manifest (#739). Each entry mirrors the parsed VolumeDecl dict shape. */
+  volumes: Record<string, unknown>[];
 };
 
 export type AstroliftContainer = Omit<GeneratedContainer, "healthcheckKind"> & {
   healthcheckKind: HealthcheckKind;
+  startupProbe: Record<string, unknown> | null;
+  readinessProbe: Record<string, unknown> | null;
+  livenessProbe: Record<string, unknown> | null;
 };
 
 export type AppTeamAccessLevel = "viewer" | "deployer" | "owner";

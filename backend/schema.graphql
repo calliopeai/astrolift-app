@@ -870,6 +870,9 @@ type AstroliftContainer {
   healthcheckValue: String!
   healthcheckPort: Int
   workloadSlug: String!
+  startupProbe: JSON
+  readinessProbe: JSON
+  livenessProbe: JSON
 }
 
 type AstroliftContainerResources {
@@ -2518,6 +2521,7 @@ type AstroliftWorkload {
   storageSize: String!
   registeredAppSlug: String!
   inClusterServiceFqdn: String!
+  volumes: JSON!
 }
 
 type AstroliftWorkloadManifest {

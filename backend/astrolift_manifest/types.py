@@ -35,6 +35,13 @@ class WorkloadManifest:
     storage_class: str | None = None
     storage_size: str | None = None
     containers: tuple[ContainerManifest, ...] = ()
+    # Volume declarations from ``[[workloads.<name>.volumes]]`` (#739).
+    # Each dict carries the raw parsed shape (name, kind, mount_path,
+    # size, storage_class, access_mode) so the platform can persist them
+    # and the workload-detail page can render volume cards without re-
+    # parsing the TOML. Kept as dicts (not VolumeDecl) so this module
+    # stays independent of security_volumes.py.
+    volumes: tuple[dict, ...] = ()
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

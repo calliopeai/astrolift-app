@@ -888,8 +888,11 @@ export type AstroliftContainer = {
   id: Scalars['GUID']['output'];
   imageRef: Scalars['String']['output'];
   isPrimary: Scalars['Boolean']['output'];
+  livenessProbe?: Maybe<Scalars['JSON']['output']>;
   name: Scalars['String']['output'];
   port: Scalars['Int']['output'];
+  readinessProbe?: Maybe<Scalars['JSON']['output']>;
+  startupProbe?: Maybe<Scalars['JSON']['output']>;
   workloadSlug: Scalars['String']['output'];
 };
 
@@ -2539,6 +2542,7 @@ export type AstroliftWorkload = {
   slug: Scalars['String']['output'];
   storageClass: Scalars['String']['output'];
   storageSize: Scalars['String']['output'];
+  volumes: Scalars['JSON']['output'];
 };
 
 export type AstroliftWorkloadManifest = {
