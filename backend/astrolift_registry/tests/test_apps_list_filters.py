@@ -34,6 +34,7 @@ from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.queries import RegistryQuery, _decode_apps_cursor
 from astrolift_registry.schema.types import (
     STALE_DEPLOY_WINDOW_DAYS,
+    AppsListSortKey,
     AstroliftAppListStatusFilter,
     AstroliftAppSourceKindFilter,
 )
@@ -397,7 +398,7 @@ def test_cursor_pagination_walks_all_rows_without_overlap():
             if page.next_cursor is None:
                 break
             cursor = page.next_cursor
-            assert _decode_apps_cursor(cursor) is not None
+            assert _decode_apps_cursor(cursor, AppsListSortKey.CREATED_DESC) is not None
             # Defensive infinite-loop guard.
             assert pages < 10
 
@@ -574,3 +575,89 @@ def test_active_preview_count_only_includes_live_previews():
     by_slug = {a.slug: a for a in page.items}
     assert by_slug[ok_app.slug].active_preview_count == 2
     assert by_slug[other_app.slug].active_preview_count == 0
+
+
+# ---------- sort_by (#729) ------------------------------------------------
+
+
+def test_sort_by_name_asc_returns_case_insensitive_order():
+    """NAME_ASC produces alphabetical order (case-insensitive) across pages."""
+    scaffold = _scaffold("-sort-name")
+    user = _superuser("sort-name-user")
+
+    # scaffold has: Alpha, Bravo, Charlie, Delta, Echo
+    all_slugs: list[str] = []
+    cursor: str | None = None
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        for _ in range(10):
+            page = RegistryQuery().astrolift_apps_page(
+                _info(),
+                sort_by=AppsListSortKey.NAME_ASC,
+                cursor=cursor,
+                limit=2,
+            )
+            all_slugs.extend(a.slug for a in page.items)
+            if page.next_cursor is None:
+                break
+            cursor = page.next_cursor
+
+    assert len(all_slugs) == 5
+    # Names returned in case-insensitive alphabetical order
+    names_in_order = [s.split("-")[0].capitalize() for s in all_slugs]
+    assert names_in_order == sorted(names_in_order, key=str.lower)
+
+
+def test_sort_by_deployed_desc_most_recent_first_nulls_last():
+    """DEPLOYED_DESC puts recently-deployed apps first; never-deployed last."""
+    scaffold = _scaffold("-sort-deploy")
+    user = _superuser("sort-deploy-user")
+
+    # ok-a: running deploy 2h ago
+    # ok-b: running deploy 2h ago (also)
+    # stale-a: running deploy >30d ago
+    # failed-a: failed deploy (no running), never-deployed == no running deploy
+    # never-a: no deploys at all
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        page = RegistryQuery().astrolift_apps_page(
+            _info(),
+            sort_by=AppsListSortKey.DEPLOYED_DESC,
+            limit=100,
+        )
+
+    slugs = [a.slug for a in page.items]
+    assert len(slugs) == 5
+
+    # ok-a / ok-b must appear before stale-a (older running deploy)
+    ok_a_idx = slugs.index(scaffold.apps["ok-a"].slug)
+    ok_b_idx = slugs.index(scaffold.apps["ok-b"].slug)
+    stale_idx = slugs.index(scaffold.apps["stale-a"].slug)
+    # failed-a and never-a have no running deploy → come last
+    never_idx = slugs.index(scaffold.apps["never-a"].slug)
+    failed_idx = slugs.index(scaffold.apps["failed-a"].slug)
+
+    assert max(ok_a_idx, ok_b_idx) < stale_idx
+    assert stale_idx < min(never_idx, failed_idx)
+
+
+def test_sort_by_cursor_mismatch_restarts_from_page_1():
+    """A cursor from one sort mode is silently discarded when sort changes."""
+    scaffold = _scaffold("-sort-mismatch")
+    user = _superuser("sort-mismatch-user")
+
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        # Get a cursor from CREATED_DESC
+        page1 = RegistryQuery().astrolift_apps_page(_info(), sort_by=AppsListSortKey.CREATED_DESC, limit=2)
+        stale_cursor = page1.next_cursor
+        assert stale_cursor is not None
+
+        # Present the CREATED_DESC cursor to NAME_ASC — should restart
+        page2 = RegistryQuery().astrolift_apps_page(
+            _info(),
+            sort_by=AppsListSortKey.NAME_ASC,
+            cursor=stale_cursor,
+            limit=100,
+        )
+
+    # Restarted from page 1 — all 5 apps are present
+    assert page2.total_count == 5
+    assert len(page2.items) == 5
