@@ -153,6 +153,7 @@ const MANAGED_SERVICE_FIELDS = `
   updatedAt
   lastActionAt
   lastActionKind
+  editableFields
 `;
 
 export const PROVISION_MANAGED_SERVICE = gql`
@@ -178,6 +179,30 @@ export const UPDATE_MANAGED_SERVICE = gql`
       errors {
         code
         message
+      }
+      data {
+        ${MANAGED_SERVICE_FIELDS}
+      }
+    }
+  }
+`;
+
+/**
+ * Trigger a full reprovision cycle for a managed service (#745).
+ *
+ * Use when a config change requires tearing down the backing cloud
+ * resource before re-creating it — i.e., the changed key is NOT in
+ * ``editableFields``. The service status transitions to PENDING; the
+ * lifecycle workflow loop picks it up.
+ */
+export const REPROVISION_MANAGED_SERVICE = gql`
+  mutation ReprovisionManagedService($input: ReprovisionManagedServiceInput!) {
+    reprovisionManagedService(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
       }
       data {
         ${MANAGED_SERVICE_FIELDS}

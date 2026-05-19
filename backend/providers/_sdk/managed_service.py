@@ -200,3 +200,14 @@ class ManagedServiceDriver(Protocol):
     def config_schema(self) -> dict[str, Any]: ...
 
     def binding_schema(self) -> BindingSchema: ...
+
+    def editable_fields(self) -> list[str]:
+        """Config keys that ``update()`` accepts without a full deprovision +
+        reprovision cycle.
+
+        Return ``["*"]`` (default) to allow any config key to be updated
+        in-place. Return a specific list to restrict which keys the driver
+        can apply live; keys NOT in the list require ``reprovisionManagedService``.
+        Return ``[]`` if ALL config changes require full reprovision.
+        """
+        return ["*"]

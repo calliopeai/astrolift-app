@@ -89,6 +89,7 @@ export const LIST_MANAGED_SERVICES = gql`
       updatedAt
       lastActionAt
       lastActionKind
+      editableFields
     }
   }
 `;
