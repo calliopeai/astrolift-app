@@ -3,6 +3,7 @@
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
+  ArchiveIcon,
   BoxIcon,
   ChevronRightIcon,
   DatabaseIcon,
@@ -14,9 +15,11 @@ import {
   Loader2Icon,
   LockIcon,
   PauseIcon,
+  PencilIcon,
   PlayCircleIcon,
   PlayIcon,
   PlugIcon,
+  PlusIcon,
   RefreshCwIcon,
   ShieldIcon,
   TimerIcon,
@@ -57,6 +60,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -96,6 +107,12 @@ import type {
   AstroliftRetentionPolicy,
   AstroliftWorkload,
 } from "@/graphql/registry/registry.types";
+import {
+  REPROVISION_MANAGED_SERVICE,
+  UPDATE_MANAGED_SERVICE,
+} from "@/graphql/services/services.mutations";
+import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
+import type { AstroliftManagedService } from "@/graphql/services/services.types";
 import { formatRelativeAge } from "@/lib/format";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -289,11 +306,18 @@ export function SettingsClient({ slug }: { slug: string }) {
 
       <ManagedServicesSummaryCard appSlug={a.slug} />
 
+      <ManagedServicesAdminSection appSlug={a.slug} />
+
       <RetentionPolicySection appSlug={a.slug} policies={a.retentionPolicies ?? []} />
 
       <EnvironmentSettingsSection appSlug={a.slug} />
 
-      <ArchiveSection appSlug={a.slug} isArchived={a.isArchived} archivedAt={a.archivedAt ?? null} />
+      <ArchiveSection
+        appSlug={a.slug}
+        appName={a.name}
+        isArchived={a.isArchived}
+        archivedAt={a.archivedAt ?? null}
+      />
 
       {/* Inline deploy-strategy badge + edit affordance (#400). Replaces
           the link-card to /config for the strategy itself — the manifest
@@ -1794,6 +1818,9 @@ const RETENTION_SIGNALS: { signal: string; label: string }[] = [
   { signal: "audit_events", label: "Audit Events" },
 ];
 
+const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 180, 365] as const;
+const RETENTION_DEFAULT_DAYS = 30;
+
 interface SetRetentionResp {
   setRetentionPolicy: MutationResult<AstroliftRetentionPolicy>;
 }
@@ -1805,9 +1832,9 @@ function RetentionPolicySection({
   appSlug: string;
   policies: AstroliftRetentionPolicy[];
 }) {
-  const policyMap = Object.fromEntries(policies.map((p) => [p.signal, p.retentionDays]));
-  const [days, setDays] = React.useState<Record<string, string>>(() =>
-    Object.fromEntries(RETENTION_SIGNALS.map(({ signal }) => [signal, String(policyMap[signal] ?? "")]))
+  const policyMap = React.useMemo(
+    () => Object.fromEntries(policies.map((p) => [p.signal, p.retentionDays])),
+    [policies],
   );
   const [saving, setSaving] = React.useState<Record<string, boolean>>({});
 
@@ -1816,13 +1843,9 @@ function RetentionPolicySection({
     awaitRefetchQueries: true,
   });
 
-  async function handleSave(signal: string) {
-    const raw = days[signal]?.trim();
-    const n = parseInt(raw ?? "", 10);
-    if (!raw || isNaN(n) || n < 1) {
-      toast.error(`Retention days must be a positive integer (${signal}).`);
-      return;
-    }
+  async function handleChange(signal: string, raw: string) {
+    const n = parseInt(raw, 10);
+    if (isNaN(n) || n < 1) return;
     setSaving((s) => ({ ...s, [signal]: true }));
     try {
       const { data } = await setRetention({
@@ -1837,7 +1860,9 @@ function RetentionPolicySection({
         toast.error(env.errors?.[0]?.message ?? "Failed to save retention policy.");
         return;
       }
-      toast.success(`${RETENTION_SIGNALS.find((s) => s.signal === signal)?.label ?? signal} retention set to ${n} days.`);
+      toast.success(
+        `${RETENTION_SIGNALS.find((s) => s.signal === signal)?.label ?? signal} retention set to ${n} days.`,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save retention policy.");
     } finally {
@@ -1852,37 +1877,55 @@ function RetentionPolicySection({
         <div>
           <h2 className="text-base font-semibold">Data retention</h2>
           <p className="text-muted-foreground mt-0.5 text-xs">
-            How long observability data is kept per signal type. Leave blank to use the platform
-            default.
+            How long observability data is kept per signal type. Defaults to{" "}
+            {RETENTION_DEFAULT_DAYS} days when no policy is set.
           </p>
         </div>
       </div>
-      <div className="flex flex-col gap-3">
-        {RETENTION_SIGNALS.map(({ signal, label }) => (
-          <div key={signal} className="flex items-center gap-3">
-            <Label className="w-28 shrink-0 text-sm">{label}</Label>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Platform default"
-              value={days[signal] ?? ""}
-              onChange={(e) => setDays((d) => ({ ...d, [signal]: e.target.value }))}
-              className="w-36"
-            />
-            <span className="text-muted-foreground text-xs">days</span>
-            <Can permission="app.update">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={saving[signal]}
-                onClick={() => handleSave(signal)}
-              >
-                {saving[signal] ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
-                Save
-              </Button>
-            </Can>
-          </div>
-        ))}
+      <div className="flex flex-col gap-2">
+        {RETENTION_SIGNALS.map(({ signal, label }) => {
+          const current = policyMap[signal] ?? RETENTION_DEFAULT_DAYS;
+          const isDefault = policyMap[signal] === undefined;
+          const isSaving = !!saving[signal];
+          return (
+            <div
+              key={signal}
+              className="bg-card flex items-center justify-between gap-3 rounded-md border p-3"
+            >
+              <div className="flex items-center gap-3">
+                <Label className="w-28 shrink-0 text-sm font-medium">{label}</Label>
+                {isDefault ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    Platform default
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                {isSaving ? (
+                  <Loader2Icon className="text-muted-foreground size-3.5 animate-spin" />
+                ) : null}
+                <Can permission="app.update">
+                  <Select
+                    value={String(current)}
+                    onValueChange={(v) => void handleChange(signal, v)}
+                    disabled={isSaving}
+                  >
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RETENTION_DAY_OPTIONS.map((d) => (
+                        <SelectItem key={d} value={String(d)}>
+                          {d} days
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Can>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1901,6 +1944,14 @@ interface SetEnvSettingResp {
 interface ClearEnvSettingResp {
   clearEnvironmentSetting: MutationResult<AstroliftEnvironmentSetting>;
 }
+
+const SUGGESTED_OVERRIDE_KEYS: { key: string; hint: string }[] = [
+  { key: "replicas", hint: "Workload replica count" },
+  { key: "cpu_request", hint: "Per-pod CPU request" },
+  { key: "cpu_limit", hint: "Per-pod CPU limit" },
+  { key: "memory_request", hint: "Per-pod memory request" },
+  { key: "memory_limit", hint: "Per-pod memory limit" },
+];
 
 function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
   const { data } = useQuery<EnvsResp2>(LIST_ENVIRONMENTS, {
@@ -1979,7 +2030,8 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
       </div>
 
       {envs.length > 1 && (
-        <div className="mb-4">
+        <div className="mb-4 flex items-center gap-2">
+          <Label className="text-muted-foreground text-xs">Environment</Label>
           <Select value={selectedEnvId || envs[0]?.id} onValueChange={setSelectedEnvId}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select environment" />
@@ -1995,7 +2047,13 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
         </div>
       )}
 
-      {settings.length > 0 && (
+      {settings.length === 0 ? (
+        <p className="text-muted-foreground mb-4 text-xs italic">
+          No overrides set for{" "}
+          <span className="text-foreground font-mono">{effectiveEnv?.name ?? ""}</span>. Add one
+          below or pick a suggested key.
+        </p>
+      ) : (
         <div className="mb-4 flex flex-col gap-1">
           {settings.map((s) => (
             <div key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
@@ -2007,6 +2065,7 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
                   variant="ghost"
                   className="text-destructive hover:text-destructive h-6 px-2 text-xs"
                   onClick={() => handleClear(s.key)}
+                  title="Clear override"
                 >
                   <Trash2Icon className="size-3" />
                 </Button>
@@ -2017,23 +2076,62 @@ function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
       )}
 
       <Can permission="app.update">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="KEY"
-            value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
-            className="w-36 font-mono text-xs"
-          />
-          <Input
-            placeholder="value"
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            className="flex-1 font-mono text-xs"
-          />
-          <Button size="sm" variant="outline" disabled={adding} onClick={handleAdd}>
-            {adding ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
-            Set
-          </Button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-muted-foreground mr-1 text-[11px]">Suggested:</span>
+            {SUGGESTED_OVERRIDE_KEYS.map((s) => {
+              const alreadySet = settings.some((row) => row.key === s.key);
+              return (
+                <Tooltip key={s.key}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 font-mono text-[10px]"
+                      disabled={alreadySet}
+                      onClick={() => setNewKey(s.key)}
+                    >
+                      {s.key}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">{alreadySet ? `${s.hint} (already set)` : s.hint}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              list="env-override-suggested-keys"
+              placeholder="KEY"
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              className="w-44 font-mono text-xs"
+            />
+            <datalist id="env-override-suggested-keys">
+              {SUGGESTED_OVERRIDE_KEYS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.hint}
+                </option>
+              ))}
+            </datalist>
+            <Input
+              placeholder="value"
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              className="flex-1 font-mono text-xs"
+            />
+            <Button size="sm" variant="outline" disabled={adding} onClick={handleAdd}>
+              {adding ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <PlusIcon className="size-3.5" />
+              )}
+              Add override
+            </Button>
+          </div>
         </div>
       </Can>
     </section>
@@ -2051,14 +2149,18 @@ interface RestoreAppResp {
 
 function ArchiveSection({
   appSlug,
+  appName,
   isArchived,
   archivedAt,
 }: {
   appSlug: string;
+  appName: string;
   isArchived: boolean;
   archivedAt: string | null;
 }) {
   const fmt = useFormatters();
+  const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   const refetch = [{ query: GET_APP, variables: { slug: appSlug } }];
   const [archive, { loading: archiving }] = useMutation<ArchiveAppResp>(ARCHIVE_APP, {
     refetchQueries: refetch,
@@ -2075,6 +2177,8 @@ function ArchiveSection({
       const env = data?.archiveApp;
       if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Archive failed."); return; }
       toast.success("App archived — workloads scaled to zero.");
+      setConfirmOpen(false);
+      router.push("/apps");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Archive failed.");
     }
@@ -2099,7 +2203,7 @@ function ArchiveSection({
           <p className="text-muted-foreground mt-0.5 text-xs">
             {isArchived
               ? archivedAt
-                ? `Archived ${fmt.relativeTime(new Date(archivedAt))}. Workloads are at zero replicas; deploys are suppressed.`
+                ? `Archived ${fmt.formatRelativeTime(archivedAt)}. Workloads are at zero replicas; deploys are suppressed.`
                 : "App is archived. Workloads are at zero replicas."
               : "Archiving scales all workloads to zero and suppresses deploys. Restore returns replicas to their pre-archive counts."}
           </p>
@@ -2120,14 +2224,437 @@ function ArchiveSection({
                 Restore
               </Button>
             ) : (
-              <Button size="sm" variant="outline" disabled={archiving} onClick={handleArchive}>
-                {archiving ? <Loader2Icon className="size-3.5 animate-spin" /> : <Trash2Icon className="size-3.5" />}
+              <Button size="sm" variant="outline" disabled={archiving} onClick={() => setConfirmOpen(true)}>
+                {archiving ? <Loader2Icon className="size-3.5 animate-spin" /> : <ArchiveIcon className="size-3.5" />}
                 Archive
               </Button>
             )}
           </Can>
         </div>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive {appName}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground space-y-2 text-sm">
+                <p>
+                  Archive is a reversible alternative to deregister. It scales every workload
+                  to <span className="text-foreground font-mono">replicas=0</span>, suppresses
+                  webhook + scheduled deploys, and releases the load balancer capacity.
+                </p>
+                <p>
+                  Your manifest, secrets, deploy tokens, managed services, and domain bindings
+                  are preserved. Restoring returns each workload to its pre-archive replica
+                  count.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={archiving}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleArchive();
+              }}
+            >
+              {archiving ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <ArchiveIcon className="size-4" />
+              )}
+              Archive {appName}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
+  );
+}
+
+// ─── managed services inline edit + reprovision ───────────────────────────────
+
+interface ManagedServicesListResp {
+  astroliftManagedServices: AstroliftManagedService[];
+}
+
+interface ReprovisionResp {
+  reprovisionManagedService: MutationResult<AstroliftManagedService>;
+}
+
+interface UpdateManagedServiceResp {
+  updateManagedService: MutationResult<AstroliftManagedService>;
+}
+
+const SERVICE_STATUS_VARIANT: Record<
+  string,
+  "ok" | "warn" | "error" | "pending" | "muted"
+> = {
+  active: "ok",
+  pending: "warn",
+  provisioning: "pending",
+  updating: "pending",
+  deprovisioning: "pending",
+  failed: "error",
+  deleted: "muted",
+};
+
+function ManagedServicesAdminSection({ appSlug }: { appSlug: string }) {
+  const { data, loading } = useQuery<ManagedServicesListResp>(LIST_MANAGED_SERVICES, {
+    variables: { appSlug, environmentName: null },
+    fetchPolicy: "cache-and-network",
+  });
+  const services = (data?.astroliftManagedServices ?? []).filter(
+    (s) => s.status !== "deleted",
+  );
+
+  const [reprovisionTarget, setReprovisionTarget] = React.useState<AstroliftManagedService | null>(
+    null,
+  );
+  const [editTarget, setEditTarget] = React.useState<AstroliftManagedService | null>(null);
+
+  if (loading && services.length === 0) {
+    return null;
+  }
+  if (services.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <PlugIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+        <div>
+          <h2 className="text-base font-semibold">Managed service admin</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Edit hot-swappable fields in place; trigger a full re-provision when a config
+            change requires tearing down and recreating the backing cloud resource.
+          </p>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <ul className="divide-y">
+          {services.map((svc) => (
+            <ManagedServiceAdminRow
+              key={svc.id}
+              svc={svc}
+              appSlug={appSlug}
+              onReprovision={() => setReprovisionTarget(svc)}
+              onEdit={() => setEditTarget(svc)}
+            />
+          ))}
+        </ul>
+      </Card>
+
+      <ReprovisionConfirmDialog
+        appSlug={appSlug}
+        target={reprovisionTarget}
+        onOpenChange={(open) => {
+          if (!open) setReprovisionTarget(null);
+        }}
+      />
+      <ManagedServiceEditSheet
+        appSlug={appSlug}
+        target={editTarget}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+      />
+    </section>
+  );
+}
+
+function ManagedServiceAdminRow({
+  svc,
+  onReprovision,
+  onEdit,
+}: {
+  svc: AstroliftManagedService;
+  appSlug: string;
+  onReprovision: () => void;
+  onEdit: () => void;
+}) {
+  const dotStatus = SERVICE_STATUS_VARIANT[svc.status] ?? "muted";
+  const editableCount = svc.editableFields?.length ?? 0;
+  const inFlight = ["provisioning", "updating", "deprovisioning", "pending"].includes(svc.status);
+
+  return (
+    <li className="flex items-center gap-3 px-4 py-3">
+      <StatusDot status={dotStatus} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-1.5">
+          <span className="text-foreground font-mono text-sm">{svc.name || svc.kind}</span>
+          <Badge variant="secondary" className="text-[10px]">
+            {svc.kind}
+            {svc.variant ? `/${svc.variant}` : ""}
+          </Badge>
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {svc.environmentName}
+          </Badge>
+          <Badge variant="outline" className="text-[10px] capitalize">
+            {svc.status}
+          </Badge>
+        </div>
+        {svc.statusError ? (
+          <p className="text-destructive mt-0.5 max-w-md truncate text-[11px]">
+            {svc.statusError}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Can permission="app.deploy">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={onEdit}
+                disabled={editableCount === 0 || inFlight}
+              >
+                <PencilIcon className="size-3.5" />
+                Edit
+                {editableCount > 0 ? (
+                  <Badge variant="secondary" className="ml-1 text-[10px]">
+                    {editableCount}
+                  </Badge>
+                ) : null}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="text-xs">
+                {editableCount === 0
+                  ? "No fields are editable in place for this kind. Use Re-provision to apply a config change that requires a teardown."
+                  : `Edit hot-swappable fields without tearing down the backing resource.`}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={onReprovision}
+                disabled={inFlight}
+              >
+                <RefreshCwIcon className="size-3.5" />
+                Re-provision
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="text-xs">
+                Tear down and recreate the cloud resource. Use when a config change is not in
+                the editable-fields set.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </Can>
+      </div>
+    </li>
+  );
+}
+
+function ReprovisionConfirmDialog({
+  appSlug,
+  target,
+  onOpenChange,
+}: {
+  appSlug: string;
+  target: AstroliftManagedService | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [reprovision, { loading }] = useMutation<ReprovisionResp>(REPROVISION_MANAGED_SERVICE, {
+    refetchQueries: [
+      { query: LIST_MANAGED_SERVICES, variables: { appSlug, environmentName: null } },
+    ],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleConfirm() {
+    if (!target) return;
+    try {
+      const { data } = await reprovision({
+        variables: { input: { managedServiceId: target.id } },
+      });
+      const env = data?.reprovisionManagedService;
+      if (!env?.ok) {
+        toast.error(env?.errors?.[0]?.message ?? "Re-provision failed.");
+        return;
+      }
+      toast.success(`Re-provisioning ${target.name || target.kind}.`);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Re-provision failed.");
+    }
+  }
+
+  return (
+    <AlertDialog open={target !== null} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Re-provision {target ? `${target.kind}/${target.name}` : "managed service"}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            The driver tears down the backing cloud resource and recreates it from the current
+            config. The service transitions to <span className="font-mono">pending</span>; the
+            lifecycle workflow picks it up. Persistent data on this kind may or may not survive
+            the teardown — check the kind&apos;s driver docs before confirming.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={loading}
+            onClick={(e) => {
+              e.preventDefault();
+              void handleConfirm();
+            }}
+          >
+            {loading ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
+              <RefreshCwIcon className="size-4" />
+            )}
+            Re-provision
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function ManagedServiceEditSheet({
+  appSlug,
+  target,
+  onOpenChange,
+}: {
+  appSlug: string;
+  target: AstroliftManagedService | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [values, setValues] = React.useState<Record<string, string>>({});
+  const [update, { loading }] = useMutation<UpdateManagedServiceResp>(UPDATE_MANAGED_SERVICE, {
+    refetchQueries: [
+      { query: LIST_MANAGED_SERVICES, variables: { appSlug, environmentName: null } },
+    ],
+    awaitRefetchQueries: true,
+  });
+
+  React.useEffect(() => {
+    if (!target) {
+      setValues({});
+      return;
+    }
+    const editable = target.editableFields ?? [];
+    const initial: Record<string, string> = {};
+    for (const field of editable) {
+      const v = target.config?.[field];
+      initial[field] = v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+    }
+    setValues(initial);
+  }, [target]);
+
+  async function handleSave() {
+    if (!target) return;
+    const editable = target.editableFields ?? [];
+    const changes: Record<string, unknown> = {};
+    for (const field of editable) {
+      const next = values[field] ?? "";
+      const original = target.config?.[field];
+      const originalStr =
+        original == null ? "" : typeof original === "string" ? original : JSON.stringify(original);
+      if (next === originalStr) continue;
+      // Preserve the original scalar type when round-tripping (number/bool stay
+      // typed; strings + JSON-shaped values pass through as the raw input).
+      if (typeof original === "number" && next.trim() !== "" && !isNaN(Number(next))) {
+        changes[field] = Number(next);
+      } else if (typeof original === "boolean") {
+        changes[field] = next === "true" || next === "1";
+      } else {
+        changes[field] = next;
+      }
+    }
+    if (Object.keys(changes).length === 0) {
+      toast.message("No changes to save.");
+      return;
+    }
+    try {
+      const { data } = await update({
+        variables: { input: { id: target.id, config: changes } },
+      });
+      const env = data?.updateManagedService;
+      if (!env?.ok) {
+        toast.error(env?.errors?.[0]?.message ?? "Update failed.");
+        return;
+      }
+      toast.success(`Updated ${target.name || target.kind}.`);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed.");
+    }
+  }
+
+  const editable = target?.editableFields ?? [];
+
+  return (
+    <Sheet open={target !== null} onOpenChange={onOpenChange}>
+      <SheetContent className="flex flex-col gap-0 sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <PencilIcon className="size-4" />
+            {target ? `Edit ${target.kind}/${target.name}` : "Edit managed service"}
+          </SheetTitle>
+          <SheetDescription>
+            Only hot-swappable fields are shown. Changes apply via the driver&apos;s update
+            path — no teardown. For other changes, use Re-provision.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          {target && editable.length === 0 ? (
+            <div className="bg-muted/40 rounded-md border p-3 text-xs">
+              <p className="text-muted-foreground">
+                This kind exposes no editable fields. Edit via the manifest TOML editor and
+                re-provision, or change here once the driver adds in-place support.
+              </p>
+            </div>
+          ) : null}
+          {editable.map((field) => (
+            <div key={field} className="grid gap-1.5">
+              <Label htmlFor={`msvc-edit-${field}`} className="font-mono text-xs">
+                {field}
+              </Label>
+              <Input
+                id={`msvc-edit-${field}`}
+                value={values[field] ?? ""}
+                onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
+                className="font-mono text-xs"
+              />
+            </div>
+          ))}
+        </div>
+
+        <SheetFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Cancel
+          </Button>
+          <Can permission="app.deploy">
+            <Button
+              onClick={() => void handleSave()}
+              disabled={loading || editable.length === 0}
+            >
+              {loading ? <Loader2Icon className="size-4 animate-spin" /> : null}
+              Save changes
+            </Button>
+          </Can>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
