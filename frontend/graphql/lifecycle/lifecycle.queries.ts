@@ -318,6 +318,13 @@ export const LIST_APP_PODS = gql`
           memoryLimit
         }
       }
+      recentErrorEvent {
+        reason
+        message
+        type
+        count
+        lastSeen
+      }
     }
   }
 `;

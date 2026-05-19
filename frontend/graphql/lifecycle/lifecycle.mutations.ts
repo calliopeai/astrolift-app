@@ -680,3 +680,35 @@ export const RUN_JOB_ONCE = gql`
     }
   }
 `;
+
+/**
+ * #693 — read-only probe that asks the platform to check the app's
+ * GitHub repo's Actions secrets and report which of the five
+ * MONORAIL_* secrets are set + whether the values match what we'd
+ * push. Used by the Settings → CI setup "Validate" button so
+ * operators can confirm wiring without dispatching a deploy.
+ *
+ * Errors via PRECONDITION bucket for: NO_SOURCE_REPO,
+ * UNSUPPORTED_SOURCE, NO_PERSONAL_CONNECTION, AUTH_FAILED.
+ */
+export const VALIDATE_CI_SECRETS = gql`
+  mutation ValidateAstroliftCiSecrets($input: ValidateAstroliftCiSecretsInput!) {
+    validateAstroliftCiSecrets(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        repo
+        results {
+          secretName
+          isSet
+          isCurrent
+          updatedAt
+        }
+      }
+    }
+  }
+`;
