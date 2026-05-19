@@ -36,6 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -81,6 +82,12 @@ class GCSDriver(ManagedServiceDriver):
 
             self._client = storage.Client(project=config.project_id)
 
+    @driver_op(
+        cloud="gcp",
+        driver="object_store_gcs",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         bucket_name = self._bucket_name_for(spec=spec)
         try:
@@ -129,6 +136,7 @@ class GCSDriver(ManagedServiceDriver):
             message=f"GCS bucket {bucket_name} provisioned",
         )
 
+    @driver_op(cloud="gcp", driver="object_store_gcs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True, handle=spec.handle,
@@ -138,6 +146,12 @@ class GCSDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="object_store_gcs",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -252,6 +266,7 @@ class GCSDriver(ManagedServiceDriver):
             message=f"bucket {bucket_name} deleted with data{suffix}",
         )
 
+    @driver_op(cloud="gcp", driver="object_store_gcs")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, _, bucket_name = handle.handle.partition("/")
         try:
@@ -271,6 +286,7 @@ class GCSDriver(ManagedServiceDriver):
             message=f"bucket {bucket_name} reachable",
         )
 
+    @driver_op(cloud="gcp", driver="object_store_gcs")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, _, bucket_name = handle.handle.partition("/")
         return Binding(
@@ -296,6 +312,7 @@ class GCSDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="object_store_gcs")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -307,6 +324,7 @@ class GCSDriver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="gcp", driver="object_store_gcs")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -319,6 +337,7 @@ class GCSDriver(ManagedServiceDriver):
             errors=["not_implemented"],
         )
 
+    @driver_op(cloud="gcp", driver="object_store_gcs", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -328,6 +347,7 @@ class GCSDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="object_store_gcs", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(env_vars={
             "GCS_BUCKET_NAME": "Bucket name",

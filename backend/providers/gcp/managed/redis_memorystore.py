@@ -19,6 +19,7 @@ import string
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -96,6 +97,12 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="gcp",
+        driver="redis_memorystore",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         instance_id = self._instance_id_for(spec=spec)
         cfg = spec.config or {}
@@ -179,6 +186,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="redis_memorystore")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         instance_id = _parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -218,6 +226,12 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             message=f"memorystore {instance_id} update queued",
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="redis_memorystore",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -298,6 +312,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="gcp", driver="redis_memorystore")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -318,6 +333,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             message=f"memorystore reports {state_name}",
         )
 
+    @driver_op(cloud="gcp", driver="redis_memorystore")
     def binding(self, handle: ServiceHandle) -> Binding:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -370,6 +386,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="redis_memorystore")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -398,6 +415,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="gcp", driver="redis_memorystore")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -423,6 +441,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             message=f"memorystore restore from {snapshot.snapshot_id} queued",
         )
 
+    @driver_op(cloud="gcp", driver="redis_memorystore", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -437,6 +456,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="redis_memorystore", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

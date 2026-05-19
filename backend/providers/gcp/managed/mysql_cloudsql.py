@@ -36,6 +36,7 @@ import string
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -130,6 +131,12 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="gcp",
+        driver="mysql_cloudsql",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         instance_id = self._instance_id_for(spec=spec)
         cfg = spec.config or {}
@@ -241,6 +248,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         instance_id = _parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -285,6 +293,12 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             message=f"cloudsql-mysql {instance_id} update queued",
         )
 
+    @driver_op(
+        cloud="gcp",
+        driver="mysql_cloudsql",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -376,6 +390,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -391,6 +406,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             message=f"cloudsql-mysql reports {state}",
         )
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql")
     def binding(self, handle: ServiceHandle) -> Binding:
         instance_id = _parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -436,6 +452,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -460,6 +477,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -488,6 +506,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             message=f"cloudsql-mysql clone from {source_id} queued",
         )
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -505,6 +524,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="gcp", driver="mysql_cloudsql", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

@@ -27,6 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -78,12 +79,25 @@ class GCPEmailStubDriver:
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="gcp",
+        driver="email_thirdparty_stub",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         raise NotImplementedError(_UNSUPPORTED_MSG)
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         raise NotImplementedError(_UNSUPPORTED_MSG)
 
+    @driver_op(
+        cloud="gcp",
+        driver="email_thirdparty_stub",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -93,15 +107,19 @@ class GCPEmailStubDriver:
     ) -> DeprovisionResult:
         raise NotImplementedError(_UNSUPPORTED_MSG)
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         raise NotImplementedError(_UNSUPPORTED_MSG)
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub")
     def binding(self, handle: ServiceHandle) -> Binding:
         raise NotImplementedError(_UNSUPPORTED_MSG)
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         raise NotImplementedError(_UNSUPPORTED_MSG)
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -111,6 +129,7 @@ class GCPEmailStubDriver:
 
     # ---- read-only schemas (kept accurate so docs render) -------------
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -122,6 +141,7 @@ class GCPEmailStubDriver:
             "properties": {},
         }
 
+    @driver_op(cloud="gcp", driver="email_thirdparty_stub", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
