@@ -441,7 +441,96 @@ def test_push_secrets_public_key_fetch_failure_returns_precondition(
     assert DeployToken.objects.filter(registered_app=app_with_repo).count() == rotated_before
 
 
-def test_push_secrets_gitlab_source_returns_precondition(
+def test_push_secrets_gitlab_source_pushes_project_variables(
+    monkeypatch,
+    permission_resolver,
+    org,
+    actor,
+    app_with_repo,
+):
+    """GitLab-sourced app pushes the five Astrolift CI values to the
+    project's CI/CD variables endpoint (#531). Shape mirrors the GitHub
+    branch — same five names, deploy-token rotation, same return
+    envelope — but each value lands via POST/PUT on the variables API
+    rather than a sealed-box PUT."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    app_with_repo.source_kind = "gitlab"
+    app_with_repo.source_repo = "acme-grp/api"
+    app_with_repo.save(update_fields=["source_kind", "source_repo", "updated_at", "version"])
+
+    # Personal GitLab connection — pick by user_id so the picker
+    # accepts it.
+    encrypted = encrypt_at_rest(b"glpat_personal_test_token")
+    SourceConnection.objects.create(
+        organization=org,
+        user=actor,
+        kind=SourceConnection.Kind.GITLAB_OAUTH_USER,
+        display_name="GitLab: actor",
+        account_login="actor",
+        secret_backend_kind=encrypted.backend_kind,
+        secret_ciphertext=encrypted.backend_ref,
+        is_active=True,
+    )
+
+    captured: dict = {"writes": [], "probes": 0}
+
+    class _Resp:
+        def __init__(self, body=b"", status=201):
+            self._body = body
+            self._status = status
+
+        def __enter__(self):
+            return SimpleNamespace(read=lambda: self._body, status=self._status)
+
+        def __exit__(self, *_):
+            return False
+
+    def fake_urlopen(req, timeout=10):
+        url = req.full_url
+        method = req.get_method()
+        # The reach-probe is a GET against /variables?per_page=1.
+        if method == "GET" and "/variables?per_page=1" in url:
+            captured["probes"] += 1
+            return _Resp(b"[]", status=200)
+        # Variable writes — POST (create) succeeds; tests don't need
+        # the PUT-fallback path here.
+        if method == "POST" and url.endswith("/variables"):
+            body = json.loads(req.data.decode("utf-8"))
+            captured["writes"].append(body)
+            return _Resp(b"", status=201)
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(
+        "astrolift_scm.providers.gitlab.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    with _ctx(org):
+        result = LifecycleMutation().push_astrolift_ci_secrets_to_repo(
+            _info(actor),
+            input=PushCiSecretsToRepoInput(app_slug=app_with_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    # All five names landed.
+    written_keys = {w["key"] for w in captured["writes"]}
+    assert written_keys == {
+        "ASTROLIFT_PUSH_ROLE_ARN",
+        "ASTROLIFT_ECR_URI",
+        "ASTROLIFT_APP_SLUG",
+        "ASTROLIFT_API_URL",
+        "ASTROLIFT_DEPLOY_TOKEN",
+    }
+    # Defaults: masked=True, protected=False.
+    for w in captured["writes"]:
+        assert w["masked"] is True
+        assert w["protected"] is False
+        assert w["variable_type"] == "env_var"
+    # Reach-probe ran first.
+    assert captured["probes"] == 1
+
+
+def test_push_secrets_bitbucket_source_returns_precondition(
     monkeypatch,
     permission_resolver,
     org,
@@ -449,10 +538,11 @@ def test_push_secrets_gitlab_source_returns_precondition(
     app_with_repo,
     personal_github_connection,
 ):
-    """A GitLab-sourced app surfaces a clean PRECONDITION envelope
-    (rather than a 500) explaining the GitLab gap."""
+    """A Bitbucket-sourced app surfaces a clean PRECONDITION envelope
+    until the Bitbucket driver lands. Sibling of the old GitLab gap
+    test."""
     permission_resolver.grant(Permission.APP_UPDATE)
-    app_with_repo.source_kind = "gitlab"
+    app_with_repo.source_kind = "bitbucket"
     app_with_repo.save(update_fields=["source_kind", "updated_at", "version"])
 
     def boom(*_args, **_kw):
@@ -471,7 +561,7 @@ def test_push_secrets_gitlab_source_returns_precondition(
 
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    assert "github" in result.errors[0].message.lower()
+    assert "bitbucket" in result.errors[0].message.lower()
 
 
 def test_push_secrets_app_not_found(

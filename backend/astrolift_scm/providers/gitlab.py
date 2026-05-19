@@ -641,3 +641,135 @@ def open_gitlab_merge_request(
             "GitLab POST merge_requests response missing web_url or iid",
         )
     return OpenMergeRequestResult(url=web_url, number=str(iid))
+
+
+# ---------------------------------------------------------------------------
+# CI / CD project variables (#531)
+# ---------------------------------------------------------------------------
+
+
+def put_gitlab_project_variable(
+    connection,
+    *,
+    repo_full_name: str,
+    key: str,
+    value: str,
+    masked: bool = True,
+    protected: bool = False,
+) -> None:
+    """Create-or-update one project-scoped CI variable on GitLab.
+
+    GitLab splits create vs update across two endpoints:
+    ``POST /projects/:id/variables`` rejects an existing key with 400,
+    ``PUT  /projects/:id/variables/:key`` rejects a missing key with
+    404. We POST first; if GitLab returns "already exists" / 400 we
+    fall through to PUT. (HEAD-probing isn't an option — GitLab's
+    variables endpoint refuses HEAD on most plans.)
+
+    ``masked=True`` hides the value in CI logs (GitLab requires the
+    value to match its mask-eligibility regex: at least 8 chars, no
+    whitespace, no special chars outside ``A-Za-z0-9+/=@:.~``). Values
+    that don't qualify get rejected by GitLab with a 400 — we surface
+    that as ``API_ERROR`` rather than silently downgrading to
+    ``masked=False`` (silent downgrade would leak the value into CI
+    logs without the operator knowing).
+
+    ``protected=False`` is the safe default: protected variables only
+    project onto protected branches, which would break the deploy on
+    feature branches. Astrolift's CI workflow runs on any branch the
+    user pushes, so the value must be reachable from any pipeline.
+    """
+    token = _token(connection)
+    base = _api_base(connection)
+    project = urllib.parse.quote(repo_full_name, safe="")
+
+    body = {
+        "key": key,
+        "value": value,
+        "masked": masked,
+        "protected": protected,
+        "variable_type": "env_var",
+    }
+    payload_bytes = json.dumps(body).encode("utf-8")
+    post_url = f"{base}/api/v4/projects/{project}/variables"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "astrolift",
+    }
+
+    req = urllib.request.Request(post_url, data=payload_bytes, method="POST", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            _ = resp.read()
+        return
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}) writing variable {key!r}. Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GitlabProviderError(
+                "NOT_FOUND",
+                f"GitLab couldn't find project {repo_full_name}. Check project access.",
+                recoverable=True,
+            ) from exc
+        # GitLab signals "key already exists" inconsistently — sometimes
+        # 400 with a body containing "has already been taken", sometimes
+        # 409. Fall through to PUT on either.
+        text_lower = body_text.lower()
+        already_exists = exc.code == 409 or (
+            exc.code == 400 and ("already been taken" in text_lower or "already exists" in text_lower)
+        )
+        if not already_exists:
+            raise GitlabProviderError(
+                "API_ERROR",
+                f"GitLab returned {exc.code} writing variable {key!r}: {body_text}",
+            ) from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError(
+            "NETWORK",
+            f"Couldn't reach GitLab writing variable {key!r}: {exc.reason}",
+        ) from exc
+
+    # POST said "already exists" — PUT to update.
+    put_url = f"{base}/api/v4/projects/{project}/variables/{urllib.parse.quote(key, safe='')}"
+    req = urllib.request.Request(put_url, data=payload_bytes, method="PUT", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            _ = resp.read()
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}) updating variable {key!r}. Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        if exc.code == 404:
+            raise GitlabProviderError(
+                "NOT_FOUND",
+                f"GitLab couldn't find variable {key!r} on update path (race with delete?).",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError(
+            "API_ERROR",
+            f"GitLab returned {exc.code} updating variable {key!r}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError(
+            "NETWORK",
+            f"Couldn't reach GitLab updating variable {key!r}: {exc.reason}",
+        ) from exc

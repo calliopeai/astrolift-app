@@ -163,6 +163,28 @@ def _pick_personal_github_connection(*, organization_id: int, user_id: int) -> S
     )
 
 
+def _pick_personal_gitlab_connection(*, organization_id: int, user_id: int) -> SourceConnection | None:
+    """Return the viewer's active personal GitLab connection (OAuth-user
+    or PAT) in the app's org. Same scoping rationale as the GitHub
+    picker — the variables we PUT through this connection get
+    attributed to the human in GitLab's audit log."""
+    return (
+        SourceConnection.objects.filter(
+            organization_id=organization_id,
+            user_id=user_id,
+            kind__in=(
+                SourceConnection.Kind.GITLAB_OAUTH_USER,
+                SourceConnection.Kind.GITLAB_PAT,
+            ),
+            is_active=True,
+            is_orphaned=False,
+            deleted_at__isnull=True,
+        )
+        .order_by("-updated_at", "-pk")
+        .first()
+    )
+
+
 # ---------------------------------------------------------------------------
 # GitHub Actions secrets API
 # ---------------------------------------------------------------------------
@@ -372,10 +394,34 @@ def push_astrolift_ci_secrets(
             "app has no source repo configured; can't push CI secrets",
         )
 
-    if app.source_kind in {"gitlab", "bitbucket", "gitea", "git_url"}:
+    if app.source_kind in {"bitbucket", "gitea"}:
+        # Bitbucket Pipelines variables + Gitea Actions secrets each
+        # need their own driver — non-trivial work, tracked as separate
+        # follow-up issues. Raise NotImplementedError so the resolver
+        # layer (mutations.py:2648) maps to PRECONDITION the same way
+        # it did before.
         raise NotImplementedError(
-            "Pushing CI secrets is GitHub-only for now; " "configure GitLab/Bitbucket variables manually."
+            f"Pushing CI secrets is not supported for source_kind={app.source_kind!r} yet; "
+            "see the per-host follow-ups for the missing driver work."
         )
+    if app.source_kind == "git_url":
+        # Bare git URLs don't have a CI surface to push to — there's no
+        # host-side variables API at all. Surface as a clean
+        # UNSUPPORTED_SOURCE rather than NotImplementedError so the FE
+        # shows "configure your CI manually" instead of "not yet
+        # implemented".
+        raise PushSecretsError(
+            "UNSUPPORTED_SOURCE",
+            "bare git URLs have no CI variable API; configure your CI runner manually",
+        )
+
+    if app.source_kind == "gitlab":
+        return _push_gitlab_ci_variables(
+            app,
+            viewer_user=viewer_user,
+            platform_api_url=platform_api_url,
+        )
+
     if app.source_kind != "github":
         raise PushSecretsError(
             "UNSUPPORTED_SOURCE",
@@ -386,7 +432,7 @@ def push_astrolift_ci_secrets(
     if not viewer_id or not getattr(viewer_user, "is_authenticated", False):
         raise PushSecretsError(
             "NO_PERSONAL_CONNECTION",
-            ("Connect your GitHub account first " "(Account drawer → Connected accounts)."),
+            ("Connect your GitHub account first (Account drawer → Connected accounts)."),
         )
 
     connection = _pick_personal_github_connection(
@@ -396,7 +442,7 @@ def push_astrolift_ci_secrets(
     if connection is None:
         raise PushSecretsError(
             "NO_PERSONAL_CONNECTION",
-            ("Connect your GitHub account first " "(Account drawer → Connected accounts)."),
+            ("Connect your GitHub account first (Account drawer → Connected accounts)."),
         )
 
     try:
@@ -460,5 +506,159 @@ def push_astrolift_ci_secrets(
     return PushSecretsResult(
         ok=True,
         secret_names=_GITHUB_SECRET_NAMES,
+        new_token_last_4=new_token_plaintext[-4:],
+    )
+
+
+# ---------------------------------------------------------------------------
+# GitLab branch
+# ---------------------------------------------------------------------------
+
+
+# GitLab masks at the variable level (vs GitHub's "all secrets are
+# encrypted at rest"). The names match the GitHub ones so the workflow
+# template can reference them identically — operator-friendly mental
+# model + one renderer if/when we render the per-host workflow YAML.
+_GITLAB_VARIABLE_NAMES = _GITHUB_SECRET_NAMES
+
+
+def _push_gitlab_ci_variables(
+    app: RegisteredApp,
+    *,
+    viewer_user,
+    platform_api_url: str,
+) -> PushSecretsResult:
+    """Push the five Astrolift CI variables onto a GitLab project's
+    CI/CD variables surface (#531).
+
+    Shape parallels the GitHub branch — same five names, same deploy-
+    token rotate-then-push ordering, same return envelope so callers
+    don't need to switch on host. Differences from GitHub:
+
+    - Auth: GitLab connections carry a bearer token directly; no sealed
+      box (GitLab encrypts variables at rest on its side).
+    - API: ``POST /projects/:id/variables`` to create, fallback to
+      ``PUT /projects/:id/variables/:key`` on already-exists.
+    - Masking: every variable is marked ``masked=True`` so it doesn't
+      leak into CI logs. GitLab rejects values that don't pass its
+      mask-eligibility regex — surfaces as ``SECRET_PUT_FAILED`` so
+      the operator can fix the value upstream (e.g. an empty
+      ``push_role_ref`` would fail the masked check).
+    """
+    from astrolift_scm.providers.gitlab import (
+        GitlabProviderError,
+        put_gitlab_project_variable,
+    )
+
+    viewer_id = getattr(viewer_user, "pk", None) or getattr(viewer_user, "id", None)
+    if not viewer_id or not getattr(viewer_user, "is_authenticated", False):
+        raise PushSecretsError(
+            "NO_PERSONAL_CONNECTION",
+            "Connect your GitLab account first (Account drawer → Connected accounts).",
+        )
+
+    connection = _pick_personal_gitlab_connection(
+        organization_id=app.organization_id,
+        user_id=viewer_id,
+    )
+    if connection is None:
+        raise PushSecretsError(
+            "NO_PERSONAL_CONNECTION",
+            "Connect your GitLab account first (Account drawer → Connected accounts).",
+        )
+
+    # Mirror the GitHub flow: rotate the deploy token only after we've
+    # proven we can speak to the host. We probe with a dry GET against
+    # the variables endpoint via a 404 on a never-used key — if auth
+    # fails we surface AUTH_FAILED here rather than after the rotate.
+    try:
+        from astrolift_scm.providers.gitlab import _api_base, _token
+
+        token = _token(connection)
+        # Lightweight reach check: HEAD against the project's variables
+        # collection. We use the existing put helper's error mapping by
+        # making a no-op POST with an invalid empty key — GitLab returns
+        # 400 with a validation error on the body, but auth issues
+        # surface as 401/403 first.
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        probe_url = (
+            f"{_api_base(connection)}/api/v4/projects/"
+            f"{urllib.parse.quote(app.source_repo, safe='')}/variables?per_page=1"
+        )
+        req = urllib.request.Request(
+            probe_url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "User-Agent": "astrolift",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                _ = resp.read()
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                return PushSecretsResult(
+                    ok=False,
+                    error_code="AUTH_FAILED",
+                    error_message=f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                )
+            if exc.code == 404:
+                return PushSecretsResult(
+                    ok=False,
+                    error_code="NOT_FOUND",
+                    error_message=f"GitLab couldn't find project {app.source_repo}. Check project access.",
+                )
+            # Other 4xx/5xx on the probe — fall through to the writes;
+            # individual variable writes will report their own errors.
+        except urllib.error.URLError as exc:
+            return PushSecretsResult(
+                ok=False,
+                error_code="NETWORK",
+                error_message=f"Couldn't reach GitLab: {exc.reason}",
+            )
+    except GitlabProviderError as exc:
+        return PushSecretsResult(
+            ok=False,
+            error_code=exc.code,
+            error_message=exc.message,
+        )
+
+    new_token_plaintext = _rotate_or_issue_deploy_token(
+        app,
+        by_user_id=viewer_id,
+    )
+
+    values = {
+        "ASTROLIFT_PUSH_ROLE_ARN": app.push_role_ref or "",
+        "ASTROLIFT_ECR_URI": app.registry_repo_uri or "",
+        "ASTROLIFT_APP_SLUG": app.slug,
+        "ASTROLIFT_API_URL": (platform_api_url or "").rstrip("/"),
+        "ASTROLIFT_DEPLOY_TOKEN": new_token_plaintext,
+    }
+
+    for name in _GITLAB_VARIABLE_NAMES:
+        try:
+            put_gitlab_project_variable(
+                connection,
+                repo_full_name=app.source_repo,
+                key=name,
+                value=values[name],
+                masked=True,
+                protected=False,
+            )
+        except GitlabProviderError as exc:
+            return PushSecretsResult(
+                ok=False,
+                error_code="SECRET_PUT_FAILED",
+                error_message=f"{name}: {exc.message}",
+            )
+
+    return PushSecretsResult(
+        ok=True,
+        secret_names=_GITLAB_VARIABLE_NAMES,
         new_token_last_4=new_token_plaintext[-4:],
     )

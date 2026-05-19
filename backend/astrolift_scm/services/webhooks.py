@@ -86,6 +86,15 @@ _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
         "github_oauth_user",
         "github_pat",
     ),
+    "gitlab": (
+        # No App-install equivalent on GitLab — the closest is the
+        # OAuth-app row, but that's the issuer config and never the
+        # connection-with-token. PAT and OAuth-user both carry a usable
+        # Bearer token; prefer OAuth-user for the per-operator
+        # attribution, fall back to PAT for the org-shared case.
+        "gitlab_oauth_user",
+        "gitlab_pat",
+    ),
 }
 
 
@@ -160,12 +169,12 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
             error="app has no source repo configured",
         )
 
-    if app.source_kind in {"gitlab", "bitbucket", "gitea", "git_url"}:
+    if app.source_kind in {"bitbucket", "gitea", "git_url"}:
         raise NotImplementedError(
-            "Source-webhook install is GitHub-only for now; "
-            "use the per-connection install_scm_webhook for other hosts."
+            f"Source-webhook install is not supported for source_kind={app.source_kind!r} yet; "
+            "see the per-host follow-ups for the missing driver work."
         )
-    if app.source_kind != "github":
+    if app.source_kind not in {"github", "gitlab"}:
         return InstallSourceWebhookResult(
             status="no_connection",
             error=f"unsupported source_kind {app.source_kind!r}",
@@ -173,10 +182,11 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
 
     connection = _pick_source_connection(app)
     if connection is None:
+        host_label = "GitLab" if app.source_kind == "gitlab" else "GitHub"
         return InstallSourceWebhookResult(
             status="no_connection",
             error=(
-                "no active source connection for this app's org. " "Connect a GitHub identity, then retry."
+                f"no active source connection for this app's org. Connect a {host_label} identity, then retry."
             ),
         )
 
