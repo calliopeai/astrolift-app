@@ -452,6 +452,15 @@ type AstroliftAppPod {
   age: DateTime
   node: String!
   containerStatuses: [AstroliftContainerStatus!]!
+  recentErrorEvent: AstroliftAppPodEvent
+}
+
+type AstroliftAppPodEvent {
+  reason: String!
+  message: String!
+  type: String!
+  count: Int!
+  lastSeen: String!
 }
 
 type AstroliftAppReprovisionState {

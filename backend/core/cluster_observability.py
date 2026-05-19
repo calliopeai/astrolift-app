@@ -55,6 +55,7 @@ class ClusterObservabilityError(Exception):
 
 _POD_BACKEND_OVERRIDE: Any = None
 _LOG_BACKEND_OVERRIDE: Any = None
+_EVENTS_BACKEND_OVERRIDE: Any = None
 
 
 def set_pod_backend_for_tests(backend: Any) -> None:
@@ -87,6 +88,22 @@ def set_log_backend_for_tests(backend: Any) -> None:
 def reset_log_backend_for_tests() -> None:
     global _LOG_BACKEND_OVERRIDE
     _LOG_BACKEND_OVERRIDE = None
+
+
+def set_events_backend_for_tests(backend: Any) -> None:
+    """Tests use this to install a deterministic events backend (#666).
+
+    Backend interface: ``backend.list_events(ctx, *, namespaces, event_type,
+    limit) -> list[ClusterEvent]`` — the driver protocol's shape.  Reset
+    with :func:`reset_events_backend_for_tests`.
+    """
+    global _EVENTS_BACKEND_OVERRIDE
+    _EVENTS_BACKEND_OVERRIDE = backend
+
+
+def reset_events_backend_for_tests() -> None:
+    global _EVENTS_BACKEND_OVERRIDE
+    _EVENTS_BACKEND_OVERRIDE = None
 
 
 # ---- Public resolver API ------------------------------------------
@@ -126,14 +143,15 @@ def _auth_for_cluster(cluster: TenantCluster) -> Any:
 
 class _OverrideDriver:
     """Test-only driver — bypasses provider-plugin lookup and
-    dispatches list_pods / stream_logs straight to the installed
-    test backends. Lets the test fixtures use any
+    dispatches list_pods / stream_logs / list_events straight to the
+    installed test backends. Lets the test fixtures use any
     ``TenantCluster.provider_plugin`` row (even one not in the
     plugin registry) without forcing the real driver path."""
 
-    def __init__(self, pod_backend: Any, log_backend: Any) -> None:
+    def __init__(self, pod_backend: Any, log_backend: Any, events_backend: Any = None) -> None:
         self._pod_backend = pod_backend
         self._log_backend = log_backend
+        self._events_backend = events_backend
 
     def list_pods(self, *, auth: Any, namespace: str, app_slug: str) -> list[Any]:
         if self._pod_backend is None:
@@ -169,6 +187,25 @@ class _OverrideDriver:
             follow=follow,
         )
 
+    def list_events(
+        self,
+        ctx: Any,
+        *,
+        namespaces: list[str] | None = None,
+        event_type: str | None = "Warning",
+        limit: int = 50,
+    ) -> list[Any]:
+        if self._events_backend is None:
+            raise ClusterObservabilityError(
+                "list_events called without an events backend override; set_events_backend_for_tests was not called",
+            )
+        return self._events_backend.list_events(
+            ctx,
+            namespaces=namespaces,
+            event_type=event_type,
+            limit=limit,
+        )
+
 
 def _driver_for_cluster(cluster: TenantCluster) -> Any:
     """Look up the ``ClusterDriver`` class for ``cluster.provider_plugin``
@@ -186,10 +223,15 @@ def _driver_for_cluster(cluster: TenantCluster) -> Any:
     would error on every test. The override driver dispatches
     straight to the test backend.
     """
-    if _POD_BACKEND_OVERRIDE is not None or _LOG_BACKEND_OVERRIDE is not None:
+    if (
+        _POD_BACKEND_OVERRIDE is not None
+        or _LOG_BACKEND_OVERRIDE is not None
+        or _EVENTS_BACKEND_OVERRIDE is not None
+    ):
         return _OverrideDriver(
             pod_backend=_POD_BACKEND_OVERRIDE,
             log_backend=_LOG_BACKEND_OVERRIDE,
+            events_backend=_EVENTS_BACKEND_OVERRIDE,
         )
 
     plugin_slug = cluster.provider_plugin.slug
@@ -270,6 +312,48 @@ def list_app_pods(
     driver = _driver_for_cluster(cluster)
     auth = _auth_for_cluster(cluster)
     return driver.list_pods(auth=auth, namespace=namespace, app_slug=app_slug)
+
+
+def list_app_pod_warning_events(
+    *,
+    cluster: TenantCluster,
+    namespace: str,
+    limit: int = 100,
+) -> list[Any]:
+    """Resolver-facing entry — recent Warning events in ``namespace`` (#666).
+
+    Returns a list of ``ClusterEvent`` dataclasses (provider SDK shape);
+    the caller is responsible for the pod-name → most-recent-event join.
+    The driver layer fetches all Warning events in the namespace so we
+    can answer 'what went wrong on this pod' for any pod the namespace
+    surfaced, without N round-trips.
+
+    Errors raise :class:`ClusterObservabilityError`; the resolver
+    swallows + renders the workloads list without inline event chips
+    rather than 502ing the page.
+    """
+    # The `list_events` driver method takes a ClusterContext (not auth).
+    # We lazy-import the context builder from core.cluster_management to
+    # avoid a hard dep on that module's TenantCluster import order.
+    from core.cluster_management import _context_for_cluster
+
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    try:
+        return driver.list_events(
+            ctx,
+            namespaces=[namespace],
+            event_type="Warning",
+            limit=limit,
+        )
+    except AttributeError as exc:
+        # The test-override driver (_OverrideDriver) doesn't ship
+        # list_events; that's intentional for unit tests that don't
+        # exercise the event path.  Surface as observability-empty
+        # rather than crashing.
+        raise ClusterObservabilityError(
+            f"driver for cluster {cluster.slug!r} does not implement list_events",
+        ) from exc
 
 
 def stream_app_logs(

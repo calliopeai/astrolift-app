@@ -26,6 +26,7 @@ from astrolift_lifecycle.schema.types import (
     AppEnvironmentType,
     AppHealthSummaryType,
     AppIdentityBindingType,
+    AppPodEventType,
     AppPodType,
     CommandRunType,
     DeploymentApprovalHistoryEntryType,
@@ -104,6 +105,22 @@ _WORKLOAD_STATUS_ORDER = (
 )
 
 
+def _event_to_type(ev) -> AppPodEventType | None:
+    """Project a ``ClusterEvent`` (provider SDK dataclass) onto the
+    GraphQL ``AppPodEventType`` (#666).  Returns None for a null input
+    so the caller can hand the result straight to ``pod_info_to_type``.
+    """
+    if ev is None:
+        return None
+    return AppPodEventType(
+        reason=getattr(ev, "reason", "") or "",
+        message=getattr(ev, "message", "") or "",
+        type=getattr(ev, "type", "") or "Warning",
+        count=int(getattr(ev, "count", 0) or 0),
+        last_seen=getattr(ev, "last_seen", "") or "",
+    )
+
+
 def _list_pods_for_app(app_slug: str, *, environment_name: str | None = None) -> list:
     """Resolve cluster + namespace for an app and ask the driver for
     live pods.
@@ -154,6 +171,77 @@ def _list_pods_for_app(app_slug: str, *, environment_name: str | None = None) ->
         # Cluster transient errors (timeouts, 5xx) keep the UI alive;
         # the platform-event log carries the diagnostic.
         return []
+
+
+def _recent_pod_warnings_for_app(
+    app_slug: str,
+    *,
+    environment_name: str | None = None,
+) -> dict[str, object]:
+    """Build a ``pod_name → most-recent Warning event`` map for an app
+    (#666).
+
+    Resolves the same cluster + namespace as ``_list_pods_for_app`` then
+    calls the cluster's ``list_events`` driver method, filtering to
+    events whose ``involved_object`` is a ``Pod/...`` string.  Returns
+    the map keyed by pod name (the segment after the slash); when two
+    events target the same pod the highest ``last_seen`` wins.
+
+    Driver failures degrade to an empty dict — the page renders pods
+    without inline error chips rather than 502ing the whole list.
+    """
+    app = (
+        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        .filter(slug=app_slug, deleted_at__isnull=True)
+        .first()
+    )
+    if app is None:
+        return {}
+
+    cluster = None
+    if environment_name:
+        env = (
+            AppEnvironment.objects.select_related("tenant_cluster")
+            .filter(
+                registered_app=app,
+                name=environment_name,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+    if cluster is None:
+        cluster = app.default_tenant_cluster
+    if cluster is None or not getattr(cluster, "is_active", True):
+        return {}
+
+    namespace = namespace_for_app(app)
+    from core.cluster_observability import (
+        ClusterObservabilityError,
+        list_app_pod_warning_events,
+    )
+
+    try:
+        events = list_app_pod_warning_events(cluster=cluster, namespace=namespace)
+    except ClusterObservabilityError:
+        return {}
+    except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
+        return {}
+
+    out: dict[str, object] = {}
+    for ev in events or []:
+        involved = getattr(ev, "involved_object", "") or ""
+        if "/" not in involved:
+            continue
+        kind, name = involved.split("/", 1)
+        if kind.strip().lower() != "pod" or not name.strip():
+            continue
+        existing = out.get(name)
+        # Newer last_seen wins.  String comparison is correct for
+        # RFC 3339 timestamps.
+        if existing is None or getattr(existing, "last_seen", "") < getattr(ev, "last_seen", ""):
+            out[name] = ev
+    return out
 
 
 def _bucket_pods_by_status(pods: list) -> list[WorkloadPodStatusBucketType]:
@@ -544,7 +632,15 @@ class LifecycleQuery:
         platform-event alerts instead.
         """
         pods = _list_pods_for_app(app_slug, environment_name=environment_name)
-        return [pod_info_to_type(p) for p in pods]
+        # #666 — surface most-recent Warning event per pod for inline
+        # ImagePullBackOff / CrashLoopBackOff / OOMKilled triage.  The
+        # event lookup is best-effort: empty dict on driver failure
+        # means the rows render without chips.
+        warnings = _recent_pod_warnings_for_app(app_slug, environment_name=environment_name)
+        return [
+            pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name)))
+            for p in pods
+        ]
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)
