@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/table";
 import {
   ADD_APP_DOMAIN,
+  ADD_WILDCARD_DOMAIN,
   PAUSE_APP_INGRESS,
   RECHECK_DOMAIN_VALIDATION,
   REMOVE_APP_DOMAIN,
@@ -132,6 +133,12 @@ interface AppDomain {
   // #685 / #686 — redirect & path-route config
   redirectRules: DomainRedirectRule[];
   pathRoutes: DomainPathRoute[];
+  // #682 — wildcard / SNI surface. Optional on the type so we don't
+  // crash on a stale Apollo cache entry written before these fields
+  // landed in the LIST query; treat undefined as "regular domain,
+  // platform-managed cert".
+  isWildcard?: boolean;
+  sniCertRef?: string;
 }
 
 interface WorkloadOption {
@@ -244,6 +251,14 @@ export function AppDomainsClient({ slug }: { slug: string }) {
   const [add, addState] = useMutation<{
     addAppDomain: MutationResult<AppDomain>;
   }>(ADD_APP_DOMAIN, { refetchQueries: refetch, awaitRefetchQueries: true });
+  // #682 — wildcard variant. Same refetch pair as the regular add so
+  // the new row shows up in the list immediately.
+  const [addWildcard, addWildcardState] = useMutation<{
+    addWildcardDomain: MutationResult<AppDomain>;
+  }>(ADD_WILDCARD_DOMAIN, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
   const [remove, removeState] = useMutation<{
     removeAppDomain: MutationResult<{ id: string; deleted: boolean }>;
   }>(REMOVE_APP_DOMAIN, { refetchQueries: refetch, awaitRefetchQueries: true });
@@ -290,6 +305,7 @@ export function AppDomainsClient({ slug }: { slug: string }) {
 
   const busy =
     addState.loading ||
+    addWildcardState.loading ||
     removeState.loading ||
     recheckState.loading ||
     uploadCertState.loading ||
@@ -491,7 +507,32 @@ export function AppDomainsClient({ slug }: { slug: string }) {
       <AddDomainSheet
         open={open}
         onOpenChange={setOpen}
-        onSubmit={async (hostname, validationMethod) => {
+        onSubmit={async (hostname, validationMethod, isWildcard, sniCertRef) => {
+          if (isWildcard) {
+            // #682 — wildcard path uses a dedicated mutation. The
+            // backend forces dns_01 (only ACME challenge that supports
+            // wildcards) regardless of what we send, but we pass it
+            // through anyway so the input shape is honest.
+            const { data } = await addWildcard({
+              variables: {
+                input: {
+                  appSlug: slug,
+                  hostname,
+                  validationMethod: "dns_01",
+                  sniCertRef: sniCertRef ?? "",
+                },
+              },
+            });
+            if (data?.addWildcardDomain.ok) {
+              toast.success(`Added wildcard *.${hostname}`);
+              setOpen(false);
+              return true;
+            }
+            toast.error(
+              data?.addWildcardDomain.errors?.[0]?.message ?? "Add failed"
+            );
+            return false;
+          }
           const { data } = await add({
             variables: {
               input: {
@@ -583,18 +624,30 @@ function AddDomainSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (hostname: string, validationMethod: string) => Promise<boolean>;
+  onSubmit: (
+    hostname: string,
+    validationMethod: string,
+    isWildcard: boolean,
+    sniCertRef: string
+  ) => Promise<boolean>;
   busy: boolean;
 }) {
   const t = useTranslations("apps.domains");
   const tCommon = useTranslations("apps.common");
   const [hostname, setHostname] = React.useState("");
   const [method, setMethod] = React.useState<ValidationMethodChoice>(DEFAULT_VALIDATION_METHOD);
+  // #682 — wildcard toggle + optional SNI cert ref. When ``isWildcard``
+  // flips on we force ``dns_01`` (the only ACME challenge that supports
+  // wildcards) so the operator sees what they're committing to.
+  const [isWildcard, setIsWildcard] = React.useState(false);
+  const [sniCertRef, setSniCertRef] = React.useState("");
 
   React.useEffect(() => {
     if (!open) {
       setHostname("");
       setMethod(DEFAULT_VALIDATION_METHOD);
+      setIsWildcard(false);
+      setSniCertRef("");
     }
   }, [open]);
 
@@ -611,7 +664,12 @@ function AddDomainSheet({
           onSubmit={async (e) => {
             e.preventDefault();
             if (!hostname.trim()) return;
-            await onSubmit(hostname.trim().toLowerCase(), backendValidationMethod(method));
+            await onSubmit(
+              hostname.trim().toLowerCase(),
+              backendValidationMethod(method),
+              isWildcard,
+              sniCertRef.trim()
+            );
           }}
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
@@ -621,18 +679,79 @@ function AddDomainSheet({
               id="d-hostname"
               value={hostname}
               onChange={(e) => setHostname(e.target.value)}
-              placeholder="checkout.acme.com"
+              placeholder={isWildcard ? "tenant.acme.com" : "checkout.acme.com"}
               autoFocus
               required
               spellCheck={false}
               className="font-mono"
             />
+            {isWildcard && hostname.trim() && (
+              <p className="text-muted-foreground font-mono text-xs">
+                Cert will cover{" "}
+                <span className="text-foreground">*.{hostname.trim().toLowerCase()}</span>
+              </p>
+            )}
           </div>
+
+          {/* #682 — Wildcard toggle. Sits between hostname and method
+              because flipping it forces the validation method to
+              dns_01 (the only ACME challenge that supports wildcards). */}
+          <div className="border-border bg-muted/30 space-y-2 rounded-md border p-3">
+            <label
+              htmlFor="d-wildcard"
+              className="flex cursor-pointer items-start gap-2 text-sm"
+            >
+              <input
+                id="d-wildcard"
+                type="checkbox"
+                checked={isWildcard}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setIsWildcard(next);
+                  // Wildcards only work with DNS-01. Flipping the
+                  // toggle on swaps the method in lock-step so the
+                  // operator sees what they're committing to.
+                  if (next) setMethod("dns_01");
+                }}
+                className="mt-0.5"
+              />
+              <span className="flex-1">
+                <span className="font-medium">Wildcard domain</span>
+                <span className="text-muted-foreground block text-xs">
+                  Cover every subdomain under{" "}
+                  <code className="font-mono">*.hostname</code>. Requires DNS-01
+                  validation.
+                </span>
+              </span>
+            </label>
+            {isWildcard && (
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="d-sni-ref" className="text-xs">
+                  SNI cert ref{" "}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <Input
+                  id="d-sni-ref"
+                  value={sniCertRef}
+                  onChange={(e) => setSniCertRef(e.target.value)}
+                  placeholder="arn:aws:acm:… / projects/…/certificates/… / cert-name"
+                  spellCheck={false}
+                  className="font-mono text-xs"
+                />
+                <p className="text-muted-foreground text-xs">
+                  ACM ARN, GCP cert name, Azure cert ID, or k8s Secret ref. Leave
+                  blank for platform-managed.
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="d-method">{t("addSheet.validationMethod")}</Label>
             <Select
               value={method}
               onValueChange={(next) => setMethod(next as ValidationMethodChoice)}
+              disabled={isWildcard}
             >
               <SelectTrigger id="d-method" className="font-mono">
                 <SelectValue />
@@ -645,8 +764,12 @@ function AddDomainSheet({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">{t(`addSheet.methodHints.${method}`)}</p>
-            {isByo && (
+            <p className="text-muted-foreground text-xs">
+              {isWildcard
+                ? "DNS-01 is required for wildcard certificates."
+                : t(`addSheet.methodHints.${method}`)}
+            </p>
+            {isByo && !isWildcard && (
               <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-2 text-xs">
                 <p className="font-medium text-sky-700 dark:text-sky-400">
                   {t("addSheet.byoTitle")}
@@ -707,8 +830,18 @@ function DomainHandshakeCard({
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-baseline gap-3">
           <StatusDot status={tone} />
-          <code className="font-mono text-base">{domain.hostname}</code>
+          <code className="font-mono text-base">
+            {domain.isWildcard ? `*.${domain.hostname}` : domain.hostname}
+          </code>
           <Badge variant="secondary">{label}</Badge>
+          {/* #682 — wildcard marker. Distinct from the cert-state badge
+              so an operator can scan the list and see at a glance which
+              domains cover a subtree vs a single host. */}
+          {domain.isWildcard && (
+            <Badge variant="outline" className="text-[10px]">
+              wildcard
+            </Badge>
+          )}
           {domain.isPlatformManagedZone && (
             <Badge variant="outline" className="text-[10px]">
               {t("platformZone")}
@@ -740,6 +873,19 @@ function DomainHandshakeCard({
             </Button>
           </Can>
         </div>
+
+        {/* #682 — surface the operator-provided SNI cert ref. Empty
+            string means "platform-managed", which is already the
+            default messaging in CertStateBlock — don't render this row
+            in that case so the card stays compact. */}
+        {domain.sniCertRef && domain.sniCertRef.length > 0 && (
+          <div className="text-muted-foreground flex items-baseline gap-2 text-xs">
+            <span>SNI cert ref:</span>
+            <code className="text-foreground font-mono break-all">
+              {domain.sniCertRef}
+            </code>
+          </div>
+        )}
 
         {domain.lastValidationError && (
           <div className="border-destructive/30 bg-destructive/5 rounded-md border p-2 text-xs">

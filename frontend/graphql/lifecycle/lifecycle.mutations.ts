@@ -38,6 +38,32 @@ export const ADD_APP_DOMAIN = gql`
   }
 `;
 
+// #682 — wildcard TLS + SNI cert ref support. The backend models the
+// wildcard flag on the domain itself (``isWildcard``) and pairs it with
+// an optional ``sniCertRef`` (ACM ARN, GCP cert name, etc.). When
+// ``sniCertRef`` is blank the platform manages the cert.
+export const ADD_WILDCARD_DOMAIN = gql`
+  mutation AddWildcardDomain($input: AddWildcardDomainInput!) {
+    addWildcardDomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        hostname
+        isWildcard
+        sniCertRef
+        validationStatus
+        validationMethod
+        isActive
+      }
+    }
+  }
+`;
+
 export const REMOVE_APP_DOMAIN = gql`
   mutation RemoveAppDomain($input: RemoveAppDomainInput!) {
     removeAppDomain(input: $input) {
