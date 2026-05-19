@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -101,6 +102,12 @@ class CNPGPostgresDriver(ManagedServiceDriver):
 
     # ---- lifecycle ------------------------------------------------
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="postgres_cnpg",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
         namespace = f"{spec.organization_slug}-{spec.app_slug}"
@@ -137,6 +144,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             message=(f"CNPG Cluster {cluster_name} applied; CNPG operator " "reconciles asynchronously"),
         )
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         # Update path: re-apply the Cluster CRD with new size/config.
         # CNPG operator handles rolling resize + replica scaling.
@@ -148,6 +156,12 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="postgres_cnpg",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -210,6 +224,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
 
     # ---- read-only -------------------------------------------------
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
             handle=handle.handle,
@@ -217,6 +232,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             message=("live status requires querying the Cluster CRD's " "status block via cluster_driver"),
         )
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def binding(self, handle: ServiceHandle) -> Binding:
         cluster_name = _unpack_handle(handle.handle).name
         # CNPG operator generates a Secret named
@@ -249,6 +265,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """CNPG snapshots = Backup CRDs. The driver emits one
         and returns the snapshot_id; CNPG operator handles
@@ -262,6 +279,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -280,6 +298,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             errors=["not_implemented_in_driver"],
         )
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -301,6 +320,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="postgres_cnpg", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

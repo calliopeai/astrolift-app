@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -52,6 +53,12 @@ class NATSDriver(ManagedServiceDriver):
     def __init__(self, *, config: NATSConfig) -> None:
         self._config = config
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="event_stream_nats",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
         namespace = self._namespace_for(spec=spec)
@@ -86,6 +93,7 @@ class NATSDriver(ManagedServiceDriver):
             message=f"NATS cluster {cluster_name} provisioned",
         )
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -93,6 +101,12 @@ class NATSDriver(ManagedServiceDriver):
             message="re-apply manifest to scale / reconfigure",
         )
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="event_stream_nats",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -145,6 +159,7 @@ class NATSDriver(ManagedServiceDriver):
             message=f"NATS StatefulSet {parsed.name} deleted",
         )
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
             handle=handle.handle,
@@ -152,6 +167,7 @@ class NATSDriver(ManagedServiceDriver):
             message="status via StatefulSet readyReplicas",
         )
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def binding(self, handle: ServiceHandle) -> Binding:
         name = _unpack_handle(handle.handle).name
         return Binding(
@@ -169,6 +185,7 @@ class NATSDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def snapshot(self, handle):
         from _sdk import UnsupportedOperationError
 
@@ -177,6 +194,7 @@ class NATSDriver(ManagedServiceDriver):
             "snapshot via stream backup; out of scope for this driver (#618)",
         )
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def restore(self, snapshot, target):
         from _sdk import UnsupportedOperationError
 
@@ -184,6 +202,7 @@ class NATSDriver(ManagedServiceDriver):
             "managed_service.restore(NATS) not supported -- NATS doesn't " "restore from snapshot (#618)",
         )
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats", heartbeat=False)
     def config_schema(self):
         return {
             "type": "object",
@@ -193,6 +212,7 @@ class NATSDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="event_stream_nats", heartbeat=False)
     def binding_schema(self):
         return BindingSchema(
             env_vars={

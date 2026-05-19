@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -78,6 +79,12 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
     def __init__(self, *, config: RabbitMQOperatorConfig) -> None:
         self._config = config
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="queue_rabbitmq",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
         namespace = self._namespace_for(spec=spec)
@@ -112,6 +119,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             message=f"RabbitMQ cluster {cluster_name} provisioned",
         )
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -119,6 +127,12 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             message="operator reconciles via re-applied CRD",
         )
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="queue_rabbitmq",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -171,6 +185,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             message=f"RabbitmqCluster {parsed.name} deleted",
         )
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
             handle=handle.handle,
@@ -178,6 +193,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             message="status delegated to operator reconciliation",
         )
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
     def binding(self, handle: ServiceHandle) -> Binding:
         name = _unpack_handle(handle.handle).name
         return Binding(
@@ -198,6 +214,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
     def snapshot(self, handle):
         from _sdk import UnsupportedOperationError
 
@@ -205,6 +222,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             "managed_service.snapshot(RabbitMQ) not supported -- snapshots " "via cluster export; out of scope (#618)",
         )
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq")
     def restore(self, snapshot, target):
         from _sdk import UnsupportedOperationError
 
@@ -212,6 +230,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             "managed_service.restore(RabbitMQ) not supported -- RabbitMQ " "doesn't restore from snapshot (#618)",
         )
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq", heartbeat=False)
     def config_schema(self):
         return {
             "type": "object",
@@ -220,6 +239,7 @@ class RabbitMQOperatorDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="queue_rabbitmq", heartbeat=False)
     def binding_schema(self):
         return BindingSchema(
             env_vars={

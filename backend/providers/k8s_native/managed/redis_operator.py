@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -72,6 +73,12 @@ class RedisOperatorDriver(ManagedServiceDriver):
     ) -> None:
         self._config = config or RedisOperatorConfig()
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="redis_operator",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
         namespace = f"{spec.organization_slug}-{spec.app_slug}"
@@ -104,6 +111,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             message=f"Redis {cluster_name} applied",
         )
 
+    @driver_op(cloud="k8s_native", driver="redis_operator")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -111,6 +119,12 @@ class RedisOperatorDriver(ManagedServiceDriver):
             message="re-call provision with new size to update",
         )
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="redis_operator",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -172,6 +186,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             message=f"Redis {parsed.name} deleted",
         )
 
+    @driver_op(cloud="k8s_native", driver="redis_operator")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
             handle=handle.handle,
@@ -179,6 +194,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             message="query the Redis CRD's status block via cluster_driver",
         )
 
+    @driver_op(cloud="k8s_native", driver="redis_operator")
     def binding(self, handle: ServiceHandle) -> Binding:
         name = _unpack_handle(handle.handle).name
         # Bitnami Redis operator generates a Service named
@@ -200,6 +216,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             notes=("Connect via REDIS_HOST + port; password from " "the operator-generated Secret."),
         )
 
+    @driver_op(cloud="k8s_native", driver="redis_operator")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -210,6 +227,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="k8s_native", driver="redis_operator")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -222,6 +240,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             errors=["not_implemented_in_driver"],
         )
 
+    @driver_op(cloud="k8s_native", driver="redis_operator", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -231,6 +250,7 @@ class RedisOperatorDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="redis_operator", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

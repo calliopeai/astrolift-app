@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -67,6 +68,12 @@ class NFSDriver(ManagedServiceDriver):
     def __init__(self, *, config: NFSConfig) -> None:
         self._config = config
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="filesystem_nfs",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         pvc_name = self._pvc_name(spec=spec)
         namespace = self._namespace_for(spec=spec)
@@ -101,6 +108,7 @@ class NFSDriver(ManagedServiceDriver):
             message=f"PVC {pvc_name} provisioned",
         )
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         return UpdateResult(
             ok=True,
@@ -108,6 +116,12 @@ class NFSDriver(ManagedServiceDriver):
             message=("PVC resize via re-applied spec; underlying CSI " "must support volume expansion"),
         )
 
+    @driver_op(
+        cloud="k8s_native",
+        driver="filesystem_nfs",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -164,6 +178,7 @@ class NFSDriver(ManagedServiceDriver):
             message=(f"PVC {parsed.name} deleted (PV reclaim follows " "the StorageClass's reclaimPolicy)"),
         )
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         return ServiceStatus(
             handle=handle.handle,
@@ -171,6 +186,7 @@ class NFSDriver(ManagedServiceDriver):
             message="status via PVC.status.phase",
         )
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs")
     def binding(self, handle: ServiceHandle) -> Binding:
         name = _unpack_handle(handle.handle).name
         return Binding(
@@ -185,6 +201,7 @@ class NFSDriver(ManagedServiceDriver):
             notes=("PVC mount; workload manifests must reference the " "PVC by name in volumes + volumeMounts."),
         )
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs")
     def snapshot(self, handle):
         from _sdk import UnsupportedOperationError
 
@@ -193,6 +210,7 @@ class NFSDriver(ManagedServiceDriver):
             "CSI-driver-specific; wire to your CSI's VolumeSnapshot CRD (#618)",
         )
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs")
     def restore(self, snapshot, target):
         from _sdk import UnsupportedOperationError
 
@@ -201,6 +219,7 @@ class NFSDriver(ManagedServiceDriver):
             "VolumeSnapshot happens at PVC-create time; out of scope (#618)",
         )
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs", heartbeat=False)
     def config_schema(self):
         return {
             "type": "object",
@@ -212,6 +231,7 @@ class NFSDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="k8s_native", driver="filesystem_nfs", heartbeat=False)
     def binding_schema(self):
         return BindingSchema(
             env_vars={
