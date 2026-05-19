@@ -13,6 +13,11 @@ export const LIST_ENVIRONMENTS = gql`
       clusterSlug
       domainZone
       createdAt
+      settings {
+        id
+        key
+        value
+      }
     }
   }
 `;

@@ -67,6 +67,17 @@ def release_notes_to_type(rn) -> ReleaseNotesType:
     )
 
 
+@strawberry.type(name="AstroliftEnvironmentSetting")
+class EnvironmentSettingType:
+    id: GUID
+    key: str
+    value: str
+
+
+def env_setting_to_type(s) -> EnvironmentSettingType:
+    return EnvironmentSettingType(id=GUID(str(s.guid)), key=s.key, value=s.value)
+
+
 @strawberry.type(name="AstroliftAppEnvironment")
 class AppEnvironmentType:
     id: GUID
@@ -79,6 +90,7 @@ class AppEnvironmentType:
     cluster_slug: str | None
     domain_zone: str | None
     created_at: dt.datetime
+    settings: list[EnvironmentSettingType] = strawberry.field(default_factory=list)
 
 
 @strawberry.type(name="AstroliftDeploymentApprover")
@@ -294,7 +306,10 @@ class PreviewEnvironmentType:
     is unreachable — workspace rule forbids hard-coded fallbacks."""
 
 
-def app_env_to_type(env) -> AppEnvironmentType:
+def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType:
+    raw = list(env.settings.filter(deleted_at__isnull=True))
+    if keys is not None:
+        raw = [s for s in raw if s.key in keys]
     return AppEnvironmentType(
         id=GUID(str(env.guid)),
         name=env.name,
@@ -306,6 +321,7 @@ def app_env_to_type(env) -> AppEnvironmentType:
         cluster_slug=env.tenant_cluster.slug if env.tenant_cluster_id else None,
         domain_zone=env.managed_domain.zone if env.managed_domain_id else None,
         created_at=env.created_at,
+        settings=[env_setting_to_type(s) for s in raw],
     )
 
 

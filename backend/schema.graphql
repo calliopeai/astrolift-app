@@ -329,6 +329,7 @@ type AstroliftAppEnvironment {
   clusterSlug: String
   domainZone: String
   createdAt: DateTime!
+  settings: [AstroliftEnvironmentSetting!]!
 }
 
 type AstroliftAppEnvironmentMutationResult {
@@ -1243,6 +1244,18 @@ type AstroliftEnrollmentQrPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftEnrollmentQrPayload
+}
+
+type AstroliftEnvironmentSetting {
+  id: GUID!
+  key: String!
+  value: String!
+}
+
+type AstroliftEnvironmentSettingMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftEnvironmentSetting
 }
 
 type AstroliftEvent {
@@ -2675,6 +2688,11 @@ input CancelDeregisterInput {
   reason: String = null
 }
 
+input ClearEnvironmentSettingInput {
+  environmentId: GUID!
+  key: String!
+}
+
 input ConfigureProviderPluginInput {
   pluginSlug: String!
   config: JSON!
@@ -3480,6 +3498,8 @@ type Mutation {
   cancelAstroliftDeregister(input: CancelDeregisterInput!): AstroliftCancelDeregisterPayloadMutationResult!
   forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
   runAstroliftJobOnce(input: RunJobOnceInput!): AstroliftRunJobOncePayloadMutationResult!
+  setEnvironmentSetting(input: SetEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
+  clearEnvironmentSetting(input: ClearEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
@@ -4150,6 +4170,12 @@ input SetAppSecretMetadataInput {
 input SetAppSubdomainInput {
   id: GUID!
   subdomain: String!
+}
+
+input SetEnvironmentSettingInput {
+  environmentId: GUID!
+  key: String!
+  value: String!
 }
 
 input SetNotificationPreferenceInput {

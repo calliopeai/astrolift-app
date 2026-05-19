@@ -80,6 +80,15 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
+  CLEAR_ENVIRONMENT_SETTING,
+  SET_ENVIRONMENT_SETTING,
+} from "@/graphql/lifecycle/lifecycle.mutations";
+import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import type {
+  AstroliftAppEnvironment,
+  AstroliftEnvironmentSetting,
+} from "@/graphql/lifecycle/lifecycle.types";
+import {
   PAUSE_APP_WEBHOOK_DEPLOYS,
   RESUME_APP_WEBHOOK_DEPLOYS,
   RESYNC_MANIFEST_FROM_REPO,
@@ -285,6 +294,8 @@ export function SettingsClient({ slug }: { slug: string }) {
       <ManagedServicesSummaryCard appSlug={a.slug} />
 
       <RetentionPolicySection appSlug={a.slug} policies={a.retentionPolicies ?? []} />
+
+      <EnvironmentSettingsSection appSlug={a.slug} />
 
       {/* Inline deploy-strategy badge + edit affordance (#400). Replaces
           the link-card to /config for the strategy itself — the manifest
@@ -1875,6 +1886,158 @@ function RetentionPolicySection({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+// ─── environment settings ─────────────────────────────────────────────────────
+
+interface EnvsResp2 {
+  astroliftEnvironments: AstroliftAppEnvironment[];
+}
+
+interface SetEnvSettingResp {
+  setEnvironmentSetting: MutationResult<AstroliftEnvironmentSetting>;
+}
+
+interface ClearEnvSettingResp {
+  clearEnvironmentSetting: MutationResult<AstroliftEnvironmentSetting>;
+}
+
+function EnvironmentSettingsSection({ appSlug }: { appSlug: string }) {
+  const { data } = useQuery<EnvsResp2>(LIST_ENVIRONMENTS, {
+    variables: { appSlug },
+    fetchPolicy: "cache-and-network",
+  });
+  const envs = data?.astroliftEnvironments ?? [];
+
+  const [selectedEnvId, setSelectedEnvId] = React.useState<string>("");
+  const selectedEnv = envs.find((e) => e.id === selectedEnvId) ?? envs[0] ?? null;
+
+  const [newKey, setNewKey] = React.useState("");
+  const [newValue, setNewValue] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+
+  const refetch = [{ query: LIST_ENVIRONMENTS, variables: { appSlug } }];
+  const [setSetting] = useMutation<SetEnvSettingResp>(SET_ENVIRONMENT_SETTING, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+  const [clearSetting] = useMutation<ClearEnvSettingResp>(CLEAR_ENVIRONMENT_SETTING, {
+    refetchQueries: refetch,
+    awaitRefetchQueries: true,
+  });
+
+  if (envs.length === 0) return null;
+
+  const effectiveEnv = envs.find((e) => e.id === (selectedEnvId || envs[0]?.id));
+  const settings = effectiveEnv?.settings ?? [];
+
+  async function handleAdd() {
+    if (!effectiveEnv) return;
+    const key = newKey.trim();
+    if (!key) { toast.error("Key is required."); return; }
+    setAdding(true);
+    try {
+      const { data: resp } = await setSetting({
+        variables: { input: { environmentId: effectiveEnv.id, key, value: newValue } },
+      });
+      const env = resp?.setEnvironmentSetting;
+      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Failed to save."); return; }
+      toast.success(`Set ${key}`);
+      setNewKey("");
+      setNewValue("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleClear(key: string) {
+    if (!effectiveEnv) return;
+    try {
+      const { data: resp } = await clearSetting({
+        variables: { input: { environmentId: effectiveEnv.id, key } },
+      });
+      const env = resp?.clearEnvironmentSetting;
+      if (!env?.ok) { toast.error(env?.errors?.[0]?.message ?? "Failed to clear."); return; }
+      toast.success(`Cleared ${key}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear.");
+    }
+  }
+
+  return (
+    <section className="rounded-lg border p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <KeyIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+        <div>
+          <h2 className="text-base font-semibold">Environment overrides</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Per-environment key/value settings that supplement the app&apos;s base configuration.
+          </p>
+        </div>
+      </div>
+
+      {envs.length > 1 && (
+        <div className="mb-4">
+          <Select value={selectedEnvId || envs[0]?.id} onValueChange={setSelectedEnvId}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select environment" />
+            </SelectTrigger>
+            <SelectContent>
+              {envs.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {settings.length > 0 && (
+        <div className="mb-4 flex flex-col gap-1">
+          {settings.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
+              <span className="w-40 shrink-0 font-mono text-xs">{s.key}</span>
+              <span className="text-muted-foreground flex-1 truncate font-mono text-xs">{s.value || "(empty)"}</span>
+              <Can permission="app.update">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive h-6 px-2 text-xs"
+                  onClick={() => handleClear(s.key)}
+                >
+                  <Trash2Icon className="size-3" />
+                </Button>
+              </Can>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Can permission="app.update">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="KEY"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            className="w-36 font-mono text-xs"
+          />
+          <Input
+            placeholder="value"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            className="flex-1 font-mono text-xs"
+          />
+          <Button size="sm" variant="outline" disabled={adding} onClick={handleAdd}>
+            {adding ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
+            Set
+          </Button>
+        </div>
+      </Can>
     </section>
   );
 }

@@ -712,3 +712,45 @@ export const VALIDATE_CI_SECRETS = gql`
     }
   }
 `;
+
+/**
+ * Set (create-or-update) a per-environment key/value setting override (#744).
+ */
+export const SET_ENVIRONMENT_SETTING = gql`
+  mutation SetEnvironmentSetting($input: SetEnvironmentSettingInput!) {
+    setEnvironmentSetting(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        key
+        value
+      }
+    }
+  }
+`;
+
+/**
+ * Soft-delete a per-environment key/value setting override (#744).
+ */
+export const CLEAR_ENVIRONMENT_SETTING = gql`
+  mutation ClearEnvironmentSetting($input: ClearEnvironmentSettingInput!) {
+    clearEnvironmentSetting(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        key
+        value
+      }
+    }
+  }
+`;

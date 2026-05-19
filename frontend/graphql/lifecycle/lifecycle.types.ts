@@ -31,11 +31,14 @@ import type {
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
   AstroliftDeregisterPreview as GeneratedDeregisterPreview,
+  AstroliftEnvironmentSetting as GeneratedEnvironmentSetting,
   AstroliftForceRedeployPreview as GeneratedForceRedeployPreview,
   AstroliftForceRedeployPreviewDeployment as GeneratedForceRedeployPreviewDeployment,
   AstroliftPreviewEnvironment as GeneratedPreviewEnvironment,
   AstroliftScheduledJobRun as GeneratedScheduledJobRun,
 } from "@/graphql/__generated__/schema";
+
+export type AstroliftEnvironmentSetting = Pick<GeneratedEnvironmentSetting, "id" | "key" | "value">;
 
 export type AstroliftGuid = string;
 

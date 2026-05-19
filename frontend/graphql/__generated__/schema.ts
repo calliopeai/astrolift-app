@@ -352,6 +352,7 @@ export type AstroliftAppEnvironment = {
   name: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   requiredApprovals: Scalars['Int']['output'];
+  settings: Array<AstroliftEnvironmentSetting>;
   url: Scalars['String']['output'];
 };
 
@@ -1262,6 +1263,18 @@ export type AstroliftEnrollmentQrPayload = {
 
 export type AstroliftEnrollmentQrPayloadMutationResult = {
   data?: Maybe<AstroliftEnrollmentQrPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftEnvironmentSetting = {
+  id: Scalars['GUID']['output'];
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftEnvironmentSettingMutationResult = {
+  data?: Maybe<AstroliftEnvironmentSetting>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -2696,6 +2709,11 @@ export type CancelDeregisterInput = {
   workflowId: Scalars['String']['input'];
 };
 
+export type ClearEnvironmentSettingInput = {
+  environmentId: Scalars['GUID']['input'];
+  key: Scalars['String']['input'];
+};
+
 export type ConfigureProviderPluginInput = {
   config: Scalars['JSON']['input'];
   organizationScoped: Scalars['Boolean']['input'];
@@ -3269,6 +3287,7 @@ export type Mutation = {
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   cancelWorkflowInstance: MutationResult;
+  clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -3425,6 +3444,7 @@ export type Mutation = {
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
+  setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
@@ -3624,6 +3644,11 @@ export type MutationCancelAstroliftDeregisterArgs = {
 
 export type MutationCancelWorkflowInstanceArgs = {
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationClearEnvironmentSettingArgs = {
+  input: ClearEnvironmentSettingInput;
 };
 
 
@@ -4286,6 +4311,11 @@ export type MutationSetAppSecretMetadataArgs = {
 
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
+};
+
+
+export type MutationSetEnvironmentSettingArgs = {
+  input: SetEnvironmentSettingInput;
 };
 
 
@@ -5785,6 +5815,12 @@ export type SetAppSecretMetadataInput = {
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
+};
+
+export type SetEnvironmentSettingInput = {
+  environmentId: Scalars['GUID']['input'];
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
 };
 
 export type SetNotificationPreferenceInput = {
