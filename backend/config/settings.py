@@ -188,6 +188,16 @@ FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
 # public Internet (localhost)".
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 
+# Mobile universal-link / app-link well-known manifest values (#541).
+# The two strings below feed the JSON payload served at
+# /.well-known/apple-app-site-association and /.well-known/assetlinks.json
+# — see ``core.views_well_known``. Defaults are obvious placeholders so
+# the file stays well-formed in dev; production installs MUST override
+# both via env var. MOBILE_ANDROID_SHA256 accepts a comma-separated
+# list to carry both the upload key + the Play app-signing key.
+MOBILE_TEAM_ID = env_str("MOBILE_TEAM_ID", "PLACEHOLDER_TEAM_ID")
+MOBILE_ANDROID_SHA256 = env_str("MOBILE_ANDROID_SHA256", "PLACEHOLDER_UPLOAD_KEY_SHA256")
+
 
 # Firebase configuration
 def var2file(variable):
