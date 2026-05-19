@@ -229,6 +229,10 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   // enables the Compare action; anything else disables it.
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [compareOpen, setCompareOpen] = React.useState(false);
+  // #657 — changelog panel expansion is keyed by deployment id so a
+  // multi-workload group can have multiple children open at once, and
+  // group-expansion (keyed by commitSha|env) stays orthogonal.
+  const [expandedChangelogIds, setExpandedChangelogIds] = React.useState<Set<string>>(new Set());
 
   const a = app.data?.astroliftApp;
   const allDeployments = React.useMemo(
@@ -272,6 +276,15 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
 
   const toggleSelect = React.useCallback((id: string) => {
     setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleChangelog = React.useCallback((id: string) => {
+    setExpandedChangelogIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -478,6 +491,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                   <TableHead>{t("table.status")}</TableHead>
                   <TableHead>{t("table.duration")}</TableHead>
                   <TableHead>{t("table.ci")}</TableHead>
+                  <TableHead className="w-8"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -637,73 +651,109 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
-                    </TableRow>
-                  );
-
-                  if (!isMultiple || !isOpen) return [parent];
-
-                  const children = g.items.map((d) => (
-                    <TableRow
-                      key={d.id}
-                      className="hover:bg-accent/30 bg-muted/30 cursor-pointer"
-                      onClick={() => (window.location.href = `/deployments/${d.id}`)}
-                    >
                       <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${d.imageTag ?? d.id}`}
-                          checked={selectedIds.has(d.id)}
-                          onChange={() => toggleSelect(d.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="w-6 pl-8">
-                        <StatusDot status={statusToDot[d.status]} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                        {new Date(d.startedAt ?? d.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-muted-foreground font-mono text-xs">
-                          {d.workloadSlug || "—"}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-mono text-xs">{d.imageTag || "—"}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {d.triggerKind}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DeploymentStatusPill status={d.status} />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <span className="inline-flex items-center gap-1">
-                          <ClockIcon className="size-3" />
-                          {formatDuration(d.durationSeconds)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {d.ciRunUrl ? (
-                          <a
-                            href={d.ciRunUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {d.ciProvider || "ci"}
-                            <ExternalLinkIcon className="size-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
+                        {!isMultiple && (
+                          <ChangelogToggle
+                            open={expandedChangelogIds.has(rep.id)}
+                            onToggle={() => toggleChangelog(rep.id)}
+                          />
                         )}
                       </TableCell>
                     </TableRow>
-                  ));
+                  );
 
-                  return [parent, ...children];
+                  const rows: React.ReactNode[] = [parent];
+                  if (!isMultiple && expandedChangelogIds.has(rep.id)) {
+                    rows.push(
+                      <ChangelogPanelRow
+                        key={`cl-${rep.id}`}
+                        deployment={rep}
+                        repoFullName={a.sourceRepo}
+                      />
+                    );
+                  }
+
+                  if (!isMultiple || !isOpen) return rows;
+
+                  const children = g.items.flatMap((d) => {
+                    const row = (
+                      <TableRow
+                        key={d.id}
+                        className="hover:bg-accent/30 bg-muted/30 cursor-pointer"
+                        onClick={() => (window.location.href = `/deployments/${d.id}`)}
+                      >
+                        <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${d.imageTag ?? d.id}`}
+                            checked={selectedIds.has(d.id)}
+                            onChange={() => toggleSelect(d.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="w-6 pl-8">
+                          <StatusDot status={statusToDot[d.status]} />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                          {new Date(d.startedAt ?? d.createdAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-muted-foreground font-mono text-xs">
+                            {d.workloadSlug || "—"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-mono text-xs">{d.imageTag || "—"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {d.triggerKind}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DeploymentStatusPill status={d.status} />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          <span className="inline-flex items-center gap-1">
+                            <ClockIcon className="size-3" />
+                            {formatDuration(d.durationSeconds)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {d.ciRunUrl ? (
+                            <a
+                              href={d.ciRunUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {d.ciProvider || "ci"}
+                              <ExternalLinkIcon className="size-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                          <ChangelogToggle
+                            open={expandedChangelogIds.has(d.id)}
+                            onToggle={() => toggleChangelog(d.id)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                    if (!expandedChangelogIds.has(d.id)) return [row];
+                    return [
+                      row,
+                      <ChangelogPanelRow
+                        key={`cl-${d.id}`}
+                        deployment={d}
+                        repoFullName={a.sourceRepo}
+                      />,
+                    ];
+                  });
+
+                  return [...rows, ...children];
                 })}
               </TableBody>
             </Table>
@@ -895,4 +945,128 @@ function jsonValue(v: unknown): string {
   } catch {
     return String(v);
   }
+}
+
+// #657 — per-row changelog expander. Kept as a stop-propagation button so
+// clicking the toggle never races the row's "navigate to detail" handler.
+function ChangelogToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={open ? "Hide changelog" : "Show changelog"}
+      aria-expanded={open}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded hover:bg-accent/50"
+    >
+      {open ? (
+        <ChevronDownIcon className="size-3.5" />
+      ) : (
+        <ChevronRightIcon className="size-3.5" />
+      )}
+    </button>
+  );
+}
+
+const COMMIT_MESSAGE_MAX = 120;
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}…`;
+}
+
+// #657 — inline changelog row. Renders as a single full-width `<td colSpan>`
+// so we keep one `<tbody>` and avoid nesting `<tr>` inside another row.
+function ChangelogPanelRow({
+  deployment,
+  repoFullName,
+}: {
+  deployment: AstroliftDeployment;
+  repoFullName: string;
+}) {
+  const sha = deployment.commitSha?.slice(0, 7) || "—";
+  const message = deployment.commitMessage
+    ? truncate(deployment.commitMessage.split("\n")[0], COMMIT_MESSAGE_MAX)
+    : "";
+  const repoLabel = repoFullName || deployment.repoUrl;
+
+  return (
+    <TableRow className="bg-muted/20 hover:bg-muted/20">
+      <TableCell colSpan={10} className="p-0">
+        <div className="border-border/60 border-t px-6 py-3 text-xs">
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <GitCommitIcon className="text-muted-foreground size-3" />
+                <code className="bg-muted rounded px-1 py-0.5 font-mono">{sha}</code>
+                {message ? (
+                  <span className="break-words text-foreground">{message}</span>
+                ) : (
+                  <span className="text-muted-foreground">No commit message.</span>
+                )}
+              </div>
+              <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                {deployment.commitAuthorAvatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={deployment.commitAuthorAvatarUrl}
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="size-4 rounded-full"
+                  />
+                ) : null}
+                <span>
+                  {deployment.commitAuthor || "unknown author"}
+                  {deployment.branch ? (
+                    <>
+                      {" on branch "}
+                      <code className="font-mono">{deployment.branch}</code>
+                    </>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {deployment.prNumber > 0 && deployment.prUrl ? (
+                <a
+                  href={deployment.prUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-foreground hover:underline inline-flex items-center gap-1"
+                >
+                  PR #{deployment.prNumber}
+                  <ExternalLinkIcon className="size-3" />
+                </a>
+              ) : null}
+              {deployment.ciRunUrl ? (
+                <a
+                  href={deployment.ciRunUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  CI run
+                  <ExternalLinkIcon className="size-3" />
+                </a>
+              ) : null}
+              {deployment.repoUrl && repoLabel ? (
+                <a
+                  href={deployment.repoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  <span className="font-mono">{repoLabel}</span>
+                  <ExternalLinkIcon className="size-3" />
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }
