@@ -189,6 +189,11 @@ class CreateAlertRuleInput:
     predicate: strawberry.scalars.JSON | None = None
     notify_channels: strawberry.scalars.JSON | None = None
     is_active: bool | None = None
+    managed_service_id: GUID | None = None
+    """Optional binding to a ManagedService instance. Required for
+    per-service predicate kinds like ``ses_bounce_rate`` and
+    ``ses_complaint_rate`` so the evaluator can resolve the live
+    driver. Ignored for global / PromQL rules."""
 
 
 @strawberry.input
@@ -199,6 +204,11 @@ class UpdateAlertRuleInput:
     predicate: strawberry.scalars.JSON | None = None
     notify_channels: strawberry.scalars.JSON | None = None
     is_active: bool | None = None
+    managed_service_id: GUID | None = None
+    """Re-point the bound managed service. Pass ``null`` from the
+    client to leave the binding unchanged. The current shape doesn't
+    support *unbinding* — operators delete + recreate to remove a
+    binding (cheap; rules don't carry history)."""
 
 
 @strawberry.input
@@ -1131,6 +1141,21 @@ class OperationsMutation:
                 f"alert rule {input.name!r} already exists",
                 field="name",
             )
+        managed_service = None
+        if input.managed_service_id is not None:
+            from astrolift_services.models import ManagedService
+
+            managed_service = ManagedService.objects.filter(
+                guid=str(input.managed_service_id),
+                deleted_at__isnull=True,
+                registered_app__organization=org,
+            ).first()
+            if managed_service is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "managed service not found",
+                    field="managedServiceId",
+                )
         rule = AlertRule.objects.create(
             organization=org,
             name=input.name.strip(),
@@ -1140,6 +1165,7 @@ class OperationsMutation:
             predicate=dict(input.predicate or {}),
             notify_channels=list(input.notify_channels or []),
             is_active=(True if input.is_active is None else bool(input.is_active)),
+            managed_service=managed_service,
         )
         return gql_success(alert_rule_to_type(rule))
 
@@ -1175,6 +1201,23 @@ class OperationsMutation:
             rule.notify_channels = list(input.notify_channels)
         if input.is_active is not None:
             rule.is_active = input.is_active
+        if input.managed_service_id is not None:
+            from astrolift_services.models import ManagedService
+
+            tenant = get_current_tenant()
+            org_id = tenant.organization_id if tenant else None
+            service = ManagedService.objects.filter(
+                guid=str(input.managed_service_id),
+                deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
+            ).first()
+            if service is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    "managed service not found",
+                    field="managedServiceId",
+                )
+            rule.managed_service = service
         rule.save()
         return gql_success(alert_rule_to_type(rule))
 

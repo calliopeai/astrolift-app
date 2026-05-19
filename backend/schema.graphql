@@ -203,6 +203,7 @@ type AstroliftAlertRule {
   createdAt: DateTime!
   updatedAt: DateTime!
   activeMute: AstroliftAlertMute
+  managedServiceId: GUID
 }
 
 type AstroliftAlertRuleMutationResult {
@@ -2884,6 +2885,7 @@ input CreateAlertRuleInput {
   predicate: JSON = null
   notifyChannels: JSON = null
   isActive: Boolean = null
+  managedServiceId: GUID = null
 }
 
 input CreateApiTokenInput {
@@ -4532,6 +4534,7 @@ input UpdateAlertRuleInput {
   predicate: JSON = null
   notifyChannels: JSON = null
   isActive: Boolean = null
+  managedServiceId: GUID = null
 }
 
 input UpdateAppInput {
