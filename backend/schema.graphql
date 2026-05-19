@@ -61,6 +61,12 @@ input ApproveSecretChangeInput {
   reason: String = null
 }
 
+enum AppsListSortKey {
+  CREATED_DESC
+  DEPLOYED_DESC
+  NAME_ASC
+}
+
 type Appsecretmetadatapayload {
   appSlug: String!
   key: String!
@@ -1893,6 +1899,7 @@ type AstroliftRegisteredApp {
   settingsLastModified: AstroliftAppSettingsLastModified
   viewerPermissions: [String!]!
   activePreviewCount: Int!
+  retentionPolicies: [AstroliftRetentionPolicy!]!
 }
 
 type AstroliftRegisteredAppMutationResult {
@@ -1905,6 +1912,30 @@ type AstroliftRegisteredAppPage {
   items: [AstroliftRegisteredApp!]!
   nextCursor: String
   totalCount: Int!
+}
+
+type AstroliftReleaseNotes {
+  baseSha: String!
+  headSha: String!
+  commits: [AstroliftReleaseNotesCommit!]!
+  pullRequests: [AstroliftReleaseNotesPR!]!
+  compareUrl: String!
+}
+
+type AstroliftReleaseNotesCommit {
+  sha: String!
+  subject: String!
+  author: String!
+  isMerge: Boolean!
+}
+
+type AstroliftReleaseNotesPR {
+  number: Int!
+  title: String!
+  body: String!
+  author: String!
+  mergedAt: String
+  prUrl: String!
 }
 
 type AstroliftRemoteRepo {
@@ -1938,6 +1969,20 @@ type AstroliftRenderedManifest {
   errorPath: String
   errorLine: Int
   errorColumn: Int
+}
+
+type AstroliftRetentionPolicy {
+  id: GUID!
+  signal: String!
+  retentionDays: Int!
+  registeredAppSlug: String!
+  createdAt: DateTime!
+}
+
+type AstroliftRetentionPolicyMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftRetentionPolicy
 }
 
 type AstroliftRevealedSecret {
@@ -3363,6 +3408,7 @@ type Mutation {
   updateAstroliftSecurityPolicy(input: UpdateSecurityPolicyInput!): AstroliftRegisteredAppMutationResult!
   pauseAstroliftAppWebhookDeploys(input: PauseAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
   resumeAstroliftAppWebhookDeploys(input: ResumeAppWebhookDeploysInput!): AstroliftRegisteredAppMutationResult!
+  setRetentionPolicy(input: SetRetentionPolicyInput!): AstroliftRetentionPolicyMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -3765,9 +3811,9 @@ type Query {
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]!
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
-  astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
+  astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
   astroliftMyApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
-  astroliftMyAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
+  astroliftMyAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50): AstroliftRegisteredAppPage!
   astroliftApp(slug: String!, includeDrift: Boolean! = false): AstroliftRegisteredApp
   astroliftAppTeamAccesses(appSlug: String!): [AstroliftAppTeamAccess!]!
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]!
@@ -3781,6 +3827,7 @@ type Query {
   astroliftDeployments(appSlug: String = null, environmentName: String = null, limit: Int! = 50): [AstroliftDeployment!]!
   astroliftDeployment(id: String!): AstroliftDeployment
   astroliftDeploymentApprovalHistory(deploymentId: String!): [AstroliftDeploymentApprovalHistoryEntry!]!
+  astroliftDeploymentReleaseNotes(deploymentId: String!): AstroliftReleaseNotes
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
   astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]!
   astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]!
@@ -4109,6 +4156,12 @@ input SetNotificationPreferenceInput {
   channel: String!
   eventKind: String!
   enabled: Boolean!
+}
+
+input SetRetentionPolicyInput {
+  appSlug: String!
+  signal: String!
+  retentionDays: Int!
 }
 
 type SharedDirectoryType {

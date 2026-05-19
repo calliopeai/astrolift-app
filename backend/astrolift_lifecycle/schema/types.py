@@ -12,6 +12,61 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftReleaseNotesCommit")
+class ReleaseNotesCommitType:
+    sha: str
+    subject: str
+    author: str
+    is_merge: bool
+
+
+@strawberry.type(name="AstroliftReleaseNotesPR")
+class ReleaseNotesPRType:
+    number: int
+    title: str
+    body: str
+    author: str
+    merged_at: str | None
+    pr_url: str
+
+
+@strawberry.type(name="AstroliftReleaseNotes")
+class ReleaseNotesType:
+    base_sha: str
+    head_sha: str
+    commits: list[ReleaseNotesCommitType]
+    pull_requests: list[ReleaseNotesPRType]
+    compare_url: str
+
+
+def release_notes_to_type(rn) -> ReleaseNotesType:
+    return ReleaseNotesType(
+        base_sha=rn.base_sha,
+        head_sha=rn.head_sha,
+        commits=[
+            ReleaseNotesCommitType(
+                sha=c.sha,
+                subject=c.subject,
+                author=c.author,
+                is_merge=c.is_merge,
+            )
+            for c in rn.commits
+        ],
+        pull_requests=[
+            ReleaseNotesPRType(
+                number=p.number,
+                title=p.title,
+                body=p.body,
+                author=p.author,
+                merged_at=p.merged_at,
+                pr_url=p.pr_url,
+            )
+            for p in rn.pull_requests
+        ],
+        compare_url=rn.compare_url,
+    )
+
+
 @strawberry.type(name="AstroliftAppEnvironment")
 class AppEnvironmentType:
     id: GUID

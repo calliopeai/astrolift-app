@@ -306,6 +306,27 @@ export const RESUME_APP_WEBHOOK_DEPLOYS = gql`
  * button on the Settings landing (#386). Non-destructive on staged
  * drafts; surfaces a one-line summary in the success toast.
  */
+/**
+ * Set (create-or-update) per-signal retention for an app (#742).
+ */
+export const SET_RETENTION_POLICY = gql`
+  mutation SetRetentionPolicy($input: SetRetentionPolicyInput!) {
+    setRetentionPolicy(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        signal
+        retentionDays
+      }
+    }
+  }
+`;
+
 export const RESYNC_MANIFEST_FROM_REPO = gql`
   mutation ResyncAstroliftManifestFromRepo($input: ResyncManifestFromRepoInput!) {
     resyncAstroliftManifestFromRepo(input: $input) {

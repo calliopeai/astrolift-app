@@ -86,6 +86,11 @@ export type ApproveSecretChangeInput = {
   reason: InputMaybe<Scalars['String']['input']>;
 };
 
+export type AppsListSortKey =
+  | 'CREATED_DESC'
+  | 'DEPLOYED_DESC'
+  | 'NAME_ASC';
+
 export type Appsecretmetadatapayload = {
   appSlug: Scalars['String']['output'];
   environmentName: Scalars['String']['output'];
@@ -1896,6 +1901,7 @@ export type AstroliftRegisteredApp = {
   registryRepoUri: Scalars['String']['output'];
   reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
+  retentionPolicies: Array<AstroliftRetentionPolicy>;
   securityPolicy: AstroliftSecurityPolicy;
   settingsLastModified?: Maybe<AstroliftAppSettingsLastModified>;
   slug: Scalars['String']['output'];
@@ -1929,6 +1935,30 @@ export type AstroliftRegisteredAppPage = {
   totalCount: Scalars['Int']['output'];
 };
 
+export type AstroliftReleaseNotes = {
+  baseSha: Scalars['String']['output'];
+  commits: Array<AstroliftReleaseNotesCommit>;
+  compareUrl: Scalars['String']['output'];
+  headSha: Scalars['String']['output'];
+  pullRequests: Array<AstroliftReleaseNotesPr>;
+};
+
+export type AstroliftReleaseNotesCommit = {
+  author: Scalars['String']['output'];
+  isMerge: Scalars['Boolean']['output'];
+  sha: Scalars['String']['output'];
+  subject: Scalars['String']['output'];
+};
+
+export type AstroliftReleaseNotesPr = {
+  author: Scalars['String']['output'];
+  body: Scalars['String']['output'];
+  mergedAt?: Maybe<Scalars['String']['output']>;
+  number: Scalars['Int']['output'];
+  prUrl: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
 export type AstroliftRemoteRepo = {
   cloneUrlHttps: Scalars['String']['output'];
   cloneUrlSsh: Scalars['String']['output'];
@@ -1960,6 +1990,20 @@ export type AstroliftRenderedManifest = {
   imageTag: Scalars['String']['output'];
   namespace: Scalars['String']['output'];
   resources: Scalars['JSON']['output'];
+};
+
+export type AstroliftRetentionPolicy = {
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  registeredAppSlug: Scalars['String']['output'];
+  retentionDays: Scalars['Int']['output'];
+  signal: Scalars['String']['output'];
+};
+
+export type AstroliftRetentionPolicyMutationResult = {
+  data?: Maybe<AstroliftRetentionPolicy>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftRevealedSecret = {
@@ -3382,6 +3426,7 @@ export type Mutation = {
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
+  setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   /** Cancel a sign request. Requires SIGNREQUEST_CHANGE_CANCEL permission. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Requires SIGNREQUEST_CHANGE_SIGN permission and an active PIN transaction. Status must be SIGN_REQUIRED. */
@@ -4249,6 +4294,11 @@ export type MutationSetNotificationPreferenceArgs = {
 };
 
 
+export type MutationSetRetentionPolicyArgs = {
+  input: SetRetentionPolicyInput;
+};
+
+
 export type MutationSignRequestCancelArgs = {
   gid: Scalars['String']['input'];
   note: Scalars['String']['input'];
@@ -4781,6 +4831,7 @@ export type Query = {
   astroliftDeploymentApprovalHistory: Array<AstroliftDeploymentApprovalHistoryEntry>;
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
+  astroliftDeploymentReleaseNotes?: Maybe<AstroliftReleaseNotes>;
   astroliftDeployments: Array<AstroliftDeployment>;
   astroliftElevationStatus: AstroliftElevationStatus;
   astroliftEmailServiceDetail?: Maybe<AstroliftEmailServiceDetail>;
@@ -5028,6 +5079,7 @@ export type QueryAstroliftAppsPageArgs = {
   limit?: Scalars['Int']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: AppsListSortKey;
   sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
   status?: InputMaybe<AstroliftAppListStatusFilter>;
   teamSlug?: InputMaybe<Scalars['String']['input']>;
@@ -5136,6 +5188,11 @@ export type QueryAstroliftDeploymentMetricsArgs = {
 };
 
 
+export type QueryAstroliftDeploymentReleaseNotesArgs = {
+  deploymentId: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftDeploymentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -5216,6 +5273,7 @@ export type QueryAstroliftMyAppsPageArgs = {
   limit?: Scalars['Int']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: AppsListSortKey;
   sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
   status?: InputMaybe<AstroliftAppListStatusFilter>;
   teamSlug?: InputMaybe<Scalars['String']['input']>;
@@ -5733,6 +5791,12 @@ export type SetNotificationPreferenceInput = {
   channel: Scalars['String']['input'];
   enabled: Scalars['Boolean']['input'];
   eventKind: Scalars['String']['input'];
+};
+
+export type SetRetentionPolicyInput = {
+  appSlug: Scalars['String']['input'];
+  retentionDays: Scalars['Int']['input'];
+  signal: Scalars['String']['input'];
 };
 
 export type SharedDirectoryType = {

@@ -83,9 +83,14 @@ import {
   PAUSE_APP_WEBHOOK_DEPLOYS,
   RESUME_APP_WEBHOOK_DEPLOYS,
   RESYNC_MANIFEST_FROM_REPO,
+  SET_RETENTION_POLICY,
 } from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
-import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
+import type {
+  AstroliftRegisteredApp,
+  AstroliftRetentionPolicy,
+  AstroliftWorkload,
+} from "@/graphql/registry/registry.types";
 import { formatRelativeAge } from "@/lib/format";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -278,6 +283,8 @@ export function SettingsClient({ slug }: { slug: string }) {
       <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />
 
       <ManagedServicesSummaryCard appSlug={a.slug} />
+
+      <RetentionPolicySection appSlug={a.slug} policies={a.retentionPolicies ?? []} />
 
       {/* Inline deploy-strategy badge + edit affordance (#400). Replaces
           the link-card to /config for the strategy itself — the manifest
@@ -1766,5 +1773,108 @@ function RunScheduledJobCard({ appSlug }: { appSlug: string }) {
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── retention policy ─────────────────────────────────────────────────────────
+
+const RETENTION_SIGNALS: { signal: string; label: string }[] = [
+  { signal: "logs", label: "Logs" },
+  { signal: "metrics", label: "Metrics" },
+  { signal: "traces", label: "Traces" },
+  { signal: "audit_events", label: "Audit Events" },
+];
+
+interface SetRetentionResp {
+  setRetentionPolicy: MutationResult<AstroliftRetentionPolicy>;
+}
+
+function RetentionPolicySection({
+  appSlug,
+  policies,
+}: {
+  appSlug: string;
+  policies: AstroliftRetentionPolicy[];
+}) {
+  const policyMap = Object.fromEntries(policies.map((p) => [p.signal, p.retentionDays]));
+  const [days, setDays] = React.useState<Record<string, string>>(() =>
+    Object.fromEntries(RETENTION_SIGNALS.map(({ signal }) => [signal, String(policyMap[signal] ?? "")]))
+  );
+  const [saving, setSaving] = React.useState<Record<string, boolean>>({});
+
+  const [setRetention] = useMutation<SetRetentionResp>(SET_RETENTION_POLICY, {
+    refetchQueries: [{ query: GET_APP, variables: { slug: appSlug } }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleSave(signal: string) {
+    const raw = days[signal]?.trim();
+    const n = parseInt(raw ?? "", 10);
+    if (!raw || isNaN(n) || n < 1) {
+      toast.error(`Retention days must be a positive integer (${signal}).`);
+      return;
+    }
+    setSaving((s) => ({ ...s, [signal]: true }));
+    try {
+      const { data } = await setRetention({
+        variables: { input: { appSlug, signal, retentionDays: n } },
+      });
+      const env = data?.setRetentionPolicy;
+      if (!env) {
+        toast.error("No response from server.");
+        return;
+      }
+      if (!env.ok) {
+        toast.error(env.errors?.[0]?.message ?? "Failed to save retention policy.");
+        return;
+      }
+      toast.success(`${RETENTION_SIGNALS.find((s) => s.signal === signal)?.label ?? signal} retention set to ${n} days.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save retention policy.");
+    } finally {
+      setSaving((s) => ({ ...s, [signal]: false }));
+    }
+  }
+
+  return (
+    <section className="rounded-lg border p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <DatabaseIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+        <div>
+          <h2 className="text-base font-semibold">Data retention</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            How long observability data is kept per signal type. Leave blank to use the platform
+            default.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        {RETENTION_SIGNALS.map(({ signal, label }) => (
+          <div key={signal} className="flex items-center gap-3">
+            <Label className="w-28 shrink-0 text-sm">{label}</Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Platform default"
+              value={days[signal] ?? ""}
+              onChange={(e) => setDays((d) => ({ ...d, [signal]: e.target.value }))}
+              className="w-36"
+            />
+            <span className="text-muted-foreground text-xs">days</span>
+            <Can permission="app.update">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving[signal]}
+                onClick={() => handleSave(signal)}
+              >
+                {saving[signal] ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
+                Save
+              </Button>
+            </Can>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
