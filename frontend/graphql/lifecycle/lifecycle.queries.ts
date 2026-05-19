@@ -47,7 +47,10 @@ export const LIST_DEPLOYMENTS = gql`
       commitSha
       commitMessage
       commitAuthor
+      commitAuthorAvatarUrl
       branch
+      prNumber
+      prUrl
       ciActorKind
       ciProvider
       ciRunUrl

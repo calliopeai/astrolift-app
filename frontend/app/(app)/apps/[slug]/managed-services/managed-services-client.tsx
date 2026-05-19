@@ -19,6 +19,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -103,6 +109,117 @@ const STATUS_DOT: Record<string, "ok" | "warn" | "error" | "pending" | "muted"> 
 };
 
 const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
+
+// #663 — kind-specific validation surface. The badges flag the "is this
+// service actually safe / configured" facts that aren't already visible
+// from the lifecycle status alone (e.g. an `active` SES service can still
+// be sending un-DKIMed email; an `active` S3 bucket can be wide-open).
+//
+// Missing config keys render nothing — the JSON is sparse and we want the
+// row to stay quiet rather than nag with "not configured" when the driver
+// hasn't yet populated the field.
+
+const GREEN_BADGE = "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+const AMBER_BADGE = "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
+const RED_BADGE = "border-destructive/40 bg-destructive/15 text-destructive";
+
+function ValidationBadges({ service }: { service: ManagedService }) {
+  const cfg = service.config ?? {};
+  const items: React.ReactNode[] = [];
+
+  switch (service.kind) {
+    case "ses_email": {
+      if ("dkim_verified" in cfg) {
+        const verified = cfg.dkim_verified === true;
+        items.push(
+          <Badge
+            key="dkim"
+            variant="outline"
+            className={verified ? GREEN_BADGE : AMBER_BADGE}
+          >
+            {verified ? "DKIM verified" : "DKIM pending"}
+          </Badge>,
+        );
+      } else {
+        items.push(
+          <Badge key="dkim" variant="outline" className={AMBER_BADGE}>
+            DKIM pending
+          </Badge>,
+        );
+      }
+      if (typeof cfg.domain_status === "string" && cfg.domain_status) {
+        items.push(
+          <Badge key="domain" variant="outline" className="capitalize">
+            {cfg.domain_status.replace(/_/g, " ")}
+          </Badge>,
+        );
+      }
+      break;
+    }
+    case "rds_postgres":
+    case "aurora_serverless": {
+      if ("backup_enabled" in cfg) {
+        const enabled = cfg.backup_enabled === true;
+        items.push(
+          <Badge
+            key="backup"
+            variant="outline"
+            className={enabled ? GREEN_BADGE : AMBER_BADGE}
+          >
+            {enabled ? "Backups enabled" : "No backup policy"}
+          </Badge>,
+        );
+      }
+      if (typeof cfg.snapshot_policy === "string" && cfg.snapshot_policy) {
+        items.push(
+          <Badge key="snap" variant="outline" className="font-mono text-[10px]">
+            {cfg.snapshot_policy}
+          </Badge>,
+        );
+      }
+      break;
+    }
+    case "s3_bucket": {
+      if ("public_access_blocked" in cfg) {
+        const blocked = cfg.public_access_blocked === true;
+        items.push(
+          <Badge
+            key="public"
+            variant="outline"
+            className={blocked ? GREEN_BADGE : RED_BADGE}
+          >
+            {blocked ? "Public access blocked" : "Public access open"}
+          </Badge>,
+        );
+      }
+      break;
+    }
+  }
+
+  // statusError applies to every kind; surface even when the kind block
+  // above produced no badges so the operator still sees the failure.
+  if (service.statusError) {
+    items.push(
+      <TooltipProvider key="err-prov">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className={`${RED_BADGE} cursor-help`}>
+              Error
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-sm">
+            <span className="break-words font-mono text-[11px]">
+              {service.statusError}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>,
+    );
+  }
+
+  if (items.length === 0) return null;
+  return <>{items}</>;
+}
 
 export function ManagedServicesClient({ slug }: { slug: string }) {
   const [open, setOpen] = React.useState(false);
@@ -260,7 +377,12 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                           {s.environmentName}
                         </Badge>
                       </TableCell>
-                      <TableCell className="capitalize">{s.status}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="capitalize">{s.status}</span>
+                          <ValidationBadges service={s} />
+                        </div>
+                      </TableCell>
                       <TableCell
                         className="flex justify-end gap-1 text-right"
                         // Stop propagation so action-buttons in this cell
