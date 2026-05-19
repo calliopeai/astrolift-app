@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -176,6 +177,12 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="cache_redis",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
@@ -264,6 +271,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             message=(f"cache {cache_name} provisioning " f"(keys in key vault {self._config.keyvault_url})"),
         )
 
+    @driver_op(cloud="azure", driver="cache_redis")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         cache_name = self._cache_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -316,6 +324,12 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             message=f"cache {cache_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="cache_redis",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -413,6 +427,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="cache_redis")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         cache_name = self._cache_name_from_handle(handle.handle)
         existing = self._describe(cache_name)
@@ -432,6 +447,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="cache_redis")
     def binding(self, handle: ServiceHandle) -> Binding:
         cache_name = self._cache_name_from_handle(handle.handle)
         existing = self._describe(cache_name)
@@ -486,6 +502,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="cache_redis")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -512,6 +529,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="cache_redis")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -542,6 +560,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             message=f"restore from {snapshot.snapshot_id} queued",
         )
 
+    @driver_op(cloud="azure", driver="cache_redis", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -562,6 +581,7 @@ class AzureCacheRedisDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="cache_redis", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

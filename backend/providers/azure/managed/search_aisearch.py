@@ -30,6 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -164,6 +165,12 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="search_aisearch",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
@@ -266,6 +273,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="search_aisearch")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         service_name = self._service_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -312,6 +320,12 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             message=f"search service {service_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="search_aisearch",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -389,6 +403,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="search_aisearch")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         service_name = self._service_name_from_handle(handle.handle)
         existing = self._describe(service_name)
@@ -407,6 +422,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="search_aisearch")
     def binding(self, handle: ServiceHandle) -> Binding:
         service_name = self._service_name_from_handle(handle.handle)
         existing = self._describe(service_name)
@@ -473,6 +489,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="search_aisearch")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         # Azure AI Search has no built-in snapshot primitive at the
         # service level; index snapshots are managed in-app via
@@ -495,6 +512,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="search_aisearch")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -512,6 +530,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="search_aisearch", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -546,6 +565,7 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="search_aisearch", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

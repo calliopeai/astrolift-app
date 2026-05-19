@@ -36,6 +36,7 @@ import string
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -198,6 +199,12 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="postgres_flexible",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
@@ -309,6 +316,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="postgres_flexible")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         server_name = self._server_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -373,6 +381,12 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             message=f"flexible server {server_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="postgres_flexible",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -490,6 +504,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="postgres_flexible")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         server_name = self._server_name_from_handle(handle.handle)
         existing = self._describe(server_name)
@@ -509,6 +524,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="postgres_flexible")
     def binding(self, handle: ServiceHandle) -> Binding:
         server_name = self._server_name_from_handle(handle.handle)
         existing = self._describe(server_name)
@@ -557,6 +573,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="postgres_flexible")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -578,6 +595,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="postgres_flexible")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -620,6 +638,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             message=(f"restore from backup {snapshot.snapshot_id} queued"),
         )
 
+    @driver_op(cloud="azure", driver="postgres_flexible", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -650,6 +669,7 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="postgres_flexible", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
