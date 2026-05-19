@@ -972,6 +972,129 @@ async def mark_running(deployment_id: int) -> None:
     d.transition_to(Deployment.Status.RUNNING)
 
 
+# ---- Preview lifecycle (build + teardown) -------------------------
+
+
+def _mark_preview_building_sync(preview_environment_id: int) -> None:
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    p = PreviewEnvironment.objects.get(pk=preview_environment_id)
+    if p.status in (
+        PreviewEnvironment.Status.RUNNING,
+        PreviewEnvironment.Status.FAILED,
+    ):
+        p.status = PreviewEnvironment.Status.BUILDING
+        p.save(update_fields=["status", "updated_at", "version"])
+
+
+@activity.defn(name="astrolift.preview.mark_building")
+async def mark_preview_building(preview_environment_id: int) -> None:
+    """Flip PreviewEnvironment to BUILDING.
+
+    Idempotent — already-BUILDING rows are left untouched; RUNNING/FAILED
+    rows re-enter BUILDING so a re-trigger doesn't get stuck in a
+    terminal state.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_preview_building_sync)(preview_environment_id)
+
+
+def _mark_preview_running_sync(preview_environment_id: int) -> None:
+    from django.utils import timezone
+
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    p = PreviewEnvironment.objects.get(pk=preview_environment_id)
+    p.status = PreviewEnvironment.Status.RUNNING
+    p.last_deployed_at = timezone.now()
+    p.save(update_fields=["status", "last_deployed_at", "updated_at", "version"])
+
+
+@activity.defn(name="astrolift.preview.mark_running")
+async def mark_preview_running(preview_environment_id: int) -> None:
+    """Flip PreviewEnvironment to RUNNING and stamp last_deployed_at."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_preview_running_sync)(preview_environment_id)
+
+
+def _mark_preview_failed_sync(preview_environment_id: int, reason: str) -> None:
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    p = PreviewEnvironment.objects.get(pk=preview_environment_id)
+    p.status = PreviewEnvironment.Status.FAILED
+    p.save(update_fields=["status", "updated_at", "version"])
+    log.warning(
+        "mark_preview_failed preview_environment_id=%s reason=%s",
+        preview_environment_id,
+        reason,
+    )
+
+
+@activity.defn(name="astrolift.preview.mark_failed")
+async def mark_preview_failed(preview_environment_id: int, reason: str = "") -> None:
+    """Flip PreviewEnvironment to FAILED."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_preview_failed_sync)(preview_environment_id, reason)
+
+
+def _provision_preview_namespace_sync(preview_environment_id: int) -> str:
+    """Ensure the preview env's dedicated namespace exists on its cluster.
+
+    The namespace name is stored in ``PreviewEnvironment.namespace`` at
+    row-creation time.  Using the stored name (rather than re-computing it
+    here) keeps the workflow idempotent across retries even if the naming
+    convention changes in flight.
+    """
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from core.app_deploy import AppDeployError
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    p = PreviewEnvironment.objects.select_related(
+        "app_environment__tenant_cluster__provider_plugin",
+        "registered_app__organization",
+    ).get(pk=preview_environment_id)
+    cluster = p.app_environment.tenant_cluster
+    if cluster is None:
+        raise AppDeployError(
+            f"preview {p.pk} env has no tenant_cluster bound — cannot provision namespace",
+        )
+    driver = _driver_for_cluster(cluster)
+    ctx = _context_for_cluster(cluster)
+    labels = {
+        "astrolift-managed": "true",
+        "app-slug": p.registered_app.slug,
+        "preview-pr": str(p.pr_number),
+    }
+    driver.ensure_namespace(ctx.slug, p.namespace, labels, {})
+    return p.namespace
+
+
+@activity.defn(name="astrolift.preview.provision_namespace")
+async def provision_preview_namespace(preview_environment_id: int) -> str:
+    """Ensure the preview environment's Kubernetes namespace exists.
+
+    Idempotent — ``driver.ensure_namespace`` is a server-side apply, so
+    running this on a pre-existing namespace is safe and a no-op from the
+    cluster's perspective.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    namespace = await sync_to_async(_provision_preview_namespace_sync)(preview_environment_id)
+    log.info(
+        "provision_preview_namespace namespace=%s",
+        namespace,
+        extra={"preview_environment_id": preview_environment_id},
+    )
+    return namespace
+
+
 # ---- Preview teardown (Phase 3) -----------------------------------
 
 

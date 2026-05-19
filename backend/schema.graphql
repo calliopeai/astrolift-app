@@ -1799,6 +1799,7 @@ type AstroliftPreviewEnvironment {
   id: GUID!
   registeredAppSlug: String!
   prNumber: Int!
+  isManual: Boolean!
   branch: String!
   commitSha: String!
   status: String!
@@ -2894,6 +2895,12 @@ input CreatePolicyInput {
   actorPattern: JSON = null
 }
 
+input CreatePreviewEnvironmentInput {
+  appSlug: String!
+  branch: String!
+  environmentName: String! = ""
+}
+
 input CreateProjectInput {
   teamId: GUID!
   name: String!
@@ -3596,6 +3603,7 @@ type Mutation {
   resumeAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   tearDownPreview(input: TearDownPreviewInputGql!): AstroliftDeploymentMutationResult!
   extendPreviewTtl(input: ExtendPreviewTtlInputGql!): AstroliftPreviewEnvironmentMutationResult!
+  createPreviewEnvironment(input: CreatePreviewEnvironmentInput!): AstroliftPreviewEnvironmentMutationResult!
   migrateAppToCluster(input: MigrateAppInputGql!): AstroliftAppEnvironmentMutationResult!
   addAppDomain(input: AddAppDomainInput!): AstroliftAppDomainMutationResult!
   removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!

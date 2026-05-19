@@ -12,6 +12,7 @@ sequence is the contract — bodies fill in.
 from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
+from astrolift_workflows.workflows.build_preview import BuildPreviewWorkflow
 from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflow
 from astrolift_workflows.workflows.decommission_cluster import (
     DecommissionClusterWorkflow,
@@ -51,6 +52,7 @@ from astrolift_workflows.workflows.validate_custom_domain import (
 
 __all__ = [
     "BringClusterIntoManagementWorkflow",
+    "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
     "CronDeployTickWorkflow",
     "DecommissionClusterWorkflow",

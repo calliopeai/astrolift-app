@@ -102,6 +102,19 @@ class DeprovisionManagedServiceInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class BuildPreviewInput:
+    """Input for ``BuildPreviewWorkflow`` (#751).
+
+    Dispatched by the ``createPreviewEnvironment`` mutation when an
+    operator manually triggers a preview build from the UI, and by the
+    GitHub PR webhook handler on opened / synchronize events.
+    """
+
+    preview_environment_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class TearDownPreviewInput:
     preview_environment_id: int
     actor: Actor
