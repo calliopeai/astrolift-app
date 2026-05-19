@@ -2936,6 +2936,74 @@ class LifecycleMutation:
         )
 
     # ----------------------------------------------------------------
+    # CI secrets validate (#693): read-only probe of the app's source
+    # repo Actions secrets, reporting which of the canonical five are
+    # set + whether they look 'current' relative to the platform's last
+    # push.
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="app.ci.validate_secrets")
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def validate_astrolift_ci_secrets(
+        self,
+        info: Info,
+        input: ValidateAstroliftCiSecretsInput,
+    ) -> MutationResultType[ValidateAstroliftCiSecretsPayload]:
+        """Probe the app's source repo for the five Astrolift CI secrets
+        (#693).
+
+        Read-only — never writes; permission gate is ``app.read`` because
+        an operator who can see the app should be allowed to verify the
+        CI setup is healthy, even if they couldn't push it.  Auth is the
+        viewer's personal GitHub OAuth connection (per #395) — same
+        scoping as the push side so the validate call doesn't surface
+        secrets visible only to an org-level PAT.
+
+        Surfaces non-GitHub source kinds + missing connections through
+        the same PRECONDITION envelope shape the push side returns;
+        ``UNSUPPORTED_SOURCE`` is the explicit code for non-GitHub.
+        """
+        from astrolift_scm.services.secrets import validate_astrolift_ci_secrets
+
+        app = (
+            RegisteredApp.objects.filter(slug=input.app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {input.app_slug!r} not found",
+                field="appSlug",
+            )
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+
+        result = validate_astrolift_ci_secrets(app, viewer_user=viewer)
+        if not result.ok:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                result.error_message or "validate failed",
+            )
+        return gql_success(
+            ValidateAstroliftCiSecretsPayload(
+                repo=app.source_repo,
+                results=[
+                    CiSecretValidationType(
+                        secret_name=r.secret_name,
+                        is_set=r.is_set,
+                        is_current=r.is_current,
+                        updated_at=r.updated_at,
+                    )
+                    for r in result.results
+                ],
+            ),
+        )
+
+    # ----------------------------------------------------------------
     # CI workflow push (#384): render the canonical
     # ``.github/workflows/astrolift-ci.yml`` for the app and commit
     # it to the deploy branch. Pairs with the secrets push (#383) so
@@ -3695,3 +3763,52 @@ class CancelDeregisterPayload:
 
     workflow_id: str
     signal_delivered: bool
+
+
+# ---------------------------------------------------------------------------
+# #693 input / payload types — validate the five Astrolift CI secrets on
+# the app's source repo.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class ValidateAstroliftCiSecretsInput:
+    """Probe the app's source repo's Actions secrets and report which of
+    the five canonical Astrolift names are set (#693).
+
+    Slug rather than guid for parity with ``pushAstroliftCiSecretsToRepo``."""
+
+    app_slug: str
+
+
+@strawberry.type(name="AstroliftCiSecretValidation")
+class CiSecretValidationType:
+    """One row of the validate-CI-secrets report (#693).
+
+    The FE renders one chip per row — green check on ``isSet=True &&
+    isCurrent in (True, None)``, amber on ``isSet=True && isCurrent=False``
+    (set but stale), red X on ``isSet=False``.
+
+    ``updatedAt`` is the GitHub-provided ISO-8601 timestamp; the FE
+    formats it as 'updated 2 days ago' next to the chip."""
+
+    secret_name: str
+    is_set: bool
+    is_current: bool | None
+    """None means 'unknown' — the platform has either never pushed
+    secrets to this repo (no baseline to compare) or GitHub returned
+    no usable updated_at on the row.  FE renders these as a green
+    check with no freshness annotation."""
+
+    updated_at: str
+
+
+@strawberry.type(name="AstroliftValidateCiSecretsPayload")
+class ValidateAstroliftCiSecretsPayload:
+    """Read-back for ``validateAstroliftCiSecrets`` (#693).
+
+    ``repo`` is the ``owner/name`` of the target repo, mirroring the
+    push payload for the FE's repo-label affordance."""
+
+    repo: str
+    results: list[CiSecretValidationType]

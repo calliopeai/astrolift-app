@@ -708,6 +708,13 @@ type AstroliftCapabilityDeprovisionPayloadMutationResult {
   data: AstroliftCapabilityDeprovisionPayload
 }
 
+type AstroliftCiSecretValidation {
+  secretName: String!
+  isSet: Boolean!
+  isCurrent: Boolean
+  updatedAt: String!
+}
+
 type AstroliftClusterBootstrapComponent {
   key: String!
   title: String!
@@ -2304,6 +2311,17 @@ type AstroliftUser {
   isActive: Boolean!
 }
 
+type AstroliftValidateCiSecretsPayload {
+  repo: String!
+  results: [AstroliftCiSecretValidation!]!
+}
+
+type AstroliftValidateCiSecretsPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftValidateCiSecretsPayload
+}
+
 type AstroliftWebhookDelivery {
   id: GUID!
   subscriptionId: GUID!
@@ -3397,6 +3415,7 @@ type Mutation {
   scaleAstroliftWorkload(input: ScaleWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
   installAstroliftSourceWebhook(input: InstallSourceWebhookInput!): AstroliftInstallSourceWebhookPayloadMutationResult!
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
+  validateAstroliftCiSecrets(input: ValidateAstroliftCiSecretsInput!): AstroliftValidateCiSecretsPayloadMutationResult!
   pushAstroliftCiWorkflowToRepo(input: PushCiWorkflowToRepoInput!): AstroliftPushCiWorkflowPayloadMutationResult!
   deregisterAstroliftApp(input: DeregisterAppInput!): AstroliftDeregisterAppPayloadMutationResult!
   cancelAstroliftDeregister(input: CancelDeregisterInput!): AstroliftCancelDeregisterPayloadMutationResult!
@@ -4382,6 +4401,10 @@ type UserType {
   memberships: [JSON!]!
   username: String!
   employeeId: String
+}
+
+input ValidateAstroliftCiSecretsInput {
+  appSlug: String!
 }
 
 """A field-level validation error."""
