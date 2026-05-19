@@ -40,14 +40,17 @@ from _sdk import (
     DnsAuthStatus,
     DnsCheckOutcome,
     EmailObservabilityDriver,
+    EmailTemplate,
     IdentityVerification,
     SendQuota,
     SendStatPoint,
     SuppressionEntry,
     SuppressionReason,
+    TemplateSendStatPoint,
     driver_op,
 )
 from _sdk._dns_probe import DnsResolveError, lookup_txt
+from aws.managed._base import ManagedServiceError
 
 if TYPE_CHECKING:
     from aws.managed.email_ses import SESEmailConfig
@@ -105,6 +108,7 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
         config: SESEmailConfig,
         ses_client: Any | None = None,
         sesv2_client: Any | None = None,
+        cloudwatch_client: Any | None = None,
     ) -> None:
         self._config = config
         if ses_client is not None:
@@ -119,6 +123,10 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
             import boto3
 
             self._sesv2 = boto3.client("sesv2", region_name=config.region)
+        # CloudWatch client is lazy — only required by the per-template
+        # send-statistics path (#628). Tests inject a fake; production
+        # paths share boto3's client cache by re-creating it when None.
+        self._cloudwatch = cloudwatch_client
 
     # ---- send health ------------------------------------------------
 
@@ -362,6 +370,238 @@ class AmazonSESObservabilityDriver(EmailObservabilityDriver):
                 return False
             raise
 
+    # ---- template management (#635) --------------------------------
+
+    @driver_op(driver="email", cloud="aws")
+    def list_templates(self) -> list[EmailTemplate]:
+        """Walk the SES ``list_templates`` page (capped at 100 per call)
+        and hydrate each row with its body via ``get_template``.
+
+        SES splits list/get cleanly: ``list_templates`` returns
+        ``{Name, CreatedTimestamp}`` metadata only; bodies require a
+        per-template ``get_template`` round-trip. The hydration cost
+        is bounded by the 100-row page cap and the typical operator
+        template count (<20), so the platform absorbs it inline to
+        avoid a two-call dance on the frontend. A get_template that
+        raises (template was deleted between list + get) is skipped
+        with a debug log; the rest of the page still renders.
+        """
+        response = self._ses.list_templates(MaxItems=100)
+        templates: list[EmailTemplate] = []
+        for meta in response.get("TemplatesMetadata") or []:
+            name = meta.get("Name") or ""
+            if not name:
+                continue
+            created_at = meta.get("CreatedTimestamp")
+            try:
+                detail = self._ses.get_template(TemplateName=name)
+            except Exception as exc:
+                log.debug("get_template(%s) skipped during list: %s", name, exc)
+                continue
+            tmpl = detail.get("Template") or {}
+            templates.append(
+                EmailTemplate(
+                    name=name,
+                    subject=str(tmpl.get("SubjectPart") or ""),
+                    html_body=str(tmpl.get("HtmlPart") or ""),
+                    text_body=str(tmpl.get("TextPart") or ""),
+                    created_at=created_at,
+                )
+            )
+        return templates
+
+    @driver_op(driver="email", cloud="aws")
+    def get_template(self, *, name: str) -> EmailTemplate:
+        try:
+            response = self._ses.get_template(TemplateName=name)
+        except Exception as exc:
+            if _is_template_not_found(exc):
+                raise ManagedServiceError(
+                    f"template {name!r} not found",
+                ) from exc
+            raise
+        tmpl = response.get("Template") or {}
+        return EmailTemplate(
+            name=name,
+            subject=str(tmpl.get("SubjectPart") or ""),
+            html_body=str(tmpl.get("HtmlPart") or ""),
+            text_body=str(tmpl.get("TextPart") or ""),
+        )
+
+    @driver_op(
+        driver="email",
+        cloud="aws",
+        audit=True,
+        sensitive_kind="email.template.create",
+    )
+    def create_template(
+        self,
+        *,
+        name: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+    ) -> EmailTemplate:
+        try:
+            self._ses.create_template(
+                Template={
+                    "TemplateName": name,
+                    "SubjectPart": subject,
+                    "HtmlPart": html_body,
+                    "TextPart": text_body,
+                },
+            )
+        except Exception as exc:
+            if _is_template_already_exists(exc):
+                raise ManagedServiceError(
+                    f"template {name!r} already exists",
+                ) from exc
+            raise
+        return EmailTemplate(
+            name=name,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+        )
+
+    @driver_op(
+        driver="email",
+        cloud="aws",
+        audit=True,
+        sensitive_kind="email.template.update",
+    )
+    def update_template(
+        self,
+        *,
+        name: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+    ) -> EmailTemplate:
+        try:
+            self._ses.update_template(
+                Template={
+                    "TemplateName": name,
+                    "SubjectPart": subject,
+                    "HtmlPart": html_body,
+                    "TextPart": text_body,
+                },
+            )
+        except Exception as exc:
+            if _is_template_not_found(exc):
+                raise ManagedServiceError(
+                    f"template {name!r} not found",
+                ) from exc
+            raise
+        return EmailTemplate(
+            name=name,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+        )
+
+    @driver_op(
+        driver="email",
+        cloud="aws",
+        audit=True,
+        sensitive_kind="email.template.delete",
+    )
+    def delete_template(self, *, name: str) -> bool:
+        try:
+            self._ses.delete_template(TemplateName=name)
+            return True
+        except Exception as exc:
+            if _is_template_not_found(exc):
+                return False
+            raise
+
+    @driver_op(driver="email", cloud="aws")
+    def get_template_send_statistics(
+        self,
+        *,
+        name: str,
+        days: int = 14,
+    ) -> list[TemplateSendStatPoint]:
+        """Fan four CloudWatch ``GetMetricStatistics`` calls (Send,
+        Delivery, Bounce, Complaint) against the ``ses2:TemplateName``
+        dimension and merge their datapoints on the timestamp axis.
+
+        CloudWatch returns one metric per call; the four-call dance is
+        the only first-party path to per-template counters today. SES
+        publishes these only when the configuration set has the
+        ``cloudwatch`` event destination wired and the SendTemplated*
+        path tagged the template name as a dimension; absent that we
+        return ``[]`` rather than synthesising zeros so the UI can
+        render an "no metrics yet" hint.
+        """
+        cw = self._cw_client()
+        if cw is None:
+            return []
+        # CloudWatch caps GetMetricStatistics at 1440 datapoints per
+        # call. At 15-minute granularity that's 15 days of headroom,
+        # so a 14-day default fits comfortably in one call.
+        bounded_days = max(1, min(int(days or 14), 14))
+        end = datetime.now(UTC)
+        start = end - _td_days(bounded_days)
+        try:
+            sends = _fetch_template_metric(
+                cw,
+                name=name,
+                metric="Send",
+                start=start,
+                end=end,
+            )
+            deliveries = _fetch_template_metric(
+                cw,
+                name=name,
+                metric="Delivery",
+                start=start,
+                end=end,
+            )
+            bounces = _fetch_template_metric(
+                cw,
+                name=name,
+                metric="Bounce",
+                start=start,
+                end=end,
+            )
+            complaints = _fetch_template_metric(
+                cw,
+                name=name,
+                metric="Complaint",
+                start=start,
+                end=end,
+            )
+        except Exception as exc:
+            log.debug("cloudwatch GetMetricStatistics failed: %s", exc)
+            return []
+        timestamps = sorted(set(sends) | set(deliveries) | set(bounces) | set(complaints))
+        return [
+            TemplateSendStatPoint(
+                timestamp=ts,
+                sends=sends.get(ts, 0),
+                deliveries=deliveries.get(ts, 0),
+                bounces=bounces.get(ts, 0),
+                complaints=complaints.get(ts, 0),
+            )
+            for ts in timestamps
+        ]
+
+    def _cw_client(self) -> Any | None:
+        if self._cloudwatch is not None:
+            return self._cloudwatch
+        try:
+            import boto3
+
+            self._cloudwatch = boto3.client(
+                "cloudwatch",
+                region_name=self._config.region,
+            )
+        except Exception as exc:  # pragma: no cover — boto3 import path
+            log.debug("cloudwatch client init failed: %s", exc)
+            return None
+        return self._cloudwatch
+
     # ---- internals --------------------------------------------------
 
     def _fetch_dkim(self, identity: str) -> _DkimAttributes:
@@ -550,3 +790,79 @@ def _check_dmarc(domain: str) -> DnsAuthCheck:
         records=[record],
         message="DMARC present but policy unclear — review the record",
     )
+
+
+def _td_days(days: int):  # type: ignore[no-untyped-def]
+    """Module-private import shim — keeps the ``timedelta`` import next
+    to the metrics helpers so the lifecycle-side imports stay quiet."""
+    from datetime import timedelta
+
+    return timedelta(days=int(days))
+
+
+def _fetch_template_metric(
+    cw: Any,
+    *,
+    name: str,
+    metric: str,
+    start: datetime,
+    end: datetime,
+) -> dict[datetime, int]:
+    """One CloudWatch GetMetricStatistics call → timestamp-indexed sums.
+
+    SES publishes per-template counters on the ``ses2:TemplateName``
+    dimension of the ``AWS/SES`` namespace (the older ``ses:`` prefix
+    is deprecated for new event destinations; the v2 ``ses2:`` form is
+    what SendTemplatedEmail v2 emits). Statistics=["Sum"] aggregates
+    each 15-minute bucket; the response is unordered so the caller
+    merges + sorts across the four metric calls."""
+    response = cw.get_metric_statistics(
+        Namespace="AWS/SES",
+        MetricName=metric,
+        Dimensions=[{"Name": "ses2:TemplateName", "Value": name}],
+        StartTime=start,
+        EndTime=end,
+        Period=900,
+        Statistics=["Sum"],
+    )
+    out: dict[datetime, int] = {}
+    for dp in response.get("Datapoints") or []:
+        ts = dp.get("Timestamp")
+        if not isinstance(ts, datetime):
+            continue
+        out[ts] = int(dp.get("Sum") or 0)
+    return out
+
+
+# SES exposes template-not-found as
+# ``TemplateDoesNotExistException`` on the per-template fetch and
+# ``AlreadyExistsException`` on create. Both come through as
+# ``ClientError`` with an ``Error.Code`` field; tests + moto sometimes
+# raise a custom exception type instead. Match on both shapes so the
+# driver behaves the same against real SES + test fakes.
+def _exception_code(exc: BaseException) -> str:
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        return str((response.get("Error") or {}).get("Code") or "")
+    return type(exc).__name__
+
+
+def _is_template_not_found(exc: BaseException) -> bool:
+    code = _exception_code(exc)
+    if "TemplateDoesNotExist" in code:
+        return True
+    if "NotFound" in code:
+        return True
+    # moto raises a bare KeyError(name) from delete_template when the
+    # template doesn't exist; recognize that path so the driver's
+    # delete returns False instead of bubbling the error.
+    if isinstance(exc, KeyError):
+        return True
+    return "does not exist" in str(exc).lower()
+
+
+def _is_template_already_exists(exc: BaseException) -> bool:
+    code = _exception_code(exc)
+    if "AlreadyExists" in code:
+        return True
+    return "already exists" in str(exc).lower()

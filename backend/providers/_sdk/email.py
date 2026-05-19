@@ -217,6 +217,41 @@ class DnsAuthStatus:
         return DnsCheckOutcome.UNKNOWN
 
 
+@dataclass(frozen=True)
+class EmailTemplate:
+    """One transactional-email template (#635).
+
+    Mirrors the SES ``Template`` shape but stays vendor-neutral so a
+    future SendGrid / Mailgun driver implementation can populate the
+    same dataclass. ``created_at`` is ``None`` when the backend doesn't
+    expose a creation timestamp (SES surfaces ``CreatedTimestamp`` only
+    on the list-call metadata, not on the per-template fetch)."""
+
+    name: str
+    subject: str
+    html_body: str
+    text_body: str
+    created_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class TemplateSendStatPoint:
+    """One 15-minute interval of send counters for a specific template
+    (#628).
+
+    Sourced from the backend's per-template metrics surface (SES uses
+    the ``ses2:TemplateName`` CloudWatch dimension on ``AWS/SES``); the
+    UI renders these as a sparkline + summary tile on the template-
+    detail page. Drivers MUST return points oldest-first so the line
+    chart renders without re-sorting."""
+
+    timestamp: datetime
+    sends: int
+    deliveries: int
+    bounces: int
+    complaints: int
+
+
 class EmailObservabilityDriver(Protocol):
     """Read-only email-detail operations + suppression-list mutations.
 
@@ -309,4 +344,84 @@ class EmailObservabilityDriver(Protocol):
         provenance — operators routinely un-suppress hard-bounced
         addresses that have been remediated.
         """
+        ...
+
+    # ---- template management (#635, #628) --------------------------
+
+    def list_templates(self) -> list[EmailTemplate]:
+        """List transactional-email templates for this identity's
+        account (#635).
+
+        Returns at most 100 entries on a single call — SES caps the
+        ``list_templates`` page at 100 rows + a continuation token; the
+        platform's MVP UI doesn't paginate (the operator's template
+        count is typically O(10)). Drivers without a templates surface
+        raise :class:`UnsupportedOperationError`."""
+        ...
+
+    def get_template(self, *, name: str) -> EmailTemplate:
+        """Fetch one template by name (#635).
+
+        Raises :class:`ManagedServiceError` (or the driver's equivalent)
+        when the template doesn't exist. The detail page resolver
+        catches that and renders a 404 envelope."""
+        ...
+
+    def create_template(
+        self,
+        *,
+        name: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+    ) -> EmailTemplate:
+        """Create a new transactional-email template (#635).
+
+        ``name`` is the unique identifier the workload references on
+        ``SendTemplatedEmail``. ``subject`` is an SES-style template
+        string that can carry ``{{handlebar}}`` substitutions; the
+        driver passes it through unchanged. Raises on duplicate name
+        so the mutation envelope can surface a clean error."""
+        ...
+
+    def update_template(
+        self,
+        *,
+        name: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+    ) -> EmailTemplate:
+        """Update an existing template in-place (#635).
+
+        Replaces every field on the template; partial-update isn't
+        portable across backends (SES, SendGrid, Postmark all expect
+        the full body on update). Raises when the template doesn't
+        exist; callers should ``create_template`` instead in that case."""
+        ...
+
+    def delete_template(self, *, name: str) -> bool:
+        """Delete a template by name (#635).
+
+        Returns ``True`` when the template existed and was deleted;
+        ``False`` when the template wasn't found (idempotent). The
+        backend MAY still hold references in send history; deletion
+        only removes the future-send path."""
+        ...
+
+    def get_template_send_statistics(
+        self,
+        *,
+        name: str,
+        days: int = 14,
+    ) -> list[TemplateSendStatPoint]:
+        """Per-template send/delivery/bounce/complaint counters (#628).
+
+        Sourced from the backend's metrics pipeline (SES → CloudWatch
+        on the ``ses2:TemplateName`` dimension; future SendGrid driver
+        → the ``/stats/templates`` endpoint). Points are 15-minute
+        granularity, oldest-first; ``days`` caps the lookback window.
+        Returns an empty list when the metrics pipeline has no data
+        (zero sends in the window, or CloudWatch event publishing
+        disabled on the configuration set)."""
         ...

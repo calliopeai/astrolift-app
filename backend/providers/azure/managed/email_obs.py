@@ -25,11 +25,13 @@ from _sdk import (
     AccountSendStatus,
     DnsAuthStatus,
     EmailObservabilityDriver,
+    EmailTemplate,
     IdentityVerification,
     SendQuota,
     SendStatPoint,
     SuppressionEntry,
     SuppressionReason,
+    TemplateSendStatPoint,
     UnsupportedOperationError,
     driver_op,
 )
@@ -96,4 +98,62 @@ class AzureAcsEmailObservabilityDriver(EmailObservabilityDriver):
         sensitive_kind="email.suppression.remove",
     )
     def remove_suppression_entry(self, *, address: str) -> bool:
+        raise UnsupportedOperationError(_UNSUPPORTED_MSG)
+
+    @driver_op(driver="email", cloud="azure")
+    def list_templates(self) -> list[EmailTemplate]:
+        raise UnsupportedOperationError(_UNSUPPORTED_MSG)
+
+    @driver_op(driver="email", cloud="azure")
+    def get_template(self, *, name: str) -> EmailTemplate:
+        raise UnsupportedOperationError(_UNSUPPORTED_MSG)
+
+    @driver_op(
+        driver="email",
+        cloud="azure",
+        audit=True,
+        sensitive_kind="email.template.create",
+    )
+    def create_template(
+        self,
+        *,
+        name: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+    ) -> EmailTemplate:
+        raise UnsupportedOperationError(_UNSUPPORTED_MSG)
+
+    @driver_op(
+        driver="email",
+        cloud="azure",
+        audit=True,
+        sensitive_kind="email.template.update",
+    )
+    def update_template(
+        self,
+        *,
+        name: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+    ) -> EmailTemplate:
+        raise UnsupportedOperationError(_UNSUPPORTED_MSG)
+
+    @driver_op(
+        driver="email",
+        cloud="azure",
+        audit=True,
+        sensitive_kind="email.template.delete",
+    )
+    def delete_template(self, *, name: str) -> bool:
+        raise UnsupportedOperationError(_UNSUPPORTED_MSG)
+
+    @driver_op(driver="email", cloud="azure")
+    def get_template_send_statistics(
+        self,
+        *,
+        name: str,
+        days: int = 14,
+    ) -> list[TemplateSendStatPoint]:
         raise UnsupportedOperationError(_UNSUPPORTED_MSG)

@@ -1299,6 +1299,20 @@ type AstroliftEmailSuppressionEntry {
   detail: String!
 }
 
+type AstroliftEmailTemplate {
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String!
+  createdAt: DateTime
+}
+
+type AstroliftEmailTemplateMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftEmailTemplate
+}
+
 type AstroliftEnrollmentQrPayload {
   qrPayload: String!
   qrSvg: String!
@@ -2423,6 +2437,14 @@ type AstroliftTeamMutationResult {
   data: AstroliftTeam
 }
 
+type AstroliftTemplateSendStatPoint {
+  timestamp: DateTime!
+  sends: Int!
+  deliveries: Int!
+  bounces: Int!
+  complaints: Int!
+}
+
 type AstroliftTenantCluster {
   id: GUID!
   slug: String!
@@ -2902,6 +2924,14 @@ input CreateDeployTokenInput {
   expiresAtIso: String = null
 }
 
+input CreateEmailTemplateInput {
+  managedServiceId: GUID!
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String! = ""
+}
+
 input CreateIdentityProviderInput {
   kind: String!
   displayName: String = null
@@ -3024,6 +3054,11 @@ input DeleteAppSecretInput {
   key: String!
 }
 
+input DeleteEmailTemplateInput {
+  managedServiceId: GUID!
+  name: String!
+}
+
 input DeleteFormDefinitionInput {
   slug: String!
 }
@@ -3134,6 +3169,17 @@ type EmailsuppressionremovepayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Emailsuppressionremovepayload
+}
+
+type Emailtemplatedeletedpayload {
+  name: String!
+  deleted: Boolean!
+}
+
+type EmailtemplatedeletedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Emailtemplatedeletedpayload
 }
 
 type EmployeeAvatarType {
@@ -3710,6 +3756,9 @@ type Mutation {
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
   addEmailSuppressionEntry(input: AddEmailSuppressionEntryInput!): EmailsuppressionaddpayloadMutationResult!
   removeEmailSuppressionEntry(input: RemoveEmailSuppressionEntryInput!): EmailsuppressionremovepayloadMutationResult!
+  createEmailTemplate(input: CreateEmailTemplateInput!): AstroliftEmailTemplateMutationResult!
+  updateEmailTemplate(input: UpdateEmailTemplateInput!): AstroliftEmailTemplateMutationResult!
+  deleteEmailTemplate(input: DeleteEmailTemplateInput!): EmailtemplatedeletedpayloadMutationResult!
   proposeSecretChange(input: ProposeSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
@@ -4079,6 +4128,9 @@ type Query {
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
   astroliftEmailServiceDetail(managedServiceId: GUID!): AstroliftEmailServiceDetail
+  astroliftEmailTemplates(managedServiceId: GUID!): [AstroliftEmailTemplate!]!
+  astroliftEmailTemplate(managedServiceId: GUID!, name: String!): AstroliftEmailTemplate
+  astroliftEmailTemplateStats(managedServiceId: GUID!, name: String!, days: Int! = 14): [AstroliftTemplateSendStatPoint!]!
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   PostgresMetrics: [[String!]!]!
@@ -4555,6 +4607,14 @@ input UpdateAppInput {
   minimumApprovals: Int = null
   cronPaused: Boolean = null
   ifMatchVersion: Int = null
+}
+
+input UpdateEmailTemplateInput {
+  managedServiceId: GUID!
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String! = ""
 }
 
 input UpdateIdentityProviderInput {
