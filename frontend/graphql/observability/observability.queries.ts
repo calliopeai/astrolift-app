@@ -214,6 +214,127 @@ export const GET_WORKLOAD_RESOURCE_USAGE = gql`
  * `nextCursor` back unchanged to fetch the next slice. Empty
  * `nextCursor` means end-of-window.
  */
+/**
+ * Per-endpoint HTTP metrics (#641).
+ *
+ * Backed by the cluster Prometheus stack; one row per route with rate,
+ * error ratio, and p50/p90/p99 latency. Empty list when OTEL HTTP
+ * instrumentation isn't detected on the workload.
+ */
+export const GET_APP_ENDPOINT_METRICS = gql`
+  query GetAppEndpointMetrics(
+    $appSlug: String!
+    $environmentName: String
+    $rangeSeconds: Int
+    $workloadSlug: String
+  ) {
+    astroliftAppEndpointMetrics(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      rangeSeconds: $rangeSeconds
+      workloadSlug: $workloadSlug
+    ) {
+      route
+      requestRate
+      errorRateRatio
+      p50Ms
+      p90Ms
+      p99Ms
+    }
+  }
+`;
+
+/**
+ * Trace explorer list + span detail (#644).
+ *
+ * `astroliftAppTraces` returns the top N recent traces; the panel
+ * lazy-loads `astroliftTraceSpans` per trace on row expansion.
+ */
+export const GET_APP_TRACES = gql`
+  query GetAppTraces(
+    $appSlug: String!
+    $since: String!
+    $until: String!
+    $environmentName: String
+    $service: String
+    $status: String
+    $limit: Int
+  ) {
+    astroliftAppTraces(
+      appSlug: $appSlug
+      since: $since
+      until: $until
+      environmentName: $environmentName
+      service: $service
+      status: $status
+      limit: $limit
+    ) {
+      traceId
+      rootService
+      rootOperation
+      spanCount
+      durationMs
+      statusCode
+    }
+  }
+`;
+
+export const GET_TRACE_SPANS = gql`
+  query GetTraceSpans($appSlug: String!, $traceId: String!, $environmentName: String) {
+    astroliftTraceSpans(
+      appSlug: $appSlug
+      traceId: $traceId
+      environmentName: $environmentName
+    ) {
+      traceId
+      spanId
+      parentSpanId
+      operation
+      service
+      startTime
+      durationMs
+      statusCode
+      attributes
+    }
+  }
+`;
+
+/**
+ * Ad-hoc PromQL executor (#647).
+ *
+ * Returns an envelope with ok / error so the panel can surface
+ * compile-time and transport errors without bubbling a GraphQL error.
+ */
+export const EXECUTE_PROMQL = gql`
+  query ExecutePromql(
+    $appSlug: String!
+    $query: String!
+    $startUnix: Int!
+    $endUnix: Int!
+    $stepSeconds: Int!
+    $environmentName: String
+  ) {
+    astroliftExecutePromql(
+      appSlug: $appSlug
+      query: $query
+      startUnix: $startUnix
+      endUnix: $endUnix
+      stepSeconds: $stepSeconds
+      environmentName: $environmentName
+    ) {
+      ok
+      error
+      series {
+        metricLabels
+        values {
+          ts
+          value
+        }
+      }
+    }
+  }
+`;
+
 export const GET_APP_LOGS = gql`
   query GetAppLogs(
     $appSlug: String!

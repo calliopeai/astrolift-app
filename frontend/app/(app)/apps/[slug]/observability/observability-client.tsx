@@ -28,13 +28,16 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import {
   DnsRecordsCard,
+  EndpointMetricsPanel,
   GoldenSignalsPanel,
   LogViewer,
   ManagedServiceMetricsList,
   MetricScopePicker,
   PodEventsPanel,
   PodExpander,
+  PromqlQueryPanel,
   TlsCertificatesCard,
+  TraceExplorerPanel,
   WorkloadIdentityCard,
 } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
@@ -811,6 +814,19 @@ export function ObservabilityClient({ slug }: { slug: string }) {
         environmentName={scopedEnv}
         workloadSlug={scopedWorkload}
       />
+
+      {/* ─── #641 per-endpoint HTTP metrics ────────────────────────── */}
+      <EndpointMetricsPanel
+        appSlug={a.slug}
+        environmentName={scopedEnv}
+        workloadSlug={scopedWorkload}
+      />
+
+      {/* ─── #644 distributed trace explorer ───────────────────────── */}
+      <TraceExplorerPanel appSlug={a.slug} environmentName={scopedEnv} />
+
+      {/* ─── #647 ad-hoc PromQL panel ──────────────────────────────── */}
+      <PromqlQueryPanel appSlug={a.slug} environmentName={scopedEnv} />
 
       {/* ─── #645 / #646 managed-service metric tiles ─────────────── */}
       <ManagedServiceMetricsList

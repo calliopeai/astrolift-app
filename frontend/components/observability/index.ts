@@ -6,6 +6,12 @@ export { DnsRecordsCard } from "./DnsRecordsCard";
 export { TlsCertificatesCard } from "./TlsCertificatesCard";
 export { WorkloadIdentityCard } from "./WorkloadIdentityCard";
 export { GoldenSignalsPanel } from "./GoldenSignalsPanel";
+export { EndpointMetricsPanel } from "./EndpointMetricsPanel";
+export type { EndpointMetricsPanelProps } from "./EndpointMetricsPanel";
+export { TraceExplorerPanel } from "./TraceExplorerPanel";
+export type { TraceExplorerPanelProps } from "./TraceExplorerPanel";
+export { PromqlQueryPanel } from "./PromqlQueryPanel";
+export type { PromqlQueryPanelProps } from "./PromqlQueryPanel";
 export {
   ManagedServiceMetricsList,
   ManagedServiceMetricsPanel,
