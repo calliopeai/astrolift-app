@@ -10,6 +10,7 @@ from collections.abc import Iterable
 
 import strawberry
 from django.conf import settings
+from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 from strawberry.types import Info
@@ -247,9 +248,14 @@ def _build_apps_page(
     if not _status_filter_active(status):
         items, next_cursor, total_count = _paginate_apps(qs, cursor=cursor, limit=page_size)
         freshness_by_app = _freshness_for_apps(items) if effective_freshness else {}
+        preview_counts = _active_preview_counts(items)
         return RegisteredAppPageType(
             items=[
-                app_to_type(a, freshness=freshness_by_app.get(a.pk) if include_freshness else None)
+                app_to_type(
+                    a,
+                    freshness=freshness_by_app.get(a.pk) if include_freshness else None,
+                    active_preview_count=preview_counts.get(a.pk, 0),
+                )
                 for a in items
             ],
             next_cursor=next_cursor,
@@ -281,13 +287,45 @@ def _build_apps_page(
         next_cursor: str | None = _encode_apps_cursor(anchor.created_at, str(anchor.guid))
     else:
         next_cursor = None
+    preview_counts = _active_preview_counts(items)
     return RegisteredAppPageType(
         items=[
-            app_to_type(a, freshness=freshness_by_app.get(a.pk) if include_freshness else None) for a in items
+            app_to_type(
+                a,
+                freshness=freshness_by_app.get(a.pk) if include_freshness else None,
+                active_preview_count=preview_counts.get(a.pk, 0),
+            )
+            for a in items
         ],
         next_cursor=next_cursor,
         total_count=total_count,
     )
+
+
+def _active_preview_counts(apps: Iterable[RegisteredApp]) -> dict[int, int]:
+    """Bulk-count active preview environments per app (#730).
+
+    One aggregate query per page (vs N FK fetches if the resolver
+    inlined the count per row). ``app_to_type`` reads this map via the
+    ``active_preview_count=`` kwarg; missing keys default to 0 (an app
+    with zero previews simply doesn't appear in the aggregate's group
+    output).
+    """
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    app_ids = [a.pk for a in apps]
+    if not app_ids:
+        return {}
+    rows = (
+        PreviewEnvironment.objects.filter(
+            registered_app_id__in=app_ids,
+            torn_down_at__isnull=True,
+            deleted_at__isnull=True,
+        )
+        .values("registered_app_id")
+        .annotate(count=models.Count("pk"))
+    )
+    return {row["registered_app_id"]: int(row["count"]) for row in rows}
 
 
 def _viewer_scope_filter() -> Q | None:
@@ -571,9 +609,17 @@ class RegistryQuery:
         freshness_by_app = _freshness_for_apps(apps) if effective_freshness else {}
         if _status_filter_active(status):
             apps = _filter_apps_by_status(apps, freshness_by_app, status)
+        preview_counts = _active_preview_counts(apps)
         if not include_freshness:
-            return [app_to_type(a) for a in apps]
-        return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in apps]
+            return [app_to_type(a, active_preview_count=preview_counts.get(a.pk, 0)) for a in apps]
+        return [
+            app_to_type(
+                a,
+                freshness=freshness_by_app.get(a.pk),
+                active_preview_count=preview_counts.get(a.pk, 0),
+            )
+            for a in apps
+        ]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
@@ -699,9 +745,17 @@ class RegistryQuery:
         freshness_by_app = _freshness_for_apps(scoped_apps) if effective_freshness else {}
         if _status_filter_active(status):
             scoped_apps = _filter_apps_by_status(scoped_apps, freshness_by_app, status)
+        preview_counts = _active_preview_counts(scoped_apps)
         if not include_freshness:
-            return [app_to_type(a) for a in scoped_apps]
-        return [app_to_type(a, freshness=freshness_by_app.get(a.pk)) for a in scoped_apps]
+            return [app_to_type(a, active_preview_count=preview_counts.get(a.pk, 0)) for a in scoped_apps]
+        return [
+            app_to_type(
+                a,
+                freshness=freshness_by_app.get(a.pk),
+                active_preview_count=preview_counts.get(a.pk, 0),
+            )
+            for a in scoped_apps
+        ]
 
     @strawberry.field
     @tenant_scoped()
