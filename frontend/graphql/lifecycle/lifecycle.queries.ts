@@ -333,6 +333,7 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
       ttlUntil
       sourceUrl
       prUrl
+      isManual
       aggregateResources {
         cpuCores
         memoryBytes
