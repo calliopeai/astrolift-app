@@ -40,6 +40,7 @@ def write_event_envelope(envelope: EventEnvelope) -> None:
             resource_id=envelope.resource_id or "",
             request_id=envelope.request_id or "",
             trace_id=envelope.trace_id or "",
+            severity=envelope.severity or "info",
         )
     except Exception:  # event writes must not break mutations
         log.exception(

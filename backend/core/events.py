@@ -50,6 +50,9 @@ class EventEnvelope:
     resource_id: str = ""
     request_id: str = ""
     trace_id: str = ""
+    severity: str = "info"
+    """``info`` | ``warn`` | ``error``. Inferred at emit time by
+    :func:`infer_event_severity` from ``payload`` + ``event_type``."""
 
 
 EventWriter = Callable[[EventEnvelope], None]
@@ -125,6 +128,60 @@ class SupplyChainBlockedPayload:
             "signature_required": bool(self.signature_required),
             "blocked_at": blocked_at_iso,
         }
+
+
+# ---- severity inference --------------------------------------------
+#
+# Single source of truth for the severity heuristic used at emit time
+# (Event.severity column, #540) and during the matching migration
+# backfill. The mobile client applied the same rules at render time;
+# moving the inference server-side lets the GraphQL query filter by
+# severity without the client having to re-derive it.
+
+_SEVERITY_VALUES = ("info", "warn", "error")
+
+
+def infer_event_severity(
+    event_type: str,
+    payload: dict[str, Any] | None,
+) -> str:
+    """Return one of ``"info" | "warn" | "error"`` for ``(event_type, payload)``.
+
+    Precedence (mirrors the mobile client's pre-#540 logic):
+
+    1. ``payload.severity`` if it's one of the canonical values.
+    2. ``payload.level`` if it's one of the canonical values.
+    3. ``payload.status`` mapped: ``failed|error`` → ``error``,
+       ``warned|degraded`` → ``warn``.
+    4. ``event_type`` shape: ``.failed`` suffix or ``error`` substring
+       (case-insensitive) → ``error``; ``.warned`` suffix or ``warn``
+       substring → ``warn``.
+    5. Default ``info``.
+    """
+    payload = payload or {}
+
+    raw_sev = payload.get("severity")
+    if isinstance(raw_sev, str) and raw_sev in _SEVERITY_VALUES:
+        return raw_sev
+
+    raw_level = payload.get("level")
+    if isinstance(raw_level, str) and raw_level in _SEVERITY_VALUES:
+        return raw_level
+
+    raw_status = payload.get("status")
+    if isinstance(raw_status, str):
+        if raw_status in ("failed", "error"):
+            return "error"
+        if raw_status in ("warned", "degraded"):
+            return "warn"
+
+    et = (event_type or "").lower()
+    if et.endswith(".failed") or "error" in et:
+        return "error"
+    if et.endswith(".warned") or "warn" in et:
+        return "warn"
+
+    return "info"
 
 
 def _log_event(envelope: EventEnvelope) -> None:
@@ -236,6 +293,7 @@ class Event:
             resource_id=str(resource_id) if resource_id is not None else "",
             request_id=request_id or "",
             trace_id=trace_id or "",
+            severity=infer_event_severity(event_type, payload),
         )
         _writer(envelope)
         _fanout_to_subscribers(envelope)
