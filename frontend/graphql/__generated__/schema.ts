@@ -1495,6 +1495,7 @@ export type AstroliftManagedDomainMutationResult = {
 export type AstroliftManagedService = {
   config: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
+  editableFields: Array<Scalars['String']['output']>;
   environmentName: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
@@ -3422,6 +3423,7 @@ export type Mutation = {
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
+  reprovisionManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
@@ -4175,6 +4177,11 @@ export type MutationRemoveEmailSuppressionEntryArgs = {
 
 export type MutationRemoveOrganizationAllowlistDomainArgs = {
   input: RemoveOrganizationAllowlistDomainInput;
+};
+
+
+export type MutationReprovisionManagedServiceArgs = {
+  input: ReprovisionManagedServiceInput;
 };
 
 
@@ -5671,6 +5678,10 @@ export type RemoveEmailSuppressionEntryInput = {
 
 export type RemoveOrganizationAllowlistDomainInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type ReprovisionManagedServiceInput = {
+  managedServiceId: Scalars['GUID']['input'];
 };
 
 export type RequestAttestationChallengeInput = {

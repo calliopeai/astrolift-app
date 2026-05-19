@@ -1485,6 +1485,7 @@ type AstroliftManagedService {
   updatedAt: DateTime!
   lastActionAt: DateTime
   lastActionKind: String!
+  editableFields: [String!]!
 }
 
 type AstroliftManagedServiceConnection {
@@ -3528,6 +3529,7 @@ type Mutation {
   rotateSecretBundle(input: RotateSecretBundleInput!): AstroliftSecretBundleMutationResult!
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  reprovisionManagedService(input: ReprovisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
@@ -4016,6 +4018,10 @@ input RemoveEmailSuppressionEntryInput {
 
 input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
+}
+
+input ReprovisionManagedServiceInput {
+  managedServiceId: GUID!
 }
 
 input RequestAttestationChallengeInput {

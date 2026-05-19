@@ -277,6 +277,19 @@ class UpdateManagedServiceInput:
 
 
 @strawberry.input
+class ReprovisionManagedServiceInput:
+    """Trigger a full reprovision cycle for a managed service (#745).
+
+    Use when a config change requires tearing down the backing cloud
+    resource before re-creating it — i.e., the changed key is NOT in
+    ``AstroliftManagedService.editableFields``. The service status
+    transitions to PENDING; the lifecycle workflow loop picks it up.
+    """
+
+    managed_service_id: GUID
+
+
+@strawberry.input
 class DeprovisionManagedServiceInput:
     """Two-axis safety surface for the managed-service deprovision (#320).
 
@@ -1479,12 +1492,34 @@ class ServicesMutation:
         info: Info,
         input: UpdateManagedServiceInput,
     ) -> MutationResultType[ManagedServiceType]:
-        svc = ManagedService.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
+        svc = ManagedService.objects.select_related(
+            "app_environment__tenant_cluster__provider_plugin",
+            "registered_app",
+        ).filter(guid=str(input.id), deleted_at__isnull=True).first()
         if svc is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "managed service not found",
             )
+        if input.config is not None:
+            from astrolift_services.schema.types import _editable_fields_for
+
+            editable = _editable_fields_for(svc)
+            if editable != ["*"]:
+                incoming_keys = set(dict(input.config).keys())
+                current_keys = set((svc.config or {}).keys())
+                changed_keys = {
+                    k for k in incoming_keys | current_keys
+                    if dict(input.config).get(k) != (svc.config or {}).get(k)
+                }
+                blocked = changed_keys - set(editable)
+                if blocked:
+                    return gql_failure(
+                        ErrorCode.VALIDATION.value,
+                        f"fields {sorted(blocked)} cannot be changed in-place; "
+                        "use reprovisionManagedService to apply them",
+                        field="config",
+                    )
         if input.name is not None:
             svc.name = input.name.strip()
         if input.config is not None:
@@ -1502,6 +1537,47 @@ class ServicesMutation:
                 "version",
             ]
         )
+        return gql_success(managed_service_to_type(svc))
+
+    @strawberry.field
+    @mutation_audit(action="managed_service.reprovision")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def reprovision_managed_service(
+        self,
+        info: Info,
+        input: ReprovisionManagedServiceInput,
+    ) -> MutationResultType[ManagedServiceType]:
+        """Trigger a full reprovision cycle for a managed service (#745).
+
+        Transitions status to PENDING so the lifecycle workflow picks it
+        up for a fresh provision pass. Use for config changes that are
+        NOT in ``editable_fields`` (i.e., changes that require tearing
+        down and re-creating the backing cloud resource).
+        """
+        svc = ManagedService.objects.select_related(
+            "app_environment__tenant_cluster__provider_plugin",
+            "registered_app",
+        ).filter(guid=str(input.managed_service_id), deleted_at__isnull=True).first()
+        if svc is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "managed service not found",
+                field="managedServiceId",
+            )
+        _blocked = {
+            ManagedService.Status.DEPROVISIONING,
+            ManagedService.Status.PROVISIONING,
+        }
+        if svc.status in _blocked:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"managed service is {svc.status}; reprovision can only be "
+                "triggered for services that are active, pending, updating, or failed",
+                field="managedServiceId",
+            )
+        svc.status = ManagedService.Status.PENDING
+        svc.save(update_fields=["status", "updated_at", "version"])
         return gql_success(managed_service_to_type(svc))
 
     @strawberry.field

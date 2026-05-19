@@ -144,6 +144,10 @@ class ManagedServiceType:
     updated_at: dt.datetime
     last_action_at: dt.datetime | None = None
     last_action_kind: str = ""
+    editable_fields: list[str] = strawberry.field(default_factory=list)
+    """Config keys the driver accepts via ``update()`` without full
+    reprovision. ``["*"]`` means all fields; ``[]`` means all changes
+    require ``reprovisionManagedService``."""
 
 
 @strawberry.type(name="AstroliftManagedServiceConnectionKey")
@@ -603,7 +607,44 @@ class SecretHistoryEntryType:
     request didn't carry one (system actors, scheduled jobs)."""
 
 
-def managed_service_to_type(svc) -> ManagedServiceType:
+def _editable_fields_for(svc) -> list[str]:
+    """Resolve the driver for this service and call ``editable_fields()``.
+
+    Returns ``["*"]`` (all fields editable) when the driver can't be
+    resolved — safe fallback that doesn't restrict the update surface
+    for services whose cluster binding isn't loaded yet."""
+    try:
+        from astrolift_drivers.registry import DriverNotFound, plugins
+        from core.cluster_observability import _config_for  # type: ignore[attr-defined]
+
+        cluster = getattr(
+            getattr(svc, "app_environment", None),
+            "tenant_cluster",
+            None,
+        )
+        if cluster is None:
+            return ["*"]
+        plugin = getattr(cluster, "provider_plugin", None)
+        if plugin is None:
+            return ["*"]
+        variant = getattr(svc, "variant", "") or ""
+        try:
+            driver_cls = plugins.get(plugin.slug, f"managed:{svc.kind}:{variant}")
+        except DriverNotFound:
+            try:
+                driver_cls = plugins.get(plugin.slug, f"managed:{svc.kind}:")
+            except DriverNotFound:
+                return ["*"]
+        cfg = _config_for(plugin.slug, cluster)
+        driver = driver_cls(config=cfg)
+        result = driver.editable_fields()
+        return list(result) if result is not None else ["*"]
+    except Exception:  # noqa: BLE001
+        return ["*"]
+
+
+def managed_service_to_type(svc, *, resolve_editable_fields: bool = False) -> ManagedServiceType:
+    editable = _editable_fields_for(svc) if resolve_editable_fields else ["*"]
     return ManagedServiceType(
         id=GUID(str(svc.guid)),
         name=svc.name,
@@ -618,4 +659,5 @@ def managed_service_to_type(svc) -> ManagedServiceType:
         updated_at=svc.updated_at,
         last_action_at=svc.last_action_at,
         last_action_kind=svc.last_action_kind or "",
+        editable_fields=editable,
     )
