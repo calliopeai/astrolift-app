@@ -88,8 +88,14 @@ export const DELETE_ALERT_RULE = gql`
   mutation DeleteAlertRule($input: DeleteAlertRuleInput!) {
     deleteAlertRule(input: $input) {
       ok
-      errors { code message }
-      data { id deleted }
+      errors {
+        code
+        message
+      }
+      data {
+        id
+        deleted
+      }
     }
   }
 `;

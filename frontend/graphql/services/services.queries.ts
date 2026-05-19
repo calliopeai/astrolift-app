@@ -206,16 +206,8 @@ export const GET_EMAIL_TEMPLATES = gql`
 `;
 
 export const GET_EMAIL_TEMPLATE_STATS = gql`
-  query GetEmailTemplateStats(
-    $managedServiceId: GUID!
-    $name: String!
-    $days: Int
-  ) {
-    astroliftEmailTemplateStats(
-      managedServiceId: $managedServiceId
-      name: $name
-      days: $days
-    ) {
+  query GetEmailTemplateStats($managedServiceId: GUID!, $name: String!, $days: Int) {
+    astroliftEmailTemplateStats(managedServiceId: $managedServiceId, name: $name, days: $days) {
       timestamp
       sends
       deliveries
@@ -251,10 +243,7 @@ export const GET_EMAIL_MESSAGES = gql`
 
 export const GET_EMAIL_ENGAGEMENT_METRICS = gql`
   query GetEmailEngagementMetrics($managedServiceId: GUID!, $days: Int) {
-    astroliftEmailEngagementMetrics(
-      managedServiceId: $managedServiceId
-      days: $days
-    ) {
+    astroliftEmailEngagementMetrics(managedServiceId: $managedServiceId, days: $days) {
       totalSends
       totalDeliveries
       totalBounces
