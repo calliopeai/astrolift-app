@@ -10,6 +10,7 @@ from core import views
 from core.schema.views import CoreStrawberryView
 from core.utils.debug import autologin
 from core.utils.logger_helper import gql_logger
+from core.views_well_known import apple_app_site_association, assetlinks_json
 from django_ratelimit.decorators import ratelimit
 from django.conf import settings
 from django.conf.urls import include
@@ -74,6 +75,16 @@ favicon_view = RedirectView.as_view(url="/static/favicon.ico", permanent=True)
 
 urlpatterns = [
     path("", root_view),
+    # Mobile universal-link / app-link well-known files (#541). Mounted
+    # at the project root (NOT under BASE_URL) so iOS / Android fetch
+    # them from the apex host the OS verifier expects:
+    # https://app.astrolift.dev/.well-known/apple-app-site-association
+    # https://app.astrolift.dev/.well-known/assetlinks.json
+    # These MUST stay anonymous-accessible — the OS verifier doesn't
+    # carry a session — so they sit ahead of the ``base`` include that
+    # routes most app traffic through auth1.
+    path(".well-known/apple-app-site-association", apple_app_site_association),
+    path(".well-known/assetlinks.json", assetlinks_json),
     path(base, include(urls)),
     # Auth1 Login
     path(f"{base}auth1/", include(Auth1SessionWorkflow.urls())),
