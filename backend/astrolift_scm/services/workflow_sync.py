@@ -36,16 +36,31 @@ from django.conf import settings
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers import ProviderError, fetch_file, open_pull_request, put_file
+from astrolift_scm.providers.gitea import (
+    GiteaProviderError,
+)
+from astrolift_scm.providers.gitea import (
+    _api_base as _gitea_api_base,
+)
+from astrolift_scm.providers.gitea import (
+    _token as _gitea_token,
+)
 from astrolift_scm.providers.github import GITHUB_API_DEFAULT, GithubProviderError, _token
 from astrolift_scm.providers.gitlab import (
     GitlabProviderError,
+)
+from astrolift_scm.providers.gitlab import (
     _api_base as _gitlab_api_base,
+)
+from astrolift_scm.providers.gitlab import (
     _token as _gitlab_token,
 )
 
 # Conventional CI workflow paths per host.
 WORKFLOW_PATH: Final = ".github/workflows/astrolift-ci.yml"
 GITLAB_WORKFLOW_PATH: Final = ".gitlab-ci.yml"
+BITBUCKET_WORKFLOW_PATH: Final = "bitbucket-pipelines.yml"
+GITEA_WORKFLOW_PATH: Final = ".gitea/workflows/astrolift-ci.yml"
 
 # Connection-kind preference order — same shape as #387 so a single
 # active connection drives both the dispatch and the push.
@@ -58,6 +73,14 @@ _KIND_PREFERENCE: dict[str, tuple[str, ...]] = {
     "gitlab": (
         "gitlab_oauth_user",
         "gitlab_pat",
+    ),
+    "bitbucket": (
+        "bitbucket_oauth_user",
+        "bitbucket_pat",
+    ),
+    "gitea": (
+        "gitea_oauth_user",
+        "gitea_pat",
     ),
 }
 
@@ -161,6 +184,113 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     return _VAR_RE.sub(_replace, template)
 
 
+def render_astrolift_bitbucket_pipeline(app: RegisteredApp) -> str:
+    """Render the full ``bitbucket-pipelines.yml`` for ``app``.
+
+    Builds the Docker image, pushes to ECR with AWS credentials read
+    from Bitbucket repository variables, then notifies Astrolift.
+    The operator must configure ``ASTROLIFT_AWS_ACCESS_KEY_ID``,
+    ``ASTROLIFT_AWS_SECRET_ACCESS_KEY``, ``ASTROLIFT_AWS_DEFAULT_REGION``,
+    and ``ASTROLIFT_DEPLOY_TOKEN`` as Bitbucket repository variables
+    (Settings → Pipelines → Repository variables).
+    """
+    api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+    ecr_uri = app.registry_repo_uri or ""
+    ecr_registry = ecr_uri.split("/")[0] if ecr_uri else ""
+    deploy_branch = (app.deploy_branch or "main").strip() or "main"
+    slug_literal = json.dumps(app.slug)
+    api_url_literal = json.dumps(api_url)
+    return (
+        "# Managed by Astrolift — do not edit by hand."
+        " Re-sync via Settings → CI setup → Sync workflow file.\n"
+        "image: atlassian/default-image:4\n"
+        "\n"
+        "definitions:\n"
+        "  services:\n"
+        "    docker:\n"
+        "      type: docker\n"
+        "\n"
+        "pipelines:\n"
+        "  branches:\n"
+        f"    {deploy_branch}:\n"
+        "      - step:\n"
+        "          name: Build, push, and notify Astrolift\n"
+        "          services:\n"
+        "            - docker\n"
+        "          script:\n"
+        f'            - export ASTROLIFT_IMAGE="{ecr_uri}:$BITBUCKET_COMMIT"\n'
+        f'            - export ECR_REGISTRY="{ecr_registry}"\n'
+        "            - apt-get update -qq && apt-get install -y -qq awscli curl ca-certificates\n"
+        '            - aws ecr get-login-password --region "$ASTROLIFT_AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"\n'
+        '            - docker build -t "$ASTROLIFT_IMAGE" .\n'
+        '            - docker push "$ASTROLIFT_IMAGE"\n'
+        "            - |\n"
+        f"              curl --fail-with-body -sS -X POST {api_url_literal}/api/v1/deploys \\\n"
+        '                -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
+        '                -H "Content-Type: application/json" \\\n'
+        f'                -d "{{\\"appSlug\\":{slug_literal},\\"image\\":\\"$ASTROLIFT_IMAGE\\",\\"commitSha\\":\\"$BITBUCKET_COMMIT\\"}}"\n'
+    )
+
+
+def render_astrolift_gitea_ci_workflow(app: RegisteredApp) -> str:
+    """Render a ``.gitea/workflows/astrolift-ci.yml`` for Gitea Actions.
+
+    Gitea Actions uses GitHub Actions syntax. Builds the Docker image,
+    pushes to ECR, then notifies Astrolift. Secrets are read from Gitea
+    repository secrets (Settings → Actions → Secrets):
+    ``ASTROLIFT_AWS_ACCESS_KEY_ID``, ``ASTROLIFT_AWS_SECRET_ACCESS_KEY``,
+    ``ASTROLIFT_AWS_DEFAULT_REGION``, ``ASTROLIFT_DEPLOY_TOKEN``.
+    """
+    api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
+    ecr_uri = app.registry_repo_uri or ""
+    ecr_registry = ecr_uri.split("/")[0] if ecr_uri else ""
+    deploy_branch = (app.deploy_branch or "main").strip() or "main"
+    slug_literal = json.dumps(app.slug)
+    api_url_literal = json.dumps(api_url)
+    return (
+        "# Managed by Astrolift — do not edit by hand."
+        " Re-sync via Settings → CI setup → Sync workflow file.\n"
+        "name: Astrolift CI\n"
+        "\n"
+        "on:\n"
+        "  push:\n"
+        f"    branches: [{deploy_branch}]\n"
+        "\n"
+        "concurrency:\n"
+        f"  group: astrolift-ci-{app.slug}-${{{{ github.ref }}}}\n"
+        "  cancel-in-progress: false\n"
+        "\n"
+        "jobs:\n"
+        "  build-and-deploy:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v4\n"
+        "      - name: Configure AWS credentials\n"
+        "        env:\n"
+        "          AWS_ACCESS_KEY_ID: ${{ secrets.ASTROLIFT_AWS_ACCESS_KEY_ID }}\n"
+        "          AWS_SECRET_ACCESS_KEY: ${{ secrets.ASTROLIFT_AWS_SECRET_ACCESS_KEY }}\n"
+        "          AWS_DEFAULT_REGION: ${{ secrets.ASTROLIFT_AWS_DEFAULT_REGION }}\n"
+        "        run: aws --version\n"
+        "      - name: Build and push image to ECR\n"
+        "        env:\n"
+        "          AWS_ACCESS_KEY_ID: ${{ secrets.ASTROLIFT_AWS_ACCESS_KEY_ID }}\n"
+        "          AWS_SECRET_ACCESS_KEY: ${{ secrets.ASTROLIFT_AWS_SECRET_ACCESS_KEY }}\n"
+        "          AWS_DEFAULT_REGION: ${{ secrets.ASTROLIFT_AWS_DEFAULT_REGION }}\n"
+        "        run: |\n"
+        f'          aws ecr get-login-password | docker login --username AWS --password-stdin "{ecr_registry}"\n'
+        f'          docker build -t "{ecr_uri}:${{{{ github.sha }}}}" .\n'
+        f'          docker push "{ecr_uri}:${{{{ github.sha }}}}"\n'
+        "      - name: Notify Astrolift\n"
+        "        env:\n"
+        "          ASTROLIFT_DEPLOY_TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}\n"
+        "        run: |\n"
+        f"          curl --fail-with-body -sS -X POST {api_url_literal}/api/v1/deploys \\\n"
+        '            -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
+        '            -H "Content-Type: application/json" \\\n'
+        f'            -d \'{{"appSlug":{slug_literal},"image":"{ecr_uri}:${{{{ github.sha }}}}","commitSha":"${{{{ github.sha }}}}"}}\'\n'
+    )
+
+
 def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
     """Render the GitLab CI equivalent of the GitHub Actions template (#735).
 
@@ -187,7 +317,7 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
         "  - deploy\n"
         "\n"
         "variables:\n"
-        f"  ASTROLIFT_IMAGE: \"{ecr_uri}:$CI_COMMIT_SHA\"\n"
+        f'  ASTROLIFT_IMAGE: "{ecr_uri}:$CI_COMMIT_SHA"\n'
         "\n"
         "build-image:\n"
         "  stage: build\n"
@@ -203,9 +333,9 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
         f"{rules_line}\n"
         "  script:\n"
         "    - apk add --no-cache aws-cli\n"
-        f"    - aws ecr get-login-password | docker login --username AWS --password-stdin \"{ecr_registry}\"\n"
-        "    - docker build -t \"$ASTROLIFT_IMAGE\" .\n"
-        "    - docker push \"$ASTROLIFT_IMAGE\"\n"
+        f'    - aws ecr get-login-password | docker login --username AWS --password-stdin "{ecr_registry}"\n'
+        '    - docker build -t "$ASTROLIFT_IMAGE" .\n'
+        '    - docker push "$ASTROLIFT_IMAGE"\n'
         "\n"
         "notify-astrolift:\n"
         "  stage: deploy\n"
@@ -219,12 +349,12 @@ def render_astrolift_gitlab_ci_workflow(app: RegisteredApp) -> str:
         "  script:\n"
         "    - apt-get update -qq && apt-get install -y -qq curl ca-certificates\n"
         "    - |\n"
-        "      curl --fail-with-body -sS -X POST \"$ASTROLIFT_API_URL/api/v1/deploys\" \\\n"
-        "        -H \"Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN\" \\\n"
-        "        -H \"Content-Type: application/json\" \\\n"
-        "        -d \"{\\\"appSlug\\\":\\\"$ASTROLIFT_APP_SLUG\\\","
-        "\\\"image\\\":\\\"$ASTROLIFT_IMAGE\\\","
-        "\\\"commitSha\\\":\\\"$CI_COMMIT_SHA\\\"}\"\n"
+        '      curl --fail-with-body -sS -X POST "$ASTROLIFT_API_URL/api/v1/deploys" \\\n'
+        '        -H "Authorization: Bearer $ASTROLIFT_DEPLOY_TOKEN" \\\n'
+        '        -H "Content-Type: application/json" \\\n'
+        '        -d "{\\"appSlug\\":\\"$ASTROLIFT_APP_SLUG\\",'
+        '\\"image\\":\\"$ASTROLIFT_IMAGE\\",'
+        '\\"commitSha\\":\\"$CI_COMMIT_SHA\\"}"\n'
     )
 
 
@@ -588,9 +718,7 @@ def _gitlab_create_branch(
             body_text = exc.read().decode("utf-8", "replace")[:200]
         except Exception:
             pass
-        already = exc.code in (409, 422) or (
-            exc.code == 400 and "already exists" in body_text.lower()
-        )
+        already = exc.code in (409, 422) or (exc.code == 400 and "already exists" in body_text.lower())
         if already:
             return
         raise GitlabProviderError(
@@ -599,6 +727,103 @@ def _gitlab_create_branch(
         ) from exc
     except urllib.error.URLError as exc:
         raise GitlabProviderError("NETWORK", f"couldn't reach GitLab: {exc.reason}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Gitea branch-protection probe
+# ---------------------------------------------------------------------------
+
+
+def _is_gitea_branch_protected(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    branch: str,
+) -> bool:
+    """GET /api/v1/repos/{owner}/{repo}/branches/{branch}.
+
+    Returns True when the branch has ``protected: true`` in the
+    Gitea response. On auth / network errors: return False so the
+    write path runs and surfaces the real error."""
+    import urllib.parse as _up
+
+    try:
+        token = _gitea_token(connection)
+        base = _gitea_api_base(connection)
+    except GiteaProviderError:
+        return False
+
+    owner, repo = repo_full_name.split("/", 1)
+    url = (
+        f"{base}/api/v1/repos/{_up.quote(owner, safe='')}/{_up.quote(repo, safe='')}"
+        f"/branches/{_up.quote(branch, safe='')}"
+    )
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return bool(data.get("protected"))
+    except (urllib.error.HTTPError, urllib.error.URLError):
+        return False
+
+
+def _gitea_create_branch_direct(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    new_branch: str,
+    from_branch: str,
+) -> None:
+    """POST /api/v1/repos/{owner}/{repo}/branches to create a side branch."""
+    import urllib.parse as _up
+
+    try:
+        token = _gitea_token(connection)
+        base = _gitea_api_base(connection)
+    except GiteaProviderError as exc:
+        raise GiteaProviderError(
+            "AUTH_FAILED",
+            f"couldn't obtain Gitea token: {exc.message}",
+        ) from exc
+
+    owner, repo = repo_full_name.split("/", 1)
+    url = f"{base}/api/v1/repos/{_up.quote(owner, safe='')}/{_up.quote(repo, safe='')}/branches"
+    body = json.dumps({"new_branch_name": new_branch, "old_branch_name": from_branch}).encode()
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            _ = resp.read()
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:200]
+        except Exception:
+            pass
+        if exc.code in (409, 422) or "already exists" in body_text.lower():
+            return
+        raise GiteaProviderError(
+            "API_ERROR",
+            f"couldn't create branch {new_branch!r}: {exc.code} {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GiteaProviderError("NETWORK", f"couldn't reach Gitea: {exc.reason}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -626,10 +851,14 @@ def sync_workflow_file_to_repo(
         return _sync_github(app)
     if app.source_kind == "gitlab":
         return _sync_gitlab(app)
+    if app.source_kind == "bitbucket":
+        return _sync_bitbucket(app)
+    if app.source_kind == "gitea":
+        return _sync_gitea(app)
     raise WorkflowSyncError(
         "UNSUPPORTED_SOURCE",
         f"CI workflow push is not yet supported for source_kind={app.source_kind!r}; "
-        "supported hosts: github, gitlab.",
+        "supported hosts: github, gitlab, bitbucket, gitea.",
     )
 
 
@@ -849,6 +1078,194 @@ def _sync_gitlab(app: RegisteredApp) -> WorkflowSyncResult:
             connection,
             repo_full_name=app.source_repo,
             path=GITLAB_WORKFLOW_PATH,
+            branch=deploy_branch,
+            content=rendered,
+            commit_message=commit_message,
+        )
+    except ProviderError as exc:
+        return WorkflowSyncResult(
+            status="fetch_failed",
+            rendered_size=rendered_size,
+            error=f"{exc.code}: {exc.message}",
+        )
+
+    return WorkflowSyncResult(
+        status="created" if existing is None else "updated",
+        commit_sha=put_result.commit_sha,
+        rendered_size=rendered_size,
+    )
+
+
+def _sync_bitbucket(app: RegisteredApp) -> WorkflowSyncResult:
+    """Bitbucket equivalent of ``_sync_github``.
+
+    Bitbucket's branch-restriction API is more complex than GitHub's /
+    GitLab's protection endpoint and requires org-admin permissions to
+    read — we skip the protection probe and write directly. If the write
+    fails because of branch restrictions the caller receives a
+    ``fetch_failed`` result with the provider error code; the operator
+    can then use the "Open PR" affordance on the UI.
+    """
+    connection = _pick_source_connection(app)
+    if connection is None:
+        raise WorkflowSyncError(
+            "NO_CONNECTION",
+            "no active source connection for this app's org. "
+            "Connect a Bitbucket identity under Settings → Source connections, then retry.",
+        )
+
+    rendered = render_astrolift_bitbucket_pipeline(app)
+    rendered_size = len(rendered.encode("utf-8"))
+    deploy_branch = (app.deploy_branch or "main").strip() or "main"
+
+    try:
+        existing = fetch_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=BITBUCKET_WORKFLOW_PATH,
+            ref=deploy_branch,
+        )
+    except ProviderError as exc:
+        return WorkflowSyncResult(
+            status="fetch_failed",
+            rendered_size=rendered_size,
+            error=f"{exc.code}: {exc.message}",
+        )
+
+    if existing is not None and existing == rendered:
+        return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
+
+    commit_message = (
+        f"chore(astrolift): sync CI workflow for {app.slug}"
+        if existing is None
+        else f"chore(astrolift): update CI workflow for {app.slug}"
+    )
+
+    try:
+        put_result = put_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=BITBUCKET_WORKFLOW_PATH,
+            branch=deploy_branch,
+            content=rendered,
+            commit_message=commit_message,
+        )
+    except ProviderError as exc:
+        return WorkflowSyncResult(
+            status="fetch_failed",
+            rendered_size=rendered_size,
+            error=f"{exc.code}: {exc.message}",
+        )
+
+    return WorkflowSyncResult(
+        status="created" if existing is None else "updated",
+        commit_sha=put_result.commit_sha,
+        rendered_size=rendered_size,
+    )
+
+
+def _sync_gitea(app: RegisteredApp) -> WorkflowSyncResult:
+    """Gitea equivalent of ``_sync_github``.
+
+    Probes ``/api/v1/repos/{owner}/{repo}/branches/{branch}`` for the
+    ``protected`` flag; opens a PR (via the providers layer) when the
+    deploy branch is protected.
+    """
+    connection = _pick_source_connection(app)
+    if connection is None:
+        raise WorkflowSyncError(
+            "NO_CONNECTION",
+            "no active source connection for this app's org. "
+            "Connect a Gitea identity under Settings → Source connections, then retry.",
+        )
+
+    rendered = render_astrolift_gitea_ci_workflow(app)
+    rendered_size = len(rendered.encode("utf-8"))
+    deploy_branch = (app.deploy_branch or "main").strip() or "main"
+
+    try:
+        existing = fetch_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=GITEA_WORKFLOW_PATH,
+            ref=deploy_branch,
+        )
+    except ProviderError as exc:
+        return WorkflowSyncResult(
+            status="fetch_failed",
+            rendered_size=rendered_size,
+            error=f"{exc.code}: {exc.message}",
+        )
+
+    if existing is not None and existing == rendered:
+        return WorkflowSyncResult(status="in_sync", rendered_size=rendered_size)
+
+    protected = _is_gitea_branch_protected(
+        connection,
+        repo_full_name=app.source_repo,
+        branch=deploy_branch,
+    )
+
+    commit_message = (
+        f"chore(astrolift): sync CI workflow for {app.slug}"
+        if existing is None
+        else f"chore(astrolift): update CI workflow for {app.slug}"
+    )
+
+    if protected:
+        side_branch = _side_branch_for(app.slug)
+        try:
+            _gitea_create_branch_direct(
+                connection,
+                repo_full_name=app.source_repo,
+                new_branch=side_branch,
+                from_branch=deploy_branch,
+            )
+            put_file(
+                connection,
+                repo_full_name=app.source_repo,
+                path=GITEA_WORKFLOW_PATH,
+                branch=side_branch,
+                content=rendered,
+                commit_message=commit_message,
+            )
+            pr_result = open_pull_request(
+                connection,
+                repo_full_name=app.source_repo,
+                head_branch=side_branch,
+                base_branch=deploy_branch,
+                title=f"Astrolift: sync CI workflow for {app.slug}",
+                body=(
+                    "This PR was opened by Astrolift to keep "
+                    f"`{GITEA_WORKFLOW_PATH}` in sync with the platform's "
+                    f"current settings for **{app.slug}**.\n\n"
+                    "Merge to enable platform-driven deploys against "
+                    f"`{deploy_branch}`."
+                ),
+            )
+        except GiteaProviderError as exc:
+            return WorkflowSyncResult(
+                status="fetch_failed",
+                rendered_size=rendered_size,
+                error=f"{exc.code}: {exc.message}",
+            )
+        except ProviderError as exc:
+            return WorkflowSyncResult(
+                status="fetch_failed",
+                rendered_size=rendered_size,
+                error=f"{exc.code}: {exc.message}",
+            )
+        return WorkflowSyncResult(
+            status="pr_opened",
+            pr_url=pr_result.url,
+            rendered_size=rendered_size,
+        )
+
+    try:
+        put_result = put_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=GITEA_WORKFLOW_PATH,
             branch=deploy_branch,
             content=rendered,
             commit_message=commit_message,
