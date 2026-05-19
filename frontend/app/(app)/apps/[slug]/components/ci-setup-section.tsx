@@ -9,9 +9,11 @@ import {
   FileCheck2Icon,
   KeyIcon,
   Loader2Icon,
+  ShieldCheckIcon,
   TerminalIcon,
   UploadCloudIcon,
   WebhookIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -31,6 +33,7 @@ import {
   INSTALL_SOURCE_WEBHOOK,
   PUSH_CI_SECRETS_TO_REPO,
   PUSH_CI_WORKFLOW_TO_REPO,
+  VALIDATE_CI_SECRETS,
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 
@@ -179,6 +182,7 @@ export function CiSetupSection({
       </details>
 
       <Can permission="app.update">
+        <ValidateCiSecretsAction appSlug={appSlug} />
         <PushAndRotateAction appSlug={appSlug} />
         <SyncWorkflowFileAction appSlug={appSlug} />
         <InstallSourceWebhookAction
@@ -275,6 +279,117 @@ export function PushAndRotateButton({
         onConfirm={handleConfirm}
       />
     </>
+  );
+}
+
+/**
+ * #693 — Read-only probe of the app's GitHub repo Actions secrets,
+ * surfacing per-secret 'isSet / isCurrent' status. No-op on Push;
+ * just verifies what's there. Saves operators a deploy-and-find-out
+ * cycle when wondering 'did I really push those secrets?'.
+ */
+interface ValidateCiSecretsResp {
+  validateAstroliftCiSecrets: {
+    ok: boolean;
+    errors: Array<{ code: string; message: string; field?: string | null }>;
+    data: {
+      repo: string;
+      results: Array<{
+        secretName: string;
+        isSet: boolean;
+        isCurrent: boolean;
+        updatedAt: string | null;
+      }>;
+    } | null;
+  };
+}
+
+function ValidateCiSecretsAction({ appSlug }: { appSlug: string }) {
+  const [validate, { loading }] = useMutation<ValidateCiSecretsResp>(VALIDATE_CI_SECRETS);
+  const [results, setResults] = React.useState<
+    ValidateCiSecretsResp["validateAstroliftCiSecrets"]["data"] | null
+  >(null);
+
+  async function handleValidate() {
+    try {
+      const { data } = await validate({ variables: { input: { appSlug } } });
+      const payload = data?.validateAstroliftCiSecrets;
+      if (!payload?.ok || !payload.data) {
+        const err = payload?.errors?.[0];
+        // PRECONDITION bucket means an upstream wiring problem rather
+        // than a per-secret state — surface the message + clear any
+        // stale results from a prior good run.
+        toast.error(err?.message ?? "Couldn't validate CI secrets.");
+        setResults(null);
+        return;
+      }
+      setResults(payload.data);
+      const okCount = payload.data.results.filter((r) => r.isSet && r.isCurrent).length;
+      const total = payload.data.results.length;
+      if (okCount === total) {
+        toast.success(`All ${total} secrets are set and current on ${payload.data.repo}.`);
+      } else {
+        toast.warning(`${okCount}/${total} secrets healthy on ${payload.data.repo}.`);
+      }
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-md border border-dashed p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Validate CI secrets</p>
+          <p className="text-muted-foreground text-xs">
+            Check what GitHub Actions actually sees today — no changes, just a read.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleValidate}
+          disabled={loading}
+          className="gap-1.5"
+        >
+          {loading ? (
+            <Loader2Icon className="size-3.5 animate-spin" />
+          ) : (
+            <ShieldCheckIcon className="size-3.5" />
+          )}
+          Validate
+        </Button>
+      </div>
+      {results && results.results.length > 0 ? (
+        <ul className="divide-border divide-y rounded-md border text-xs">
+          {results.results.map((r) => (
+            <li key={r.secretName} className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+              <span className="font-mono">{r.secretName}</span>
+              <span className="inline-flex items-center gap-1.5">
+                {r.isSet && r.isCurrent ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                    <CheckIcon className="size-3" /> current
+                  </span>
+                ) : r.isSet ? (
+                  <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                    <CheckIcon className="size-3" /> set, stale
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-rose-700 dark:text-rose-300">
+                    <XIcon className="size-3" /> not set
+                  </span>
+                )}
+                {r.updatedAt ? (
+                  <span className="text-muted-foreground">
+                    {new Date(r.updatedAt).toLocaleDateString()}
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

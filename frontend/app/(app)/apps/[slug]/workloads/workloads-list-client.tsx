@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  AlertCircleIcon,
   AlertTriangleIcon,
   BoxIcon,
   CalendarClockIcon,
@@ -64,6 +65,16 @@ interface WorkloadLiveStatus {
   ready: number;
   desired: number;
   maxRestarts: number;
+  // #666 — surfaces the most recent K8s warning event across the
+  // workload's pods so operators see ImagePullBackOff /
+  // CrashLoopBackOff / OOMKilled inline without drilling into the
+  // pod's detail page.
+  errorEvent: {
+    reason: string;
+    message: string;
+    count: number;
+    lastSeen: string;
+  } | null;
 }
 
 /**
@@ -92,10 +103,29 @@ function aggregatePodStatus(
     const pp = byWorkload.get(w.slug) ?? [];
     const ready = pp.filter((p) => (p.phase || "").toLowerCase() === "running").length;
     const maxRestarts = pp.reduce((acc, p) => Math.max(acc, p.restarts ?? 0), 0);
+    // #666 — pick the most-recent error event across pods so the
+    // chip surfaces what's actually breaking. `recentErrorEvent`
+    // is null on healthy pods.
+    let errorEvent: WorkloadLiveStatus["errorEvent"] = null;
+    for (const p of pp) {
+      const ev = (p as AstroliftAppPod & {
+        recentErrorEvent?: {
+          reason: string;
+          message: string;
+          count: number;
+          lastSeen: string;
+        } | null;
+      }).recentErrorEvent;
+      if (!ev) continue;
+      if (!errorEvent || Date.parse(ev.lastSeen) > Date.parse(errorEvent.lastSeen)) {
+        errorEvent = ev;
+      }
+    }
     result.set(w.slug, {
       ready,
       desired: Math.max(w.replicas || 0, pp.length),
       maxRestarts,
+      errorEvent,
     });
   }
   return result;
@@ -253,6 +283,7 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                     ready: 0,
                     desired: w.replicas || 0,
                     maxRestarts: 0,
+                    errorEvent: null as WorkloadLiveStatus["errorEvent"],
                   };
                   return (
                     <TableRow
@@ -306,6 +337,22 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                           <div className="text-muted-foreground mt-1">
                             HPA {w.hpaMinReplicas}–{w.hpaMaxReplicas} @{" "}
                             {w.hpaTargetCpuPct}% CPU
+                          </div>
+                        ) : null}
+                        {/* #666 — inline error chip for ImagePullBackOff /
+                            CrashLoopBackOff / OOMKilled / FailedScheduling.
+                            Shows the K8s reason as the badge label; the
+                            tooltip carries the full event message. */}
+                        {live.errorEvent ? (
+                          <div className="mt-1" title={live.errorEvent.message}>
+                            <Badge
+                              variant="outline"
+                              className="border-rose-500/40 text-rose-700 dark:text-rose-300 gap-1"
+                            >
+                              <AlertCircleIcon className="size-3" />
+                              {live.errorEvent.reason}
+                              {live.errorEvent.count > 1 ? ` × ${live.errorEvent.count}` : ""}
+                            </Badge>
                           </div>
                         ) : null}
                       </TableCell>
