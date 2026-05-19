@@ -96,6 +96,7 @@ export type Appsecretmetadatapayload = {
   environmentName: Scalars['String']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   key: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
   setAt?: Maybe<Scalars['DateTime']['output']>;
   setVia: Scalars['String']['output'];
 };
@@ -515,6 +516,7 @@ export type AstroliftAppSecret = {
   lastEditedAt?: Maybe<Scalars['DateTime']['output']>;
   lastEditedBy?: Maybe<AstroliftSecretEditor>;
   managedServiceKind: Scalars['String']['output'];
+  scope: Scalars['String']['output'];
   setVia: Scalars['String']['output'];
   source: Scalars['String']['output'];
 };
@@ -5955,6 +5957,7 @@ export type RotateAppSecretInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   key: Scalars['String']['input'];
+  scope: Scalars['String']['input'];
   setVia: InputMaybe<Scalars['String']['input']>;
   value: Scalars['String']['input'];
 };
@@ -6009,6 +6012,7 @@ export type SetAppSecretInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
   key: Scalars['String']['input'];
+  scope: Scalars['String']['input'];
   setVia: InputMaybe<Scalars['String']['input']>;
   value: Scalars['String']['input'];
 };
@@ -6018,6 +6022,7 @@ export type SetAppSecretMetadataInput = {
   environmentName: InputMaybe<Scalars['String']['input']>;
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
   key: Scalars['String']['input'];
+  scope: Scalars['String']['input'];
   setVia: InputMaybe<Scalars['String']['input']>;
 };
 
