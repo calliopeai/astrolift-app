@@ -442,6 +442,12 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             message=(f"azure monitor workspace {workspace_name} update queued"),
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="timeseries_monitor",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -537,6 +543,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="timeseries_monitor")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         workspace_name = self._workspace_name_from_handle(handle.handle)
         existing = self._describe(workspace_name)
@@ -556,6 +563,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="timeseries_monitor")
     def binding(self, handle: ServiceHandle) -> Binding:
         workspace_name = self._workspace_name_from_handle(handle.handle)
         existing = self._describe(workspace_name)
@@ -619,6 +627,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="timeseries_monitor")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """Azure Monitor managed Prometheus has no first-party
         snapshot API. The linked Log Analytics workspace is the
@@ -640,6 +649,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="timeseries_monitor")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -658,6 +668,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="timeseries_monitor", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -679,6 +690,7 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="timeseries_monitor", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
