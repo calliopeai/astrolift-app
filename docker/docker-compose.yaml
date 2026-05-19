@@ -31,10 +31,6 @@ services:
       - POSTGRES_HOST=postgres-local
       - POSTGRES_PORT=5432
       - DJANGO_CACHE_URL=redis://redis-local:6379/1
-      - OPENSEARCH_URL=http://opensearch-local:9200
-      # Indexing is opt-in (off by default everywhere). The docker
-      # stack ships an opensearch-local container, so flip it on here.
-      - OPENSEARCH_INDEXING=1
       - DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
       - EMAIL_HOST=mailpit-local
       - EMAIL_PORT=1025
@@ -139,24 +135,6 @@ services:
       redis-local:
         condition: service_healthy
 
-  opensearch-local:
-    profiles: ["search"]
-    image: opensearchproject/opensearch:2
-    container_name: opensearch-local
-    environment:
-      - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
-    ports:
-      - '127.0.0.1:${ASTROLIFT_OPENSEARCH_PORT:-9200}:9200'
-    volumes:
-      - opensearch-data:/usr/share/opensearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   minio-local:
     profiles: ["storage"]
     image: minio/minio:latest
@@ -234,5 +212,4 @@ volumes:
   postgres_data:
   static_volume:
   media_volume:
-  opensearch-data:
   minio-data:

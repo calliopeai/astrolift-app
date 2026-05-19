@@ -705,7 +705,7 @@ class SiteLabelAdmin(BaseCoreAdmin, AdminGrapheneUtils):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    actions = ['flush_cache', 'check_opensearch_connection', 'create_opensearch_index', 'delete_opensearch_index']
+    actions = ['flush_cache']
     list_display = ('session_key', 'username', 'expire_date')
     search_fields = ['session_key']
     list_filter = ['expire_date']
@@ -726,59 +726,6 @@ class SessionAdmin(admin.ModelAdmin):
     def flush_cache(self, request, queryset):
         from django.core.cache import cache
         cache.clear()
-
-    @admin.action(description='Run search index session')
-    def create_opensearch_index(self, request, queryset):
-        from django.core.management import call_command
-        from opensearchpy.exceptions import ConflictError
-        try:
-            # Create OpenSearch indices
-            logger.info("Create OpenSearch indices")
-            call_command('opensearch', 'index', 'create', '--force')
-            logger.info("Successfully created OpenSearch indices")
-
-            # Index documents
-            logger.info("Create OpenSearch docs")
-            call_command('opensearch', 'document', 'index', '--force')
-            logger.info("Successfully indexed documents to OpenSearch")
-
-            messages.success(request, 'Successfully created and indexed OpenSearch indices')
-        except (SystemExit, ConflictError) as e:
-            # Index doesn't exist - this is not an error, just log it
-            logger.info(f"OpenSearch index already exists {e}")
-            messages.warning(request, 'OpenSearch index already exists')
-        except Exception as e:
-            logger.exception(f'Failed to run search index session: {e}. Please try to delete any previous indices')
-            messages.error(request, f'Failed to run search index session: {str(e)}')
-
-    @admin.action(description='Delete search index session')
-    def delete_opensearch_index(self, request, queryset):
-        from django.core.management import call_command
-        from opensearchpy.exceptions import NotFoundError
-        try:
-            # Delete any previous indexes if any
-            logger.info("Deleting previous OpenSearch indices")
-            call_command('opensearch', 'index', 'delete', '--force')
-            logger.info("Successfully deleted previous OpenSearch indices")
-            messages.success(request, 'Successfully deleted OpenSearch indices')
-        except (SystemExit, NotFoundError) as e:
-            # Index doesn't exist - this is not an error, just log it
-            logger.info(f"OpenSearch index doesn't exist or was already deleted {e}")
-            messages.warning(request, 'OpenSearch index does not exist or was already deleted')
-        except Exception as e:
-            logger.exception(f'Failed to delete search index: {e}')
-            messages.error(request, f'Failed to delete search index: {str(e)}')
-
-    @admin.action(description='Check opensearch connection')
-    def check_opensearch_connection(self, request, queryset):
-        from opensearchpy import connections
-
-        try:
-            client = connections.get_connection()
-            client.info()
-            logger.info(f"Successfully connected to OpenSearch {client.info()}.")
-        except Exception as e:
-            logger.info(f"Failed to connect to OpenSearch: {e}")
 
 
 @admin.register(TemplateModel)

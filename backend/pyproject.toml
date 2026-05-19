@@ -54,7 +54,6 @@ extend-exclude = [
   "core/serializers",
   "core/systems",
   "core/tests/helper.py",
-  "core/tests/test_opensearch.py",
   "core/tests/test_rocketchat_rest_client.py",
   "core/tests/test_signal_heper.py",
   "core/tests/test_tracking.py",

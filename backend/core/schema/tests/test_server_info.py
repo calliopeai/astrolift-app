@@ -165,7 +165,6 @@ class AstroliftServerInfoTest(TestCase):
             TEMPORAL_ENABLED = True
             DEPLOY_PIPELINE_ENABLED = True
             EMAIL_NOTIFICATIONS = False
-            SEARCH_PROFILE_ENABLED = False
             ALLOW_SELF_APPROVE_DEPLOYS = False
             DEPLOY_TOKEN_LEGACY_PREFIX_ACCEPTED = True
 

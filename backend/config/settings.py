@@ -282,13 +282,6 @@ CACHES = {
     },
 }
 
-# OpenSearch
-OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
-# Indexing is opt-in; staging/prod set OPENSEARCH_INDEXING=1.
-# Off by default keeps test/local stacks free of NXDOMAIN noise from
-# the indexing signals when no OpenSearch host is reachable.
-OPENSEARCH_INDEXING = os.environ.get("OPENSEARCH_INDEXING", "").lower() in ("1", "true", "yes", "on")
-
 CSRF_TRUSTED_ORIGINS = [
     "https://storage.googleapis.com/",
     "http://localhost:3000",
@@ -410,7 +403,6 @@ CONSTANCE_CONFIG = {
     "PUT_PRESIGNED_URL_EXPIRATION": (60, "Time to live in seconds of presigned urls for uploading."),
     "GET_PRESIGNED_URL_EXPIRATION": (3600, "Time to live in seconds of presigned urls for downloading."),
     "AUTH0_REGISTER_NEW_USER": (False, "Register new users in Auth0"),
-    "SEARCH_PROFILE_ENABLED": (False, "Enables opensearch for profile search"),
     "EMAIL_NOTIFICATIONS": (False, "Enables the platform to send Email Notifications"),
     "TEMPORAL_ENABLED": (
         ASTROLIFT_TEMPORAL_ENABLED,
@@ -611,7 +603,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "collapse": False,
     },
     "Auth0": {"fields": ("AUTH0_REGISTER_NEW_USER",), "collapse": False},
-    "Search": {"fields": ("SEARCH_PROFILE_ENABLED",), "collapse": False},
     "Notifications": {"fields": ("EMAIL_NOTIFICATIONS",), "collapse": False},
     "Workflows": {
         "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
