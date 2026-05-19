@@ -665,10 +665,16 @@ class RegistryQuery:
         This resolver keeps the flat-list return shape for back-compat
         with the ``LIST_APPS`` query (#405). New callers should use
         ``astroliftAppsPage`` for cursor pagination + ``totalCount``.
+
+        Archived apps (#743) are hidden from this list. The standard
+        list query has no opt-in for surfacing them; ops UIs that need
+        to see archived rows should call ``astroliftAppsPage`` with
+        ``includeArchived: true``.
         """
         status = _coerce_apps_status(status)
         qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
-            deleted_at__isnull=True
+            deleted_at__isnull=True,
+            archived_at__isnull=True,
         )
         qs = _apply_apps_list_filters(
             qs,
@@ -715,6 +721,7 @@ class RegistryQuery:
         sort_by: AppsListSortKey = AppsListSortKey.CREATED_DESC,
         cursor: str | None = None,
         limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
+        include_archived: bool = False,
     ) -> RegisteredAppPageType:
         """Cursor-paginated org-scoped apps list (#481, #729).
 
@@ -747,11 +754,18 @@ class RegistryQuery:
         the worst-case page latency bounded; callers that keep
         paginating will still receive every match across multiple
         pages.
+
+        ``include_archived`` (default False, #743) opts the page into
+        showing archived apps. The standard list view hides them so
+        operators don't see scaled-to-zero rows mixed in; the future
+        "Archived apps" admin page flips this flag on.
         """
         status = _coerce_apps_status(status)
         qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
             deleted_at__isnull=True
         )
+        if not include_archived:
+            qs = qs.filter(archived_at__isnull=True)
         qs = _apply_apps_list_filters(
             qs,
             search=search,
@@ -801,6 +815,10 @@ class RegistryQuery:
         docstring for the per-axis behaviour. Filters compose with
         the viewer's scope: a search needle still only walks rows the
         viewer can see.
+
+        Archived apps (#743) are hidden — same rationale as
+        :func:`astrolift_apps`. The page variant exposes an
+        ``includeArchived`` opt-in for ops; this flat list does not.
         """
         status = _coerce_apps_status(status)
         scope_filter = _viewer_scope_filter()
@@ -809,7 +827,8 @@ class RegistryQuery:
 
         tenant = get_current_tenant()
         base_qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
-            deleted_at__isnull=True
+            deleted_at__isnull=True,
+            archived_at__isnull=True,
         )
         if tenant is not None and tenant.organization_id is not None:
             base_qs = base_qs.filter(organization_id=tenant.organization_id)
@@ -857,6 +876,7 @@ class RegistryQuery:
         sort_by: AppsListSortKey = AppsListSortKey.CREATED_DESC,
         cursor: str | None = None,
         limit: int = _APPS_LIST_PAGE_DEFAULT_LIMIT,
+        include_archived: bool = False,
     ) -> RegisteredAppPageType:
         """Cursor-paginated viewer-scoped apps list (#481, #729).
 
@@ -865,6 +885,10 @@ class RegistryQuery:
         from the tenancy guardrail for the same reason
         :func:`astrolift_my_apps` is — the viewer's bindings ARE the
         gate.
+
+        ``include_archived`` (default False, #743) opts the page into
+        showing archived apps the viewer can reach. Same opt-in shape
+        as :func:`astrolift_apps_page`.
         """
         status = _coerce_apps_status(status)
         scope_filter = _viewer_scope_filter()
@@ -875,6 +899,8 @@ class RegistryQuery:
         base_qs = RegisteredApp.objects.select_related("organization", "team", "project").filter(
             deleted_at__isnull=True
         )
+        if not include_archived:
+            base_qs = base_qs.filter(archived_at__isnull=True)
         if tenant is not None and tenant.organization_id is not None:
             base_qs = base_qs.filter(organization_id=tenant.organization_id)
 

@@ -5131,6 +5131,7 @@ export type QueryAstroliftAppsArgs = {
 
 export type QueryAstroliftAppsPageArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
+  includeArchived?: Scalars['Boolean']['input'];
   includeFreshness?: Scalars['Boolean']['input'];
   limit?: Scalars['Int']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
@@ -5325,6 +5326,7 @@ export type QueryAstroliftMyAppsArgs = {
 
 export type QueryAstroliftMyAppsPageArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
+  includeArchived?: Scalars['Boolean']['input'];
   includeFreshness?: Scalars['Boolean']['input'];
   limit?: Scalars['Int']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;

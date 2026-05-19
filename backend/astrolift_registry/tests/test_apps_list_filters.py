@@ -661,3 +661,87 @@ def test_sort_by_cursor_mismatch_restarts_from_page_1():
     # Restarted from page 1 — all 5 apps are present
     assert page2.total_count == 5
     assert len(page2.items) == 5
+
+
+# ---------- archive filter (#743) -------------------------------------
+
+
+def test_apps_list_hides_archived_apps():
+    """Archived apps are excluded from the standard flat list."""
+    scaffold = _scaffold("-archive-flat")
+    user = _superuser("archive-flat-user")
+
+    archived = scaffold.apps["ok-a"]
+    archived.archived_at = timezone.now()
+    archived.save(update_fields=["archived_at"])
+
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        result = RegistryQuery().astrolift_apps(_info())
+
+    slugs = {a.slug for a in result}
+    assert archived.slug not in slugs
+    assert slugs == {scaffold.apps[k].slug for k in ("failed-a", "stale-a", "never-a", "ok-b")}
+
+
+def test_apps_page_hides_archived_by_default():
+    """Cursor-paginated org list hides archived apps unless include_archived=True."""
+    scaffold = _scaffold("-archive-page")
+    user = _superuser("archive-page-user")
+
+    archived = scaffold.apps["ok-a"]
+    archived.archived_at = timezone.now()
+    archived.save(update_fields=["archived_at"])
+
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        hidden = RegistryQuery().astrolift_apps_page(_info(), limit=100)
+        revealed = RegistryQuery().astrolift_apps_page(_info(), limit=100, include_archived=True)
+
+    assert archived.slug not in {a.slug for a in hidden.items}
+    assert hidden.total_count == 4
+    assert archived.slug in {a.slug for a in revealed.items}
+    assert revealed.total_count == 5
+
+
+def test_my_apps_hides_archived_apps():
+    """Viewer-scoped flat list hides archived apps."""
+    scaffold = _scaffold("-archive-my")
+    # Bind the viewer to the org so my_apps surfaces every row.
+    user = _user("archive-my-user")
+    RoleBinding.objects.create(
+        user=user,
+        role=scaffold.role,
+        scope_kind=RoleBinding.ScopeKind.ORG,
+        scope_id=scaffold.org.id,
+    )
+
+    archived = scaffold.apps["ok-b"]
+    archived.archived_at = timezone.now()
+    archived.save(update_fields=["archived_at"])
+
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        result = RegistryQuery().astrolift_my_apps(_info())
+
+    assert archived.slug not in {a.slug for a in result}
+
+
+def test_my_apps_page_include_archived_opt_in():
+    """Viewer-scoped page exposes archived apps via include_archived."""
+    scaffold = _scaffold("-archive-my-page")
+    user = _user("archive-my-page-user")
+    RoleBinding.objects.create(
+        user=user,
+        role=scaffold.role,
+        scope_kind=RoleBinding.ScopeKind.ORG,
+        scope_id=scaffold.org.id,
+    )
+
+    archived = scaffold.apps["never-a"]
+    archived.archived_at = timezone.now()
+    archived.save(update_fields=["archived_at"])
+
+    with tenant_context(TenantContext(organization_id=scaffold.org.id, actor_user_id=user.id)):
+        hidden = RegistryQuery().astrolift_my_apps_page(_info(), limit=100)
+        revealed = RegistryQuery().astrolift_my_apps_page(_info(), limit=100, include_archived=True)
+
+    assert archived.slug not in {a.slug for a in hidden.items}
+    assert archived.slug in {a.slug for a in revealed.items}
