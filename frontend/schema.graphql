@@ -291,6 +291,9 @@ type AstroliftAppDomain {
   certificateState: String!
   lastCertificateError: String!
   byoCertificateUploadedAt: DateTime
+  certExpiresAt: DateTime
+  certIssuerSerial: String!
+  certObservabilityStatus: String!
 }
 
 type AstroliftAppDomainMutationResult {

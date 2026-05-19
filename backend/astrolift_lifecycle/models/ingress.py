@@ -190,6 +190,61 @@ class CustomDomain(BaseCoreModel):
     )
     byo_certificate_uploaded_at = models.DateTimeField(null=True, blank=True)
 
+    # ---- cert observability metadata (#731) -----------------------
+    # Cached snapshot of the TLS driver's ``CertificateInfo`` so the
+    # AppDomain GraphQL type can render 'expires in N days' without a
+    # per-request round-trip to the cloud's cert API.  Refreshed at
+    # most once per hour by the resolver's lazy refresher (#731) and
+    # by the cert-renewal workflow when it rotates the cert.
+
+    cert_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Cached ``not_after`` from the TLS driver's "
+            "``list_certificates`` call.  Null when no certificate has "
+            "been issued yet (state ``not_requested`` / ``issuing``) or "
+            "the driver returned no row.  The FE renders 'expires in N "
+            "days' off this column and dots the chip warning when less "
+            "than 14 days."
+        ),
+    )
+    cert_issuer_serial = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=(
+            "Stable identifier for the current cert across renewals — "
+            "the ACM ARN, the Let's Encrypt serial, etc.  Lets the "
+            "renewal workflow observe a renewal landing (the serial "
+            "changes) versus the same cert living on past its "
+            "originally-issued date (the serial holds steady)."
+        ),
+    )
+    cert_observability_status = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=(
+            "Driver-reported renewal status the FE colours the chip "
+            "off ('auto' / 'manual' / 'failed' / 'unknown').  Empty "
+            "string when never populated; the FE renders the chip "
+            "neutral in that case."
+        ),
+    )
+    cert_metadata_refreshed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Last time the resolver's lazy refresher (or the renewal "
+            "workflow) updated cert_expires_at / cert_issuer_serial / "
+            "cert_observability_status.  Reads older than 1h trigger a "
+            "background refresh; null forces a refresh on the next "
+            "read."
+        ),
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

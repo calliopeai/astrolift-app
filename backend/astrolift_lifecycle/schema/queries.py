@@ -505,7 +505,14 @@ class LifecycleQuery:
             )
             .order_by("-created_at")[:100]
         )
-        return [app_domain_to_type(d) for d in qs]
+        domains = list(qs)
+        # #731 — lazy refresh of cached cert observability metadata.
+        # Best-effort + bounded by a 1h TTL so the page render isn't
+        # gated on a cloud round-trip for every read.  Errors swallow:
+        # operators see the previously-cached value (or no chip on
+        # first refresh failure).
+        _refresh_cert_metadata_if_stale(domains, app_slug=app_slug)
+        return [app_domain_to_type(d) for d in domains]
 
     @strawberry.field
     @require_permission(Permission.APP_READ_LOGS)
@@ -1086,6 +1093,115 @@ def _preview_with_cost(p) -> PreviewEnvironmentType:
         ),
         estimated_daily_cost_usd=cost,
     )
+
+
+_CERT_METADATA_TTL_SECONDS = 60 * 60  # 1h cache, per #731 acceptance
+
+
+def _refresh_cert_metadata_if_stale(domains: list, *, app_slug: str) -> None:
+    """Best-effort lazy refresh of cached TLS cert metadata (#731).
+
+    Walks ``domains`` and, for any row whose ``cert_metadata_refreshed_at``
+    is older than the 1h TTL (or null), asks the TLS driver for the
+    current cert info and persists the snapshot back to the row.  Errors
+    are swallowed — the FE renders the previously-cached value (or no
+    chip on first failure) rather than 502-ing the whole page.
+
+    Resolved once per call: the driver_for_capability lookup is cached
+    under the cluster instance, and the list_certificates call accepts
+    a hostname filter so we only fetch the rows we care about per
+    domain.  When multiple domains share a cluster we batch by hostname
+    rather than per-cluster (drivers vary in how they implement the
+    filter; AWS ACM matches against DomainName + SANs).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from core.app_deploy import AppDeployError, driver_for_capability
+
+    now = timezone.now()
+    ttl = timedelta(seconds=_CERT_METADATA_TTL_SECONDS)
+    # Cache driver lookups per (cluster_id) — multiple domains often
+    # share a cluster so we don't want N driver instantiations.
+    driver_cache: dict[int, object] = {}
+    cluster_cache: dict[int, object] = {}
+
+    for d in domains:
+        if d.certificate_state in ("not_requested", "issuing", "byo"):
+            # No upstream cert to query yet (or operator-managed BYO);
+            # skip refresh so we don't carry stale ACM data into a row
+            # whose lifecycle hasn't reached issuance.
+            continue
+        if d.cert_metadata_refreshed_at and (now - d.cert_metadata_refreshed_at) < ttl:
+            continue
+
+        # Resolve the cluster lazily; the domain doesn't carry a direct
+        # FK so we go through the registered app + default cluster.
+        app = getattr(d, "registered_app", None)
+        if app is None:
+            continue
+        cluster = cluster_cache.get(app.pk)
+        if cluster is None:
+            cluster = _resolve_app_cluster(app_slug=app.slug, environment_name=None)
+            cluster_cache[app.pk] = cluster
+        if cluster is None:
+            continue
+
+        driver = driver_cache.get(cluster.pk)
+        if driver is None:
+            try:
+                driver = driver_for_capability(cluster, "tls")
+            except AppDeployError:
+                driver_cache[cluster.pk] = False  # type: ignore[assignment]
+                continue
+            driver_cache[cluster.pk] = driver
+        if driver is False:
+            continue
+
+        try:
+            certs = driver.list_certificates(filter_hostname=d.hostname)
+        except (NotImplementedError, Exception):  # noqa: BLE001
+            continue
+
+        # Find the row matching this domain's hostname.  list_certificates
+        # may return multiple (wildcards, SANs); prefer an exact match
+        # then fall back to the first row.
+        match = next((c for c in certs if getattr(c, "hostname", "") == d.hostname), None)
+        if match is None and certs:
+            match = certs[0]
+        if match is None:
+            # Driver returned no rows — still refresh the timestamp so
+            # we don't hot-loop on a hostname the driver can't answer.
+            d.cert_metadata_refreshed_at = now
+            d.save(update_fields=["cert_metadata_refreshed_at", "updated_at", "version"])
+            continue
+
+        try:
+            from datetime import datetime
+
+            not_after_raw = getattr(match, "not_after", "") or ""
+            if not_after_raw:
+                parsed = datetime.fromisoformat(not_after_raw.replace("Z", "+00:00"))
+                d.cert_expires_at = parsed
+            d.cert_issuer_serial = getattr(match, "id", "") or ""
+            d.cert_observability_status = getattr(match, "renewal_status", "") or ""
+            d.cert_metadata_refreshed_at = now
+            d.save(
+                update_fields=[
+                    "cert_expires_at",
+                    "cert_issuer_serial",
+                    "cert_observability_status",
+                    "cert_metadata_refreshed_at",
+                    "updated_at",
+                    "version",
+                ]
+            )
+        except (ValueError, TypeError):
+            # Bad timestamp shape — refresh the timestamp anyway so we
+            # don't hot-loop, but leave the other fields untouched.
+            d.cert_metadata_refreshed_at = now
+            d.save(update_fields=["cert_metadata_refreshed_at", "updated_at", "version"])
 
 
 def _resolve_app_cluster(*, app_slug: str, environment_name: str | None):
