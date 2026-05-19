@@ -36,6 +36,7 @@ import string
 from dataclasses import dataclass, field
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -151,6 +152,12 @@ class RDSMySQLDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="mysql_rds",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         instance_id = self._instance_id_for(spec=spec)
         cfg = spec.config or {}
@@ -235,6 +242,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             message=(f"db instance {instance_id} provisioning " f"(password in {secret_arn})"),
         )
 
+    @driver_op(cloud="aws", driver="mysql_rds")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, instance_id = parse_handle(spec.handle)
         cfg = spec.config or {}
@@ -286,6 +294,12 @@ class RDSMySQLDriver(ManagedServiceDriver):
             message=f"db instance {instance_id} update queued",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="mysql_rds",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -366,6 +380,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="mysql_rds")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, instance_id = parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -382,6 +397,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             message=f"rds reports {rds_state}",
         )
 
+    @driver_op(cloud="aws", driver="mysql_rds")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, instance_id = parse_handle(handle.handle)
         existing = self._describe(instance_id)
@@ -423,6 +439,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="mysql_rds")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
@@ -443,6 +460,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="mysql_rds")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -474,6 +492,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             message=(f"restore from snapshot {snapshot.snapshot_id} queued"),
         )
 
+    @driver_op(cloud="aws", driver="mysql_rds", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -495,6 +514,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="mysql_rds", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={

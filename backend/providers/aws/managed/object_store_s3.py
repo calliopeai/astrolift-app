@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -74,6 +75,12 @@ class S3Driver(ManagedServiceDriver):
 
     # ---- lifecycle ------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="object_store_s3",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         bucket_name = self._bucket_name_for(spec=spec)
         try:
@@ -165,6 +172,7 @@ class S3Driver(ManagedServiceDriver):
             message=f"bucket {bucket_name} provisioned",
         )
 
+    @driver_op(cloud="aws", driver="object_store_s3")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         """S3 buckets don't have 'size'; this is a no-op for now.
         Spec acceptance: 'update_managed_service is idempotent.'"""
@@ -176,6 +184,12 @@ class S3Driver(ManagedServiceDriver):
                     "the bucket-policy editor)",
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="object_store_s3",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -258,6 +272,7 @@ class S3Driver(ManagedServiceDriver):
 
     # ---- read-only ops --------------------------------------------
 
+    @driver_op(cloud="aws", driver="object_store_s3")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         _, bucket_name = parse_handle(handle.handle)
         try:
@@ -291,6 +306,7 @@ class S3Driver(ManagedServiceDriver):
             message=f"bucket {bucket_name} reachable",
         )
 
+    @driver_op(cloud="aws", driver="object_store_s3")
     def binding(self, handle: ServiceHandle) -> Binding:
         _, bucket_name = parse_handle(handle.handle)
         bucket_arn = f"arn:aws:s3:::{bucket_name}"
@@ -324,6 +340,7 @@ class S3Driver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="object_store_s3")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """S3 'snapshots' are version markers — versioning gives a
         natural point-in-time restore. The snapshot_id is the
@@ -345,6 +362,7 @@ class S3Driver(ManagedServiceDriver):
             created_at=datetime.now(tz=UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="object_store_s3")
     def restore(
         self, snapshot: SnapshotHandle, target: ProvisionSpec,
     ) -> ProvisionResult:
@@ -363,6 +381,7 @@ class S3Driver(ManagedServiceDriver):
             errors=["not_implemented"],
         )
 
+    @driver_op(cloud="aws", driver="object_store_s3", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -377,6 +396,7 @@ class S3Driver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="object_store_s3", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(env_vars={
             "S3_BUCKET_NAME": "S3 bucket name",

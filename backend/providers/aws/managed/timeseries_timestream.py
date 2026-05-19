@@ -50,6 +50,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -156,6 +157,12 @@ class TimestreamDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="aws",
+        driver="timeseries_timestream",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         database_name = self._database_name_for(spec=spec)
         table_name = self._table_name_for(spec=spec)
@@ -298,6 +305,7 @@ class TimestreamDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="timeseries_timestream")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         database_name, table_name = self._split_handle(spec.handle)
         cfg = spec.config or {}
@@ -363,6 +371,12 @@ class TimestreamDriver(ManagedServiceDriver):
             message=(f"timestream {database_name}/{table_name} update queued"),
         )
 
+    @driver_op(
+        cloud="aws",
+        driver="timeseries_timestream",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -464,6 +478,7 @@ class TimestreamDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="aws", driver="timeseries_timestream")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         database_name, table_name = self._split_handle(handle.handle)
         existing_db = self._describe_database(database_name)
@@ -493,6 +508,7 @@ class TimestreamDriver(ManagedServiceDriver):
             message=f"timestream reports {ts_state}",
         )
 
+    @driver_op(cloud="aws", driver="timeseries_timestream")
     def binding(self, handle: ServiceHandle) -> Binding:
         database_name, table_name = self._split_handle(handle.handle)
         existing_db = self._describe_database(database_name)
@@ -552,6 +568,7 @@ class TimestreamDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="timeseries_timestream")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """Timestream has no first-party snapshot API -- the magnetic
         store IS the durability story (queryable retention up to the
@@ -577,6 +594,7 @@ class TimestreamDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="aws", driver="timeseries_timestream")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -599,6 +617,7 @@ class TimestreamDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="aws", driver="timeseries_timestream", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -621,6 +640,7 @@ class TimestreamDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="aws", driver="timeseries_timestream", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
