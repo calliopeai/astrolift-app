@@ -66,11 +66,6 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
         "Outbound email notifications are enabled on this install.",
     ),
     (
-        "SEARCH_PROFILE_ENABLED",
-        "search.profile_enabled",
-        "OpenSearch-backed profile search is enabled.",
-    ),
-    (
         "ALLOW_SELF_APPROVE_DEPLOYS",
         "approvals.self_approve_allowed",
         "Single-engineer / dev orgs may approve their own deploy requests.",
