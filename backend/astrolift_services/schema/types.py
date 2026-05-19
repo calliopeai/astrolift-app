@@ -58,6 +58,24 @@ class AppSecretType:
     last_edited_at: dt.datetime | None = None
     last_edited_by: SecretEditorType | None = None
 
+    # ---- sidecar metadata (#677 / #678) -----------------------------
+    # Both fields are nullable / empty by default — most app secrets do
+    # not carry explicit expiry or non-default provenance.  When the
+    # operator (or a CLI / env-paste / bundle writer) sets these via
+    # ``setAppSecretMetadata`` the FE renders an expiry chip and a
+    # "Set via <source>" tooltip in the secret-row's last-edited cell.
+
+    expires_at: dt.datetime | None = None
+    """Operator-declared rotation deadline (#677).  Null when no
+    explicit deadline is set — the typical state for evergreen
+    literals.  The FE colours the chip warning when this is within
+    14 days and renders a 'rotate now' affordance."""
+
+    set_via: str = "web"
+    """Provenance of the most recent set/rotate write (#678).  One of
+    ``web | cli | env_paste | bundle | managed_service``.  Defaults
+    to ``web`` for back-fill and rows the platform never tagged."""
+
 
 @strawberry.type(name="AstroliftSecretBundle")
 class SecretBundleType:
