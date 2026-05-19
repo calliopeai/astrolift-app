@@ -573,6 +573,15 @@ type AstroliftAppTeamAccessMutationResult {
   data: AstroliftAppTeamAccess
 }
 
+type AstroliftAppTrace {
+  traceId: String!
+  rootService: String!
+  rootOperation: String!
+  spanCount: Int!
+  durationMs: Float!
+  statusCode: String!
+}
+
 type AstroliftAppUrlHealth {
   url: String!
   status: String!
@@ -2437,6 +2446,18 @@ type AstroliftTimeSeriesPoint {
   value: Float!
 }
 
+type AstroliftTraceSpan {
+  traceId: String!
+  spanId: String!
+  parentSpanId: String
+  operation: String!
+  service: String!
+  startTime: String!
+  durationMs: Float!
+  statusCode: String!
+  attributes: JSON!
+}
+
 type AstroliftTriggerDeployWorkflowPayload {
   runUrl: String!
   dispatchedBranch: String!
@@ -4059,6 +4080,8 @@ type Query {
   astroliftAppManagedServiceMetrics(managedServiceId: ID!, rangeSeconds: Int = null): AstroliftManagedServiceMetrics
   astroliftPodResourceUsage(appSlug: String!, podName: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftPodResourceUsage
   astroliftExecutePromql(appSlug: String!, query: String!, startUnix: Int!, endUnix: Int!, stepSeconds: Int!, environmentName: String = null): AstroliftExecutePromqlResult!
+  astroliftAppTraces(appSlug: String!, since: String!, until: String!, environmentName: String = null, service: String = null, operation: String = null, minDurationMs: Float = null, status: String = null, limit: Int = null): [AstroliftAppTrace!]!
+  astroliftTraceSpans(appSlug: String!, traceId: String!, environmentName: String = null): [AstroliftTraceSpan!]!
   astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail

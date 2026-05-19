@@ -359,3 +359,42 @@ class ExecutePromqlResult:
     ok: bool
     error: str
     series: list[PromqlSeries]
+
+
+@strawberry.type(name="AstroliftTraceSpan")
+class TraceSpan:
+    """One span inside a distributed trace (#749).
+
+    Mirrors the ``SpanRef`` data class from the provider SDK's
+    ``TraceDriver`` protocol. ``attributes`` is the span's OTEL
+    attribute map serialised as JSON.
+    """
+
+    trace_id: str
+    span_id: str
+    parent_span_id: str | None
+    operation: str
+    service: str
+    start_time: str
+    """UNIX nanoseconds as a string (OTEL convention)."""
+    duration_ms: float
+    status_code: str
+    """OK | ERROR | UNSET"""
+    attributes: strawberry.scalars.JSON
+
+
+@strawberry.type(name="AstroliftAppTrace")
+class AppTrace:
+    """A summary of one distributed trace (#749).
+
+    Returned by ``astroliftAppTraces``. The ``traceId`` is passed to
+    ``astroliftTraceSpans`` to retrieve the full span set.
+    """
+
+    trace_id: str
+    root_service: str
+    root_operation: str
+    span_count: int
+    duration_ms: float
+    status_code: str
+    """OK | ERROR | UNSET"""

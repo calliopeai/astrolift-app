@@ -594,6 +594,15 @@ export type AstroliftAppTeamAccessMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAppTrace = {
+  durationMs: Scalars['Float']['output'];
+  rootOperation: Scalars['String']['output'];
+  rootService: Scalars['String']['output'];
+  spanCount: Scalars['Int']['output'];
+  statusCode: Scalars['String']['output'];
+  traceId: Scalars['String']['output'];
+};
+
 export type AstroliftAppUrlHealth = {
   lastChecked: Scalars['DateTime']['output'];
   latencyMs?: Maybe<Scalars['Int']['output']>;
@@ -2456,6 +2465,18 @@ export type AstroliftTenantClusterMutationResult = {
 export type AstroliftTimeSeriesPoint = {
   ts: Scalars['DateTime']['output'];
   value: Scalars['Float']['output'];
+};
+
+export type AstroliftTraceSpan = {
+  attributes: Scalars['JSON']['output'];
+  durationMs: Scalars['Float']['output'];
+  operation: Scalars['String']['output'];
+  parentSpanId?: Maybe<Scalars['String']['output']>;
+  service: Scalars['String']['output'];
+  spanId: Scalars['String']['output'];
+  startTime: Scalars['String']['output'];
+  statusCode: Scalars['String']['output'];
+  traceId: Scalars['String']['output'];
 };
 
 export type AstroliftTriggerDeployWorkflowPayload = {
@@ -5050,6 +5071,7 @@ export type Query = {
   astroliftAppSecrets: Array<AstroliftAppSecret>;
   astroliftAppStatusCodeBreakdown?: Maybe<AstroliftStatusCodeBreakdown>;
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
+  astroliftAppTraces: Array<AstroliftAppTrace>;
   astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
   astroliftAppUrlProbeHistory: Array<AstroliftAppUrlHealth>;
   astroliftApps: Array<AstroliftRegisteredApp>;
@@ -5132,6 +5154,7 @@ export type Query = {
   astroliftSshDeployKeys: Array<AstroliftSshDeployKey>;
   astroliftTeamMembers: Array<AstroliftMember>;
   astroliftTeams: Array<AstroliftTeam>;
+  astroliftTraceSpans: Array<AstroliftTraceSpan>;
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
@@ -5293,6 +5316,19 @@ export type QueryAstroliftAppStatusCodeBreakdownArgs = {
 
 export type QueryAstroliftAppTeamAccessesArgs = {
   appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppTracesArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  minDurationMs?: InputMaybe<Scalars['Float']['input']>;
+  operation?: InputMaybe<Scalars['String']['input']>;
+  service?: InputMaybe<Scalars['String']['input']>;
+  since: Scalars['String']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+  until: Scalars['String']['input'];
 };
 
 
@@ -5647,6 +5683,13 @@ export type QueryAstroliftSshDeployKeysArgs = {
 
 export type QueryAstroliftTeamMembersArgs = {
   teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTraceSpansArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  traceId: Scalars['String']['input'];
 };
 
 
