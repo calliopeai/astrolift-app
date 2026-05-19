@@ -125,6 +125,18 @@ class SESEmailConfig:
     """Default for new identities. Mirrors the OpenSearch driver's
     posture; operators with ``force_destroy=True`` bypass on delete."""
 
+    sns_event_destination_arn: str = ""
+    """SNS topic ARN to wire as a configuration-set event destination
+    (#756). When non-empty, ``_ensure_configuration_set`` calls
+    ``ses:CreateConfigurationSetEventDestination`` so SES publishes
+    SEND / DELIVERY / BOUNCE / COMPLAINT / OPEN / CLICK notifications
+    through SNS to the platform's webhook receiver. Empty (the
+    default) leaves the driver free to fall back to
+    ``django.conf.settings.SES_EVENTS_SNS_TOPIC_ARN`` at call time —
+    production deployments rely on the settings fallback so the
+    constructor doesn't need to plumb the ARN through every
+    instantiation site."""
+
 
 class AmazonSESDriver(ManagedServiceDriver):
     def __init__(
@@ -674,7 +686,78 @@ class AmazonSESDriver(ManagedServiceDriver):
                 # Don't fail provision on configuration-set errors --
                 # the identity is still usable; surface via message.
                 return name
+
+        # SNS event destination wiring (#756). When the platform has a
+        # ``SES_EVENTS_SNS_TOPIC_ARN`` configured (the opscode-managed
+        # platform-wide topic the ingestion webhook subscribes to) the
+        # driver wires a ``platform-sns`` event destination on the
+        # configuration set so SES publishes SEND / DELIVERY / BOUNCE
+        # / COMPLAINT / OPEN / CLICK notifications through SNS to the
+        # platform's ``/webhooks/ses-events/`` receiver.
+        #
+        # Best-effort: a failure here doesn't fail provision (the
+        # identity is still usable for sending; the operator just
+        # won't get per-message events until the destination is wired
+        # manually). ``EventDestinationAlreadyExists`` is the
+        # idempotent path on re-runs.
+        topic_arn = self._sns_event_topic_arn()
+        if topic_arn:
+            try:
+                self._ses.create_configuration_set_event_destination(
+                    ConfigurationSetName=name,
+                    EventDestination={
+                        "Name": "platform-sns",
+                        "Enabled": True,
+                        "MatchingEventTypes": [
+                            "send",
+                            "delivery",
+                            "bounce",
+                            "complaint",
+                            "open",
+                            "click",
+                        ],
+                        "SNSDestination": {"TopicARN": topic_arn},
+                    },
+                )
+            except Exception as exc:
+                # EventDestinationAlreadyExists / ConfigurationSet
+                # already wired -- treat as idempotent success.
+                if (
+                    "AlreadyExists"
+                    not in type(exc).__name__
+                    and "AlreadyExists" not in str(exc)
+                ):
+                    # Soft-fail: log via the result message in the
+                    # caller would be nicer, but the caller doesn't
+                    # surface partial failures; swallow so identity
+                    # provisioning still succeeds.
+                    pass
         return name
+
+    def _sns_event_topic_arn(self) -> str:
+        """Resolve the platform's SES → SNS topic ARN.
+
+        Two-source resolution: the explicit field on
+        ``SESEmailConfig`` wins (used by unit tests that pass an ARN
+        directly), falling back to Django's
+        ``settings.SES_EVENTS_SNS_TOPIC_ARN`` so the production
+        wiring doesn't need to touch every ``SESEmailConfig``
+        constructor. The Django import is wrapped so the provider
+        package stays importable from contexts that don't carry a
+        configured Django (e.g. a standalone driver smoke test).
+        """
+        explicit = getattr(self._config, "sns_event_destination_arn", "") or ""
+        if explicit:
+            return str(explicit)
+        try:
+            from django.conf import settings  # type: ignore[import-not-found]
+        except Exception:
+            return ""
+        try:
+            value = getattr(settings, "SES_EVENTS_SNS_TOPIC_ARN", "")
+        except Exception:
+            return ""
+        return str(value or "")
 
     def _delete_configuration_set(self, *, identity: str) -> None:
         name = self._configuration_set_name_for(identity)
