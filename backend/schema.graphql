@@ -1855,6 +1855,7 @@ type AstroliftRegisteredApp {
   configDrift: AstroliftAppConfigDrift
   settingsLastModified: AstroliftAppSettingsLastModified
   viewerPermissions: [String!]!
+  activePreviewCount: Int!
 }
 
 type AstroliftRegisteredAppMutationResult {

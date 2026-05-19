@@ -383,6 +383,13 @@ class RegisteredAppType:
     # :func:`astrolift_identity.permission_resolver.resolve_effective_permissions_for_apps`.
     viewer_permissions: list[str]
 
+    # Active-preview-environment count (#730). Used by the apps list
+    # card to render an "N previews" badge so operators can spot apps
+    # with active PR-driven previews without drilling into Previews.
+    # 0 is rendered as plain text; > 0 surfaces the badge. Computed in
+    # one bulk-aggregate query per page rather than N FK fetches.
+    active_preview_count: int = 0
+
 
 @strawberry.type(name="AstroliftAppTeamAccess")
 class AppTeamAccessType:
@@ -626,6 +633,7 @@ def app_to_type(
     drift: AppConfigDriftType | None = None,
     settings_last_modified: AppSettingsLastModifiedType | None = None,
     viewer_permissions: Iterable[str] | None = None,
+    active_preview_count: int | None = None,
 ) -> RegisteredAppType:
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
@@ -705,7 +713,27 @@ def app_to_type(
         config_drift=drift,
         settings_last_modified=settings_last_modified,
         viewer_permissions=sorted(viewer_permissions) if viewer_permissions is not None else [],
+        active_preview_count=(
+            int(active_preview_count) if active_preview_count is not None else _fallback_preview_count(app)
+        ),
     )
+
+
+def _fallback_preview_count(app) -> int:
+    """Per-row preview count for callers that didn't pre-aggregate.
+
+    The list resolvers compute this in one bulk query and pass it in;
+    the single-app resolver (and any code path that didn't pre-aggregate)
+    falls through here and pays one extra query per app. Cheap on the
+    detail page; the list path is the one that has to stay O(1) per
+    row, and that path always passes ``active_preview_count`` explicitly."""
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    return PreviewEnvironment.objects.filter(
+        registered_app_id=app.pk,
+        torn_down_at__isnull=True,
+        deleted_at__isnull=True,
+    ).count()
 
 
 def _paused_by_email(app) -> str | None:

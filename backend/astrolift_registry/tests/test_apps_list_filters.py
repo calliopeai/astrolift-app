@@ -29,7 +29,7 @@ from django.utils import timezone
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Role, RoleBinding, Team
-from astrolift_lifecycle.models import AppEnvironment, Deployment
+from astrolift_lifecycle.models import AppEnvironment, Deployment, PreviewEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.queries import RegistryQuery, _decode_apps_cursor
 from astrolift_registry.schema.types import (
@@ -493,8 +493,11 @@ def test_page_query_count_independent_of_app_count():
     assert small.total_count == full.total_count
     # And the cheap path is genuinely cheap — the resolver only fires
     # a small constant number of queries (page + count +
-    # prefetch + viewer/permission checks).
-    assert len(small_ctx.captured_queries) <= 4, [q["sql"] for q in small_ctx.captured_queries]
+    # prefetch + viewer/permission checks + #730's active-preview-count
+    # aggregate). The bound is intentionally a constant, not a
+    # per-row scaling — N+1 protection is the ``small == full``
+    # assertion above; this is the absolute-cheapness assertion.
+    assert len(small_ctx.captured_queries) <= 5, [q["sql"] for q in small_ctx.captured_queries]
 
 
 # ---------- my-apps parity ---------------------------------------------
@@ -521,3 +524,53 @@ def test_my_apps_page_honours_filters_and_viewer_scope():
     assert page.total_count == 1
     assert [a.slug for a in page.items] == [scaffold.apps["ok-a"].slug]
     assert page.next_cursor is None
+
+
+# ---------- activePreviewCount (#730) --------------------------------
+
+
+def test_active_preview_count_only_includes_live_previews():
+    """The page resolver surfaces ``activePreviewCount`` per row, counting
+    only PreviewEnvironment rows whose ``torn_down_at`` is null. Apps
+    with no live previews surface 0; torn-down rows are excluded."""
+    scaffold = _scaffold("-prevct")
+    user = _superuser("prevct-user")
+    ok_app = scaffold.apps["ok-a"]
+    ok_env = scaffold.envs["ok-a"]
+    other_app = scaffold.apps["failed-a"]
+
+    # 2 live + 1 torn-down on ok_app; 0 on other_app.
+    PreviewEnvironment.objects.create(
+        registered_app=ok_app,
+        app_environment=ok_env,
+        pr_number=11,
+        branch="feat/a",
+        hostname=f"pr-11.{ok_app.slug}.example",
+        namespace=f"prev-11-{ok_app.slug}",
+    )
+    PreviewEnvironment.objects.create(
+        registered_app=ok_app,
+        app_environment=ok_env,
+        pr_number=12,
+        branch="feat/b",
+        hostname=f"pr-12.{ok_app.slug}.example",
+        namespace=f"prev-12-{ok_app.slug}",
+    )
+    torn_down = PreviewEnvironment.objects.create(
+        registered_app=ok_app,
+        app_environment=ok_env,
+        pr_number=13,
+        branch="feat/c",
+        hostname=f"pr-13.{ok_app.slug}.example",
+        namespace=f"prev-13-{ok_app.slug}",
+    )
+    torn_down.torn_down_at = torn_down.created_at
+    torn_down.save(update_fields=["torn_down_at", "updated_at", "version"])
+
+    page = _run_in_tenant(
+        {"organization_id": scaffold.org.id, "actor_user_id": user.id},
+        lambda: RegistryQuery().astrolift_apps_page(_info(), limit=100),
+    )
+    by_slug = {a.slug: a for a in page.items}
+    assert by_slug[ok_app.slug].active_preview_count == 2
+    assert by_slug[other_app.slug].active_preview_count == 0
