@@ -23,7 +23,11 @@ import {
   REDEPLOY_APP,
   ROLLBACK_DEPLOYMENT,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { GET_DEPLOYMENT, GET_DEPLOYMENT_LOG } from "@/graphql/lifecycle/lifecycle.queries";
+import {
+  GET_DEPLOYMENT,
+  GET_DEPLOYMENT_APPROVAL_HISTORY,
+  GET_DEPLOYMENT_LOG,
+} from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subscriptions";
@@ -128,6 +132,26 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
   const events = useQuery<EventsResp>(LIST_EVENTS, {
     variables: { limit: 50 },
+    skip: !deployment,
+    fetchPolicy: "cache-and-network",
+  });
+
+  // #653 approval / review trail. Fetched lazily — only deploys that
+  // gated through quorum produce history rows, so the resolver returns
+  // [] for the trivial "no approvals required" case.
+  const approvalHistory = useQuery<{
+    astroliftDeploymentApprovalHistory: Array<{
+      id: string;
+      action: string;
+      decision: string;
+      actorKind: string;
+      actorId: string;
+      actorDisplay: string;
+      occurredAt: string;
+      reason: string;
+    }>;
+  }>(GET_DEPLOYMENT_APPROVAL_HISTORY, {
+    variables: { deploymentId: id },
     skip: !deployment,
     fetchPolicy: "cache-and-network",
   });
@@ -384,6 +408,63 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                     <pre className="bg-muted mt-1 max-h-40 overflow-auto rounded p-2 text-xs">
                       {JSON.stringify(e.detail, null, 2)}
                     </pre>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* #653 — approval/review trail. Shows the full audit chain
+          (proposed → reviewed → approved → deployed) when the deploy
+          gated through quorum; collapses to a single triggered-by row
+          when no approval was required. Lazy-loaded so an open detail
+          page on an ungated deploy stays cheap. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {approvalHistory.loading && !approvalHistory.data ? (
+            <Skeleton className="h-16 w-full" />
+          ) : (approvalHistory.data?.astroliftDeploymentApprovalHistory ?? []).length === 0 ? (
+            <div className="text-muted-foreground text-sm">
+              {d.triggeredByUserId
+                ? `Triggered by user ${d.triggeredByUserId} via ${d.triggerKind}.`
+                : `Triggered automatically via ${d.triggerKind}${d.ciProvider ? ` (${d.ciProvider})` : ""}.`}
+              {d.approvalsRequired === 0 && " No approvals required for this environment."}
+            </div>
+          ) : (
+            <ol className="border-muted relative ml-3 space-y-3 border-l pl-4 text-sm">
+              {(approvalHistory.data?.astroliftDeploymentApprovalHistory ?? []).map((e) => (
+                <li key={e.id} className="relative">
+                  <span className="bg-background border-muted-foreground absolute top-1.5 -left-[21px] size-3 rounded-full border" />
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-medium capitalize">{e.action}</span>
+                    {e.decision && e.decision !== "none" && (
+                      <Badge
+                        variant={
+                          e.decision === "approved"
+                            ? "default"
+                            : e.decision === "rejected"
+                              ? "destructive"
+                              : "outline"
+                        }
+                        className="text-[10px] capitalize"
+                      >
+                        {e.decision}
+                      </Badge>
+                    )}
+                    <span className="text-muted-foreground font-mono text-xs">
+                      {e.actorDisplay} ({e.actorKind})
+                    </span>
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      {formatTime(e.occurredAt)}
+                    </span>
+                  </div>
+                  {e.reason && (
+                    <div className="text-muted-foreground mt-0.5 italic">{e.reason}</div>
                   )}
                 </li>
               ))}
