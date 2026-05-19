@@ -4,9 +4,12 @@ import { useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   ClockIcon,
   ExternalLinkIcon,
   GitCommitIcon,
+  LayersIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -124,6 +127,67 @@ function githubCommitUrl(repo: string, sha: string): string {
   return `https://github.com/${repo}/commit/${sha}`;
 }
 
+// #658 — collapse multi-workload deploys (FE + BE + combo for the same
+// SHA → 3 rows today) into a single expandable parent.  Worst-status
+// wins so a fan-out group surfaces as 'failed' the moment any child
+// fails, no matter how many other children succeeded.  Groups are
+// keyed by ``commitSha|environmentName`` so the same SHA deployed to
+// two envs still shows as two separate top-level rows.
+type GroupBy = "commit" | "flat";
+
+type DeploymentGroupKey = string;
+
+interface DeploymentGroup {
+  key: DeploymentGroupKey;
+  representative: AstroliftDeployment;
+  items: AstroliftDeployment[];
+}
+
+const STATUS_RANK: Record<DeploymentStatus, number> = {
+  failed: 5,
+  pending_approval: 4,
+  pending: 4,
+  deploying: 4,
+  redeploying: 4,
+  running: 3,
+  superseded: 2,
+  rolled_back: 1,
+};
+
+function worstStatus(items: AstroliftDeployment[]): DeploymentStatus {
+  return items.reduce<DeploymentStatus>((acc, d) => {
+    return (STATUS_RANK[d.status] ?? 0) > (STATUS_RANK[acc] ?? 0) ? d.status : acc;
+  }, items[0].status);
+}
+
+function groupDeployments(
+  list: AstroliftDeployment[],
+  mode: GroupBy
+): DeploymentGroup[] {
+  if (mode === "flat") {
+    return list.map((d) => ({ key: d.id, representative: d, items: [d] }));
+  }
+  const buckets = new Map<DeploymentGroupKey, DeploymentGroup>();
+  for (const d of list) {
+    // Ungrouped buckets for rows with no SHA — manual/legacy entries.
+    const key = d.commitSha
+      ? `${d.commitSha}|${d.environmentName}`
+      : `__nosha__|${d.id}`;
+    const g = buckets.get(key);
+    if (g) {
+      g.items.push(d);
+      // The representative tracks the newest startedAt so the parent
+      // row's timestamp matches the latest workload's deploy.
+      const a = new Date(d.startedAt ?? d.createdAt).getTime();
+      const b = new Date(g.representative.startedAt ?? g.representative.createdAt).getTime();
+      if (a > b) g.representative = d;
+    } else {
+      buckets.set(key, { key, representative: d, items: [d] });
+    }
+  }
+  return Array.from(buckets.values());
+}
+
 export function AppDeploymentsClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.deployments");
@@ -140,6 +204,12 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   const [triggerFilter, setTriggerFilter] = React.useState<TriggerKind | "all">("all");
   const [envFilter, setEnvFilter] = React.useState<string>("all");
   const [search, setSearch] = React.useState("");
+  const [groupBy, setGroupBy] = React.useState<GroupBy>("commit");
+  // Groups stay collapsed by default — the parent row already shows
+  // SHA / env / aggregate status, so the operator only expands when
+  // they want per-workload status.  Track expanded state keyed by
+  // group key (commitSha|env), not deployment id.
+  const [expanded, setExpanded] = React.useState<Set<DeploymentGroupKey>>(new Set());
 
   const a = app.data?.astroliftApp;
   const allDeployments = React.useMemo(
@@ -169,6 +239,17 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       return true;
     });
   }, [allDeployments, statusBucket, triggerFilter, envFilter, search]);
+
+  const grouped = React.useMemo(() => groupDeployments(filtered, groupBy), [filtered, groupBy]);
+
+  const toggleGroup = React.useCallback((key: DeploymentGroupKey) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   if (app.loading && !a) {
     return (
@@ -251,8 +332,20 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             ))}
           </SelectContent>
         </Select>
+        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+          <SelectTrigger className="w-44">
+            <LayersIcon className="mr-1 size-3.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="commit">Group by commit</SelectItem>
+            <SelectItem value="flat">Flat (no grouping)</SelectItem>
+          </SelectContent>
+        </Select>
         <span className="text-muted-foreground ml-auto text-xs">
-          {t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
+          {groupBy === "commit" && grouped.length !== filtered.length
+            ? `${grouped.length} groups · ${filtered.length} of ${allDeployments.length}`
+            : t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
         </span>
       </div>
 
@@ -289,109 +382,188 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((d) => (
-                  <TableRow
-                    key={d.id}
-                    className="hover:bg-accent/30 cursor-pointer"
-                    onClick={() => (window.location.href = `/deployments/${d.id}`)}
-                  >
-                    <TableCell className="w-6">
-                      <StatusDot status={statusToDot[d.status]} />
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">
-                      {new Date(d.startedAt ?? d.createdAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono text-xs">
-                        {d.environmentName}
-                      </Badge>
-                      {d.workloadSlug && (
-                        <div className="text-muted-foreground mt-1 font-mono text-xs">
-                          {d.workloadSlug}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-mono text-xs">{d.imageTag || "—"}</div>
-                      {d.commitSha && (
-                        <div className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 font-mono text-xs">
-                          <GitCommitIcon className="size-3" />
-                          {a.sourceKind === "github" && a.sourceRepo ? (
-                            <a
-                              href={githubCommitUrl(a.sourceRepo, d.commitSha)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {d.commitSha.slice(0, 7)}
-                            </a>
+                {grouped.flatMap((g) => {
+                  const isMultiple = g.items.length > 1;
+                  const isOpen = expanded.has(g.key);
+                  const rep = g.representative;
+                  const aggStatus = isMultiple ? worstStatus(g.items) : rep.status;
+                  const aggDuration = isMultiple
+                    ? g.items.reduce<number | null>((acc, d) => {
+                        if (d.durationSeconds == null) return acc;
+                        return acc == null ? d.durationSeconds : Math.max(acc, d.durationSeconds);
+                      }, null)
+                    : rep.durationSeconds;
+
+                  const parent = (
+                    <TableRow
+                      key={`g-${g.key}`}
+                      className="hover:bg-accent/30 cursor-pointer"
+                      onClick={() => {
+                        if (isMultiple) toggleGroup(g.key);
+                        else window.location.href = `/deployments/${rep.id}`;
+                      }}
+                    >
+                      <TableCell className="w-6">
+                        {isMultiple ? (
+                          isOpen ? (
+                            <ChevronDownIcon className="size-3.5" />
                           ) : (
-                            d.commitSha.slice(0, 7)
-                          )}
-                          {d.branch && (
-                            <span className="text-muted-foreground/80">· {d.branch}</span>
-                          )}
+                            <ChevronRightIcon className="size-3.5" />
+                          )
+                        ) : (
+                          <StatusDot status={statusToDot[rep.status]} />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {new Date(rep.startedAt ?? rep.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {rep.environmentName}
+                        </Badge>
+                        {isMultiple ? (
+                          <div className="text-muted-foreground mt-1 inline-flex items-center gap-1 text-xs">
+                            <LayersIcon className="size-3" />
+                            {g.items.length} workloads
+                          </div>
+                        ) : (
+                          rep.workloadSlug && (
+                            <div className="text-muted-foreground mt-1 font-mono text-xs">
+                              {rep.workloadSlug}
+                            </div>
+                          )
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-mono text-xs">{rep.imageTag || "—"}</div>
+                        {rep.commitSha && (
+                          <div className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 font-mono text-xs">
+                            <GitCommitIcon className="size-3" />
+                            {a.sourceKind === "github" && a.sourceRepo ? (
+                              <a
+                                href={githubCommitUrl(a.sourceRepo, rep.commitSha)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {rep.commitSha.slice(0, 7)}
+                              </a>
+                            ) : (
+                              rep.commitSha.slice(0, 7)
+                            )}
+                            {rep.branch && (
+                              <span className="text-muted-foreground/80">· {rep.branch}</span>
+                            )}
+                          </div>
+                        )}
+                        <div className="text-muted-foreground/80 mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
+                          <span>{t("row.prMissing")}</span>
+                          <span className="font-mono">
+                            {rep.commitAuthor
+                              ? t("row.authorBy", { name: rep.commitAuthor })
+                              : t("row.authorMissing")}
+                          </span>
                         </div>
-                      )}
-                      {/*
-                        Stacked author / PR line. `prNumber` + `prUrl` are
-                        not yet on the deployment payload (see
-                        backend follow-on issue) so we render a dash
-                        placeholder until the schema lands; `commitAuthor`
-                        is available and rendered when non-empty.
-                      */}
-                      <div className="text-muted-foreground/80 mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
-                        <span>
-                          {t("row.prMissing")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {rep.triggerKind}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DeploymentStatusPill status={aggStatus} />
+                        {rep.approvalsRequired > 0 && (
+                          <div className="text-muted-foreground mt-1 text-xs">
+                            {t("approvalsCount", {
+                              received: rep.approvalsReceived,
+                              required: rep.approvalsRequired,
+                            })}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <ClockIcon className="size-3" />
+                          {formatDuration(aggDuration)}
                         </span>
-                        <span className="font-mono">
-                          {d.commitAuthor
-                            ? t("row.authorBy", { name: d.commitAuthor })
-                            : t("row.authorMissing")}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {d.triggerKind}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DeploymentStatusPill status={d.status} />
-                      {d.approvalsRequired > 0 && (
-                        <div className="text-muted-foreground mt-1 text-xs">
-                          {t("approvalsCount", {
-                            received: d.approvalsReceived,
-                            required: d.approvalsRequired,
-                          })}
+                      </TableCell>
+                      <TableCell>
+                        {rep.ciRunUrl ? (
+                          <a
+                            href={rep.ciRunUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {rep.ciProvider || "ci"}
+                            <ExternalLinkIcon className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+
+                  if (!isMultiple || !isOpen) return [parent];
+
+                  const children = g.items.map((d) => (
+                    <TableRow
+                      key={d.id}
+                      className="hover:bg-accent/30 bg-muted/30 cursor-pointer"
+                      onClick={() => (window.location.href = `/deployments/${d.id}`)}
+                    >
+                      <TableCell className="w-6 pl-8">
+                        <StatusDot status={statusToDot[d.status]} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                        {new Date(d.startedAt ?? d.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {d.workloadSlug || "—"}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <span className="inline-flex items-center gap-1">
-                        <ClockIcon className="size-3" />
-                        {formatDuration(d.durationSeconds)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {d.ciRunUrl ? (
-                        <a
-                          href={d.ciRunUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {d.ciProvider || "ci"}
-                          <ExternalLinkIcon className="size-3" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-mono text-xs">{d.imageTag || "—"}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {d.triggerKind}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DeploymentStatusPill status={d.status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <ClockIcon className="size-3" />
+                          {formatDuration(d.durationSeconds)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {d.ciRunUrl ? (
+                          <a
+                            href={d.ciRunUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {d.ciProvider || "ci"}
+                            <ExternalLinkIcon className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ));
+
+                  return [parent, ...children];
+                })}
               </TableBody>
             </Table>
           )}
