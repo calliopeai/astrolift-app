@@ -9,7 +9,9 @@ import {
   ClockIcon,
   ExternalLinkIcon,
   GitCommitIcon,
+  GitCompareIcon,
   LayersIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -20,6 +22,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,6 +32,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -38,10 +48,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LIST_DEPLOYMENTS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import {
+  COMPARE_DEPLOYMENTS,
+  LIST_DEPLOYMENTS,
+  LIST_ENVIRONMENTS,
+} from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppEnvironment,
   AstroliftDeployment,
+  AstroliftDeploymentComparison,
   DeploymentStatus,
   TriggerKind,
 } from "@/graphql/lifecycle/lifecycle.types";
@@ -210,6 +225,10 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   // they want per-workload status.  Track expanded state keyed by
   // group key (commitSha|env), not deployment id.
   const [expanded, setExpanded] = React.useState<Set<DeploymentGroupKey>>(new Set());
+  // #652 — multi-select for deploy-vs-deploy compare. Exactly two selected
+  // enables the Compare action; anything else disables it.
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [compareOpen, setCompareOpen] = React.useState(false);
 
   const a = app.data?.astroliftApp;
   const allDeployments = React.useMemo(
@@ -250,6 +269,49 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       return next;
     });
   }, []);
+
+  const toggleSelect = React.useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Selectable rows = all individual deployments shown (flatten groups
+  // for the master checkbox so it covers what the operator can see).
+  const visibleIds = React.useMemo(() => {
+    const ids: string[] = [];
+    for (const g of grouped) {
+      for (const item of g.items) ids.push(item.id);
+    }
+    return ids;
+  }, [grouped]);
+
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected =
+    !allVisibleSelected && visibleIds.some((id) => selectedIds.has(id));
+
+  const toggleSelectAll = React.useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allChecked = visibleIds.every((id) => next.has(id));
+      if (allChecked) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }, [visibleIds]);
+
+  const selectedList = React.useMemo(
+    () => allDeployments.filter((d) => selectedIds.has(d.id)),
+    [allDeployments, selectedIds]
+  );
+  const canCompare = selectedList.length === 2;
 
   if (app.loading && !a) {
     return (
@@ -349,6 +411,32 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
         </span>
       </div>
 
+      {/* #652 — compare toolbar. Surfaces selection count + Compare CTA
+          whenever at least one row is selected. Compare requires exactly
+          two so the diff has a clear A→B direction. */}
+      {selectedList.length > 0 && (
+        <div className="bg-accent/30 border-border flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-xs">
+          <span className="font-medium">{selectedList.length} selected</span>
+          <Button
+            size="sm"
+            disabled={!canCompare}
+            onClick={() => setCompareOpen(true)}
+            className="ml-auto"
+          >
+            <GitCompareIcon className="size-3.5" />
+            Compare {canCompare ? "" : "(select exactly 2)"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <XIcon className="size-3.5" />
+            Clear
+          </Button>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {deployments.loading && allDeployments.length === 0 ? (
@@ -371,6 +459,17 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible deployments"
+                      checked={allVisibleSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someVisibleSelected;
+                      }}
+                      onChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead className="w-6"></TableHead>
                   <TableHead>{t("table.when")}</TableHead>
                   <TableHead>{t("table.env")}</TableHead>
@@ -394,6 +493,14 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       }, null)
                     : rep.durationSeconds;
 
+                  // For a group, the parent-row checkbox selects/deselects
+                  // every child deployment in the group (so the group's
+                  // representative compare semantics still need an
+                  // expanded single-deploy selection — the checkbox is a
+                  // shortcut, not a primary path).
+                  const allItemsSelected = g.items.every((d) => selectedIds.has(d.id));
+                  const someItemsSelected =
+                    !allItemsSelected && g.items.some((d) => selectedIds.has(d.id));
                   const parent = (
                     <TableRow
                       key={`g-${g.key}`}
@@ -403,6 +510,27 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                         else window.location.href = `/deployments/${rep.id}`;
                       }}
                     >
+                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${rep.imageTag ?? rep.id}`}
+                          checked={allItemsSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someItemsSelected;
+                          }}
+                          onChange={() => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (allItemsSelected) {
+                                for (const d of g.items) next.delete(d.id);
+                              } else {
+                                for (const d of g.items) next.add(d.id);
+                              }
+                              return next;
+                            });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="w-6">
                         {isMultiple ? (
                           isOpen ? (
@@ -520,6 +648,14 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       className="hover:bg-accent/30 bg-muted/30 cursor-pointer"
                       onClick={() => (window.location.href = `/deployments/${d.id}`)}
                     >
+                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${d.imageTag ?? d.id}`}
+                          checked={selectedIds.has(d.id)}
+                          onChange={() => toggleSelect(d.id)}
+                        />
+                      </TableCell>
                       <TableCell className="w-6 pl-8">
                         <StatusDot status={statusToDot[d.status]} />
                       </TableCell>
@@ -582,6 +718,181 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
         </Link>
         .
       </p>
+
+      {canCompare && (
+        <CompareDeploymentsSheet
+          open={compareOpen}
+          onOpenChange={setCompareOpen}
+          deployA={selectedList[0]}
+          deployB={selectedList[1]}
+        />
+      )}
     </PageShell>
   );
+}
+
+// #652 — deploy-vs-deploy diff. The query is fired on open so a
+// closed sheet doesn't keep paying for the comparison; the cache is
+// keyed on (idA, idB) so reopening the same pair is a no-network hit.
+function CompareDeploymentsSheet({
+  open,
+  onOpenChange,
+  deployA,
+  deployB,
+}: {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+  deployA: AstroliftDeployment;
+  deployB: AstroliftDeployment;
+}) {
+  const { data, loading, error } = useQuery<{
+    astroliftCompareDeployments: AstroliftDeploymentComparison | null;
+  }>(COMPARE_DEPLOYMENTS, {
+    variables: { idA: deployA.id, idB: deployB.id },
+    skip: !open,
+  });
+  const cmp = data?.astroliftCompareDeployments ?? null;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="flex flex-col gap-4 sm:max-w-3xl">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2 font-mono text-base">
+            <GitCompareIcon className="size-4" />
+            {deployA.imageTag || deployA.id.slice(0, 7)} →{" "}
+            {deployB.imageTag || deployB.id.slice(0, 7)}
+            {cmp?.compareUrl && (
+              <a
+                href={cmp.compareUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 text-xs"
+              >
+                View on source host
+                <ExternalLinkIcon className="size-3" />
+              </a>
+            )}
+          </SheetTitle>
+          <SheetDescription>
+            {cmp ? (
+              <span className="font-mono text-xs">
+                {cmp.baseSha.slice(0, 7)}...{cmp.headSha.slice(0, 7)}
+              </span>
+            ) : loading ? (
+              "Loading comparison..."
+            ) : error ? (
+              <span className="text-destructive">
+                {error.message}
+              </span>
+            ) : (
+              "—"
+            )}
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+          {loading && !cmp ? (
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : cmp ? (
+            <>
+              <section className="space-y-2">
+                <h4 className="text-sm font-semibold">Image diff</h4>
+                {cmp.imageDiffSummary ? (
+                  <pre className="bg-muted/40 border-border overflow-x-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
+                    {cmp.imageDiffSummary}
+                  </pre>
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    No image diff available for this pair.
+                  </p>
+                )}
+              </section>
+
+              <section className="space-y-2">
+                <h4 className="text-sm font-semibold">
+                  Manifest diff{" "}
+                  <span className="text-muted-foreground text-xs font-normal">
+                    ({cmp.manifestDiff.length} change
+                    {cmp.manifestDiff.length === 1 ? "" : "s"})
+                  </span>
+                </h4>
+                {cmp.manifestDiff.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">
+                    Manifests are identical between these two deploys.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {cmp.manifestDiff.map((entry, i) => (
+                      <ManifestDiffRow key={`${entry.path}-${i}`} entry={entry} />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ManifestDiffRow({
+  entry,
+}: {
+  entry: { op: string; path: string; before: unknown; after: unknown };
+}) {
+  const badge =
+    entry.op === "add" ? (
+      <Badge className="border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+        + add
+      </Badge>
+    ) : entry.op === "remove" ? (
+      <Badge variant="destructive">− remove</Badge>
+    ) : (
+      <Badge className="border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300">
+        ~ replace
+      </Badge>
+    );
+
+  return (
+    <li className="border-border bg-muted/20 space-y-1 rounded-md border p-2 font-mono text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        {badge}
+        <code className="break-all">{entry.path}</code>
+      </div>
+      {entry.op === "add" && (
+        <pre className="text-emerald-700 dark:text-emerald-300 whitespace-pre-wrap break-all">
+          {jsonValue(entry.after)}
+        </pre>
+      )}
+      {entry.op === "remove" && (
+        <pre className="text-destructive whitespace-pre-wrap break-all">
+          {jsonValue(entry.before)}
+        </pre>
+      )}
+      {entry.op === "replace" && (
+        <div className="space-y-1">
+          <pre className="text-destructive whitespace-pre-wrap break-all">
+            − {jsonValue(entry.before)}
+          </pre>
+          <pre className="text-emerald-700 dark:text-emerald-300 whitespace-pre-wrap break-all">
+            + {jsonValue(entry.after)}
+          </pre>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function jsonValue(v: unknown): string {
+  if (v === null || v === undefined) return "null";
+  if (typeof v === "string") return v;
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return String(v);
+  }
 }

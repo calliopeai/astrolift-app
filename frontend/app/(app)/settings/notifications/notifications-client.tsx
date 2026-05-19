@@ -18,6 +18,8 @@ import {
 import { LIST_MY_NOTIFICATIONS } from "@/graphql/operations/operations.queries";
 import type { AstroliftNotification } from "@/graphql/operations/operations.types";
 
+import { AlertSubscriptionsCard } from "./alert-subscriptions-card";
+
 interface Resp {
   astroliftMyNotifications: AstroliftNotification[];
 }
@@ -57,6 +59,8 @@ export function NotificationsClient() {
       title="Notifications"
       description="Your inbox: deploy approvals, failure alerts, invitations, quota warnings."
     >
+      <AlertSubscriptionsCard />
+
       <div className="flex items-center justify-between gap-3">
         <Badge variant="outline" className="gap-1">
           <BellIcon className="size-3" />

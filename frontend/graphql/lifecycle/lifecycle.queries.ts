@@ -275,6 +275,23 @@ export const LIST_APP_DOMAINS = gql`
         lastCheckedAt
         message
       }
+      redirectRules {
+        id
+        kind
+        sourcePattern
+        destinationUrl
+        httpStatus
+        preserveQueryString
+        priority
+      }
+      pathRoutes {
+        id
+        pathPrefix
+        targetWorkloadSlug
+        targetPort
+        stripPrefix
+        priority
+      }
     }
   }
 `;
@@ -513,6 +530,39 @@ export const PREVIEW_FORCE_REDEPLOY = gql`
         ciActorKind
         ciRunUrl
       }
+    }
+  }
+`;
+
+// --- Deploy-vs-deploy comparison (#652) ---
+export const COMPARE_DEPLOYMENTS = gql`
+  query CompareDeployments($idA: String!, $idB: String!) {
+    astroliftCompareDeployments(idA: $idA, idB: $idB) {
+      deploymentAId
+      deploymentBId
+      baseSha
+      headSha
+      compareUrl
+      manifestDiff {
+        op
+        path
+        before
+        after
+      }
+      imageDiffSummary
+    }
+  }
+`;
+
+// --- User alert subscriptions (#703) ---
+export const LIST_MY_ALERT_SUBSCRIPTIONS = gql`
+  query ListMyAlertSubscriptions($appSlug: String) {
+    astroliftMyAlertSubscriptions(appSlug: $appSlug) {
+      id
+      appSlug
+      alertKind
+      channel
+      enabled
     }
   }
 `;

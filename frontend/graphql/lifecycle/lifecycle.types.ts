@@ -28,6 +28,7 @@ import type {
   AstroliftContainerStatus as GeneratedContainerStatus,
   AstroliftDeployment as GeneratedDeployment,
   AstroliftDeploymentApprover as GeneratedDeploymentApprover,
+  AstroliftDeploymentComparison as GeneratedDeploymentComparison,
   AstroliftDeploymentLogEntry as GeneratedDeploymentLogEntry,
   AstroliftDeploymentMetrics as GeneratedDeploymentMetrics,
   AstroliftDeregisterPreview as GeneratedDeregisterPreview,
@@ -36,6 +37,9 @@ import type {
   AstroliftForceRedeployPreviewDeployment as GeneratedForceRedeployPreviewDeployment,
   AstroliftPreviewEnvironment as GeneratedPreviewEnvironment,
   AstroliftScheduledJobRun as GeneratedScheduledJobRun,
+  AstroliftUserAlertSubscription as GeneratedUserAlertSubscription,
+  BulkAppResultItem as GeneratedBulkAppResultItem,
+  BulkOperationResult as GeneratedBulkOperationResult,
 } from "@/graphql/__generated__/schema";
 
 export type AstroliftEnvironmentSetting = Pick<GeneratedEnvironmentSetting, "id" | "key" | "value">;
@@ -263,3 +267,13 @@ export type AstroliftDeregisterPreview = GeneratedDeregisterPreview;
 export type AstroliftForceRedeployPreview = GeneratedForceRedeployPreview;
 
 export type AstroliftForceRedeployPreviewDeployment = GeneratedForceRedeployPreviewDeployment;
+
+// #652
+export type AstroliftDeploymentComparison = GeneratedDeploymentComparison;
+
+// #703
+export type AstroliftUserAlertSubscription = GeneratedUserAlertSubscription;
+
+// #698
+export type BulkOperationResult = GeneratedBulkOperationResult;
+export type BulkAppResultItem = GeneratedBulkAppResultItem;
