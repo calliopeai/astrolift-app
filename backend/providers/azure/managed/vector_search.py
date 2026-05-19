@@ -44,6 +44,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -196,6 +197,12 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
 
     # ---- lifecycle ----------------------------------------------------
 
+    @driver_op(
+        cloud="azure",
+        driver="vector_search",
+        audit=True,
+        sensitive_kind="managed_service_provision",
+    )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         if self._secrets is None:
             return ProvisionResult(
@@ -302,6 +309,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="vector_search")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         service_name = self._service_name_from_handle(spec.handle)
         cfg = spec.config or {}
@@ -352,6 +360,12 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             message=f"search service {service_name} update queued",
         )
 
+    @driver_op(
+        cloud="azure",
+        driver="vector_search",
+        audit=True,
+        sensitive_kind="managed_service_deprovision",
+    )
     def deprovision(
         self,
         spec: DeprovisionSpec,
@@ -418,6 +432,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
 
     # ---- read-only ops ------------------------------------------------
 
+    @driver_op(cloud="azure", driver="vector_search")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         service_name = self._service_name_from_handle(handle.handle)
         existing = self._describe(service_name)
@@ -434,6 +449,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             message=f"azure reports {azure_state}",
         )
 
+    @driver_op(cloud="azure", driver="vector_search")
     def binding(self, handle: ServiceHandle) -> Binding:
         service_name = self._service_name_from_handle(handle.handle)
         existing = self._describe(service_name)
@@ -484,6 +500,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="vector_search")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         """Azure AI Search has no first-party snapshot API. Operators
         export index contents via the REST 'indexes/<name>/docs/search'
@@ -505,6 +522,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             created_at=datetime.now(UTC).isoformat(),
         )
 
+    @driver_op(cloud="azure", driver="vector_search")
     def restore(
         self,
         snapshot: SnapshotHandle,
@@ -523,6 +541,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             ),
         )
 
+    @driver_op(cloud="azure", driver="vector_search", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
@@ -561,6 +580,7 @@ class AzureAISearchVectorDriver(ManagedServiceDriver):
             },
         }
 
+    @driver_op(cloud="azure", driver="vector_search", heartbeat=False)
     def binding_schema(self) -> BindingSchema:
         return BindingSchema(
             env_vars={
