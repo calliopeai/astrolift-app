@@ -1,13 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  DatabaseIcon,
-  InfoIcon,
-  MailIcon,
-  PlusIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { DatabaseIcon, InfoIcon, MailIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -18,12 +12,7 @@ import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -119,7 +108,8 @@ const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
 // row to stay quiet rather than nag with "not configured" when the driver
 // hasn't yet populated the field.
 
-const GREEN_BADGE = "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+const GREEN_BADGE =
+  "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
 const AMBER_BADGE = "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
 const RED_BADGE = "border-destructive/40 bg-destructive/15 text-destructive";
 
@@ -132,26 +122,22 @@ function ValidationBadges({ service }: { service: ManagedService }) {
       if ("dkim_verified" in cfg) {
         const verified = cfg.dkim_verified === true;
         items.push(
-          <Badge
-            key="dkim"
-            variant="outline"
-            className={verified ? GREEN_BADGE : AMBER_BADGE}
-          >
+          <Badge key="dkim" variant="outline" className={verified ? GREEN_BADGE : AMBER_BADGE}>
             {verified ? "DKIM verified" : "DKIM pending"}
-          </Badge>,
+          </Badge>
         );
       } else {
         items.push(
           <Badge key="dkim" variant="outline" className={AMBER_BADGE}>
             DKIM pending
-          </Badge>,
+          </Badge>
         );
       }
       if (typeof cfg.domain_status === "string" && cfg.domain_status) {
         items.push(
           <Badge key="domain" variant="outline" className="capitalize">
             {cfg.domain_status.replace(/_/g, " ")}
-          </Badge>,
+          </Badge>
         );
       }
       break;
@@ -161,20 +147,16 @@ function ValidationBadges({ service }: { service: ManagedService }) {
       if ("backup_enabled" in cfg) {
         const enabled = cfg.backup_enabled === true;
         items.push(
-          <Badge
-            key="backup"
-            variant="outline"
-            className={enabled ? GREEN_BADGE : AMBER_BADGE}
-          >
+          <Badge key="backup" variant="outline" className={enabled ? GREEN_BADGE : AMBER_BADGE}>
             {enabled ? "Backups enabled" : "No backup policy"}
-          </Badge>,
+          </Badge>
         );
       }
       if (typeof cfg.snapshot_policy === "string" && cfg.snapshot_policy) {
         items.push(
           <Badge key="snap" variant="outline" className="font-mono text-[10px]">
             {cfg.snapshot_policy}
-          </Badge>,
+          </Badge>
         );
       }
       break;
@@ -183,13 +165,9 @@ function ValidationBadges({ service }: { service: ManagedService }) {
       if ("public_access_blocked" in cfg) {
         const blocked = cfg.public_access_blocked === true;
         items.push(
-          <Badge
-            key="public"
-            variant="outline"
-            className={blocked ? GREEN_BADGE : RED_BADGE}
-          >
+          <Badge key="public" variant="outline" className={blocked ? GREEN_BADGE : RED_BADGE}>
             {blocked ? "Public access blocked" : "Public access open"}
-          </Badge>,
+          </Badge>
         );
       }
       break;
@@ -208,12 +186,10 @@ function ValidationBadges({ service }: { service: ManagedService }) {
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-sm">
-            <span className="break-words font-mono text-[11px]">
-              {service.statusError}
-            </span>
+            <span className="font-mono text-[11px] break-words">{service.statusError}</span>
           </TooltipContent>
         </Tooltip>
-      </TooltipProvider>,
+      </TooltipProvider>
     );
   }
 
@@ -289,9 +265,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
       toast.success(`${verb} ${s.name}`);
       setDeprovisionTarget(null);
     } else {
-      throw new Error(
-        data?.deprovisionManagedService.errors?.[0]?.message ?? "Deprovision failed",
-      );
+      throw new Error(data?.deprovisionManagedService.errors?.[0]?.message ?? "Deprovision failed");
     }
   }
 
@@ -300,9 +274,8 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
       title="Managed services"
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          Databases, caches, queues attached to {slug}. Provisioned via the
-          platform&apos;s driver registry; the workflow loop watches DB-side
-          status and drives the upstream lifecycle.
+          Databases, caches, queues attached to {slug}. Provisioned via the platform&apos;s driver
+          registry; the workflow loop watches DB-side status and drives the upstream lifecycle.
         </span>
       }
       actions={
@@ -450,9 +423,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
             setOpen(false);
             return true;
           }
-          toast.error(
-            data?.provisionManagedService.errors?.[0]?.message ?? "Provision failed",
-          );
+          toast.error(data?.provisionManagedService.errors?.[0]?.message ?? "Provision failed");
           return false;
         }}
         busy={busy}
@@ -478,40 +449,38 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-4 space-y-3">
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
               <label className="flex cursor-pointer items-start gap-3 text-sm">
                 <input
                   type="checkbox"
                   checked={deleteData}
                   onChange={(e) => setDeleteData(e.target.checked)}
-                  className="mt-0.5 size-4 cursor-pointer rounded border-destructive/50 accent-destructive"
+                  className="border-destructive/50 accent-destructive mt-0.5 size-4 cursor-pointer rounded"
                 />
                 <span>
                   <strong className="text-destructive">Delete persistent data.</strong>{" "}
                   <span className="text-muted-foreground">
-                    Skip the final snapshot / retained-backup path; empty buckets,
-                    purge queues, drop databases. Unchecked (default), the driver
-                    keeps a restorable artifact alongside the resource teardown.
+                    Skip the final snapshot / retained-backup path; empty buckets, purge queues,
+                    drop databases. Unchecked (default), the driver keeps a restorable artifact
+                    alongside the resource teardown.
                   </span>
                 </span>
               </label>
             </div>
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
               <label className="flex cursor-pointer items-start gap-3 text-sm">
                 <input
                   type="checkbox"
                   checked={forceDestroy}
                   onChange={(e) => setForceDestroy(e.target.checked)}
-                  className="mt-0.5 size-4 cursor-pointer rounded border-destructive/50 accent-destructive"
+                  className="border-destructive/50 accent-destructive mt-0.5 size-4 cursor-pointer rounded"
                 />
                 <span>
-                  <strong className="text-destructive">
-                    Force destroy (--atomic).
-                  </strong>{" "}
+                  <strong className="text-destructive">Force destroy (--atomic).</strong>{" "}
                   <span className="text-muted-foreground">
-                    Bypass cloud-side safety guards: suspend bucket versioning,
-                    ignore deletion-protection flags, terminate active sessions,
-                    ignore lingering bindings. Equivalent to Terraform&apos;s{" "}
+                    Bypass cloud-side safety guards: suspend bucket versioning, ignore
+                    deletion-protection flags, terminate active sessions, ignore lingering bindings.
+                    Equivalent to Terraform&apos;s{" "}
                     <code className="font-mono text-xs">force_destroy = true</code>.
                   </span>
                 </span>
@@ -529,9 +498,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
                   try {
                     await handleDeprovision(deprovisionTarget);
                   } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : "Deprovision failed",
-                    );
+                    toast.error(err instanceof Error ? err.message : "Deprovision failed");
                   }
                 }
               }}
@@ -553,6 +520,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
           managedServiceId={emailDetailTarget.id}
           serviceName={emailDetailTarget.name || emailDetailTarget.kind}
           appSlug={slug}
+          serviceConfig={emailDetailTarget.config ?? {}}
           open={emailDetailTarget !== null}
           onOpenChange={(next) => {
             if (!next) setEmailDetailTarget(null);
@@ -607,9 +575,8 @@ function ProvisionSheet({
         <SheetHeader>
           <SheetTitle>Provision managed service</SheetTitle>
           <SheetDescription>
-            Picks a kind + variant; the workflow loop creates the upstream
-            resource (RDS, ElastiCache, etc.) and surfaces the connection
-            envelope keys here once active.
+            Picks a kind + variant; the workflow loop creates the upstream resource (RDS,
+            ElastiCache, etc.) and surfaces the connection envelope keys here once active.
           </SheetDescription>
         </SheetHeader>
         <form
