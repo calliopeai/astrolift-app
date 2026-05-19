@@ -67,6 +67,40 @@ def release_notes_to_type(rn) -> ReleaseNotesType:
     )
 
 
+@strawberry.type(name="AstroliftManifestDiffEntry")
+class ManifestDiffEntryType:
+    """One changed resource in a ``compareDeployments`` manifest diff.
+
+    ``op`` mirrors JSON Patch (#737): ``add`` / ``remove`` / ``replace``.
+    ``path`` is a dotted key path from the manifest root.
+    ``before`` / ``after`` hold the serialised JSON values (null when not
+    applicable — e.g. ``after`` is null for ``remove``)."""
+
+    op: str
+    path: str
+    before: JSON
+    after: JSON
+
+
+@strawberry.type(name="AstroliftDeploymentComparison")
+class DeploymentComparisonType:
+    """Result of ``compareDeployments(idA, idB)`` (#737).
+
+    All three sections are best-effort: the commit range and compare URL
+    require both deployments to have ``commit_sha`` set and the app to
+    have a GitHub App install.  The manifest diff requires both to have
+    ``rendered_manifest_snapshot`` (null on pre-#737 deploys — empty diff
+    returned).  The image diff is best-effort registry introspection."""
+
+    deployment_a_id: GUID
+    deployment_b_id: GUID
+    base_sha: str
+    head_sha: str
+    compare_url: str
+    manifest_diff: list[ManifestDiffEntryType]
+    image_diff_summary: str
+
+
 @strawberry.type(name="AstroliftEnvironmentSetting")
 class EnvironmentSettingType:
     id: GUID

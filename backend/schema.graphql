@@ -1026,6 +1026,16 @@ type AstroliftDeploymentApprover {
   mailtoUrl: String!
 }
 
+type AstroliftDeploymentComparison {
+  deploymentAId: GUID!
+  deploymentBId: GUID!
+  baseSha: String!
+  headSha: String!
+  compareUrl: String!
+  manifestDiff: [AstroliftManifestDiffEntry!]!
+  imageDiffSummary: String!
+}
+
 type AstroliftDeploymentLifecycleEvent {
   deploymentId: String!
   registeredAppSlug: String!
@@ -1592,6 +1602,13 @@ type AstroliftManagedServiceTestEmailResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedServiceTestEmailResult
+}
+
+type AstroliftManifestDiffEntry {
+  op: String!
+  path: String!
+  before: JSON!
+  after: JSON!
 }
 
 type AstroliftMarkOnboardingCompletePayload {
@@ -3955,6 +3972,7 @@ type Query {
   astroliftDeployment(id: String!): AstroliftDeployment
   astroliftDeploymentApprovalHistory(deploymentId: String!): [AstroliftDeploymentApprovalHistoryEntry!]!
   astroliftDeploymentReleaseNotes(deploymentId: String!): AstroliftReleaseNotes
+  astroliftCompareDeployments(idA: String!, idB: String!): AstroliftDeploymentComparison
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
   astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]!
   astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]!
