@@ -253,3 +253,60 @@ class CustomDomain(BaseCoreModel):
                 name="custom_domain_hostname_unique_active",
             ),
         ]
+
+
+class DomainRedirectRule(BaseCoreModel):
+    """One redirect rule bound to a ``CustomDomain`` (#742).
+
+    Surfaces the HTTP→HTTPS / apex→www / alt-domain rules the FE renders
+    under the Redirects sub-section of the Domains page (#685). The
+    renderer reads the rule set for a domain when emitting the
+    Ingress/route resources and wires it onto the cluster's ingress
+    controller (nginx ``server-snippet``, traefik middleware, ALB
+    redirect-action) via the per-cloud driver.
+
+    Rules are ordered by ``priority`` (low → high; first match wins).
+    ``setDomainRedirects`` replaces the full set atomically; the FE never
+    edits individual rows.
+
+    Soft-delete tracking lives on ``BaseCoreModel.deleted_at`` — the
+    ``setDomainRedirects`` mutation soft-deletes the previous set before
+    inserting the new one, preserving the audit trail.
+    """
+
+    class Kind(models.TextChoices):
+        HTTP_TO_HTTPS = "http_to_https"
+        APEX_TO_WWW = "apex_to_www"
+        WWW_TO_APEX = "www_to_apex"
+        ALIAS = "alias"
+        CUSTOM = "custom"
+
+    class HttpStatus(models.IntegerChoices):
+        MOVED_PERMANENTLY = 301
+        FOUND = 302
+        TEMPORARY_REDIRECT = 307
+        PERMANENT_REDIRECT = 308
+
+    custom_domain = models.ForeignKey(
+        CustomDomain,
+        related_name="redirect_rules",
+        on_delete=models.CASCADE,
+    )
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    source_pattern = models.CharField(max_length=512, blank=True, default="")
+    destination_url = models.CharField(max_length=512, blank=True, default="")
+    http_status = models.IntegerField(
+        choices=HttpStatus.choices,
+        default=HttpStatus.MOVED_PERMANENTLY,
+    )
+    preserve_query_string = models.BooleanField(default=True)
+    priority = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["priority"]
+        indexes = [
+            models.Index(
+                fields=["custom_domain", "priority"],
+                name="redirect_domain_priority_idx",
+            ),
+        ]

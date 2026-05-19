@@ -40,6 +40,7 @@ from astrolift_lifecycle.models import (
     CustomDomain,
     Deployment,
     DeployToken,
+    DomainRedirectRule,
     EnvironmentSetting,
     PreviewEnvironment,
 )
@@ -277,6 +278,31 @@ class UploadCustomDomainCertificateInput:
 class _AppDomainRemovedPayload:
     id: GUID
     deleted: bool
+
+
+# Domain redirect rules (#742) ---------------------------------------
+
+
+@strawberry.input
+class DomainRedirectRuleInput:
+    """One redirect rule on the replace-all ``setDomainRedirects``
+    payload (#742). Mirrors ``DomainRedirectRule``'s persisted shape;
+    defaults match the model defaults so the FE only needs to specify
+    ``kind`` for the well-known kinds (http_to_https / apex_to_www /
+    www_to_apex)."""
+
+    kind: str
+    source_pattern: str = ""
+    destination_url: str = ""
+    http_status: int = 301
+    preserve_query_string: bool = True
+    priority: int = 0
+
+
+@strawberry.input
+class SetDomainRedirectsInput:
+    domain_id: GUID
+    rules: list[DomainRedirectRuleInput]
 
 
 # Deploy token CRUD (#281) -------------------------------------------
@@ -2250,6 +2276,103 @@ class LifecycleMutation:
                 "version",
             ],
         )
+        return gql_success(app_domain_to_type(domain))
+
+    @strawberry.field
+    @mutation_audit(action="app.domain.redirects_updated")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def set_domain_redirects(
+        self,
+        info: Info,
+        input: SetDomainRedirectsInput,
+    ) -> MutationResultType[AppDomainType]:
+        """Replace the redirect-rule set on a custom domain (#742).
+
+        The FE renders the rules table as a single editable list; this
+        mutation accepts the new full set and atomically:
+
+        1. Soft-deletes every active row on the domain (preserves the
+           audit trail via ``deleted_at``).
+        2. Bulk-creates the new rows from ``input.rules``.
+
+        The renderer reads the live set the next time the cluster's
+        ingress is reconciled — the per-driver wiring (nginx
+        ``server-snippet``, traefik middleware, ALB redirect-action)
+        translates each rule into the cloud's redirect primitive.
+        """
+        valid_kinds = {k.value for k in DomainRedirectRule.Kind}
+        valid_statuses = {s.value for s in DomainRedirectRule.HttpStatus}
+        for idx, row in enumerate(input.rules):
+            if row.kind not in valid_kinds:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"rules[{idx}].kind must be one of {sorted(valid_kinds)}",
+                    field="rules",
+                )
+            if int(row.http_status) not in valid_statuses:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"rules[{idx}].httpStatus must be one of {sorted(valid_statuses)}",
+                    field="rules",
+                )
+            # ``custom`` and ``alias`` rules need an explicit destination
+            # — the renderer has nothing to derive from for these kinds.
+            # ``http_to_https`` / ``apex_to_www`` / ``www_to_apex`` are
+            # well-known and the renderer derives the target from the
+            # parent domain's hostname.
+            if (
+                row.kind
+                in (
+                    DomainRedirectRule.Kind.CUSTOM.value,
+                    DomainRedirectRule.Kind.ALIAS.value,
+                )
+                and not (row.destination_url or "").strip()
+            ):
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"rules[{idx}].destinationUrl is required for kind={row.kind!r}",
+                    field="rules",
+                )
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        domain_qs = CustomDomain.objects.filter(
+            guid=str(input.domain_id),
+            deleted_at__isnull=True,
+        )
+        if org_id is not None:
+            domain_qs = domain_qs.filter(registered_app__organization_id=org_id)
+        domain = domain_qs.select_related("registered_app").first()
+        if domain is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "domain not found",
+            )
+
+        now = timezone.now()
+        with transaction.atomic():
+            DomainRedirectRule.objects.filter(
+                custom_domain=domain,
+                deleted_at__isnull=True,
+            ).update(
+                deleted_at=now,
+                updated_at=now,
+            )
+            DomainRedirectRule.objects.bulk_create(
+                [
+                    DomainRedirectRule(
+                        custom_domain=domain,
+                        kind=row.kind,
+                        source_pattern=(row.source_pattern or "").strip(),
+                        destination_url=(row.destination_url or "").strip(),
+                        http_status=int(row.http_status),
+                        preserve_query_string=bool(row.preserve_query_string),
+                        priority=int(row.priority),
+                    )
+                    for row in input.rules
+                ],
+            )
         return gql_success(app_domain_to_type(domain))
 
     # ---- Deploy tokens (#281) ------------------------------------
