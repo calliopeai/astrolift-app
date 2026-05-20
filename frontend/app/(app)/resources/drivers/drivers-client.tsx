@@ -135,24 +135,41 @@ function normalize(plugin: AstroliftProviderPlugin): DriverRow {
     string,
     unknown
   >;
-  const drivers = manifest.drivers as Record<string, unknown> | undefined;
+  // The backend's bootstrap_provider_plugins writes
+  //   { drivers: ["cluster","dns",…], managed_service_kinds: ["postgres",…] }
+  // (drivers is an ARRAY of role strings, not a dict).  Older / hand-edited
+  // manifests may use a dict shape, so accept both: build a Set of role
+  // names from whichever form is present.
+  const rawDrivers = manifest.drivers;
+  const driverRoles = new Set<string>();
+  if (Array.isArray(rawDrivers)) {
+    for (const r of rawDrivers) if (typeof r === "string") driverRoles.add(r);
+  } else if (rawDrivers && typeof rawDrivers === "object") {
+    for (const [k, v] of Object.entries(rawDrivers)) {
+      if (v) driverRoles.add(k);
+    }
+  }
+
   const capabilities: Record<string, boolean> = {};
   for (const cap of CAPABILITIES) {
-    // A driver is "supported" if the manifest carries any non-null
-    // entry under either drivers.<cap> or <cap>. Be liberal in what
-    // we accept — manifest shape varies per plugin.
     capabilities[cap.key] = Boolean(
-      drivers?.[cap.key] ??
-        manifest[cap.key] ??
+      driverRoles.has(cap.key) ||
+        manifest[cap.key] ||
         manifest[`${cap.key}_driver`],
     );
   }
-  const managedServicesRaw =
+
+  // Backend canonical key is ``managed_service_kinds`` (list of kind
+  // strings).  Fall back to legacy ``managed_services`` / camelCase
+  // shapes so a hand-edited row still renders.
+  const managedRaw =
+    (manifest.managed_service_kinds as unknown[] | undefined) ??
+    (manifest.managedServiceKinds as unknown[] | undefined) ??
     (manifest.managed_services as unknown[] | undefined) ??
     (manifest.managedServices as unknown[] | undefined) ??
     [];
-  const managedServices = Array.isArray(managedServicesRaw)
-    ? managedServicesRaw
+  const managedServices = Array.isArray(managedRaw)
+    ? managedRaw
         .map((s) =>
           typeof s === "string"
             ? s
@@ -183,6 +200,18 @@ export function DriversClient() {
     if (live.length > 0) return live.map(normalize);
     return FALLBACK_PROVIDERS.map((p) => ({ ...p }));
   }, [data]);
+
+  // Union of managed-service kinds declared across all live rows.
+  // Keeps the table from going stale when the platform ships a new
+  // kind (e.g. vector_index, time_series) — the column appears as
+  // soon as any provider advertises it.  Falls back to the hardcoded
+  // taxonomy when no rows are live.
+  const managedKindColumns = React.useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of rows) for (const k of r.managedServices) seen.add(k);
+    if (seen.size === 0) return [...MANAGED_SERVICE_KINDS] as string[];
+    return Array.from(seen).sort();
+  }, [rows]);
 
   const usingFallback =
     !loading && (data?.astroliftProviderPlugins?.length ?? 0) === 0;
@@ -289,7 +318,7 @@ export function DriversClient() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[200px]">Provider</TableHead>
-                    {MANAGED_SERVICE_KINDS.map((kind) => (
+                    {managedKindColumns.map((kind) => (
                       <TableHead key={kind} className="text-center">
                         {kind}
                       </TableHead>
@@ -302,7 +331,7 @@ export function DriversClient() {
                       <TableCell>
                         <span className="text-sm font-medium">{row.name}</span>
                       </TableCell>
-                      {MANAGED_SERVICE_KINDS.map((kind) => (
+                      {managedKindColumns.map((kind) => (
                         <TableCell key={kind} className="text-center">
                           {row.managedServices.includes(kind) ? (
                             <Badge className="text-[10px]">yes</Badge>
