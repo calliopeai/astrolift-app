@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { LiveRegionProvider } from "@/components/LiveRegion";
 import { PlatformIncidentBanner } from "@/components/PlatformIncidentBanner";
+import { ScmCallbackToast } from "@/components/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { StepUpPrompt } from "@/components/StepUpPrompt";
@@ -58,6 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </SidebarInset>
                 <CommandPalette />
                 <KeyboardShortcuts />
+                <ScmCallbackToast />
                 <SessionExpiredModal />
                 <StepUpPrompt />
               </SidebarProvider>
