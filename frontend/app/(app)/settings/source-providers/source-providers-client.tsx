@@ -224,6 +224,17 @@ export function SourceProvidersClient() {
             >
               one-click GitHub flow + GitLab wizard — full walkthrough
             </Link>
+            {/* #760 — GitHub's manifest API can't set the App's logo, so
+                the App lands with a placeholder. Surface the platform's
+                logo asset here so operators can grab it once + upload
+                manually under App settings → Display information. */}
+            <a
+              href="/static/img/astrolift-app-icon.png"
+              download="astrolift-app-icon.png"
+              className="text-muted-foreground text-[11px] underline"
+            >
+              download Astrolift logo for your new App
+            </a>
           </div>
         </CardHeader>
         <CardContent className="p-0">
