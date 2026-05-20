@@ -168,6 +168,17 @@ def _manifest_json(
     # dispatch) silently falls back to no-creds and 403s.
     oauth_callback_url = f"{base}/app/auth1/scm/github/callback"
 
+    # Note: we intentionally do NOT set ``request_oauth_on_install=True``
+    # here.  When that toggle is on, GitHub uses ``callback_urls[0]`` as
+    # the post-install destination instead of ``setup_url`` — and our
+    # OAuth callback validates against a session-pinned state that
+    # doesn't exist on the install-time path, so the operator lands on
+    # ``state_mismatch``.  The proper fix is a unified handler that
+    # recognizes install-time params on the OAuth callback (tracked as
+    # a follow-up).  For now the App lands with Callback URL populated
+    # (fixes the empty-field bug) but OAuth-during-install unchecked;
+    # operator clicks "Connect" on the Connected Accounts chip after
+    # install to complete the user OAuth dance.
     return {
         "name": f"astrolift-{install_slug}",
         "url": base,
@@ -177,7 +188,6 @@ def _manifest_json(
         },
         "redirect_url": manifest_redirect_url,
         "callback_urls": [oauth_callback_url],
-        "request_oauth_on_install": True,
         "setup_url": setup_url,
         "setup_on_update": True,
         "public": False,
