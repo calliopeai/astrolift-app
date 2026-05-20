@@ -67,7 +67,17 @@ const config: CodegenConfig = {
       },
     },
     "graphql/__generated__/operations.ts": {
-      plugins: ["typescript-operations"],
+      // Self-contained operations file: chain `typescript` +
+      // `typescript-operations` so the operations file emits its own
+      // helper types (Exact, Maybe, etc.) + input types + enums.
+      // We tried (and rejected): (a) `importTypesFrom` config —
+      // silently ignored by the bare plugin; (b) `import-types`
+      // preset — breaks on graphql-codegen 5 with 'visitFn.call is
+      // not a function'; (c) `add` plugin to import helpers — works
+      // for helpers but not for the dozens of input/enum types the
+      // operations reference. Inlining is the only path that
+      // type-checks reliably.
+      plugins: ["typescript", "typescript-operations"],
       config: {
         scalars: {
           GUID: "string",
@@ -76,9 +86,7 @@ const config: CodegenConfig = {
         },
         skipTypename: true,
         avoidOptionals: { field: false, inputValue: true },
-        // Import base types from schema.ts rather than duplicating them.
-        importTypesFrom: "./schema",
-        onlyOperationTypes: true,
+        enumsAsTypes: true,
       },
     },
   },
