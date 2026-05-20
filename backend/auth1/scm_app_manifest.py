@@ -155,9 +155,18 @@ def _manifest_json(
     scope. Operator can broaden later by editing the App on GitHub.
     """
     base = _app_base_url(request)
-    callback_url = f"{base}/app/auth1/scm/github/app-manifest/callback"
+    # Manifest-completion redirect — fires once when the App is first
+    # created from the manifest. Different from the OAuth callback.
+    manifest_redirect_url = f"{base}/app/auth1/scm/github/app-manifest/callback"
     setup_url = f"{base}/app/auth1/scm/github/app-manifest/setup"
     webhook_url = f"{base}/app/auth1/scm/github/webhook/{connection_guid}/"
+    # User-to-server OAuth callback — fires every time an operator
+    # authorizes the App on their account.  Without this in the manifest
+    # the created App's "Identifying and authorizing users" section is
+    # empty, the OAuth dance can't redirect anywhere, and any path that
+    # needs a user token (push CI workflow, push CI secrets, deploy
+    # dispatch) silently falls back to no-creds and 403s.
+    oauth_callback_url = f"{base}/app/auth1/scm/github/callback"
 
     return {
         "name": f"astrolift-{install_slug}",
@@ -166,7 +175,9 @@ def _manifest_json(
             "url": webhook_url,
             "active": True,
         },
-        "redirect_url": callback_url,
+        "redirect_url": manifest_redirect_url,
+        "callback_urls": [oauth_callback_url],
+        "request_oauth_on_install": True,
         "setup_url": setup_url,
         "setup_on_update": True,
         "public": False,
