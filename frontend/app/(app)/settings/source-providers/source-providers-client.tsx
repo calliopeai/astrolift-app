@@ -108,40 +108,14 @@ export function SourceProvidersClient() {
 
   const conns = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS);
 
-  // Surface OAuth-callback outcomes from /app/auth1/scm/<host>/callback
-  // — the dance lands the browser back here with ?scm_connected or
-  // ?scm_error so we can toast and clean up the URL. The callback
-  // emits a host-agnostic ?scm_connected=<login> so the toast text
-  // stays generic (we don't know which host it was at this point
-  // unless we plumb that through; ?scm_error is also host-agnostic).
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    const ok = url.searchParams.get("scm_connected");
-    const err = url.searchParams.get("scm_error");
-    if (ok) {
-      toast.success(`Connected ${ok}`);
-      void conns.refetch();
-    } else if (err === "app_base_url_not_public") {
-      toast.error(
-        "GitHub can't reach this install. Set APP_BASE_URL on the backend to your public URL (e.g. https://astrolift.example.com) and redeploy.",
-        { duration: 10_000 }
-      );
-    } else if (err === "config_missing_client_id") {
-      toast.error(
-        "This GitHub connection is missing its Client ID — add it via 'Add Client ID' below.",
-        { duration: 10_000 }
-      );
-    } else if (err) {
-      toast.error(`SCM OAuth: ${err.replace(/_/g, " ")}`);
-    }
-    if (ok || err) {
-      url.searchParams.delete("scm_connected");
-      url.searchParams.delete("scm_error");
-      window.history.replaceState({}, "", url.toString());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // OAuth-callback outcome toasts moved to a layout-level component
+  // (#759, `components/ScmCallbackToast`) so they surface regardless
+  // of where `return_to` lands. Refetching the list when we land on
+  // this page with a success param is now the only page-specific
+  // bit; the toast handler in the layout consumes the param before
+  // we run, so we can't read it directly. The query already
+  // cache-and-network-fetches on mount, so the row state is up to
+  // date without an explicit refetch hook here.
   const keys = useQuery<KeysResp>(LIST_SSH_DEPLOY_KEYS, {
     variables: { appSlug: null },
   });
