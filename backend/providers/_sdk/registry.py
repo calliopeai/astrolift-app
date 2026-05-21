@@ -23,6 +23,23 @@ class Tag:
 SecretSpec = dict[str, Any]
 
 
+@dataclass(frozen=True)
+class CiPushRole:
+    """A cloud-side identity that the SCM provider's CI runner can assume
+    to push to the platform-owned registry repo.
+
+    ``role_ref`` is opaque to the platform (the CI workflow embeds it
+    verbatim — IAM role ARN for AWS / Workload Identity Pool resource
+    name for GCP / Federated Identity Credential resource id for Azure).
+    ``scm_provider`` is the SCM the role's trust policy is bound to
+    (``github`` today; ``gitlab``/``bitbucket`` later when those SCM
+    drivers grow OIDC support).
+    """
+
+    role_ref: str
+    scm_provider: str
+
+
 class ImageRegistryDriver(Protocol):
     """Protocol for managing container image registry repositories and credentials.
 
@@ -39,3 +56,21 @@ class ImageRegistryDriver(Protocol):
     def push(self, local_image: str, repo: str, tag: str) -> str: ...
 
     def list_tags(self, repo: str) -> list[Tag]: ...
+
+    def ensure_ci_push_role(
+        self,
+        *,
+        repo: str,
+        scm_provider: str,
+        scm_repo_full_name: str,
+    ) -> CiPushRole:
+        """Provision (or refresh) a cloud-side identity assumable by the
+        SCM provider's CI runner via OIDC, scoped to push images into
+        ``repo`` only.
+
+        Drivers that don't (yet) implement OIDC-based CI push must raise
+        :class:`_sdk.UnsupportedOperationError` so the lifecycle layer
+        can fall back to long-lived access keys or surface an operator-
+        facing TODO.
+        """
+        ...
