@@ -20,10 +20,16 @@ import base64
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
-from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
+from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
 
 from aws._errors import ConflictError, NotFoundError, map_client_error
+
+# GitHub's OIDC issuer — present in the trust policy of the per-app
+# push role, and the `aud` claim our IAM trust enforces on the JWT
+# the CI runner presents at AssumeRoleWithWebIdentity time.
+_GITHUB_OIDC_PROVIDER_HOST = "token.actions.githubusercontent.com"
 
 
 @dataclass(frozen=True)
@@ -51,8 +57,15 @@ class ECRConfig:
 class ECRDriver(ImageRegistryDriver):
     """boto3-backed ECR driver."""
 
-    def __init__(self, *, config: ECRConfig, client: Any | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        config: ECRConfig,
+        client: Any | None = None,
+        iam_client: Any | None = None,
+    ) -> None:
         self._config = config
+        self._iam = iam_client  # lazily created when ensure_ci_push_role is called
         if client is not None:
             self._client = client
         else:
@@ -197,6 +210,117 @@ class ECRDriver(ImageRegistryDriver):
             raise NotFoundError(f"repository {repo} not found") from exc
         except Exception as exc:  # noqa: BLE001
             raise map_client_error(exc) from exc
+
+    @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.create_ci_push_role")
+    def ensure_ci_push_role(
+        self,
+        *,
+        repo: str,
+        scm_provider: str,
+        scm_repo_full_name: str,
+    ) -> CiPushRole:
+        """Provision (or refresh) an IAM role assumable by GitHub Actions
+        via OIDC, scoped to pushing into ``repo`` only.
+
+        Naming: ``astrolift-<repo>-ecr-push`` (truncated to fit IAM's
+        64-char role-name limit).  Trust policy enforces both the
+        repo scope (``sub`` claim) AND the GitHub ``aud`` claim so
+        another tenant's CI in the same GitHub org can't assume this
+        role.  Inline policy grants only the five ECR push actions
+        scoped to this repo's ARN.  Idempotent — re-running refreshes
+        the trust + inline policies in place.
+
+        Mirrors the pattern proven against AWS in production reference
+        Django apps.  Pre-req: the AWS account must have the GitHub
+        OIDC provider registered (one-time setup via
+        ``aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com``).
+        """
+        if scm_provider != "github":
+            raise UnsupportedOperationError(
+                f"ECRDriver only supports scm_provider='github' today; got {scm_provider!r}",
+            )
+        if "/" not in scm_repo_full_name:
+            raise ValueError(
+                f"scm_repo_full_name must be 'owner/repo'; got {scm_repo_full_name!r}",
+            )
+        import json
+
+        if self._iam is None:
+            import boto3
+
+            self._iam = boto3.client("iam", region_name=self._config.region)
+
+        account_id = self._config.account_id
+        # IAM role names cap at 64 chars; truncate from the head if our
+        # full naming convention overflows (rare — repo names are slugs).
+        role_name = f"astrolift-{repo}-ecr-push"[:64]
+        oidc_arn = f"arn:aws:iam::{account_id}:oidc-provider/{_GITHUB_OIDC_PROVIDER_HOST}"
+        repo_arn = f"arn:aws:ecr:{self._config.region}:{account_id}:repository/{repo}"
+
+        trust_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Federated": oidc_arn},
+                    "Action": "sts:AssumeRoleWithWebIdentity",
+                    "Condition": {
+                        "StringEquals": {
+                            f"{_GITHUB_OIDC_PROVIDER_HOST}:aud": "sts.amazonaws.com",
+                        },
+                        "StringLike": {
+                            f"{_GITHUB_OIDC_PROVIDER_HOST}:sub": f"repo:{scm_repo_full_name}:*",
+                        },
+                    },
+                },
+            ],
+        }
+        push_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "ecr:GetAuthorizationToken",
+                    "Resource": "*",
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:PutImage",
+                        "ecr:InitiateLayerUpload",
+                        "ecr:UploadLayerPart",
+                        "ecr:CompleteLayerUpload",
+                        "ecr:BatchGetImage",
+                    ],
+                    "Resource": repo_arn,
+                },
+            ],
+        }
+
+        try:
+            response = self._iam.create_role(
+                RoleName=role_name,
+                AssumeRolePolicyDocument=json.dumps(trust_policy),
+                Description=f"Astrolift ECR push role for {scm_repo_full_name} → {repo}",
+            )
+            role_arn = response["Role"]["Arn"]
+        except self._iam.exceptions.EntityAlreadyExistsException:
+            # Refresh the trust policy in case the SCM repo or scope
+            # changed.  ``update_assume_role_policy`` is the idempotent
+            # path; ``put_role_policy`` below is also idempotent.
+            self._iam.update_assume_role_policy(
+                RoleName=role_name,
+                PolicyDocument=json.dumps(trust_policy),
+            )
+            role_arn = self._iam.get_role(RoleName=role_name)["Role"]["Arn"]
+
+        self._iam.put_role_policy(
+            RoleName=role_name,
+            PolicyName="ecr-push",
+            PolicyDocument=json.dumps(push_policy),
+        )
+        return CiPushRole(role_ref=role_arn, scm_provider="github")
 
     # ---- internals ------------------------------------------------
 
