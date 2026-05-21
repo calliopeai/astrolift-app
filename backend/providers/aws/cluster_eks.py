@@ -978,63 +978,37 @@ class EKSClusterDriver(ClusterDriver):
         else:
             self._describe_cache.pop(cluster_name, None)
 
-    def _synthesize_kubeconfig(
+    def _synthesize_token_auth(
         self,
         *,
-        slug: str,
         cluster_name: str,
         region: str,
-    ) -> dict[str, Any]:
-        """Build the auth_config blob (``{"kubeconfig": <yaml>}``)
-        a synthesized ``ClusterAuth(auth_method='kubeconfig', ...)``
-        carries through ``build_api_client``.
+    ) -> tuple[dict[str, Any], str]:
+        """Build ``(auth_config, endpoint)`` for a ``service_account_token``-
+        shaped ClusterAuth.
 
-        The YAML shape is the standard EKS kubeconfig — one cluster,
-        one user, one context — with the bearer token inlined under
-        the user's ``token`` field. We deliberately do NOT emit an
-        ``exec`` stanza pointing at ``aws eks get-token`` because the
-        platform worker container doesn't ship the AWS CLI; inlining
-        the token sidesteps that and matches what ``mint_eks_token``
-        already does for in-process consumption."""
-        import yaml
+        Returns the bearer token + base64 CA in the shape
+        ``build_api_client``'s ``service_account_token`` branch consumes
+        (``{"token": <bearer>, "ca_cert": <pem-or-base64>}``) plus the
+        cluster API endpoint so the caller can stamp it onto the
+        replaced ClusterAuth / ClusterContext.
 
+        Why not ``kubeconfig``: ``kubernetes.config.load_kube_config_from_dict``
+        populates ``Configuration.api_key["authorization"]`` correctly,
+        but the ApiClient's request dispatch silently drops the
+        Authorization header for inline-``token`` users when the
+        kubeconfig has no exec stanza — every request goes out unauthed
+        and EKS returns 401. The bypass-kubeconfig pattern (direct
+        Configuration object with ``host``/``ssl_ca_cert``/``api_key``)
+        is what the python kubernetes-client actually ships working for
+        EKS Bearer auth.
+        """
         describe = self._cached_describe(cluster_name)
         token = self._cached_token(cluster_name, region)
-        user_name = f"astrolift-{slug}"
-        kubeconfig = {
-            "apiVersion": "v1",
-            "kind": "Config",
-            "current-context": slug,
-            "clusters": [
-                {
-                    "name": cluster_name,
-                    "cluster": {
-                        "server": describe.endpoint,
-                        # CA is delivered base64-encoded by EKS;
-                        # kubeconfig spec also expects base64 under
-                        # ``certificate-authority-data`` — pass through
-                        # unchanged.
-                        "certificate-authority-data": describe.ca_data,
-                    },
-                },
-            ],
-            "users": [
-                {
-                    "name": user_name,
-                    "user": {"token": token},
-                },
-            ],
-            "contexts": [
-                {
-                    "name": slug,
-                    "context": {
-                        "cluster": cluster_name,
-                        "user": user_name,
-                    },
-                },
-            ],
-        }
-        return {"kubeconfig": yaml.safe_dump(kubeconfig, sort_keys=False)}
+        return (
+            {"token": token, "ca_cert": describe.ca_data},
+            describe.endpoint,
+        )
 
     def _resolve_eks_auth_context(self, cluster: ClusterContext) -> ClusterContext:
         if cluster.auth_method != "exec_plugin":
@@ -1046,15 +1020,15 @@ class EKSClusterDriver(ClusterDriver):
             cfg.get("cluster_name"),
             cfg.get("region"),
         )
-        auth_config = self._synthesize_kubeconfig(
-            slug=cluster.slug,
+        auth_config, endpoint = self._synthesize_token_auth(
             cluster_name=cluster_name,
             region=region,
         )
         return dataclasses.replace(
             cluster,
-            auth_method="kubeconfig",
+            auth_method="service_account_token",
             auth_config=auth_config,
+            endpoint=endpoint,
         )
 
     def _resolve_eks_auth(self, auth: ClusterAuth) -> ClusterAuth:
@@ -1067,15 +1041,15 @@ class EKSClusterDriver(ClusterDriver):
             cfg.get("cluster_name"),
             cfg.get("region"),
         )
-        auth_config = self._synthesize_kubeconfig(
-            slug=auth.slug,
+        auth_config, endpoint = self._synthesize_token_auth(
             cluster_name=cluster_name,
             region=region,
         )
         return dataclasses.replace(
             auth,
-            auth_method="kubeconfig",
+            auth_method="service_account_token",
             auth_config=auth_config,
+            endpoint=endpoint,
         )
 
     # ---- Cluster health (#68 slice 1) -----------------------------
