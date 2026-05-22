@@ -127,7 +127,44 @@ def _provision_registry_repo_sync(registered_app_id: int) -> str:
     repo_name = f"{app.organization.slug}/{app.slug}"
     repo = registry_driver.ensure_repo(repo_name)
     app.registry_repo_uri = repo.uri
-    app.save(update_fields=["registry_repo_uri", "updated_at", "version"])
+
+    # Provision (or refresh) the CI push role so the SCM provider's
+    # runner can authenticate to the registry via OIDC — no long-lived
+    # access keys.  The push code path already reads ``push_role_ref``
+    # (see astrolift_scm/services/secrets.py: ASTROLIFT_PUSH_ROLE_ARN),
+    # so populating the field here flips the CI workflow's
+    # ``aws-actions/configure-aws-credentials`` step into OIDC mode on
+    # the next ``pushAstroliftCiSecrets`` call.
+    #
+    # Skipped when:
+    #  - the app has no source repo (manually-registered, no SCM)
+    #  - the source kind isn't supported by the registry driver (today
+    #    only github is wired in the AWS ECR driver — other SCMs raise
+    #    UnsupportedOperationError, which we treat as "no-op for now"
+    #    rather than failing the whole provision)
+    if app.source_repo and hasattr(registry_driver, "ensure_ci_push_role"):
+        try:
+            push_role = registry_driver.ensure_ci_push_role(
+                repo=repo_name,
+                scm_provider=app.source_kind,
+                scm_repo_full_name=app.source_repo,
+            )
+            app.push_role_ref = push_role.role_ref
+        except Exception as exc:  # noqa: BLE001
+            # Don't fail the whole provision on push-role failure —
+            # the app can still be deployed via long-lived access keys
+            # (legacy) and operators can re-run reprovision to retry.
+            log.warning(
+                "ensure_ci_push_role failed for %s: %s",
+                app.slug,
+                exc,
+                extra={"registered_app_id": registered_app_id},
+            )
+
+    save_fields = ["registry_repo_uri", "updated_at", "version"]
+    if app.push_role_ref:
+        save_fields.insert(1, "push_role_ref")
+    app.save(update_fields=save_fields)
     return repo.uri
 
 
