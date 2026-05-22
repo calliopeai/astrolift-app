@@ -710,18 +710,15 @@ class LiveManagementBackend:
         return "updated"
 
     def list_cluster_crds(self, *, auth: ClusterAuth) -> list[str]:
-        try:
-            from kubernetes import client as k8s_client
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(
-                "kubernetes python client is not installed",
-            ) from exc
+        # #765 — route through the low-level call_api wrapper so a
+        # kubernetes-client minor bump can't silently break auth
+        # dispatch on this hot path.  Same observable behavior as the
+        # high-level ``ApiextensionsV1Api.list_custom_resource_definition``,
+        # but bypasses any high-level method drift.
+        from k8s_native._api_client_helpers import list_cluster_crd_names
         from k8s_native.observability import build_api_client
 
-        api_client = build_api_client(auth)
-        ext = k8s_client.ApiextensionsV1Api(api_client)
-        resp = ext.list_custom_resource_definition(timeout_seconds=10)
-        return sorted(item.metadata.name for item in (resp.items or []))
+        return list_cluster_crd_names(build_api_client(auth))
 
     def list_namespaced_pods(
         self,
@@ -730,34 +727,32 @@ class LiveManagementBackend:
         namespace: str,
         label_selector: str | None = None,
     ) -> list[dict[str, Any]]:
-        try:
-            from kubernetes import client as k8s_client
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("kubernetes python client is not installed") from exc
+        # #765 — low-level wrapper for cross-version-stable auth.
+        from k8s_native._api_client_helpers import list_namespaced_pod_dicts
         from k8s_native.observability import build_api_client
 
-        api_client = build_api_client(auth)
-        core_v1 = k8s_client.CoreV1Api(api_client)
         try:
-            resp = core_v1.list_namespaced_pod(
+            pods = list_namespaced_pod_dicts(
+                build_api_client(auth),
                 namespace=namespace,
                 label_selector=label_selector,
-                timeout_seconds=10,
             )
         except Exception:
+            # Probe path expects "no pods" rather than an exception for
+            # missing-namespace + transient errors. Matches the prior
+            # high-level method's behavior.
             return []
+
         out: list[dict[str, Any]] = []
-        for pod in resp.items or []:
-            metadata = getattr(pod, "metadata", None)
-            spec = getattr(pod, "spec", None)
-            containers = getattr(spec, "containers", None) or [] if spec else []
-            image = ""
-            if containers:
-                image = getattr(containers[0], "image", "") or ""
+        for pod in pods:
+            metadata = pod.get("metadata") or {}
+            spec = pod.get("spec") or {}
+            containers = spec.get("containers") or []
+            image = containers[0].get("image", "") if containers else ""
             out.append(
                 {
-                    "name": getattr(metadata, "name", "") or "" if metadata else "",
-                    "labels": dict(getattr(metadata, "labels", {}) or {}) if metadata else {},
+                    "name": metadata.get("name", ""),
+                    "labels": dict(metadata.get("labels") or {}),
                     "image": image,
                 }
             )

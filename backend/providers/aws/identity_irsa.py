@@ -10,6 +10,18 @@ Per #8's workload_identity policy, this driver:
 - attaches inline / managed policies for the role's permissions
 - annotates the SA with `eks.amazonaws.com/role-arn` so the EKS
   pod-identity webhook injects credentials
+
+Naming convention (#766): tenant IAM roles use ``astrolift-tenant-<slug>``.
+Mirrors the ``<platform>-tenant-<slug>`` pattern proven in production
+AWS Django apps — clearly scoped, easy to grep in audit logs, fits
+inside IAM's 64-char role-name limit for any reasonable slug.
+
+Legacy / backward-compat: pre-#766 rows may have roles named
+``astrolift-<slug>`` (no ``-tenant-`` infix); ``describe_identity``
+looks up both shapes so the operability surface keeps working
+across the rename.  No data migration of existing IAM roles is
+attempted — they stay under their original names; new roles use
+the canonical pattern.
 """
 
 from __future__ import annotations
@@ -159,12 +171,12 @@ class IRSADriver(WorkloadIdentityDriver):
 
     @driver_op(cloud="aws", driver="identity")
     def describe_identity(self, app_slug: str) -> IdentityBinding | None:
-        """Return the IRSA binding for an app, or ``None`` when no role
-        named ``astrolift-<app_slug>`` exists.
+        """Return the IRSA binding for an app, or ``None`` when no
+        matching role exists.
 
-        The role-name convention follows the workspace pattern
-        (``astrolift-<slug>`` from ``create_identity_role`` callers in
-        the lifecycle deploy code). ``last_used_at`` comes from
+        Tries the canonical name first (``astrolift-tenant-<slug>`` per
+        #766) then falls back to the legacy name (``astrolift-<slug>``)
+        for pre-rename rows.  ``last_used_at`` comes from
         ``RoleLastUsed`` on ``GetRole`` — IAM populates that lazily, so
         a freshly-created role reports None until the first STS exchange.
 
@@ -173,13 +185,18 @@ class IRSADriver(WorkloadIdentityDriver):
         system:serviceaccount:<ns>:<sa>"`` for a single subject, or
         ``"OIDC trust: <N> service account(s)"`` for multi-subject roles.
         Operators who need the full policy click through to IAM."""
-        role_name = f"astrolift-{app_slug}"
-        try:
-            response = self._iam.get_role(RoleName=role_name)
-        except self._iam.exceptions.NoSuchEntityException:
+        # Canonical name first, then legacy fallback.
+        response = None
+        for role_name in (f"astrolift-tenant-{app_slug}", f"astrolift-{app_slug}"):
+            try:
+                response = self._iam.get_role(RoleName=role_name)
+                break
+            except self._iam.exceptions.NoSuchEntityException:
+                continue
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+        if response is None:
             return None
-        except Exception as exc:
-            raise map_client_error(exc) from exc
 
         role = response["Role"]
         trust_doc = role.get("AssumeRolePolicyDocument") or {}
