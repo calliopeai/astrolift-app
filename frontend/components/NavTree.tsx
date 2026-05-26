@@ -279,7 +279,7 @@ export function NavTree() {
               </div>
             </SidebarMenuButton>
             <CollapsibleContent>
-              <SidebarMenuSub>
+              <SidebarMenuSub className="mx-2 px-1.5">
                 {tree.teams.length === 0 ? (
                   <EmptyRow
                     href="/teams"
@@ -350,7 +350,7 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
               {node.team.name}
             </Link>
             <CollapsibleTrigger
-              className="-mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              className="-mr-1 translate-x-3.5 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
               aria-label={`Toggle ${node.team.name}`}
             >
               <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/team:rotate-90" />
@@ -358,7 +358,7 @@ function TeamNode({ node, activeAppSlug, open, toggle }: TeamNodeProps) {
           </div>
         </SidebarMenuSubButton>
         <CollapsibleContent>
-          <SidebarMenuSub>
+          <SidebarMenuSub className="mx-2 px-1.5">
             {hasChildren ? (
               <>
                 {node.projects.map((projectNode) => (
@@ -450,7 +450,7 @@ function ProjectNode({
               {node.project.name}
             </Link>
             <CollapsibleTrigger
-              className="-mr-1 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
+              className="-mr-1 translate-x-7 flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-sidebar-accent"
               aria-label={`Toggle ${node.project.name}`}
             >
               <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/project:rotate-90" />
@@ -458,7 +458,7 @@ function ProjectNode({
           </div>
         </SidebarMenuSubButton>
         <CollapsibleContent>
-          <SidebarMenuSub>
+          <SidebarMenuSub className="mx-2 px-1.5">
             {node.apps.length === 0 ? (
               <EmptyRow
                 href="/apps/new"
@@ -533,7 +533,7 @@ function UnassignedAppsBlock({
         <CircleDashedIcon className="size-3" aria-hidden />
         <span className="truncate">{label}</span>
       </div>
-      <SidebarMenuSub>
+      <SidebarMenuSub className="mx-2 px-1.5">
         {apps.map((app) => (
           <AppLeaf
             key={app.id}
