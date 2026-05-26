@@ -20,3 +20,19 @@ class SecretsBackend(Protocol):
     def delete(self, path: str) -> None: ...
 
     def list(self, prefix: str) -> list[str]: ...
+
+    def ensure_initialized(self) -> dict | None:
+        """Bootstrap the secrets backend if it requires out-of-band setup
+        (e.g. creating a KMS key, enabling a Vault secrets engine).
+
+        Backends that require no initialisation (AWS Secrets Manager,
+        GCP Secret Manager, Azure Key Vault) should raise
+        ``NotImplementedError``; the cluster-bring workflow treats that as
+        a successful no-op and stamps ``secrets_backend_provisioned_at``.
+
+        Backends that do perform setup (Vault, custom) should return a
+        ``dict`` with any relevant output, or ``None``.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not require out-of-band initialisation"
+        )
