@@ -24,6 +24,7 @@ import dataclasses
 import enum
 import functools
 import logging
+import threading
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -32,6 +33,11 @@ from core.permissions import Permission, PermissionDenied
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
+
+# Thread-local so MutationAuditExtension can read the @mutation_audit action
+# name after the resolver runs.  Set by the wrapper, read by the extension's
+# on_operation() hook after ``yield``.  Safe for WSGI (one thread per request).
+_mutation_action_local: threading.local = threading.local()
 
 
 T = TypeVar("T")
@@ -155,6 +161,11 @@ def mutation_audit(
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs) -> MutationResult:
+            # Publish action name so MutationAuditExtension (schema-level
+            # extension that writes to the DB audit log) can record the
+            # dot-notation action instead of the raw GraphQL operation name.
+            _mutation_action_local.action = action
+
             tenant = get_current_tenant()
             target_kind: str | None = None
             target_id: int | str | None = None

@@ -5,6 +5,7 @@ who called it, when, with what variables, and whether it succeeded.
 
 Sensitive fields (password, pin, token) are redacted from logged variables.
 """
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -17,7 +18,7 @@ from core.models import Tracking
 
 logger = logging.getLogger(__name__)
 
-SENSITIVE_KEYS = {'password', 'pin', 'token', 'secret', 'ssn', 'credit_card', 'secure'}
+SENSITIVE_KEYS = {"password", "pin", "token", "secret", "ssn", "credit_card", "secure"}
 
 
 def _redact(variables: dict | None) -> dict:
@@ -27,7 +28,7 @@ def _redact(variables: dict | None) -> dict:
     redacted = {}
     for key, value in variables.items():
         if any(s in key.lower() for s in SENSITIVE_KEYS):
-            redacted[key] = '***REDACTED***'
+            redacted[key] = "***REDACTED***"
         elif isinstance(value, dict):
             redacted[key] = _redact(value)
         else:
@@ -37,11 +38,13 @@ def _redact(variables: dict | None) -> dict:
 
 class MutationAuditLog(models.Model):
     """Persistent log of every GraphQL mutation execution."""
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL,
-        related_name='mutation_audit_logs',
+        related_name="mutation_audit_logs",
     )
     operation = models.CharField(max_length=200, db_index=True)
     variables = models.JSONField(default=dict, blank=True)
@@ -51,14 +54,14 @@ class MutationAuditLog(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ["-timestamp"]
         indexes = [
-            models.Index(fields=['user', '-timestamp']),
-            models.Index(fields=['operation', '-timestamp']),
+            models.Index(fields=["user", "-timestamp"]),
+            models.Index(fields=["operation", "-timestamp"]),
         ]
 
     def __str__(self):
-        return f'{self.operation} by {self.user} at {self.timestamp}'
+        return f"{self.operation} by {self.user} at {self.timestamp}"
 
 
 class MutationAuditExtension(SchemaExtension):
@@ -73,21 +76,31 @@ class MutationAuditExtension(SchemaExtension):
                 return
 
             query = request.query.strip()
-            if not query.lower().startswith('mutation'):
+            if not query.lower().startswith("mutation"):
                 return
 
-            # Extract operation name
-            operation_name = request.operation_name or 'unknown'
+            # Prefer the dot-notation action set by @mutation_audit (e.g.
+            # "cluster.install_prereqs") over the raw GraphQL operation name
+            # (e.g. "installClusterPrereqs").  The lifecycle-audit resolver
+            # filters on dot-notation prefixes, so this must match.
+            try:
+                from core.mutations import _mutation_action_local
+
+                operation_name = (
+                    getattr(_mutation_action_local, "action", None) or request.operation_name or "unknown"
+                )
+            except Exception:
+                operation_name = request.operation_name or "unknown"
 
             # Get user from context
             user = None
             ip_address = None
-            context = getattr(request, 'context', None)
+            context = getattr(request, "context", None)
             if context:
-                user = getattr(context, 'user', None)
+                user = getattr(context, "user", None)
                 if user and not user.is_authenticated:
                     user = None
-                req = getattr(context, 'request', None)
+                req = getattr(context, "request", None)
                 if req:
                     ip_address = _get_client_ip(req)
 
@@ -110,12 +123,12 @@ class MutationAuditExtension(SchemaExtension):
                 ip_address=ip_address,
             )
         except Exception as e:
-            logger.warning(f'Mutation audit log failed: {e}')
+            logger.warning(f"Mutation audit log failed: {e}")
 
 
 def _get_client_ip(request) -> str | None:
     """Extract client IP from Django request."""
-    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    xff = request.META.get("HTTP_X_FORWARDED_FOR")
     if xff:
-        return xff.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")

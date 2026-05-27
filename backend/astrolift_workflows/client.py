@@ -172,14 +172,14 @@ async def _list_for_cluster_async(
     cluster_guid: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    client = await _get_client_async()
     # Workflow ids the cluster workflows use all end in the cluster's
     # guid (BringClusterIntoManagement-<guid>, DecommissionCluster-
     # Workflow-<guid>, InstallClusterPrereqsWorkflow-<guid>, ...).
     # Temporal's visibility query language lets us pattern-match.
-    query = f'WorkflowId STARTS_WITH "" AND WorkflowId LIKE "%{cluster_guid}%"'
+    query = f'WorkflowId LIKE "%{cluster_guid}%"'
     rows: list[dict[str, Any]] = []
     try:
+        client = await _get_client_async()
         async for run in client.list_workflows(query=query):
             rows.append(
                 {
@@ -194,7 +194,7 @@ async def _list_for_cluster_async(
             if len(rows) >= limit:
                 break
     except Exception as exc:  # noqa: BLE001 — log + return empty
-        logger.warning("temporal list_workflows query failed: %s", exc)
+        logger.warning("temporal list_workflows_for_cluster failed (guid=%s): %s", cluster_guid, exc)
         return []
     return rows
 
