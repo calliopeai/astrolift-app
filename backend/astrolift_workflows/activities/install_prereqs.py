@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import urllib.request
 from typing import Any
 
@@ -200,8 +201,6 @@ def _install_cluster_prereqs_sync(
         # Slug the repo URL into a valid K8s resource name:
         # strip scheme, replace non-alphanumeric with '-', truncate to 52 chars
         # (HelmRepository name limit is 63; "helmrepo-" prefix + 52 = 61).
-        import re
-
         repo_slug = re.sub(r"[^a-z0-9]+", "-", component.chart_repo_url.lower().split("//")[-1].rstrip("/"))
         repo_slug = repo_slug.strip("-")[:52]
         repo_name = f"helmrepo-{repo_slug}"
