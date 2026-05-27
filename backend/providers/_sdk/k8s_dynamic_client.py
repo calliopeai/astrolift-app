@@ -574,3 +574,34 @@ class KubernetesDynamicClient:
             local_port=first_local,
             remote_port=first_remote,
         )
+
+    # ---- health-surface proxies ------------------------------------
+    #
+    # _kube_health helpers call these methods on any driver client so
+    # the cloud-specific auth bootstrap is irrelevant to the listing
+    # logic. CoreV1Api / AppsV1Api are built per-call (cheap — they
+    # share the already-open ApiClient) so no extra state is needed.
+
+    def list_namespaced_pod(self, *, namespace: str, **kwargs: Any) -> Any:
+        """Proxy to ``CoreV1Api.list_namespaced_pod`` for health queries.
+
+        Accepts the same ``label_selector`` / ``field_selector`` kwargs
+        the official client supports and passes them through unchanged.
+        Token is refreshed before the call so short-lived cloud tokens
+        (EKS: 15 min) don't expire mid-query.
+        """
+        self._refresh_token()
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        return core_v1.list_namespaced_pod(namespace, **kwargs)
+
+    def list_namespaced_event(self, *, namespace: str, **kwargs: Any) -> Any:
+        """Proxy to ``CoreV1Api.list_namespaced_event`` for event queries."""
+        self._refresh_token()
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        return core_v1.list_namespaced_event(namespace, **kwargs)
+
+    def list_namespaced_deployment(self, *, namespace: str, **kwargs: Any) -> Any:
+        """Proxy to ``AppsV1Api.list_namespaced_deployment`` for workload health."""
+        self._refresh_token()
+        apps_v1 = self._client_module.AppsV1Api(self._api_client)
+        return apps_v1.list_namespaced_deployment(namespace, **kwargs)
