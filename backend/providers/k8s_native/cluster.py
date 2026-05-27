@@ -522,8 +522,8 @@ class K8sNativeClusterDriver(ClusterDriver):
         """
         return [
             BootstrapComponent(
-                key="tls_issuer",
-                title="TLS certificate strategy",
+                key="cert-manager",
+                title="cert-manager (TLS certificates)",
                 default_enabled=True,
                 rationale=(
                     "Bare-metal clusters need cert-manager + an Issuer the "
@@ -532,8 +532,7 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "internal-only traffic."
                 ),
                 helm_values={
-                    "certManager": {"enabled": True, "installCRDs": True},
-                    "clusterIssuer": {"enabled": True},
+                    "installCRDs": True,
                 },
                 requires=["subzone:dns (for Let's Encrypt DNS-01)"],
                 options=[
@@ -548,6 +547,10 @@ class K8sNativeClusterDriver(ClusterDriver):
                         default="acme_letsencrypt_prod",
                     ),
                 ],
+                chart_name="cert-manager",
+                chart_repo_url="https://charts.jetstack.io",
+                chart_repo_type="default",
+                chart_version="v1.16.3",
             ),
             BootstrapComponent(
                 key="ingress-nginx",
@@ -558,9 +561,13 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "ingress-nginx is the platform's default; pair it with "
                     "MetalLB so its Service:LoadBalancer gets an IP."
                 ),
-                helm_values={"ingress-nginx": {"enabled": True}},
+                helm_values={},
                 requires=["metallb"],
                 options=[],
+                chart_name="ingress-nginx",
+                chart_repo_url="https://kubernetes.github.io/ingress-nginx",
+                chart_repo_type="default",
+                chart_version="4.11.1",
             ),
             BootstrapComponent(
                 key="metallb",
@@ -571,9 +578,13 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "bare-metal stay Pending forever. The operator must "
                     "configure an IPAddressPool with a routable range."
                 ),
-                helm_values={"metallb": {"enabled": True}},
+                helm_values={},
                 requires=["ip_pool: routable LB range"],
                 options=[],
+                chart_name="metallb",
+                chart_repo_url="https://metallb.github.io/metallb",
+                chart_repo_type="default",
+                chart_version="0.14.8",
             ),
             BootstrapComponent(
                 key="external-dns",
@@ -586,11 +597,8 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "records; external-dns writes A/CNAME entries there."
                 ),
                 helm_values={
-                    "external-dns": {
-                        "enabled": True,
-                        "provider": "rfc2136",
-                        "sources": ["service", "ingress"],
-                    },
+                    "provider": "rfc2136",
+                    "sources": ["service", "ingress"],
                 },
                 requires=["subzone:dns (delegated)"],
                 options=[
@@ -605,9 +613,13 @@ class K8sNativeClusterDriver(ClusterDriver):
                         default="rfc2136",
                     ),
                 ],
+                chart_name="external-dns",
+                chart_repo_url="https://kubernetes-sigs.github.io/external-dns/",
+                chart_repo_type="default",
+                chart_version="1.14.5",
             ),
             BootstrapComponent(
-                key="storage",
+                key="longhorn",
                 title="Storage (Longhorn)",
                 default_enabled=True,
                 rationale=(
@@ -616,11 +628,13 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "TopoLVM, NFS) should flip this off and configure that "
                     "StorageClass separately."
                 ),
-                helm_values={
-                    "storageClasses": {"enabled": True, "longhorn": {"enabled": True}},
-                },
+                helm_values={},
                 requires=["node_disks: dedicated disk path on each node"],
                 options=[],
+                chart_name="longhorn",
+                chart_repo_url="https://charts.longhorn.io",
+                chart_repo_type="default",
+                chart_version="1.7.2",
             ),
             BootstrapComponent(
                 key="metrics-server",
@@ -629,9 +643,13 @@ class K8sNativeClusterDriver(ClusterDriver):
                 rationale=(
                     "Required for HorizontalPodAutoscaler and ``kubectl top``. Not bundled in vanilla k8s distros."
                 ),
-                helm_values={"metricsServer": {"enabled": True}},
+                helm_values={},
                 requires=[],
                 options=[],
+                chart_name="metrics-server",
+                chart_repo_url="https://kubernetes-sigs.github.io/metrics-server/",
+                chart_repo_type="default",
+                chart_version="3.12.2",
             ),
             BootstrapComponent(
                 key="kube-prometheus-stack",
@@ -643,13 +661,14 @@ class K8sNativeClusterDriver(ClusterDriver):
                     "external Prometheus / Mimir / Datadog instead."
                 ),
                 helm_values={
-                    "kube-prometheus-stack": {
-                        "enabled": True,
-                        "grafana": {"enabled": True},
-                    },
+                    "grafana": {"enabled": True},
                 },
                 requires=["storage:rwo for Prom + Grafana PVs"],
                 options=[],
+                chart_name="kube-prometheus-stack",
+                chart_repo_url="https://prometheus-community.github.io/helm-charts",
+                chart_repo_type="default",
+                chart_version="65.1.0",
             ),
         ]
 

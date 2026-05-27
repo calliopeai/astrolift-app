@@ -3,10 +3,13 @@
 The bootstrap recipe lives in each provider's driver (see
 ``BootstrapComponent`` in ``_sdk/cluster.py``). The activity here
 takes the operator's selection (which components, plus per-option
-overrides), renders a Flux ``HelmRelease`` per selected component
-with the driver's pre-tuned helm values merged with the operator's
-overrides, and applies them to the cluster via
-``cluster_driver.apply_manifests``.
+overrides), renders a Flux ``HelmRelease`` per selected component (plus a
+``HelmRepository`` per unique upstream chart registry) with the
+driver's pre-tuned helm values merged with the operator's overrides,
+and applies them to the cluster via ``cluster_driver.apply_manifests``.
+Each cloud driver provides its own chart coordinates (chart name,
+upstream Helm repo URL, pinned version) so EKS, GKE, AKS, and vanilla
+k8s all install from the right upstream registries.
 
 Why HelmRelease (Flux) instead of running ``helm`` from a Job:
 - A HelmRelease is declarative + idempotent — re-running the
@@ -165,18 +168,73 @@ def _install_cluster_prereqs_sync(
     applied: list[str] = []
     skipped: list[str] = []
 
+    # Collect HelmRepository manifests first (one per unique repo URL,
+    # deduplicated so multiple components sharing a registry emit only
+    # one HelmRepository resource). We build them in a dict keyed by
+    # repo URL, then prepend them to the apply list so Flux can resolve
+    # the source reference before the HelmRelease objects land.
+    repo_manifests: dict[str, dict[str, Any]] = {}
+
     for component in components:
         if component.key not in selected_set:
             skipped.append(component.key)
             continue
+        if not component.chart_repo_url:
+            # No chart for this component (e.g. cloud-native annotation-based
+            # TLS where ACM / GKE-managed / AppGW handles certs without an
+            # in-cluster controller). Record in applied so the UI reflects
+            # the operator's choice; no HelmRelease emitted.
+            log.info(
+                "install_cluster_prereqs: component %s has no chart — "
+                "skipping HelmRelease (cloud-native path)",
+                component.key,
+            )
+            applied.append(component.key)
+            continue
+
         merged_values = _merge_helm_values(
             component.helm_values,
             option_overrides.get(component.key, {}),
         )
-        # Render a Flux HelmRelease pointing at the astrolift-prereqs
-        # umbrella chart's subchart for this component. Chart name +
-        # version are platform-pinned so the operator's "Install"
-        # click is reproducible across releases of the platform.
+
+        # Slug the repo URL into a valid K8s resource name:
+        # strip scheme, replace non-alphanumeric with '-', truncate to 52 chars
+        # (HelmRepository name limit is 63; "helmrepo-" prefix + 52 = 61).
+        import re
+
+        repo_slug = re.sub(r"[^a-z0-9]+", "-", component.chart_repo_url.lower().split("//")[-1].rstrip("/"))
+        repo_slug = repo_slug.strip("-")[:52]
+        repo_name = f"helmrepo-{repo_slug}"
+
+        if component.chart_repo_url not in repo_manifests:
+            repo_spec: dict[str, Any] = {
+                "interval": "1h",
+                "url": component.chart_repo_url,
+            }
+            if component.chart_repo_type == "oci":
+                repo_spec["type"] = "oci"
+            repo_manifests[component.chart_repo_url] = {
+                "apiVersion": "source.toolkit.fluxcd.io/v1",
+                "kind": "HelmRepository",
+                "metadata": {
+                    "name": repo_name,
+                    "namespace": target_namespace,
+                    "labels": {"astrolift.io/managed-by": "platform"},
+                },
+                "spec": repo_spec,
+            }
+
+        chart_spec: dict[str, Any] = {
+            "chart": component.chart_name,
+            "sourceRef": {
+                "kind": "HelmRepository",
+                "name": repo_name,
+                "namespace": target_namespace,
+            },
+        }
+        if component.chart_version:
+            chart_spec["version"] = component.chart_version
+
         helm_release = {
             "apiVersion": "helm.toolkit.fluxcd.io/v2",
             "kind": "HelmRelease",
@@ -190,16 +248,7 @@ def _install_cluster_prereqs_sync(
             },
             "spec": {
                 "interval": "5m",
-                "chart": {
-                    "spec": {
-                        "chart": component.key,
-                        "sourceRef": {
-                            "kind": "HelmRepository",
-                            "name": "astrolift-prereqs",
-                            "namespace": target_namespace,
-                        },
-                    },
-                },
+                "chart": {"spec": chart_spec},
                 "install": {"createNamespace": True, "remediation": {"retries": 3}},
                 "upgrade": {"remediation": {"retries": 3}},
                 "values": merged_values,
@@ -208,27 +257,9 @@ def _install_cluster_prereqs_sync(
         resources.append(helm_release)
         applied.append(component.key)
 
-    # Always re-assert the platform HelmRepository so re-running the
-    # install on a fresh cluster doesn't fail with "HelmRepository
-    # not found". Idempotent; cluster_driver.apply_manifests is a
-    # server-side-apply call.
-    resources.insert(
-        0,
-        {
-            "apiVersion": "source.toolkit.fluxcd.io/v1",
-            "kind": "HelmRepository",
-            "metadata": {
-                "name": "astrolift-prereqs",
-                "namespace": target_namespace,
-                "labels": {"astrolift.io/managed-by": "platform"},
-            },
-            "spec": {
-                "interval": "1h",
-                "url": "oci://ghcr.io/calliopeai/astrolift-prereqs",
-                "type": "oci",
-            },
-        },
-    )
+    # Prepend HelmRepository manifests so Flux registers the chart
+    # sources before the HelmRelease objects that reference them.
+    resources = list(repo_manifests.values()) + resources
 
     result = driver.apply_manifests(ctx.slug, target_namespace, resources)
     if not result.ok:

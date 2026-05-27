@@ -501,32 +501,6 @@ class GKEClusterDriver(ClusterDriver):
         """
         return [
             BootstrapComponent(
-                key="tls_issuer",
-                title="TLS certificate strategy",
-                default_enabled=True,
-                rationale=(
-                    "GKE supports Google-managed SSL certs via the "
-                    "ManagedCertificate CRD — least operational overhead. "
-                    "cert-manager + ACME-LetsEncrypt available when "
-                    "operators need a portable cert flow."
-                ),
-                helm_values={},
-                requires=[],
-                options=[
-                    BootstrapOption(
-                        key="mode",
-                        label="Issuer",
-                        choices=[
-                            ("gke_managed", "Google-managed certs (recommended, GCE ingress)"),
-                            ("acme_letsencrypt_prod", "Let's Encrypt prod (cert-manager + Cloud DNS DNS-01)"),
-                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
-                            ("self_signed", "Self-signed (internal only)"),
-                        ],
-                        default="gke_managed",
-                    ),
-                ],
-            ),
-            BootstrapComponent(
                 key="external-dns",
                 title="external-dns (Cloud DNS)",
                 default_enabled=True,
@@ -536,14 +510,15 @@ class GKEClusterDriver(ClusterDriver):
                     "via Workload Identity."
                 ),
                 helm_values={
-                    "external-dns": {
-                        "enabled": True,
-                        "provider": "google",
-                        "sources": ["service", "ingress"],
-                    },
+                    "provider": "google",
+                    "sources": ["service", "ingress"],
                 },
                 requires=["workload_identity:external-dns", "clouddns_zone"],
                 options=[],
+                chart_name="external-dns",
+                chart_repo_url="https://kubernetes-sigs.github.io/external-dns/",
+                chart_repo_type="default",
+                chart_version="1.14.5",
             ),
             BootstrapComponent(
                 key="kube-prometheus-stack",
@@ -555,13 +530,45 @@ class GKEClusterDriver(ClusterDriver):
                     "pd-ssd in helm values for higher write throughput."
                 ),
                 helm_values={
-                    "kube-prometheus-stack": {
-                        "enabled": True,
-                        "grafana": {"enabled": True},
-                    },
+                    "grafana": {"enabled": True},
                 },
                 requires=["storage:rwo"],
                 options=[],
+                chart_name="kube-prometheus-stack",
+                chart_repo_url="https://prometheus-community.github.io/helm-charts",
+                chart_repo_type="default",
+                chart_version="65.1.0",
+            ),
+            BootstrapComponent(
+                key="cert-manager",
+                title="cert-manager (non-GKE-managed TLS)",
+                default_enabled=False,
+                rationale=(
+                    "GKE supports Google-managed SSL certs natively via "
+                    "ManagedCertificate — least operational overhead. Enable "
+                    "cert-manager only when you need portable ACME issuance "
+                    "or internal mTLS outside the GCE ingress path."
+                ),
+                helm_values={
+                    "installCRDs": True,
+                },
+                requires=[],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("acme_letsencrypt_prod", "Let's Encrypt prod (Cloud DNS DNS-01)"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                            ("self_signed", "Self-signed (internal only)"),
+                        ],
+                        default="acme_letsencrypt_prod",
+                    ),
+                ],
+                chart_name="cert-manager",
+                chart_repo_url="https://charts.jetstack.io",
+                chart_repo_type="default",
+                chart_version="v1.16.3",
             ),
         ]
 
