@@ -28,7 +28,10 @@ from astrolift_workflows.inputs import (
 )
 
 with workflow.unsafe.imports_passed_through():
-    from astrolift_workflows.activities import install_cluster_prereqs
+    from astrolift_workflows.activities import (
+        install_cluster_prereqs,
+        record_cluster_bootstrap_run,
+    )
 
 
 # Manifest apply against a Kubernetes cluster typically returns in
@@ -41,6 +44,10 @@ _APPLY_RETRY = RetryPolicy(
     maximum_interval=timedelta(seconds=30),
     maximum_attempts=3,
 )
+
+# Recording the bootstrap run is a fast, non-critical DB write.
+_RECORD_TIMEOUT = timedelta(seconds=30)
+_RECORD_RETRY = RetryPolicy(maximum_attempts=2)
 
 
 def _truncate(message: str, *, limit: int = 4000) -> str:
@@ -55,6 +62,13 @@ class InstallClusterPrereqsWorkflow:
     async def run(
         self, input: InstallClusterPrereqsInput,
     ) -> WorkflowResult:
+        started_at = workflow.now()
+        actor_user_id = (
+            input.actor.user_id
+            if input.actor.kind == "user"
+            else None
+        )
+
         try:
             result = await workflow.execute_activity(
                 install_cluster_prereqs,
@@ -67,12 +81,27 @@ class InstallClusterPrereqsWorkflow:
                 retry_policy=_APPLY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(
-                    f"install_cluster_prereqs failed: {exc}",
-                ),
-            )
+            error_msg = _truncate(f"install_cluster_prereqs failed: {exc}")
+            # Best-effort record — don't let a write failure mask the
+            # original error.
+            try:
+                await workflow.execute_activity(
+                    record_cluster_bootstrap_run,
+                    args=[
+                        input.cluster_id,
+                        actor_user_id,
+                        "failed",
+                        [],
+                        error_msg,
+                        started_at.isoformat(),
+                        workflow.now().isoformat(),
+                    ],
+                    start_to_close_timeout=_RECORD_TIMEOUT,
+                    retry_policy=_RECORD_RETRY,
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            return WorkflowResult(ok=False, message=error_msg)
 
         applied = (
             result.get("applied", []) if isinstance(result, dict) else []
@@ -80,6 +109,25 @@ class InstallClusterPrereqsWorkflow:
         skipped = (
             result.get("skipped", []) if isinstance(result, dict) else []
         )
+
+        try:
+            await workflow.execute_activity(
+                record_cluster_bootstrap_run,
+                args=[
+                    input.cluster_id,
+                    actor_user_id,
+                    "succeeded",
+                    applied,
+                    "",
+                    started_at.isoformat(),
+                    workflow.now().isoformat(),
+                ],
+                start_to_close_timeout=_RECORD_TIMEOUT,
+                retry_policy=_RECORD_RETRY,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
         return WorkflowResult(
             ok=True,
             message=(

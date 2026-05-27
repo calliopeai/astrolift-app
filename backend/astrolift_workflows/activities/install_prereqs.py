@@ -269,6 +269,80 @@ def _install_cluster_prereqs_sync(
     }
 
 
+def _record_bootstrap_run_sync(
+    cluster_id: int,
+    actor_user_id: int | None,
+    status: str,
+    applied: list[str],
+    error_message: str,
+    started_at_iso: str,
+    ended_at_iso: str,
+) -> None:
+    """Persist a ``ClusterBootstrapRun`` row for a UI-triggered install.
+
+    Mirror of what ``recordClusterBootstrapRun`` (called by the CLI)
+    writes, so the "Last bootstrap" panel populates regardless of how
+    the operator initiated the install. Best-effort — callers should
+    catch exceptions and not let a write failure mask the real outcome.
+    """
+    from datetime import datetime
+
+    from astrolift_clusters.models import ClusterBootstrapRun, TenantCluster
+
+    cluster = TenantCluster.objects.get(pk=cluster_id)
+    user = None
+    if actor_user_id is not None:
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        user = User.objects.filter(pk=actor_user_id).first()
+
+    ClusterBootstrapRun.objects.create(
+        tenant_cluster=cluster,
+        triggered_by=user,
+        status=status,
+        installed_releases=[{"name": key} for key in applied],
+        chart_version="",  # Flux manages chart versions; not known at apply time
+        cli_version="",
+        host_info={"triggered_via": "ui"},
+        error_message=error_message,
+        started_at=datetime.fromisoformat(started_at_iso),
+        ended_at=datetime.fromisoformat(ended_at_iso),
+    )
+
+
+@activity.defn(name="astrolift.cluster.record_bootstrap_run")
+async def record_cluster_bootstrap_run(
+    cluster_id: int,
+    actor_user_id: int | None,
+    status: str,
+    applied: list[str],
+    error_message: str,
+    started_at_iso: str,
+    ended_at_iso: str,
+) -> None:
+    """Write a ``ClusterBootstrapRun`` record so the UI 'Last bootstrap'
+    panel reflects UI-triggered installs, not just CLI runs."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_record_bootstrap_run_sync)(
+        cluster_id,
+        actor_user_id,
+        status,
+        applied,
+        error_message,
+        started_at_iso,
+        ended_at_iso,
+    )
+    log.info(
+        "record_cluster_bootstrap_run cluster_id=%d status=%s applied=%d",
+        cluster_id,
+        status,
+        len(applied),
+    )
+
+
 @activity.defn(name="astrolift.cluster.install_prereqs")
 async def install_cluster_prereqs(
     cluster_id: int,
