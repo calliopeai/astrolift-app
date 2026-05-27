@@ -26,9 +26,12 @@ top of it.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+log = logging.getLogger("astrolift_providers.aws.cluster_eks")
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -764,19 +767,54 @@ class EKSClusterDriver(ClusterDriver):
             in the prd-eks-astrolift TF; not in the bootstrap recipe).
           - Ingress: aws-load-balancer-controller renders Ingress as ALB.
 
-        Auth wiring:
-          - All controllers that need AWS API calls (LB controller,
-            external-dns, cluster-autoscaler) bind to IRSA roles
-            provisioned by the opscode TF. The recipe pre-fills the
-            ServiceAccount annotations with the role ARN pattern; the
-            install workflow resolves the actual ARN from the cluster
-            row's provider_config before invoking helm.
+        IRSA wiring:
+          Controllers that call AWS APIs (LB controller, external-dns)
+          need ``eks.amazonaws.com/role-arn`` on their ServiceAccount.
+          The ARN is resolved in this order:
+            1. ``cluster.auth_config["irsa_roles"][<component-key>]`` —
+               explicit override for non-standard role names.
+            2. Convention: ``arn:aws:iam::{account_id}:role/{cluster_name}-{key}``
+               matching the naming used in the opscode TF modules.
+          If neither source yields an ARN the annotation is omitted and
+          the controller runs with the node/Fargate execution role (which
+          typically lacks the required policies — the pod will fail).
+
+        Fargate notes:
+          - DaemonSets with ``hostNetwork:true`` don't schedule on
+            Fargate pods; node-exporter is disabled so Pending pods
+            don't pile up.
+          - PVCs backed by gp3 (EBS) work on Fargate when the EBS CSI
+            managed addon is installed (standard in the prd-eks TF).
         """
-        # aws-load-balancer-controller requires the EKS cluster name at
-        # install time. Resolve it from auth_config (set by register_tenant_cluster /
-        # AUTO_DISCOVER_AWS) and fall back to the driver's own config name so
-        # tests that construct the driver directly still get a usable value.
-        eks_cluster_name = (cluster.auth_config or {}).get("cluster_name") or self._config.cluster_name
+        auth_cfg = cluster.auth_config or {}
+        eks_cluster_name = auth_cfg.get("cluster_name") or self._config.cluster_name
+
+        # IRSA role ARN resolution ----------------------------------------
+        # 1. Explicit override map stored in auth_config takes precedence.
+        # 2. Convention: <cluster_name>-<component_key>, matching the
+        #    opscode TF module naming (iam-role-for-service-accounts with
+        #    use_name_prefix = false).
+        irsa_overrides: dict[str, str] = auth_cfg.get("irsa_roles", {})
+        account_id = ""
+        try:
+            account_id = self._sts.get_caller_identity()["Account"]
+        except Exception:
+            log.warning(
+                "bootstrap_components: STS get_caller_identity failed — "
+                "IRSA role ARNs will be empty if not set in auth_config.irsa_roles"
+            )
+
+        def _irsa_arn(key: str) -> str:
+            if key in irsa_overrides:
+                return irsa_overrides[key]
+            if account_id:
+                return f"arn:aws:iam::{account_id}:role/{eks_cluster_name}-{key}"
+            return ""
+
+        def _sa_with_irsa(key: str) -> dict:
+            arn = _irsa_arn(key)
+            annotations = {"eks.amazonaws.com/role-arn": arn} if arn else {}
+            return {"create": True, "annotations": annotations}
 
         return [
             BootstrapComponent(
@@ -791,7 +829,7 @@ class EKSClusterDriver(ClusterDriver):
                 ),
                 helm_values={
                     "clusterName": eks_cluster_name,
-                    "serviceAccount": {"create": True, "annotations": {}},
+                    "serviceAccount": _sa_with_irsa("aws-load-balancer-controller"),
                 },
                 requires=["irsa:aws-load-balancer-controller"],
                 options=[],
@@ -814,7 +852,7 @@ class EKSClusterDriver(ClusterDriver):
                 helm_values={
                     "provider": "aws",
                     "sources": ["service", "ingress"],
-                    "serviceAccount": {"create": True, "annotations": {}},
+                    "serviceAccount": _sa_with_irsa("external-dns"),
                 },
                 requires=["irsa:external-dns", "route53_zone_id"],
                 options=[],
@@ -846,9 +884,12 @@ class EKSClusterDriver(ClusterDriver):
                 rationale=(
                     "Metrics scraping + dashboarding for the platform UI's "
                     "cluster-status charts. Prom storage backed by EBS gp3 "
-                    "PVs (the EKS-installed default StorageClass)."
+                    "PVs (the EKS-installed default StorageClass). "
+                    "node-exporter is disabled — DaemonSets with hostNetwork "
+                    "don't schedule on Fargate."
                 ),
                 helm_values={
+                    "nodeExporter": {"enabled": False},
                     "prometheus": {
                         "prometheusSpec": {
                             "storageSpec": {
