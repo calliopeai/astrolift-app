@@ -142,6 +142,26 @@ def _ensure_flux_installed(driver, ctx_slug: str) -> None:
     log.info("Flux bootstrap applied — caller should let Temporal retry for CRD registration")
 
 
+_LEGACY_HELM_RELEASE_NAMES: frozenset[str] = frozenset(
+    [
+        # tls_issuer was renamed to cert-manager across all cloud drivers.
+        # Clusters that ran bootstrap before the rename will have a stale
+        # astrolift-tls-issuer HelmRelease that the activity no longer emits;
+        # we delete it so Flux stops trying to install an invalid chart.
+        "astrolift-tls-issuer",
+    ]
+)
+
+_LEGACY_HELM_REPO_NAMES: frozenset[str] = frozenset(
+    [
+        # The old umbrella chart approach emitted an "astrolift-prereqs"
+        # HelmRepository pointing at the GHCR OCI registry. That chart
+        # doesn't exist and was replaced by per-component upstream repos.
+        "astrolift-prereqs",
+    ]
+)
+
+
 def _install_cluster_prereqs_sync(
     cluster_id: int,
     selected_keys: list[str],
@@ -175,6 +195,11 @@ def _install_cluster_prereqs_sync(
     # repo URL, then prepend them to the apply list so Flux can resolve
     # the source reference before the HelmRelease objects land.
     repo_manifests: dict[str, dict[str, Any]] = {}
+
+    # Track which HelmRelease names this run actively manages — any
+    # platform-managed release NOT in this set is either deselected or
+    # legacy and should be removed so Flux stops reconciling it.
+    expected_release_names: set[str] = set()
 
     for component in components:
         if component.key not in selected_set:
@@ -223,6 +248,9 @@ def _install_cluster_prereqs_sync(
                 "spec": repo_spec,
             }
 
+        release_name = f"astrolift-{component.key.replace('_', '-')}"
+        expected_release_names.add(release_name)
+
         chart_spec: dict[str, Any] = {
             "chart": component.chart_name,
             "sourceRef": {
@@ -238,7 +266,7 @@ def _install_cluster_prereqs_sync(
             "apiVersion": "helm.toolkit.fluxcd.io/v2",
             "kind": "HelmRelease",
             "metadata": {
-                "name": f"astrolift-{component.key.replace('_', '-')}",
+                "name": release_name,
                 "namespace": target_namespace,
                 "labels": {
                     "astrolift.io/managed-by": "platform",
@@ -303,9 +331,60 @@ def _install_cluster_prereqs_sync(
             "install_cluster_prereqs apply failed: " + "; ".join(str(e) for e in result.errors),
         )
 
+    # ---- Stale resource cleanup -----------------------------------------
+    # Delete HelmRelease objects that this run no longer manages:
+    #   • Deselected components: operator unchecked a component on re-run.
+    #   • Legacy names: components renamed across platform versions.
+    # Best-effort — a delete failure is logged but doesn't fail the activity;
+    # the apply above already succeeded so the cluster is in the right
+    # desired state for selected components.
+    deleted: list[str] = []
+
+    # Deselected components that had charts (skipped components without
+    # chart_repo_url never emitted a HelmRelease, so nothing to delete).
+    deselected_releases = [
+        f"astrolift-{c.key.replace('_', '-')}"
+        for c in components
+        if c.key not in selected_set and c.chart_repo_url
+    ]
+    to_delete_releases = set(deselected_releases) | _LEGACY_HELM_RELEASE_NAMES
+    to_delete_repos = _LEGACY_HELM_REPO_NAMES
+
+    stale_manifests: list[dict[str, Any]] = [
+        {
+            "apiVersion": "helm.toolkit.fluxcd.io/v2",
+            "kind": "HelmRelease",
+            "metadata": {"name": name, "namespace": target_namespace},
+        }
+        for name in to_delete_releases
+    ] + [
+        {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "HelmRepository",
+            "metadata": {"name": name, "namespace": target_namespace},
+        }
+        for name in to_delete_repos
+    ]
+
+    if stale_manifests:
+        try:
+            del_result = driver.delete_manifests(ctx.slug, target_namespace, stale_manifests)
+            deleted = list(del_result.deleted)
+            log.info(
+                "install_cluster_prereqs: stale cleanup deleted=%d on cluster %s",
+                len(deleted),
+                ctx.slug,
+            )
+        except Exception as exc:
+            log.warning(
+                "install_cluster_prereqs: stale cleanup failed (non-fatal): %s",
+                exc,
+            )
+
     return {
         "applied": applied,
         "skipped": skipped,
+        "deleted": deleted,
         "namespace": target_namespace,
         "created": list(result.created),
         "updated": list(result.updated),
