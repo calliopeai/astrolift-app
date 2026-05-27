@@ -97,7 +97,7 @@ def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) ->
         )
     result = driver.apply_manifests(ctx.slug, namespace, resources)
     if not result.ok:
-        raise AppDeployError("apply_to_target failed: " + "; ".join(result.errors))
+        raise AppDeployError("apply_to_target failed: " + "; ".join(str(e) for e in result.errors))
     return {
         "created": list(result.created),
         "updated": list(result.updated),
