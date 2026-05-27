@@ -275,9 +275,14 @@ def _config_for(plugin_slug: str, cluster: TenantCluster) -> Any:
     if plugin_slug == "aws":
         from aws.cluster_eks import EKSConfig
 
+        # cluster_name resolution order:
+        #   1. provider_config["cluster_name"] (operator-pinned at plugin configure)
+        #   2. auth_config["cluster_name"]     (set by bootstrap_components / IRSA path)
+        #   3. cluster.slug                    (last-resort fallback)
+        ac = cluster.auth_config or {}
         return EKSConfig(
-            region=str(pc.get("region", cluster.region or "")),
-            cluster_name=str(pc.get("cluster_name", cluster.slug)),
+            region=str(pc.get("region", ac.get("region", cluster.region or ""))),
+            cluster_name=str(pc.get("cluster_name", ac.get("cluster_name", cluster.slug))),
         )
     if plugin_slug == "gcp":
         from gcp.cluster_gke import GKEConfig

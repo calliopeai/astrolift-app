@@ -1157,7 +1157,12 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:
+        except Exception as exc:
+            log.warning(
+                "list_pod_phase_summary: k8s client build failed for cluster=%s: %s",
+                cluster.slug,
+                exc,
+            )
             return []
         return pod_phase_summary_from_client(
             client,
@@ -1177,7 +1182,12 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:
+        except Exception as exc:
+            log.warning(
+                "list_events: k8s client build failed for cluster=%s: %s",
+                cluster.slug,
+                exc,
+            )
             return []
         return events_from_client(
             client,
@@ -1200,7 +1210,12 @@ class EKSClusterDriver(ClusterDriver):
 
         try:
             client = self._k8s(cluster.slug)
-        except Exception:
+        except Exception as exc:
+            log.warning(
+                "list_workload_health: k8s client build failed for cluster=%s: %s",
+                cluster.slug,
+                exc,
+            )
             return []
         return workload_health_from_client(
             client,
