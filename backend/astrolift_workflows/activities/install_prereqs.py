@@ -143,7 +143,7 @@ def _install_cluster_prereqs_sync(
     result = driver.apply_manifests(ctx.slug, target_namespace, resources)
     if not result.ok:
         raise AppDeployError(
-            "install_cluster_prereqs apply failed: " + "; ".join(result.errors),
+            "install_cluster_prereqs apply failed: " + "; ".join(str(e) for e in result.errors),
         )
 
     return {
