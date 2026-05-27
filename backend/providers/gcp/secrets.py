@@ -33,6 +33,11 @@ class GCPSecretsBackend(SecretsBackend):
 
             self._client = secretmanager.SecretManagerServiceClient()
 
+    def ensure_initialized(self) -> dict | None:
+        raise NotImplementedError(
+            "GCPSecretsBackend does not require out-of-band initialisation"
+        )
+
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.read")
     def get(self, path: str) -> dict[str, str] | None:
         secret_name = self._secret_name(path)
