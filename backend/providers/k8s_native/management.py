@@ -449,6 +449,9 @@ def _classify_metrics_and_prom(
 # Namespaces the probe inspects. Kept here as a constant so subclasses
 # can extend it without re-implementing the probe body.
 PROBE_NAMESPACES: tuple[str, ...] = (
+    # Platform-managed namespace: Flux installs all bootstrap components
+    # here when the operator uses the UI bootstrap recipe.
+    "astrolift-system",
     "cert-manager",
     "ingress-nginx",
     "kube-system",
@@ -494,14 +497,50 @@ def probe_cluster_capabilities(
 
     storage_classes = backend.list_storage_classes(auth=auth)
 
-    cert_manager = _classify_cert_manager(crds, pods_by_namespace.get("cert-manager", []))
+    # When operators use the UI bootstrap recipe, all components land in
+    # astrolift-system via Flux HelmRelease. Merge those pods into each
+    # classifier's candidate list so detection works regardless of whether
+    # the operator used the platform's Flux path or installed into the
+    # conventional per-component namespace manually.
+    platform_pods = pods_by_namespace.get("astrolift-system", [])
+
+    cert_manager_pods = pods_by_namespace.get("cert-manager", []) + [
+        p for p in platform_pods
+        if "cert-manager" in str(p.get("name", ""))
+        or p.get("labels", {}).get("app.kubernetes.io/name", "") == "cert-manager"
+    ]
+    cert_manager = _classify_cert_manager(crds, cert_manager_pods)
+
     ingress = _classify_ingress(
         declared_class=cluster.ingress_class,
         pods_by_namespace=pods_by_namespace,
     )
     service_mesh = _classify_service_mesh(crds)
-    external_dns = _classify_external_dns(pods_by_namespace.get("external-dns", []))
-    metrics_server, prometheus = _classify_metrics_and_prom(pods_by_namespace)
+
+    external_dns_pods = pods_by_namespace.get("external-dns", []) + [
+        p for p in platform_pods
+        if "external-dns" in str(p.get("name", ""))
+        or p.get("labels", {}).get("app.kubernetes.io/name", "") == "external-dns"
+    ]
+    external_dns = _classify_external_dns(external_dns_pods)
+
+    # Extend pods_by_namespace with astrolift-system pods bucketed under
+    # the conventional namespace keys so _classify_metrics_and_prom can
+    # find them without a signature change.
+    augmented = dict(pods_by_namespace)
+    augmented.setdefault("kube-system", [])
+    augmented["kube-system"] = augmented["kube-system"] + [
+        p for p in platform_pods
+        if "metrics-server" in str(p.get("name", ""))
+        or p.get("labels", {}).get("app.kubernetes.io/name", "") == "metrics-server"
+    ]
+    augmented.setdefault("kube-prometheus-stack", [])
+    augmented["kube-prometheus-stack"] = augmented["kube-prometheus-stack"] + [
+        p for p in platform_pods
+        if "prometheus" in str(p.get("name", ""))
+        or p.get("labels", {}).get("app.kubernetes.io/name", "") in {"prometheus", "kube-prometheus-stack"}
+    ]
+    metrics_server, prometheus = _classify_metrics_and_prom(augmented)
 
     return {
         "cert_manager": cert_manager,
