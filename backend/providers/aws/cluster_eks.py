@@ -772,6 +772,12 @@ class EKSClusterDriver(ClusterDriver):
             install workflow resolves the actual ARN from the cluster
             row's provider_config before invoking helm.
         """
+        # aws-load-balancer-controller requires the EKS cluster name at
+        # install time. Resolve it from auth_config (set by register_tenant_cluster /
+        # AUTO_DISCOVER_AWS) and fall back to the driver's own config name so
+        # tests that construct the driver directly still get a usable value.
+        eks_cluster_name = (cluster.auth_config or {}).get("cluster_name") or self._config.cluster_name
+
         return [
             BootstrapComponent(
                 key="aws-load-balancer-controller",
@@ -784,7 +790,7 @@ class EKSClusterDriver(ClusterDriver):
                     "Bound to its IRSA role via ServiceAccount annotation."
                 ),
                 helm_values={
-                    "clusterName": "",  # resolved at install time from cluster row
+                    "clusterName": eks_cluster_name,
                     "serviceAccount": {"create": True, "annotations": {}},
                 },
                 requires=["irsa:aws-load-balancer-controller"],
