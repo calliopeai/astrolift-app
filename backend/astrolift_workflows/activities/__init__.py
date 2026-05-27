@@ -81,6 +81,7 @@ from astrolift_workflows.activities.custom_domain import (
 )
 from astrolift_workflows.activities.install_prereqs import (
     install_cluster_prereqs,
+    record_cluster_bootstrap_run,
 )
 from astrolift_workflows.activities.managed_service_lifecycle import (
     deprovision_managed_service,
@@ -143,6 +144,7 @@ __all__ = [
     "gc_stale_previews",
     "health_check",
     "install_cluster_prereqs",
+    "record_cluster_bootstrap_run",
     "issue_custom_domain_certificate",
     "list_active_secret_bundle_targets",
     "list_app_managed_service_ids",
