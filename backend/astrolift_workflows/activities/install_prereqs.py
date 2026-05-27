@@ -247,6 +247,7 @@ def _install_cluster_prereqs_sync(
             },
             "spec": {
                 "interval": "5m",
+                "timeout": component.install_timeout,
                 "chart": {"spec": chart_spec},
                 "install": {"createNamespace": True, "remediation": {"retries": 3}},
                 "upgrade": {"remediation": {"retries": 3}},
