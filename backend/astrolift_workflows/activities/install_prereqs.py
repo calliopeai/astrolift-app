@@ -67,7 +67,7 @@ def _flux_crd_missing(errors: list) -> bool:
     requested resource" in the apply error message.
     """
     _CRD_MISS_MARKERS = (
-        "No matches found for kind",
+        "no matches found for",  # kubernetes-client: CRD group not registered
         "the server could not find the requested resource",
         "no kind",
     )
