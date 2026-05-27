@@ -93,8 +93,6 @@ def _ensure_flux_installed(driver, ctx_slug: str) -> None:
     retried by Temporal anyway, so a partially-ready Flux converges on
     the next attempt.
     """
-    import time
-
     import yaml
 
     log.info(
@@ -137,11 +135,7 @@ def _ensure_flux_installed(driver, ctx_slug: str) -> None:
                 + "; ".join(str(e) for e in result.errors),
             )
 
-    # Give the API server a moment to register the new CRD groups before
-    # the caller retries — Temporal will handle the case where this isn't
-    # enough time via its normal activity retry schedule.
-    log.info("Flux bootstrap applied; waiting 10 s for CRD group registration")
-    time.sleep(10)
+    log.info("Flux bootstrap applied — caller should let Temporal retry for CRD registration")
 
 
 def _install_cluster_prereqs_sync(
@@ -239,16 +233,26 @@ def _install_cluster_prereqs_sync(
     result = driver.apply_manifests(ctx.slug, target_namespace, resources)
     if not result.ok:
         if _flux_crd_missing(result.errors):
-            # Flux CRDs aren't registered yet — self-bootstrap Flux, then
-            # retry. On the retry Flux is present so HelmRepository /
-            # HelmRelease applies succeed normally.
+            # Flux CRDs aren't registered yet — bootstrap Flux and then let
+            # Temporal retry the activity. We don't retry inline because CRD
+            # group registration is async and takes 20-60 s after apply; a
+            # naive in-process sleep would either be too short (same failure)
+            # or waste the activity heartbeat budget. Instead we raise a
+            # retriable ApplicationError so Temporal reschedules the attempt
+            # after its configured retry delay; by then Flux is fully ready.
             log.info(
                 "install_cluster_prereqs: Flux CRDs missing on cluster %s — "
-                "bootstrapping Flux and retrying",
+                "bootstrapping Flux; Temporal will retry",
                 ctx.slug,
             )
             _ensure_flux_installed(driver, ctx.slug)
-            result = driver.apply_manifests(ctx.slug, target_namespace, resources)
+            from temporalio.exceptions import ApplicationError
+
+            raise ApplicationError(
+                f"Flux bootstrapped on cluster {ctx.slug!r}; "
+                "waiting for CRD group registration — Temporal will retry",
+                non_retryable=False,
+            )
 
     if not result.ok:
         raise AppDeployError(
