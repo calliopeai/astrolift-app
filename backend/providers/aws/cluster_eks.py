@@ -774,37 +774,6 @@ class EKSClusterDriver(ClusterDriver):
         """
         return [
             BootstrapComponent(
-                key="tls_issuer",
-                title="TLS certificate strategy",
-                default_enabled=True,
-                rationale=(
-                    "EKS clusters typically use ACM for public TLS via the "
-                    "AWS Load Balancer Controller — operators issue certs "
-                    "in ACM (cheap, auto-renewed) and reference them by "
-                    "ARN on each Ingress. cert-manager is only needed for "
-                    "internal mTLS or non-ALB cert flows."
-                ),
-                helm_values={
-                    # 'acm' mode is the default — no chart values; the
-                    # LB controller picks up cert ARNs from Ingress
-                    # annotations operators set per-app.
-                },
-                requires=["aws-load-balancer-controller"],
-                options=[
-                    BootstrapOption(
-                        key="mode",
-                        label="Issuer",
-                        choices=[
-                            ("acm", "AWS Certificate Manager (recommended, ALB ingress)"),
-                            ("acme_letsencrypt_prod", "Let's Encrypt prod (cert-manager + Route53 DNS-01)"),
-                            ("acme_letsencrypt_staging", "Let's Encrypt staging (testing)"),
-                            ("self_signed", "Self-signed (internal traffic only)"),
-                        ],
-                        default="acm",
-                    ),
-                ],
-            ),
-            BootstrapComponent(
                 key="aws-load-balancer-controller",
                 title="AWS Load Balancer Controller",
                 default_enabled=True,
@@ -815,15 +784,15 @@ class EKSClusterDriver(ClusterDriver):
                     "Bound to its IRSA role via ServiceAccount annotation."
                 ),
                 helm_values={
-                    "aws-load-balancer-controller": {
-                        "enabled": True,
-                        # cluster name + region resolved by the install
-                        # workflow from the cluster row's auth_config.
-                        "serviceAccount": {"create": True, "annotations": {}},
-                    },
+                    "clusterName": "",  # resolved at install time from cluster row
+                    "serviceAccount": {"create": True, "annotations": {}},
                 },
                 requires=["irsa:aws-load-balancer-controller"],
                 options=[],
+                chart_name="aws-load-balancer-controller",
+                chart_repo_url="https://aws.github.io/eks-charts",
+                chart_repo_type="default",
+                chart_version="1.9.2",
             ),
             BootstrapComponent(
                 key="external-dns",
@@ -836,15 +805,16 @@ class EKSClusterDriver(ClusterDriver):
                     "hosted zone."
                 ),
                 helm_values={
-                    "external-dns": {
-                        "enabled": True,
-                        "provider": "aws",
-                        "sources": ["service", "ingress"],
-                        "serviceAccount": {"create": True, "annotations": {}},
-                    },
+                    "provider": "aws",
+                    "sources": ["service", "ingress"],
+                    "serviceAccount": {"create": True, "annotations": {}},
                 },
                 requires=["irsa:external-dns", "route53_zone_id"],
                 options=[],
+                chart_name="external-dns",
+                chart_repo_url="https://kubernetes-sigs.github.io/external-dns/",
+                chart_repo_type="default",
+                chart_version="1.14.5",
             ),
             BootstrapComponent(
                 key="metrics-server",
@@ -854,9 +824,13 @@ class EKSClusterDriver(ClusterDriver):
                     "Required for HorizontalPodAutoscaler. EKS doesn't ship "
                     "it as a managed addon (the upstream chart is what we use)."
                 ),
-                helm_values={"metricsServer": {"enabled": True}},
+                helm_values={},
                 requires=[],
                 options=[],
+                chart_name="metrics-server",
+                chart_repo_url="https://kubernetes-sigs.github.io/metrics-server/",
+                chart_repo_type="default",
+                chart_version="3.12.2",
             ),
             BootstrapComponent(
                 key="kube-prometheus-stack",
@@ -868,26 +842,58 @@ class EKSClusterDriver(ClusterDriver):
                     "PVs (the EKS-installed default StorageClass)."
                 ),
                 helm_values={
-                    "kube-prometheus-stack": {
-                        "enabled": True,
-                        "prometheus": {
-                            "prometheusSpec": {
-                                "storageSpec": {
-                                    "volumeClaimTemplate": {
-                                        "spec": {
-                                            "storageClassName": "gp3",
-                                            "accessModes": ["ReadWriteOnce"],
-                                            "resources": {"requests": {"storage": "50Gi"}},
-                                        },
+                    "prometheus": {
+                        "prometheusSpec": {
+                            "storageSpec": {
+                                "volumeClaimTemplate": {
+                                    "spec": {
+                                        "storageClassName": "gp3",
+                                        "accessModes": ["ReadWriteOnce"],
+                                        "resources": {"requests": {"storage": "50Gi"}},
                                     },
                                 },
                             },
                         },
-                        "grafana": {"enabled": True, "persistence": {"storageClassName": "gp3"}},
                     },
+                    "grafana": {"enabled": True, "persistence": {"storageClassName": "gp3"}},
                 },
                 requires=["storage:gp3"],
                 options=[],
+                chart_name="kube-prometheus-stack",
+                chart_repo_url="https://prometheus-community.github.io/helm-charts",
+                chart_repo_type="default",
+                chart_version="65.1.0",
+            ),
+            BootstrapComponent(
+                key="cert-manager",
+                title="cert-manager (in-cluster TLS, internal mTLS)",
+                default_enabled=False,
+                rationale=(
+                    "EKS operators typically use ACM via ALB annotations for "
+                    "public TLS — no in-cluster cert controller needed. Enable "
+                    "cert-manager only when you need internal mTLS, webhook "
+                    "certificates, or non-ALB cert flows."
+                ),
+                helm_values={
+                    "installCRDs": True,
+                },
+                requires=[],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("self_signed", "Self-signed (internal / mTLS)"),
+                            ("acme_letsencrypt_prod", "Let's Encrypt prod (Route53 DNS-01)"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                        ],
+                        default="self_signed",
+                    ),
+                ],
+                chart_name="cert-manager",
+                chart_repo_url="https://charts.jetstack.io",
+                chart_repo_type="default",
+                chart_version="v1.16.3",
             ),
         ]
 

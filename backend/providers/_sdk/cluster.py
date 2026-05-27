@@ -490,9 +490,10 @@ class BootstrapComponent:
     """
 
     key: str
-    """Stable identifier; matches the top-level key in the
-    astrolift-prereqs chart's values.yaml (``cert-manager``,
-    ``external-dns``, ``kube-prometheus-stack``, etc.)."""
+    """Stable identifier; used as the HelmRelease name suffix
+    (``astrolift-{key}``) and the key the operator sends back
+    in ``option_overrides`` (e.g. ``cert-manager``,
+    ``external-dns``, ``kube-prometheus-stack``)."""
 
     title: str
     """Human-readable name shown in the UI checkbox list."""
@@ -518,6 +519,21 @@ class BootstrapComponent:
     options: list[BootstrapOption] = field(default_factory=list)
     """Operator-pickable sub-options for this component. Empty list
     means no sub-choices; the component is on/off only."""
+
+    chart_name: str = ""
+    """Helm chart name to install for this component.
+    Empty string means no HelmRelease is emitted (e.g. cloud-native
+    annotation-based TLS — ACM on EKS, GKE Managed Certs, AppGW on AKS)."""
+
+    chart_repo_url: str = ""
+    """Helm repository URL. Empty when ``chart_name`` is empty."""
+
+    chart_repo_type: str = "default"
+    """``"default"`` for HTTP Helm repos, ``"oci"`` for OCI registries."""
+
+    chart_version: str = ""
+    """Pinned chart version. Empty means Flux fetches latest (not
+    recommended for production — always pin to a tested release)."""
 
 
 @dataclass(frozen=True)

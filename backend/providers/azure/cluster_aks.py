@@ -505,32 +505,6 @@ class AKSClusterDriver(ClusterDriver):
         Azure doesn't provide a managed equivalent."""
         return [
             BootstrapComponent(
-                key="tls_issuer",
-                title="TLS certificate strategy",
-                default_enabled=True,
-                rationale=(
-                    "Application Gateway with Key Vault-backed certs is "
-                    "the AKS-native path (no in-cluster controller needed). "
-                    "cert-manager + ACME-LetsEncrypt or self-signed available "
-                    "when the operator runs nginx ingress instead."
-                ),
-                helm_values={},
-                requires=[],
-                options=[
-                    BootstrapOption(
-                        key="mode",
-                        label="Issuer",
-                        choices=[
-                            ("appgw_keyvault", "Application Gateway + Key Vault (recommended)"),
-                            ("acme_letsencrypt_prod", "Let's Encrypt prod (cert-manager + Azure DNS DNS-01)"),
-                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
-                            ("self_signed", "Self-signed (internal only)"),
-                        ],
-                        default="appgw_keyvault",
-                    ),
-                ],
-            ),
-            BootstrapComponent(
                 key="external-dns",
                 title="external-dns (Azure DNS)",
                 default_enabled=True,
@@ -540,14 +514,15 @@ class AKSClusterDriver(ClusterDriver):
                     "Azure AD Federated Identity Credentials."
                 ),
                 helm_values={
-                    "external-dns": {
-                        "enabled": True,
-                        "provider": "azure",
-                        "sources": ["service", "ingress"],
-                    },
+                    "provider": "azure",
+                    "sources": ["service", "ingress"],
                 },
                 requires=["federated_identity:external-dns", "azuredns_zone"],
                 options=[],
+                chart_name="external-dns",
+                chart_repo_url="https://kubernetes-sigs.github.io/external-dns/",
+                chart_repo_type="default",
+                chart_version="1.14.5",
             ),
             BootstrapComponent(
                 key="metrics-server",
@@ -558,9 +533,13 @@ class AKSClusterDriver(ClusterDriver):
                     "default — only enable if the cluster was created "
                     "without it (legacy bootstrap or custom node config)."
                 ),
-                helm_values={"metricsServer": {"enabled": True}},
+                helm_values={},
                 requires=[],
                 options=[],
+                chart_name="metrics-server",
+                chart_repo_url="https://kubernetes-sigs.github.io/metrics-server/",
+                chart_repo_type="default",
+                chart_version="3.12.2",
             ),
             BootstrapComponent(
                 key="kube-prometheus-stack",
@@ -573,13 +552,45 @@ class AKSClusterDriver(ClusterDriver):
                     "the OTel collector at Log Analytics instead."
                 ),
                 helm_values={
-                    "kube-prometheus-stack": {
-                        "enabled": True,
-                        "grafana": {"enabled": True},
-                    },
+                    "grafana": {"enabled": True},
                 },
                 requires=["storage:rwo"],
                 options=[],
+                chart_name="kube-prometheus-stack",
+                chart_repo_url="https://prometheus-community.github.io/helm-charts",
+                chart_repo_type="default",
+                chart_version="65.1.0",
+            ),
+            BootstrapComponent(
+                key="cert-manager",
+                title="cert-manager (non-AppGW TLS)",
+                default_enabled=False,
+                rationale=(
+                    "Application Gateway with Key Vault-backed certs is "
+                    "the AKS-native path — no in-cluster controller needed. "
+                    "Enable cert-manager when you run nginx ingress instead "
+                    "or need internal mTLS."
+                ),
+                helm_values={
+                    "installCRDs": True,
+                },
+                requires=[],
+                options=[
+                    BootstrapOption(
+                        key="mode",
+                        label="Issuer",
+                        choices=[
+                            ("acme_letsencrypt_prod", "Let's Encrypt prod (Azure DNS DNS-01)"),
+                            ("acme_letsencrypt_staging", "Let's Encrypt staging"),
+                            ("self_signed", "Self-signed (internal only)"),
+                        ],
+                        default="self_signed",
+                    ),
+                ],
+                chart_name="cert-manager",
+                chart_repo_url="https://charts.jetstack.io",
+                chart_repo_type="default",
+                chart_version="v1.16.3",
             ),
         ]
 
