@@ -189,7 +189,11 @@ class AKSClusterDriver(ClusterDriver):
         client = self._k8s(cluster)
         deleted, not_found, errors = [], [], []
         for m in manifests:
-            kind = m.get("kind", "")
+            api_version = m.get("apiVersion", "")
+            kind_bare = m.get("kind", "")
+            # For CRDs (apiVersion is "group/version") construct the
+            # "group/version/Kind" form that split_kind accepts.
+            kind = f"{api_version}/{kind_bare}" if "/" in api_version else kind_bare
             name = m.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:

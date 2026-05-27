@@ -371,10 +371,16 @@ def _install_cluster_prereqs_sync(
             del_result = driver.delete_manifests(ctx.slug, target_namespace, stale_manifests)
             deleted = list(del_result.deleted)
             log.info(
-                "install_cluster_prereqs: stale cleanup deleted=%d on cluster %s",
+                "install_cluster_prereqs: stale cleanup deleted=%d not_found=%d on cluster %s",
                 len(deleted),
+                len(del_result.not_found),
                 ctx.slug,
             )
+            if del_result.errors:
+                log.warning(
+                    "install_cluster_prereqs: stale cleanup errors (non-fatal): %s",
+                    "; ".join(del_result.errors),
+                )
         except Exception as exc:
             log.warning(
                 "install_cluster_prereqs: stale cleanup failed (non-fatal): %s",
