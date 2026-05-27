@@ -181,7 +181,7 @@ def _install_cluster_prereqs_sync(
             "apiVersion": "helm.toolkit.fluxcd.io/v2",
             "kind": "HelmRelease",
             "metadata": {
-                "name": f"astrolift-{component.key}",
+                "name": f"astrolift-{component.key.replace('_', '-')}",
                 "namespace": target_namespace,
                 "labels": {
                     "astrolift.io/managed-by": "platform",
