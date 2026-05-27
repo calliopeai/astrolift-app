@@ -560,6 +560,7 @@ class AKSClusterDriver(ClusterDriver):
                 chart_repo_url="https://prometheus-community.github.io/helm-charts",
                 chart_repo_type="default",
                 chart_version="65.1.0",
+                install_timeout="15m",
             ),
             BootstrapComponent(
                 key="cert-manager",

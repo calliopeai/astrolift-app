@@ -535,6 +535,11 @@ class BootstrapComponent:
     """Pinned chart version. Empty means Flux fetches latest (not
     recommended for production — always pin to a tested release)."""
 
+    install_timeout: str = "5m"
+    """Flux HelmRelease install/upgrade timeout. Override for heavy charts
+    (e.g. kube-prometheus-stack) that take longer than the 5-minute default
+    to reach a ready state, especially on Fargate where image pulls are cold."""
+
 
 @dataclass(frozen=True)
 class PodPhaseSummary:
