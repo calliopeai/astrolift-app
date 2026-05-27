@@ -182,7 +182,11 @@ class K8sNativeClusterDriver(ClusterDriver):
         not_found: list[str] = []
         errors: list[str] = []
         for manifest in manifests:
-            kind = manifest.get("kind", "")
+            api_version = manifest.get("apiVersion", "")
+            kind_bare = manifest.get("kind", "")
+            # For CRDs (apiVersion is "group/version") construct the
+            # "group/version/Kind" form that split_kind accepts.
+            kind = f"{api_version}/{kind_bare}" if "/" in api_version else kind_bare
             name = manifest.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:

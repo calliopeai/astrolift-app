@@ -285,7 +285,11 @@ class EKSClusterDriver(ClusterDriver):
         not_found: list[str] = []
         errors: list[str] = []
         for manifest in manifests:
-            kind = manifest.get("kind", "")
+            api_version = manifest.get("apiVersion", "")
+            kind_bare = manifest.get("kind", "")
+            # For CRDs (apiVersion is "group/version") construct the
+            # "group/version/Kind" form that split_kind accepts.
+            kind = f"{api_version}/{kind_bare}" if "/" in api_version else kind_bare
             name = manifest.get("metadata", {}).get("name", "")
             ref = f"{kind}/{name}"
             try:
@@ -804,6 +808,23 @@ class EKSClusterDriver(ClusterDriver):
                 "IRSA role ARNs will be empty if not set in auth_config.irsa_roles"
             )
 
+        # VPC ID — required by aws-load-balancer-controller when EC2 IMDS
+        # is unavailable (e.g. Fargate). The controller's auto-discovery
+        # path calls the IMDS mac/vpc-id endpoint, which times out on
+        # Fargate pods. Provide it explicitly from DescribeCluster so the
+        # controller starts without any IMDS dependency.
+        # Override via auth_config["vpc_id"] for non-standard setups.
+        vpc_id: str = auth_cfg.get("vpc_id", "")
+        if not vpc_id:
+            try:
+                resp = self._eks.describe_cluster(name=eks_cluster_name)
+                vpc_id = resp["cluster"]["resourcesVpcConfig"].get("vpcId", "")
+            except Exception:
+                log.warning(
+                    "bootstrap_components: EKS describe_cluster failed — "
+                    "vpcId will not be set; ALB controller may fail on Fargate"
+                )
+
         def _irsa_arn(key: str) -> str:
             if key in irsa_overrides:
                 return irsa_overrides[key]
@@ -816,6 +837,16 @@ class EKSClusterDriver(ClusterDriver):
             annotations = {"eks.amazonaws.com/role-arn": arn} if arn else {}
             return {"create": True, "annotations": annotations}
 
+        alb_values: dict = {
+            "clusterName": eks_cluster_name,
+            # Fargate doesn't expose EC2 IMDS; supply these explicitly so
+            # the controller never falls back to instance metadata.
+            "awsRegion": self._config.region,
+            "serviceAccount": _sa_with_irsa("aws-load-balancer-controller"),
+        }
+        if vpc_id:
+            alb_values["vpcId"] = vpc_id
+
         return [
             BootstrapComponent(
                 key="aws-load-balancer-controller",
@@ -827,10 +858,7 @@ class EKSClusterDriver(ClusterDriver):
                     "Service controller; without this, ingress doesn't work. "
                     "Bound to its IRSA role via ServiceAccount annotation."
                 ),
-                helm_values={
-                    "clusterName": eks_cluster_name,
-                    "serviceAccount": _sa_with_irsa("aws-load-balancer-controller"),
-                },
+                helm_values=alb_values,
                 requires=["irsa:aws-load-balancer-controller"],
                 options=[],
                 chart_name="aws-load-balancer-controller",
@@ -944,6 +972,11 @@ class EKSClusterDriver(ClusterDriver):
                 chart_repo_url="https://charts.jetstack.io",
                 chart_repo_type="default",
                 chart_version="v1.16.3",
+                # ALB controller registers a MutatingWebhookConfiguration;
+                # cert-manager install creates Services that hit that webhook.
+                # Wait until the ALB controller is ready to avoid "no endpoints"
+                # failures on the webhook call.
+                depends_on=["aws-load-balancer-controller"],
             ),
         ]
 
