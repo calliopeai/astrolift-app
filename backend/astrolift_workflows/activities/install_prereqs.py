@@ -252,6 +252,19 @@ def _install_cluster_prereqs_sync(
                 "install": {"createNamespace": True, "remediation": {"retries": 3}},
                 "upgrade": {"remediation": {"retries": 3}},
                 "values": merged_values,
+                **(
+                    {
+                        "dependsOn": [
+                            {
+                                "name": f"astrolift-{dep.replace('_', '-')}",
+                                "namespace": target_namespace,
+                            }
+                            for dep in component.depends_on
+                        ]
+                    }
+                    if component.depends_on
+                    else {}
+                ),
             },
         }
         resources.append(helm_release)

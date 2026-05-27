@@ -540,6 +540,13 @@ class BootstrapComponent:
     (e.g. kube-prometheus-stack) that take longer than the 5-minute default
     to reach a ready state, especially on Fargate where image pulls are cold."""
 
+    depends_on: list[str] = field(default_factory=list)
+    """Component keys that must reach Ready=True before Flux starts this
+    component's reconciliation. Maps to the Flux HelmRelease ``dependsOn``
+    field. Use when one component registers webhooks or CRDs that another
+    component depends on at install time (e.g. kube-prometheus-stack waiting
+    for aws-load-balancer-controller's webhook to be live)."""
+
 
 @dataclass(frozen=True)
 class PodPhaseSummary:

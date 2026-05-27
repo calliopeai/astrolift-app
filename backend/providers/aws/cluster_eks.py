@@ -799,6 +799,7 @@ class EKSClusterDriver(ClusterDriver):
                 chart_repo_url="https://aws.github.io/eks-charts",
                 chart_repo_type="default",
                 chart_version="1.9.2",
+                install_timeout="10m",
             ),
             BootstrapComponent(
                 key="external-dns",
@@ -870,6 +871,7 @@ class EKSClusterDriver(ClusterDriver):
                 chart_repo_type="default",
                 chart_version="65.1.0",
                 install_timeout="15m",
+                depends_on=["aws-load-balancer-controller"],
             ),
             BootstrapComponent(
                 key="cert-manager",
