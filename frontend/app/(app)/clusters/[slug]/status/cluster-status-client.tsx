@@ -211,7 +211,7 @@ function ClusterMetricsSection({ clusterId }: { clusterId: string }) {
     return (
       <div className="space-y-4">
         <WindowSelector value={window} onChange={setWindow} />
-        <Card>
+        <Card className="rounded-none shadow-md">
           <CardContent className="pt-6">
             <p className="text-muted-foreground text-sm">
               {reason === "no_endpoint"
@@ -268,7 +268,7 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
   const chartData = series.points.map((p) => ({ ts: p.ts, value: p.value }));
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="rounded-none shadow-md overflow-hidden">
       <CardHeader className="pb-2 pt-4 px-4">
         <span className="text-muted-foreground text-xs uppercase tracking-wide">
           {series.label}

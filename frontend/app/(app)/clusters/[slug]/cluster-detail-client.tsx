@@ -63,32 +63,27 @@ const LIFECYCLE_CONFIG: Record<
     label: string;
     variant: "default" | "secondary" | "outline" | "destructive";
     icon: React.ReactNode;
-    borderColor: string;
   }
 > = {
   registered: {
     label: "Registered",
     variant: "outline",
     icon: <LayersIcon className="size-3" />,
-    borderColor: "border-l-border",
   },
   managing: {
     label: "Managing…",
     variant: "secondary",
     icon: <Loader2Icon className="size-3 animate-spin" />,
-    borderColor: "border-l-amber-400",
   },
   managed: {
     label: "Managed",
     variant: "default",
     icon: <CheckCircleIcon className="size-3" />,
-    borderColor: "border-l-emerald-500",
   },
   error: {
     label: "Error",
     variant: "destructive",
     icon: <AlertTriangleIcon className="size-3" />,
-    borderColor: "border-l-destructive",
   },
 };
 
@@ -218,7 +213,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
       <ClusterTabs slug={slug} active="overview" />
 
       {/* ── Management status card ──────────────────────────────────── */}
-      <Card className={`border-l-4 ${lc.borderColor}`}>
+      <Card className="rounded-none shadow-md border-l-4 border-l-neutral-600 dark:border-l-neutral-500">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -260,7 +255,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
 
       {/* ── Capabilities grid ───────────────────────────────────────── */}
       {hasCaps && (
-        <Card>
+        <Card className="rounded-none shadow-md">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Capabilities</CardTitle>
             <CardDescription>
@@ -276,16 +271,16 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
                 return (
                   <div
                     key={key}
-                    className={`flex items-center gap-3 rounded-lg border p-3 ${
+                    className={`flex items-center gap-3 border p-3 ${
                       installed
-                        ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+                        ? "border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800/40"
                         : "border-border bg-muted/30"
                     }`}
                   >
                     <span
-                      className={`rounded-md p-1.5 shrink-0 ${
+                      className={`p-1.5 shrink-0 ${
                         installed
-                          ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400"
+                          ? "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -293,11 +288,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm font-medium leading-snug truncate">{meta.label}</p>
-                      <p
-                        className={`text-xs mt-0.5 ${
-                          installed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-                        }`}
-                      >
+                      <p className="text-xs mt-0.5 text-muted-foreground">
                         {installed ? "Installed" : "Not detected"}
                       </p>
                     </div>
@@ -311,7 +302,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
 
       {/* ── Error card ──────────────────────────────────────────────── */}
       {lifecycle === "error" && cluster.lastManagementError && (
-        <Card className="border-destructive/40 bg-destructive/5">
+        <Card className="rounded-none shadow-md border-l-4 border-l-destructive border-destructive/40 bg-destructive/5">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2 text-base">
               <AlertTriangleIcon className="size-4" />
@@ -331,7 +322,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
 
       {/* ── Action required ─────────────────────────────────────────── */}
       {lifecycle !== "managed" && lifecycle !== "managing" && (
-        <div className="border-border bg-muted/40 rounded-md border p-4 text-sm">
+        <div className="border-border bg-muted/40 border p-4 text-sm">
           <p className="font-medium">Action required</p>
           <p className="text-muted-foreground mt-1">
             This cluster isn&apos;t managed yet.{" "}
@@ -397,7 +388,7 @@ interface StatTileProps {
 
 function StatTile({ label, value, icon, valueClass = "text-foreground", loading }: StatTileProps) {
   return (
-    <Card>
+    <Card className="rounded-none shadow-md">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
         <span className="text-muted-foreground text-xs uppercase tracking-wide">{label}</span>
         <span className="text-muted-foreground">{icon}</span>
