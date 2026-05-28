@@ -382,3 +382,50 @@ class ClusterWorkloadHealthType:
     (Progressing condition with reason NewReplicaSetAvailable).
     Empty string when the Deployment has never rolled or when the
     condition isn't populated by the apiserver."""
+
+
+# ---- Prometheus range metrics / sparkline charts (#772 charts) -----
+
+
+@strawberry.type(name="AstroliftClusterPrometheusRangePoint")
+class ClusterPrometheusRangePointType:
+    """A single (unix timestamp, value) data point in a range series."""
+
+    ts: float
+    value: float
+
+
+@strawberry.type(name="AstroliftClusterPrometheusRangeSeries")
+class ClusterPrometheusRangeSeriesType:
+    """One named golden-signal time series from a Prometheus range query."""
+
+    metric: str
+    """Machine key — 'node_count' | 'pod_running_ratio' | 'cpu_utilization'
+    | 'memory_utilization' | 'deployment_ready_ratio'."""
+
+    label: str
+    """Human-readable display label for the chart card header."""
+
+    unit: str
+    """'count' | 'ratio' — how the UI should format the value."""
+
+    current: float | None
+    """Last point's value; None when Prometheus returned no data."""
+
+    points: list[ClusterPrometheusRangePointType]
+
+
+@strawberry.type(name="AstroliftClusterPrometheusRangeMetrics")
+class ClusterPrometheusRangeMetricsType:
+    """Range-query (historical) Prometheus metrics for the Status tab
+    sparkline charts. All five golden signals share one query call;
+    ``series`` is empty and ``available=False`` when Prometheus is
+    unconfigured or unreachable."""
+
+    available: bool
+    reason: str | None
+    """'no_endpoint' | 'unreachable' | None when ok."""
+
+    range_seconds: int
+    step_seconds: int
+    series: list[ClusterPrometheusRangeSeriesType]

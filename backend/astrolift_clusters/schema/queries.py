@@ -14,6 +14,9 @@ from astrolift_clusters.schema.types import (
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
     ClusterPrometheusMetricsType,
+    ClusterPrometheusRangeMetricsType,
+    ClusterPrometheusRangePointType,
+    ClusterPrometheusRangeSeriesType,
     ClusterWorkflowRunType,
     ClusterWorkloadHealthType,
     ManagedDomainType,
@@ -424,6 +427,159 @@ class ClustersQuery:
             cpu_utilization=cpu_utilization,
             memory_utilization=memory_utilization,
             deployment_ready_ratio=deployment_ready_ratio,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_prometheus_range_metrics(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        range_seconds: int = 3600,
+        step_seconds: int = 60,
+    ) -> ClusterPrometheusRangeMetricsType:
+        """Prometheus range queries for the Status tab sparkline charts.
+
+        Returns one ``ClusterPrometheusRangeSeriesType`` per golden
+        signal (node count, pod running ratio, CPU / memory
+        utilization, deployment ready ratio). Each series carries a
+        dense point array at ``step_seconds`` resolution over the
+        trailing ``range_seconds`` window.
+
+        Endpoint resolution mirrors ``astroliftClusterPrometheusMetrics``:
+        ``provider_config['prometheus_endpoint']`` → capability-probe
+        fallback → ``no_endpoint``.
+
+        Inputs are clamped (range: 5m–7d; step: 15s–3600s) so a rogue
+        caller can't DOS Prometheus with an absurdly fine step.
+        """
+        import time as _time
+
+        from astrolift_operations.prometheus_client import (
+            PrometheusError,
+            query_range,
+        )
+
+        cluster = TenantCluster.objects.filter(
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return ClusterPrometheusRangeMetricsType(
+                available=False,
+                reason=None,
+                range_seconds=range_seconds,
+                step_seconds=step_seconds,
+                series=[],
+            )
+
+        pc = cluster.provider_config or {}
+        endpoint = (pc.get("prometheus_endpoint") or "").strip()
+        if not endpoint:
+            caps = cluster.capabilities or {}
+            endpoint = (caps.get("prometheus_endpoint") or "").strip()
+        if not endpoint:
+            return ClusterPrometheusRangeMetricsType(
+                available=False,
+                reason="no_endpoint",
+                range_seconds=range_seconds,
+                step_seconds=step_seconds,
+                series=[],
+            )
+
+        # Clamp: range 5m–7d, step 15s–3600s.
+        range_seconds = max(300, min(int(range_seconds), 7 * 86400))
+        step_seconds = max(15, min(int(step_seconds), 3600))
+
+        end_unix = int(_time.time())
+        start_unix = end_unix - range_seconds
+
+        _METRICS = [
+            {
+                "metric": "node_count",
+                "label": "Nodes",
+                "unit": "count",
+                "query": "count(kube_node_info)",
+            },
+            {
+                "metric": "pod_running_ratio",
+                "label": "Pods running",
+                "unit": "ratio",
+                "query": 'sum(kube_pod_status_phase{phase="Running"}) / sum(kube_pod_status_phase)',
+            },
+            {
+                "metric": "cpu_utilization",
+                "label": "CPU utilization",
+                "unit": "ratio",
+                "query": 'sum(kube_pod_container_resource_requests{resource="cpu"}) / sum(kube_node_status_allocatable{resource="cpu"})',
+            },
+            {
+                "metric": "memory_utilization",
+                "label": "Memory utilization",
+                "unit": "ratio",
+                "query": 'sum(kube_pod_container_resource_requests{resource="memory"}) / sum(kube_node_status_allocatable{resource="memory"})',
+            },
+            {
+                "metric": "deployment_ready_ratio",
+                "label": "Deployments ready",
+                "unit": "ratio",
+                "query": "sum(kube_deployment_status_replicas_ready) / sum(kube_deployment_spec_replicas)",
+            },
+        ]
+
+        series: list[ClusterPrometheusRangeSeriesType] = []
+        for m in _METRICS:
+            try:
+                rows = query_range(
+                    endpoint=endpoint,
+                    query=m["query"],
+                    start_unix=start_unix,
+                    end_unix=end_unix,
+                    step_seconds=step_seconds,
+                )
+            except PrometheusError:
+                series.append(
+                    ClusterPrometheusRangeSeriesType(
+                        metric=m["metric"],
+                        label=m["label"],
+                        unit=m["unit"],
+                        current=None,
+                        points=[],
+                    )
+                )
+                continue
+
+            # Sum across all returned series (mirrors query_instant's
+            # multi-series aggregation). Each golden-signal query is
+            # already a cluster-level scalar via sum() but a partial
+            # Prometheus response could return multiple rows.
+            ts_map: dict[float, float] = {}
+            for row in rows:
+                for ts, val in row.values:
+                    ts_map[ts] = ts_map.get(ts, 0.0) + val
+
+            points = [
+                ClusterPrometheusRangePointType(ts=ts, value=val)
+                for ts, val in sorted(ts_map.items())
+            ]
+            current: float | None = points[-1].value if points else None
+            series.append(
+                ClusterPrometheusRangeSeriesType(
+                    metric=m["metric"],
+                    label=m["label"],
+                    unit=m["unit"],
+                    current=current,
+                    points=points,
+                )
+            )
+
+        return ClusterPrometheusRangeMetricsType(
+            available=True,
+            reason=None,
+            range_seconds=range_seconds,
+            step_seconds=step_seconds,
+            series=series,
         )
 
     @strawberry.field
