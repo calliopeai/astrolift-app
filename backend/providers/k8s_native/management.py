@@ -547,6 +547,9 @@ def probe_cluster_capabilities(
     # so the metrics resolver can use it without manual operator config.
     # Refreshed on every capability probe — operators just run
     # refreshClusterManagement if the pod restarts with a new IP.
+    # Note: EKS Fargate pod IPs are VPC-native (real ENI IPs) and routable
+    # from ECS. K8s Service ClusterIPs are virtual/iptables-only and are
+    # NOT routable from outside the cluster.
     prometheus_endpoint: str | None = None
     if prometheus:
         prom_candidates = augmented.get("kube-prometheus-stack", [])
