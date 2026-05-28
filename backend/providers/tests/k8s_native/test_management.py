@@ -234,6 +234,75 @@ def test_probe_detects_metrics_server_via_kube_system_pod():
     assert caps["metrics_server"] is True
 
 
+def test_probe_auto_discovers_prometheus_endpoint_from_pod_ip():
+    """When Prometheus is detected and the candidate pod has a podIP,
+    the probe surfaces ``prometheus_endpoint`` so the metrics resolver
+    can hit the pod directly without operator-provided config."""
+    backend = FakeManagementBackend(
+        pods_by_namespace={
+            "kube-prometheus-stack": [
+                {
+                    "name": "prometheus-kube-prometheus-prometheus-0",
+                    "labels": {"app.kubernetes.io/name": "prometheus"},
+                    "image": "quay.io/prometheus/prometheus:v2.54.0",
+                    "pod_ip": "10.42.1.17",
+                }
+            ]
+        },
+    )
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+    assert caps["prometheus"] is True
+    assert caps["prometheus_endpoint"] == "http://10.42.1.17:9090"
+
+
+def test_probe_prometheus_endpoint_none_when_no_prometheus():
+    backend = FakeManagementBackend()
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+    assert caps["prometheus"] is False
+    assert caps["prometheus_endpoint"] is None
+
+
+def test_probe_prometheus_endpoint_none_when_pod_ip_missing():
+    """Prometheus detected but pod is still pending (no podIP yet) ->
+    flag installed but leave endpoint None; the next refresh will pick
+    it up once the pod has scheduled."""
+    backend = FakeManagementBackend(
+        pods_by_namespace={
+            "monitoring": [
+                {
+                    "name": "prometheus-server-0",
+                    "labels": {"app.kubernetes.io/name": "prometheus"},
+                    "image": "quay.io/prometheus/prometheus:v2.54.0",
+                    "pod_ip": None,
+                }
+            ]
+        },
+    )
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+    assert caps["prometheus"] is True
+    assert caps["prometheus_endpoint"] is None
+
+
+def test_probe_auto_discovers_prometheus_endpoint_from_platform_namespace():
+    """Flux-installed stacks land in astrolift-system; the endpoint
+    fallback should pick up the prometheus pod from there too."""
+    backend = FakeManagementBackend(
+        pods_by_namespace={
+            "astrolift-system": [
+                {
+                    "name": "prometheus-astrolift-0",
+                    "labels": {"app.kubernetes.io/name": "prometheus"},
+                    "image": "quay.io/prometheus/prometheus:v2.54.0",
+                    "pod_ip": "10.42.5.23",
+                }
+            ]
+        },
+    )
+    caps = probe_cluster_capabilities(backend=backend, cluster=_ctx())
+    assert caps["prometheus"] is True
+    assert caps["prometheus_endpoint"] == "http://10.42.5.23:9090"
+
+
 def test_probe_tolerates_missing_namespaces():
     """A namespace that doesn't exist surfaces as an exception from
     the underlying SDK; the probe should swallow it and treat the
