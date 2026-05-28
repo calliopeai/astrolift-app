@@ -415,3 +415,36 @@ export const CLUSTER_PROMETHEUS_METRICS = gql`
     }
   }
 `;
+
+// Prometheus range-query (historical) metrics for the Status tab sparkline
+// charts (#772). Returns one series per golden signal with dense point arrays.
+// rangeSeconds: 3600 (1h) | 21600 (6h) | 86400 (24h)
+// stepSeconds: auto-scaled to ~60-96 points per window.
+export const CLUSTER_PROMETHEUS_RANGE_METRICS = gql`
+  query ClusterPrometheusRangeMetrics(
+    $clusterId: GUID!
+    $rangeSeconds: Int
+    $stepSeconds: Int
+  ) {
+    astroliftClusterPrometheusRangeMetrics(
+      clusterId: $clusterId
+      rangeSeconds: $rangeSeconds
+      stepSeconds: $stepSeconds
+    ) {
+      available
+      reason
+      rangeSeconds
+      stepSeconds
+      series {
+        metric
+        label
+        unit
+        current
+        points {
+          ts
+          value
+        }
+      }
+    }
+  }
+`;
