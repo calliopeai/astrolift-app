@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from strawberry.types import Info
 
@@ -32,6 +34,8 @@ from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+log = logging.getLogger(__name__)
 
 
 @strawberry.type
@@ -378,6 +382,12 @@ class ClustersQuery:
             caps = cluster.capabilities or {}
             endpoint = (caps.get("prometheus_endpoint") or "").strip()
         if not endpoint:
+            log.warning(
+                "prometheus_metrics: no endpoint for cluster %s (provider_config=%s caps=%s)",
+                cluster_id,
+                bool(pc.get("prometheus_endpoint")),
+                bool((cluster.capabilities or {}).get("prometheus_endpoint")),
+            )
             return ClusterPrometheusMetricsType(
                 available=False,
                 reason="no_endpoint",
@@ -388,10 +398,9 @@ class ClustersQuery:
                 deployment_ready_ratio=None,
             )
 
+        log.info("prometheus_metrics: cluster=%s endpoint=%s", cluster_id, endpoint)
         try:
-            node_count = int(
-                query_instant(endpoint=endpoint, query="count(kube_node_info)")
-            )
+            node_count = int(query_instant(endpoint=endpoint, query="count(kube_node_info)"))
             pod_running_ratio = query_instant(
                 endpoint=endpoint,
                 query='sum(kube_pod_status_phase{phase="Running"}) / sum(kube_pod_status_phase)',
@@ -408,7 +417,13 @@ class ClustersQuery:
                 endpoint=endpoint,
                 query="sum(kube_deployment_status_replicas_ready) / sum(kube_deployment_spec_replicas)",
             )
-        except PrometheusError:
+        except PrometheusError as exc:
+            log.warning(
+                "prometheus_metrics: unreachable cluster=%s endpoint=%s err=%s",
+                cluster_id,
+                endpoint,
+                exc,
+            )
             return ClusterPrometheusMetricsType(
                 available=False,
                 reason="unreachable",
@@ -481,6 +496,10 @@ class ClustersQuery:
             caps = cluster.capabilities or {}
             endpoint = (caps.get("prometheus_endpoint") or "").strip()
         if not endpoint:
+            log.warning(
+                "prometheus_range_metrics: no endpoint for cluster %s",
+                cluster_id,
+            )
             return ClusterPrometheusRangeMetricsType(
                 available=False,
                 reason="no_endpoint",
@@ -489,6 +508,13 @@ class ClustersQuery:
                 series=[],
             )
 
+        log.info(
+            "prometheus_range_metrics: cluster=%s endpoint=%s range=%ss step=%ss",
+            cluster_id,
+            endpoint,
+            range_seconds,
+            step_seconds,
+        )
         # Clamp: range 5m–7d, step 15s–3600s.
         range_seconds = max(300, min(int(range_seconds), 30 * 86400))
         step_seconds = max(15, min(int(step_seconds), 3600))
@@ -552,10 +578,7 @@ class ClustersQuery:
             for row in rows:
                 for ts, val in row.values:
                     ts_map[ts] = ts_map.get(ts, 0.0) + val
-            points = [
-                ClusterPrometheusRangePointType(ts=ts, value=val)
-                for ts, val in sorted(ts_map.items())
-            ]
+            points = [ClusterPrometheusRangePointType(ts=ts, value=val) for ts, val in sorted(ts_map.items())]
             current_val: float | None = points[-1].value if points else None
             return ClusterPrometheusRangeSeriesType(
                 metric=m["metric"],
@@ -578,6 +601,11 @@ class ClustersQuery:
         # than "No data in window" for each card.
         errors = [r for r in raw_results if r is _PROM_ERROR]
         if len(errors) == len(_METRICS):
+            log.warning(
+                "prometheus_range_metrics: all queries failed — unreachable cluster=%s endpoint=%s",
+                cluster_id,
+                endpoint,
+            )
             return ClusterPrometheusRangeMetricsType(
                 available=False,
                 reason="unreachable",
@@ -589,7 +617,9 @@ class ClustersQuery:
         # Partial failures: return empty series for the failed metrics so
         # the available cards still render.
         series = [
-            r if r is not _PROM_ERROR else ClusterPrometheusRangeSeriesType(
+            r
+            if r is not _PROM_ERROR
+            else ClusterPrometheusRangeSeriesType(
                 metric=_METRICS[i]["metric"],
                 label=_METRICS[i]["label"],
                 unit=_METRICS[i]["unit"],

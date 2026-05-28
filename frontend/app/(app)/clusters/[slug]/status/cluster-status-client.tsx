@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 
+import Link from "next/link";
+
 import { useQuery } from "@apollo/client/react";
-import { AlertTriangleIcon } from "lucide-react";
+import { AlertTriangleIcon, RefreshCwIcon, WifiOffIcon } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -162,13 +164,19 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
       }
     >
       <ClusterTabs slug={slug} active="status" />
-      <ClusterMetricsSection clusterId={cluster.id} />
+      <ClusterMetricsSection clusterId={cluster.id} slug={slug} />
     </PageShell>
   );
 }
 
 // ─── Metrics section with window selector ────────────────────────────
-function ClusterMetricsSection({ clusterId }: { clusterId: string }) {
+function ClusterMetricsSection({
+  clusterId,
+  slug,
+}: {
+  clusterId: string;
+  slug: string;
+}) {
   const [window, setWindow] = useState<WindowLabel>("1h");
   const win = WINDOWS.find((w) => w.label === window)!;
 
@@ -208,18 +216,14 @@ function ClusterMetricsSection({ clusterId }: { clusterId: string }) {
   // Prometheus unavailable
   if (!range?.available) {
     const reason = range?.reason ?? instant?.reason;
+    const isNoEndpoint = reason === "no_endpoint";
     return (
       <div className="space-y-4">
         <WindowSelector value={window} onChange={setWindow} />
-        <Card className="!rounded-none shadow-md">
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">
-              {reason === "no_endpoint"
-                ? "No Prometheus endpoint configured. Run Refresh cluster management to auto-discover it, or set prometheus_endpoint in provider_config."
-                : "Prometheus is unreachable. Check that the endpoint is accessible from the control plane."}
-            </p>
-          </CardContent>
-        </Card>
+        <PrometheusUnavailableCard
+          isNoEndpoint={isNoEndpoint}
+          settingsHref={`/clusters/${slug}/settings`}
+        />
       </div>
     );
   }
@@ -233,6 +237,49 @@ function ClusterMetricsSection({ clusterId }: { clusterId: string }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Prometheus unavailable card ─────────────────────────────────────
+function PrometheusUnavailableCard({
+  isNoEndpoint,
+  settingsHref,
+}: {
+  isNoEndpoint: boolean;
+  settingsHref: string;
+}) {
+  const Icon = isNoEndpoint ? RefreshCwIcon : WifiOffIcon;
+  const title = isNoEndpoint
+    ? "No Prometheus endpoint"
+    : "Prometheus unreachable";
+  const body = isNoEndpoint
+    ? "The control plane hasn't discovered a Prometheus endpoint for this cluster yet."
+    : "The control plane can't reach the Prometheus endpoint stored for this cluster.";
+  const hint = isNoEndpoint
+    ? "Go to Settings and run Refresh cluster management to auto-discover the endpoint, or set prometheus_endpoint in provider_config."
+    : "Verify the endpoint is accessible from the control plane on port 9090 and that firewall rules allow inbound traffic from the ECS task security group.";
+
+  return (
+    <Card className="!rounded-none shadow-md">
+      <CardContent className="pt-6">
+        <div className="flex items-start gap-3">
+          <Icon className="mt-0.5 size-5 shrink-0 text-amber-500" />
+          <div className="space-y-1">
+            <p className="font-medium text-sm">{title}</p>
+            <p className="text-muted-foreground text-sm">{body}</p>
+            <p className="text-muted-foreground text-xs">{hint}</p>
+            {isNoEndpoint && (
+              <Link
+                href={settingsHref}
+                className="mt-2 inline-block text-xs text-primary underline-offset-4 hover:underline"
+              >
+                Go to cluster settings →
+              </Link>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

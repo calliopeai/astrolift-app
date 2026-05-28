@@ -505,7 +505,8 @@ def probe_cluster_capabilities(
     platform_pods = pods_by_namespace.get("astrolift-system", [])
 
     cert_manager_pods = pods_by_namespace.get("cert-manager", []) + [
-        p for p in platform_pods
+        p
+        for p in platform_pods
         if "cert-manager" in str(p.get("name", ""))
         or p.get("labels", {}).get("app.kubernetes.io/name", "") == "cert-manager"
     ]
@@ -518,7 +519,8 @@ def probe_cluster_capabilities(
     service_mesh = _classify_service_mesh(crds)
 
     external_dns_pods = pods_by_namespace.get("external-dns", []) + [
-        p for p in platform_pods
+        p
+        for p in platform_pods
         if "external-dns" in str(p.get("name", ""))
         or p.get("labels", {}).get("app.kubernetes.io/name", "") == "external-dns"
     ]
@@ -530,13 +532,15 @@ def probe_cluster_capabilities(
     augmented = dict(pods_by_namespace)
     augmented.setdefault("kube-system", [])
     augmented["kube-system"] = augmented["kube-system"] + [
-        p for p in platform_pods
+        p
+        for p in platform_pods
         if "metrics-server" in str(p.get("name", ""))
         or p.get("labels", {}).get("app.kubernetes.io/name", "") == "metrics-server"
     ]
     augmented.setdefault("kube-prometheus-stack", [])
     augmented["kube-prometheus-stack"] = augmented["kube-prometheus-stack"] + [
-        p for p in platform_pods
+        p
+        for p in platform_pods
         if "prometheus" in str(p.get("name", ""))
         or p.get("labels", {}).get("app.kubernetes.io/name", "") in {"prometheus", "kube-prometheus-stack"}
     ]
@@ -566,10 +570,15 @@ def probe_cluster_capabilities(
         for _ns in _prom_scan_namespaces:
             for pod in pods_by_namespace.get(_ns, []):
                 ip = pod.get("pod_ip")
-                if ip and (
-                    "prometheus" in str(pod.get("name", ""))
-                    or pod.get("labels", {}).get("app.kubernetes.io/name") in {"prometheus", "kube-prometheus"}
-                ):
+                # Use ONLY the app.kubernetes.io/name label — NOT a name
+                # substring match.  kube-prometheus-stack names all pods with
+                # "prometheus" in their names (alertmanager, operator, etc.),
+                # so a name check selects whichever pod the K8s API returns
+                # first, which is typically NOT the actual server pod.
+                if ip and pod.get("labels", {}).get("app.kubernetes.io/name") in {
+                    "prometheus",
+                    "kube-prometheus",
+                }:
                     prometheus_endpoint = f"http://{ip}:9090"
                     break
             if prometheus_endpoint:
