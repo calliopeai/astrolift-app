@@ -550,20 +550,30 @@ def probe_cluster_capabilities(
     # Note: EKS Fargate pod IPs are VPC-native (real ENI IPs) and routable
     # from ECS. K8s Service ClusterIPs are virtual/iptables-only and are
     # NOT routable from outside the cluster.
+    #
+    # Scan the same set of namespaces that _classify_metrics_and_prom uses
+    # so endpoint discovery works regardless of whether the operator installed
+    # Prometheus into kube-prometheus-stack, monitoring, observability, etc.
     prometheus_endpoint: str | None = None
     if prometheus:
-        prom_candidates = augmented.get("kube-prometheus-stack", [])
-        for pod in prom_candidates:
-            ip = pod.get("pod_ip")
-            if ip and "prometheus" in str(pod.get("name", "")):
-                prometheus_endpoint = f"http://{ip}:9090"
-                break
-        if not prometheus_endpoint:
-            for pod in platform_pods:
+        _prom_scan_namespaces = (
+            "kube-prometheus-stack",
+            "monitoring",
+            "prometheus",
+            "observability",
+            "astrolift-system",
+        )
+        for _ns in _prom_scan_namespaces:
+            for pod in pods_by_namespace.get(_ns, []):
                 ip = pod.get("pod_ip")
-                if ip and "prometheus" in str(pod.get("name", "")):
+                if ip and (
+                    "prometheus" in str(pod.get("name", ""))
+                    or pod.get("labels", {}).get("app.kubernetes.io/name") in {"prometheus", "kube-prometheus"}
+                ):
                     prometheus_endpoint = f"http://{ip}:9090"
                     break
+            if prometheus_endpoint:
+                break
 
     return {
         "cert_manager": cert_manager,
