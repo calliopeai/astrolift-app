@@ -34,9 +34,11 @@ import { ClusterTabs } from "../components/cluster-tabs";
 
 // ─── Window config ────────────────────────────────────────────────────
 const WINDOWS = [
-  { label: "1h", rangeSeconds: 3600, stepSeconds: 60 },
-  { label: "6h", rangeSeconds: 21600, stepSeconds: 300 },
-  { label: "24h", rangeSeconds: 86400, stepSeconds: 900 },
+  { label: "1h",  rangeSeconds: 3_600,   stepSeconds: 60   },
+  { label: "6h",  rangeSeconds: 21_600,  stepSeconds: 300  },
+  { label: "24h", rangeSeconds: 86_400,  stepSeconds: 900  },
+  { label: "3d",  rangeSeconds: 259_200, stepSeconds: 3600 },
+  { label: "7d",  rangeSeconds: 604_800, stepSeconds: 7200 },
 ] as const;
 
 type WindowLabel = (typeof WINDOWS)[number]["label"];

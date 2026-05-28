@@ -451,7 +451,7 @@ class ClustersQuery:
         ``provider_config['prometheus_endpoint']`` → capability-probe
         fallback → ``no_endpoint``.
 
-        Inputs are clamped (range: 5m–7d; step: 15s–3600s) so a rogue
+        Inputs are clamped (range: 5m–30d; step: 15s–3600s) so a rogue
         caller can't DOS Prometheus with an absurdly fine step.
         """
         import time as _time
@@ -489,7 +489,7 @@ class ClustersQuery:
             )
 
         # Clamp: range 5m–7d, step 15s–3600s.
-        range_seconds = max(300, min(int(range_seconds), 7 * 86400))
+        range_seconds = max(300, min(int(range_seconds), 30 * 86400))
         step_seconds = max(15, min(int(step_seconds), 3600))
 
         end_unix = int(_time.time())
@@ -537,6 +537,7 @@ class ClustersQuery:
                     start_unix=start_unix,
                     end_unix=end_unix,
                     step_seconds=step_seconds,
+                    timeout=15.0,
                 )
             except PrometheusError:
                 series.append(

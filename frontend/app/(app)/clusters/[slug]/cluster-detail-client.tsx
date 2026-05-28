@@ -2,37 +2,54 @@
 
 import { useQuery } from "@apollo/client/react";
 import {
+  Activity,
   AlertTriangleIcon,
+  CheckCircle2Icon,
   CheckCircleIcon,
+  DatabaseIcon,
+  GlobeIcon,
+  HardDriveIcon,
   LayersIcon,
   Loader2Icon,
+  LockIcon,
+  NetworkIcon,
+  ServerIcon,
+  ShieldCheckIcon,
+  TrendingUpIcon,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
-import { StatusDot } from "@/components/StatusDot";
-import { ClusterTabs } from "./components/cluster-tabs";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CLUSTER_APP_COUNT,
+  CLUSTER_PROMETHEUS_METRICS,
   LIST_CLUSTERS,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
+import { ClusterTabs } from "./components/cluster-tabs";
+
+// ─── Types ────────────────────────────────────────────────────────────
 interface Resp {
   astroliftClusters: AstroliftTenantCluster[];
 }
 
-const POLL_INTERVAL_MS = 4000;
-
 type Lifecycle = "registered" | "managing" | "managed" | "error";
 
+// ─── Static maps ─────────────────────────────────────────────────────
 const PROVIDER_LABEL: Record<string, string> = {
-  k8s_native: "Kubernetes (native)",
+  k8s_native: "Kubernetes",
   eks: "AWS EKS",
   gke: "Google GKE",
   aks: "Azure AKS",
@@ -40,59 +57,102 @@ const PROVIDER_LABEL: Record<string, string> = {
   kind: "kind",
 };
 
-const LIFECYCLE_PRESENTATION: Record<
+const LIFECYCLE_CONFIG: Record<
   Lifecycle,
   {
     label: string;
     variant: "default" | "secondary" | "outline" | "destructive";
     icon: React.ReactNode;
+    borderColor: string;
   }
 > = {
   registered: {
     label: "Registered",
     variant: "outline",
     icon: <LayersIcon className="size-3" />,
+    borderColor: "border-l-border",
   },
   managing: {
     label: "Managing…",
     variant: "secondary",
     icon: <Loader2Icon className="size-3 animate-spin" />,
+    borderColor: "border-l-amber-400",
   },
   managed: {
     label: "Managed",
     variant: "default",
     icon: <CheckCircleIcon className="size-3" />,
+    borderColor: "border-l-emerald-500",
   },
   error: {
     label: "Error",
     variant: "destructive",
     icon: <AlertTriangleIcon className="size-3" />,
+    borderColor: "border-l-destructive",
   },
 };
 
-// Probed-capability rows the operator cares about, in the order the
-// management report renders them. Each entry derives its row from
-// the JSON shape persisted on TenantCluster.capabilities. Missing
-// keys fall back to "Not detected" rather than blowing up the page —
-// older rows from before #316 will have an empty JSONField until the
-// operator clicks Refresh.
-const CAPABILITY_KEYS = [
-  "cert_manager",
-  "ingress",
-  "service_mesh",
-  "external_dns",
-  "storage_classes",
-  "metrics_server",
-  "prometheus",
-] as const;
+// ─── Capability config ────────────────────────────────────────────────
+type CapKey =
+  | "cert_manager"
+  | "ingress"
+  | "service_mesh"
+  | "external_dns"
+  | "storage_classes"
+  | "metrics_server"
+  | "prometheus";
+
+const CAPABILITY_META: Record<
+  CapKey,
+  { label: string; icon: React.ReactNode }
+> = {
+  cert_manager: {
+    label: "cert-manager",
+    icon: <ShieldCheckIcon className="size-4" />,
+  },
+  ingress: {
+    label: "Ingress",
+    icon: <NetworkIcon className="size-4" />,
+  },
+  service_mesh: {
+    label: "Service mesh",
+    icon: <LockIcon className="size-4" />,
+  },
+  external_dns: {
+    label: "external-dns",
+    icon: <GlobeIcon className="size-4" />,
+  },
+  storage_classes: {
+    label: "Storage classes",
+    icon: <HardDriveIcon className="size-4" />,
+  },
+  metrics_server: {
+    label: "Metrics server",
+    icon: <Activity className="size-4" />,
+  },
+  prometheus: {
+    label: "Prometheus",
+    icon: <TrendingUpIcon className="size-4" />,
+  },
+};
+
+function isCapInstalled(key: CapKey, value: unknown): boolean {
+  if (key === "storage_classes") return Array.isArray(value) && value.length > 0;
+  if (value && typeof value === "object") {
+    return !!(value as Record<string, unknown>).installed;
+  }
+  return !!value;
+}
+
+// ─── Main component ───────────────────────────────────────────────────
+const POLL_INTERVAL_MS = 4000;
 
 export function ClusterDetailClient({ slug }: { slug: string }) {
-  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_CLUSTERS);
+  const { data, loading, startPolling, stopPolling } =
+    useQuery<Resp>(LIST_CLUSTERS);
   const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug);
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
-  // Mirror the list page's polling — keep refetching while the
-  // workflow's still in flight, stop the moment we settle.
   React.useEffect(() => {
     if (lifecycle === "managing") {
       startPolling(POLL_INTERVAL_MS);
@@ -128,94 +188,128 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
   }
 
   const provider = PROVIDER_LABEL[cluster.providerPluginSlug] ?? cluster.providerPluginSlug;
+  const lc = LIFECYCLE_CONFIG[lifecycle];
   const caps = (cluster.capabilities ?? {}) as Record<string, unknown>;
-  const lifecyclePresentation = LIFECYCLE_PRESENTATION[lifecycle];
+  const hasCaps = Object.keys(caps).length > 0;
 
   return (
     <PageShell
       title={
         <span className="flex items-center gap-3">
           <span className="bg-muted text-muted-foreground rounded-md p-1.5">
-            <LayersIcon className="size-4" />
+            <ServerIcon className="size-4" />
           </span>
           {cluster.name}
         </span>
       }
       description={
         <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono">{cluster.slug}</span>
+          <span className="font-mono text-sm">{cluster.slug}</span>
           <Badge variant="secondary">{provider}</Badge>
           {cluster.region && <Badge variant="outline">{cluster.region}</Badge>}
           {!cluster.isActive && <Badge variant="destructive">inactive</Badge>}
-          <Badge variant={lifecyclePresentation.variant} className="gap-1">
-            {lifecyclePresentation.icon}
-            {lifecyclePresentation.label}
+          <Badge variant={lc.variant} className="gap-1">
+            {lc.icon}
+            {lc.label}
           </Badge>
         </span>
       }
     >
       <ClusterTabs slug={slug} active="overview" />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* ── Management status card ──────────────────────────────────── */}
+      <Card className={`border-l-4 ${lc.borderColor}`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">Management</CardTitle>
+              <CardDescription className="mt-0.5">
+                {lifecycle === "managed" && cluster.managedAt
+                  ? `Active since ${new Date(cluster.managedAt).toLocaleString()}`
+                  : cluster.capabilitiesProbedAt
+                    ? `Capabilities probed ${new Date(cluster.capabilitiesProbedAt).toLocaleString()}`
+                    : "Not yet brought into management"}
+              </CardDescription>
+            </div>
+            <Badge variant={lc.variant} className="gap-1 shrink-0">
+              {lc.icon}
+              {lc.label}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground text-xs uppercase tracking-wide">Provider</dt>
+              <dd className="font-medium mt-0.5">{provider}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs uppercase tracking-wide">Region</dt>
+              <dd className="font-mono mt-0.5">{cluster.region || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs uppercase tracking-wide">Auth</dt>
+              <dd className="font-mono mt-0.5">{cluster.authMethod || "—"}</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      {/* ── Live stats row ──────────────────────────────────────────── */}
+      <LiveStatsRow clusterId={cluster.id} />
+
+      {/* ── Capabilities grid ───────────────────────────────────────── */}
+      {hasCaps && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-muted-foreground text-sm">Status</CardTitle>
-            <StatusDot status={cluster.isActive ? "ok" : "error"} />
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Capabilities</CardTitle>
+            <CardDescription>
+              Detected during the last capability probe. Refresh cluster
+              management to update.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold capitalize">
-              {lifecyclePresentation.label.replace("…", "")}
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {cluster.managedAt
-                ? `Managed since ${new Date(cluster.managedAt).toLocaleString()}`
-                : cluster.capabilitiesProbedAt
-                  ? `Probed ${new Date(cluster.capabilitiesProbedAt).toLocaleString()}`
-                  : "Not yet brought into management"}
-            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {(Object.keys(CAPABILITY_META) as CapKey[]).map((key) => {
+                const meta = CAPABILITY_META[key];
+                const installed = isCapInstalled(key, caps[key]);
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center gap-3 rounded-lg border p-3 ${
+                      installed
+                        ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+                        : "border-border bg-muted/30"
+                    }`}
+                  >
+                    <span
+                      className={`rounded-md p-1.5 shrink-0 ${
+                        installed
+                          ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {meta.icon}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-snug truncate">{meta.label}</p>
+                      <p
+                        className={`text-xs mt-0.5 ${
+                          installed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                        }`}
+                      >
+                        {installed ? "Installed" : "Not detected"}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm">Provider</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">{provider}</p>
-            <p className="text-muted-foreground font-mono text-xs">{cluster.providerPluginSlug}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm">Region</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="font-mono text-sm">{cluster.region || "—"}</p>
-          </CardContent>
-        </Card>
-
-        <AppsBoundCard clusterId={cluster.id} />
-      </div>
-
-      {Object.keys(caps).length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {CAPABILITY_KEYS.map((key) => {
-            const p = formatCapability(key, caps[key]);
-            return (
-              <Badge key={key} variant={p.installed ? "default" : "outline"} className="gap-1">
-                {p.installed ? (
-                  <CheckCircleIcon className="size-3" />
-                ) : (
-                  <AlertTriangleIcon className="size-3" />
-                )}
-                {p.label}
-              </Badge>
-            );
-          })}
-        </div>
       )}
 
+      {/* ── Error card ──────────────────────────────────────────────── */}
       {lifecycle === "error" && cluster.lastManagementError && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardHeader>
@@ -224,8 +318,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
               Last management failure
             </CardTitle>
             <CardDescription>
-              The workflow recorded this error on its most recent attempt. Fix the underlying issue
-              and click Retry to re-run.
+              Fix the underlying issue and click Retry from Settings to re-run.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -236,6 +329,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
         </Card>
       )}
 
+      {/* ── Action required ─────────────────────────────────────────── */}
       {lifecycle !== "managed" && lifecycle !== "managing" && (
         <div className="border-border bg-muted/40 rounded-md border p-4 text-sm">
           <p className="font-medium">Action required</p>
@@ -255,114 +349,119 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
   );
 }
 
-function formatCapability(
-  key: string,
-  value: unknown
-): { label: string; installed: boolean; detail: string } {
-  if (key === "cert_manager") {
-    const v = (value ?? {}) as {
-      installed?: boolean;
-      version?: string | null;
-      default_issuer?: string | null;
-    };
-    return {
-      label: "cert-manager",
-      installed: !!v.installed,
-      detail:
-        [v.version && `version ${v.version}`, v.default_issuer && `issuer ${v.default_issuer}`]
-          .filter(Boolean)
-          .join(" · ") || "—",
-    };
-  }
-  if (key === "ingress") {
-    const v = (value ?? {}) as {
-      installed?: boolean;
-      class?: string | null;
-      controller_version?: string | null;
-    };
-    return {
-      label: "ingress controller",
-      installed: !!v.installed,
-      detail:
-        [v.class && `class ${v.class}`, v.controller_version && `version ${v.controller_version}`]
-          .filter(Boolean)
-          .join(" · ") || "—",
-    };
-  }
-  if (key === "service_mesh") {
-    const v = (value ?? {}) as { installed?: boolean; kind?: string | null };
-    return {
-      label: "service mesh",
-      installed: !!v.installed,
-      detail: v.kind ?? "—",
-    };
-  }
-  if (key === "external_dns") {
-    const v = (value ?? {}) as { installed?: boolean; provider?: string | null };
-    return {
-      label: "external-dns",
-      installed: !!v.installed,
-      detail: v.provider ?? "—",
-    };
-  }
-  if (key === "storage_classes") {
-    const arr = Array.isArray(value) ? (value as string[]) : [];
-    return {
-      label: "storage classes",
-      installed: arr.length > 0,
-      detail: arr.length > 0 ? arr.join(", ") : "—",
-    };
-  }
-  if (key === "metrics_server") {
-    return {
-      label: "metrics-server",
-      installed: !!value,
-      detail: "—",
-    };
-  }
-  if (key === "prometheus") {
-    return {
-      label: "Prometheus",
-      installed: !!value,
-      detail: "—",
-    };
-  }
-  return {
-    label: key,
-    installed: false,
-    detail: typeof value === "object" ? JSON.stringify(value) : String(value),
-  };
-}
-
-// ─── Apps-bound count card (#393) ───────────────────────────────────────
-// Single-number summary of how many active apps target this cluster
-// (via default_tenant_cluster FK OR per-env binding). Backs the
-// operator's question "what's the blast radius of decommissioning?".
+// ─── Live stats row ───────────────────────────────────────────────────
+// Apps bound (from cluster query) + Prometheus instant metrics.
+// Prometheus tiles degrade gracefully to "—" when unavailable.
 
 interface AppCountResp {
   astroliftAppCountForCluster: number;
 }
 
-function AppsBoundCard({ clusterId }: { clusterId: string }) {
-  const { data, loading } = useQuery<AppCountResp>(CLUSTER_APP_COUNT, {
-    variables: { clusterId },
-    pollInterval: 30000,
-  });
+interface PrometheusInstantResp {
+  astroliftClusterPrometheusMetrics: {
+    available: boolean;
+    nodeCount: number | null;
+    podRunningRatio: number | null;
+    cpuUtilization: number | null;
+    memoryUtilization: number | null;
+    deploymentReadyRatio: number | null;
+  };
+}
+
+function pct(v: number | null): string {
+  if (v === null) return "—";
+  return `${(v * 100).toFixed(1)}%`;
+}
+
+function utilizationTone(v: number | null): string {
+  if (v === null) return "text-foreground";
+  if (v < 0.7) return "text-emerald-600";
+  if (v < 0.9) return "text-amber-600";
+  return "text-destructive";
+}
+
+function healthTone(v: number | null): string {
+  if (v === null) return "text-foreground";
+  if (v >= 0.9) return "text-emerald-600";
+  if (v >= 0.7) return "text-amber-600";
+  return "text-destructive";
+}
+
+interface StatTileProps {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ReactNode;
+  valueClass?: string;
+  loading?: boolean;
+}
+
+function StatTile({ label, value, icon, valueClass = "text-foreground", loading }: StatTileProps) {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-muted-foreground text-sm">Apps bound</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
+        <span className="text-muted-foreground text-xs uppercase tracking-wide">{label}</span>
+        <span className="text-muted-foreground">{icon}</span>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         {loading ? (
-          <Skeleton className="h-5 w-12" />
+          <Skeleton className="h-7 w-16" />
         ) : (
-          <p className="text-sm">
-            <span className="text-2xl font-semibold">{data?.astroliftAppCountForCluster ?? 0}</span>{" "}
-            <span className="text-muted-foreground">active</span>
-          </p>
+          <p className={`text-2xl font-semibold tabular-nums ${valueClass}`}>{value}</p>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function LiveStatsRow({ clusterId }: { clusterId: string }) {
+  const { data: appData, loading: appLoading } = useQuery<AppCountResp>(
+    CLUSTER_APP_COUNT,
+    { variables: { clusterId }, pollInterval: 30000 },
+  );
+  const { data: promData, loading: promLoading } =
+    useQuery<PrometheusInstantResp>(CLUSTER_PROMETHEUS_METRICS, {
+      variables: { clusterId },
+      pollInterval: 60000,
+    });
+
+  const m = promData?.astroliftClusterPrometheusMetrics;
+  const hasLiveData = m?.available;
+
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <StatTile
+        label="Apps bound"
+        value={appData?.astroliftAppCountForCluster ?? "—"}
+        icon={<LayersIcon className="size-4" />}
+        loading={appLoading}
+      />
+      <StatTile
+        label="Nodes"
+        value={hasLiveData && m.nodeCount !== null ? m.nodeCount : "—"}
+        icon={<ServerIcon className="size-4" />}
+        loading={promLoading && !promData}
+      />
+      <StatTile
+        label="Pods running"
+        value={hasLiveData ? pct(m.podRunningRatio) : "—"}
+        icon={<CheckCircle2Icon className="size-4" />}
+        valueClass={hasLiveData ? healthTone(m.podRunningRatio) : "text-muted-foreground"}
+        loading={promLoading && !promData}
+      />
+      <StatTile
+        label="CPU"
+        value={hasLiveData ? pct(m.cpuUtilization) : "—"}
+        icon={<Activity className="size-4" />}
+        valueClass={hasLiveData ? utilizationTone(m.cpuUtilization) : "text-muted-foreground"}
+        loading={promLoading && !promData}
+      />
+      <StatTile
+        label="Memory"
+        value={hasLiveData ? pct(m.memoryUtilization) : "—"}
+        icon={<DatabaseIcon className="size-4" />}
+        valueClass={hasLiveData ? utilizationTone(m.memoryUtilization) : "text-muted-foreground"}
+        loading={promLoading && !promData}
+      />
+    </div>
   );
 }
