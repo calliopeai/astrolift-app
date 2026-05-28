@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type TabKey = "overview" | "status";
+type TabKey = "overview" | "status" | "health" | "activity" | "settings";
 
 interface TabSpec {
   key: TabKey;
@@ -26,6 +26,24 @@ const TABS: TabSpec[] = [
     label: "Status",
     href: (s) => `/clusters/${s}/status`,
     match: (p, s) => p.startsWith(`/clusters/${s}/status`),
+  },
+  {
+    key: "health",
+    label: "Health",
+    href: (s) => `/clusters/${s}/health`,
+    match: (p, s) => p.startsWith(`/clusters/${s}/health`),
+  },
+  {
+    key: "activity",
+    label: "Activity",
+    href: (s) => `/clusters/${s}/activity`,
+    match: (p, s) => p.startsWith(`/clusters/${s}/activity`),
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    href: (s) => `/clusters/${s}/settings`,
+    match: (p, s) => p.startsWith(`/clusters/${s}/settings`),
   },
 ];
 
