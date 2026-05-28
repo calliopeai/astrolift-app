@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   CLUSTER_HEALTH,
   CLUSTER_LIFECYCLE_AUDIT,
+  CLUSTER_PROMETHEUS_METRICS,
   CLUSTER_WORKLOAD_HEALTH,
   LIST_CLUSTERS,
   RECENT_CLUSTER_WORKFLOWS,
@@ -96,21 +97,7 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
 
       <LifecycleTimelineCard clusterId={cluster.id} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Metrics</CardTitle>
-          <CardDescription>
-            Prometheus-sourced CPU / memory / pod-count / deploy-
-            frequency trends, capability-gated on
-            <code className="font-mono mx-1 text-xs">prometheus.installed</code>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-muted-foreground text-sm">
-          Coming in PR 4 of this feature. Install the Prometheus stack
-          via the Overview tab&apos;s bootstrap recipe card to unlock
-          this surface.
-        </CardContent>
-      </Card>
+      <ClusterMetricsCard clusterId={cluster.id} />
     </PageShell>
   );
 }
@@ -436,6 +423,132 @@ function RecentWorkflowsCard({ clusterId }: { clusterId: string }) {
               );
             })}
           </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Cluster metrics card (#771) ─────────────────────────────────────
+// Prometheus instant queries: node count, pod running ratio, CPU/memory
+// utilization, deployment ready ratio. Gracefully degrades when no
+// prometheus_endpoint is configured in provider_config.
+
+interface PrometheusMetricsResp {
+  astroliftClusterPrometheusMetrics: {
+    available: boolean;
+    reason: string | null;
+    nodeCount: number | null;
+    podRunningRatio: number | null;
+    cpuUtilization: number | null;
+    memoryUtilization: number | null;
+    deploymentReadyRatio: number | null;
+  };
+}
+
+function pct(ratio: number | null): string {
+  if (ratio === null) return "—";
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function MetricTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "ok" | "warn" | "bad";
+}) {
+  const colour =
+    tone === "ok"
+      ? "text-emerald-600"
+      : tone === "warn"
+        ? "text-amber-600"
+        : tone === "bad"
+          ? "text-destructive"
+          : "text-foreground";
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-muted-foreground text-xs uppercase tracking-wide">
+        {label}
+      </span>
+      <span className={`text-xl font-semibold tabular-nums ${colour}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function utilizationTone(ratio: number | null): "ok" | "warn" | "bad" {
+  if (ratio === null) return "ok";
+  if (ratio < 0.7) return "ok";
+  if (ratio < 0.9) return "warn";
+  return "bad";
+}
+
+function ClusterMetricsCard({ clusterId }: { clusterId: string }) {
+  const { data, loading } = useQuery<PrometheusMetricsResp>(
+    CLUSTER_PROMETHEUS_METRICS,
+    { variables: { clusterId }, pollInterval: 60000 },
+  );
+  const m = data?.astroliftClusterPrometheusMetrics;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Metrics</CardTitle>
+        <CardDescription>
+          Prometheus-sourced cluster saturation. Instant queries — node
+          count, pod health, CPU / memory utilization, deployment
+          readiness. Updates every 60s.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading && !m ? (
+          <Skeleton className="h-16 w-full" />
+        ) : !m?.available ? (
+          <p className="text-muted-foreground text-sm">
+            {m?.reason === "no_endpoint"
+              ? "No Prometheus endpoint configured. Set prometheus_endpoint in provider_config to unlock this card."
+              : "Prometheus is unreachable. Check that the endpoint in provider_config is correct and accessible from the control plane."}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+            <MetricTile
+              label="Nodes"
+              value={m.nodeCount !== null ? String(m.nodeCount) : "—"}
+            />
+            <MetricTile
+              label="Pods running"
+              value={pct(m.podRunningRatio)}
+              tone={
+                m.podRunningRatio !== null && m.podRunningRatio >= 0.9
+                  ? "ok"
+                  : "warn"
+              }
+            />
+            <MetricTile
+              label="CPU utilization"
+              value={pct(m.cpuUtilization)}
+              tone={utilizationTone(m.cpuUtilization)}
+            />
+            <MetricTile
+              label="Memory utilization"
+              value={pct(m.memoryUtilization)}
+              tone={utilizationTone(m.memoryUtilization)}
+            />
+            <MetricTile
+              label="Deployments ready"
+              value={pct(m.deploymentReadyRatio)}
+              tone={
+                m.deploymentReadyRatio !== null &&
+                m.deploymentReadyRatio >= 0.9
+                  ? "ok"
+                  : "warn"
+              }
+            />
+          </div>
         )}
       </CardContent>
     </Card>

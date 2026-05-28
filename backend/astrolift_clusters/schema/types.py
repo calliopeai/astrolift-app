@@ -343,6 +343,23 @@ class ClusterWorkflowRunType:
 # ---- Cluster workload health (#362) -------------------------------
 
 
+@strawberry.type(name="AstroliftClusterPrometheusMetrics")
+class ClusterPrometheusMetricsType:
+    """Prometheus-sourced cluster saturation metrics for the Status tab
+    Metrics card (#771). All fields are None when Prometheus is
+    unavailable or not configured."""
+
+    available: bool
+    reason: str | None
+    """Why unavailable: 'no_endpoint' | 'unreachable' | None when ok."""
+
+    node_count: int | None
+    pod_running_ratio: float | None
+    cpu_utilization: float | None
+    memory_utilization: float | None
+    deployment_ready_ratio: float | None
+
+
 @strawberry.type(name="AstroliftClusterWorkloadHealth")
 class ClusterWorkloadHealthType:
     """Per-Deployment health row for the Status tab's Workload health
