@@ -529,10 +529,14 @@ class ClustersQuery:
             },
         ]
 
-        def _fetch_series(m: dict) -> ClusterPrometheusRangeSeriesType:
+        _PROM_ERROR = object()  # sentinel: query failed with PrometheusError
+
+        def _fetch_series(m: dict) -> ClusterPrometheusRangeSeriesType | object:
             """Fetch one golden-signal range series. Runs in a thread pool
             so all five queries execute concurrently — worst-case latency
-            is one timeout (10s) rather than five in sequence (50s)."""
+            is one timeout (10s) rather than five in sequence (50s).
+            Returns _PROM_ERROR sentinel on PrometheusError so the caller
+            can distinguish "endpoint unreachable" from "no data yet"."""
             try:
                 rows = query_range(
                     endpoint=endpoint,
@@ -543,13 +547,7 @@ class ClustersQuery:
                     timeout=10.0,
                 )
             except PrometheusError:
-                return ClusterPrometheusRangeSeriesType(
-                    metric=m["metric"],
-                    label=m["label"],
-                    unit=m["unit"],
-                    current=None,
-                    points=[],
-                )
+                return _PROM_ERROR
             ts_map: dict[float, float] = {}
             for row in rows:
                 for ts, val in row.values:
@@ -569,18 +567,44 @@ class ClustersQuery:
 
         # Run all five queries concurrently — worst-case latency is one
         # timeout (10s) rather than five in sequence (50s).
-        series: list[ClusterPrometheusRangeSeriesType] = [None] * len(_METRICS)  # type: ignore[list-item]
+        raw_results: list[ClusterPrometheusRangeSeriesType | object] = [None] * len(_METRICS)  # type: ignore[list-item]
         with ThreadPoolExecutor(max_workers=5) as pool:
             futures = {pool.submit(_fetch_series, m): i for i, m in enumerate(_METRICS)}
             for fut in as_completed(futures):
-                series[futures[fut]] = fut.result()
+                raw_results[futures[fut]] = fut.result()
+
+        # If every query errored, Prometheus is unreachable — report
+        # available=False so the UI shows the correct error state rather
+        # than "No data in window" for each card.
+        errors = [r for r in raw_results if r is _PROM_ERROR]
+        if len(errors) == len(_METRICS):
+            return ClusterPrometheusRangeMetricsType(
+                available=False,
+                reason="unreachable",
+                range_seconds=range_seconds,
+                step_seconds=step_seconds,
+                series=[],
+            )
+
+        # Partial failures: return empty series for the failed metrics so
+        # the available cards still render.
+        series = [
+            r if r is not _PROM_ERROR else ClusterPrometheusRangeSeriesType(
+                metric=_METRICS[i]["metric"],
+                label=_METRICS[i]["label"],
+                unit=_METRICS[i]["unit"],
+                current=None,
+                points=[],
+            )
+            for i, r in enumerate(raw_results)
+        ]
 
         return ClusterPrometheusRangeMetricsType(
             available=True,
             reason=None,
             range_seconds=range_seconds,
             step_seconds=step_seconds,
-            series=series,
+            series=series,  # type: ignore[arg-type]
         )
 
     @strawberry.field
