@@ -911,29 +911,22 @@ class EKSClusterDriver(ClusterDriver):
                 default_enabled=True,
                 rationale=(
                     "Metrics scraping + dashboarding for the platform UI's "
-                    "cluster-status charts. Prom storage backed by EBS gp3 "
-                    "PVs (the EKS-installed default StorageClass). "
-                    "node-exporter is disabled — DaemonSets with hostNetwork "
-                    "don't schedule on Fargate."
+                    "cluster-status charts. Prometheus runs with ephemeral "
+                    "storage (no PVC required) — 24h retention, resets on "
+                    "pod restart. node-exporter is disabled — DaemonSets "
+                    "with hostNetwork don't schedule on Fargate."
                 ),
                 helm_values={
                     "nodeExporter": {"enabled": False},
                     "prometheus": {
                         "prometheusSpec": {
-                            "storageSpec": {
-                                "volumeClaimTemplate": {
-                                    "spec": {
-                                        "storageClassName": "gp3",
-                                        "accessModes": ["ReadWriteOnce"],
-                                        "resources": {"requests": {"storage": "50Gi"}},
-                                    },
-                                },
-                            },
+                            "retention": "24h",
+                            "storageSpec": {},
                         },
                     },
-                    "grafana": {"enabled": True, "persistence": {"storageClassName": "gp3"}},
+                    "grafana": {"enabled": True, "persistence": {"enabled": False}},
                 },
-                requires=["storage:gp3"],
+                requires=[],
                 options=[],
                 chart_name="kube-prometheus-stack",
                 chart_repo_url="https://prometheus-community.github.io/helm-charts",

@@ -398,3 +398,20 @@ export const CLUSTER_WORKLOAD_HEALTH = gql`
     }
   }
 `;
+
+// Prometheus-sourced cluster saturation metrics for the Status tab
+// Metrics card (#771). Instant queries — node count, pod running
+// ratio, CPU/memory utilization, deployment health ratio.
+export const CLUSTER_PROMETHEUS_METRICS = gql`
+  query ClusterPrometheusMetrics($clusterId: GUID!) {
+    astroliftClusterPrometheusMetrics(clusterId: $clusterId) {
+      available
+      reason
+      nodeCount
+      podRunningRatio
+      cpuUtilization
+      memoryUtilization
+      deploymentReadyRatio
+    }
+  }
+`;

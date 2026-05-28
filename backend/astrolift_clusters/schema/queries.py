@@ -13,6 +13,7 @@ from astrolift_clusters.schema.types import (
     ClusterEventType,
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
+    ClusterPrometheusMetricsType,
     ClusterWorkflowRunType,
     ClusterWorkloadHealthType,
     ManagedDomainType,
@@ -322,6 +323,102 @@ class ClustersQuery:
             # the cluster anyway, just without an install checklist.
             components = []
         return bootstrap_plan_to_type(cluster, components)
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_prometheus_metrics(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> ClusterPrometheusMetricsType:
+        """Prometheus-sourced cluster saturation metrics for the Status
+        tab Metrics card (#771).
+
+        Reads five instant PromQL queries against the cluster's
+        configured Prometheus endpoint (``provider_config
+        ['prometheus_endpoint']``). Returns ``available=False`` with a
+        ``reason`` string when no endpoint is configured or the endpoint
+        is unreachable — the UI degrades gracefully in both cases.
+
+        Queries are cached 30s by the existing prometheus_client TTL
+        cache so repeated tab opens don't hammer Prometheus.
+        """
+        from astrolift_operations.prometheus_client import (
+            PrometheusError,
+            query_instant,
+        )
+
+        _unavailable = ClusterPrometheusMetricsType(
+            available=False,
+            reason=None,
+            node_count=None,
+            pod_running_ratio=None,
+            cpu_utilization=None,
+            memory_utilization=None,
+            deployment_ready_ratio=None,
+        )
+
+        cluster = TenantCluster.objects.filter(
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return _unavailable
+
+        pc = cluster.provider_config or {}
+        endpoint = (pc.get("prometheus_endpoint") or "").strip()
+        if not endpoint:
+            return ClusterPrometheusMetricsType(
+                available=False,
+                reason="no_endpoint",
+                node_count=None,
+                pod_running_ratio=None,
+                cpu_utilization=None,
+                memory_utilization=None,
+                deployment_ready_ratio=None,
+            )
+
+        try:
+            node_count = int(
+                query_instant(endpoint=endpoint, query="count(kube_node_info)")
+            )
+            pod_running_ratio = query_instant(
+                endpoint=endpoint,
+                query='sum(kube_pod_status_phase{phase="Running"}) / sum(kube_pod_status_phase)',
+            )
+            cpu_utilization = query_instant(
+                endpoint=endpoint,
+                query='sum(kube_pod_container_resource_requests{resource="cpu"}) / sum(kube_node_status_allocatable{resource="cpu"})',
+            )
+            memory_utilization = query_instant(
+                endpoint=endpoint,
+                query='sum(kube_pod_container_resource_requests{resource="memory"}) / sum(kube_node_status_allocatable{resource="memory"})',
+            )
+            deployment_ready_ratio = query_instant(
+                endpoint=endpoint,
+                query="sum(kube_deployment_status_replicas_ready) / sum(kube_deployment_spec_replicas)",
+            )
+        except PrometheusError:
+            return ClusterPrometheusMetricsType(
+                available=False,
+                reason="unreachable",
+                node_count=None,
+                pod_running_ratio=None,
+                cpu_utilization=None,
+                memory_utilization=None,
+                deployment_ready_ratio=None,
+            )
+
+        return ClusterPrometheusMetricsType(
+            available=True,
+            reason=None,
+            node_count=node_count,
+            pod_running_ratio=pod_running_ratio,
+            cpu_utilization=cpu_utilization,
+            memory_utilization=memory_utilization,
+            deployment_ready_ratio=deployment_ready_ratio,
+        )
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_REGISTER)
