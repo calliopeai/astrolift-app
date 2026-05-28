@@ -213,7 +213,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
       <ClusterTabs slug={slug} active="overview" />
 
       {/* ── Management status card ──────────────────────────────────── */}
-      <Card className="rounded-none shadow-md border-l-4 border-l-neutral-600 dark:border-l-neutral-500">
+      <Card className="!rounded-none shadow-md border-l-4 border-l-neutral-600 dark:border-l-neutral-500">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -255,7 +255,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
 
       {/* ── Capabilities grid ───────────────────────────────────────── */}
       {hasCaps && (
-        <Card className="rounded-none shadow-md">
+        <Card className="!rounded-none shadow-md">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Capabilities</CardTitle>
             <CardDescription>
@@ -302,7 +302,7 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
 
       {/* ── Error card ──────────────────────────────────────────────── */}
       {lifecycle === "error" && cluster.lastManagementError && (
-        <Card className="rounded-none shadow-md border-l-4 border-l-destructive border-destructive/40 bg-destructive/5">
+        <Card className="!rounded-none shadow-md border-l-4 border-l-destructive border-destructive/40 bg-destructive/5">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2 text-base">
               <AlertTriangleIcon className="size-4" />
@@ -388,7 +388,7 @@ interface StatTileProps {
 
 function StatTile({ label, value, icon, valueClass = "text-foreground", loading }: StatTileProps) {
   return (
-    <Card className="rounded-none shadow-md">
+    <Card className="!rounded-none shadow-md">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
         <span className="text-muted-foreground text-xs uppercase tracking-wide">{label}</span>
         <span className="text-muted-foreground">{icon}</span>
