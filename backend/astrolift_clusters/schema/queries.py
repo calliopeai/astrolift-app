@@ -369,6 +369,12 @@ class ClustersQuery:
         pc = cluster.provider_config or {}
         endpoint = (pc.get("prometheus_endpoint") or "").strip()
         if not endpoint:
+            # Fall back to probe-discovered endpoint. Auto-populated when
+            # the capability probe runs (bringClusterIntoManagement /
+            # refreshClusterManagement). No operator config required.
+            caps = cluster.capabilities or {}
+            endpoint = (caps.get("prometheus_endpoint") or "").strip()
+        if not endpoint:
             return ClusterPrometheusMetricsType(
                 available=False,
                 reason="no_endpoint",

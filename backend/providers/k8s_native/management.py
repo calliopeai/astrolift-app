@@ -542,6 +542,26 @@ def probe_cluster_capabilities(
     ]
     metrics_server, prometheus = _classify_metrics_and_prom(augmented)
 
+    # Auto-discover Prometheus pod IP for direct VPC-native queries from
+    # the ECS control plane. Stored in capabilities["prometheus_endpoint"]
+    # so the metrics resolver can use it without manual operator config.
+    # Refreshed on every capability probe — operators just run
+    # refreshClusterManagement if the pod restarts with a new IP.
+    prometheus_endpoint: str | None = None
+    if prometheus:
+        prom_candidates = augmented.get("kube-prometheus-stack", [])
+        for pod in prom_candidates:
+            ip = pod.get("pod_ip")
+            if ip and "prometheus" in str(pod.get("name", "")):
+                prometheus_endpoint = f"http://{ip}:9090"
+                break
+        if not prometheus_endpoint:
+            for pod in platform_pods:
+                ip = pod.get("pod_ip")
+                if ip and "prometheus" in str(pod.get("name", "")):
+                    prometheus_endpoint = f"http://{ip}:9090"
+                    break
+
     return {
         "cert_manager": cert_manager,
         "ingress": ingress,
@@ -550,6 +570,7 @@ def probe_cluster_capabilities(
         "service_mesh": service_mesh,
         "metrics_server": metrics_server,
         "prometheus": prometheus,
+        "prometheus_endpoint": prometheus_endpoint,
     }
 
 
@@ -793,6 +814,7 @@ class LiveManagementBackend:
                     "name": metadata.get("name", ""),
                     "labels": dict(metadata.get("labels") or {}),
                     "image": image,
+                    "pod_ip": (pod.get("status") or {}).get("podIP"),
                 }
             )
         return out
