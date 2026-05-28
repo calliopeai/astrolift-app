@@ -455,6 +455,7 @@ class ClustersQuery:
         caller can't DOS Prometheus with an absurdly fine step.
         """
         import time as _time
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         from astrolift_operations.prometheus_client import (
             PrometheusError,
@@ -528,8 +529,10 @@ class ClustersQuery:
             },
         ]
 
-        series: list[ClusterPrometheusRangeSeriesType] = []
-        for m in _METRICS:
+        def _fetch_series(m: dict) -> ClusterPrometheusRangeSeriesType:
+            """Fetch one golden-signal range series. Runs in a thread pool
+            so all five queries execute concurrently — worst-case latency
+            is one timeout (10s) rather than five in sequence (50s)."""
             try:
                 rows = query_range(
                     endpoint=endpoint,
@@ -537,43 +540,40 @@ class ClustersQuery:
                     start_unix=start_unix,
                     end_unix=end_unix,
                     step_seconds=step_seconds,
-                    timeout=15.0,
+                    timeout=10.0,
                 )
             except PrometheusError:
-                series.append(
-                    ClusterPrometheusRangeSeriesType(
-                        metric=m["metric"],
-                        label=m["label"],
-                        unit=m["unit"],
-                        current=None,
-                        points=[],
-                    )
+                return ClusterPrometheusRangeSeriesType(
+                    metric=m["metric"],
+                    label=m["label"],
+                    unit=m["unit"],
+                    current=None,
+                    points=[],
                 )
-                continue
-
-            # Sum across all returned series (mirrors query_instant's
-            # multi-series aggregation). Each golden-signal query is
-            # already a cluster-level scalar via sum() but a partial
-            # Prometheus response could return multiple rows.
             ts_map: dict[float, float] = {}
             for row in rows:
                 for ts, val in row.values:
                     ts_map[ts] = ts_map.get(ts, 0.0) + val
-
             points = [
                 ClusterPrometheusRangePointType(ts=ts, value=val)
                 for ts, val in sorted(ts_map.items())
             ]
-            current: float | None = points[-1].value if points else None
-            series.append(
-                ClusterPrometheusRangeSeriesType(
-                    metric=m["metric"],
-                    label=m["label"],
-                    unit=m["unit"],
-                    current=current,
-                    points=points,
-                )
+            current_val: float | None = points[-1].value if points else None
+            return ClusterPrometheusRangeSeriesType(
+                metric=m["metric"],
+                label=m["label"],
+                unit=m["unit"],
+                current=current_val,
+                points=points,
             )
+
+        # Run all five queries concurrently — worst-case latency is one
+        # timeout (10s) rather than five in sequence (50s).
+        series: list[ClusterPrometheusRangeSeriesType] = [None] * len(_METRICS)  # type: ignore[list-item]
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {pool.submit(_fetch_series, m): i for i, m in enumerate(_METRICS)}
+            for fut in as_completed(futures):
+                series[futures[fut]] = fut.result()
 
         return ClusterPrometheusRangeMetricsType(
             available=True,
