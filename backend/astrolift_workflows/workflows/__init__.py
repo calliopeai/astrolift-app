@@ -28,6 +28,8 @@ from astrolift_workflows.workflows.install_cluster_prereqs import (
 from astrolift_workflows.workflows.migrate_app import MigrateAppWorkflow
 from astrolift_workflows.workflows.onboard_app import OnboardAppWorkflow
 from astrolift_workflows.workflows.promote_deployment import PromoteDeploymentWorkflow
+from astrolift_workflows.workflows.provision_namespace import NamespaceProvisionWorkflow
+from astrolift_workflows.workflows.provision_registry import RegistryProvisionWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
 from astrolift_workflows.workflows.scheduled import (
     CapturePlatformCostSnapshotWorkflow,
@@ -63,6 +65,7 @@ __all__ = [
     "DriftDetectionWorkflow",
     "InstallClusterPrereqsWorkflow",
     "MigrateAppWorkflow",
+    "NamespaceProvisionWorkflow",
     "OnboardAppWorkflow",
     "PollScheduledJobRunsWorkflow",
     "PreviewGarbageCollectWorkflow",
@@ -70,6 +73,7 @@ __all__ = [
     "PruneAuditLogWorkflow",
     "PruneStaleSessionsWorkflow",
     "ReconcileClusterCapabilitiesWorkflow",
+    "RegistryProvisionWorkflow",
     "RehealWebhookSubscriptionsWorkflow",
     "RollbackDeploymentWorkflow",
     "RotateSecretBundleWorkflow",
