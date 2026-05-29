@@ -47,7 +47,9 @@ def _provision_namespace_sync(registered_app_id: int, app_environment_id: int | 
 
     app = RegisteredApp.all_objects.select_related("organization").get(pk=registered_app_id)
     cluster: TenantCluster | None = None
-    if app_environment_id is not None:
+    # Treat falsy ids (0, None) as "no explicit env" so the workflow can
+    # pass a placeholder (0) without triggering a DoesNotExist lookup.
+    if app_environment_id:
         env = AppEnvironment.all_objects.select_related("tenant_cluster").get(pk=app_environment_id)
         cluster = env.tenant_cluster
     if cluster is None:
