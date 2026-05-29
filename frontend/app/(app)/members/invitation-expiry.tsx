@@ -20,6 +20,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -34,6 +35,7 @@ const ONE_DAY = 24 * ONE_HOUR;
 
 export function InvitationExpiryBadge({ expiresAt, className }: Props) {
   const t = useTranslations("lists.invitationExpiry");
+  const fmt = useFormatters();
   const [now, setNow] = React.useState<number>(() => Date.now());
   const [mounted, setMounted] = React.useState(false);
 
@@ -47,7 +49,7 @@ export function InvitationExpiryBadge({ expiresAt, className }: Props) {
 
   const target = React.useMemo(() => new Date(expiresAt).getTime(), [expiresAt]);
   const remainingMs = target - now;
-  const tooltip = React.useMemo(() => new Date(expiresAt).toLocaleString(), [expiresAt]);
+  const tooltip = fmt.formatDateTime(expiresAt);
 
   const label = formatRemaining(remainingMs, t);
   const isExpired = remainingMs <= 0;

@@ -24,6 +24,7 @@ import {
 import { SOFT_DELETE_TEAM } from "@/graphql/identity/identity.mutations";
 import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type { AstroliftTeam, MutationResult } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { CreateTeamDialog } from "./create-team-dialog";
 
@@ -32,6 +33,7 @@ interface TeamsResp {
 }
 
 export function TeamsClient() {
+  const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftTeam | null>(null);
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
@@ -108,11 +110,7 @@ export function TeamsClient() {
                       {team.slug}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(team.createdAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {fmt.formatDate(team.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Can permission="team.delete">

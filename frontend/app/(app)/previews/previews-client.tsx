@@ -33,6 +33,7 @@ import type {
   AstroliftPreviewEnvironment,
   PreviewStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface MutationResultLite {
@@ -54,14 +55,12 @@ const statusToDot: Record<
   torn_down: "muted",
 };
 
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
-}
-
 export function PreviewsClient() {
   const t = useTranslations("lists.previews");
+  const fmt = useFormatters();
   const { can } = useMyPermissions();
+  const formatTime = (iso: string | null | undefined): string =>
+    iso ? fmt.formatDateTime(iso) : "—";
   const { data, loading } = useQuery<Resp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: null },
     pollInterval: 30000,

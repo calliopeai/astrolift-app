@@ -67,6 +67,7 @@ import {
 import { LIST_WEBHOOK_DELIVERIES, LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
 import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
 import { DOC_LINKS } from "@/lib/docs/urls";
+import { useFormatters } from "@/lib/i18n/formatters";
 import type {
   AstroliftWebhookDelivery,
   AstroliftWebhookSecretReveal,
@@ -116,6 +117,7 @@ export function WebhooksClient({
   appSlug,
   tabs,
 }: { appSlug?: string; tabs?: React.ReactNode } = {}) {
+  const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [reveal, setReveal] = React.useState<AstroliftWebhookSecretReveal | null>(null);
   const [rotateTarget, setRotateTarget] = React.useState<AstroliftWebhookSubscription | null>(null);
@@ -426,7 +428,7 @@ export function WebhooksClient({
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {s.lastDeliveryAt
-                          ? `${new Date(s.lastDeliveryAt).toLocaleString()} (${s.lastResponseStatus ?? "?"})`
+                          ? `${fmt.formatDateTime(s.lastDeliveryAt)} (${s.lastResponseStatus ?? "?"})`
                           : "never"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
@@ -689,6 +691,7 @@ function KV({ label, value, mono }: { label: string; value: React.ReactNode; mon
 }
 
 function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscription }) {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<DeliveriesResp>(LIST_WEBHOOK_DELIVERIES, {
     variables: { subscriptionId: subscription.id, limit: 10 },
     fetchPolicy: "cache-and-network",
@@ -702,7 +705,7 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
           label="Secret rotated"
           value={
             subscription.secretRotatedAt
-              ? new Date(subscription.secretRotatedAt).toLocaleString()
+              ? fmt.formatDateTime(subscription.secretRotatedAt)
               : "never"
           }
         />
@@ -710,7 +713,7 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
           label="Last delivery"
           value={
             subscription.lastDeliveryAt
-              ? new Date(subscription.lastDeliveryAt).toLocaleString()
+              ? fmt.formatDateTime(subscription.lastDeliveryAt)
               : "never"
           }
         />
@@ -747,7 +750,7 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
                   <TableRow key={d.id}>
                     <TableCell className="font-mono text-xs">{d.retryAttempt}</TableCell>
                     <TableCell className="text-xs">
-                      {new Date(d.deliveredAt).toLocaleString()}
+                      {fmt.formatDateTime(d.deliveredAt)}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{d.eventType}</TableCell>
                     <TableCell>

@@ -51,6 +51,7 @@ import type {
   AstroliftScheduledJobRun,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
 interface JobResp {
@@ -86,11 +87,6 @@ function formatDuration(seconds: number | null | undefined): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${s}s`;
-}
-
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
 }
 
 function consoleHrefForJobRun(run: AstroliftScheduledJobRun): string {
@@ -392,6 +388,8 @@ function ScheduledJobsExample({ caption }: { caption: string }) {
 
 function ScheduledJobRunsTable({ jobs }: { jobs: AstroliftScheduledJobRun[] }) {
   const t = useTranslations("jobs.scheduled");
+  const fmt = useFormatters();
+  const formatTime = (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
 
   function toggle(id: string) {
@@ -475,6 +473,8 @@ function ScheduledJobRunsTable({ jobs }: { jobs: AstroliftScheduledJobRun[] }) {
 
 function CommandRunsTable({ cmds }: { cmds: AstroliftCommandRun[] }) {
   const t = useTranslations("jobs.commands");
+  const fmt = useFormatters();
+  const formatTime = (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
 
   function toggle(id: string) {

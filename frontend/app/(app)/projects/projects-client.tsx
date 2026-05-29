@@ -30,6 +30,7 @@ import type {
   AstroliftTeam,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { CreateProjectDialog } from "./create-project-dialog";
 
@@ -41,6 +42,7 @@ interface TeamsResp {
 }
 
 export function ProjectsClient() {
+  const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftProject | null>(null);
   const projects = useQuery<Resp>(LIST_PROJECTS);
@@ -137,11 +139,7 @@ export function ProjectsClient() {
                       <Badge variant="secondary">{p.team.slug}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(p.createdAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {fmt.formatDate(p.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Can permission="project.delete">

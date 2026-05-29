@@ -30,6 +30,7 @@ import {
   useWorkflowInstances,
 } from "@/graphql/workflows/workflows.hooks";
 import type { WorkflowHistoryEvent, WorkflowInstance } from "@/graphql/workflows/workflows.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 const STATUS_OPTIONS = [
   { value: "ALL", label: "All statuses" },
@@ -61,6 +62,7 @@ export function WorkflowInstancesPanel({
   workflowType?: string;
   isAdmin?: boolean;
 }) {
+  const fmt = useFormatters();
   const [typeFilter, setTypeFilter] = useState(workflowType ?? "");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
@@ -142,7 +144,7 @@ export function WorkflowInstancesPanel({
                   </div>
                   <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span>{inst.workflowType}</span>
-                    {inst.startedAt && <span>Started {formatTimestamp(inst.startedAt)}</span>}
+                    {inst.startedAt && <span>Started {fmt.formatDateTime(inst.startedAt)}</span>}
                     {inst.durationSeconds != null && (
                       <span>{formatDuration(inst.durationSeconds)}</span>
                     )}
@@ -177,6 +179,7 @@ function InstanceDetailPanel({
   onClose: () => void;
   onAfterMutation: () => void;
 }) {
+  const fmt = useFormatters();
   const { detail, loading, error, refetch } = useWorkflowInstanceDetail(workflowId);
 
   if (!workflowId) {
@@ -202,7 +205,7 @@ function InstanceDetailPanel({
                 <span className="font-mono">{detail.instance.runId.slice(0, 8)}</span>
               )}
               {detail.instance.startedAt && (
-                <span>Started {formatTimestamp(detail.instance.startedAt)}</span>
+                <span>Started {fmt.formatDateTime(detail.instance.startedAt)}</span>
               )}
               {detail.instance.durationSeconds != null && (
                 <span>{formatDuration(detail.instance.durationSeconds)}</span>
@@ -317,6 +320,7 @@ function AdminControls({ workflowId, onAfter }: { workflowId: string; onAfter: (
 }
 
 function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
+  const fmt = useFormatters();
   if (history.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-4 text-center text-xs">
@@ -358,7 +362,7 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
             </div>
             {ev.timestamp && (
               <span className="text-muted-foreground shrink-0 font-mono whitespace-nowrap">
-                {formatTimestamp(ev.timestamp)}
+                {fmt.formatDateTime(ev.timestamp)}
               </span>
             )}
           </li>
