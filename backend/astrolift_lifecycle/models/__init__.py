@@ -2,6 +2,7 @@ from astrolift_lifecycle.models.app_environment import AppEnvironment
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
+from astrolift_lifecycle.models.dev_environment import DevEnvironment
 from astrolift_lifecycle.models.environment_setting import EnvironmentSetting
 from astrolift_lifecycle.models.ingress import (
     CustomDomain,
@@ -20,6 +21,7 @@ __all__ = [
     "DeployToken",
     "Deployment",
     "DeploymentLog",
+    "DevEnvironment",
     "DomainPathRoute",
     "DomainRedirectRule",
     "EnvironmentSetting",
