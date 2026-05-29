@@ -2,6 +2,7 @@
 
 import {
   ActivityIcon,
+  BarChart3Icon,
   BookOpenIcon,
   BoxIcon,
   CalendarClockIcon,
@@ -85,14 +86,12 @@ const sections: NavSection[] = [
     ],
   },
   {
-    label: "Operations",
+    // Run — active app operations: environments, release workflows,
+    // scheduled jobs, and PR preview deployments. Mirrors the "Run"
+    // pillar in the Calliope BROC (Build / Run / Observe / Control)
+    // positioning: Astrolift is the runtime layer.
+    label: "Run",
     items: [
-      {
-        label: "Ops dashboard",
-        href: "/ops",
-        icon: <GaugeIcon />,
-        permission: "org.read",
-      },
       {
         label: "Environments",
         href: "/environments",
@@ -117,6 +116,19 @@ const sections: NavSection[] = [
         icon: <GitPullRequestIcon />,
         permission: "app.read",
       },
+    ],
+  },
+  {
+    // Observe — passive visibility: live ops dashboard, event stream,
+    // audit trail, and cross-app metrics. Read-only surfaces.
+    label: "Observe",
+    items: [
+      {
+        label: "Ops dashboard",
+        href: "/ops",
+        icon: <GaugeIcon />,
+        permission: "org.read",
+      },
       {
         label: "Events",
         href: "/events",
@@ -129,10 +141,18 @@ const sections: NavSection[] = [
         icon: <ScrollTextIcon />,
         permission: "audit_log.read",
       },
+      {
+        label: "Metrics",
+        href: "/metrics",
+        icon: <BarChart3Icon />,
+        permission: { anyOf: ["app.read", "app.read_metrics"] },
+      },
     ],
   },
   {
-    label: "Infrastructure",
+    // Control — platform configuration: clusters, DNS, cloud providers,
+    // and webhooks. Setup-once surfaces that govern the runtime plane.
+    label: "Control",
     items: [
       {
         label: "Clusters",
