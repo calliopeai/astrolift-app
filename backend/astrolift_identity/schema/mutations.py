@@ -231,6 +231,11 @@ class UpdateMyProfileInput:
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
+    timezone: str | None = None
+    """IANA timezone name to save as the user's explicit zone override.
+    Pass an empty string to clear the override (fall back to
+    browser-detected zone). Pass ``None`` to leave the current value
+    unchanged. Validated against ``zoneinfo.available_timezones()``."""
 
 
 @strawberry.input
@@ -2015,6 +2020,26 @@ class IdentityMutation:
             viewer.email = email
         viewer.save(update_fields=["first_name", "last_name", "email"])
 
+        # ── Timezone preference (#775) ──────────────────────────────────
+        # Stored in UserPreferences (lazy one-to-one off auth.User).
+        # Validated against zoneinfo.available_timezones(); an empty
+        # string clears the override so the UI reverts to browser-detected.
+        if input.timezone is not None:
+            from zoneinfo import available_timezones
+
+            from astrolift_identity.models import UserPreferences
+
+            tz_val = input.timezone.strip()
+            if tz_val and tz_val not in available_timezones():
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"{tz_val!r} is not a valid IANA timezone name",
+                    field="timezone",
+                )
+            prefs = UserPreferences.for_user(viewer)
+            prefs.timezone = tz_val
+            prefs.save(update_fields=["timezone"])
+
         return gql_success(_my_profile_payload(viewer, org, locked))
 
     @strawberry.field
@@ -2594,6 +2619,13 @@ def _idp_locked_fields(user, session=None) -> list[str]:
 
 
 def _my_profile_payload(user, org, locked: list[str]) -> MyProfileType:
+    from astrolift_identity.models import UserPreferences
+
+    try:
+        tz = user.preferences.timezone or None
+    except UserPreferences.DoesNotExist:
+        tz = None
+
     return MyProfileType(
         user_id=user.pk,
         username=user.username or "",
@@ -2602,4 +2634,5 @@ def _my_profile_payload(user, org, locked: list[str]) -> MyProfileType:
         email=user.email or "",
         locked_fields=list(locked),
         org_allows_edit=org.allow_user_profile_edit,
+        timezone=tz,
     )

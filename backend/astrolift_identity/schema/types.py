@@ -45,6 +45,10 @@ class MyProfileType:
     overwritten on the next sync, so the UI surfaces them
     read-only with a tooltip. ``org_allows_edit`` is the outer
     org-policy gate; when False, the entire form is read-only.
+
+    ``timezone`` is the user's saved IANA timezone override (e.g.
+    ``"America/New_York"``). Empty string / None means "no override
+    — fall back to the browser-detected zone."
     """
 
     user_id: int
@@ -54,6 +58,7 @@ class MyProfileType:
     email: str
     locked_fields: list[str]
     org_allows_edit: bool
+    timezone: str | None
 
 
 @strawberry.type(name="AstroliftTeam")

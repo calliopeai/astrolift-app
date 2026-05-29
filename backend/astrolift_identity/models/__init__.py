@@ -11,6 +11,7 @@ from astrolift_identity.models.organization_allowlisted_domain import (
     OrganizationAllowlistedDomain,
 )
 from astrolift_identity.models.policy import Policy
+from astrolift_identity.models.preferences import UserPreferences
 from astrolift_identity.models.project import Project
 from astrolift_identity.models.role import Role
 from astrolift_identity.models.role_binding import RoleBinding
@@ -52,4 +53,5 @@ __all__ = [
     "Role",
     "RoleBinding",
     "Team",
+    "UserPreferences",
 ]
