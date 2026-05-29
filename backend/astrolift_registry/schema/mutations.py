@@ -1686,7 +1686,14 @@ class RegistryMutation:
         # This is the "connect source post-registration" case: the wizard
         # normally creates environments at register time; for apps that
         # skipped that step, resync is the natural recovery path.
-        if result.status in ("applied", "in_sync") and result.env_names:
+        #
+        # NOTE: do not gate on ``result.env_names`` here. A manifest whose
+        # [environments.*] table uses a non-canonical key produces an empty
+        # list, but _bootstrap_app_environments still needs to run so that
+        # OnboardAppWorkflow fires for apps still in ``pending`` state.
+        # The function's own cluster guard and ``provisioning_pending`` flag
+        # make it safe to call unconditionally on a successful sync.
+        if result.status in ("applied", "in_sync"):
             _bootstrap_app_environments(app, result.env_names)
 
         summary = "Already in sync." if result.status == "in_sync" else summarize_changes(result.changes)
