@@ -282,6 +282,32 @@ def github_start(request: HttpRequest) -> Any:
 @csrf_exempt  # GitHub redirect doesn't carry our CSRF token; state cookie is the auth.
 @require_GET
 def github_callback(request: HttpRequest) -> Any:
+    """Unified GitHub OAuth callback — handles both the regular per-user
+    "Connect my GitHub" dance and the install-time OAuth flow triggered
+    when ``request_oauth_on_install: true`` is set in the App manifest.
+
+    **Regular path** (``/settings/source-providers → Connect``):
+      GitHub bounces back with ``code`` + ``state`` (our session-pinned
+      token). We validate state, exchange code, upsert the
+      ``github_oauth_user`` row.
+
+    **Install-time path** (operator installs the App → GitHub sends
+    ``code`` + ``installation_id`` + ``setup_action=install``):
+      GitHub generated the OAuth state value, so we can't validate it
+      against a stored session token. Instead we anchor to the
+      ``scm_github_install_state`` cookie set by the manifest flow.
+      We exchange the code, write ``installation_id`` to the connection
+      row, flip it active, and upsert the per-user token — combining
+      what ``github_app_manifest_setup`` and ``github_start →
+      github_callback`` used to do in two separate trips.
+    """
+    installation_id = (request.GET.get("installation_id") or "").strip()
+    setup_action = (request.GET.get("setup_action") or "").strip()
+
+    if installation_id and setup_action == "install":
+        return _github_install_time_callback(request)
+
+    # ── Regular path ────────────────────────────────────────────────────
     state_in = request.GET.get("state", "")
     code = request.GET.get("code", "")
     pending = _pop_pending_state(request, "github")
@@ -340,6 +366,86 @@ def github_callback(request: HttpRequest) -> Any:
     _upsert_user_connection(
         request,
         config,
+        access_token,
+        account_login,
+        kind="github_oauth_user",
+        display_template="GitHub: {}",
+        anonymous_label="GitHub (personal)",
+    )
+    return _redirect_with_ok(return_to, account_login or "github")
+
+
+def _github_install_time_callback(request: HttpRequest) -> Any:
+    """Handle the OAuth-during-install callback (``request_oauth_on_install``).
+
+    GitHub sends ``code``, ``installation_id``, and ``setup_action=install``
+    together — there is no session-pinned state to validate against because
+    GitHub generated the OAuth state value.  We anchor the connection row via
+    ``scm_github_install_state`` (set by the manifest flow before it bounced
+    the operator to GitHub's install page).
+
+    This combines what previously required two separate operator actions
+    (install App → then click 'Connect') into a single callback trip.
+    """
+    code = request.GET.get("code", "")
+    installation_id = (request.GET.get("installation_id") or "").strip()
+
+    pending = request.session.pop("scm_github_install_state", None)
+    if not pending:
+        return _redirect_with_error("/settings/source-providers", "no_pending_install_state")
+    return_to = _safe_return_to(pending.get("return_to"))
+
+    if not code:
+        return _redirect_with_error(return_to, "no_code")
+
+    connection = SourceConnection.objects.filter(
+        guid=pending.get("connection_guid", ""),
+        kind="github_app_install",
+        deleted_at__isnull=True,
+    ).first()
+    if connection is None:
+        return _redirect_with_error(return_to, "connection_missing")
+
+    client_id = connection.app_client_id
+    if not client_id:
+        return _redirect_with_error(return_to, "config_missing_client_id")
+
+    try:
+        client_secret = _resolve_client_secret(connection)
+    except RuntimeError:
+        return _redirect_with_error(return_to, "config_missing_oauth_secret")
+    if not client_secret:
+        return _redirect_with_error(return_to, "config_missing_oauth_secret")
+
+    access_token, err = _resolve_user_token_via_post(
+        GITHUB_TOKEN_EXCHANGE,
+        {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "code": code,
+            "redirect_uri": connection.oauth_redirect_uri or "",
+        },
+    )
+    if err is not None or access_token is None:
+        return _redirect_with_error(return_to, err or "exchange_failed")
+
+    # Write installation_id + activate the connection row — mirrors what
+    # github_app_manifest_setup did on the non-OAuth-during-install path.
+    if installation_id.isdigit():
+        connection.installation_id = installation_id[:64]
+        connection.is_active = True
+        connection.is_orphaned = False
+        connection.orphaned_at = None
+        connection.orphaned_reason = ""
+        connection.save()
+
+    # Upsert the per-user OAuth token row — mirrors github_callback's
+    # regular path so a user who installs via this flow gets the same
+    # first-class ``github_oauth_user`` row as one who clicks "Connect".
+    account_login = _resolve_github_login(access_token)
+    _upsert_user_connection(
+        request,
+        connection,
         access_token,
         account_login,
         kind="github_oauth_user",

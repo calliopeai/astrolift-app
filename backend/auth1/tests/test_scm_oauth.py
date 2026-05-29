@@ -500,3 +500,177 @@ def test_gitlab_callback_wrong_kind_in_session(org_user_member):
     )
     assert resp.status_code == 302
     assert "scm_error=no_pending_state" in resp["Location"]
+
+
+# ---------------------------------------------------------------------------
+# Install-time OAuth callback (request_oauth_on_install=true path)  (#761)
+# ---------------------------------------------------------------------------
+
+
+def test_github_install_time_callback_success(org_user_member):
+    """Install-time: GitHub sends code + installation_id + setup_action=install.
+    The callback skips state validation, anchors via scm_github_install_state,
+    exchanges the code, activates the connection, and upserts github_oauth_user."""
+    org, user = org_user_member
+    connection = _make_github_app_install(org)
+    connection.is_active = False
+    connection.installation_id = ""
+    connection.save()
+
+    client = Client()
+    _login(client, user)
+
+    # Seed the install-state cookie as the manifest flow would have done.
+    session = client.session
+    session["scm_github_install_state"] = {
+        "state": "github-generated-state",
+        "connection_guid": str(connection.guid),
+        "return_to": "/settings/source-providers",
+    }
+    session.save()
+
+    fake_token = "ghu_install_time_token"
+    fake_login = "acme-install-user"
+
+    with (
+        patch("auth1.scm_oauth._resolve_user_token_via_post", return_value=(fake_token, None)),
+        patch("auth1.scm_oauth._resolve_github_login", return_value=fake_login),
+    ):
+        resp = client.get(
+            "/app/auth1/scm/github/callback",
+            {
+                "code": "install-code",
+                "state": "github-generated-state",  # GitHub-generated; we don't validate it
+                "installation_id": "99999",
+                "setup_action": "install",
+            },
+        )
+
+    assert resp.status_code == 302
+    assert "scm_connected=" in resp["Location"]
+
+    # Connection row should now be active with the installation_id written.
+    connection.refresh_from_db()
+    assert connection.is_active is True
+    assert connection.installation_id == "99999"
+
+    # Per-user github_oauth_user row should exist.
+    user_conn = SourceConnection.objects.filter(
+        organization=org,
+        user=user,
+        kind="github_oauth_user",
+        parent_oauth_app=connection,
+    ).first()
+    assert user_conn is not None
+    assert user_conn.account_login == fake_login
+    plain = decrypt(
+        EncryptedSecret(
+            backend_kind=user_conn.secret_backend_kind,
+            backend_ref=bytes(user_conn.secret_ciphertext),
+        )
+    )
+    assert plain == fake_token.encode()
+
+
+def test_github_install_time_callback_no_pending_state(org_user_member):
+    """Install-time callback with no scm_github_install_state cookie → install_state error."""
+    org, user = org_user_member
+    _make_github_app_install(org)
+    client = Client()
+    _login(client, user)
+
+    resp = client.get(
+        "/app/auth1/scm/github/callback",
+        {
+            "code": "install-code",
+            "state": "xyz",
+            "installation_id": "99999",
+            "setup_action": "install",
+        },
+    )
+    assert resp.status_code == 302
+    assert "scm_error=no_pending_install_state" in resp["Location"]
+
+
+def test_github_install_time_callback_exchange_failure(org_user_member):
+    """Install-time callback: token exchange failure redirects with exchange_failed."""
+    org, user = org_user_member
+    connection = _make_github_app_install(org)
+
+    client = Client()
+    _login(client, user)
+
+    session = client.session
+    session["scm_github_install_state"] = {
+        "state": "github-generated-state",
+        "connection_guid": str(connection.guid),
+        "return_to": "/settings/source-providers",
+    }
+    session.save()
+
+    with patch("auth1.scm_oauth._resolve_user_token_via_post", return_value=(None, "exchange_failed")):
+        resp = client.get(
+            "/app/auth1/scm/github/callback",
+            {
+                "code": "bad-code",
+                "state": "github-generated-state",
+                "installation_id": "99999",
+                "setup_action": "install",
+            },
+        )
+
+    assert resp.status_code == 302
+    assert "scm_error=exchange_failed" in resp["Location"]
+
+
+def test_github_install_time_callback_missing_client_id(org_user_member):
+    """Install-time callback: connection row without app_client_id → missing_client_id."""
+    org, user = org_user_member
+    connection = _make_github_app_install(org, client_id="")
+
+    client = Client()
+    _login(client, user)
+
+    session = client.session
+    session["scm_github_install_state"] = {
+        "state": "github-generated-state",
+        "connection_guid": str(connection.guid),
+        "return_to": "/settings/source-providers",
+    }
+    session.save()
+
+    resp = client.get(
+        "/app/auth1/scm/github/callback",
+        {
+            "code": "install-code",
+            "state": "github-generated-state",
+            "installation_id": "99999",
+            "setup_action": "install",
+        },
+    )
+    assert resp.status_code == 302
+    assert "scm_error=config_missing_client_id" in resp["Location"]
+
+
+def test_github_regular_callback_unaffected_by_install_params(org_user_member):
+    """Regular callback path must still work even when installation_id is absent."""
+    org, user = org_user_member
+    config = _make_oauth_app(org, "github_oauth_app")
+    client = Client()
+    _login(client, user)
+
+    client.get("/app/auth1/scm/github/start", {"config_id": str(config.guid)})
+    state = client.session["scm_oauth_state"]["state"]
+
+    with (
+        patch("auth1.scm_oauth._resolve_user_token_via_post", return_value=("tok", None)),
+        patch("auth1.scm_oauth._resolve_github_login", return_value="regular-user"),
+    ):
+        resp = client.get(
+            "/app/auth1/scm/github/callback",
+            {"state": state, "code": "xyz"},
+            # No installation_id — stays on regular path
+        )
+
+    assert resp.status_code == 302
+    assert "scm_connected=regular-user" in resp["Location"]
