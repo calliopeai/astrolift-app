@@ -20,8 +20,7 @@ from temporalio import activity
 log = logging.getLogger("astrolift_workflows.activities")
 
 
-@activity.defn(name="astrolift.app.mark_provisioning")
-async def mark_app_provisioning(registered_app_id: int) -> None:
+def _mark_app_provisioning_sync(registered_app_id: int) -> None:
     from astrolift_registry.models import RegisteredApp
 
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
@@ -30,12 +29,27 @@ async def mark_app_provisioning(registered_app_id: int) -> None:
     app.transition_provisioning(RegisteredApp.ProvisioningStatus.PROVISIONING)
 
 
-@activity.defn(name="astrolift.app.mark_ready")
-async def mark_app_ready(registered_app_id: int) -> None:
+@activity.defn(name="astrolift.app.mark_provisioning")
+async def mark_app_provisioning(registered_app_id: int) -> None:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_app_provisioning_sync)(registered_app_id)
+
+
+def _mark_app_ready_sync(registered_app_id: int) -> None:
     from astrolift_registry.models import RegisteredApp
 
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
     app.transition_provisioning(RegisteredApp.ProvisioningStatus.READY)
+
+
+@activity.defn(name="astrolift.app.mark_ready")
+async def mark_app_ready(registered_app_id: int) -> None:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_app_ready_sync)(registered_app_id)
 
 
 def _provision_namespace_sync(registered_app_id: int, app_environment_id: int | None) -> str:
@@ -325,12 +339,19 @@ async def pre_flight(deployment_id: int) -> None:
     await sync_to_async(_pre_flight_sync)(deployment_id)
 
 
-@activity.defn(name="astrolift.deploy.mark_deploying")
-async def mark_deploying(deployment_id: int) -> None:
+def _mark_deploying_sync(deployment_id: int) -> None:
     from astrolift_lifecycle.models import Deployment
 
     d = Deployment.all_objects.get(pk=deployment_id)
     d.transition_to(Deployment.Status.DEPLOYING)
+
+
+@activity.defn(name="astrolift.deploy.mark_deploying")
+async def mark_deploying(deployment_id: int) -> None:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_deploying_sync)(deployment_id)
 
 
 @activity.defn(name="astrolift.deploy.render_manifests")
@@ -1003,12 +1024,19 @@ async def health_check(deployment_id: int) -> bool:
     return await sync_to_async(_health_check_sync)(deployment_id)
 
 
-@activity.defn(name="astrolift.deploy.mark_running")
-async def mark_running(deployment_id: int) -> None:
+def _mark_running_sync(deployment_id: int) -> None:
     from astrolift_lifecycle.models import Deployment
 
     d = Deployment.all_objects.get(pk=deployment_id)
     d.transition_to(Deployment.Status.RUNNING)
+
+
+@activity.defn(name="astrolift.deploy.mark_running")
+async def mark_running(deployment_id: int) -> None:
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    await sync_to_async(_mark_running_sync)(deployment_id)
 
 
 # ---- Preview lifecycle (build + teardown) -------------------------
