@@ -56,7 +56,11 @@ export type IdpKind =
 
 export type AstroliftOrganization = GeneratedOrganization;
 
-export type AstroliftMyProfile = GeneratedMyProfile;
+// Extend the generated profile type with the timezone field that
+// the codegen doesn't know about yet (pending `make schema + codegen`).
+export type AstroliftMyProfile = GeneratedMyProfile & {
+  timezone?: string | null;
+};
 
 export type AstroliftTeam = Omit<GeneratedTeam, "organization"> & {
   organization: Pick<AstroliftOrganization, "id" | "slug" | "name">;

@@ -130,6 +130,7 @@ export const UPDATE_MY_PROFILE = gql`
         email
         lockedFields
         orgAllowsEdit
+        timezone
       }
     }
   }
