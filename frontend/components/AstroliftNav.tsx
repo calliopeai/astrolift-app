@@ -169,13 +169,11 @@ const sections: NavSection[] = [
     ],
   },
   {
-    label: "Administration",
-    // Platform-admin concerns — RBAC, tokens, cost/quotas. These are
-    // the platform's own controls. True GRC (compliance frameworks,
-    // attestations, control testing) lives in Zentinelle, which
-    // ingests Astrolift's AuditEvent stream via webhook. The
-    // sub-pages are reached through the horizontal tab bar inside
-    // /administration, not the sidebar.
+    label: "Manage",
+    // Administration (RBAC, tokens, cost/quotas), personal settings,
+    // and reference resources grouped under one section. The
+    // Administration sub-pages are reached through the horizontal tab
+    // bar inside /administration, not the sidebar.
     items: [
       {
         label: "Administration",
@@ -192,11 +190,6 @@ const sections: NavSection[] = [
           ],
         },
       },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
       { label: "Settings", href: "/settings", icon: <Settings2Icon /> },
       { label: "Docs", href: "/resources/docs", icon: <BookOpenIcon /> },
       { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
