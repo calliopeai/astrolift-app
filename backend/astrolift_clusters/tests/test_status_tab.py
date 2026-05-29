@@ -785,3 +785,272 @@ def test_recent_workflows_disabled_returns_empty(settings):
     from astrolift_workflows.client import list_workflows_for_cluster
 
     assert list_workflows_for_cluster("any-guid", limit=10) == []
+
+
+# ─── Prometheus metrics resolver tests (#771) ────────────────────────
+
+
+def test_prometheus_metrics_denied_without_cluster_register(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """The Prometheus metrics resolver shares the read-side permission
+    gate with every other Status tab resolver. Callers without
+    CLUSTER_REGISTER must be denied before any Prometheus I/O fires."""
+    with tenant_context(TenantContext(organization_id=org.id)):
+        with pytest.raises(PermissionDenied):
+            ClustersQuery().astrolift_cluster_prometheus_metrics(
+                _info(),
+                cluster_id=GUID(str(cluster.guid)),
+            )
+
+
+def test_prometheus_metrics_missing_cluster_returns_unavailable(
+    org,
+    permission_resolver,
+):
+    """A non-existent cluster guid returns available=False without
+    raising. The UI degrades gracefully to the empty-state card
+    (same contract as cluster_health / workload_health)."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(uuid.uuid4())),
+        )
+    assert result.available is False
+
+
+def test_prometheus_metrics_no_endpoint_returns_no_endpoint_reason(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """When neither provider_config nor capabilities carries a
+    prometheus_endpoint, the resolver returns available=False with
+    reason='no_endpoint' — no network I/O attempted."""
+    cluster.provider_config = {}
+    cluster.capabilities = {}
+    cluster.save()
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert result.available is False
+    assert result.reason == "no_endpoint"
+
+
+def test_prometheus_metrics_endpoint_from_capabilities(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When provider_config has no endpoint but capabilities does
+    (populated by the probe during bringClusterIntoManagement), the
+    resolver falls back to capabilities and executes queries."""
+    cluster.provider_config = {}
+    cluster.capabilities = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    _instant_calls: list[str] = []
+
+    def _fake_instant(*, endpoint: str, query: str, **_kw: object) -> float:
+        _instant_calls.append(query)
+        # count() returns int-like; ratios return 0–1.
+        if "count(" in query:
+            return 3.0
+        return 0.55
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_instant", _fake_instant)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is True
+    assert result.node_count == 3
+    assert len(_instant_calls) == 5
+
+
+def test_prometheus_metrics_happy_path(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When Prometheus returns values for all five golden-signal
+    queries, the resolver surfaces them 1:1 and sets available=True."""
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    counter = [0]
+
+    def _fake_instant(*, endpoint: str, query: str, **_kw: object) -> float:
+        counter[0] += 1
+        if "count(" in query:
+            return 5.0
+        return 0.60
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_instant", _fake_instant)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is True
+    assert result.reason is None
+    assert result.node_count == 5
+    assert result.pod_running_ratio == pytest.approx(0.60)
+    assert result.cpu_utilization == pytest.approx(0.60)
+    assert result.memory_utilization == pytest.approx(0.60)
+    assert result.deployment_ready_ratio == pytest.approx(0.60)
+    assert counter[0] == 5  # exactly five queries fired
+
+
+def test_prometheus_metrics_unreachable_returns_unreachable_reason(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """A PrometheusError on any of the five queries causes the resolver
+    to return available=False with reason='unreachable'. No partial
+    values are exposed — the UI shows a uniform error card."""
+    from astrolift_operations.prometheus_client import PrometheusUnavailable
+
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    def _raise(*_a: object, **_kw: object) -> float:
+        raise PrometheusUnavailable("connection refused")
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_instant", _raise)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is False
+    assert result.reason == "unreachable"
+    assert result.node_count is None
+
+
+def test_prometheus_range_metrics_no_endpoint(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Range-metrics resolver also returns available=False / reason=
+    'no_endpoint' when the cluster has no prometheus_endpoint. The
+    sparkline grid degrades gracefully to the empty-state card."""
+    cluster.provider_config = {}
+    cluster.capabilities = {}
+    cluster.save()
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_range_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert result.available is False
+    assert result.reason == "no_endpoint"
+    assert result.series == []
+
+
+def test_prometheus_range_metrics_happy_path(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When Prometheus returns data for all eight golden-signal range
+    queries, the resolver returns available=True and one series per
+    metric, each with at least one point."""
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    # Minimal fake: each query returns one row with two (ts, value) pairs.
+    class _FakeRow:
+        def __init__(self) -> None:
+            import time
+
+            self.values = [(time.time() - 30, 0.5), (time.time(), 0.6)]
+
+    def _fake_range(*, endpoint: str, query: str, **_kw: object) -> list:
+        return [_FakeRow()]
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_range", _fake_range)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_range_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+            range_seconds=3600,
+            step_seconds=60,
+        )
+
+    assert result.available is True
+    assert result.reason is None
+    assert len(result.series) == 8  # all eight golden signals
+    for s in result.series:
+        assert len(s.points) >= 1
+        assert s.current is not None
+
+
+def test_prometheus_range_metrics_all_queries_fail_returns_unreachable(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When all eight range queries fail with PrometheusError, the
+    resolver returns available=False / reason='unreachable'. If only
+    some fail, the resolver returns partial series (empty points for
+    the failed ones) and available=True — this test targets the
+    all-failed path."""
+    from astrolift_operations.prometheus_client import PrometheusUnavailable
+
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    def _raise(*_a: object, **_kw: object) -> list:
+        raise PrometheusUnavailable("connection refused")
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_range", _raise)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_range_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is False
+    assert result.reason == "unreachable"
+    assert result.series == []
