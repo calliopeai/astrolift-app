@@ -2,30 +2,22 @@
 
 import {
   ActivityIcon,
-  BarChart3Icon,
   BookOpenIcon,
   BoxIcon,
   CalendarClockIcon,
   ChevronRightIcon,
-  FileTextIcon,
   GitPullRequestIcon,
   CloudIcon,
-  CoinsIcon,
   DownloadIcon,
-  FileBoxIcon,
   GaugeIcon,
   GitBranchIcon,
   GlobeIcon,
   HomeIcon,
-  KeyIcon,
   LayersIcon,
-  LifeBuoyIcon,
-  PlugIcon,
   RocketIcon,
   ScrollTextIcon,
   Settings2Icon,
   ShieldIcon,
-  UsersIcon,
   WebhookIcon,
   WorkflowIcon,
 } from "lucide-react";
@@ -181,73 +173,34 @@ const sections: NavSection[] = [
     // Platform-admin concerns — RBAC, tokens, cost/quotas. These are
     // the platform's own controls. True GRC (compliance frameworks,
     // attestations, control testing) lives in Zentinelle, which
-    // ingests Astrolift's AuditEvent stream via webhook.
+    // ingests Astrolift's AuditEvent stream via webhook. The
+    // sub-pages are reached through the horizontal tab bar inside
+    // /administration, not the sidebar.
     items: [
       {
-        label: "Teams",
-        href: "/teams",
-        icon: <UsersIcon />,
-        permission: "team.read",
-      },
-      {
-        label: "Projects",
-        href: "/projects",
-        icon: <FileBoxIcon />,
-        permission: "project.read",
-      },
-      {
-        label: "Members",
-        href: "/members",
+        label: "Administration",
+        href: "/administration",
         icon: <ShieldIcon />,
-        permission: "org.manage_members",
+        permission: {
+          anyOf: [
+            "team.read",
+            "project.read",
+            "org.manage_members",
+            "api_token.create",
+            "billing.read",
+            "app.read",
+          ],
+        },
       },
-      {
-        label: "Tokens",
-        href: "/tokens",
-        icon: <KeyIcon />,
-        permission: { anyOf: ["api_token.create", "api_token.revoke"] },
-      },
-      {
-        label: "Cost",
-        href: "/cost",
-        icon: <CoinsIcon />,
-        permission: "billing.read",
-      },
-      {
-        label: "Quotas",
-        href: "/quotas",
-        icon: <GaugeIcon />,
-        permission: "billing.read",
-      },
-      {
-        label: "Metrics",
-        href: "/metrics",
-        icon: <BarChart3Icon />,
-        permission: { anyOf: ["app.read", "app.read_metrics"] },
-      },
-    ],
-  },
-  {
-    label: "Resources",
-    items: [
-      { label: "Docs", href: "/resources/docs", icon: <BookOpenIcon /> },
-      {
-        label: "Manifest reference",
-        href: "/resources/manifest",
-        icon: <FileTextIcon />,
-      },
-      {
-        label: "Driver reference",
-        href: "/resources/drivers",
-        icon: <PlugIcon />,
-      },
-      { label: "Get help", href: "/resources/help", icon: <LifeBuoyIcon /> },
-      { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
     ],
   },
   {
     label: "Account",
-    items: [{ label: "Settings", href: "/settings", icon: <Settings2Icon /> }],
+    items: [
+      { label: "Settings", href: "/settings", icon: <Settings2Icon /> },
+      { label: "Docs", href: "/resources/docs", icon: <BookOpenIcon /> },
+      { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
+    ],
   },
 ];
 
