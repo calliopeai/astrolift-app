@@ -5,6 +5,7 @@ import {
   FileTextIcon,
   LifeBuoyIcon,
   PlugIcon,
+  ServerIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +34,11 @@ const LINKS: SubnavLink[] = [
     href: "/resources/drivers",
     label: "Driver reference",
     icon: <PlugIcon className="size-4" />,
+  },
+  {
+    href: "/resources/clusters",
+    label: "Connected clusters",
+    icon: <ServerIcon className="size-4" />,
   },
   {
     href: "/resources/help",
