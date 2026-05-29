@@ -17,6 +17,7 @@ import {
   RocketIcon,
   ScrollTextIcon,
   Settings2Icon,
+  ShieldCheckIcon,
   ShieldIcon,
   WebhookIcon,
   WorkflowIcon,
@@ -178,6 +179,19 @@ const sections: NavSection[] = [
         href: "/webhooks",
         icon: <WebhookIcon />,
         permission: { anyOf: ["webhook.create", "webhook.update"] },
+      },
+    ],
+  },
+  {
+    // Secure — the Zentinelle integration gateway. Zentinelle is the
+    // Control + Observe + Secure pillar in the BROCS stack. This entry
+    // is the handoff from Astrolift (Run) into the GRC/security plane.
+    label: "Secure",
+    items: [
+      {
+        label: "Zentinelle",
+        href: "/secure/zentinelle",
+        icon: <ShieldCheckIcon />,
       },
     ],
   },
