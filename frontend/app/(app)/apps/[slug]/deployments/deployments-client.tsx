@@ -14,6 +14,7 @@ import {
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -189,6 +190,9 @@ function groupDeployments(
 export function AppDeploymentsClient({ slug }: { slug: string }) {
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.deployments");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
     variables: { appSlug: slug, limit: 100 },
@@ -198,9 +202,38 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     variables: { appSlug: slug },
   });
 
-  const [statusBucket, setStatusBucket] = React.useState<StatusBucket>("all");
-  const [envFilter, setEnvFilter] = React.useState<string>("all");
-  const [search, setSearch] = React.useState("");
+  // Filters are persisted to URL search params so a page refresh or
+  // shared link preserves the operator's view.
+  const rawBucket = searchParams.get("status") as StatusBucket | null;
+  const statusBucket: StatusBucket =
+    rawBucket && STATUS_BUCKET_KEYS.some((k) => k.value === rawBucket) ? rawBucket : "all";
+  const envFilter = searchParams.get("env") ?? "all";
+
+  // Search input uses local state for responsive typing; the URL param is
+  // synced on a short delay so the URL stays linkable without blocking input.
+  const [search, setSearchLocal] = React.useState<string>(
+    () => searchParams.get("q") ?? ""
+  );
+
+  function updateFilter(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value && value !== "all" && value !== "") {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  const setStatusBucket = (v: StatusBucket) => updateFilter("status", v);
+  const setEnvFilter = (v: string) => updateFilter("env", v);
+
+  // Debounce search → URL (300 ms gives snappy typing without thrashing history).
+  React.useEffect(() => {
+    const id = setTimeout(() => updateFilter("q", search), 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
   // Groups stay collapsed by default — the parent row already shows
   // SHA / env / aggregate status, so the operator only expands when
   // they want per-workload status.  Track expanded state keyed by
@@ -385,7 +418,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
           <Input
             placeholder={t("filters.search")}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setSearchLocal(e.target.value)}
             className="h-7 max-w-48 text-xs"
           />
           {envList.length > 1 && (
@@ -507,7 +540,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       className="hover:bg-accent/30 cursor-pointer"
                       onClick={() => {
                         if (isMultiple) toggleGroup(g.key);
-                        else window.location.href = `/deployments/${rep.id}`;
+                        else router.push(`/deployments/${rep.id}`);
                       }}
                     >
                       <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
@@ -666,7 +699,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       <TableRow
                         key={d.id}
                         className="hover:bg-accent/30 bg-muted/30 cursor-pointer"
-                        onClick={() => (window.location.href = `/deployments/${d.id}`)}
+                        onClick={() => router.push(`/deployments/${d.id}`)}
                       >
                         <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
                           <input
