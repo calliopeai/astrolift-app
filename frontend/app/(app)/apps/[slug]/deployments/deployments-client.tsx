@@ -26,13 +26,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -58,10 +51,10 @@ import type {
   AstroliftDeployment,
   AstroliftDeploymentComparison,
   DeploymentStatus,
-  TriggerKind,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { cn } from "@/lib/utils";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -94,16 +87,6 @@ const STATUS_BUCKET_KEYS: { value: StatusBucket; key: string }[] = [
   { value: "failed", key: "failed" },
   { value: "in_flight", key: "inFlight" },
   { value: "other", key: "other" },
-];
-
-const TRIGGER_KEYS: { value: TriggerKind | "all"; key: string }[] = [
-  { value: "all", key: "all" },
-  { value: "push", key: "push" },
-  { value: "manual", key: "manual" },
-  { value: "ci", key: "ci" },
-  { value: "scheduled", key: "scheduled" },
-  { value: "rollback", key: "rollback" },
-  { value: "promotion", key: "promotion" },
 ];
 
 const IN_FLIGHT: ReadonlySet<DeploymentStatus> = new Set([
@@ -216,10 +199,8 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   });
 
   const [statusBucket, setStatusBucket] = React.useState<StatusBucket>("all");
-  const [triggerFilter, setTriggerFilter] = React.useState<TriggerKind | "all">("all");
   const [envFilter, setEnvFilter] = React.useState<string>("all");
   const [search, setSearch] = React.useState("");
-  const [groupBy, setGroupBy] = React.useState<GroupBy>("commit");
   // Groups stay collapsed by default — the parent row already shows
   // SHA / env / aggregate status, so the operator only expands when
   // they want per-workload status.  Track expanded state keyed by
@@ -244,7 +225,6 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   const filtered = React.useMemo(() => {
     return allDeployments.filter((d) => {
       if (!statusMatches(statusBucket, d.status)) return false;
-      if (triggerFilter !== "all" && d.triggerKind !== triggerFilter) return false;
       if (envFilter !== "all" && d.environmentName !== envFilter) return false;
       if (search) {
         const needle = search.toLowerCase();
@@ -261,9 +241,9 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       }
       return true;
     });
-  }, [allDeployments, statusBucket, triggerFilter, envFilter, search]);
+  }, [allDeployments, statusBucket, envFilter, search]);
 
-  const grouped = React.useMemo(() => groupDeployments(filtered, groupBy), [filtered, groupBy]);
+  const grouped = React.useMemo(() => groupDeployments(filtered, "commit"), [filtered]);
 
   const toggleGroup = React.useCallback((key: DeploymentGroupKey) => {
     setExpanded((prev) => {
@@ -360,68 +340,74 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       <AppTabs slug={a.slug} active="deployments" />
 
       {/* ─── filter bar ────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder={t("filters.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={statusBucket} onValueChange={(v) => setStatusBucket(v as StatusBucket)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_BUCKET_KEYS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
+      <div className="flex flex-col gap-2">
+        {/* status pills */}
+        <div className="flex flex-wrap items-center gap-1">
+          {STATUS_BUCKET_KEYS.map((o) => {
+            const count =
+              o.value === "all"
+                ? allDeployments.length
+                : allDeployments.filter((d) => statusMatches(o.value, d.status)).length;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setStatusBucket(o.value)}
+                className={cn(
+                  "rounded-full border px-3 py-0.5 text-xs font-medium transition-colors",
+                  statusBucket === o.value
+                    ? "border-foreground/30 bg-foreground text-background"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                )}
+              >
                 {t(`statusBuckets.${o.key}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={triggerFilter}
-          onValueChange={(v) => setTriggerFilter(v as TriggerKind | "all")}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TRIGGER_KEYS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {t(`triggers.${o.key}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={envFilter} onValueChange={setEnvFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder={t("filters.anyEnv")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("filters.anyEnv")}</SelectItem>
-            {envList.map((e) => (
-              <SelectItem key={e.id} value={e.name}>
-                {e.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
-          <SelectTrigger className="w-44">
-            <LayersIcon className="mr-1 size-3.5" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="commit">Group by commit</SelectItem>
-            <SelectItem value="flat">Flat (no grouping)</SelectItem>
-          </SelectContent>
-        </Select>
-        <span className="text-muted-foreground ml-auto text-xs">
-          {groupBy === "commit" && grouped.length !== filtered.length
-            ? `${grouped.length} groups · ${filtered.length} of ${allDeployments.length}`
-            : t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
-        </span>
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "ml-1.5 tabular-nums",
+                      statusBucket === o.value ? "opacity-70" : "opacity-60"
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <span className="text-muted-foreground ml-auto text-xs">
+            {grouped.length !== filtered.length
+              ? `${grouped.length} groups · ${filtered.length} of ${allDeployments.length}`
+              : t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
+          </span>
+        </div>
+        {/* secondary: search + env */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            placeholder={t("filters.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-7 max-w-48 text-xs"
+          />
+          {envList.length > 1 && (
+            <div className="flex items-center gap-1">
+              {["all", ...envList.map((e) => e.name)].map((env) => (
+                <button
+                  key={env}
+                  type="button"
+                  onClick={() => setEnvFilter(env)}
+                  className={cn(
+                    "rounded px-2 py-0.5 text-xs transition-colors",
+                    envFilter === env
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {env === "all" ? t("filters.anyEnv") : env}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* #652 — compare toolbar. Surfaces selection count + Compare CTA
