@@ -2,6 +2,7 @@
 
 import { useQuery } from "@apollo/client/react";
 import { CheckIcon, MinusIcon, PlugIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
@@ -22,11 +23,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LIST_PROVIDER_PLUGINS } from "@/graphql/clusters/clusters.queries";
+import {
+  LIST_CLUSTERS,
+  LIST_PROVIDER_PLUGINS,
+} from "@/graphql/clusters/clusters.queries";
 import type { AstroliftProviderPlugin } from "@/graphql/clusters/clusters.types";
 
 interface Resp {
   astroliftProviderPlugins: AstroliftProviderPlugin[];
+}
+
+interface ClusterCountResp {
+  astroliftClusters: Array<{ id: string; providerPluginSlug: string }>;
 }
 
 // Canonical driver-capability axes. Order matters — these are the
@@ -194,12 +202,29 @@ export function DriversClient() {
   const { data, loading } = useQuery<Resp>(LIST_PROVIDER_PLUGINS, {
     fetchPolicy: "cache-first",
   });
+  const { data: clusterData } = useQuery<ClusterCountResp>(LIST_CLUSTERS, {
+    fetchPolicy: "cache-first",
+  });
 
   const rows: DriverRow[] = React.useMemo(() => {
     const live = data?.astroliftProviderPlugins ?? [];
     if (live.length > 0) return live.map(normalize);
     return FALLBACK_PROVIDERS.map((p) => ({ ...p }));
   }, [data]);
+
+  // Bound-cluster count per provider slug. Drives the inline 'N
+  // clusters bound' affordance on each provider row — lets an operator
+  // scan the page and spot dormant drivers at a glance.
+  const clusterCountByProvider = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of clusterData?.astroliftClusters ?? []) {
+      counts.set(
+        c.providerPluginSlug,
+        (counts.get(c.providerPluginSlug) ?? 0) + 1,
+      );
+    }
+    return counts;
+  }, [clusterData]);
 
   // Union of managed-service kinds declared across all live rows.
   // Keeps the table from going stale when the platform ships a new
@@ -258,7 +283,7 @@ export function DriversClient() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[200px]">Provider</TableHead>
+                    <TableHead className="w-[260px]">Provider</TableHead>
                     {CAPABILITIES.map((cap) => (
                       <TableHead key={cap.key} className="text-center">
                         {cap.label}
@@ -267,38 +292,72 @@ export function DriversClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.slug}>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium">
-                            {row.name}
-                          </span>
-                          <span className="text-muted-foreground font-mono text-xs">
-                            {row.slug}
-                            {row.version ? ` · v${row.version}` : ""}
-                          </span>
-                        </div>
-                      </TableCell>
-                      {CAPABILITIES.map((cap) => (
-                        <TableCell key={cap.key} className="text-center">
-                          {row.capabilities[cap.key] ? (
-                            <CheckIcon
-                              className="text-emerald-600 mx-auto size-4"
-                              aria-label="supported"
-                            />
-                          ) : (
-                            <MinusIcon
-                              className="text-muted-foreground mx-auto size-4"
-                              aria-label="not supported"
-                            />
-                          )}
+                  {rows.map((row) => {
+                    const boundCount =
+                      clusterCountByProvider.get(row.slug) ?? 0;
+                    return (
+                      <TableRow key={row.slug}>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-medium">
+                              {row.name}
+                            </span>
+                            <span className="text-muted-foreground font-mono text-xs">
+                              {row.slug}
+                              {row.version ? ` · v${row.version}` : ""}
+                            </span>
+                            {boundCount > 0 ? (
+                              <Link
+                                href="/clusters"
+                                className="inline-flex w-fit"
+                              >
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]"
+                                >
+                                  {boundCount}{" "}
+                                  {boundCount === 1
+                                    ? "cluster bound"
+                                    : "clusters bound"}
+                                </Badge>
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px]">
+                                No clusters
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                        {CAPABILITIES.map((cap) => (
+                          <TableCell key={cap.key} className="text-center">
+                            {row.capabilities[cap.key] ? (
+                              <CheckIcon
+                                className="text-emerald-600 mx-auto size-4"
+                                aria-label="supported"
+                              />
+                            ) : (
+                              <MinusIcon
+                                className="text-muted-foreground mx-auto size-4"
+                                aria-label="not supported"
+                              />
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+              <p className="text-muted-foreground mt-4 text-xs">
+                Matrix reflects manifest declarations · last probed varies by
+                cluster ·{" "}
+                <Link
+                  href="/resources/clusters"
+                  className="text-primary hover:underline"
+                >
+                  See live capabilities →
+                </Link>
+              </p>
             </CardContent>
           </Card>
 
