@@ -12,13 +12,28 @@ from __future__ import annotations
 
 import base64
 import json
+import re
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
-from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
+from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
 from azure._errors import NotFoundError, map_api_error
+
+# Built-in Azure RBAC role `AcrPush` (ARM-fixed GUID); referenced by ID
+# rather than display name because the ID is stable across tenants while
+# display names can drift.
+_ACR_PUSH_ROLE_DEFINITION_ID = "8311e382-0749-4cb8-b61a-304f252e45ec"
+
+# GitHub Actions' OIDC issuer — embedded verbatim in every Federated
+# Identity Credential the driver creates.
+_GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
+
+# The audience Azure's STS expects on the GitHub OIDC token at
+# AssumeRoleWithWebIdentity time. Fixed string per Azure AD docs.
+_AZURE_AD_TOKEN_EXCHANGE_AUDIENCE = "api://AzureADTokenExchange"
 
 
 @dataclass(frozen=True)
@@ -38,6 +53,21 @@ class ACRConfig:
     client: Any | None = None
     """ContainerRegistryManagementClient — injected for tests."""
 
+    tenant_id: str | None = None
+    """Azure AD tenant the FIC binds against. Required for
+    ``ensure_ci_push_role``; embedded verbatim in the returned
+    ``role_ref`` so the CI workflow can pass it to
+    ``azure/login@v2`` without a separate lookup. Optional on the
+    config so non-CI driver flows don't need it set."""
+
+    msi_client: Any | None = None
+    """ManagedServiceIdentityClient — injected for tests; production
+    builds a real one lazily inside ``ensure_ci_push_role``."""
+
+    authz_client: Any | None = None
+    """AuthorizationManagementClient — injected for tests; used to
+    create the AcrPush role assignment scoped to this registry."""
+
 
 class ACRDriver(ImageRegistryDriver):
     def __init__(self, *, config: ACRConfig) -> None:
@@ -54,6 +84,12 @@ class ACRDriver(ImageRegistryDriver):
                 credential=DefaultAzureCredential(),
                 subscription_id=config.subscription_id,
             )
+        # MSI + Authorization clients are only needed by
+        # ``ensure_ci_push_role``; created lazily to avoid forcing
+        # operators to install the extra packages when their plugin
+        # config wires CI push another way.
+        self._msi = config.msi_client
+        self._authz = config.authz_client
 
     @property
     def login_server(self) -> str:
@@ -163,3 +199,222 @@ class ACRDriver(ImageRegistryDriver):
                 )
             )
         return out
+
+    @driver_op(cloud="azure", driver="registry", audit=True, sensitive_kind="registry.create_ci_push_role")
+    def ensure_ci_push_role(
+        self,
+        *,
+        repo: str,
+        scm_provider: str,
+        scm_repo_full_name: str,
+    ) -> CiPushRole:
+        """Provision (or refresh) a User-Assigned Managed Identity that
+        GitHub Actions can assume via OIDC + push to this ACR registry.
+
+        Three Azure resources land idempotently:
+
+        1. A User-Assigned Managed Identity named
+           ``astrolift-<sanitized-repo>-acr-push``.
+        2. An ``AcrPush`` role assignment scoping that MI to the
+           registry resource (skipped if an equivalent assignment
+           already exists).
+        3. A Federated Identity Credential on the MI naming GitHub as
+           the trusted OIDC issuer + the SCM repo as the trusted
+           subject (``repo:<owner>/<name>:*``).
+
+        Returns a ``CiPushRole`` whose ``role_ref`` is a JSON blob with
+        ``client_id`` / ``tenant_id`` / ``subscription_id`` —
+        ``azure/login@v2`` consumes those three fields directly, no
+        separate lookup needed from the CI workflow.
+
+        Pre-req: an operator-supplied ``tenant_id`` on the config (or
+        the MI returns a populated ``tenant_id`` we can fall back to).
+        """
+        if scm_provider != "github":
+            raise UnsupportedOperationError(
+                f"ACRDriver only supports scm_provider='github' today; got {scm_provider!r}",
+            )
+        if "/" not in scm_repo_full_name:
+            raise ValueError(
+                f"scm_repo_full_name must be 'owner/repo'; got {scm_repo_full_name!r}",
+            )
+
+        if self._msi is None:
+            from azure.identity import DefaultAzureCredential
+            from azure.mgmt.msi import ManagedServiceIdentityClient
+
+            self._msi = ManagedServiceIdentityClient(
+                credential=DefaultAzureCredential(),
+                subscription_id=self._config.subscription_id,
+            )
+        if self._authz is None:
+            from azure.identity import DefaultAzureCredential
+            from azure.mgmt.authorization import AuthorizationManagementClient
+
+            self._authz = AuthorizationManagementClient(
+                credential=DefaultAzureCredential(),
+                subscription_id=self._config.subscription_id,
+            )
+
+        mi_name = _mi_name_for_repo(repo)
+        registry_scope = (
+            f"/subscriptions/{self._config.subscription_id}"
+            f"/resourceGroups/{self._config.resource_group}"
+            "/providers/Microsoft.ContainerRegistry/registries"
+            f"/{self._config.registry_name}"
+        )
+        role_definition_id = (
+            f"/subscriptions/{self._config.subscription_id}"
+            f"/providers/Microsoft.Authorization/roleDefinitions"
+            f"/{_ACR_PUSH_ROLE_DEFINITION_ID}"
+        )
+
+        # 1) Create-or-get the Managed Identity. ``create_or_update``
+        # is idempotent on the Azure side — a second call on the same
+        # name returns the existing identity with its principal_id +
+        # client_id populated.
+        try:
+            identity = self._msi.user_assigned_identities.create_or_update(
+                resource_group_name=self._config.resource_group,
+                resource_name=mi_name,
+                parameters={
+                    "location": self._config.location,
+                    "tags": {
+                        "astrolift.io/managed-by": "platform",
+                        "astrolift.io/scm-repo": scm_repo_full_name,
+                        "astrolift.io/registry-repo": repo,
+                    },
+                },
+            )
+        except Exception as exc:
+            raise map_api_error(exc) from exc
+
+        principal_id = getattr(identity, "principal_id", "") or ""
+        client_id = getattr(identity, "client_id", "") or ""
+        tenant_id = self._config.tenant_id or getattr(identity, "tenant_id", "") or ""
+        if not tenant_id:
+            raise ValueError(
+                "ACRConfig.tenant_id must be set (or the MI must return a tenant_id) "
+                "to construct a CI push role ref",
+            )
+
+        # 2) Idempotent AcrPush role assignment. Azure's role-assignment
+        # API rejects duplicates with RoleAssignmentExists; rather than
+        # catching that we list-then-skip so the assignment lifecycle
+        # stays observable (e.g. a future "rotate" path).
+        if not self._role_assignment_exists(
+            scope=registry_scope,
+            principal_id=principal_id,
+            role_definition_id=role_definition_id,
+        ):
+            assignment_name = _role_assignment_name(
+                principal_id=principal_id,
+                role_definition_id=role_definition_id,
+                scope=registry_scope,
+            )
+            try:
+                self._authz.role_assignments.create(
+                    scope=registry_scope,
+                    role_assignment_name=assignment_name,
+                    parameters={
+                        "properties": {
+                            "roleDefinitionId": role_definition_id,
+                            "principalId": principal_id,
+                            "principalType": "ServicePrincipal",
+                        },
+                    },
+                )
+            except Exception as exc:
+                # Race against a concurrent driver run: another caller
+                # may have created the assignment between our list +
+                # our create. Treat "already exists" as success rather
+                # than failing the whole CI bootstrap.
+                if type(exc).__name__ != "ResourceExistsError":
+                    raise map_api_error(exc) from exc
+
+        # 3) Federated Identity Credential. ``create_or_update`` is
+        # idempotent — the FIC name is fixed (``github-push``) so a
+        # second call refreshes the issuer/subject/audience in place
+        # when the SCM repo or scope changes.
+        try:
+            self._msi.federated_identity_credentials.create_or_update(
+                resource_group_name=self._config.resource_group,
+                resource_name=mi_name,
+                federated_identity_credential_resource_name="github-push",
+                parameters={
+                    "properties": {
+                        "issuer": _GITHUB_OIDC_ISSUER,
+                        "subject": f"repo:{scm_repo_full_name}:*",
+                        "audiences": [_AZURE_AD_TOKEN_EXCHANGE_AUDIENCE],
+                    },
+                },
+            )
+        except Exception as exc:
+            raise map_api_error(exc) from exc
+
+        return CiPushRole(
+            role_ref=json.dumps(
+                {
+                    "client_id": client_id,
+                    "tenant_id": tenant_id,
+                    "subscription_id": self._config.subscription_id,
+                },
+                sort_keys=True,
+            ),
+            scm_provider="github",
+        )
+
+    def _role_assignment_exists(
+        self,
+        *,
+        scope: str,
+        principal_id: str,
+        role_definition_id: str,
+    ) -> bool:
+        """List existing assignments at the registry scope + check for
+        a match on principal + role-definition. Returns False on
+        list-errors so the caller's create path runs (Azure will
+        reject the duplicate with ResourceExistsError if our list was
+        stale — that branch is handled at the call site)."""
+        if self._authz is None:
+            return False
+        try:
+            existing = self._authz.role_assignments.list_for_scope(scope=scope)
+        except Exception:
+            return False
+        for assignment in existing:
+            props = getattr(assignment, "properties", None) or assignment
+            assigned_principal = getattr(props, "principal_id", None)
+            assigned_role = getattr(props, "role_definition_id", None)
+            if assigned_principal == principal_id and assigned_role == role_definition_id:
+                return True
+        return False
+
+
+# ---- module-private helpers ------------------------------------------------
+
+
+def _mi_name_for_repo(repo: str) -> str:
+    """Build the per-repo Managed Identity name.
+
+    Azure MI names accept ``0-9 A-Z a-z _ -`` only (128 char max). Repo
+    slugs in the platform may contain ``/`` (e.g. ``acme/api``) which
+    must be normalized — we replace any non-conforming character with
+    ``-`` then truncate to fit the ``astrolift-<repo[:20]>-acr-push``
+    template the spec mandates."""
+    safe = re.sub(r"[^0-9A-Za-z-]", "-", repo)[:20]
+    return f"astrolift-{safe}-acr-push"[:128]
+
+
+def _role_assignment_name(
+    *,
+    principal_id: str,
+    role_definition_id: str,
+    scope: str,
+) -> str:
+    """Generate a deterministic UUID-shaped name for the role
+    assignment so concurrent driver runs converge on the same name +
+    Azure's idempotency on the resource name kicks in."""
+    namespace = uuid.NAMESPACE_URL
+    payload = f"{scope}|{role_definition_id}|{principal_id}"
+    return str(uuid.uuid5(namespace, payload))
