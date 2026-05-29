@@ -24,6 +24,11 @@ class RegisteredApp(NamedBaseCoreModel):
         BITBUCKET = "bitbucket"
         GITEA = "gitea"
         GIT_URL = "git_url"
+        # Apps promoted from a Calliope App Builder DevEnvironment
+        # (#767, #768). No source repo; the canonical artifact is the
+        # file tree captured on the DevEnvironment at promote time and
+        # baked into a container image by the platform.
+        DIRECT_UPLOAD = "direct_upload"
 
     class TriggerMode(models.TextChoices):
         AUTO_ON_PUSH = "auto_on_push"

@@ -79,6 +79,11 @@ from astrolift_workflows.activities.custom_domain import (
     probe_required_records,
     transition_domain_status,
 )
+from astrolift_workflows.activities.dev_environment import (
+    mark_dev_environment_failed,
+    provision_dev_environment,
+    sync_dev_environment_files,
+)
 from astrolift_workflows.activities.install_prereqs import (
     install_cluster_prereqs,
     record_cluster_bootstrap_run,
@@ -157,6 +162,7 @@ __all__ = [
     "mark_decommissioned",
     "mark_decommissioning",
     "mark_deploying",
+    "mark_dev_environment_failed",
     "mark_error",
     "mark_managed",
     "mark_managed_service_deprovisioning",
@@ -172,6 +178,7 @@ __all__ = [
     "pre_flight",
     "probe_capabilities",
     "probe_required_records",
+    "provision_dev_environment",
     "provision_managed_services_initial",
     "provision_namespace",
     "provision_preview_namespace",
@@ -189,6 +196,7 @@ __all__ = [
     "run_preflight_job",
     "soft_delete_app_records",
     "switch_app_env_binding",
+    "sync_dev_environment_files",
     "teardown_cluster_infra",
     "transition_domain_status",
     "update_secrets",

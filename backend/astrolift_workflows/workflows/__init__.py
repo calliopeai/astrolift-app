@@ -22,6 +22,10 @@ from astrolift_workflows.workflows.deprovision_managed_service import (
     DeprovisionManagedServiceWorkflow,
 )
 from astrolift_workflows.workflows.deregister_app import DeregisterAppWorkflow
+from astrolift_workflows.workflows.dev_environment import (
+    CreateDevEnvironmentWorkflow,
+    SyncDevEnvironmentFilesWorkflow,
+)
 from astrolift_workflows.workflows.install_cluster_prereqs import (
     InstallClusterPrereqsWorkflow,
 )
@@ -56,6 +60,7 @@ __all__ = [
     "BringClusterIntoManagementWorkflow",
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",
+    "CreateDevEnvironmentWorkflow",
     "CronDeployTickWorkflow",
     "DecommissionClusterWorkflow",
     "DeleteSecretBundleFromClustersWorkflow",
@@ -78,6 +83,7 @@ __all__ = [
     "RollbackDeploymentWorkflow",
     "RotateSecretBundleWorkflow",
     "SecretBundleScheduledRefreshWorkflow",
+    "SyncDevEnvironmentFilesWorkflow",
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
     "ValidateCustomDomainWorkflow",

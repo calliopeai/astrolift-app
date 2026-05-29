@@ -22,6 +22,7 @@ from astrolift_identity.urls import (
     api_urlpatterns as identity_api_urls,
     app_urlpatterns as identity_app_urls,
 )
+from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
 
@@ -99,6 +100,11 @@ urlpatterns = [
     # against — POST /api/cli/v1/auth/{start,complete,refresh} —
     # work without rewriting the consumer.
     *identity_api_urls,
+    # Calliope App Builder REST surface (#767, #768). Mounted at the
+    # project root for the same reason as the CLI flow — the App
+    # Builder ships against ``/api/builder/v1/dev-environments/...``
+    # as a stable wire contract.
+    *lifecycle_api_urls,
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),

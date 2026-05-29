@@ -298,6 +298,35 @@ class DeleteSecretBundleFromClustersInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class CreateDevEnvironmentInput:
+    """Input for ``CreateDevEnvironmentWorkflow`` (#767).
+
+    Drives the initial provisioning of a Calliope App Builder dev
+    environment — namespace + ConfigMap + Deployment + Service + Ingress
+    on the bound ``TenantCluster``. The REST endpoint creates the
+    ``DevEnvironment`` row in ``creating`` state then starts the workflow;
+    the workflow flips the row to ``running`` (or ``failed``) when it
+    settles.
+    """
+
+    dev_environment_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class SyncDevEnvironmentFilesInput:
+    """Input for ``SyncDevEnvironmentFilesWorkflow`` (#767).
+
+    Fired when the App Builder pushes a new file tree to a running dev
+    environment. The workflow updates the ConfigMap holding the file
+    payload and bumps a pod-template annotation so the Deployment rolls
+    a fresh pod that picks up the new contents.
+    """
+
+    dev_environment_id: int
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""
