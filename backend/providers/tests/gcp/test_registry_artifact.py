@@ -1,4 +1,4 @@
-"""Tests for ArtifactRegistryDriver (#40)."""
+"""Tests for ArtifactRegistryDriver (#40, #763)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from _sdk import UnsupportedOperationError
 from gcp._errors import NotFoundError
 from gcp.registry_artifact import (
     ArtifactRegistryConfig,
@@ -16,7 +17,11 @@ from gcp.registry_artifact import (
 )
 
 
-class _NotFound(Exception):
+class _NotFound(Exception):  # noqa: N818 — mocks google.cloud exception name verbatim
+    pass
+
+
+class _AlreadyExists(Exception):  # noqa: N818 — mocks google.cloud exception name verbatim
     pass
 
 
@@ -225,3 +230,364 @@ def test_delete_repo_force_not_implemented(
 ) -> None:
     with pytest.raises(NotImplementedError):
         driver.delete_repo("api", archive=False)
+
+
+# --- ensure_ci_push_role (#763) -----------------------------------
+
+
+@dataclass
+class _FakeBinding:
+    role: str
+    members: list[str] = field(default_factory=list)
+
+
+class _FakeBindingList(list):
+    def add(self, **kwargs: Any) -> _FakeBinding:
+        b = _FakeBinding(
+            role=kwargs["role"],
+            members=list(kwargs.get("members", [])),
+        )
+        self.append(b)
+        return b
+
+
+@dataclass
+class _FakePolicy:
+    bindings: _FakeBindingList = field(default_factory=_FakeBindingList)
+
+
+@dataclass
+class _FakeServiceAccount:
+    email: str
+
+
+@dataclass
+class _FakeARIAMClient(FakeARClient):
+    """AR client extended with IAM policy CRUD for the AR repo path."""
+
+    iam_policies: dict[str, _FakePolicy] = field(default_factory=dict)
+    set_iam_calls: list[tuple[str, _FakePolicy]] = field(default_factory=list)
+
+    def get_iam_policy(self, *, resource: str) -> _FakePolicy:
+        return self.iam_policies.setdefault(resource, _FakePolicy())
+
+    def set_iam_policy(
+        self,
+        *,
+        resource: str,
+        policy: _FakePolicy,
+    ) -> _FakePolicy:
+        self.iam_policies[resource] = policy
+        self.set_iam_calls.append((resource, policy))
+        return policy
+
+
+@dataclass
+class _FakeIAMClient:
+    """Stand-in for ``iam_admin_v1.IAMClient`` covering SA create +
+    SA IAM policy CRUD — the surface the driver exercises."""
+
+    service_accounts: dict[str, _FakeServiceAccount] = field(default_factory=dict)
+    policies: dict[str, _FakePolicy] = field(default_factory=dict)
+    create_calls: list[dict[str, Any]] = field(default_factory=list)
+    set_iam_calls: list[tuple[str, _FakePolicy]] = field(default_factory=list)
+
+    def create_service_account(
+        self,
+        *,
+        name: str,
+        account_id: str,
+        service_account: dict[str, Any],
+    ) -> _FakeServiceAccount:
+        self.create_calls.append(
+            {
+                "name": name,
+                "account_id": account_id,
+                "service_account": service_account,
+            }
+        )
+        if account_id in self.service_accounts:
+            raise _AlreadyExists(account_id)
+        project = name.split("/", 1)[1]
+        email = f"{account_id}@{project}.iam.gserviceaccount.com"
+        sa = _FakeServiceAccount(email=email)
+        self.service_accounts[account_id] = sa
+        return sa
+
+    def get_iam_policy(self, *, resource: str) -> _FakePolicy:
+        return self.policies.setdefault(resource, _FakePolicy())
+
+    def set_iam_policy(
+        self,
+        *,
+        resource: str,
+        policy: _FakePolicy,
+    ) -> _FakePolicy:
+        self.policies[resource] = policy
+        self.set_iam_calls.append((resource, policy))
+        return policy
+
+
+@dataclass
+class _FakeResponse:
+    status_code: int
+    payload: dict[str, Any] = field(default_factory=dict)
+    text: str = ""
+
+    def json(self) -> dict[str, Any]:
+        return self.payload
+
+
+@dataclass
+class _FakeWipClient:
+    """Stand-in ``AuthorizedSession``. Tracks GET/POST against the
+    WIF REST surface. POSTs flip a 404 to 200 for the matching
+    pool/provider, mirroring real-API create-then-get semantics."""
+
+    pools: dict[str, dict[str, Any]] = field(default_factory=dict)
+    providers: dict[str, dict[str, Any]] = field(default_factory=dict)
+    get_calls: list[str] = field(default_factory=list)
+    post_calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+
+    def get(self, url: str) -> _FakeResponse:
+        self.get_calls.append(url)
+        pool = self._match_pool(url)
+        if pool is not None:
+            return _FakeResponse(
+                status_code=200 if pool in self.pools else 404,
+                payload=self.pools.get(pool, {}),
+            )
+        provider = self._match_provider(url)
+        if provider is not None:
+            return _FakeResponse(
+                status_code=200 if provider in self.providers else 404,
+                payload=self.providers.get(provider, {}),
+            )
+        return _FakeResponse(status_code=404)
+
+    def post(
+        self,
+        url: str,
+        json: dict[str, Any] | None = None,
+    ) -> _FakeResponse:
+        self.post_calls.append((url, json or {}))
+        pool = self._match_pool_create(url)
+        if pool is not None:
+            self.pools[pool] = json or {}
+            return _FakeResponse(status_code=200, payload={"name": pool})
+        provider = self._match_provider_create(url)
+        if provider is not None:
+            self.providers[provider] = json or {}
+            return _FakeResponse(status_code=200, payload={"name": provider})
+        return _FakeResponse(status_code=400)
+
+    @staticmethod
+    def _match_pool(url: str) -> str | None:
+        marker = "/workloadIdentityPools/"
+        if marker not in url or "/providers/" in url:
+            return None
+        return url.split(marker, 1)[1]
+
+    @staticmethod
+    def _match_provider(url: str) -> str | None:
+        marker = "/providers/"
+        if "/workloadIdentityPools/" not in url or marker not in url:
+            return None
+        return url.split(marker, 1)[1]
+
+    @staticmethod
+    def _match_pool_create(url: str) -> str | None:
+        if "workloadIdentityPoolId=" not in url:
+            return None
+        return url.split("workloadIdentityPoolId=", 1)[1]
+
+    @staticmethod
+    def _match_provider_create(url: str) -> str | None:
+        if "workloadIdentityPoolProviderId=" not in url:
+            return None
+        return url.split("workloadIdentityPoolProviderId=", 1)[1]
+
+
+@dataclass
+class _FakeProject:
+    name: str
+
+
+@dataclass
+class _FakeProjectsClient:
+    project_number: str = "123456789"
+
+    def get_project(self, *, name: str) -> _FakeProject:
+        return _FakeProject(name=f"projects/{self.project_number}")
+
+
+@pytest.fixture
+def fake_ar_iam_client() -> _FakeARIAMClient:
+    _NotFound.__name__ = "NotFound"
+    _AlreadyExists.__name__ = "AlreadyExists"
+    return _FakeARIAMClient()
+
+
+@pytest.fixture
+def fake_iam_client() -> _FakeIAMClient:
+    _AlreadyExists.__name__ = "AlreadyExists"
+    return _FakeIAMClient()
+
+
+@pytest.fixture
+def fake_wip_client() -> _FakeWipClient:
+    return _FakeWipClient()
+
+
+@pytest.fixture(autouse=True)
+def patch_resourcemanager(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+    import types
+
+    fake_module = types.ModuleType("google.cloud.resourcemanager_v3")
+    fake_module.ProjectsClient = _FakeProjectsClient  # type: ignore[attr-defined]
+    google_module = sys.modules.get("google", types.ModuleType("google"))
+    cloud_module = sys.modules.get(
+        "google.cloud",
+        types.ModuleType("google.cloud"),
+    )
+    sys.modules.setdefault("google", google_module)
+    sys.modules.setdefault("google.cloud", cloud_module)
+    sys.modules["google.cloud.resourcemanager_v3"] = fake_module
+
+
+@pytest.fixture
+def push_driver(
+    fake_ar_iam_client: _FakeARIAMClient,
+    fake_iam_client: _FakeIAMClient,
+    fake_wip_client: _FakeWipClient,
+) -> ArtifactRegistryDriver:
+    return ArtifactRegistryDriver(
+        config=ArtifactRegistryConfig(
+            project_id="acme",
+            location="us-central1",
+            repository_id="astrolift-images",
+            client=fake_ar_iam_client,
+            iam_client=fake_iam_client,
+            wip_client=fake_wip_client,
+        ),
+    )
+
+
+def test_ensure_ci_push_role_creates_new(
+    push_driver: ArtifactRegistryDriver,
+    fake_ar_iam_client: _FakeARIAMClient,
+    fake_iam_client: _FakeIAMClient,
+    fake_wip_client: _FakeWipClient,
+) -> None:
+    role = push_driver.ensure_ci_push_role(
+        repo="api",
+        scm_provider="github",
+        scm_repo_full_name="acme-co/api",
+    )
+
+    assert role.scm_provider == "github"
+    payload = json.loads(role.role_ref)
+    assert payload["sa_email"] == "astrolift-api-ar-push@acme.iam.gserviceaccount.com"
+    assert payload["wip_provider"] == (
+        "projects/acme/locations/global/workloadIdentityPools/astrolift-github-actions/providers/github-oidc"
+    )
+
+    pool_creates = [
+        url for url, _ in fake_wip_client.post_calls if "workloadIdentityPoolId=astrolift-github-actions" in url
+    ]
+    assert len(pool_creates) == 1
+    provider_creates = [
+        url for url, _ in fake_wip_client.post_calls if "workloadIdentityPoolProviderId=github-oidc" in url
+    ]
+    assert len(provider_creates) == 1
+
+    _, provider_body = next(
+        (u, body) for u, body in fake_wip_client.post_calls if "workloadIdentityPoolProviderId=github-oidc" in u
+    )
+    assert provider_body["oidc"]["issuerUri"] == "https://token.actions.githubusercontent.com"
+    assert provider_body["attributeMapping"] == {
+        "google.subject": "assertion.sub",
+        "attribute.repository": "assertion.repository",
+    }
+
+    assert len(fake_iam_client.create_calls) == 1
+    assert fake_iam_client.create_calls[0]["account_id"] == "astrolift-api-ar-push"
+
+    ar_resource = "projects/acme/locations/us-central1/repositories/astrolift-images"
+    ar_policy = fake_ar_iam_client.iam_policies[ar_resource]
+    writer = next(b for b in ar_policy.bindings if b.role == "roles/artifactregistry.writer")
+    assert "serviceAccount:astrolift-api-ar-push@acme.iam.gserviceaccount.com" in writer.members
+
+    sa_resource = "projects/-/serviceAccounts/astrolift-api-ar-push@acme.iam.gserviceaccount.com"
+    sa_policy = fake_iam_client.policies[sa_resource]
+    wif_binding = next(b for b in sa_policy.bindings if b.role == "roles/iam.workloadIdentityUser")
+    expected_member = (
+        "principalSet://iam.googleapis.com/projects/123456789"
+        "/locations/global/workloadIdentityPools/astrolift-github-actions"
+        "/attribute.repository/acme-co/api"
+    )
+    assert expected_member in wif_binding.members
+
+
+def test_ensure_ci_push_role_idempotent(
+    push_driver: ArtifactRegistryDriver,
+    fake_ar_iam_client: _FakeARIAMClient,
+    fake_iam_client: _FakeIAMClient,
+    fake_wip_client: _FakeWipClient,
+) -> None:
+    first = push_driver.ensure_ci_push_role(
+        repo="api",
+        scm_provider="github",
+        scm_repo_full_name="acme-co/api",
+    )
+    pre_calls = {
+        "pool_posts": len(fake_wip_client.post_calls),
+        "sa_creates": len(fake_iam_client.create_calls),
+        "ar_set": len(fake_ar_iam_client.set_iam_calls),
+        "sa_set": len(fake_iam_client.set_iam_calls),
+    }
+
+    second = push_driver.ensure_ci_push_role(
+        repo="api",
+        scm_provider="github",
+        scm_repo_full_name="acme-co/api",
+    )
+
+    assert second == first
+
+    # No new WIF pool / provider creates.
+    assert len(fake_wip_client.post_calls) == pre_calls["pool_posts"]
+
+    # SA create was attempted again (driver swallows AlreadyExists),
+    # but no duplicate SA materialized.
+    assert len(fake_iam_client.create_calls) == pre_calls["sa_creates"] + 1
+    assert len(fake_iam_client.service_accounts) == 1
+
+    # Bindings short-circuit BEFORE set_iam_policy when the member is already
+    # present, so the set counter is unchanged.
+    assert len(fake_ar_iam_client.set_iam_calls) == pre_calls["ar_set"]
+    assert len(fake_iam_client.set_iam_calls) == pre_calls["sa_set"]
+
+    ar_resource = "projects/acme/locations/us-central1/repositories/astrolift-images"
+    writer = next(
+        b for b in fake_ar_iam_client.iam_policies[ar_resource].bindings if b.role == "roles/artifactregistry.writer"
+    )
+    assert len(writer.members) == 1
+
+    sa_resource = "projects/-/serviceAccounts/astrolift-api-ar-push@acme.iam.gserviceaccount.com"
+    wif_binding = next(
+        b for b in fake_iam_client.policies[sa_resource].bindings if b.role == "roles/iam.workloadIdentityUser"
+    )
+    assert len(wif_binding.members) == 1
+
+
+def test_ensure_ci_push_role_unsupported_scm(
+    push_driver: ArtifactRegistryDriver,
+) -> None:
+    with pytest.raises(UnsupportedOperationError):
+        push_driver.ensure_ci_push_role(
+            repo="api",
+            scm_provider="gitlab",
+            scm_repo_full_name="acme-co/api",
+        )

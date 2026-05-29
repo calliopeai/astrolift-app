@@ -167,16 +167,38 @@ def terminate_workflow(workflow_id: str, reason: str) -> bool:
         return False
 
 
+# Known cluster-targeting workflow types. The workflow_id for each is
+# always "<type>-<cluster_guid>" (mutations construct it that way so
+# re-firing joins the running run instead of spawning a parallel one).
+# Listed here so the visibility query is built from exact WorkflowId=
+# predicates instead of a substring LIKE — standard SQL visibility (the
+# default in temporalio/auto-setup) does NOT support LIKE on
+# WorkflowId; only advanced/Elasticsearch visibility does. The exact-id
+# approach works on both backends.
+_CLUSTER_WORKFLOW_ID_PREFIXES: tuple[str, ...] = (
+    "BringClusterIntoManagement",
+    "DecommissionClusterWorkflow",
+    "InstallClusterPrereqsWorkflow",
+)
+
+
 @async_to_sync
 async def _list_for_cluster_async(
     cluster_guid: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    # Workflow ids the cluster workflows use all end in the cluster's
-    # guid (BringClusterIntoManagement-<guid>, DecommissionCluster-
-    # Workflow-<guid>, InstallClusterPrereqsWorkflow-<guid>, ...).
-    # Temporal's visibility query language lets us pattern-match.
-    query = f'WorkflowId LIKE "%{cluster_guid}%"'
+    # Build the visibility query from exact WorkflowId predicates for
+    # each known cluster workflow type. Standard SQL visibility supports
+    # ``WorkflowId="<exact>"`` and ``OR`` between predicates; it does NOT
+    # support ``LIKE "%...%"`` (advanced visibility / Elasticsearch only),
+    # which silently returned an empty list in prod for every Status tab
+    # request and made it look like no workflow runs ever happened.
+    #
+    # Each ``WorkflowId="<type>-<guid>"`` predicate returns ALL historical
+    # runs that ever used that workflow id, so repeated Install /
+    # Bring / Refresh / Decommission invocations are all surfaced.
+    predicates = [f'WorkflowId="{prefix}-{cluster_guid}"' for prefix in _CLUSTER_WORKFLOW_ID_PREFIXES]
+    query = " OR ".join(predicates)
     rows: list[dict[str, Any]] = []
     try:
         client = await _get_client_async()
