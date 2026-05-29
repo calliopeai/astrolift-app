@@ -131,6 +131,8 @@ const SUCCEEDED: ReadonlySet<DeploymentStatus> = new Set(["running"]);
 // of the table regardless of how many columns we render.
 const TABLE_COLUMNS = 7;
 
+const DEPLOYMENTS_PAGE_SIZE = 20;
+
 function statusMatches(bucket: StatusBucket, status: DeploymentStatus): boolean {
   switch (bucket) {
     case "all":
@@ -246,6 +248,14 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // Client-side pagination over the filtered list. Reset back to page 1
+  // whenever the active filter set changes so a narrowed view always
+  // starts at the top instead of stranding the user on an empty page.
+  const [page, setPage] = React.useState(1);
+  React.useEffect(() => {
+    setPage(1);
+  }, [statusBucket, envFilter, search]);
+
   // #652 — multi-select for deploy-vs-deploy compare. Exactly two selected
   // enables the Compare action; anything else disables it.
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -278,6 +288,11 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       return true;
     });
   }, [allDeployments, statusBucket, envFilter, search]);
+
+  const visibleDeployments = React.useMemo(
+    () => filtered.slice(0, page * DEPLOYMENTS_PAGE_SIZE),
+    [filtered, page]
+  );
 
   const toggleSelect = React.useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -343,6 +358,10 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
       }
     >
       <AppTabs slug={a.slug} active="deployments" />
+
+      {allDeployments.length > 0 && !deployments.loading && (
+        <DeploymentStatsBar deployments={allDeployments} />
+      )}
 
       {/* ─── filter bar ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
@@ -475,7 +494,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.flatMap((d) => {
+                {visibleDeployments.flatMap((d) => {
                   const isOpen = openId === d.id;
                   return [
                     <DeploymentRow
@@ -502,6 +521,17 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
           )}
         </CardContent>
       </Card>
+
+      {visibleDeployments.length < filtered.length && (
+        <div className="flex justify-center">
+          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)}>
+            Show {Math.min(DEPLOYMENTS_PAGE_SIZE, filtered.length - visibleDeployments.length)} more
+            <span className="text-muted-foreground ml-1">
+              ({visibleDeployments.length} of {filtered.length})
+            </span>
+          </Button>
+        </div>
+      )}
 
       <p className="text-muted-foreground text-center text-xs">
         {t("footer", { count: allDeployments.length })}{" "}
@@ -1193,6 +1223,150 @@ function CommitMetaRow({
           <ExternalLinkIcon className="size-3" />
         </a>
       )}
+    </div>
+  );
+}
+
+// ─── Deployment stats bar ──────────────────────────────────────────────
+
+function DeploymentStatsBar({ deployments }: { deployments: AstroliftDeployment[] }) {
+  const stats = React.useMemo(() => {
+    const total = deployments.length;
+    const running = deployments.filter((d) => d.status === "running").length;
+    const failed = deployments.filter((d) => d.status === "failed").length;
+    const inFlight = deployments.filter((d) => IN_FLIGHT.has(d.status)).length;
+
+    const successDenom = running + failed;
+    const successRate = successDenom > 0 ? Math.round((running / successDenom) * 100) : null;
+
+    const durations = deployments
+      .map((d) => d.durationSeconds)
+      .filter((v): v is number => v != null);
+    const avgDuration =
+      durations.length > 0
+        ? Math.round(durations.reduce((sum, v) => sum + v, 0) / durations.length)
+        : null;
+
+    return { total, running, failed, inFlight, successRate, avgDuration };
+  }, [deployments]);
+
+  const successColor =
+    stats.successRate == null
+      ? "text-muted-foreground"
+      : stats.successRate >= 80
+        ? "text-emerald-500"
+        : stats.successRate >= 50
+          ? "text-amber-500"
+          : "text-destructive";
+
+  return (
+    <div className="flex flex-wrap items-stretch gap-3">
+      <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Deployments"
+          value={stats.total.toString()}
+          sub="in current view"
+        />
+        <StatCard
+          label="Success rate"
+          value={stats.successRate == null ? "—" : `${stats.successRate}%`}
+          valueClassName={successColor}
+          sub={`${stats.running} running`}
+        />
+        <StatCard
+          label="Avg duration"
+          value={stats.avgDuration == null ? "—" : formatDuration(stats.avgDuration)}
+          sub="per deploy"
+        />
+        <StatCard
+          label="Failed"
+          value={stats.failed.toString()}
+          valueClassName={stats.failed > 0 ? "text-destructive" : undefined}
+          sub="need attention"
+        />
+      </div>
+      <FrequencyBars deployments={deployments} />
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="bg-muted/30 border-border rounded-lg border px-4 py-3">
+      <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+        {label}
+      </div>
+      <div className={cn("text-xl font-semibold tabular-nums", valueClassName)}>{value}</div>
+      <div className="text-muted-foreground text-[11px]">{sub}</div>
+    </div>
+  );
+}
+
+function FrequencyBars({ deployments }: { deployments: AstroliftDeployment[] }) {
+  const { buckets, max } = React.useMemo(() => {
+    const days: { date: Date; key: string; count: number }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      days.push({ date, key, count: 0 });
+    }
+    const keyByDate = new Map(days.map((d) => [d.key, d]));
+    for (const d of deployments) {
+      const iso = d.startedAt ?? d.createdAt;
+      if (!iso) continue;
+      const when = new Date(iso);
+      when.setHours(0, 0, 0, 0);
+      const key = `${when.getFullYear()}-${when.getMonth()}-${when.getDate()}`;
+      const bucket = keyByDate.get(key);
+      if (bucket) bucket.count += 1;
+    }
+    const maxCount = days.reduce((m, d) => Math.max(m, d.count), 0);
+    return { buckets: days, max: maxCount };
+  }, [deployments]);
+
+  const total = buckets.reduce((sum, b) => sum + b.count, 0);
+
+  return (
+    <div className="bg-muted/30 border-border flex min-w-[200px] flex-col rounded-lg border px-4 py-3">
+      <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+        Last 7 days
+      </div>
+      <div className="mt-2 flex h-10 items-end gap-1">
+        {buckets.map((b) => {
+          const height = max > 0 ? Math.max(4, Math.round((b.count / max) * 100)) : 4;
+          return (
+            <div
+              key={b.key}
+              className="flex flex-1 flex-col items-center justify-end"
+              title={`${b.date.toLocaleDateString()}: ${b.count}`}
+            >
+              <div
+                className={cn(
+                  "w-full rounded-sm",
+                  b.count > 0
+                    ? "bg-[color:var(--brand-primary)]"
+                    : "bg-[color:var(--brand-primary)]/50"
+                )}
+                style={{ height: `${height}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-muted-foreground mt-1 text-[11px]">{total} this week</div>
     </div>
   );
 }
