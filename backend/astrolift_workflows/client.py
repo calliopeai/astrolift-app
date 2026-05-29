@@ -445,3 +445,33 @@ def cancel_workflow(workflow_id: str) -> bool:
     except Exception:
         logger.exception("temporal cancel failed: id=%s", workflow_id)
         return False
+
+
+@async_to_sync
+async def _query_async(workflow_id: str, query_name: str) -> Any:
+    client = await _get_client_async()
+    handle = client.get_workflow_handle(workflow_id)
+    return await handle.query(query_name)
+
+
+def query_workflow(workflow_id: str, query_name: str) -> Any | None:
+    """Query a running workflow's state via a registered query handler.
+
+    Returns ``None`` when Temporal is disabled, the workflow is not
+    found (already completed/terminated), or the query handler raises.
+    Callers must treat ``None`` as "no live data available".
+
+    Typical call::
+
+        progress = query_workflow(
+            f"OnboardAppWorkflow-{app.guid}",
+            "provisioning_progress",
+        )
+    """
+    if not _temporal_enabled():
+        return None
+    try:
+        return _query_async(workflow_id, query_name)
+    except Exception:
+        logger.warning("temporal query failed: id=%s query=%s", workflow_id, query_name)
+        return None
