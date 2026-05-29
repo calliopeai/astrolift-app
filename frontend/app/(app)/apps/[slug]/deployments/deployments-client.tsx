@@ -1,27 +1,34 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   BoxIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
+  CheckCircle2Icon,
+  CheckIcon,
+  ClipboardIcon,
   ClockIcon,
   ExternalLinkIcon,
   GitCommitIcon,
   GitCompareIcon,
-  LayersIcon,
+  RotateCcwIcon,
+  StopCircleIcon,
+  Trash2Icon,
+  UndoIcon,
+  XCircleIcon,
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
-import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,7 +50,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  ABORT_DEPLOYMENT,
+  APPROVE_DEPLOYMENT,
+  REDEPLOY_APP,
+  ROLLBACK_DEPLOYMENT,
+} from "@/graphql/lifecycle/lifecycle.mutations";
+import {
   COMPARE_DEPLOYMENTS,
+  GET_DEPLOYMENT_LOG,
   LIST_DEPLOYMENTS,
   LIST_ENVIRONMENTS,
 } from "@/graphql/lifecycle/lifecycle.queries";
@@ -51,10 +65,12 @@ import type {
   AstroliftAppEnvironment,
   AstroliftDeployment,
   AstroliftDeploymentComparison,
+  AstroliftDeploymentLogEntry,
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
-import { GET_APP } from "@/graphql/registry/registry.queries";
+import { GET_APP, GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { cn } from "@/lib/utils";
 
 import { AppTabs } from "../components/app-tabs";
@@ -68,17 +84,28 @@ interface DeploymentsResp {
 interface EnvsResp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
+interface LogResp {
+  astroliftDeploymentLog: AstroliftDeploymentLogEntry[];
+}
+interface ManifestResp {
+  astroliftRenderedManifest: {
+    appSlug: string;
+    environmentName?: string | null;
+    imageTag?: string | null;
+    namespace: string;
+    resources: unknown;
+    error?: string | null;
+    errorPath?: string | null;
+    errorLine?: number | null;
+    errorColumn?: number | null;
+  } | null;
+}
 
-const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
-  pending_approval: "warn",
-  pending: "warn",
-  deploying: "pending",
-  redeploying: "pending",
-  running: "ok",
-  failed: "error",
-  superseded: "muted",
-  rolled_back: "muted",
-};
+interface MutationResultLite<T> {
+  ok: boolean;
+  errors: { code: string; message: string }[];
+  data: T | null;
+}
 
 type StatusBucket = "all" | "succeeded" | "failed" | "in_flight" | "other";
 
@@ -98,6 +125,11 @@ const IN_FLIGHT: ReadonlySet<DeploymentStatus> = new Set([
 ]);
 const FAILED: ReadonlySet<DeploymentStatus> = new Set(["failed"]);
 const SUCCEEDED: ReadonlySet<DeploymentStatus> = new Set(["running"]);
+
+// Number of visible columns in the deployments table. The inline-expand
+// row uses this for its `colSpan` so the panel always spans the width
+// of the table regardless of how many columns we render.
+const TABLE_COLUMNS = 7;
 
 function statusMatches(bucket: StatusBucket, status: DeploymentStatus): boolean {
   switch (bucket) {
@@ -122,69 +154,24 @@ function formatDuration(seconds: number | null | undefined): string {
   return `${m}m ${s}s`;
 }
 
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString();
+}
+
+function formatLogTime(iso: string | null | undefined): string {
+  if (!iso) return "--:--:--";
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
 function githubCommitUrl(repo: string, sha: string): string {
   return `https://github.com/${repo}/commit/${sha}`;
-}
-
-// #658 — collapse multi-workload deploys (FE + BE + combo for the same
-// SHA → 3 rows today) into a single expandable parent.  Worst-status
-// wins so a fan-out group surfaces as 'failed' the moment any child
-// fails, no matter how many other children succeeded.  Groups are
-// keyed by ``commitSha|environmentName`` so the same SHA deployed to
-// two envs still shows as two separate top-level rows.
-type GroupBy = "commit" | "flat";
-
-type DeploymentGroupKey = string;
-
-interface DeploymentGroup {
-  key: DeploymentGroupKey;
-  representative: AstroliftDeployment;
-  items: AstroliftDeployment[];
-}
-
-const STATUS_RANK: Record<DeploymentStatus, number> = {
-  failed: 5,
-  pending_approval: 4,
-  pending: 4,
-  deploying: 4,
-  redeploying: 4,
-  running: 3,
-  superseded: 2,
-  rolled_back: 1,
-};
-
-function worstStatus(items: AstroliftDeployment[]): DeploymentStatus {
-  return items.reduce<DeploymentStatus>((acc, d) => {
-    return (STATUS_RANK[d.status] ?? 0) > (STATUS_RANK[acc] ?? 0) ? d.status : acc;
-  }, items[0].status);
-}
-
-function groupDeployments(
-  list: AstroliftDeployment[],
-  mode: GroupBy
-): DeploymentGroup[] {
-  if (mode === "flat") {
-    return list.map((d) => ({ key: d.id, representative: d, items: [d] }));
-  }
-  const buckets = new Map<DeploymentGroupKey, DeploymentGroup>();
-  for (const d of list) {
-    // Ungrouped buckets for rows with no SHA — manual/legacy entries.
-    const key = d.commitSha
-      ? `${d.commitSha}|${d.environmentName}`
-      : `__nosha__|${d.id}`;
-    const g = buckets.get(key);
-    if (g) {
-      g.items.push(d);
-      // The representative tracks the newest startedAt so the parent
-      // row's timestamp matches the latest workload's deploy.
-      const a = new Date(d.startedAt ?? d.createdAt).getTime();
-      const b = new Date(g.representative.startedAt ?? g.representative.createdAt).getTime();
-      if (a > b) g.representative = d;
-    } else {
-      buckets.set(key, { key, representative: d, items: [d] });
-    }
-  }
-  return Array.from(buckets.values());
 }
 
 export function AppDeploymentsClient({ slug }: { slug: string }) {
@@ -193,6 +180,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const deployments = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {
     variables: { appSlug: slug, limit: 100 },
@@ -202,31 +190,54 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     variables: { appSlug: slug },
   });
 
-  // Filters are persisted to URL search params so a page refresh or
-  // shared link preserves the operator's view.
+  // Filters and the open-row id are persisted to URL search params so a
+  // page refresh or shared link preserves the operator's view exactly.
   const rawBucket = searchParams.get("status") as StatusBucket | null;
   const statusBucket: StatusBucket =
     rawBucket && STATUS_BUCKET_KEYS.some((k) => k.value === rawBucket) ? rawBucket : "all";
   const envFilter = searchParams.get("env") ?? "all";
+  const openId = searchParams.get("open");
 
-  // Search input uses local state for responsive typing; the URL param is
-  // synced on a short delay so the URL stays linkable without blocking input.
-  const [search, setSearchLocal] = React.useState<string>(
-    () => searchParams.get("q") ?? ""
+  const [search, setSearchLocal] = React.useState<string>(() => searchParams.get("q") ?? "");
+
+  const writeParams = React.useCallback(
+    (mutate: (p: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutate(params);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
   );
 
   function updateFilter(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value && value !== "all" && value !== "") {
-      params.set(key, value);
-    } else {
-      params.delete(key);
-    }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    writeParams((params) => {
+      if (value && value !== "all" && value !== "") {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
   }
 
   const setStatusBucket = (v: StatusBucket) => updateFilter("status", v);
   const setEnvFilter = (v: string) => updateFilter("env", v);
+
+  const setOpenId = React.useCallback(
+    (id: string | null) => {
+      writeParams((params) => {
+        if (id) params.set("open", id);
+        else params.delete("open");
+      });
+    },
+    [writeParams]
+  );
+
+  const toggleOpen = React.useCallback(
+    (id: string) => {
+      setOpenId(openId === id ? null : id);
+    },
+    [openId, setOpenId]
+  );
 
   // Debounce search → URL (300 ms gives snappy typing without thrashing history).
   React.useEffect(() => {
@@ -234,19 +245,11 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
-  // Groups stay collapsed by default — the parent row already shows
-  // SHA / env / aggregate status, so the operator only expands when
-  // they want per-workload status.  Track expanded state keyed by
-  // group key (commitSha|env), not deployment id.
-  const [expanded, setExpanded] = React.useState<Set<DeploymentGroupKey>>(new Set());
+
   // #652 — multi-select for deploy-vs-deploy compare. Exactly two selected
   // enables the Compare action; anything else disables it.
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [compareOpen, setCompareOpen] = React.useState(false);
-  // #657 — changelog panel expansion is keyed by deployment id so a
-  // multi-workload group can have multiple children open at once, and
-  // group-expansion (keyed by commitSha|env) stays orthogonal.
-  const [expandedChangelogIds, setExpandedChangelogIds] = React.useState<Set<string>>(new Set());
 
   const a = app.data?.astroliftApp;
   const allDeployments = React.useMemo(
@@ -276,17 +279,6 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     });
   }, [allDeployments, statusBucket, envFilter, search]);
 
-  const grouped = React.useMemo(() => groupDeployments(filtered, "commit"), [filtered]);
-
-  const toggleGroup = React.useCallback((key: DeploymentGroupKey) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
   const toggleSelect = React.useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -296,29 +288,9 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     });
   }, []);
 
-  const toggleChangelog = React.useCallback((id: string) => {
-    setExpandedChangelogIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  // Selectable rows = all individual deployments shown (flatten groups
-  // for the master checkbox so it covers what the operator can see).
-  const visibleIds = React.useMemo(() => {
-    const ids: string[] = [];
-    for (const g of grouped) {
-      for (const item of g.items) ids.push(item.id);
-    }
-    return ids;
-  }, [grouped]);
-
-  const allVisibleSelected =
-    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-  const someVisibleSelected =
-    !allVisibleSelected && visibleIds.some((id) => selectedIds.has(id));
+  const visibleIds = React.useMemo(() => filtered.map((d) => d.id), [filtered]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = !allVisibleSelected && visibleIds.some((id) => selectedIds.has(id));
 
   const toggleSelectAll = React.useCallback(() => {
     setSelectedIds((prev) => {
@@ -372,9 +344,8 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
     >
       <AppTabs slug={a.slug} active="deployments" />
 
-      {/* ─── filter bar ────────────────────────────────────────────────── */}
+      {/* ─── filter bar ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        {/* status pills */}
         <div className="flex flex-wrap items-center gap-1">
           {STATUS_BUCKET_KEYS.map((o) => {
             const count =
@@ -390,7 +361,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                   "rounded-full border px-3 py-0.5 text-xs font-medium transition-colors",
                   statusBucket === o.value
                     ? "border-foreground/30 bg-foreground text-background"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                    : "text-muted-foreground hover:border-border hover:text-foreground border-transparent"
                 )}
               >
                 {t(`statusBuckets.${o.key}`)}
@@ -408,12 +379,9 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             );
           })}
           <span className="text-muted-foreground ml-auto text-xs">
-            {grouped.length !== filtered.length
-              ? `${grouped.length} groups · ${filtered.length} of ${allDeployments.length}`
-              : t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
+            {t("filters.counts", { filtered: filtered.length, total: allDeployments.length })}
           </span>
         </div>
-        {/* secondary: search + env */}
         <div className="flex flex-wrap items-center gap-2">
           <Input
             placeholder={t("filters.search")}
@@ -458,11 +426,7 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
             <GitCompareIcon className="size-3.5" />
             Compare {canCompare ? "" : "(select exactly 2)"}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedIds(new Set())}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
             <XIcon className="size-3.5" />
             Clear
           </Button>
@@ -502,277 +466,36 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
                       onChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="w-6"></TableHead>
-                  <TableHead>{t("table.when")}</TableHead>
-                  <TableHead>{t("table.env")}</TableHead>
-                  <TableHead>{t("table.imageCommit")}</TableHead>
-                  <TableHead>{t("table.trigger")}</TableHead>
                   <TableHead>{t("table.status")}</TableHead>
+                  <TableHead>{t("table.imageCommit")}</TableHead>
+                  <TableHead>{t("table.env")}</TableHead>
+                  <TableHead>{t("table.when")}</TableHead>
                   <TableHead>{t("table.duration")}</TableHead>
-                  <TableHead>{t("table.ci")}</TableHead>
-                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {grouped.flatMap((g) => {
-                  const isMultiple = g.items.length > 1;
-                  const isOpen = expanded.has(g.key);
-                  const rep = g.representative;
-                  const aggStatus = isMultiple ? worstStatus(g.items) : rep.status;
-                  const aggDuration = isMultiple
-                    ? g.items.reduce<number | null>((acc, d) => {
-                        if (d.durationSeconds == null) return acc;
-                        return acc == null ? d.durationSeconds : Math.max(acc, d.durationSeconds);
-                      }, null)
-                    : rep.durationSeconds;
-
-                  // For a group, the parent-row checkbox selects/deselects
-                  // every child deployment in the group (so the group's
-                  // representative compare semantics still need an
-                  // expanded single-deploy selection — the checkbox is a
-                  // shortcut, not a primary path).
-                  const allItemsSelected = g.items.every((d) => selectedIds.has(d.id));
-                  const someItemsSelected =
-                    !allItemsSelected && g.items.some((d) => selectedIds.has(d.id));
-                  const parent = (
-                    <TableRow
-                      key={`g-${g.key}`}
-                      className="hover:bg-accent/30 cursor-pointer"
-                      onClick={() => {
-                        if (isMultiple) toggleGroup(g.key);
-                        else router.push(`/deployments/${rep.id}`);
-                      }}
-                    >
-                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${rep.imageTag ?? rep.id}`}
-                          checked={allItemsSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someItemsSelected;
-                          }}
-                          onChange={() => {
-                            setSelectedIds((prev) => {
-                              const next = new Set(prev);
-                              if (allItemsSelected) {
-                                for (const d of g.items) next.delete(d.id);
-                              } else {
-                                for (const d of g.items) next.add(d.id);
-                              }
-                              return next;
-                            });
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="w-6">
-                        {isMultiple ? (
-                          isOpen ? (
-                            <ChevronDownIcon className="size-3.5" />
-                          ) : (
-                            <ChevronRightIcon className="size-3.5" />
-                          )
-                        ) : (
-                          <StatusDot status={statusToDot[rep.status]} />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">
-                        {new Date(rep.startedAt ?? rep.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {rep.environmentName}
-                        </Badge>
-                        {isMultiple ? (
-                          <div className="text-muted-foreground mt-1 inline-flex items-center gap-1 text-xs">
-                            <LayersIcon className="size-3" />
-                            {g.items.length} workloads
-                          </div>
-                        ) : (
-                          rep.workloadSlug && (
-                            <div className="text-muted-foreground mt-1 font-mono text-xs">
-                              {rep.workloadSlug}
-                            </div>
-                          )
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-mono text-xs">{rep.imageTag || "—"}</div>
-                        {rep.commitSha && (
-                          <div className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 font-mono text-xs">
-                            <GitCommitIcon className="size-3" />
-                            {a.sourceKind === "github" && a.sourceRepo ? (
-                              <a
-                                href={githubCommitUrl(a.sourceRepo, rep.commitSha)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {rep.commitSha.slice(0, 7)}
-                              </a>
-                            ) : (
-                              rep.commitSha.slice(0, 7)
-                            )}
-                            {rep.branch && (
-                              <span className="text-muted-foreground/80">· {rep.branch}</span>
-                            )}
-                          </div>
-                        )}
-                        <div className="text-muted-foreground/80 mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
-                          <span>{t("row.prMissing")}</span>
-                          <span className="font-mono">
-                            {rep.commitAuthor
-                              ? t("row.authorBy", { name: rep.commitAuthor })
-                              : t("row.authorMissing")}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {rep.triggerKind}
-                        </Badge>
-                        {rep.strategy && rep.strategy !== "unknown" && (
-                          <div className="text-muted-foreground mt-1 text-[10px] capitalize">
-                            {rep.strategy.replace(/_/g, " ")}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <DeploymentStatusPill status={aggStatus} />
-                        {rep.approvalsRequired > 0 && (
-                          <div className="text-muted-foreground mt-1 text-xs">
-                            {t("approvalsCount", {
-                              received: rep.approvalsReceived,
-                              required: rep.approvalsRequired,
-                            })}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <span className="inline-flex items-center gap-1">
-                          <ClockIcon className="size-3" />
-                          {formatDuration(aggDuration)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {rep.ciRunUrl ? (
-                          <a
-                            href={rep.ciRunUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {rep.ciProvider || "ci"}
-                            <ExternalLinkIcon className="size-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                        {!isMultiple && (
-                          <ChangelogToggle
-                            open={expandedChangelogIds.has(rep.id)}
-                            onToggle={() => toggleChangelog(rep.id)}
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-
-                  const rows: React.ReactNode[] = [parent];
-                  if (!isMultiple && expandedChangelogIds.has(rep.id)) {
-                    rows.push(
-                      <ChangelogPanelRow
-                        key={`cl-${rep.id}`}
-                        deployment={rep}
-                        repoFullName={a.sourceRepo}
-                      />
-                    );
-                  }
-
-                  if (!isMultiple || !isOpen) return rows;
-
-                  const children = g.items.flatMap((d) => {
-                    const row = (
-                      <TableRow
-                        key={d.id}
-                        className="hover:bg-accent/30 bg-muted/30 cursor-pointer"
-                        onClick={() => router.push(`/deployments/${d.id}`)}
-                      >
-                        <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            aria-label={`Select ${d.imageTag ?? d.id}`}
-                            checked={selectedIds.has(d.id)}
-                            onChange={() => toggleSelect(d.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="w-6 pl-8">
-                          <StatusDot status={statusToDot[d.status]} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                          {new Date(d.startedAt ?? d.createdAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-muted-foreground font-mono text-xs">
-                            {d.workloadSlug || "—"}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-mono text-xs">{d.imageTag || "—"}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {d.triggerKind}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DeploymentStatusPill status={d.status} />
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          <span className="inline-flex items-center gap-1">
-                            <ClockIcon className="size-3" />
-                            {formatDuration(d.durationSeconds)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {d.ciRunUrl ? (
-                            <a
-                              href={d.ciRunUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {d.ciProvider || "ci"}
-                              <ExternalLinkIcon className="size-3" />
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                          <ChangelogToggle
-                            open={expandedChangelogIds.has(d.id)}
-                            onToggle={() => toggleChangelog(d.id)}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                    if (!expandedChangelogIds.has(d.id)) return [row];
-                    return [
-                      row,
-                      <ChangelogPanelRow
-                        key={`cl-${d.id}`}
+                {filtered.flatMap((d) => {
+                  const isOpen = openId === d.id;
+                  return [
+                    <DeploymentRow
+                      key={d.id}
+                      deployment={d}
+                      isOpen={isOpen}
+                      selected={selectedIds.has(d.id)}
+                      onToggleSelect={() => toggleSelect(d.id)}
+                      onToggleOpen={() => toggleOpen(d.id)}
+                      app={a}
+                    />,
+                    isOpen ? (
+                      <DeploymentExpandPanel
+                        key={`${d.id}-panel`}
                         deployment={d}
-                        repoFullName={a.sourceRepo}
-                      />,
-                    ];
-                  });
-
-                  return [...rows, ...children];
+                        app={a}
+                        onClose={() => setOpenId(null)}
+                      />
+                    ) : null,
+                  ];
                 })}
               </TableBody>
             </Table>
@@ -800,9 +523,682 @@ export function AppDeploymentsClient({ slug }: { slug: string }) {
   );
 }
 
-// #652 — deploy-vs-deploy diff. The query is fired on open so a
-// closed sheet doesn't keep paying for the comparison; the cache is
-// keyed on (idA, idB) so reopening the same pair is a no-network hit.
+// ─── Row ───────────────────────────────────────────────────────────────
+
+function DeploymentRow({
+  deployment,
+  isOpen,
+  selected,
+  onToggleSelect,
+  onToggleOpen,
+  app,
+}: {
+  deployment: AstroliftDeployment;
+  isOpen: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onToggleOpen: () => void;
+  app: AstroliftRegisteredApp;
+}) {
+  const d = deployment;
+  return (
+    <TableRow
+      className={cn(
+        "hover:bg-accent/30 cursor-pointer",
+        isOpen && "bg-accent/40 hover:bg-accent/40"
+      )}
+      onClick={onToggleOpen}
+      aria-expanded={isOpen}
+    >
+      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          aria-label={`Select ${d.imageTag ?? d.id}`}
+          checked={selected}
+          onChange={onToggleSelect}
+        />
+      </TableCell>
+      <TableCell>
+        <DeploymentStatusPill status={d.status} />
+      </TableCell>
+      <TableCell>
+        <div className="font-mono text-xs">{d.imageTag || "—"}</div>
+        {d.workloadSlug && (
+          <div className="text-muted-foreground mt-0.5 font-mono text-[11px]">{d.workloadSlug}</div>
+        )}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="font-mono text-xs">
+          {d.environmentName}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-sm whitespace-nowrap">
+        {formatTime(d.startedAt ?? d.createdAt)}
+      </TableCell>
+      <TableCell className="font-mono text-xs">
+        <span className="inline-flex items-center gap-1">
+          <ClockIcon className="size-3" />
+          {formatDuration(d.durationSeconds)}
+        </span>
+      </TableCell>
+      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+        <RowActions deployment={d} app={app} />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ─── Row actions ───────────────────────────────────────────────────────
+
+function RowActions({
+  deployment,
+  app,
+}: {
+  deployment: AstroliftDeployment;
+  app: AstroliftRegisteredApp;
+}) {
+  const { can } = useMyPermissions();
+  const d = deployment;
+
+  const refetch = [
+    {
+      query: LIST_DEPLOYMENTS,
+      variables: { appSlug: app.slug, limit: 100 },
+    },
+  ];
+
+  const [approve, approveState] = useMutation<{
+    approveDeployment: MutationResultLite<AstroliftDeployment>;
+  }>(APPROVE_DEPLOYMENT, { refetchQueries: refetch });
+  const [abort, abortState] = useMutation<{
+    abortDeployment: MutationResultLite<AstroliftDeployment>;
+  }>(ABORT_DEPLOYMENT, { refetchQueries: refetch });
+  const [rollback, rollbackState] = useMutation<{
+    rollbackDeployment: MutationResultLite<AstroliftDeployment>;
+  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: refetch });
+  const [redeploy, redeployState] = useMutation<{
+    redeployApp: MutationResultLite<AstroliftDeployment>;
+  }>(REDEPLOY_APP, { refetchQueries: refetch });
+
+  const [confirmAbort, setConfirmAbort] = React.useState(false);
+  const [confirmRollback, setConfirmRollback] = React.useState(false);
+  const [confirmTrash, setConfirmTrash] = React.useState(false);
+
+  const busy =
+    approveState.loading || abortState.loading || rollbackState.loading || redeployState.loading;
+
+  function reportResult(
+    label: string,
+    result: MutationResultLite<AstroliftDeployment> | null | undefined
+  ) {
+    if (!result) return;
+    if (result.ok) {
+      toast.success(`${label}: ${result.data?.status ?? "ok"}`);
+    } else {
+      throw new Error(result.errors[0]?.message ?? `${label} failed`);
+    }
+  }
+
+  const showApprove =
+    d.status === "pending_approval" &&
+    d.approvalsReceived < d.approvalsRequired &&
+    can("app.approve_deploy");
+  const inFlight = IN_FLIGHT.has(d.status);
+  const showAbort = inFlight && can("app.deploy");
+  const showRedeploy = d.status === "running" && can("app.deploy");
+  const showRollback =
+    (d.status === "running" || d.status === "superseded" || d.status === "rolled_back") &&
+    can("app.rollback");
+  const showFailedRollback = d.status === "failed" && can("app.rollback");
+  const showFailedTrash = d.status === "failed" && can("app.deploy");
+
+  return (
+    <div className="inline-flex items-center justify-end gap-1">
+      {showApprove && (
+        <Button
+          size="sm"
+          variant="default"
+          disabled={busy}
+          onClick={async () => {
+            try {
+              const { data } = await approve({
+                variables: { input: { id: d.id } },
+              });
+              reportResult("approveDeployment", data?.approveDeployment);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Approve failed");
+            }
+          }}
+        >
+          <CheckIcon className="size-3.5" />
+          Approve
+        </Button>
+      )}
+      {showRedeploy && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={async () => {
+            try {
+              const { data } = await redeploy({
+                variables: { input: { id: d.id } },
+              });
+              reportResult("redeployApp", data?.redeployApp);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Redeploy failed");
+            }
+          }}
+        >
+          <RotateCcwIcon className="size-3.5" />
+          Redeploy
+        </Button>
+      )}
+      {(showRollback || showFailedRollback) && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => setConfirmRollback(true)}
+        >
+          <UndoIcon className="size-3.5" />
+          Rollback
+        </Button>
+      )}
+      {showAbort && (
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={busy}
+          onClick={() => setConfirmAbort(true)}
+        >
+          <StopCircleIcon className="size-3.5" />
+          Abort
+        </Button>
+      )}
+      {showFailedTrash && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          aria-label="Discard failed deployment"
+          onClick={() => setConfirmTrash(true)}
+        >
+          <Trash2Icon className="size-3.5" />
+        </Button>
+      )}
+
+      <ConfirmDialogWithReason
+        open={confirmAbort}
+        onOpenChange={setConfirmAbort}
+        title={`Abort deploy to ${d.environmentName}?`}
+        description="The in-flight rollout will be marked failed. Tell the team what changed."
+        reasonLabel="Reason for abort"
+        reasonPlaceholder="Why are you aborting this deploy?"
+        confirmLabel="Abort deploy"
+        destructive
+        onConfirm={async (reason) => {
+          const { data } = await abort({
+            variables: { input: { id: d.id, reason } },
+          });
+          reportResult("abortDeployment", data?.abortDeployment);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmRollback}
+        onOpenChange={setConfirmRollback}
+        title={`Rollback ${d.environmentName} to ${d.imageTag || d.id.slice(0, 8)}?`}
+        description="The platform will redeploy this image as the live version. The current rollout will be marked superseded."
+        confirmLabel="Roll back"
+        onConfirm={async () => {
+          const { data } = await rollback({
+            variables: { input: { id: d.id } },
+          });
+          reportResult("rollbackDeployment", data?.rollbackDeployment);
+        }}
+      />
+
+      <ConfirmDialogWithReason
+        open={confirmTrash}
+        onOpenChange={setConfirmTrash}
+        title={`Discard failed deploy ${d.imageTag || d.id.slice(0, 8)}?`}
+        description="The row stays in history but the rollout is marked aborted. Tell the team what changed."
+        reasonLabel="Reason for discard"
+        reasonPlaceholder="Why are you discarding this deploy?"
+        confirmLabel="Discard"
+        destructive
+        onConfirm={async (reason) => {
+          const { data } = await abort({
+            variables: { input: { id: d.id, reason } },
+          });
+          reportResult("abortDeployment", data?.abortDeployment);
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Inline expand panel ───────────────────────────────────────────────
+
+function DeploymentExpandPanel({
+  deployment,
+  app,
+  onClose,
+}: {
+  deployment: AstroliftDeployment;
+  app: AstroliftRegisteredApp;
+  onClose: () => void;
+}) {
+  const d = deployment;
+  const log = useQuery<LogResp>(GET_DEPLOYMENT_LOG, {
+    variables: { deploymentId: d.id },
+    fetchPolicy: "cache-and-network",
+  });
+  const manifest = useQuery<ManifestResp>(GET_RENDERED_MANIFEST, {
+    variables: {
+      appSlug: d.registeredAppSlug,
+      environmentName: d.environmentName,
+      imageTag: d.imageTag || null,
+    },
+    fetchPolicy: "cache-first",
+  });
+
+  const success = d.status === "running";
+  const failed = d.status === "failed";
+  const env = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
+    variables: { appSlug: d.registeredAppSlug },
+    fetchPolicy: "cache-first",
+  });
+  const envObj = env.data?.astroliftEnvironments?.find((e) => e.name === d.environmentName);
+
+  return (
+    <TableRow className="bg-muted/20 hover:bg-muted/20">
+      <TableCell colSpan={TABLE_COLUMNS} className="p-0">
+        <div className="border-border/60 space-y-4 border-t px-6 py-4">
+          {/* Header bar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <DeploymentStatusPill status={d.status} />
+            <span className="font-mono text-sm">{d.imageTag || d.id.slice(0, 12)}</span>
+            <span className="text-muted-foreground text-xs">·</span>
+            <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+              <ClockIcon className="size-3" />
+              {formatDuration(d.durationSeconds)}
+            </span>
+            <span className="text-muted-foreground text-xs">·</span>
+            <Badge variant="outline" className="font-mono text-xs">
+              {d.environmentName}
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              onClick={onClose}
+              aria-label="Close panel"
+            >
+              <XIcon className="size-3.5" />
+              Close
+            </Button>
+          </div>
+
+          {/* Success / failure banner */}
+          {success && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-[color:var(--brand-primary)]/30 bg-[color:var(--brand-primary)]/10 px-3 py-2 text-sm">
+              <CheckCircle2Icon className="size-4 text-[color:var(--brand-primary)]" />
+              <span className="font-medium">Deployment successful!</span>
+              {envObj?.url && (
+                <a
+                  href={envObj.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[color:var(--brand-primary)] hover:underline"
+                >
+                  Open app
+                  <ExternalLinkIcon className="size-3" />
+                </a>
+              )}
+            </div>
+          )}
+          {failed && (
+            <div className="border-destructive/30 bg-destructive/10 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm">
+              <XCircleIcon className="text-destructive size-4" />
+              <span className="font-medium">Deployment failed.</span>
+              {d.abortedReason && (
+                <span className="text-destructive/90 font-mono text-xs break-words">
+                  {d.abortedReason}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Applied manifests */}
+          <ManifestTabs
+            manifest={manifest.data?.astroliftRenderedManifest}
+            loading={manifest.loading}
+          />
+
+          {/* Deployment log */}
+          <DeploymentLog entries={log.data?.astroliftDeploymentLog ?? []} loading={log.loading} />
+
+          {/* Secondary commit / branch / CI metadata row */}
+          <CommitMetaRow deployment={d} repoFullName={app.sourceRepo} />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ─── Manifest tabs ─────────────────────────────────────────────────────
+
+interface ManifestForTabs {
+  resources: unknown;
+  error?: string | null;
+  errorPath?: string | null;
+  errorLine?: number | null;
+}
+
+function ManifestTabs({
+  manifest,
+  loading,
+}: {
+  manifest: ManifestForTabs | null | undefined;
+  loading: boolean;
+}) {
+  const tabs = React.useMemo(() => buildManifestTabs(manifest?.resources), [manifest?.resources]);
+  // Track only the user's tab selection. The effective active tab falls
+  // back to the first available kind whenever the user hasn't picked
+  // one yet or the manifest shape changed and their selection no longer
+  // exists — this avoids a setState-in-effect cascade.
+  const [override, setOverride] = React.useState<string | null>(null);
+  const activeTab = (override && tabs.find((t) => t.id === override)) || tabs[0] || null;
+  const body = activeTab ? JSON.stringify(activeTab.payload, null, 2) : "";
+
+  async function copyBody() {
+    if (!body) return;
+    try {
+      await navigator.clipboard.writeText(body);
+      toast.success("Manifest copied to clipboard");
+    } catch {
+      toast.error("Couldn't copy — clipboard access blocked");
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        Applied manifests
+      </h4>
+      {loading && !manifest ? (
+        <Skeleton className="h-32 w-full" />
+      ) : manifest?.error ? (
+        <div className="text-destructive text-xs">
+          <p className="font-medium">Manifest could not be rendered.</p>
+          <p className="mt-1 font-mono">{manifest.error}</p>
+          {manifest.errorPath && (
+            <p className="text-muted-foreground mt-1 font-mono">
+              {manifest.errorPath}
+              {manifest.errorLine != null && ` :${manifest.errorLine}`}
+            </p>
+          )}
+        </div>
+      ) : tabs.length === 0 ? (
+        <p className="text-muted-foreground text-xs">No manifest available for this deployment.</p>
+      ) : (
+        <div className="space-y-2">
+          <div className="border-border flex flex-wrap items-center gap-1 border-b">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setOverride(t.id)}
+                className={cn(
+                  "-mb-px border-b-2 px-3 py-1.5 text-xs font-medium transition-colors",
+                  activeTab?.id === t.id
+                    ? "border-foreground text-foreground"
+                    : "text-muted-foreground hover:text-foreground border-transparent"
+                )}
+              >
+                {t.label}
+                {t.count > 1 && (
+                  <span className="text-muted-foreground ml-1 tabular-nums">{t.count}</span>
+                )}
+              </button>
+            ))}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto h-7"
+              onClick={copyBody}
+              disabled={!body}
+            >
+              <ClipboardIcon className="size-3.5" />
+              Copy
+            </Button>
+          </div>
+          <pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 font-mono text-xs leading-relaxed">
+            {body}
+          </pre>
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface ManifestTab {
+  id: string;
+  label: string;
+  count: number;
+  payload: unknown;
+}
+
+const KNOWN_K8S_KINDS = new Set([
+  "Deployment",
+  "StatefulSet",
+  "DaemonSet",
+  "Service",
+  "Ingress",
+  "ConfigMap",
+  "Secret",
+  "CronJob",
+  "Job",
+  "HorizontalPodAutoscaler",
+  "ServiceAccount",
+  "Role",
+  "RoleBinding",
+  "ClusterRole",
+  "ClusterRoleBinding",
+  "PersistentVolumeClaim",
+  "NetworkPolicy",
+  "PodDisruptionBudget",
+]);
+
+/**
+ * Group rendered manifest resources by Kubernetes kind into one tab per
+ * kind. Handles both shapes the backend produces:
+ *   - an array of `{ kind, ...spec }` resources (the typical shape)
+ *   - a `Record<kind, spec | spec[]>` keyed by kind (the legacy shape)
+ *
+ * Anything else falls back to a single "Manifest" tab carrying the raw
+ * payload so the operator can still inspect / copy the rendered JSON.
+ */
+function buildManifestTabs(resources: unknown): ManifestTab[] {
+  if (resources == null) return [];
+  if (Array.isArray(resources)) {
+    const groups = new Map<string, unknown[]>();
+    for (const item of resources) {
+      if (item && typeof item === "object" && "kind" in (item as Record<string, unknown>)) {
+        const kind = String((item as { kind?: unknown }).kind ?? "Manifest");
+        const bucket = groups.get(kind) ?? [];
+        bucket.push(item);
+        groups.set(kind, bucket);
+      }
+    }
+    if (groups.size > 0) {
+      return Array.from(groups.entries())
+        .map(([kind, items]) => ({
+          id: kind,
+          label: kind,
+          count: items.length,
+          payload: items.length === 1 ? items[0] : items,
+        }))
+        .sort((a, b) => kindOrder(a.id) - kindOrder(b.id) || a.label.localeCompare(b.label));
+    }
+    // Array of opaque entries — fall through to the catch-all single tab.
+    return [{ id: "manifest", label: "Manifest", count: resources.length, payload: resources }];
+  }
+  if (typeof resources === "object") {
+    const record = resources as Record<string, unknown>;
+    const keys = Object.keys(record);
+    const k8sKeys = keys.filter((k) => KNOWN_K8S_KINDS.has(k));
+    if (k8sKeys.length > 0) {
+      return k8sKeys
+        .map((kind) => {
+          const value = record[kind];
+          const count = Array.isArray(value) ? value.length : 1;
+          return { id: kind, label: kind, count, payload: value };
+        })
+        .sort((a, b) => kindOrder(a.id) - kindOrder(b.id) || a.label.localeCompare(b.label));
+    }
+  }
+  return [{ id: "manifest", label: "Manifest", count: 1, payload: resources }];
+}
+
+const KIND_ORDER: Record<string, number> = {
+  Deployment: 0,
+  StatefulSet: 1,
+  DaemonSet: 2,
+  CronJob: 3,
+  Job: 4,
+  Service: 10,
+  Ingress: 11,
+  HorizontalPodAutoscaler: 20,
+  ConfigMap: 30,
+  Secret: 31,
+  ServiceAccount: 40,
+  Role: 41,
+  RoleBinding: 42,
+  ClusterRole: 43,
+  ClusterRoleBinding: 44,
+  PersistentVolumeClaim: 50,
+  NetworkPolicy: 60,
+  PodDisruptionBudget: 70,
+};
+
+function kindOrder(kind: string): number {
+  return KIND_ORDER[kind] ?? 100;
+}
+
+// ─── Deployment log ────────────────────────────────────────────────────
+
+function DeploymentLog({
+  entries,
+  loading,
+}: {
+  entries: AstroliftDeploymentLogEntry[];
+  loading: boolean;
+}) {
+  return (
+    <section className="space-y-2">
+      <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        Deployment log
+      </h4>
+      {loading && entries.length === 0 ? (
+        <Skeleton className="h-24 w-full" />
+      ) : entries.length === 0 ? (
+        <p className="text-muted-foreground text-xs">No log entries for this deployment yet.</p>
+      ) : (
+        <ol className="bg-muted/40 max-h-64 space-y-1 overflow-auto rounded-md p-3 font-mono text-xs leading-snug">
+          {entries.map((e) => (
+            <li key={e.id} className="flex flex-wrap items-baseline gap-2">
+              <span className="text-muted-foreground tabular-nums">
+                {formatLogTime(e.occurredAt)}
+              </span>
+              <Badge variant="outline" className="text-[10px] capitalize">
+                {e.status.replace(/_/g, " ")}
+              </Badge>
+              <span className="text-foreground break-words">{e.message || "—"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+// ─── Commit / branch / CI metadata row ─────────────────────────────────
+
+function CommitMetaRow({
+  deployment,
+  repoFullName,
+}: {
+  deployment: AstroliftDeployment;
+  repoFullName: string;
+}) {
+  const d = deployment;
+  if (!d.commitSha && !d.branch && !d.commitAuthor && !d.ciRunUrl && !d.prNumber && !d.repoUrl) {
+    return null;
+  }
+  const sha = d.commitSha ? d.commitSha.slice(0, 7) : null;
+  return (
+    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+      {sha && (
+        <span className="inline-flex items-center gap-1">
+          <GitCommitIcon className="size-3" />
+          {repoFullName ? (
+            <a
+              href={githubCommitUrl(repoFullName, d.commitSha)}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-foreground font-mono hover:underline"
+            >
+              {sha}
+            </a>
+          ) : (
+            <span className="font-mono">{sha}</span>
+          )}
+          {d.branch && <span className="text-muted-foreground/80">· {d.branch}</span>}
+        </span>
+      )}
+      {d.commitAuthor && <span>by {d.commitAuthor}</span>}
+      {d.prNumber > 0 && d.prUrl && (
+        <a
+          href={d.prUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-foreground inline-flex items-center gap-1 hover:underline"
+        >
+          PR #{d.prNumber}
+          <ExternalLinkIcon className="size-3" />
+        </a>
+      )}
+      {d.ciRunUrl && (
+        <a
+          href={d.ciRunUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-foreground inline-flex items-center gap-1 hover:underline"
+        >
+          {d.ciProvider || "ci"} run
+          <ExternalLinkIcon className="size-3" />
+        </a>
+      )}
+      {repoFullName && d.repoUrl && (
+        <a
+          href={d.repoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-foreground inline-flex items-center gap-1 hover:underline"
+        >
+          <span className="font-mono">{repoFullName}</span>
+          <ExternalLinkIcon className="size-3" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+// ─── Compare sheet (#652) ──────────────────────────────────────────────
+
 function CompareDeploymentsSheet({
   open,
   onOpenChange,
@@ -850,9 +1246,7 @@ function CompareDeploymentsSheet({
             ) : loading ? (
               "Loading comparison..."
             ) : error ? (
-              <span className="text-destructive">
-                {error.message}
-              </span>
+              <span className="text-destructive">{error.message}</span>
             ) : (
               "—"
             )}
@@ -933,21 +1327,21 @@ function ManifestDiffRow({
         <code className="break-all">{entry.path}</code>
       </div>
       {entry.op === "add" && (
-        <pre className="text-emerald-700 dark:text-emerald-300 whitespace-pre-wrap break-all">
+        <pre className="break-all whitespace-pre-wrap text-emerald-700 dark:text-emerald-300">
           {jsonValue(entry.after)}
         </pre>
       )}
       {entry.op === "remove" && (
-        <pre className="text-destructive whitespace-pre-wrap break-all">
+        <pre className="text-destructive break-all whitespace-pre-wrap">
           {jsonValue(entry.before)}
         </pre>
       )}
       {entry.op === "replace" && (
         <div className="space-y-1">
-          <pre className="text-destructive whitespace-pre-wrap break-all">
+          <pre className="text-destructive break-all whitespace-pre-wrap">
             − {jsonValue(entry.before)}
           </pre>
-          <pre className="text-emerald-700 dark:text-emerald-300 whitespace-pre-wrap break-all">
+          <pre className="break-all whitespace-pre-wrap text-emerald-700 dark:text-emerald-300">
             + {jsonValue(entry.after)}
           </pre>
         </div>
@@ -964,128 +1358,4 @@ function jsonValue(v: unknown): string {
   } catch {
     return String(v);
   }
-}
-
-// #657 — per-row changelog expander. Kept as a stop-propagation button so
-// clicking the toggle never races the row's "navigate to detail" handler.
-function ChangelogToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={open ? "Hide changelog" : "Show changelog"}
-      aria-expanded={open}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded hover:bg-accent/50"
-    >
-      {open ? (
-        <ChevronDownIcon className="size-3.5" />
-      ) : (
-        <ChevronRightIcon className="size-3.5" />
-      )}
-    </button>
-  );
-}
-
-const COMMIT_MESSAGE_MAX = 120;
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}…`;
-}
-
-// #657 — inline changelog row. Renders as a single full-width `<td colSpan>`
-// so we keep one `<tbody>` and avoid nesting `<tr>` inside another row.
-function ChangelogPanelRow({
-  deployment,
-  repoFullName,
-}: {
-  deployment: AstroliftDeployment;
-  repoFullName: string;
-}) {
-  const sha = deployment.commitSha?.slice(0, 7) || "—";
-  const message = deployment.commitMessage
-    ? truncate(deployment.commitMessage.split("\n")[0], COMMIT_MESSAGE_MAX)
-    : "";
-  const repoLabel = repoFullName || deployment.repoUrl;
-
-  return (
-    <TableRow className="bg-muted/20 hover:bg-muted/20">
-      <TableCell colSpan={10} className="p-0">
-        <div className="border-border/60 border-t px-6 py-3 text-xs">
-          <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <GitCommitIcon className="text-muted-foreground size-3" />
-                <code className="bg-muted rounded px-1 py-0.5 font-mono">{sha}</code>
-                {message ? (
-                  <span className="break-words text-foreground">{message}</span>
-                ) : (
-                  <span className="text-muted-foreground">No commit message.</span>
-                )}
-              </div>
-              <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-                {deployment.commitAuthorAvatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={deployment.commitAuthorAvatarUrl}
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="size-4 rounded-full"
-                  />
-                ) : null}
-                <span>
-                  {deployment.commitAuthor || "unknown author"}
-                  {deployment.branch ? (
-                    <>
-                      {" on branch "}
-                      <code className="font-mono">{deployment.branch}</code>
-                    </>
-                  ) : null}
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {deployment.prNumber > 0 && deployment.prUrl ? (
-                <a
-                  href={deployment.prUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-foreground hover:underline inline-flex items-center gap-1"
-                >
-                  PR #{deployment.prNumber}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              ) : null}
-              {deployment.ciRunUrl ? (
-                <a
-                  href={deployment.ciRunUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-                >
-                  CI run
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              ) : null}
-              {deployment.repoUrl && repoLabel ? (
-                <a
-                  href={deployment.repoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-                >
-                  <span className="font-mono">{repoLabel}</span>
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </TableCell>
-    </TableRow>
-  );
 }
