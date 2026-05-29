@@ -67,6 +67,7 @@ import {
   MUTE_ALERT_RULE,
   UNMUTE_ALERT_RULE,
 } from "@/graphql/operations/alerts.queries";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface AlertMute {
   id: string;
@@ -121,6 +122,7 @@ const SEVERITIES = ["info", "warn", "critical"];
 
 export function AlertsClient() {
   const t = useTranslations("lists.alerts");
+  const fmt = useFormatters();
   const [createOpen, setCreateOpen] = React.useState(false);
   const rules = useQuery<RulesResp>(LIST_ALERT_RULES, {
     variables: { activeOnly: false },
@@ -396,7 +398,7 @@ export function AlertsClient() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {new Date(r.createdAt).toLocaleDateString()}
+                      {fmt.formatDate(r.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -524,7 +526,7 @@ export function AlertsClient() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {new Date(e.firedAt).toLocaleString()}
+                      {fmt.formatDateTime(e.firedAt)}
                     </TableCell>
                     <TableCell>
                       {e.resolvedAt ? (

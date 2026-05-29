@@ -47,6 +47,7 @@ import {
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { RegisterClusterDialog } from "./register-cluster-dialog";
 
@@ -117,6 +118,7 @@ function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: st
 }
 
 export function ClustersClient() {
+  const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [unregisterTarget, setUnregisterTarget] = React.useState<AstroliftTenantCluster | null>(
     null
@@ -420,7 +422,7 @@ export function ClustersClient() {
                     <TableCell className="font-mono text-xs">{c.ingressClass}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {c.capabilitiesProbedAt
-                        ? new Date(c.capabilitiesProbedAt).toLocaleString()
+                        ? fmt.formatDateTime(c.capabilitiesProbedAt)
                         : "never"}
                     </TableCell>
                     <TableCell className="text-right">

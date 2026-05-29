@@ -42,6 +42,7 @@ import type {
   AstroliftRevokeAstroliftSessionPayload,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface SessionsResp {
   astroliftActiveSessions: AstroliftActiveSession[];
@@ -60,6 +61,7 @@ const CLIENT_KIND_ICONS: Record<
 
 export function SecuritySettingsClient() {
   const t = useTranslations("securitySessions");
+  const fmt = useFormatters();
   const { data, loading, error, refetch } = useQuery<SessionsResp>(LIST_ACTIVE_SESSIONS, {
     fetchPolicy: "cache-and-network",
   });
@@ -227,12 +229,12 @@ export function SecuritySettingsClient() {
                     </TableCell>
                     <TableCell
                       className="text-muted-foreground text-xs"
-                      title={s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : undefined}
+                      title={s.lastSeenAt ? fmt.formatDateTime(s.lastSeenAt) : undefined}
                     >
                       {relativeFromNow(s.lastSeenAt)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {s.expiresAt ? new Date(s.expiresAt).toLocaleString() : "—"}
+                      {s.expiresAt ? fmt.formatDateTime(s.expiresAt) : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

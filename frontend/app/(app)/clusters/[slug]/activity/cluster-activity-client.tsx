@@ -20,6 +20,7 @@ import {
   RECENT_CLUSTER_WORKFLOWS,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { ClusterTabs } from "../components/cluster-tabs";
 
@@ -109,6 +110,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 function RecentWorkflowsCard({ clusterId }: { clusterId: string }) {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<RecentWorkflowsResp>(RECENT_CLUSTER_WORKFLOWS, {
     variables: { clusterId, limit: 10 },
     pollInterval: 15000,
@@ -161,9 +163,7 @@ function RecentWorkflowsCard({ clusterId }: { clusterId: string }) {
                     {r.status}
                   </Badge>
                   <span className="text-muted-foreground ml-auto text-xs">
-                    {r.startedAt
-                      ? new Date(r.startedAt).toLocaleString()
-                      : "—"}
+                    {r.startedAt ? fmt.formatDateTime(r.startedAt) : "—"}
                     {duration !== null && (
                       <span className="opacity-60"> · {duration}s</span>
                     )}
@@ -197,6 +197,7 @@ interface LifecycleAuditResp {
 }
 
 function LifecycleTimelineCard({ clusterId }: { clusterId: string }) {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<LifecycleAuditResp>(CLUSTER_LIFECYCLE_AUDIT, {
     variables: { clusterId, limit: 50 },
     pollInterval: 30000,
@@ -251,7 +252,7 @@ function LifecycleTimelineCard({ clusterId }: { clusterId: string }) {
                     </span>
                   )}
                   <span className="text-muted-foreground ml-auto text-xs">
-                    {new Date(e.timestamp).toLocaleString()}
+                    {fmt.formatDateTime(e.timestamp)}
                   </span>
                 </div>
                 {!e.success && e.errors.length > 0 && (

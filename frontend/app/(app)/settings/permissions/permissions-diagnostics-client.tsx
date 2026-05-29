@@ -14,6 +14,7 @@ import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { GET_ME } from "@/graphql/user/user.queries";
 import type { CurrentUser } from "@/graphql/user/user.types";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface MyPermsResp {
   astroliftMyPermissions: string[];
@@ -39,6 +40,7 @@ const RESOURCE_TONE: Record<string, string> = {
 };
 
 export function PermissionsDiagnosticsClient() {
+  const fmt = useFormatters();
   const me = useQuery<MeResp>(GET_ME);
   const perms = useQuery<MyPermsResp>(GET_MY_PERMISSIONS);
   const bindings = useQuery<BindingsResp>(LIST_ROLE_BINDINGS);
@@ -213,12 +215,12 @@ export function PermissionsDiagnosticsClient() {
                   </Badge>
                   {b.expiresAt && (
                     <span className="text-muted-foreground text-xs">
-                      expires {new Date(b.expiresAt).toLocaleString()}
+                      expires {fmt.formatDateTime(b.expiresAt)}
                     </span>
                   )}
                 </div>
                 <div className="text-muted-foreground mt-1 text-xs">
-                  granted {new Date(b.grantedAt).toLocaleString()}
+                  granted {fmt.formatDateTime(b.grantedAt)}
                 </div>
               </div>
             ))
