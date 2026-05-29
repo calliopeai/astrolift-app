@@ -550,16 +550,44 @@ class AKSClusterDriver(ClusterDriver):
                 title="Prometheus + Grafana + Alertmanager",
                 default_enabled=True,
                 rationale=(
-                    "Metrics scraping + dashboarding. Persistent disk via "
-                    "Azure-managed-disk StorageClass; operators on Azure "
-                    "Monitor for containers can disable this and point "
-                    "the OTel collector at Log Analytics instead."
+                    "Metrics scraping + dashboarding. The default storage "
+                    "mode is ephemeral (emptyDir) — 24h retention, TSDB "
+                    "resets on pod restart. Select 'azurefile_persistent' "
+                    "to get 30d retention backed by Azure Files (SMB/NFS); "
+                    "that requires the Azure Files CSI driver and the "
+                    "'azurefile-prometheus' StorageClass applied from "
+                    "Terraform output before running this recipe. Operators "
+                    "on Azure Monitor for containers can disable this "
+                    "component and point the OTel collector at Log Analytics."
                 ),
                 helm_values={
                     "grafana": {"enabled": True},
+                    "prometheus": {
+                        "prometheusSpec": {
+                            "retention": "24h",
+                            "storageSpec": {},
+                        },
+                    },
                 },
                 requires=["storage:rwo"],
-                options=[],
+                options=[
+                    BootstrapOption(
+                        key="prometheus_storage",
+                        label="Prometheus storage backend",
+                        choices=[
+                            (
+                                "ephemeral",
+                                "Ephemeral (emptyDir) — 24h retention, resets on pod restart",
+                            ),
+                            (
+                                "azurefile_persistent",
+                                "Persistent Azure Files — 30d retention, survives restarts; "
+                                "requires Azure Files CSI addon + azurefile-prometheus StorageClass",
+                            ),
+                        ],
+                        default="ephemeral",
+                    ),
+                ],
                 chart_name="kube-prometheus-stack",
                 chart_repo_url="https://prometheus-community.github.io/helm-charts",
                 chart_repo_type="default",

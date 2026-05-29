@@ -62,6 +62,89 @@ def _merge_helm_values(
     return out
 
 
+# StorageSpec blocks for persistent Prometheus storage on each cloud.
+# Each entry is a ready-to-embed kube-prometheus-stack storageSpec value.
+# The StorageClass name must exist in the cluster before the HelmRelease
+# is installed — operators apply the SC manifest emitted by Terraform
+# (EFS CSI on EKS, Filestore CSI on GKE, Azure Files CSI on AKS) before
+# running the bootstrap recipe.
+_PROMETHEUS_PERSISTENT_STORAGE_SPECS: dict[str, dict] = {
+    # EFS-backed on EKS Fargate (#772). EBS can't attach to Fargate pods;
+    # EFS (NFS) is the only AWS-native persistent storage available there.
+    "efs_persistent": {
+        "volumeClaimTemplate": {
+            "spec": {
+                "storageClassName": "efs-prometheus",
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "50Gi"}},
+            }
+        }
+    },
+    # Filestore CSI on GKE (NFS-backed, works across AZ-distributed nodes).
+    "filestore_persistent": {
+        "volumeClaimTemplate": {
+            "spec": {
+                "storageClassName": "filestore-prometheus",
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "50Gi"}},
+            }
+        }
+    },
+    # Azure Files CSI on AKS (SMB/NFS, works on virtual-node Fargate-style
+    # pods and standard node pools alike).
+    "azurefile_persistent": {
+        "volumeClaimTemplate": {
+            "spec": {
+                "storageClassName": "azurefile-prometheus",
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": "50Gi"}},
+            }
+        }
+    },
+}
+
+
+def _apply_semantic_options(
+    component_key: str,
+    values: dict[str, Any],
+    options: dict[str, str],
+) -> dict[str, Any]:
+    """Convert semantic option keys (not valid Helm keys) into proper nested
+    Helm values, stripping the synthetic key so it doesn't land in the
+    HelmRelease spec.
+
+    Currently handles ``prometheus_storage`` on ``kube-prometheus-stack``:
+      - ``"ephemeral"`` (or absent) → empty storageSpec, 24h retention
+      - ``"efs_persistent"`` → EFS StorageClass PVC, 30d retention (EKS)
+      - ``"filestore_persistent"`` → Filestore StorageClass PVC, 30d (GKE)
+      - ``"azurefile_persistent"`` → Azure Files StorageClass PVC, 30d (AKS)
+
+    Any unrecognised ``prometheus_storage`` value is treated as ephemeral so
+    a typo doesn't silently push invalid YAML into the HelmRelease.
+    """
+    if component_key != "kube-prometheus-stack":
+        return values
+
+    storage_mode = options.get("prometheus_storage", "ephemeral")
+    # Strip the synthetic key regardless of mode — it isn't a valid Helm value.
+    result = {k: v for k, v in values.items() if k != "prometheus_storage"}
+
+    storage_spec = _PROMETHEUS_PERSISTENT_STORAGE_SPECS.get(storage_mode)
+    if storage_spec is None:
+        # ephemeral or unknown — leave storageSpec empty, 24h retention.
+        return result
+
+    # Deep-merge: update the nested prometheusSpec without clobbering other
+    # top-level keys (nodeExporter, grafana, etc.).
+    prom_block = dict(result.get("prometheus", {}))
+    prom_spec = dict(prom_block.get("prometheusSpec", {}))
+    prom_spec["storageSpec"] = storage_spec
+    prom_spec["retention"] = "30d"
+    prom_block["prometheusSpec"] = prom_spec
+    result["prometheus"] = prom_block
+    return result
+
+
 def _flux_crd_missing(errors: list) -> bool:
     """Return True if any ApplyError indicates the Flux CRDs don't exist yet.
 
@@ -218,10 +301,9 @@ def _install_cluster_prereqs_sync(
             applied.append(component.key)
             continue
 
-        merged_values = _merge_helm_values(
-            component.helm_values,
-            option_overrides.get(component.key, {}),
-        )
+        component_options = option_overrides.get(component.key, {})
+        merged_values = _merge_helm_values(component.helm_values, component_options)
+        merged_values = _apply_semantic_options(component.key, merged_values, component_options)
 
         # Slug the repo URL into a valid K8s resource name:
         # strip scheme, replace non-alphanumeric with '-', truncate to 52 chars

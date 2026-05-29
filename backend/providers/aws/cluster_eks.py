@@ -911,10 +911,16 @@ class EKSClusterDriver(ClusterDriver):
                 default_enabled=True,
                 rationale=(
                     "Metrics scraping + dashboarding for the platform UI's "
-                    "cluster-status charts. Prometheus runs with ephemeral "
-                    "storage (no PVC required) — 24h retention, resets on "
-                    "pod restart. node-exporter is disabled — DaemonSets "
-                    "with hostNetwork don't schedule on Fargate."
+                    "cluster-status charts. EBS can't attach to Fargate pods "
+                    "(no underlying EC2 host). The default storage mode is "
+                    "ephemeral (emptyDir) — 24h retention, TSDB resets on "
+                    "pod restart. Select 'efs_persistent' to get 30d "
+                    "retention backed by an EFS Access Point; that requires "
+                    "the aws-efs-csi-driver managed addon and the "
+                    "'efs-prometheus' StorageClass (apply the manifest from "
+                    "Terraform output before running this recipe). "
+                    "node-exporter is disabled — DaemonSets with hostNetwork "
+                    "don't schedule on Fargate."
                 ),
                 helm_values={
                     "nodeExporter": {"enabled": False},
@@ -926,8 +932,31 @@ class EKSClusterDriver(ClusterDriver):
                     },
                     "grafana": {"enabled": True, "persistence": {"enabled": False}},
                 },
+                # storageclass:efs-prometheus must be present when the operator
+                # selects the efs_persistent storage mode. Apply the StorageClass
+                # manifest emitted by the Terraform output before running this
+                # recipe. The bootstrap recipe doesn't enforce this automatically
+                # yet — the Flux HelmRelease will fail with a PVC-binding error
+                # if the StorageClass is absent.
                 requires=[],
-                options=[],
+                options=[
+                    BootstrapOption(
+                        key="prometheus_storage",
+                        label="Prometheus storage backend",
+                        choices=[
+                            (
+                                "ephemeral",
+                                "Ephemeral (emptyDir) — 24h retention, resets on pod restart",
+                            ),
+                            (
+                                "efs_persistent",
+                                "Persistent EFS — 30d retention, survives restarts; "
+                                "requires aws-efs-csi-driver addon + efs-prometheus StorageClass",
+                            ),
+                        ],
+                        default="ephemeral",
+                    ),
+                ],
                 chart_name="kube-prometheus-stack",
                 chart_repo_url="https://prometheus-community.github.io/helm-charts",
                 chart_repo_type="default",

@@ -529,15 +529,42 @@ class GKEClusterDriver(ClusterDriver):
                 title="Prometheus + Grafana + Alertmanager",
                 default_enabled=True,
                 rationale=(
-                    "Metrics scraping + dashboarding. Persistent disk via "
-                    "the GKE-default pd-standard StorageClass; flip to "
-                    "pd-ssd in helm values for higher write throughput."
+                    "Metrics scraping + dashboarding. The default storage "
+                    "mode is ephemeral (emptyDir) — 24h retention, TSDB "
+                    "resets on pod restart. Select 'filestore_persistent' "
+                    "to get 30d retention backed by a GCP Filestore NFS "
+                    "volume; that requires the Filestore CSI driver and the "
+                    "'filestore-prometheus' StorageClass applied from "
+                    "Terraform output before running this recipe."
                 ),
                 helm_values={
                     "grafana": {"enabled": True},
+                    "prometheus": {
+                        "prometheusSpec": {
+                            "retention": "24h",
+                            "storageSpec": {},
+                        },
+                    },
                 },
                 requires=["storage:rwo"],
-                options=[],
+                options=[
+                    BootstrapOption(
+                        key="prometheus_storage",
+                        label="Prometheus storage backend",
+                        choices=[
+                            (
+                                "ephemeral",
+                                "Ephemeral (emptyDir) — 24h retention, resets on pod restart",
+                            ),
+                            (
+                                "filestore_persistent",
+                                "Persistent Filestore — 30d retention, survives restarts; "
+                                "requires Filestore CSI addon + filestore-prometheus StorageClass",
+                            ),
+                        ],
+                        default="ephemeral",
+                    ),
+                ],
                 chart_name="kube-prometheus-stack",
                 chart_repo_url="https://prometheus-community.github.io/helm-charts",
                 chart_repo_type="default",
