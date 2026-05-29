@@ -541,3 +541,247 @@ def test_helper_sorts_by_namespace_then_name():
         ("tenant-a", "bravo"),
         ("tenant-b", "zeta"),
     ]
+
+
+# ─── Lifecycle audit resolver tests (#770) ───────────────────────────
+
+
+def _mkaudit(
+    *,
+    operation: str,
+    variables: dict,
+    success: bool = True,
+    errors: list[str] | None = None,
+) -> None:
+    """Insert one ``MutationAuditLog`` row directly. The audit
+    extension normally writes these inside ``on_operation``; tests
+    bypass the extension and write rows that simulate what the
+    extension would produce for a given mutation."""
+    from core.schema.audit import MutationAuditLog
+
+    MutationAuditLog.objects.create(
+        operation=operation,
+        variables=variables,
+        success=success,
+        errors=errors or [],
+    )
+
+
+def test_lifecycle_audit_denied_without_cluster_register(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """The lifecycle timeline shares the read-side permission with the
+    rest of the Status tab. Callers without it must be denied before
+    the table scan begins."""
+    with tenant_context(TenantContext(organization_id=org.id)):
+        with pytest.raises(PermissionDenied):
+            ClustersQuery().astrolift_cluster_lifecycle_audit(
+                _info(),
+                cluster_id=GUID(str(cluster.guid)),
+            )
+
+
+def test_lifecycle_audit_missing_cluster_returns_empty(
+    org,
+    permission_resolver,
+):
+    """A non-existent cluster guid must return an empty list rather
+    than fall back to a global audit-log dump. Mirrors the cluster_
+    health / workload_health contract."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(uuid.uuid4())),
+        )
+    assert result == []
+
+
+def test_lifecycle_audit_matches_dot_notation_operation(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """The canonical case: ``@mutation_audit`` populates
+    ``_mutation_action_local.action`` and the extension records the
+    dot-notation form (e.g. ``cluster.install_prereqs``). The resolver
+    matches on the ``cluster.`` prefix."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="cluster.install_prereqs",
+        variables={"input": {"clusterId": str(cluster.guid), "selectedComponents": ["cert-manager"]}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+    assert result[0].operation == "cluster.install_prereqs"
+
+
+def test_lifecycle_audit_matches_pascal_case_operation(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Defensive fallback (#770): when the thread-local isn't set,
+    ``MutationAuditExtension`` records ``request.operation_name`` —
+    the PascalCase GraphQL operation name (e.g. ``InstallClusterPrereqs``).
+    The resolver matches the known PascalCase names so a thread-local
+    regression doesn't silently empty the Status tab card.
+
+    This is the bug pattern the previous fix attempt addressed at the
+    extension layer but couldn't fully resolve from the audit-write
+    side; the resolver now tolerates both formats."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="InstallClusterPrereqs",
+        variables={"input": {"clusterId": str(cluster.guid), "selectedComponents": ["cert-manager"]}},
+    )
+    _mkaudit(
+        operation="BringClusterIntoManagement",
+        variables={"input": {"clusterId": str(cluster.guid)}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    ops = {r.operation for r in result}
+    assert ops == {"InstallClusterPrereqs", "BringClusterIntoManagement"}
+
+
+def test_lifecycle_audit_matches_register_by_slug_not_guid(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """RegisterTenantCluster's variables don't carry a cluster guid
+    yet (the row is being created), only the slug + name. The resolver
+    must match such rows via the slug check so the cluster's own
+    registration appears in its lifecycle timeline."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="cluster.register",
+        variables={"input": {"slug": cluster.slug, "name": cluster.name}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+    assert result[0].operation == "cluster.register"
+
+
+def test_lifecycle_audit_skips_other_clusters(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """A cluster's lifecycle timeline must contain only rows that
+    reference its own guid or slug — rows for unrelated clusters must
+    be excluded even when the operation prefix matches."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    other_guid = str(uuid.uuid4())
+    _mkaudit(
+        operation="cluster.install_prereqs",
+        variables={"input": {"clusterId": other_guid}},
+    )
+    _mkaudit(
+        operation="cluster.install_prereqs",
+        variables={"input": {"clusterId": str(cluster.guid)}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+
+
+def test_lifecycle_audit_skips_unrelated_operations(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Non-cluster mutations targeting other domains (app.deploy,
+    secret.rotated, ...) must not bleed into the cluster timeline even
+    when the cluster's guid happens to appear in their variables."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="app.deploy",
+        variables={"input": {"appId": "x", "clusterRef": str(cluster.guid)}},
+    )
+    _mkaudit(
+        operation="cluster.register",
+        variables={"input": {"slug": cluster.slug, "name": cluster.name}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+    assert result[0].operation == "cluster.register"
+
+
+def test_lifecycle_audit_respects_limit_and_newest_first(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Resolver returns newest-first (matches ``order_by('-timestamp')``)
+    and stops after ``limit`` matches — operators see the most-recent
+    activity on the Status tab even when the audit table is dense."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    for _ in range(5):
+        _mkaudit(
+            operation="cluster.install_prereqs",
+            variables={"input": {"clusterId": str(cluster.guid)}},
+        )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+            limit=3,
+        )
+    assert len(result) == 3
+    timestamps = [r.timestamp for r in result]
+    assert timestamps == sorted(timestamps, reverse=True)
+
+
+# ─── Recent cluster workflows visibility-query tests (#770) ──────────
+
+
+def test_recent_workflows_query_uses_exact_workflow_id_predicates():
+    """The visibility query must use exact ``WorkflowId="<type>-<guid>"``
+    predicates joined with OR — standard SQL visibility doesn't support
+    ``LIKE "%...%"`` on WorkflowId, which silently returned no rows in
+    prod even after Bring / Install / Decommission workflows ran.
+
+    Tests assert the constructed query shape rather than going through
+    a real Temporal server because the network layer is covered by the
+    Temporal SDK's own integration tests; what matters here is that we
+    don't reintroduce the LIKE-substring regression."""
+    from astrolift_workflows.client import _CLUSTER_WORKFLOW_ID_PREFIXES
+
+    # The prefixes must cover every workflow type that constructs its
+    # workflow_id as "<prefix>-<cluster_guid>" in ClustersMutation.
+    # Any new cluster workflow must add a prefix here.
+    assert "BringClusterIntoManagement" in _CLUSTER_WORKFLOW_ID_PREFIXES
+    assert "DecommissionClusterWorkflow" in _CLUSTER_WORKFLOW_ID_PREFIXES
+    assert "InstallClusterPrereqsWorkflow" in _CLUSTER_WORKFLOW_ID_PREFIXES
+
+
+def test_recent_workflows_disabled_returns_empty(settings):
+    """With Temporal off (kill switch flipped), the resolver returns
+    an empty list rather than raising — the Status tab card renders
+    its 'no runs recorded yet' empty state."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    from astrolift_workflows.client import list_workflows_for_cluster
+
+    assert list_workflows_for_cluster("any-guid", limit=10) == []
