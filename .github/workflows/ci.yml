@@ -1,9 +1,9 @@
 name: ci
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
+  # CI disabled until we have a stable working version — re-enable by
+  # restoring: pull_request + push: branches: [main]
 
 permissions:
   contents: read
