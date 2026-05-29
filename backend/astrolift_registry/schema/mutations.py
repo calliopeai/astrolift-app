@@ -642,7 +642,7 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_workflows.client import start_workflow
-    from astrolift_workflows.inputs import OnboardAppInput
+    from astrolift_workflows.inputs import Actor, OnboardAppInput
 
     # Must have at least one managed cluster to bind environments to.
     # TenantCluster.organization is nullable: null means shared (available to
@@ -701,9 +701,22 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     )
     if created_any or provisioning_pending:
         try:
+            # OnboardAppWorkflow only reads registered_app_id from its
+            # input; actor / provider_plugin_id / tenant_cluster_id are
+            # legacy fields carried in the dataclass for schema stability
+            # but are not forwarded to any activity.  Supply system
+            # defaults so the frozen dataclass can be constructed here
+            # without access to a live request context.
             start_workflow(
                 "OnboardAppWorkflow",
-                args=[OnboardAppInput(registered_app_id=app.pk)],
+                args=[
+                    OnboardAppInput(
+                        registered_app_id=app.pk,
+                        actor=Actor(kind="system", display="resync-bootstrap"),
+                        provider_plugin_id=0,
+                        tenant_cluster_id=cluster.pk,
+                    )
+                ],
                 workflow_id=f"OnboardAppWorkflow-{app.guid}",
             )
         except Exception:  # noqa: BLE001 — log and move on; don't fail the resync
