@@ -88,6 +88,7 @@ const CAPABILITY_KEYS = [
  * the bottom in its own red-bordered section.
  */
 export function ClusterSettingsClient({ slug }: { slug: string }) {
+  const fmt = useFormatters();
   const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_CLUSTERS);
   const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug);
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
@@ -326,7 +327,7 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
             }
           />
           <Field label="Ingress class" mono value={cluster.ingressClass} />
-          <Field label="Registered" value={new Date(cluster.createdAt).toLocaleString()} />
+          <Field label="Registered" value={fmt.formatDateTime(cluster.createdAt)} />
         </CardContent>
       </Card>
 

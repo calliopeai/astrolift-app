@@ -18,6 +18,7 @@ import {
   LIST_EVENTS_AGGREGATED,
 } from "@/graphql/operations/operations.queries";
 import type { AstroliftEvent } from "@/graphql/operations/operations.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface RawResp {
   astroliftEvents: AstroliftEvent[];
@@ -174,6 +175,7 @@ function AggregatedList({ eventTypeFilter }: { eventTypeFilter: string }) {
 
 function BucketRow({ bucket }: { bucket: AggregatedEvent }) {
   const t = useTranslations("lists.events");
+  const fmt = useFormatters();
   const [expanded, setExpanded] = React.useState(false);
   // Expand: re-query unaggregated events filtered to this bucket's event type
   // and let the row show the members. The backend doesn't (today) have a
@@ -214,8 +216,8 @@ function BucketRow({ bucket }: { bucket: AggregatedEvent }) {
             />
             <span className="text-muted-foreground text-xs">
               {bucket.count > 1
-                ? `${new Date(bucket.firstAt).toLocaleString()} → ${new Date(bucket.lastAt).toLocaleString()}`
-                : new Date(bucket.lastAt).toLocaleString()}
+                ? `${fmt.formatDateTime(bucket.firstAt)} → ${fmt.formatDateTime(bucket.lastAt)}`
+                : fmt.formatDateTime(bucket.lastAt)}
             </span>
           </div>
           {expanded && (
@@ -240,6 +242,7 @@ function BucketMembers({
   resourceKind: string;
   resourceId: string;
 }) {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<RawResp>(LIST_EVENTS, {
     variables: { limit: 200, eventType },
     fetchPolicy: "cache-and-network",
@@ -266,7 +269,7 @@ function BucketMembers({
               {e.eventType}
             </Badge>
             <span className="text-muted-foreground text-xs">
-              {new Date(e.occurredAt).toLocaleString()}
+              {fmt.formatDateTime(e.occurredAt)}
             </span>
           </div>
           {Object.keys(e.payload ?? {}).length > 0 && (
@@ -281,6 +284,7 @@ function BucketMembers({
 }
 
 function EventRow({ event }: { event: AstroliftEvent }) {
+  const fmt = useFormatters();
   return (
     <li className="flex items-start gap-4 p-4">
       <div className="bg-primary/10 text-primary mt-0.5 rounded-md p-2">
@@ -297,7 +301,7 @@ function EventRow({ event }: { event: AstroliftEvent }) {
             payload={event.payload}
           />
           <span className="text-muted-foreground text-xs">
-            {new Date(event.occurredAt).toLocaleString()}
+            {fmt.formatDateTime(event.occurredAt)}
           </span>
         </div>
         {Object.keys(event.payload ?? {}).length > 0 && (

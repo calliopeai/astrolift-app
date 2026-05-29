@@ -20,6 +20,7 @@ import {
   LIST_CLUSTERS,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { ClusterTabs } from "../components/cluster-tabs";
 
@@ -121,6 +122,7 @@ const PHASE_VARIANT: Record<string, "default" | "secondary" | "destructive" | "o
 };
 
 function LiveHealthCard({ clusterId }: { clusterId: string }) {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<HealthResp>(CLUSTER_HEALTH, {
     variables: { clusterId, eventLimit: 25 },
     pollInterval: 30000,
@@ -199,9 +201,7 @@ function LiveHealthCard({ clusterId }: { clusterId: string }) {
                           </Badge>
                         )}
                         <span className="text-muted-foreground ml-auto text-xs">
-                          {e.lastSeen
-                            ? new Date(e.lastSeen).toLocaleString()
-                            : "—"}
+                          {e.lastSeen ? fmt.formatDateTime(e.lastSeen) : "—"}
                         </span>
                       </div>
                       <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
@@ -240,6 +240,7 @@ interface WorkloadHealthResp {
 }
 
 function WorkloadHealthCard({ clusterId }: { clusterId: string }) {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<WorkloadHealthResp>(
     CLUSTER_WORKLOAD_HEALTH,
     {
@@ -351,9 +352,7 @@ function WorkloadHealthCard({ clusterId }: { clusterId: string }) {
                         {row.lastImageDeployedAt ? (
                           <span className="inline-flex items-center gap-1">
                             <RocketIcon className="size-3" />
-                            {new Date(
-                              row.lastImageDeployedAt,
-                            ).toLocaleString()}
+                            {fmt.formatDateTime(row.lastImageDeployedAt)}
                           </span>
                         ) : (
                           <span className="opacity-60">never</span>

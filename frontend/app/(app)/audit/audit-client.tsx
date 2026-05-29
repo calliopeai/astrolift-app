@@ -60,6 +60,7 @@ import type {
   AstroliftAuditRetention,
   AuditExportFormat,
 } from "@/graphql/operations/operations.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface PageResp {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
@@ -117,6 +118,7 @@ function todayIso(): string {
 
 export function AuditClient() {
   const t = useTranslations("lists.audit");
+  const fmt = useFormatters();
 
   const [actionFilter, setActionFilter] = React.useState("");
   const [decisionFilter, setDecisionFilter] = React.useState<string>("");
@@ -354,7 +356,7 @@ export function AuditClient() {
                       onClick={() => setActiveRow(row)}
                     >
                       <TableCell className="font-mono text-xs whitespace-nowrap">
-                        {new Date(row.occurredAt).toLocaleString()}
+                        {fmt.formatDateTime(row.occurredAt)}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{row.actorDisplay || row.actorKind}</div>
@@ -418,6 +420,7 @@ function AuditDetailsSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations("lists.audit");
+  const fmt = useFormatters();
   const hasBefore = row?.before != null;
   const hasAfter = row?.after != null;
   const showDiff = hasBefore && hasAfter;
@@ -430,7 +433,7 @@ function AuditDetailsSheet({
             <SheetHeader>
               <SheetTitle className="font-mono text-base">{row.action}</SheetTitle>
               <SheetDescription>
-                {new Date(row.occurredAt).toLocaleString()} · {row.actorDisplay || row.actorKind} ·{" "}
+                {fmt.formatDateTime(row.occurredAt)} · {row.actorDisplay || row.actorKind} ·{" "}
                 {row.decision}
               </SheetDescription>
             </SheetHeader>

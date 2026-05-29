@@ -17,6 +17,7 @@ import {
 } from "@/graphql/operations/operations.mutations";
 import { LIST_MY_NOTIFICATIONS } from "@/graphql/operations/operations.queries";
 import type { AstroliftNotification } from "@/graphql/operations/operations.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AlertSubscriptionsCard } from "./alert-subscriptions-card";
 
@@ -25,6 +26,7 @@ interface Resp {
 }
 
 export function NotificationsClient() {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<Resp>(LIST_MY_NOTIFICATIONS, {
     variables: { unreadOnly: false, limit: 100 },
     pollInterval: 10000,
@@ -111,7 +113,7 @@ export function NotificationsClient() {
                           {n.kind.replace(/_/g, " ")}
                         </Badge>
                         <span className="text-muted-foreground text-xs">
-                          {new Date(n.createdAt).toLocaleString()}
+                          {fmt.formatDateTime(n.createdAt)}
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-medium">{n.title}</p>

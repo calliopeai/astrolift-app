@@ -34,6 +34,7 @@ export function useFormatters() {
         day: "numeric",
         hour: "numeric",
         minute: "numeric",
+        timeZoneName: "short",
       }),
     formatNumber: (n: number) => fmt.number(n),
     formatPercent: (n: number) => fmt.number(n, { style: "percent" }),

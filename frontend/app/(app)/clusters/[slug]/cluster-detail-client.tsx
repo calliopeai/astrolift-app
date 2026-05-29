@@ -37,6 +37,7 @@ import {
   LIST_CLUSTERS,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { ClusterTabs } from "./components/cluster-tabs";
 
@@ -143,6 +144,7 @@ function isCapInstalled(key: CapKey, value: unknown): boolean {
 const POLL_INTERVAL_MS = 4000;
 
 export function ClusterDetailClient({ slug }: { slug: string }) {
+  const fmt = useFormatters();
   const { data, loading, startPolling, stopPolling } =
     useQuery<Resp>(LIST_CLUSTERS);
   const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug);
@@ -220,9 +222,9 @@ export function ClusterDetailClient({ slug }: { slug: string }) {
               <CardTitle className="text-base">Management</CardTitle>
               <CardDescription className="mt-0.5">
                 {lifecycle === "managed" && cluster.managedAt
-                  ? `Active since ${new Date(cluster.managedAt).toLocaleString()}`
+                  ? `Active since ${fmt.formatDateTime(cluster.managedAt)}`
                   : cluster.capabilitiesProbedAt
-                    ? `Capabilities probed ${new Date(cluster.capabilitiesProbedAt).toLocaleString()}`
+                    ? `Capabilities probed ${fmt.formatDateTime(cluster.capabilitiesProbedAt)}`
                     : "Not yet brought into management"}
               </CardDescription>
             </div>

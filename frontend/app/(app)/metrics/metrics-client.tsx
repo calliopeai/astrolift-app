@@ -36,6 +36,7 @@ import type {
   AstroliftDeploymentMetrics,
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface MetricsResp {
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
@@ -101,6 +102,7 @@ function MetricCard({
 }
 
 export function MetricsClient() {
+  const fmt = useFormatters();
   const [windowDays] = React.useState(30);
 
   const { data: metricsData, loading: metricsLoading } = useQuery<MetricsResp>(
@@ -270,7 +272,7 @@ export function MetricsClient() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {a.lastDeployedAt
-                        ? new Date(a.lastDeployedAt).toLocaleString()
+                        ? fmt.formatDateTime(a.lastDeployedAt)
                         : "—"}
                     </TableCell>
                   </TableRow>

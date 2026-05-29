@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/Toaster";
+import { TimezoneDetector } from "@/components/TimezoneDetector";
 import { getDirection } from "@/lib/i18n/direction";
 import "./globals.css";
 
@@ -29,6 +30,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} dir={direction} suppressHydrationWarning>
       <body className="antialiased">
+        <TimezoneDetector />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

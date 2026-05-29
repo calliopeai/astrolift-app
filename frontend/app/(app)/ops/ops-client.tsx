@@ -42,6 +42,7 @@ import type {
   AstroliftWorkflowRun,
   WorkflowRunStatus,
 } from "@/graphql/operations/operations.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface ClustersResp {
   astroliftClusters: AstroliftTenantCluster[];
@@ -100,6 +101,7 @@ function formatPct(rate: number | null | undefined): string {
 }
 
 export function OpsClient() {
+  const fmt = useFormatters();
   const clusters = useQuery<ClustersResp>(LIST_CLUSTERS, {
     pollInterval: 60000,
   });
@@ -337,9 +339,9 @@ export function OpsClient() {
                           </Badge>
                         </div>
                         <div className="text-muted-foreground mt-0.5 text-xs">
-                          fired {new Date(a.firedAt).toLocaleString()}
+                          fired {fmt.formatDateTime(a.firedAt)}
                           {a.acknowledgedAt && (
-                            <> · ack&apos;d {new Date(a.acknowledgedAt).toLocaleString()}</>
+                            <> · ack&apos;d {fmt.formatDateTime(a.acknowledgedAt)}</>
                           )}
                         </div>
                       </div>
@@ -406,11 +408,11 @@ export function OpsClient() {
                         {r.startedAt && (
                           <span className="inline-flex items-center gap-1">
                             <ClockIcon className="size-3" />
-                            started {new Date(r.startedAt).toLocaleString()}
+                            started {fmt.formatDateTime(r.startedAt)}
                           </span>
                         )}
                         {r.endedAt && (
-                          <> · ended {new Date(r.endedAt).toLocaleString()}</>
+                          <> · ended {fmt.formatDateTime(r.endedAt)}</>
                         )}
                       </div>
                       {r.failure && Object.keys(r.failure).length > 0 && (
@@ -467,7 +469,7 @@ export function OpsClient() {
                   className="flex flex-wrap items-center gap-3 px-6 py-3 text-sm"
                 >
                   <span className="text-muted-foreground w-44 shrink-0 font-mono text-xs">
-                    {new Date(e.occurredAt).toLocaleString()}
+                    {fmt.formatDateTime(e.occurredAt)}
                   </span>
                   <Badge variant="outline" className="font-mono text-xs">
                     {e.action}
