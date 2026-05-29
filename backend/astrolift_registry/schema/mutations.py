@@ -675,6 +675,13 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     org_slug = (
         getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
     ).lower()
+    # Use the org's default_managed_domain zone when configured; fall
+    # back to org_slug so existing installs without a ManagedDomain row
+    # still get a non-empty URL.
+    _default_domain = getattr(app.organization, "default_managed_domain", None)
+    base_zone: str = (
+        getattr(_default_domain, "zone", None) or org_slug
+    )
     created_any = False
     effective_env_names = list(env_names) if env_names else []
     if not effective_env_names:
@@ -694,7 +701,7 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
                 registered_app=app,
                 tenant_cluster=cluster,
                 name=env_name,
-                url=f"https://{app.subdomain or app.slug}.{org_slug}",
+                url=f"https://{app.subdomain or app.slug}.{base_zone}",
                 required_approvals=0,
             )
             created_any = True
