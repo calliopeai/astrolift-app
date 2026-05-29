@@ -121,23 +121,46 @@ class ClustersQuery:
         if cluster is None:
             return []
 
-        # Operations we care about for cluster lifecycle:
-        # - registerTenantCluster / updateTenantCluster / unregister
-        # - bringClusterIntoManagement / refreshClusterManagement
-        # - decommissionCluster
-        # - installClusterPrereqs
-        # - configureProviderPlugin (when the plugin in question is bound)
+        # Operations we care about for cluster lifecycle, matched either
+        # by dot-notation prefix (the ``@mutation_audit`` ``action`` value
+        # the extension records when the thread-local is populated) OR
+        # by raw GraphQL operation name (what the extension falls back
+        # to when ``_mutation_action_local.action`` isn't set on this
+        # thread — e.g. a sibling code path bypasses the decorator
+        # chain, or the wrapper short-circuits before the assignment).
+        # Matching both means a regression on either path still surfaces
+        # the timeline rather than silently emptying the Status tab card.
         prefixes = (
             "cluster.",
             "managed_domain.",
             "provider_plugin.",
+        )
+        # GraphQL operation names (PascalCase) for the same mutations.
+        # Synchronised with the ``@mutation_audit`` annotations on
+        # ``ClustersMutation`` — keep these in lockstep when a new
+        # cluster / domain / provider mutation lands.
+        operation_names = frozenset(
+            (
+                "RegisterTenantCluster",
+                "UpdateTenantCluster",
+                "UnregisterTenantCluster",
+                "BringClusterIntoManagement",
+                "RefreshClusterManagement",
+                "DecommissionCluster",
+                "InstallClusterPrereqs",
+                "RecordClusterBootstrapRun",
+                "CreateManagedDomain",
+                "UpdateManagedDomain",
+                "SoftDeleteManagedDomain",
+                "ConfigureProviderPlugin",
+            ),
         )
         qs = MutationAuditLog.objects.select_related("user").order_by("-timestamp")
         cluster_guid = str(cluster.guid)
         cluster_slug = cluster.slug
         out: list[ClusterLifecycleAuditEntryType] = []
         for log in qs.iterator(chunk_size=200):
-            if not any(log.operation.startswith(p) for p in prefixes):
+            if not (any(log.operation.startswith(p) for p in prefixes) or log.operation in operation_names):
                 continue
             # JSON-references via either guid or slug match. Stringify
             # variables once and substring-match — cheap, no JSON-path

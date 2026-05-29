@@ -90,7 +90,7 @@ def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
     return driver, ctx, namespace
 
 
-def _config_for_capability(plugin_slug: str, cluster: "TenantCluster", capability: str) -> Any:
+def _config_for_capability(plugin_slug: str, cluster: TenantCluster, capability: str) -> Any:
     """Build the driver-specific config dataclass for (plugin, capability).
 
     Non-cluster capabilities (registry, identity, secrets, dns, tls) need
@@ -129,7 +129,7 @@ def _config_for_capability(plugin_slug: str, cluster: "TenantCluster", capabilit
     return _config_for(plugin_slug, cluster)
 
 
-def driver_for_capability(cluster: "TenantCluster", capability: str) -> Any:
+def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
     """Resolve a non-cluster driver (``secrets``, ``dns``, ``registry``,
     ``tls``, ``identity``) for the cluster's provider plugin.
 
