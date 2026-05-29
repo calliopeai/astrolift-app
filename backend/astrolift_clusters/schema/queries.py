@@ -458,9 +458,10 @@ class ClustersQuery:
 
         Returns one ``ClusterPrometheusRangeSeriesType`` per golden
         signal (node count, pod running ratio, CPU / memory
-        utilization, deployment ready ratio). Each series carries a
-        dense point array at ``step_seconds`` resolution over the
-        trailing ``range_seconds`` window.
+        utilization, deployment ready ratio, apiserver p99 latency,
+        network receive rate, container restart rate). Each series
+        carries a dense point array at ``step_seconds`` resolution
+        over the trailing ``range_seconds`` window.
 
         Endpoint resolution mirrors ``astroliftClusterPrometheusMetrics``:
         ``provider_config['prometheus_endpoint']`` → capability-probe
@@ -553,14 +554,32 @@ class ClustersQuery:
                 "unit": "ratio",
                 "query": "sum(kube_deployment_status_replicas_ready) / sum(kube_deployment_spec_replicas)",
             },
+            {
+                "metric": "latency_p99",
+                "label": "Apiserver p99",
+                "unit": "seconds",
+                "query": 'histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!~"WATCH|WATCHLIST|LIST|PROXY|CONNECT"}[5m])) by (le))',
+            },
+            {
+                "metric": "network_rx",
+                "label": "Network receive",
+                "unit": "bytes_per_sec",
+                "query": "sum(rate(container_network_receive_bytes_total[5m]))",
+            },
+            {
+                "metric": "restart_rate",
+                "label": "Restarts / min",
+                "unit": "count",
+                "query": "sum(rate(kube_pod_container_status_restarts_total[5m])) * 60",
+            },
         ]
 
         _PROM_ERROR = object()  # sentinel: query failed with PrometheusError
 
         def _fetch_series(m: dict) -> ClusterPrometheusRangeSeriesType | object:
             """Fetch one golden-signal range series. Runs in a thread pool
-            so all five queries execute concurrently — worst-case latency
-            is one timeout (10s) rather than five in sequence (50s).
+            so all eight queries execute concurrently — worst-case latency
+            is one timeout (10s) rather than eight in sequence (80s).
             Returns _PROM_ERROR sentinel on PrometheusError so the caller
             can distinguish "endpoint unreachable" from "no data yet"."""
             try:
@@ -588,10 +607,10 @@ class ClustersQuery:
                 points=points,
             )
 
-        # Run all five queries concurrently — worst-case latency is one
-        # timeout (10s) rather than five in sequence (50s).
+        # Run all eight queries concurrently — worst-case latency is one
+        # timeout (10s) rather than eight in sequence (80s).
         raw_results: list[ClusterPrometheusRangeSeriesType | object] = [None] * len(_METRICS)  # type: ignore[list-item]
-        with ThreadPoolExecutor(max_workers=5) as pool:
+        with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {pool.submit(_fetch_series, m): i for i, m in enumerate(_METRICS)}
             for fut in as_completed(futures):
                 raw_results[futures[fut]] = fut.result()

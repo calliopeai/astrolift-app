@@ -181,7 +181,18 @@ function fmtTs(ts: number): string {
 function fmtValue(value: number | null, unit: string): string {
   if (value === null) return "—";
   if (unit === "ratio") return `${(value * 100).toFixed(1)}%`;
-  if (unit === "count") return String(Math.round(value));
+  if (unit === "count") return value < 0.1 ? "0" : value.toFixed(2);
+  if (unit === "seconds") {
+    if (value < 0.001) return `${(value * 1_000_000).toFixed(0)}µs`;
+    if (value < 1) return `${(value * 1000).toFixed(0)}ms`;
+    return `${value.toFixed(2)}s`;
+  }
+  if (unit === "bytes_per_sec") {
+    if (value < 1024) return `${value.toFixed(0)} B/s`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB/s`;
+    if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB/s`;
+    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB/s`;
+  }
   return value.toFixed(2);
 }
 
@@ -190,12 +201,26 @@ function seriesTone(
 ): "ok" | "warn" | "bad" | "neutral" {
   const v = series.current;
   if (v === null) return "neutral";
-  if (series.unit === "count") return "neutral";
   if (series.metric === "pod_running_ratio" || series.metric === "deployment_ready_ratio") {
     if (v >= 0.9) return "ok";
     if (v >= 0.7) return "warn";
     return "bad";
   }
+  // latency — low is good; apiserver p99 > 500ms is concerning
+  if (series.metric === "latency_p99") {
+    if (v < 0.1) return "ok";
+    if (v < 0.5) return "warn";
+    return "bad";
+  }
+  // network throughput — neutral (volume isn't inherently bad)
+  if (series.metric === "network_rx") return "neutral";
+  // restart rate — any restarts are concerning
+  if (series.metric === "restart_rate") {
+    if (v === 0) return "ok";
+    if (v < 1) return "warn";
+    return "bad";
+  }
+  if (series.unit === "count") return "neutral";
   // utilization metrics — high is bad
   if (v < 0.7) return "ok";
   if (v < 0.9) return "warn";
