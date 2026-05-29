@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 import {
   useArchiveForm,
@@ -162,6 +163,7 @@ function FormOverview({
   };
   fieldCount: number;
 }) {
+  const fmt = useFormatters();
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -176,7 +178,7 @@ function FormOverview({
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Published</h3>
           <p className="text-muted-foreground text-sm">
-            {form.publishedAt ? new Date(form.publishedAt).toLocaleDateString() : "Not yet"}
+            {form.publishedAt ? fmt.formatDate(form.publishedAt) : "Not yet"}
           </p>
         </div>
       </div>

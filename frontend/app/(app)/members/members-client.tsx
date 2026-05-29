@@ -69,6 +69,7 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { GrantRoleDialog } from "./grant-role-dialog";
@@ -110,6 +111,7 @@ export function MembersClient() {
   // member bulk surface can reuse a sibling key set without
   // overloading orgMembers.
   const tBulk = useTranslations("lists.membersBulk");
+  const fmt = useFormatters();
   const perms = useMyPermissions();
   const canManageMembers = perms.can("org.manage_members");
 
@@ -413,9 +415,7 @@ export function MembersClient() {
                           <LastActiveCell value={m.lastActiveAt} />
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {m.joinedAt
-                            ? new Date(m.joinedAt).toLocaleDateString()
-                            : new Date(m.createdAt).toLocaleDateString()}
+                          {m.joinedAt ? fmt.formatDate(m.joinedAt) : fmt.formatDate(m.createdAt)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -570,7 +570,7 @@ export function MembersClient() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(b.grantedAt).toLocaleDateString()}
+                        {fmt.formatDate(b.grantedAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Can permission="org.manage_members">
@@ -648,7 +648,7 @@ export function MembersClient() {
                           <InvitationExpiryBadge expiresAt={inv.expiresAt} />
                         ) : (
                           <span className="text-muted-foreground text-sm">
-                            {new Date(inv.expiresAt).toLocaleDateString()}
+                            {fmt.formatDate(inv.expiresAt)}
                           </span>
                         )}
                       </TableCell>
@@ -854,6 +854,7 @@ function formatRelative(iso: string, now: number): string {
  */
 function LastActiveCell({ value }: { value: string | null | undefined }) {
   const t = useTranslations("orgMembers");
+  const fmt = useFormatters();
   const [now] = React.useState(() => Date.now());
   if (!value) {
     return <span className="text-muted-foreground text-sm">{t("lastActiveNever")}</span>;
@@ -867,7 +868,7 @@ function LastActiveCell({ value }: { value: string | null | undefined }) {
         <TooltipTrigger asChild>
           <span className="text-foreground cursor-help text-sm">{formatRelative(value, now)}</span>
         </TooltipTrigger>
-        <TooltipContent>{date.toLocaleString()}</TooltipContent>
+        <TooltipContent>{fmt.formatDateTime(date)}</TooltipContent>
       </Tooltip>
       {isStale && (
         <Badge variant="secondary" className="text-[10px]">

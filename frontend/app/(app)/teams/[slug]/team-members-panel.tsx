@@ -44,6 +44,7 @@ import type {
   AstroliftTeam,
   MutationResult,
 } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface TeamMembersResp {
@@ -68,6 +69,7 @@ interface Props {
  */
 export function TeamMembersPanel({ team, roles }: Props) {
   const t = useTranslations("lists.teamMembersBulk");
+  const fmt = useFormatters();
   const perms = useMyPermissions();
   const canManageTeamMembers = perms.can("team.manage_members");
 
@@ -227,9 +229,7 @@ export function TeamMembersPanel({ team, roles }: Props) {
                 <Badge variant={m.isActive ? "default" : "secondary"}>{m.lifecycle}</Badge>
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
-                {m.joinedAt
-                  ? new Date(m.joinedAt).toLocaleDateString()
-                  : new Date(m.createdAt).toLocaleDateString()}
+                {m.joinedAt ? fmt.formatDate(m.joinedAt) : fmt.formatDate(m.createdAt)}
               </TableCell>
             </TableRow>
           ))}

@@ -53,6 +53,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, ProvisioningStatus } from "@/graphql/registry/registry.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 const statusDot: Record<ProvisioningStatus, "ok" | "warn" | "error" | "pending"> = {
   ready: "ok",
@@ -73,6 +74,7 @@ interface MembersResp {
 
 export function ProjectDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
+  const fmt = useFormatters();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
@@ -273,11 +275,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(a.createdAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {fmt.formatDate(a.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button asChild size="sm" variant="ghost">
@@ -338,7 +336,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                     <div className="font-medium">{m.user.username || m.user.email}</div>
                     <div className="text-muted-foreground text-xs">
                       {m.user.email} · joined{" "}
-                      {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : "—"}
+                      {m.joinedAt ? fmt.formatDate(m.joinedAt) : "—"}
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs uppercase">
@@ -371,9 +369,7 @@ export function ProjectDetailClient({ slug }: { slug: string }) {
                 <dt className="text-muted-foreground">Team</dt>
                 <dd className="col-span-2 font-mono text-xs">{project.team.slug}</dd>
                 <dt className="text-muted-foreground">Created</dt>
-                <dd className="col-span-2 text-xs">
-                  {new Date(project.createdAt).toLocaleString()}
-                </dd>
+                <dd className="col-span-2 text-xs">{fmt.formatDateTime(project.createdAt)}</dd>
               </dl>
               <p className="text-muted-foreground text-xs">
                 Project rename ships when the backend mutation lands; the slug is intentionally

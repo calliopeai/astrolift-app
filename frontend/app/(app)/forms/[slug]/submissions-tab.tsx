@@ -13,6 +13,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { FormSubmission } from "@/graphql/forms/forms.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 const PAGE_SIZE = 25;
 
@@ -35,6 +36,7 @@ export function FormSubmissionsTab({
   submissions: FormSubmission[];
   loading: boolean;
 }) {
+  const fmt = useFormatters();
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<FormSubmission | null>(null);
 
@@ -84,7 +86,9 @@ export function FormSubmissionsTab({
                 onClick={() => setSelected(sub)}
                 className="hover:bg-accent/50 cursor-pointer border-t"
               >
-                <td className="px-3 py-2 font-mono text-xs">{formatTimestamp(sub.submittedAt)}</td>
+                <td className="px-3 py-2 font-mono text-xs">
+                  {sub.submittedAt ? fmt.formatDateTime(sub.submittedAt) : ""}
+                </td>
                 <td className="px-3 py-2 text-xs">v{sub.formVersion}</td>
                 <td className="px-3 py-2">
                   <Badge variant="outline">{sub.status}</Badge>
@@ -136,6 +140,7 @@ function SubmissionDetailSheet({
   submission: FormSubmission | null;
   onClose: () => void;
 }) {
+  const fmt = useFormatters();
   return (
     <Sheet open={submission !== null} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-xl">
@@ -148,7 +153,7 @@ function SubmissionDetailSheet({
               </SheetTitle>
               <SheetDescription>
                 {submission.formName} · v{submission.formVersion} · submitted{" "}
-                {formatTimestamp(submission.submittedAt)}
+                {submission.submittedAt ? fmt.formatDateTime(submission.submittedAt) : ""}
               </SheetDescription>
             </SheetHeader>
             <div className="overflow-y-auto px-4 pb-4">
@@ -234,15 +239,6 @@ function formatLeaf(v: unknown): string {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   if (Array.isArray(v)) return `[${v.length}]`;
   return "{…}";
-}
-
-function formatTimestamp(iso: string): string {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }
 
 // ─── sparkline ────────────────────────────────────────────────────────
