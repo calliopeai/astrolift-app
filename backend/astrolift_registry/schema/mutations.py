@@ -668,12 +668,22 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
         app.save(update_fields=["default_tenant_cluster", "updated_at", "version"])
 
     # Create AppEnvironment records for each env in the manifest that
-    # doesn't already exist.
+    # doesn't already exist.  When the manifest carries no [environments.*]
+    # sections env_names is empty; fall back to a single "production"
+    # environment so the provisioning activities (provision_registry_repo,
+    # provision_namespace) have a cluster binding to work with.
     org_slug = (
         getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
     ).lower()
     created_any = False
-    for env_name in env_names:
+    effective_env_names = list(env_names) if env_names else []
+    if not effective_env_names:
+        has_any = AppEnvironment.objects.filter(
+            registered_app=app, deleted_at__isnull=True
+        ).exists()
+        if not has_any:
+            effective_env_names = ["production"]
+    for env_name in effective_env_names:
         existing = AppEnvironment.objects.filter(
             registered_app=app,
             name=env_name,
