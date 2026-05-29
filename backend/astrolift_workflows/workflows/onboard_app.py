@@ -52,8 +52,7 @@ class OnboardAppWorkflow:
         )
         await workflow.execute_activity(
             provision_managed_services_initial,
-            input.registered_app_id,
-            0,  # placeholder until env id resolution lives in spec workflow
+            args=[input.registered_app_id, 0],  # 0 = no explicit env id
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
         )
         await workflow.execute_activity(
