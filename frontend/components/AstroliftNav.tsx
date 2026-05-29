@@ -75,24 +75,24 @@ interface NavSection {
 // list pages and have been folded into Administration.
 const sections: NavSection[] = [
   {
-    label: "Platform",
+    // Overview stands alone — no section label, never collapsible.
+    label: "",
     items: [
       { label: "Overview", href: "/dashboard", icon: <HomeIcon /> },
+    ],
+  },
+  {
+    // Run — active app operations: deployments, environments, release
+    // workflows, scheduled jobs, and PR preview deployments. Mirrors
+    // the "Run" pillar in the Calliope BROCS positioning.
+    label: "Run",
+    items: [
       {
         label: "Deployments",
         href: "/deployments",
         icon: <RocketIcon />,
         permission: "app.read",
       },
-    ],
-  },
-  {
-    // Run — active app operations: environments, release workflows,
-    // scheduled jobs, and PR preview deployments. Mirrors the "Run"
-    // pillar in the Calliope BROC (Build / Run / Observe / Control)
-    // positioning: Astrolift is the runtime layer.
-    label: "Run",
-    items: [
       {
         label: "Environments",
         href: "/environments",
@@ -282,6 +282,32 @@ export function AstroliftNav() {
         // (every section appears expanded for new operators).
         // The PageHeader breadcrumb still shows where you are if
         // the active item happens to live in a collapsed section.
+        // Unlabeled sections (empty label) are always visible — no
+        // collapsible wrapper and no section header.
+        if (!section.label) {
+          return (
+            <SidebarGroup key="__top__">
+              <SidebarMenu>
+                {visibleItems.map((item) => {
+                  const active =
+                    pathname === item.href ||
+                    (item.href !== "/" && pathname.startsWith(item.href + "/"));
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                        <Link href={item.href} data-onboarding-tour={item.tourTarget}>
+                          {item.icon}
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+          );
+        }
+
         const isOpen = !collapsed[section.label];
 
         return (
