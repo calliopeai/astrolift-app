@@ -347,6 +347,7 @@ export const GET_MY_PROFILE = gql`
       email
       lockedFields
       orgAllowsEdit
+      timezone
     }
   }
 `;

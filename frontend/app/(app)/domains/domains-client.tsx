@@ -44,6 +44,7 @@ import {
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 interface Resp {
   astroliftManagedDomains: AstroliftManagedDomain[];
@@ -57,6 +58,7 @@ const defaultForBadge: Record<string, string> = {
 };
 
 export function DomainsClient() {
+  const fmt = useFormatters();
   const { data, loading } = useQuery<Resp>(LIST_MANAGED_DOMAINS);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftManagedDomain | null>(null);
@@ -170,7 +172,7 @@ export function DomainsClient() {
                     </TableCell>
                     <TableCell>{d.isWildcardManaged ? "yes" : "no"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(d.createdAt).toLocaleDateString()}
+                      {fmt.formatDate(d.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

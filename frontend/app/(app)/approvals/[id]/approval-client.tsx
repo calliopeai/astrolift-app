@@ -39,6 +39,7 @@ import type {
   AstroliftDeploymentApprovalHistoryEntry,
   DeploymentStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface MutationResultLite<T> {
@@ -68,14 +69,12 @@ const statusToDot: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | 
 
 const COMMIT_PREVIEW_DEFAULT_LINES = 3;
 
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
-}
-
 export function ApprovalClient({ id }: { id: string }) {
   const t = useTranslations("lists.approval");
+  const fmt = useFormatters();
   const { can } = useMyPermissions();
+  const formatTime = (iso: string | null | undefined): string =>
+    iso ? fmt.formatDateTime(iso) : "—";
   const { data, loading, refetch } = useQuery<DeploymentResp>(GET_DEPLOYMENT, {
     variables: { id },
     fetchPolicy: "cache-and-network",
@@ -503,6 +502,7 @@ function HistoryEntry({
   entry: AstroliftDeploymentApprovalHistoryEntry;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const fmt = useFormatters();
   const tone = decisionTone(entry.action, entry.decision);
   const Icon = decisionIcon(entry.action);
   return (
@@ -518,9 +518,7 @@ function HistoryEntry({
             {entry.actorDisplay || entry.actorKind || t("history.actorUnknown")}
           </span>
         </div>
-        <p className="text-muted-foreground text-[11px]">
-          {new Date(entry.occurredAt).toLocaleString()}
-        </p>
+        <p className="text-muted-foreground text-[11px]">{fmt.formatDateTime(entry.occurredAt)}</p>
         {entry.reason && <p className="mt-1 text-xs whitespace-pre-wrap">{entry.reason}</p>}
       </div>
     </li>
