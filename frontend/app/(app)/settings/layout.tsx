@@ -1,20 +1,25 @@
-import { SettingsShell } from "./settings-shell";
+import { SettingsSubnav } from "./settings-subnav";
 
 export const metadata = {
   title: "Settings · Astrolift",
 };
 
 /**
- * Shared chrome for the /settings subtree (#414).
+ * Shared chrome for the /settings subtree.
  *
- * Renders a persistent left rail listing every settings sub-route
- * grouped by section (Organization / Personal / Tokens), a
- * `Settings › Section › Page` breadcrumb above each sub-route's
- * content, and a top-sheet fallback on mobile.
- *
- * Sub-routes own their own `PageShell` for title + description; this
- * layout adds only the cross-page chrome.
+ * Uses the same horizontal subnav pattern as /resources and
+ * /administration — the previous left-rail sidebar caused a double-nav
+ * when combined with the main AppSidebar.
  */
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
-  return <SettingsShell>{children}</SettingsShell>;
+export default function SettingsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 flex-col">
+      <SettingsSubnav />
+      <div className="flex-1">{children}</div>
+    </div>
+  );
 }
