@@ -541,3 +541,516 @@ def test_helper_sorts_by_namespace_then_name():
         ("tenant-a", "bravo"),
         ("tenant-b", "zeta"),
     ]
+
+
+# ─── Lifecycle audit resolver tests (#770) ───────────────────────────
+
+
+def _mkaudit(
+    *,
+    operation: str,
+    variables: dict,
+    success: bool = True,
+    errors: list[str] | None = None,
+) -> None:
+    """Insert one ``MutationAuditLog`` row directly. The audit
+    extension normally writes these inside ``on_operation``; tests
+    bypass the extension and write rows that simulate what the
+    extension would produce for a given mutation."""
+    from core.schema.audit import MutationAuditLog
+
+    MutationAuditLog.objects.create(
+        operation=operation,
+        variables=variables,
+        success=success,
+        errors=errors or [],
+    )
+
+
+def test_lifecycle_audit_denied_without_cluster_register(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """The lifecycle timeline shares the read-side permission with the
+    rest of the Status tab. Callers without it must be denied before
+    the table scan begins."""
+    with tenant_context(TenantContext(organization_id=org.id)):
+        with pytest.raises(PermissionDenied):
+            ClustersQuery().astrolift_cluster_lifecycle_audit(
+                _info(),
+                cluster_id=GUID(str(cluster.guid)),
+            )
+
+
+def test_lifecycle_audit_missing_cluster_returns_empty(
+    org,
+    permission_resolver,
+):
+    """A non-existent cluster guid must return an empty list rather
+    than fall back to a global audit-log dump. Mirrors the cluster_
+    health / workload_health contract."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(uuid.uuid4())),
+        )
+    assert result == []
+
+
+def test_lifecycle_audit_matches_dot_notation_operation(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """The canonical case: ``@mutation_audit`` populates
+    ``_mutation_action_local.action`` and the extension records the
+    dot-notation form (e.g. ``cluster.install_prereqs``). The resolver
+    matches on the ``cluster.`` prefix."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="cluster.install_prereqs",
+        variables={"input": {"clusterId": str(cluster.guid), "selectedComponents": ["cert-manager"]}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+    assert result[0].operation == "cluster.install_prereqs"
+
+
+def test_lifecycle_audit_matches_pascal_case_operation(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Defensive fallback (#770): when the thread-local isn't set,
+    ``MutationAuditExtension`` records ``request.operation_name`` —
+    the PascalCase GraphQL operation name (e.g. ``InstallClusterPrereqs``).
+    The resolver matches the known PascalCase names so a thread-local
+    regression doesn't silently empty the Status tab card.
+
+    This is the bug pattern the previous fix attempt addressed at the
+    extension layer but couldn't fully resolve from the audit-write
+    side; the resolver now tolerates both formats."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="InstallClusterPrereqs",
+        variables={"input": {"clusterId": str(cluster.guid), "selectedComponents": ["cert-manager"]}},
+    )
+    _mkaudit(
+        operation="BringClusterIntoManagement",
+        variables={"input": {"clusterId": str(cluster.guid)}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    ops = {r.operation for r in result}
+    assert ops == {"InstallClusterPrereqs", "BringClusterIntoManagement"}
+
+
+def test_lifecycle_audit_matches_register_by_slug_not_guid(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """RegisterTenantCluster's variables don't carry a cluster guid
+    yet (the row is being created), only the slug + name. The resolver
+    must match such rows via the slug check so the cluster's own
+    registration appears in its lifecycle timeline."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="cluster.register",
+        variables={"input": {"slug": cluster.slug, "name": cluster.name}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+    assert result[0].operation == "cluster.register"
+
+
+def test_lifecycle_audit_skips_other_clusters(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """A cluster's lifecycle timeline must contain only rows that
+    reference its own guid or slug — rows for unrelated clusters must
+    be excluded even when the operation prefix matches."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    other_guid = str(uuid.uuid4())
+    _mkaudit(
+        operation="cluster.install_prereqs",
+        variables={"input": {"clusterId": other_guid}},
+    )
+    _mkaudit(
+        operation="cluster.install_prereqs",
+        variables={"input": {"clusterId": str(cluster.guid)}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+
+
+def test_lifecycle_audit_skips_unrelated_operations(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Non-cluster mutations targeting other domains (app.deploy,
+    secret.rotated, ...) must not bleed into the cluster timeline even
+    when the cluster's guid happens to appear in their variables."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    _mkaudit(
+        operation="app.deploy",
+        variables={"input": {"appId": "x", "clusterRef": str(cluster.guid)}},
+    )
+    _mkaudit(
+        operation="cluster.register",
+        variables={"input": {"slug": cluster.slug, "name": cluster.name}},
+    )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert len(result) == 1
+    assert result[0].operation == "cluster.register"
+
+
+def test_lifecycle_audit_respects_limit_and_newest_first(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Resolver returns newest-first (matches ``order_by('-timestamp')``)
+    and stops after ``limit`` matches — operators see the most-recent
+    activity on the Status tab even when the audit table is dense."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    for _ in range(5):
+        _mkaudit(
+            operation="cluster.install_prereqs",
+            variables={"input": {"clusterId": str(cluster.guid)}},
+        )
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_lifecycle_audit(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+            limit=3,
+        )
+    assert len(result) == 3
+    timestamps = [r.timestamp for r in result]
+    assert timestamps == sorted(timestamps, reverse=True)
+
+
+# ─── Recent cluster workflows visibility-query tests (#770) ──────────
+
+
+def test_recent_workflows_query_uses_exact_workflow_id_predicates():
+    """The visibility query must use exact ``WorkflowId="<type>-<guid>"``
+    predicates joined with OR — standard SQL visibility doesn't support
+    ``LIKE "%...%"`` on WorkflowId, which silently returned no rows in
+    prod even after Bring / Install / Decommission workflows ran.
+
+    Tests assert the constructed query shape rather than going through
+    a real Temporal server because the network layer is covered by the
+    Temporal SDK's own integration tests; what matters here is that we
+    don't reintroduce the LIKE-substring regression."""
+    from astrolift_workflows.client import _CLUSTER_WORKFLOW_ID_PREFIXES
+
+    # The prefixes must cover every workflow type that constructs its
+    # workflow_id as "<prefix>-<cluster_guid>" in ClustersMutation.
+    # Any new cluster workflow must add a prefix here.
+    assert "BringClusterIntoManagement" in _CLUSTER_WORKFLOW_ID_PREFIXES
+    assert "DecommissionClusterWorkflow" in _CLUSTER_WORKFLOW_ID_PREFIXES
+    assert "InstallClusterPrereqsWorkflow" in _CLUSTER_WORKFLOW_ID_PREFIXES
+
+
+def test_recent_workflows_disabled_returns_empty(settings):
+    """With Temporal off (kill switch flipped), the resolver returns
+    an empty list rather than raising — the Status tab card renders
+    its 'no runs recorded yet' empty state."""
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    from astrolift_workflows.client import list_workflows_for_cluster
+
+    assert list_workflows_for_cluster("any-guid", limit=10) == []
+
+
+# ─── Prometheus metrics resolver tests (#771) ────────────────────────
+
+
+def test_prometheus_metrics_denied_without_cluster_register(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """The Prometheus metrics resolver shares the read-side permission
+    gate with every other Status tab resolver. Callers without
+    CLUSTER_REGISTER must be denied before any Prometheus I/O fires."""
+    with tenant_context(TenantContext(organization_id=org.id)):
+        with pytest.raises(PermissionDenied):
+            ClustersQuery().astrolift_cluster_prometheus_metrics(
+                _info(),
+                cluster_id=GUID(str(cluster.guid)),
+            )
+
+
+def test_prometheus_metrics_missing_cluster_returns_unavailable(
+    org,
+    permission_resolver,
+):
+    """A non-existent cluster guid returns available=False without
+    raising. The UI degrades gracefully to the empty-state card
+    (same contract as cluster_health / workload_health)."""
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(uuid.uuid4())),
+        )
+    assert result.available is False
+
+
+def test_prometheus_metrics_no_endpoint_returns_no_endpoint_reason(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """When neither provider_config nor capabilities carries a
+    prometheus_endpoint, the resolver returns available=False with
+    reason='no_endpoint' — no network I/O attempted."""
+    cluster.provider_config = {}
+    cluster.capabilities = {}
+    cluster.save()
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert result.available is False
+    assert result.reason == "no_endpoint"
+
+
+def test_prometheus_metrics_endpoint_from_capabilities(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When provider_config has no endpoint but capabilities does
+    (populated by the probe during bringClusterIntoManagement), the
+    resolver falls back to capabilities and executes queries."""
+    cluster.provider_config = {}
+    cluster.capabilities = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    _instant_calls: list[str] = []
+
+    def _fake_instant(*, endpoint: str, query: str, **_kw: object) -> float:
+        _instant_calls.append(query)
+        # count() returns int-like; ratios return 0–1.
+        if "count(" in query:
+            return 3.0
+        return 0.55
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_instant", _fake_instant)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is True
+    assert result.node_count == 3
+    assert len(_instant_calls) == 5
+
+
+def test_prometheus_metrics_happy_path(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When Prometheus returns values for all five golden-signal
+    queries, the resolver surfaces them 1:1 and sets available=True."""
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    counter = [0]
+
+    def _fake_instant(*, endpoint: str, query: str, **_kw: object) -> float:
+        counter[0] += 1
+        if "count(" in query:
+            return 5.0
+        return 0.60
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_instant", _fake_instant)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is True
+    assert result.reason is None
+    assert result.node_count == 5
+    assert result.pod_running_ratio == pytest.approx(0.60)
+    assert result.cpu_utilization == pytest.approx(0.60)
+    assert result.memory_utilization == pytest.approx(0.60)
+    assert result.deployment_ready_ratio == pytest.approx(0.60)
+    assert counter[0] == 5  # exactly five queries fired
+
+
+def test_prometheus_metrics_unreachable_returns_unreachable_reason(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """A PrometheusError on any of the five queries causes the resolver
+    to return available=False with reason='unreachable'. No partial
+    values are exposed — the UI shows a uniform error card."""
+    from astrolift_operations.prometheus_client import PrometheusUnavailable
+
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    def _raise(*_a: object, **_kw: object) -> float:
+        raise PrometheusUnavailable("connection refused")
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_instant", _raise)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is False
+    assert result.reason == "unreachable"
+    assert result.node_count is None
+
+
+def test_prometheus_range_metrics_no_endpoint(
+    cluster,
+    org,
+    permission_resolver,
+):
+    """Range-metrics resolver also returns available=False / reason=
+    'no_endpoint' when the cluster has no prometheus_endpoint. The
+    sparkline grid degrades gracefully to the empty-state card."""
+    cluster.provider_config = {}
+    cluster.capabilities = {}
+    cluster.save()
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_range_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+    assert result.available is False
+    assert result.reason == "no_endpoint"
+    assert result.series == []
+
+
+def test_prometheus_range_metrics_happy_path(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When Prometheus returns data for all eight golden-signal range
+    queries, the resolver returns available=True and one series per
+    metric, each with at least one point."""
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    # Minimal fake: each query returns one row with two (ts, value) pairs.
+    class _FakeRow:
+        def __init__(self) -> None:
+            import time
+
+            self.values = [(time.time() - 30, 0.5), (time.time(), 0.6)]
+
+    def _fake_range(*, endpoint: str, query: str, **_kw: object) -> list:
+        return [_FakeRow()]
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_range", _fake_range)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_range_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+            range_seconds=3600,
+            step_seconds=60,
+        )
+
+    assert result.available is True
+    assert result.reason is None
+    assert len(result.series) == 8  # all eight golden signals
+    for s in result.series:
+        assert len(s.points) >= 1
+        assert s.current is not None
+
+
+def test_prometheus_range_metrics_all_queries_fail_returns_unreachable(
+    cluster,
+    org,
+    permission_resolver,
+    monkeypatch,
+):
+    """When all eight range queries fail with PrometheusError, the
+    resolver returns available=False / reason='unreachable'. If only
+    some fail, the resolver returns partial series (empty points for
+    the failed ones) and available=True — this test targets the
+    all-failed path."""
+    from astrolift_operations.prometheus_client import PrometheusUnavailable
+
+    cluster.provider_config = {"prometheus_endpoint": "http://prom:9090"}
+    cluster.save()
+
+    def _raise(*_a: object, **_kw: object) -> list:
+        raise PrometheusUnavailable("connection refused")
+
+    from astrolift_operations import prometheus_client as prom_mod
+
+    monkeypatch.setattr(prom_mod, "query_range", _raise)
+
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersQuery().astrolift_cluster_prometheus_range_metrics(
+            _info(),
+            cluster_id=GUID(str(cluster.guid)),
+        )
+
+    assert result.available is False
+    assert result.reason == "unreachable"
+    assert result.series == []
