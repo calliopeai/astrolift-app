@@ -108,14 +108,16 @@ jobs:
       fail-fast: false
       matrix:
         product: ${{ fromJSON(needs.matrix.outputs.products) }}
-        platform: [linux/amd64, linux/arm64]
+        platform: [linux/amd64]
         include:
           - platform: linux/amd64
             suffix: amd64
             runner: ubuntu-latest
-          - platform: linux/arm64
-            suffix: arm64
-            runner: ubuntu-24.04-arm
+        # arm64 disabled until we have a stable working version — re-enable by
+        # adding linux/arm64 back to the platform list and the include below:
+        # - platform: linux/arm64
+        #   suffix: arm64
+        #   runner: ubuntu-24.04-arm
 
     steps:
       - uses: actions/checkout@v4
@@ -248,19 +250,20 @@ jobs:
       - name: Push manifests
         run: |
           set -euo pipefail
+          # arm64 disabled — create manifest from amd64 only.
+          # When arm64 is re-enabled, add "${BASE}:${{ steps.cfg.outputs.base_tag }}-arm64"
+          # to each manifest create call.
           for REGISTRY in "${{ env.REGISTRY_DOCKERHUB }}" "${{ env.REGISTRY_GHCR }}"; do
             BASE="${REGISTRY}/${{ env.IMAGE_NAMESPACE }}/${{ steps.cfg.outputs.image }}"
             VBASE="${BASE}:${{ steps.cfg.outputs.base_tag }}"
 
             docker manifest create --amend "$VBASE" \
-              "${BASE}:${{ steps.cfg.outputs.base_tag }}-amd64" \
-              "${BASE}:${{ steps.cfg.outputs.base_tag }}-arm64"
+              "${BASE}:${{ steps.cfg.outputs.base_tag }}-amd64"
             docker manifest push "$VBASE"
 
             for ALIAS in ${{ steps.cfg.outputs.extra_tags }}; do
               docker manifest create --amend "${BASE}:${ALIAS}" \
-                "${BASE}:${{ steps.cfg.outputs.base_tag }}-amd64" \
-                "${BASE}:${{ steps.cfg.outputs.base_tag }}-arm64"
+                "${BASE}:${{ steps.cfg.outputs.base_tag }}-amd64"
               docker manifest push "${BASE}:${ALIAS}"
             done
           done
