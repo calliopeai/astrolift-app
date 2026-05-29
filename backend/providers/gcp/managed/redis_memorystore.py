@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
@@ -36,7 +36,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
 
 KIND = "redis"
 
@@ -168,7 +167,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     "instance": instance_body,
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if secret_name is not None:
                 self._delete_auth_secret(instance_id)
             return ProvisionResult(
@@ -215,7 +214,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     "instance": instance,
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return UpdateResult(
                 ok=False, handle=spec.handle,
                 message=f"update_instance: {exc}",
@@ -269,7 +268,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                         },
                     },
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 # Don't block delete on export failure; surface the
                 # message but proceed.
                 pass
@@ -278,7 +277,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             self._redis.delete_instance(
                 request={"name": self._full_name(instance_id)},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             err_str = str(exc)
             if (
                 not force_destroy
@@ -405,7 +404,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _ManagedServiceError(
                 f"export_instance: {exc}",
             ) from exc
@@ -429,7 +428,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProvisionResult(
                 ok=False, handle="",
                 message=f"import_instance: {exc}",
@@ -480,7 +479,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             return self._redis.get_instance(
                 request={"name": self._full_name(instance_id)},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if "404" in str(exc) or "NotFound" in str(exc) or "not found" in str(exc).lower():
                 return None
             raise
@@ -527,7 +526,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         try:
             self._sm.add_secret_version(
@@ -537,7 +536,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                 },
             )
             return name
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _ManagedServiceError(
                 f"add_secret_version for {name}: {exc}",
             ) from exc
@@ -553,7 +552,7 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
                     ),
                 },
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             return
 
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -28,7 +27,7 @@ class FakeBinding:
 
 @dataclass
 class FakePolicy:
-    bindings: "FakeBindingList"
+    bindings: FakeBindingList
 
 
 class FakeBindingList(list):

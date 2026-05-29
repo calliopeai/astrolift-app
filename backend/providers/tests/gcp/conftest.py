@@ -8,12 +8,10 @@ exercise the driver's policy logic.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-
 
 # ----- google-cloud exception stand-ins ---------------------------
 # These mimic the .__class__.__name__ matching that the drivers use
@@ -69,7 +67,7 @@ class FakeManagedZone:
     record_sets: list[FakeRecordSet] = field(default_factory=list)
     pending_changes: list[Any] = field(default_factory=list)
 
-    def changes(self) -> "_FakeChanges":
+    def changes(self) -> _FakeChanges:
         return _FakeChanges(zone=self)
 
     def list_resource_record_sets(self) -> list[FakeRecordSet]:

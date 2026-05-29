@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 
-from _sdk.availability import AvailabilityMatrix, MATRIX
+from _sdk.availability import MATRIX, AvailabilityMatrix
 from _sdk.base import ProviderPlugin
 
 

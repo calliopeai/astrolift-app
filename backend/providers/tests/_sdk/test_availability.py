@@ -8,7 +8,6 @@ from _sdk.availability import (
     REQUIRED_ROLES,
     AvailabilityMatrix,
     DriverEntry,
-    ManagedServiceEntry,
 )
 
 

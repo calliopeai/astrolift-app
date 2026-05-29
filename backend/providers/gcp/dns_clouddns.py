@@ -7,7 +7,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, Record
-
 from gcp._errors import NotFoundError, map_api_error
 
 
@@ -54,7 +53,7 @@ class CloudDNSDriver(DnsDriver):
                     changes.delete_record_set(existing)
             changes.add_record_set(record_set)
             changes.create()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         return Record(zone=zone, name=name, type=type, value=value, ttl=ttl)
 
@@ -76,7 +75,7 @@ class CloudDNSDriver(DnsDriver):
             changes.create()
         except NotFoundError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
 
     @driver_op(cloud="gcp", driver="dns")
@@ -96,7 +95,7 @@ class CloudDNSDriver(DnsDriver):
                         )
                     )
             return out
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
 
     def _resolve_zone(self, *, zone: str) -> Any:
@@ -109,7 +108,7 @@ class CloudDNSDriver(DnsDriver):
                 if managed_zone.dns_name == canonical:
                     self._config._zone_cache[canonical] = managed_zone.name
                     return managed_zone
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         raise NotFoundError(f"hosted zone {zone} not found")
 

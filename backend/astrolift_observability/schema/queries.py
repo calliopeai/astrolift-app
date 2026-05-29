@@ -53,10 +53,10 @@ from astrolift_observability.schema.types import (
     WorkloadResourceGauge,
     WorkloadResourceUsage,
 )
-from astrolift_services.models.managed_service import ManagedService
 from astrolift_operations import prometheus_client
 from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import RegisteredApp
+from astrolift_services.models.managed_service import ManagedService
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 

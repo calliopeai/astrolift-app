@@ -23,8 +23,7 @@ from typing import Any
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
-
-from aws._errors import ConflictError, NotFoundError, map_client_error
+from aws._errors import NotFoundError, map_client_error
 
 # GitHub's OIDC issuer — present in the trust policy of the per-app
 # push role, and the `aud` claim our IAM trust enforces on the JWT
@@ -97,7 +96,7 @@ class ECRDriver(ImageRegistryDriver):
         except self._client.exceptions.RepositoryAlreadyExistsException:
             # Repo exists — fetch its URI rather than failing
             return self._describe_repo(name=name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.delete")
@@ -113,7 +112,7 @@ class ECRDriver(ImageRegistryDriver):
             self._client.delete_repository(repositoryName=name, force=True)
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.get_pull_secret")
@@ -125,7 +124,7 @@ class ECRDriver(ImageRegistryDriver):
         """
         try:
             response = self._client.get_authorization_token()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
         auth_data = response["authorizationData"][0]
@@ -208,7 +207,7 @@ class ECRDriver(ImageRegistryDriver):
             return tags
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {repo} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     @driver_op(cloud="aws", driver="registry", audit=True, sensitive_kind="registry.create_ci_push_role")
@@ -336,7 +335,7 @@ class ECRDriver(ImageRegistryDriver):
             return Repo(name=name, uri=data["repositoryUri"])
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     def _block_push(self, *, name: str) -> None:
@@ -370,5 +369,5 @@ class ECRDriver(ImageRegistryDriver):
             )
         except self._client.exceptions.RepositoryNotFoundException as exc:
             raise NotFoundError(f"repository {name} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc

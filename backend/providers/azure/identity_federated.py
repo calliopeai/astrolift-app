@@ -16,7 +16,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.identity import WorkloadIdentityDriver
-
 from azure._errors import NotFoundError, map_api_error
 
 
@@ -71,7 +70,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                     },
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
                     f"managed identity {identity_role} not found",
@@ -108,7 +107,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                     },
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         return getattr(identity, "client_id", "") or ""
 
@@ -134,7 +133,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 resource_group_name=self._config.resource_group,
                 resource_name=role,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(f"role {role} not found") from exc
             raise map_api_error(exc) from exc
@@ -147,7 +146,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
                 resource_group_name=self._config.resource_group,
                 resource_name=name,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
                     f"managed identity {name} not found",

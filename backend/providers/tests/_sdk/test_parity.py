@@ -18,7 +18,6 @@ from _sdk.registry import ImageRegistryDriver
 from _sdk.secrets import SecretsBackend
 from _sdk.tls import TlsDriver
 
-
 ROLE_PROTOCOLS = {
     "cluster": ClusterDriver,
     "ingress": IngressDriver,

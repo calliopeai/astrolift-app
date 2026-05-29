@@ -22,7 +22,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.secrets import SecretsBackend
-
 from aws._errors import NotFoundError, map_client_error
 
 
@@ -128,7 +127,7 @@ class AWSSecretsBackend(SecretsBackend):
             )
         except self._sm.exceptions.ResourceNotFoundException:
             return None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
         secret_string = response.get("SecretString", "")
@@ -163,9 +162,9 @@ class AWSSecretsBackend(SecretsBackend):
                     SecretId=secret_id,
                     SecretString=secret_string,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise map_client_error(exc) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     def _sm_delete(self, path: str) -> None:
@@ -179,7 +178,7 @@ class AWSSecretsBackend(SecretsBackend):
             )
         except self._sm.exceptions.ResourceNotFoundException as exc:
             raise NotFoundError(f"secret {path} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     def _sm_list(self, prefix: str) -> list[str]:
@@ -201,7 +200,7 @@ class AWSSecretsBackend(SecretsBackend):
                     else:
                         out.append(name)
             return sorted(out)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     # ---- SSM Parameter Store backend ------------------------------
@@ -221,7 +220,7 @@ class AWSSecretsBackend(SecretsBackend):
             )
         except self._ssm.exceptions.ParameterNotFound:
             return None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
         value = response["Parameter"]["Value"]
@@ -244,7 +243,7 @@ class AWSSecretsBackend(SecretsBackend):
             if self._config.kms_key_id:
                 kwargs["KeyId"] = self._config.kms_key_id
             self._ssm.put_parameter(**kwargs)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     def _ssm_delete(self, path: str) -> None:
@@ -252,7 +251,7 @@ class AWSSecretsBackend(SecretsBackend):
             self._ssm.delete_parameter(Name=self._ssm_name(path))
         except self._ssm.exceptions.ParameterNotFound as exc:
             raise NotFoundError(f"parameter {path} not found") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
 
     def _ssm_list(self, prefix: str) -> list[str]:
@@ -276,5 +275,5 @@ class AWSSecretsBackend(SecretsBackend):
                     else:
                         out.append(name)
             return sorted(out)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc

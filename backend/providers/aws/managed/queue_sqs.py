@@ -5,7 +5,6 @@ Spec ref: spec 23-provider-plugin-aws + _sdk/managed_service.py.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,7 +32,6 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
-
 
 KIND = "queue"
 
@@ -129,13 +127,13 @@ class SQSDriver(ManagedServiceDriver):
             # Idempotent — same name + attributes is OK
             try:
                 response = self._sqs.get_queue_url(QueueName=queue_name)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return ProvisionResult(
                     ok=False, handle="",
                     message=f"queue already exists but lookup failed: {exc}",
                     errors=[str(exc)],
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProvisionResult(
                 ok=False, handle="",
                 message=f"create_queue: {exc}",
@@ -183,7 +181,7 @@ class SQSDriver(ManagedServiceDriver):
             self._sqs.set_queue_attributes(
                 QueueUrl=queue_url, Attributes=attributes,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return UpdateResult(
                 ok=False, handle=spec.handle,
                 message=f"set_queue_attributes: {exc}",
@@ -225,7 +223,7 @@ class SQSDriver(ManagedServiceDriver):
 
         try:
             self._sqs.delete_queue(QueueUrl=queue_url)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return DeprovisionResult(
                 ok=False, handle=spec.handle,
                 message=f"delete_queue: {exc}",
@@ -381,6 +379,6 @@ class SQSDriver(ManagedServiceDriver):
             raise ManagedServiceError(
                 f"queue {queue_name} does not exist",
             ) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc
         return response["QueueUrl"]

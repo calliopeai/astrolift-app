@@ -13,7 +13,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.secrets import SecretsBackend
-
 from azure._errors import NotFoundError, map_api_error
 
 
@@ -49,7 +48,7 @@ class KeyVaultSecretsBackend(SecretsBackend):
         secret_name = self._secret_name(path)
         try:
             secret = self._client.get_secret(secret_name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 return None
             raise map_api_error(exc) from exc
@@ -72,7 +71,7 @@ class KeyVaultSecretsBackend(SecretsBackend):
                     "astrolift_io_managed_by": "platform",
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
 
     @driver_op(cloud="azure", driver="secrets", audit=True, sensitive_kind="secret.delete")
@@ -84,7 +83,7 @@ class KeyVaultSecretsBackend(SecretsBackend):
             # Tests inject sync poller; production polls real op.
             if hasattr(poller, "result"):
                 poller.result()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(f"secret {path} not found") from exc
             raise map_api_error(exc) from exc
@@ -93,7 +92,7 @@ class KeyVaultSecretsBackend(SecretsBackend):
     def list(self, prefix: str) -> list[str]:
         try:
             iterator = self._client.list_properties_of_secrets()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         prefixed = self._secret_name(prefix)
         out: list[str] = []

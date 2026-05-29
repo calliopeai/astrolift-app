@@ -15,7 +15,6 @@ from typing import Any
 from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
 
-
 SUPPORTED_VARIANTS = ("agic", "gateway_api")
 
 

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from _sdk.postgres_extensions import (
-    POLICIES,
     PG_CRON,
     PGVECTOR,
+    POLICIES,
     ExtensionEntry,
     VariantExtensionPolicy,
     policy_for,

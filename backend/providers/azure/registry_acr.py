@@ -18,7 +18,6 @@ from typing import Any
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
-
 from azure._errors import NotFoundError, map_api_error
 
 
@@ -71,7 +70,7 @@ class ACRDriver(ImageRegistryDriver):
                 resource_group_name=self._config.resource_group,
                 registry_name=self._config.registry_name,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
                     f"ACR registry {self._config.registry_name} " f"not found in {self._config.resource_group}",
@@ -149,7 +148,7 @@ class ACRDriver(ImageRegistryDriver):
                 registry_name=self._config.registry_name,
                 repository=repo,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(f"repo {repo} not found") from exc
             raise map_api_error(exc) from exc

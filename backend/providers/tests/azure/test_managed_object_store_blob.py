@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -32,7 +32,7 @@ class FakeContainerProperties:
 
 
 class FakeContainer:
-    def __init__(self, name: str, *, parent: "FakeBlobServiceClient") -> None:
+    def __init__(self, name: str, *, parent: FakeBlobServiceClient) -> None:
         self.name = name
         self._parent = parent
         self.created = False

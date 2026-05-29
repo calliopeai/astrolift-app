@@ -18,8 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from _sdk.availability import (
-    AvailabilityMatrix,
     REQUIRED_ROLES,
+    AvailabilityMatrix,
 )
 from _sdk.base import ProviderPlugin
 from _sdk.composition import CompositionRegistry

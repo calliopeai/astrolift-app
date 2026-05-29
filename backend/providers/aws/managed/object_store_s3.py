@@ -38,7 +38,6 @@ from aws.managed._base import (
     tags_for,
 )
 
-
 KIND = "object_store"
 
 
@@ -102,7 +101,7 @@ class S3Driver(ManagedServiceDriver):
                 message=f"bucket name {bucket_name} already taken globally",
                 errors=[bucket_name],
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProvisionResult(
                 ok=False, handle="",
                 message=f"create_bucket: {exc}",
@@ -118,7 +117,7 @@ class S3Driver(ManagedServiceDriver):
                     for t in tags_for(spec)
                 ]},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Tag failure isn't fatal — surface but proceed
             return ProvisionResult(
                 ok=True,
@@ -135,7 +134,7 @@ class S3Driver(ManagedServiceDriver):
                     Bucket=bucket_name,
                     VersioningConfiguration={"Status": "Enabled"},
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return ProvisionResult(
                     ok=True,
                     handle=handle_for(kind=KIND, resource_id=bucket_name),
@@ -156,7 +155,7 @@ class S3Driver(ManagedServiceDriver):
                         "RestrictPublicBuckets": True,
                     },
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return ProvisionResult(
                     ok=True,
                     handle=handle_for(kind=KIND, resource_id=bucket_name),
@@ -243,12 +242,12 @@ class S3Driver(ManagedServiceDriver):
                     Bucket=bucket_name,
                     VersioningConfiguration={"Status": "Suspended"},
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
         try:
             self._empty_bucket(bucket_name=bucket_name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return DeprovisionResult(
                 ok=False, handle=spec.handle,
                 message=f"empty failed: {exc}",
@@ -258,7 +257,7 @@ class S3Driver(ManagedServiceDriver):
             self._s3.delete_bucket(Bucket=bucket_name)
         except self._s3.exceptions.NoSuchBucket:
             pass
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return DeprovisionResult(
                 ok=False, handle=spec.handle,
                 message=f"delete_bucket: {exc}",
@@ -282,7 +281,7 @@ class S3Driver(ManagedServiceDriver):
                 handle=handle.handle, state="deprovisioned",
                 message=f"bucket {bucket_name} does not exist",
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # head_bucket on missing bucket can also surface as
             # generic ClientError with HTTP 404 (boto3 doesn't
             # always raise NoSuchBucket cleanly via head_bucket).
@@ -448,5 +447,5 @@ class S3Driver(ManagedServiceDriver):
                         Bucket=bucket_name,
                         Delete={"Objects": objects},
                     )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_client_error(exc) from exc

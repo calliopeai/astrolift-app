@@ -14,13 +14,12 @@ Covers:
 
 from __future__ import annotations
 
+import uuid
 from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-
-import uuid
 
 from astrolift_identity.models import (
     Member,
@@ -31,7 +30,6 @@ from astrolift_identity.models import (
     Team,
 )
 from astrolift_identity.schema.queries import IdentityQuery
-from astrolift_operations.models.audit_event import AuditEvent
 from astrolift_registry.models import RegisteredApp
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context

@@ -203,7 +203,7 @@ def test_delete_role_with_managed_policy(
     )
     driver.attach_policy(
         role="acme-api",
-        policy=f"arn:aws:iam::123456789012:policy/extra",
+        policy="arn:aws:iam::123456789012:policy/extra",
     )
     driver.delete_identity_role("acme-api")
     with pytest.raises(Exception):

@@ -18,9 +18,7 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.tls import Certificate, TlsDriver
-
 from azure._errors import NotFoundError, map_api_error
-
 
 _SUPPORTED_STRATEGIES = (
     "azure_managed_cert",
@@ -80,7 +78,7 @@ class AzureAppGatewayTlsDriver(TlsDriver):
         if strategy == "akv_referenced" and self._cert_client is not None:
             try:
                 cert = self._cert_client.get_certificate(cert_name)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if type(exc).__name__ == "ResourceNotFoundError":
                     return Certificate(
                         id=cert_name,
@@ -117,7 +115,7 @@ class AzureAppGatewayTlsDriver(TlsDriver):
             )
         try:
             cert = self._cert_client.get_certificate(certificate_id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
                     f"certificate {certificate_id} not found",
@@ -142,7 +140,7 @@ class AzureAppGatewayTlsDriver(TlsDriver):
             )
             if hasattr(poller, "result"):
                 poller.result()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
                     f"certificate {certificate_id} not found",
