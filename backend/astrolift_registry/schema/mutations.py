@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.db.models import Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -644,11 +645,13 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     from astrolift_workflows.inputs import OnboardAppInput
 
     # Must have at least one managed cluster to bind environments to.
+    # TenantCluster.organization is nullable: null means shared (available to
+    # all orgs). Accept clusters scoped to this org OR shared clusters.
     cluster = app.default_tenant_cluster
     if cluster is None:
         cluster = (
             TenantCluster.objects.filter(
-                organization=app.organization,
+                Q(organization=app.organization) | Q(organization__isnull=True),
                 deleted_at__isnull=True,
                 is_active=True,
                 lifecycle=TenantCluster.Lifecycle.MANAGED.value,
@@ -837,8 +840,9 @@ class RegistryMutation:
             # Bind to the first managed cluster so downstream activities
             # (provision_registry_repo, provision_namespace) can resolve
             # the registry driver without an additional lookup step.
+            # organization is nullable on TenantCluster: null = shared.
             default_tenant_cluster=TenantCluster.objects.filter(
-                organization=project.organization,
+                Q(organization=project.organization) | Q(organization__isnull=True),
                 deleted_at__isnull=True,
                 is_active=True,
                 lifecycle=TenantCluster.Lifecycle.MANAGED.value,
@@ -1312,8 +1316,7 @@ class RegistryMutation:
         if result.status == "diverged":
             return gql_failure(
                 "SCM_DIVERGED",
-                result.error
-                or "staged drafts would be clobbered by repo content; push or discard first",
+                result.error or "staged drafts would be clobbered by repo content; push or discard first",
             )
 
         # ``applied`` / ``in_sync`` both leave the DB in a coherent
