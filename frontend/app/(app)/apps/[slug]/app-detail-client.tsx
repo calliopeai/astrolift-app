@@ -3,7 +3,6 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
-  BoxIcon,
   ExternalLinkIcon,
   FileCodeIcon,
   GitBranchIcon,
@@ -20,7 +19,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
-import { AppTopologyMap, appTopology } from "@/components/topology";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,10 +73,6 @@ interface AppResp {
 interface WorkloadsResp {
   astroliftWorkloads: AstroliftWorkload[];
 }
-
-// Topology synthesis lives in @/components/topology/synthesize (#705)
-// so the dedicated Topology tab and the Overview thumbnail render the
-// same graph.
 
 // ─── component ────────────────────────────────────────────────────────────────
 
@@ -144,7 +138,6 @@ export function AppDetailClient({ slug }: { slug: string }) {
   const primaryHost =
     publicCount > 0 ? `${wlList.find((w) => w.isPublic)?.slug}.${a.subdomain}` : null;
 
-  const { nodes: topoNodes, edges: topoEdges } = appTopology(a, wlList);
   const sourceLabel = SOURCE_KIND_LABEL[a.sourceKind] ?? a.sourceKind;
 
   return (
@@ -252,48 +245,6 @@ export function AppDetailClient({ slug }: { slug: string }) {
       />
 
       <DeploymentPanel appSlug={a.slug} />
-
-      {/* Topology thumbnail (#705). Full graph lives on its own tab —
-          this is a glance-pane: 160px tall, non-interactive at this
-          size, with "Open Topology" cta pinned to the corner. Empty
-          state still surfaces inline so the operator gets the same
-          "no workloads yet" hint without bouncing between tabs. */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-          <div>
-            <CardTitle>{tDetail("topology.title")}</CardTitle>
-            <CardDescription>{tDetail("topology.description")}</CardDescription>
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <a href={`/apps/${a.slug}/topology`}>{tDetail("topology.open")}</a>
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          {workloads.loading ? (
-            <div className="space-y-2 p-6">
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : topoNodes.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<BoxIcon className="size-5" />}
-                title={tDetail("topology.emptyTitle")}
-                description={tDetail("topology.emptyDescription")}
-              />
-            </div>
-          ) : (
-            <a
-              href={`/apps/${a.slug}/topology`}
-              className="hover:bg-muted/30 block rounded-b-md p-4 transition-colors"
-              aria-label={tDetail("topology.open")}
-            >
-              <div className="pointer-events-none">
-                <AppTopologyMap nodes={topoNodes} edges={topoEdges} height={160} />
-              </div>
-            </a>
-          )}
-        </CardContent>
-      </Card>
 
       <PendingDeployments appSlug={a.slug} />
 
