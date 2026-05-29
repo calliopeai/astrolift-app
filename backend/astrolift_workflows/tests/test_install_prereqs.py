@@ -86,12 +86,102 @@ def test_bindings_secret_name_stable_across_calls():
 # ---- module-level imports do not raise --------------------------------
 
 
+# ---- _apply_semantic_options (#772) ------------------------------------
+
+
+def test_apply_semantic_options_ephemeral_strips_key_and_keeps_empty_spec():
+    """Ephemeral mode (default) must strip the synthetic prometheus_storage
+    key from the merged values and leave storageSpec empty."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    base = {
+        "nodeExporter": {"enabled": False},
+        "prometheus": {"prometheusSpec": {"retention": "24h", "storageSpec": {}}},
+        "prometheus_storage": "ephemeral",
+    }
+    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "ephemeral"})
+    assert "prometheus_storage" not in out
+    assert out["prometheus"]["prometheusSpec"]["storageSpec"] == {}
+    assert out["prometheus"]["prometheusSpec"]["retention"] == "24h"
+
+
+def test_apply_semantic_options_efs_persistent_sets_storagespec_and_retention():
+    """efs_persistent must embed the EFS PVC template and switch retention to 30d."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    base = {
+        "nodeExporter": {"enabled": False},
+        "prometheus": {"prometheusSpec": {"retention": "24h", "storageSpec": {}}},
+        "prometheus_storage": "efs_persistent",
+    }
+    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "efs_persistent"})
+    assert "prometheus_storage" not in out
+    spec = out["prometheus"]["prometheusSpec"]
+    assert spec["retention"] == "30d"
+    assert spec["storageSpec"]["volumeClaimTemplate"]["spec"]["storageClassName"] == "efs-prometheus"
+
+
+def test_apply_semantic_options_filestore_persistent():
+    """filestore_persistent must reference the filestore-prometheus StorageClass."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}}
+    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "filestore_persistent"})
+    sc = out["prometheus"]["prometheusSpec"]["storageSpec"]["volumeClaimTemplate"]["spec"]["storageClassName"]
+    assert sc == "filestore-prometheus"
+
+
+def test_apply_semantic_options_azurefile_persistent():
+    """azurefile_persistent must reference the azurefile-prometheus StorageClass."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}}
+    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "azurefile_persistent"})
+    sc = out["prometheus"]["prometheusSpec"]["storageSpec"]["volumeClaimTemplate"]["spec"]["storageClassName"]
+    assert sc == "azurefile-prometheus"
+
+
+def test_apply_semantic_options_unknown_mode_strips_key():
+    """An unknown prometheus_storage value is treated as ephemeral — the key
+    is stripped and storageSpec is left unchanged."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}, "prometheus_storage": "unknown_mode"}
+    out = _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "unknown_mode"})
+    assert "prometheus_storage" not in out
+    assert out["prometheus"]["prometheusSpec"]["storageSpec"] == {}
+
+
+def test_apply_semantic_options_noop_for_other_components():
+    """The function must be a no-op for any component other than
+    kube-prometheus-stack."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    values = {"mode": "efs_persistent"}  # same key, different component
+    out = _apply_semantic_options("cert-manager", values, {"mode": "efs_persistent"})
+    assert out == values
+
+
+def test_apply_semantic_options_does_not_mutate_base():
+    """Pure-function semantic — base dict must not be modified in place."""
+    from astrolift_workflows.activities.install_prereqs import _apply_semantic_options
+
+    base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}}
+    original_base = {"prometheus": {"prometheusSpec": {"storageSpec": {}}}}
+    _apply_semantic_options("kube-prometheus-stack", base, {"prometheus_storage": "efs_persistent"})
+    assert base == original_base
+
+
+# ---- module-level imports do not raise --------------------------------
+
+
 def test_install_prereqs_module_imports_clean():
     """Smoke: a syntax/import error in install_prereqs.py would
     surface here without needing a worker boot."""
     import astrolift_workflows.activities.install_prereqs as m
 
     assert hasattr(m, "_merge_helm_values")
+    assert hasattr(m, "_apply_semantic_options")
     assert hasattr(m, "install_cluster_prereqs")
 
 
