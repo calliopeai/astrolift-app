@@ -13,7 +13,7 @@ import {
   StopCircleIcon,
   UndoIcon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -135,9 +135,36 @@ interface BulkAction {
 export function DeploymentsClient() {
   const t = useTranslations("lists.deployments");
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [openCreate, setOpenCreate] = React.useState(false);
-  const [statusBucket, setStatusBucket] = React.useState<StatusBucket>("all");
-  const [appFilter, setAppFilter] = React.useState("");
+
+  // Filters synced to URL so refresh / back-button preserves the view.
+  const rawBucket = searchParams.get("status") as StatusBucket | null;
+  const validBuckets: StatusBucket[] = ["all", "active", "running", "failed"];
+  const statusBucket: StatusBucket =
+    rawBucket && validBuckets.includes(rawBucket) ? rawBucket : "all";
+  const [appFilter, setAppFilter] = React.useState<string>(
+    () => searchParams.get("app") ?? ""
+  );
+
+  function updateFilter(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value && value !== "all" && value !== "") {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  const setStatusBucket = (v: StatusBucket) => updateFilter("status", v);
+
+  React.useEffect(() => {
+    const id = setTimeout(() => updateFilter("app", appFilter), 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appFilter]);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const { can } = useMyPermissions();
   const {
