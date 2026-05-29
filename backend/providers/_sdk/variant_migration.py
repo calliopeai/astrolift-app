@@ -14,9 +14,8 @@ the catalog + planner.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
-
 
 MigrationMode = Literal[
     "cutover",          # stop, snapshot, restore on new variant, restart

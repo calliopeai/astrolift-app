@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from _sdk.storage_encryption import (
     POLICIES,
-    EncryptionPolicy,
     check_encryption,
     policy_for,
 )

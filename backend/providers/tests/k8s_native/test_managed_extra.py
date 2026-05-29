@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from _sdk.managed_service import (
-    DeprovisionSpec,
     ProvisionSpec,
     ServiceHandle,
 )

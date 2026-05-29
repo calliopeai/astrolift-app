@@ -55,7 +55,6 @@ from _sdk.managed_service import (
     ValueRef,
 )
 
-
 KIND = "queue"
 
 
@@ -102,7 +101,7 @@ class PubSubDriver(ManagedServiceDriver):
         )
         try:
             self._pub.create_topic(request={"name": topic_path})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ != "AlreadyExists":
                 return ProvisionResult(
                     ok=False,
@@ -114,7 +113,7 @@ class PubSubDriver(ManagedServiceDriver):
             self._sub.create_subscription(
                 request={"name": sub_path, "topic": topic_path},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ != "AlreadyExists":
                 return ProvisionResult(
                     ok=False,
@@ -182,7 +181,7 @@ class PubSubDriver(ManagedServiceDriver):
                     },
                 )
                 any_present = True
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if type(exc).__name__ != "NotFound":
                     # Surface but don't abort.
                     pass
@@ -192,7 +191,7 @@ class PubSubDriver(ManagedServiceDriver):
                 request={"subscription": sub_path},
             )
             any_present = True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             err_name = type(exc).__name__
             if err_name == "NotFound":
                 pass
@@ -218,7 +217,7 @@ class PubSubDriver(ManagedServiceDriver):
         try:
             self._pub.delete_topic(request={"topic": topic_path})
             any_present = True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ != "NotFound":
                 return DeprovisionResult(
                     ok=False,
@@ -255,7 +254,7 @@ class PubSubDriver(ManagedServiceDriver):
                     ),
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return ServiceStatus(
                     handle=handle.handle,

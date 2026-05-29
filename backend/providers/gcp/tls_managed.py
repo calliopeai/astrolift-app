@@ -19,7 +19,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.tls import Certificate, TlsDriver
-
 from gcp._errors import NotFoundError, map_api_error
 
 
@@ -73,7 +72,7 @@ class GCPManagedCertDriver(TlsDriver):
                 ssl_certificate_resource=cert,
             )
             operation.result()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "AlreadyExists":
                 # Idempotent — fetch + return
                 return self.get_certificate(cert_name)
@@ -87,7 +86,7 @@ class GCPManagedCertDriver(TlsDriver):
                 project=self._config.project_id,
                 ssl_certificate=certificate_id,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 raise NotFoundError(
                     f"certificate {certificate_id} not found",
@@ -117,7 +116,7 @@ class GCPManagedCertDriver(TlsDriver):
                 ssl_certificate=certificate_id,
             )
             operation.result()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 raise NotFoundError(
                     f"certificate {certificate_id} not found",

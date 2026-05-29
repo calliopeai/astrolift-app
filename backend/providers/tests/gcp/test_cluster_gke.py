@@ -6,14 +6,12 @@ fake k8s client; container_v1 stub serves DescribeCluster.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from _sdk.cluster import WorkloadStatus
 from gcp._errors import NotFoundError
 from gcp.cluster_gke import GKEClusterDriver, GKEConfig, _NotFound
 

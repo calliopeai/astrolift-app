@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from azure._errors import (
     ConflictError,
     NotFoundError,

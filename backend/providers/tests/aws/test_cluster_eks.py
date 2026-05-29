@@ -14,7 +14,6 @@ cluster.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -22,11 +21,6 @@ import boto3
 import pytest
 
 from _sdk.cluster import (
-    ApplyResult,
-    DeleteResult,
-    ExecResult,
-    NamespaceState,
-    RolloutResult,
     WorkloadStatus,
 )
 from aws._errors import NotFoundError

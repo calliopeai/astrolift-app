@@ -549,12 +549,12 @@ def _make_file_upload(*, name: str, user, organization):
 
     Mirrors ``_make_data_process`` for fixture style — the only thing
     under test is the queryset's tenant-scope behaviour."""
-    from core.models.upload import FileUpload, Upload
-
     # public_url has a unique constraint on the Upload table, so each
     # row needs a distinct value even in tests that don't care about
     # the URL itself. Use a UUID-derived path to guarantee uniqueness.
     import uuid
+
+    from core.models.upload import FileUpload, Upload
 
     upload = Upload.objects.create(
         name=name,

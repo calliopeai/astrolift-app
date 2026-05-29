@@ -8,7 +8,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.secrets import SecretsBackend
-
 from gcp._errors import NotFoundError, map_api_error
 
 
@@ -46,7 +45,7 @@ class GCPSecretsBackend(SecretsBackend):
             response = self._client.access_secret_version(
                 name=version_path,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return None
             raise map_api_error(exc) from exc
@@ -67,7 +66,7 @@ class GCPSecretsBackend(SecretsBackend):
         # version with the payload.
         try:
             self._client.get_secret(name=secret_path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ != "NotFound":
                 raise map_api_error(exc) from exc
             self._create_secret(secret_name=secret_name)
@@ -77,7 +76,7 @@ class GCPSecretsBackend(SecretsBackend):
                 parent=secret_path,
                 payload={"data": json.dumps(kvs).encode("utf-8")},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
 
     @driver_op(cloud="gcp", driver="secrets", audit=True, sensitive_kind="secret.delete")
@@ -85,7 +84,7 @@ class GCPSecretsBackend(SecretsBackend):
         secret_path = f"projects/{self._config.project_id}" f"/secrets/{self._secret_name(path)}"
         try:
             self._client.delete_secret(name=secret_path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 raise NotFoundError(f"secret {path} not found") from exc
             raise map_api_error(exc) from exc
@@ -98,7 +97,7 @@ class GCPSecretsBackend(SecretsBackend):
                 parent=f"projects/{self._config.project_id}",
                 filter=f'name:"{full_prefix}"',
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         out: list[str] = []
         for secret in iterator:
@@ -141,5 +140,5 @@ class GCPSecretsBackend(SecretsBackend):
                 secret_id=secret_name,
                 secret={"replication": replication},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc

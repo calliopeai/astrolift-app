@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, Protocol, get_type_hints
 
 from _sdk.base import ProviderPlugin
 

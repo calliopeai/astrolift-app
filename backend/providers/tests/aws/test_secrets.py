@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from aws._errors import NotFoundError
 from aws.secrets import AWSSecretsBackend, SecretsConfig, _split_backend
-
 
 # ---- routing -----------------------------------------------------
 

@@ -54,7 +54,6 @@ from _sdk.managed_service import (
     ValueRef,
 )
 
-
 KIND = "mysql"
 
 
@@ -231,7 +230,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 project=self._config.project_id,
                 body=instance_body,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._delete_master_password_secret(instance_id)
             return ProvisionResult(
                 ok=False, handle="",
@@ -282,7 +281,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 instance=instance_id,
                 body={"settings": settings},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return UpdateResult(
                 ok=False, handle=spec.handle,
                 message=f"patch: {exc}",
@@ -332,7 +331,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                         },
                     },
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return DeprovisionResult(
                     ok=False, handle=spec.handle,
                     message=f"failed to clear deletionProtection: {exc}",
@@ -359,7 +358,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                     instance=instance_id,
                     body={"description": f"final-{instance_id}"},
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 # Don't block delete on backup failure — defeats the
                 # safety path. Surface via message but proceed.
                 pass
@@ -369,7 +368,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 project=self._config.project_id,
                 instance=instance_id,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return DeprovisionResult(
                 ok=False, handle=spec.handle,
                 message=f"delete: {exc}",
@@ -467,7 +466,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 instance=instance_id,
                 body={"description": snap_id},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _ManagedServiceError(
                 f"insert_backup_run: {exc}",
             ) from exc
@@ -494,7 +493,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProvisionResult(
                 ok=False, handle="",
                 message=f"clone: {exc}",
@@ -550,7 +549,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 project=self._config.project_id,
                 instance=instance_id,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if "404" in str(exc) or "not found" in str(exc).lower():
                 return None
             raise
@@ -610,7 +609,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             # AlreadyExists or similar — fall through to add_version.
             pass
         try:
@@ -623,7 +622,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                 },
             )
             return name
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _ManagedServiceError(
                 f"add_secret_version for {name}: {exc}",
             ) from exc
@@ -639,7 +638,7 @@ class CloudSQLMySQLDriver(ManagedServiceDriver):
                     ),
                 },
             )
-        except Exception:  # noqa: BLE001 — best-effort cleanup
+        except Exception:
             return
 
 

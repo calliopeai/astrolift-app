@@ -21,7 +21,6 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
-
 Manifest = dict[str, Any]
 
 

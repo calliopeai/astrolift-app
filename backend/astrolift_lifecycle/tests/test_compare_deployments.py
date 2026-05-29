@@ -11,7 +11,6 @@ import pytest
 
 from astrolift_lifecycle.models import Deployment
 from astrolift_lifecycle.schema.queries import LifecycleQuery, _compute_manifest_diff
-from astrolift_lifecycle.schema.types import ManifestDiffEntryType
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 

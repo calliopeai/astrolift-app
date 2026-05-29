@@ -7,9 +7,7 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, Record
-
 from azure._errors import NotFoundError, map_api_error
-
 
 _TYPE_RECORD_FIELD = {
     "A": "a_records",
@@ -65,7 +63,7 @@ class AzureDNSDriver(DnsDriver):
                 record_type=type,
                 parameters=params,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         return Record(zone=zone, name=name, type=type, value=value, ttl=ttl)
 
@@ -82,7 +80,7 @@ class AzureDNSDriver(DnsDriver):
                 ),
                 record_type=record_type,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if exc.__class__.__name__ == "ResourceNotFoundError":
                 raise NotFoundError(
                     f"record {name} ({record_type}) in zone {zone} " f"not found",
@@ -96,7 +94,7 @@ class AzureDNSDriver(DnsDriver):
                 resource_group_name=self._config.resource_group,
                 zone_name=zone,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc
         out: list[Record] = []
         for rs in iterator:

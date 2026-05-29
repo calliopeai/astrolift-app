@@ -33,7 +33,6 @@ from k8s_native.observability import (
     build_api_client,
 )
 
-
 # ---- Fakes --------------------------------------------------------
 
 

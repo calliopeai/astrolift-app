@@ -7,7 +7,7 @@ canned responses. Test surface mirrors AWS ElastiCache (#352).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -16,8 +16,6 @@ from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
     ServiceHandle,
-    SnapshotHandle,
-    UpdateSpec,
 )
 from gcp.managed.redis_memorystore import (
     KIND,
@@ -26,7 +24,6 @@ from gcp.managed.redis_memorystore import (
     _generate_auth_token,
     _parse_handle,
 )
-
 
 # ---- fakes -----------------------------------------------------------
 

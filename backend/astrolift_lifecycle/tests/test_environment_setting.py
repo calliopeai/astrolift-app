@@ -17,7 +17,6 @@ pytestmark = pytest.mark.django_db
 
 
 def _ctx(org, actor=None):
-    from django.contrib.auth import get_user_model
     return tenant_context(
         TenantContext(
             organization_id=org.id,

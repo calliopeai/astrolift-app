@@ -4,14 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from _sdk.cluster import ApplyResult
 from _sdk.managed_service import (
-    DeprovisionSpec,
     ProvisionSpec,
     ServiceHandle,
-    UpdateSpec,
 )
 from k8s_native.managed.postgres_cnpg import (
     SIZE_TO_SPEC,

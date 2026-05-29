@@ -131,7 +131,7 @@ def _list_crd_names(*, k8s_client: object) -> list[str]:
             kind="CustomResourceDefinition",
             namespace=None,
         ) or []
-    except Exception:  # noqa: BLE001
+    except Exception:
         return []
     return [
         item.get("metadata", {}).get("name", "")
@@ -145,7 +145,7 @@ def _list_deployment_names(*, k8s_client: object) -> list[str]:
         return []
     try:
         items = list_method(kind="Deployment", namespace=None) or []
-    except Exception:  # noqa: BLE001
+    except Exception:
         return []
     return [
         item.get("metadata", {}).get("name", "")

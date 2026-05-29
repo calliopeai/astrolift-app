@@ -124,6 +124,14 @@ from _sdk.cost import (
 # Policy modules (storage encryption, edge security, postgres
 # extensions, variant migration, identity chains, CSI, instrumentation)
 from _sdk.csi import CsiDriverProfile, render_storage_class
+from _sdk.edge_security import (
+    DEFAULT_PROFILE,
+    EdgeSecurityProfile,
+    HstsPolicy,
+    SecurityHeaders,
+    TlsPolicy,
+    WafPolicy,
+)
 from _sdk.email import (
     AccountSendStatus,
     DkimToken,
@@ -138,14 +146,6 @@ from _sdk.email import (
     SuppressionEntry,
     SuppressionReason,
     TemplateSendStatPoint,
-)
-from _sdk.edge_security import (
-    DEFAULT_PROFILE,
-    EdgeSecurityProfile,
-    HstsPolicy,
-    SecurityHeaders,
-    TlsPolicy,
-    WafPolicy,
 )
 from _sdk.event import EventDriver
 from _sdk.identity_chain import (

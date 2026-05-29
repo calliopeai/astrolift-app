@@ -10,7 +10,6 @@ from typing import Any
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.registry import ImageRegistryDriver, Repo, SecretSpec, Tag
-
 from gcp._errors import NotFoundError, map_api_error
 
 
@@ -55,7 +54,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         )
         try:
             self._client.get_repository(name=ar_path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # GCP NotFound = "Repository not found"; create it
             if type(exc).__name__ == "NotFound":
                 self._create_artifact_registry_repo(
@@ -145,7 +144,7 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
         )
         try:
             response = self._client.list_tags(parent=package_path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 raise NotFoundError(f"package {repo} not found") from exc
             raise map_api_error(exc) from exc
@@ -181,5 +180,5 @@ class ArtifactRegistryDriver(ImageRegistryDriver):
                 repository_id=self._config.repository_id,
             )
             operation.result()  # Wait for completion
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc

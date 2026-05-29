@@ -54,7 +54,6 @@ from _sdk.managed_service import (
     ValueRef,
 )
 
-
 KIND = "object_store"
 
 
@@ -100,7 +99,7 @@ class GCSDriver(ManagedServiceDriver):
                 self._client.create_bucket(
                     bucket, location=self._config.location,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if type(exc).__name__ == "Conflict":
                     pass  # idempotent
                 else:
@@ -124,7 +123,7 @@ class GCSDriver(ManagedServiceDriver):
                 labels["astrolift-io-managed-service-id"] = spec.managed_service_id
             bucket.labels = labels
             bucket.patch()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProvisionResult(
                 ok=False, handle="",
                 message=f"provision failed: {exc}",
@@ -172,7 +171,7 @@ class GCSDriver(ManagedServiceDriver):
 
         try:
             bucket = self._client.get_bucket(bucket_name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return DeprovisionResult(
                     ok=True, handle=spec.handle,
@@ -225,7 +224,7 @@ class GCSDriver(ManagedServiceDriver):
             try:
                 bucket.retention_policy = None
                 bucket.patch()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return DeprovisionResult(
                     ok=False, handle=spec.handle,
                     message=f"failed to clear retention_policy: {exc}",
@@ -249,7 +248,7 @@ class GCSDriver(ManagedServiceDriver):
                         blob.patch()
                 blob.delete()
             bucket.delete()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return DeprovisionResult(
                     ok=True, handle=spec.handle,
@@ -271,7 +270,7 @@ class GCSDriver(ManagedServiceDriver):
         _, _, bucket_name = handle.handle.partition("/")
         try:
             self._client.get_bucket(bucket_name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 return ServiceStatus(
                     handle=handle.handle, state="deprovisioned",

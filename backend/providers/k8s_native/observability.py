@@ -129,7 +129,7 @@ def build_api_client(auth: ClusterAuth) -> Any:
             # client reads ``ssl_ca_cert`` lazily on first request, so
             # closing here would race the SSL handshake. We rely on
             # the kernel to GC the FD when the process exits.
-            ca_file = tempfile.NamedTemporaryFile(  # noqa: SIM115
+            ca_file = tempfile.NamedTemporaryFile(
                 mode="w",
                 suffix=".crt",
                 delete=False,

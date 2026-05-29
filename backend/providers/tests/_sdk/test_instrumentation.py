@@ -9,7 +9,6 @@ from _sdk.instrumentation import (
     VECTOR_SIDECAR,
     IngressTracingConfig,
     ServiceMeshConfig,
-    SidecarSpec,
     annotate_for_mesh,
     annotate_ingress_tracing,
     compose_instrumentation,

@@ -125,7 +125,6 @@ class _DefaultHttp:
         from urllib.error import HTTPError
         from urllib.parse import urlencode
         from urllib.request import Request, urlopen
-        import json
 
         full = url
         if params:

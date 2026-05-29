@@ -17,8 +17,6 @@ from _sdk.managed_service import (
     DeprovisionSpec,
     ProvisionSpec,
     ServiceHandle,
-    SnapshotHandle,
-    UpdateSpec,
 )
 from gcp.managed.postgres_cloudsql import (
     KIND,
@@ -27,7 +25,6 @@ from gcp.managed.postgres_cloudsql import (
     _generate_master_password,
     _parse_handle,
 )
-
 
 # ---- fakes -----------------------------------------------------------
 

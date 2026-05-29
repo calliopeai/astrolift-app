@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from _sdk.cluster import ApplyResult, DeleteResult
 from k8s_native.dns_external import ExternalDnsConfig, ExternalDnsDriver
 

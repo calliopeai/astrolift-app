@@ -34,7 +34,7 @@ exception; the resolver layer treats both cases uniformly.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime  # noqa: TC003 -- runtime annotation on @dataclass field
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 

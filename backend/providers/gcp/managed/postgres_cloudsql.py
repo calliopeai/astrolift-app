@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
@@ -54,7 +54,6 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-
 
 KIND = "postgres"
 
@@ -224,7 +223,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 project=self._config.project_id,
                 body=instance_body,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._delete_master_password_secret(instance_id)
             return ProvisionResult(
                 ok=False, handle="",
@@ -275,7 +274,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 instance=instance_id,
                 body={"settings": settings},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return UpdateResult(
                 ok=False, handle=spec.handle,
                 message=f"patch: {exc}",
@@ -321,7 +320,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     instance=instance_id,
                     body={"settings": {"deletionProtectionEnabled": False}},
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return DeprovisionResult(
                     ok=False, handle=spec.handle,
                     message=f"failed to clear deletionProtection: {exc}",
@@ -348,18 +347,18 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     instance=instance_id,
                     body={"description": f"final-{instance_id}"},
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception:
                 # Don't block delete on backup failure — that defeats
                 # the purpose of the safety path. Surface to operator
                 # via the message but proceed.
-                pass  # noqa: TRY302
+                pass
 
         try:
             self._sql.delete(
                 project=self._config.project_id,
                 instance=instance_id,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return DeprovisionResult(
                 ok=False, handle=spec.handle,
                 message=f"delete: {exc}",
@@ -454,7 +453,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 instance=instance_id,
                 body={"description": snap_id},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _ManagedServiceError(
                 f"insert_backup_run: {exc}",
             ) from exc
@@ -481,7 +480,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProvisionResult(
                 ok=False, handle="",
                 message=f"clone: {exc}",
@@ -537,7 +536,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 project=self._config.project_id,
                 instance=instance_id,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if "404" in str(exc) or "not found" in str(exc).lower():
                 return None
             raise
@@ -586,7 +585,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     },
                 },
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             # AlreadyExists or similar — fall through to add_version.
             pass
         try:
@@ -597,7 +596,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                 },
             )
             return name
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _ManagedServiceError(
                 f"add_secret_version for {name}: {exc}",
             ) from exc
@@ -613,7 +612,7 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
                     ),
                 },
             )
-        except Exception:  # noqa: BLE001 — best-effort cleanup
+        except Exception:
             return
 
 

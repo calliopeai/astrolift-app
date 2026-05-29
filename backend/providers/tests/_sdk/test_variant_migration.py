@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from _sdk.variant_migration import (
     APP_TRAFFIC_PAUSED,
-    RECIPES,
     EXTENSIONS_ON_TARGET,
+    RECIPES,
     MigrationCatalog,
     MigrationRecipe,
     MigrationRequirement,

@@ -10,15 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pytest
-
 from _sdk._kube_health import (
     PLATFORM_NAMESPACE,
     default_namespaces,
     events_from_client,
     pod_phase_summary_from_client,
 )
-
 
 # ---- fakes -----------------------------------------------------------
 

@@ -17,9 +17,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk.availability import (
-    AvailabilityMatrix,
     MATRIX,
     REQUIRED_ROLES,
+    AvailabilityMatrix,
 )
 from _sdk.base import ProviderPlugin
 from _sdk.composition import CompositionRegistry
@@ -133,7 +133,7 @@ def probe_connectivity(
     timestamp = now_iso or datetime.now(tz=UTC).isoformat()
     try:
         cluster_driver.get_namespace(record.cluster_id, sentinel_namespace)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return ProbeResult(
             ok=False, last_probed_at=timestamp,
             message=f"connectivity probe failed: {exc}",

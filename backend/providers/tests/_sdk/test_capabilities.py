@@ -5,7 +5,6 @@ from __future__ import annotations
 from _sdk.availability import MATRIX
 from _sdk.base import ProviderPlugin
 from _sdk.capabilities import (
-    BindingValidation,
     ServiceDependency,
     negotiate_variant,
     validate_cluster_binding,

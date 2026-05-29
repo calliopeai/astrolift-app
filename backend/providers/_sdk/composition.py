@@ -15,8 +15,6 @@ find the implementing plugin.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterable
-from typing import Any
 
 
 @dataclasses.dataclass(frozen=True)

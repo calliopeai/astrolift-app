@@ -17,7 +17,6 @@ from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.identity import WorkloadIdentityDriver
-
 from gcp._errors import NotFoundError, map_api_error
 
 
@@ -72,7 +71,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
                 resource=self._sa_resource(name=identity_role),
                 policy=policy,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 raise NotFoundError(
                     f"GCP SA {identity_role} not found",
@@ -100,7 +99,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
                     "description": "Astrolift workload identity SA",
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "AlreadyExists":
                 return self._sa_email(name=name)
             raise map_api_error(exc) from exc
@@ -108,7 +107,6 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         # Attach project-level roles via the operator-supplied
         # permissions list. Each entry is {role: '...'}.
         if permissions:
-            from google.iam.v1 import policy_pb2
 
             for perm in permissions:
                 role = perm.get("role")
@@ -133,7 +131,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
             self._iam.delete_service_account(
                 name=self._sa_resource(name=role),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if type(exc).__name__ == "NotFound":
                 raise NotFoundError(f"role {role} not found") from exc
             raise map_api_error(exc) from exc
@@ -168,5 +166,5 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
             elif member not in binding.members:
                 binding.members.append(member)
             client.set_iam_policy(resource=project, policy=policy)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise map_api_error(exc) from exc

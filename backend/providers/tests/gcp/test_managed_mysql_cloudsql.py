@@ -25,7 +25,6 @@ from gcp.managed.mysql_cloudsql import (
     _parse_handle,
 )
 
-
 # ---- fakes -----------------------------------------------------------
 
 
