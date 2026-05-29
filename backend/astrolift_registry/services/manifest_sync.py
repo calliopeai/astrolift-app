@@ -123,11 +123,17 @@ class ResyncResult:
                         message so the UI can surface it.
 
     ``changes`` is populated on ``applied``; otherwise empty.
+
+    ``env_names`` carries the ``[environments.*]`` section keys found
+    in the repo manifest (e.g. ``["production", "staging"]``). The
+    mutation layer uses this to bootstrap ``AppEnvironment`` rows when
+    the app hasn't been provisioned yet.
     """
 
     status: str
     changes: ResyncChanges
     error: str | None = None
+    env_names: list[str] = dataclasses.field(default_factory=list)
 
 
 _FetchFn = Callable[[SourceConnection, str, str, str], "str | None"]
@@ -401,6 +407,7 @@ def resync_app_manifest_from_repo(
     # ``fetch_failed`` from the operator's perspective — we never
     # silently apply garbage and never clobber the DB.
     try:
+        repo_raw_manifest = parse_raw(repo_text)
         repo_manifest = _normalize_text(repo_text)
     except ManifestError as exc:
         return ResyncResult(
@@ -408,6 +415,10 @@ def resync_app_manifest_from_repo(
             changes=ResyncChanges(),
             error=f"repo manifest failed to parse: {exc}",
         )
+
+    # Extract environment names so the mutation layer can bootstrap
+    # AppEnvironment rows for apps that haven't been provisioned yet.
+    env_names = list(repo_raw_manifest.raw.get("environments", {}).keys())
 
     repo_hash = manifest_hash(repo_manifest.serialized)
     db_raw = app.manifest_raw or ""
@@ -455,7 +466,7 @@ def resync_app_manifest_from_repo(
             fields.append("last_resync_at")
             fields += ["updated_at", "version"]
             app.save(update_fields=fields)
-        return ResyncResult(status="in_sync", changes=ResyncChanges())
+        return ResyncResult(status="in_sync", changes=ResyncChanges(), env_names=env_names)
 
     changes = _compute_changes(db_manifest, repo_manifest)
 
@@ -492,7 +503,7 @@ def resync_app_manifest_from_repo(
                 ]
             )
 
-    return ResyncResult(status="applied", changes=changes)
+    return ResyncResult(status="applied", changes=changes, env_names=env_names)
 
 
 def summarize_changes(changes: ResyncChanges) -> str:

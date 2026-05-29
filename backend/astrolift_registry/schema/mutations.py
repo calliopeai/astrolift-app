@@ -626,6 +626,92 @@ class RestoreAppInput:
     app_slug: str
 
 
+def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> None:
+    """Create AppEnvironment rows and kick off OnboardAppWorkflow when the
+    app is still in its initial ``pending`` provisioning state.
+
+    Called after a successful "Resync from source" so that apps whose
+    source was connected post-registration (bypassing the wizard) get the
+    same environment setup the wizard would have applied.
+
+    Idempotent: existing active environments are left untouched.
+    If no managed cluster is available the function is a no-op and lets the
+    operator retry once a cluster is adopted.
+    """
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_workflows.client import start_workflow
+    from astrolift_workflows.inputs import OnboardAppInput
+
+    # Must have at least one managed cluster to bind environments to.
+    cluster = app.default_tenant_cluster
+    if cluster is None:
+        cluster = (
+            TenantCluster.objects.filter(
+                organization=app.organization,
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            )
+            .order_by("pk")
+            .first()
+        )
+    if cluster is None:
+        return
+
+    # Ensure default_tenant_cluster is set on the app.
+    if app.default_tenant_cluster_id is None:
+        app.default_tenant_cluster = cluster
+        app.save(update_fields=["default_tenant_cluster", "updated_at", "version"])
+
+    # Create AppEnvironment records for each env in the manifest that
+    # doesn't already exist.
+    org_slug = (
+        getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
+    ).lower()
+    created_any = False
+    for env_name in env_names:
+        existing = AppEnvironment.objects.filter(
+            registered_app=app,
+            name=env_name,
+            deleted_at__isnull=True,
+        ).exists()
+        if not existing:
+            AppEnvironment.objects.create(
+                registered_app=app,
+                tenant_cluster=cluster,
+                name=env_name,
+                url=f"https://{app.subdomain or app.slug}.{org_slug}",
+                required_approvals=0,
+            )
+            created_any = True
+
+    # Trigger OnboardAppWorkflow when the app is still pending (never
+    # provisioned). The workflow is idempotent via its workflow_id guard,
+    # so a concurrent click is safe.
+    provisioning_pending = getattr(app, "provisioning_status", None) in (
+        None,
+        "pending",
+        RegisteredApp.ProvisioningStatus.PENDING.value
+        if hasattr(RegisteredApp, "ProvisioningStatus")
+        else "pending",
+    )
+    if created_any or provisioning_pending:
+        try:
+            start_workflow(
+                "OnboardAppWorkflow",
+                args=[OnboardAppInput(registered_app_id=app.pk)],
+                workflow_id=f"OnboardAppWorkflow-{app.guid}",
+            )
+        except Exception:  # noqa: BLE001 — log and move on; don't fail the resync
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "bootstrap: failed to start OnboardAppWorkflow for app %s",
+                app.slug,
+            )
+
+
 @strawberry.type
 class RegistryMutation:
     @strawberry.field
@@ -748,6 +834,17 @@ class RegistryMutation:
             minimum_approvals=approval["minimum_approvals"]
             if approval["minimum_approvals"] is not None
             else 1,
+            # Bind to the first managed cluster so downstream activities
+            # (provision_registry_repo, provision_namespace) can resolve
+            # the registry driver without an additional lookup step.
+            default_tenant_cluster=TenantCluster.objects.filter(
+                organization=project.organization,
+                deleted_at__isnull=True,
+                is_active=True,
+                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            )
+            .order_by("pk")
+            .first(),
         )
         if approval["user_ids"] is not None:
             app.approver_users.set(approval["user_ids"])
@@ -1580,6 +1677,14 @@ class RegistryMutation:
                 ErrorCode.CONFLICT.value,
                 result.error or "manifest diverged from repo",
             )
+
+        # Bootstrap AppEnvironment records and OnboardAppWorkflow for apps
+        # that were registered before their manifest existed in the repo.
+        # This is the "connect source post-registration" case: the wizard
+        # normally creates environments at register time; for apps that
+        # skipped that step, resync is the natural recovery path.
+        if result.status in ("applied", "in_sync") and result.env_names:
+            _bootstrap_app_environments(app, result.env_names)
 
         summary = "Already in sync." if result.status == "in_sync" else summarize_changes(result.changes)
         return gql_success(
