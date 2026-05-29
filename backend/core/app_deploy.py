@@ -90,7 +90,46 @@ def driver_for_deployment(deployment: Deployment) -> tuple[Any, Any, str]:
     return driver, ctx, namespace
 
 
-def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
+def _config_for_capability(plugin_slug: str, cluster: "TenantCluster", capability: str) -> Any:
+    """Build the driver-specific config dataclass for (plugin, capability).
+
+    Non-cluster capabilities (registry, identity, secrets, dns, tls) need
+    their own config type — the cluster-level ``EKSConfig`` / ``GKEConfig``
+    returned by ``_config_for`` only carries what the *cluster driver*
+    needs (kubeconfig / cluster name), not the AWS account ID or OIDC
+    issuer the ECR / IRSA drivers require.  Falls back to ``_config_for``
+    for any combination not explicitly listed here.
+    """
+    pc = cluster.provider_config or {}
+    ac = cluster.auth_config or {}
+    region = str(pc.get("region", ac.get("region", cluster.region or "")))
+
+    if plugin_slug == "aws":
+        if capability == "registry":
+            from aws.registry_ecr import ECRConfig
+
+            return ECRConfig(
+                region=region,
+                account_id=str(pc.get("account_id", "")),
+                image_scanning_enabled=bool(pc.get("image_scanning_enabled", True)),
+                image_tag_mutability=str(pc.get("image_tag_mutability", "IMMUTABLE")),
+            )
+        if capability == "identity":
+            from aws.identity_irsa import IRSAConfig
+
+            return IRSAConfig(
+                region=region,
+                account_id=str(pc.get("account_id", "")),
+                cluster_oidc_issuer=str(ac.get("cluster_oidc_issuer", "")),
+                role_path=str(pc.get("irsa_role_path", "/astrolift/")),
+            )
+
+    # Fallback: cluster-level config (EKSConfig / GKEConfig / AKSConfig) for
+    # secrets, dns, tls, and any capability without a dedicated entry above.
+    return _config_for(plugin_slug, cluster)
+
+
+def driver_for_capability(cluster: "TenantCluster", capability: str) -> Any:
     """Resolve a non-cluster driver (``secrets``, ``dns``, ``registry``,
     ``tls``, ``identity``) for the cluster's provider plugin.
 
@@ -108,7 +147,7 @@ def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
         raise AppDeployError(
             f"cluster {cluster.slug}: provider plugin {plugin_slug!r} does not register a {capability!r} driver",
         ) from exc
-    cfg = _config_for(plugin_slug, cluster)
+    cfg = _config_for_capability(plugin_slug, cluster, capability)
     try:
         return driver_cls(config=cfg)
     except TypeError as exc:
