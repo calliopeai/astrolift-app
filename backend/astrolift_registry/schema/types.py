@@ -252,6 +252,29 @@ class AppSettingsLastModifiedType:
     observability: dt.datetime | None
 
 
+@strawberry.type(name="AstroliftProvisioningProgress")
+class ProvisioningProgressType:
+    """Live step-tracker for an in-flight ``OnboardAppWorkflow``.
+
+    Mirrors the dict returned by the workflow's ``provisioning_progress``
+    query handler so the FE can render a per-step indicator without
+    rolling its own state machine. ``current_step`` is the active step
+    label (e.g. ``"provisioning:registry+namespace"``); ``completed`` is
+    the ordered list of step ids that have finished; ``total_steps`` is
+    the full canonical sequence the workflow walks.
+
+    Returned ``None`` on the parent field when the app isn't actively
+    provisioning, when Temporal is disabled, or when the workflow has
+    already completed and the visibility query no longer resolves the
+    handle — callers treat that as "no live data, fall back to the
+    DB-persisted provisioning_status".
+    """
+
+    current_step: str
+    completed: list[str]
+    total_steps: list[str]
+
+
 @strawberry.type(name="AstroliftRegisteredApp")
 class RegisteredAppType:
     id: GUID
@@ -417,7 +440,48 @@ class RegisteredAppType:
     active_preview_count: int = 0
     # Retention policy overrides per signal (#742). Populated lazily by
     # the single-app detail resolver; empty list on list resolvers.
-    retention_policies: list["RetentionPolicyType"] = strawberry.field(default_factory=list)
+    retention_policies: list[RetentionPolicyType] = strawberry.field(default_factory=list)
+
+    @strawberry.field
+    def provisioning_progress(self) -> ProvisioningProgressType | None:
+        """Live step-tracker for an in-flight ``OnboardAppWorkflow``.
+
+        Resolves to ``None`` for the common case (any app whose
+        ``provisioning_status`` isn't ``"provisioning"``) so the FE can
+        cheap-skip the live indicator without a Temporal round-trip.
+        Otherwise issues a Temporal query against
+        ``OnboardAppWorkflow-<app.guid>`` for the
+        ``provisioning_progress`` handler. The handler return shape
+        maps 1:1 onto :class:`ProvisioningProgressType` keys.
+
+        Falls back to ``None`` whenever the query can't be answered —
+        Temporal disabled, the workflow already completed and was
+        archived, or the query handler raised. The FE treats ``None``
+        as "no live data" and uses the persisted ``provisioning_status``
+        for the static badge instead.
+        """
+        # Local import — mirrors the pattern in
+        # ``astrolift_registry/schema/mutations.py`` and keeps the type
+        # module free of the workflows-client import at parse time so
+        # the cheap list resolvers don't pay for the Temporal SDK.
+        from astrolift_workflows.client import query_workflow
+
+        if (self.provisioning_status or "").strip() != "provisioning":
+            return None
+        guid = getattr(self, "id", None)
+        if not guid:
+            return None
+        workflow_id = f"OnboardAppWorkflow-{guid}"
+        result = query_workflow(workflow_id, "provisioning_progress")
+        if result is None:
+            return None
+        if isinstance(result, dict):
+            return ProvisioningProgressType(
+                current_step=str(result.get("current_step", "")),
+                completed=list(result.get("completed", []) or []),
+                total_steps=list(result.get("total_steps", []) or []),
+            )
+        return None
 
 
 @strawberry.type(name="AstroliftAppTeamAccess")
