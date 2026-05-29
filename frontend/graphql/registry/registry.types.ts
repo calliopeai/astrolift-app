@@ -114,6 +114,26 @@ export type AstroliftAppConfigDrift = GeneratedAppConfigDrift;
  */
 export type AstroliftAppSettingsLastModified = GeneratedAppSettingsLastModified;
 
+/**
+ * Live progress rollup surfaced on the app overview while the
+ * provisioning workflow is running. Populated only when
+ * ``provisioningStatus == "provisioning"``; ``null`` otherwise. Manual
+ * entry until ``make codegen`` regenerates the generated TypeScript
+ * types from the updated schema.graphql.
+ *
+ * - ``currentStep``: free-form label of the step currently running
+ *   (e.g. ``"provisioning:registry+namespace"``).
+ * - ``completed``: stable step keys that have finished, in completion
+ *   order (e.g. ``["registry"]``).
+ * - ``totalSteps``: stable step keys for the full provisioning plan,
+ *   in execution order. Drives the step indicator on the FE.
+ */
+export interface ProvisioningProgress {
+  currentStep: string;
+  completed: string[];
+  totalSteps: string[];
+}
+
 export type AstroliftRegisteredApp = Omit<
   GeneratedRegisteredApp,
   | "sourceKind"
@@ -141,6 +161,13 @@ export type AstroliftRegisteredApp = Omit<
    * generated TypeScript types from the updated schema.graphql.
    */
   activePreviewCount: number;
+  /**
+   * Live step-by-step provisioning progress. Populated only when
+   * ``provisioningStatus == "provisioning"``; ``null`` otherwise.
+   * Manual entry until `make codegen` regenerates the generated
+   * TypeScript types from the updated schema.graphql.
+   */
+  provisioningProgress?: ProvisioningProgress | null;
 };
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {

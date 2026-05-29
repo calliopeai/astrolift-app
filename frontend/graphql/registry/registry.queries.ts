@@ -32,6 +32,11 @@ const APP_FIELDS = `
   isActive
   provisioningStatus
   provisioningError
+  provisioningProgress {
+    currentStep
+    completed
+    totalSteps
+  }
   deployTokenLast4
   logRetentionDays
   previewMaxActive

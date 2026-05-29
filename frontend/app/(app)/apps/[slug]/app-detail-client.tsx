@@ -45,6 +45,7 @@ import { DeregisterPendingBanner } from "./components/deregister-pending-banner"
 import { LatestDeploymentRow } from "./components/latest-deployment-row";
 import { ObservabilitySection } from "./components/observability-section";
 import { PendingDeployments } from "./components/pending-deployments";
+import { ProvisioningProgressPanel } from "./components/provisioning-progress";
 import { QuickLinksGrid } from "./components/quick-links-grid";
 import { RepoBadge } from "./components/repo-badge";
 import { ReprovisionCallout } from "./components/reprovision-callout";
@@ -227,6 +228,8 @@ export function AppDetailClient({ slug }: { slug: string }) {
           </p>
         </div>
       )}
+
+      <ProvisioningProgressPanel app={a} />
 
       <ReprovisionCallout appSlug={a.slug} reprovision={a.reprovision} />
 
