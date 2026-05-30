@@ -30,7 +30,7 @@ class DiagramItem:
         return self
 
     def render_id(self) -> str:
-        ...
+        return f'{self.id}["{self.title}"]'
 
     def render_body(self) -> [str]:
         return self._render_nodes(self.next)

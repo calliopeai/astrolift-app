@@ -194,7 +194,7 @@ class SignRequestMixin:
 
     def on_reset_sign_request(self) -> 'SignRequest':
         """This called after the sign request is reset"""
-        pass
+        return None  # type: ignore[return-value]
 
 
 class SignRequest(Tracking):
