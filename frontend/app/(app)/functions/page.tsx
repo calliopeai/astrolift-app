@@ -1,10 +1,16 @@
-import { BoltIcon, ExternalLinkIcon, ScaleIcon, ZapIcon } from "lucide-react";
+"use client";
 
+import {
+  ActivityIcon,
+  AlertTriangleIcon,
+  BoltIcon,
+  GaugeIcon,
+  LinkIcon,
+} from "lucide-react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+
+import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-
-export const metadata = { title: "Functions · Astrolift" };
 
 /**
  * Functions — event-driven, short-lived container invocations.
@@ -21,75 +27,94 @@ export const metadata = { title: "Functions · Astrolift" };
  * Same image build pipeline, same cluster, same secrets model as every
  * other Astrolift workload. The runtime layer (Knative or equivalent)
  * handles cold starts, warm pools, and concurrency limits.
- *
- * Gateway page — Functions require Knative Serving on the tenant cluster.
  */
+
+type FunctionTab = "invocations" | "errors" | "throughput" | "triggers";
+const TABS: readonly FunctionTab[] = ["invocations", "errors", "throughput", "triggers"];
+
+const TAB_LABELS: Record<FunctionTab, string> = {
+  invocations: "Invocations",
+  errors: "Errors",
+  throughput: "Throughput",
+  triggers: "Triggers",
+};
+
 export default function FunctionsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const rawTab = searchParams.get("tab") as FunctionTab | null;
+  const tab: FunctionTab = rawTab && TABS.includes(rawTab) ? rawTab : "invocations";
+
+  function setTab(next: FunctionTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "invocations") {
+      params.delete("tab");
+    } else {
+      params.set("tab", next);
+    }
+    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
+  }
+
   return (
     <PageShell
       title="Functions"
       description="Event-driven container invocations — scale to zero, trigger on HTTP, queues, or webhooks."
     >
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-6">
-            <div className="bg-primary/10 text-primary w-fit rounded-md p-2.5">
-              <BoltIcon className="size-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Event-driven triggers</p>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Invoke functions via HTTP, SQS/SNS messages, webhooks, or
-                platform events. Each invocation runs in an isolated container
-                — same image, same secrets, full audit trail.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-6">
-            <div className="bg-primary/10 text-primary w-fit rounded-md p-2.5">
-              <ScaleIcon className="size-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Scale to zero</p>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Functions scale down to zero replicas between invocations and
-                spin up in milliseconds on demand. Powered by Knative Serving
-                on the tenant cluster — no idle pod cost.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-6">
-            <div className="bg-primary/10 text-primary w-fit rounded-md p-2.5">
-              <ZapIcon className="size-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Same deploy pipeline</p>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Functions are declared in <code>astrolift.toml</code> as
-                <code> kind: function</code> workloads. Same image build,
-                same secrets injection, same approval gates as every other
-                Astrolift workload.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" className="w-fit gap-1.5" asChild>
-              <a
-                href="https://astrolift.ai/roadmap"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLinkIcon className="size-3.5" />
-                View roadmap
-              </a>
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b pb-0 mb-4">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={[
+              "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+              t === tab
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            ].join(" ")}
+          >
+            {TAB_LABELS[t]}
+          </button>
+        ))}
       </div>
+
+      {/* Invocations — recent function calls */}
+      {tab === "invocations" && (
+        <EmptyState
+          icon={<BoltIcon className="size-5" />}
+          title="No invocations yet"
+          description="Recent function invocations — function name, app, status, HTTP status code, duration, and trigger source — will appear here once functions are deployed to the tenant cluster."
+        />
+      )}
+
+      {/* Errors — failed invocations */}
+      {tab === "errors" && (
+        <EmptyState
+          icon={<AlertTriangleIcon className="size-5" />}
+          title="No errors"
+          description="Failed invocations with error type, stack trace, and trigger context will appear here."
+        />
+      )}
+
+      {/* Throughput — golden signals per function from Prometheus */}
+      {tab === "throughput" && (
+        <EmptyState
+          icon={<GaugeIcon className="size-5" />}
+          title="No throughput data"
+          description="Throughput metrics from Prometheus — connect an observability backend to view golden signals (p99 latency, error rate, requests/sec) per function."
+        />
+      )}
+
+      {/* Triggers — configured event sources per function */}
+      {tab === "triggers" && (
+        <EmptyState
+          icon={<LinkIcon className="size-5" />}
+          title="No function workloads"
+          description="Function workloads declared as kind: function in astrolift.toml will appear here with their HTTP endpoint URLs and configured event sources."
+        />
+      )}
     </PageShell>
   );
 }
