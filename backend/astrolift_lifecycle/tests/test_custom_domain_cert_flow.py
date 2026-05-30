@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from astrolift_lifecycle.models import CustomDomain
+from astrolift_lifecycle.models import AppEnvironment, CustomDomain
 from astrolift_lifecycle.schema.mutations import (
     EnvironmentByIdInput,
     LifecycleMutation,
@@ -579,3 +579,214 @@ def test_render_live_omits_503_annotation(app, env, deployment):
     ing = next(r for r in out if r["kind"] == "Ingress")
     assert "nginx.ingress.kubernetes.io/server-snippet" not in ing["metadata"]["annotations"]
     assert ing["metadata"]["labels"]["astrolift.dev/ingress-state"] == "live"
+
+
+# ---- managed subdomain Ingress -------------------------------------------
+
+
+@pytest.fixture
+def managed_domain(org):
+    from astrolift_clusters.models import ManagedDomain
+
+    return ManagedDomain.objects.create(
+        zone="apps.example.com",
+        organization=org,
+        dns_driver="route53",
+        dns_config={"certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/abc"},
+        default_for=ManagedDomain.DefaultFor.TENANT_APPS,
+        is_wildcard_managed=True,
+    )
+
+
+@pytest.fixture
+def managed_domain_no_cert(org):
+    from astrolift_clusters.models import ManagedDomain
+
+    return ManagedDomain.objects.create(
+        zone="apps.example.com",
+        organization=org,
+        dns_driver="route53",
+        dns_config={},
+        default_for=ManagedDomain.DefaultFor.NONE,
+        is_wildcard_managed=False,
+    )
+
+
+@pytest.fixture
+def cluster_alb(org, provider_plugin):
+    from astrolift_clusters.models import TenantCluster
+
+    return TenantCluster.objects.create(
+        organization=org,
+        name="eks-cluster",
+        slug="eks-cluster",
+        provider_plugin=provider_plugin,
+        provider_config={},
+        region="us-east-1",
+        endpoint="https://eks.cluster.invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        ingress_class="alb",
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+
+
+@pytest.fixture
+def env_alb(app, cluster_alb, managed_domain):
+    return AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster_alb,
+        managed_domain=managed_domain,
+        name="prod",
+        url="https://hello-app.acme-test.apps.example.com",
+        required_approvals=0,
+    )
+
+
+@pytest.fixture
+def deployment_alb(app, env_alb):
+    from astrolift_lifecycle.models import Deployment
+
+    return Deployment.objects.create(
+        registered_app=app,
+        app_environment=env_alb,
+        triggered_by_user_id=None,
+        trigger_kind="manual",
+        status=Deployment.Status.PENDING.value,
+        image_tag="v1",
+    )
+
+
+@pytest.mark.django_db
+def test_render_managed_subdomain_alb_emits_ingress(deployment_alb):
+    """ALB cluster with managed_domain emits an ALB Ingress with the
+    ACM cert ARN annotation for the platform-assigned hostname."""
+    out = _render_app_ingresses_and_tls(deployment_alb.pk, "test-ns", _make_manifest())
+    ingresses = [r for r in out if r["kind"] == "Ingress"]
+    assert len(ingresses) == 1
+    ing = ingresses[0]
+    # ALBIngressDriver sets ingressClassName: alb
+    assert ing["spec"]["ingressClassName"] == "alb"
+    # Namespace must be injected by the caller since ALBIngressDriver
+    # doesn't know it.
+    assert ing["metadata"]["namespace"] == "test-ns"
+    # Platform-label present so operators can distinguish managed vs custom
+    assert ing["metadata"]["labels"]["astrolift.dev/managed-subdomain"] == "true"
+    # Hostname: {app}.{org}.{zone} → hello-app.acme-test.apps.example.com
+    rule_hosts = [r["host"] for r in ing["spec"]["rules"]]
+    assert "hello-app.acme-test.apps.example.com" in rule_hosts
+    # ACM cert ARN must appear in the LBC annotation
+    annotations = ing["metadata"]["annotations"]
+    assert annotations.get("alb.ingress.kubernetes.io/certificate-arn") == (
+        "arn:aws:acm:us-east-1:123456789012:certificate/abc"
+    )
+
+
+@pytest.mark.django_db
+def test_render_managed_subdomain_alb_no_cert_arn_falls_back_to_letsencrypt(
+    app, cluster_alb, managed_domain_no_cert
+):
+    """ALB cluster without a cert ARN in dns_config falls back to
+    letsencrypt strategy — no certificate-arn annotation is emitted."""
+    from astrolift_lifecycle.models import Deployment
+
+    env_no_cert = AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster_alb,
+        managed_domain=managed_domain_no_cert,
+        name="staging",
+        url="https://staging.example.com",
+        required_approvals=0,
+    )
+    deployment = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env_no_cert,
+        triggered_by_user_id=None,
+        trigger_kind="manual",
+        status=Deployment.Status.PENDING.value,
+        image_tag="v2",
+    )
+    out = _render_app_ingresses_and_tls(deployment.pk, "test-ns", _make_manifest())
+    ingresses = [r for r in out if r["kind"] == "Ingress"]
+    assert len(ingresses) == 1
+    ing = ingresses[0]
+    assert ing["spec"]["ingressClassName"] == "alb"
+    # No cert ARN → no certificate-arn annotation
+    assert "alb.ingress.kubernetes.io/certificate-arn" not in ing["metadata"]["annotations"]
+
+
+@pytest.mark.django_db
+def test_render_managed_subdomain_nginx(app, cluster, managed_domain_no_cert):
+    """nginx cluster with managed_domain emits a generic Ingress with
+    the cert-manager cluster-issuer annotation (no cert ARN in config)."""
+    from astrolift_lifecycle.models import Deployment
+
+    env_nginx = AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster,  # cluster has ingress_class="nginx" (default)
+        managed_domain=managed_domain_no_cert,
+        name="prod",
+        url="https://hello.example.com",
+        required_approvals=0,
+    )
+    deployment = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env_nginx,
+        triggered_by_user_id=None,
+        trigger_kind="manual",
+        status=Deployment.Status.PENDING.value,
+        image_tag="v1",
+    )
+    out = _render_app_ingresses_and_tls(deployment.pk, "test-ns", _make_manifest())
+    ingresses = [r for r in out if r["kind"] == "Ingress"]
+    assert len(ingresses) == 1
+    ing = ingresses[0]
+    assert ing["metadata"]["name"] == "hello-app-managed"
+    assert ing["metadata"]["namespace"] == "test-ns"
+    assert ing["metadata"]["labels"]["astrolift.dev/managed-subdomain"] == "true"
+    # No cert ARN → cert-manager handles issuance
+    assert ing["metadata"]["annotations"].get("cert-manager.io/cluster-issuer") == "letsencrypt-prod"
+    # Hostname in rules
+    rule_hosts = [r["host"] for r in ing["spec"]["rules"]]
+    assert "hello-app.acme-test.apps.example.com" in rule_hosts
+
+
+@pytest.mark.django_db
+def test_render_managed_subdomain_combined_with_custom_domain(deployment_alb):
+    """When both a managed subdomain AND an active CustomDomain exist,
+    both Ingresses are emitted."""
+    CustomDomain.objects.create(
+        registered_app=deployment_alb.registered_app,
+        hostname="checkout.acme.com",
+        validation_status=CustomDomain.ValidationStatus.VALIDATED,
+        certificate_state=CustomDomain.CertificateState.ACTIVE,
+        is_platform_managed_zone=True,
+        is_active=True,
+    )
+    out = _render_app_ingresses_and_tls(deployment_alb.pk, "test-ns", _make_manifest())
+    ingresses = [r for r in out if r["kind"] == "Ingress"]
+    # One for the CustomDomain, one for the managed subdomain
+    assert len(ingresses) == 2
+    names = {i["metadata"]["name"] for i in ingresses}
+    assert any("checkout" in n for n in names), "CustomDomain Ingress missing"
+    assert any(
+        i["metadata"]["labels"].get("astrolift.dev/managed-subdomain") == "true" for i in ingresses
+    ), "managed subdomain Ingress missing"
+
+
+@pytest.mark.django_db
+def test_render_no_managed_domain_unchanged(deployment):
+    """Environments without a managed_domain still emit only
+    CustomDomain Ingresses — no regression on the existing path."""
+    CustomDomain.objects.create(
+        registered_app=deployment.registered_app,
+        hostname="api.acme.com",
+        validation_status=CustomDomain.ValidationStatus.VALIDATED,
+        certificate_state=CustomDomain.CertificateState.ACTIVE,
+        is_platform_managed_zone=True,
+        is_active=True,
+    )
+    out = _render_app_ingresses_and_tls(deployment.pk, "ns", _make_manifest())
+    ingresses = [r for r in out if r["kind"] == "Ingress"]
+    assert len(ingresses) == 1
+    assert ingresses[0]["metadata"]["labels"].get("astrolift.dev/managed-subdomain") != "true"
