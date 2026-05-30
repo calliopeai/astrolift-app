@@ -12,7 +12,6 @@ import {
   DownloadIcon,
   GaugeIcon,
   GlobeIcon,
-  HomeIcon,
   LayersIcon,
   RocketIcon,
   ScrollTextIcon,
@@ -74,13 +73,6 @@ interface NavSection {
 // leaves now; "Teams" and "Projects" remain as the flat management
 // list pages and have been folded into Administration.
 const sections: NavSection[] = [
-  {
-    // Overview stands alone — no section label, never collapsible.
-    label: "",
-    items: [
-      { label: "Overview", href: "/dashboard", icon: <HomeIcon /> },
-    ],
-  },
   {
     // Run — active app operations: deployments, environments, release
     // workflows, scheduled jobs, and PR preview deployments. Mirrors

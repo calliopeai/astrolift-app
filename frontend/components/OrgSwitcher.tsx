@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 
 import {
   SidebarMenu,
@@ -24,24 +25,26 @@ export function OrgSwitcher() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton size="lg" className="cursor-default">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/10 ring-1 ring-sidebar-primary/30">
-            <Image
-              src="/logo.svg"
-              alt="Astrolift"
-              width={20}
-              height={20}
-              priority
-            />
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold tracking-tight">
-              Astrolift
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {loading ? "…" : (org?.name ?? "control plane")}
-            </span>
-          </div>
+        <SidebarMenuButton size="lg" asChild>
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/10 ring-1 ring-sidebar-primary/30">
+              <Image
+                src="/logo.svg"
+                alt="Astrolift"
+                width={20}
+                height={20}
+                priority
+              />
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold tracking-tight">
+                Astrolift
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {loading ? "…" : (org?.name ?? "control plane")}
+              </span>
+            </div>
+          </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
