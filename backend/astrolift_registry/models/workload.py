@@ -21,6 +21,10 @@ class Workload(NamedBaseCoreModel):
         STATEFULSET = "statefulset"
         JOB = "job"
         CRONJOB = "cronjob"
+        # One-shot ``batch/v1 Job`` (runs once, no schedule). Distinct
+        # from the legacy ``JOB`` choice — ``task`` is the kind the
+        # manifest parser / renderer support end-to-end.
+        TASK = "task"
 
     class ConcurrencyPolicy(models.TextChoices):
         # Mirrors Kubernetes ``CronJob.spec.concurrencyPolicy``:

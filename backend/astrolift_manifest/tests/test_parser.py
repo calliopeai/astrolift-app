@@ -318,6 +318,168 @@ env = { LOG_LEVEL = "info", DRY_RUN = "0" }
     assert env == {"LOG_LEVEL": "info", "DRY_RUN": "0"}
 
 
+# ---- [[tasks]] desugaring (#792) --------------------------------------
+
+
+def test_tasks_block_desugars_into_task_workload():
+    toml = """
+name = "hello"
+
+[[tasks]]
+name = "migrate"
+command = ["/bin/migrate"]
+"""
+    raw = parse_raw(toml)
+    assert len(raw.workloads) == 1
+    w = raw.workloads[0]
+    assert w.name == "migrate"
+    assert w.kind == "task"
+    # One-shot: no schedule, never rescheduled.
+    assert w.schedule is None
+    # Tasks are private (no ingress) and have a single primary container.
+    assert w.is_public is False
+    assert len(w.containers) == 1
+    c = w.containers[0]
+    assert c.is_primary is True
+    assert c.command == ("/bin/migrate",)
+    assert c.port == 0  # tasks don't expose ports
+    assert c.healthcheck_kind == "none"  # no liveness/readiness
+
+
+def test_tasks_block_does_not_require_schedule():
+    """Unlike [[jobs]] (which desugar to a cronjob and need a
+    schedule), a [[tasks]] entry is one-shot and parses fine without
+    one."""
+    toml = """
+name = "hello"
+
+[[tasks]]
+name = "migrate"
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].kind == "task"
+    assert raw.workloads[0].schedule is None
+
+
+def test_tasks_block_with_dockerfile_alias():
+    toml = """
+name = "hello"
+
+[[tasks]]
+name = "migrate"
+dockerfile = "Dockerfile.migrate"
+command = ["/bin/run"]
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].containers[0].dockerfile_path == "Dockerfile.migrate"
+
+
+def test_tasks_env_pairs_propagate():
+    toml = """
+name = "hello"
+
+[[tasks]]
+name = "migrate"
+command = ["/bin/run"]
+env = { LOG_LEVEL = "info", DRY_RUN = "0" }
+"""
+    raw = parse_raw(toml)
+    env = dict(raw.workloads[0].containers[0].env)
+    assert env == {"LOG_LEVEL": "info", "DRY_RUN": "0"}
+
+
+def test_tasks_workloads_and_jobs_can_coexist():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  port = 8080
+
+[[jobs]]
+name = "nightly"
+schedule = "0 0 * * *"
+command = ["/bin/run"]
+
+[[tasks]]
+name = "migrate"
+command = ["/bin/migrate"]
+"""
+    raw = parse_raw(toml)
+    names = sorted(w.name for w in raw.workloads)
+    assert names == ["migrate", "nightly", "web"]
+    kinds = {w.name: w.kind for w in raw.workloads}
+    assert kinds == {"web": "deployment", "nightly": "cronjob", "migrate": "task"}
+
+
+def test_tasks_name_collision_with_workload_rejected():
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "shared"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  port = 8080
+
+[[tasks]]
+name = "shared"
+command = ["/bin/run"]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "collides" in str(exc.value)
+
+
+def test_tasks_name_collision_with_job_rejected():
+    """A [[tasks]] entry sharing a name with a [[jobs]] entry would
+    produce two Workload rows with the same name — reject it the same
+    way a [[workloads]] collision is rejected."""
+    toml = """
+name = "hello"
+
+[[jobs]]
+name = "shared"
+schedule = "0 0 * * *"
+command = ["/bin/run"]
+
+[[tasks]]
+name = "shared"
+command = ["/bin/run"]
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "collides" in str(exc.value)
+
+
+def test_task_kind_accepted_on_bare_workload():
+    """``kind = "task"`` is valid on a [[workloads]] entry, not just
+    via the [[tasks]] shorthand."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "migrate"
+kind = "task"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  command = ["/bin/migrate"]
+"""
+    raw = parse_raw(toml)
+    assert raw.workloads[0].kind == "task"
+    assert raw.workloads[0].schedule is None
+
+
 def test_parse_missing_name_is_error():
     toml = """
 [[workloads]]
