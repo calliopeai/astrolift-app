@@ -197,6 +197,11 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     ``RegisteredApp.manifest_raw`` + Deployment.image_tag, and re-rendering
     keeps activities idempotent across retries (a stored payload could
     drift across temporal-history compactions).
+
+    Includes the managed-subdomain Ingress when the AppEnvironment has a
+    ManagedDomain FK and a TenantCluster. Caller must ensure both
+    relations are prefetched (``app_environment__managed_domain`` and
+    ``app_environment__tenant_cluster``).
     """
     from astrolift_manifest.normalize import NormalizationDefaults, normalize
     from astrolift_manifest.parser import parse_raw
@@ -209,14 +214,159 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
             f"app {app.slug!r} has no saved manifest — open the Manifest tab and paste astrolift.toml first",
         )
     manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
-    return _render(
+    namespace = namespace_for_app(app)
+    resources = _render(
         manifest,
         app_slug=app.slug,
-        namespace=namespace_for_app(app),
+        namespace=namespace,
         image_tag=deployment.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
         environment_name=env.name,
     )
+
+    # Fold in the managed-subdomain Ingress if the environment has a
+    # platform domain assigned. This mirrors the logic in the
+    # render_manifests Temporal activity so apply_manifests always has
+    # the full resource set regardless of which code path produced it.
+    managed_domain = getattr(env, "managed_domain", None)
+    cluster = getattr(env, "tenant_cluster", None)
+    if managed_domain is not None and cluster is not None:
+        ingress_resources = _render_managed_subdomain_ingress(
+            deployment, manifest, namespace, managed_domain, cluster
+        )
+        if ingress_resources:
+            resources = sorted(
+                [*resources, *ingress_resources],
+                key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
+            )
+
+    return resources
+
+
+def _render_managed_subdomain_ingress(
+    deployment: "Deployment",
+    manifest: Any,
+    namespace: str,
+    managed_domain: Any,
+    cluster: Any,
+) -> list[dict[str, Any]]:
+    """Return K8s Ingress resources for the platform-assigned subdomain."""
+    from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
+
+    app = deployment.registered_app
+    org_slug = app.organization.slug if app.organization_id else ""
+    if not org_slug:
+        return []
+
+    computed = compute_hostnames(
+        manifest,
+        HostnameInputs(
+            app_slug=app.slug,
+            org_slug=org_slug,
+            base_zone=managed_domain.zone,
+        ),
+    )
+    if not computed:
+        return []
+
+    cert_arn: str | None = (
+        managed_domain.dns_config.get("certificate_arn") if managed_domain.dns_config else None
+    )
+    ingress_paused = bool(getattr(deployment.app_environment, "ingress_paused", False))
+    ingress_state_label = "paused" if ingress_paused else "live"
+    out: list[dict[str, Any]] = []
+
+    if getattr(cluster, "ingress_class", None) == "alb":
+        from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
+
+        driver = ALBIngressDriver(
+            config=ALBConfig(
+                region=cluster.region or "us-east-1",
+                certificate_arn=cert_arn,
+            )
+        )
+        tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
+        by_workload: dict[str, list[str]] = {}
+        for wh in computed:
+            by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
+        for workload_slug, hostnames in by_workload.items():
+            for rendered in driver.render_ingress(
+                app=app.slug,
+                workload=workload_slug,
+                hostnames=hostnames,
+                tls_strategy=tls_strategy,
+            ):
+                rendered.setdefault("metadata", {})["namespace"] = namespace
+                rendered["metadata"].setdefault("labels", {})[
+                    "astrolift.dev/managed-subdomain"
+                ] = "true"
+                rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = ingress_state_label
+                out.append(rendered)
+    else:
+        all_hostnames = [wh.hostname for wh in computed]
+        primary_workload = next(
+            (w for w in manifest.workloads if w.kind == "deployment"), None
+        )
+        if primary_workload is None:
+            return []
+        primary_container = next(
+            (c for c in primary_workload.containers if c.is_primary),
+            primary_workload.containers[0] if primary_workload.containers else None,
+        )
+        if primary_container is None or primary_container.port <= 0:
+            return []
+        annotations: dict[str, str] = {}
+        if ingress_paused:
+            annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
+                'return 503 "Astrolift: app is paused";'
+            )
+        if not cert_arn:
+            annotations["cert-manager.io/cluster-issuer"] = "letsencrypt-prod"
+        out.append(
+            {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": {
+                    "name": f"{app.slug}-managed",
+                    "namespace": namespace,
+                    "annotations": annotations,
+                    "labels": {
+                        "astrolift.dev/app": app.slug,
+                        "astrolift.dev/managed-subdomain": "true",
+                        "astrolift.dev/ingress-state": ingress_state_label,
+                    },
+                },
+                "spec": {
+                    "ingressClassName": cluster.ingress_class,
+                    "tls": [
+                        {
+                            "hosts": all_hostnames,
+                            "secretName": f"{app.slug}-managed-tls",
+                        }
+                    ],
+                    "rules": [
+                        {
+                            "host": h,
+                            "http": {
+                                "paths": [
+                                    {
+                                        "path": "/",
+                                        "pathType": "Prefix",
+                                        "backend": {
+                                            "service": {
+                                                "name": primary_workload.name,
+                                                "port": {"number": int(primary_container.port)},
+                                            }
+                                        },
+                                    }
+                                ]
+                            },
+                        }
+                        for h in all_hostnames
+                    ],
+                },
+            }
+        )
 
 
 def workloads_from_resources(

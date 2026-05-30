@@ -761,6 +761,7 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
     d = Deployment.all_objects.select_related(
         "registered_app__organization",
         "app_environment__tenant_cluster",
+        "app_environment__managed_domain",
     ).get(pk=deployment_id)
     driver, ctx, namespace = driver_for_deployment(d)
     resources = render_resources_for_deployment(d)
