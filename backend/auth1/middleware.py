@@ -48,13 +48,16 @@ class Auth0SessionMiddleware(SessionMiddleware):
 
     def _pull_from_authorization_bearer(self, request: WSGIRequest) -> bool | None:
         api_key = self._get_authorization_data(request, self.BEARER)
-        if api_key:
-            if api_key == settings.CLIENT_SESSION_API_KEY:
-                request.session = self.SessionStore()
-                request.session.clear()
-                return True
-            else:
-                raise Auth0SessionMiddlewareException('Unauthorized', status=401)
+        if api_key and settings.CLIENT_SESSION_API_KEY and api_key == settings.CLIENT_SESSION_API_KEY:
+            # Matches the configured session API key — establish a fresh session.
+            request.session = self.SessionStore()
+            request.session.clear()
+            return True
+        # Any other Bearer (API token alft_at_…, deploy token alft_dt_…,
+        # OIDC, etc.) is for a later middleware (#428, #425) to claim;
+        # pass through rather than 401'ing here so the downstream auth
+        # middlewares actually see the request.
+        return None
 
     def _pull_from_authorization_session(self, request: WSGIRequest) -> bool | None:
         session_key = self._get_authorization_data(request, self.SESSION)
