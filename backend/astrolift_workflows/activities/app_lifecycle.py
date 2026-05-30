@@ -453,20 +453,22 @@ def _render_app_ingresses_and_tls(
     namespace: str,
     manifest,
 ) -> list[dict[str, Any]]:
-    """Emit one ``Ingress`` per active CustomDomain + a TLS ``Secret``
-    for every BYO cert. Skips domains in non-serving states
-    (validating, failed, not_requested) — we never want traffic
-    routed at a hostname whose cert isn't usable yet.
+    """Emit Ingress resources for both CustomDomains and the platform-
+    assigned managed subdomain, plus TLS Secrets for BYO certs.
 
-    For ACTIVE-state domains on platform-managed zones the cert lives
-    in the cloud's cert manager (ACM, Google-managed cert, Azure cert)
-    and is referenced by annotation/spec at the cluster's ingress
-    controller; we leave the Ingress' ``tls.secretName`` pointing at
-    the conventional ``<app>-<host>-tls`` name and let the controller
-    populate it via cert-manager when present. For ACTIVE on external
-    zones we annotate with ``cert-manager.io/cluster-issuer`` so the
-    cluster's cert-manager does the HTTP-01 dance on first apply. For
-    BYO we emit the TLS Secret inline from the operator-supplied PEM.
+    **CustomDomains** — one Ingress per validated + active custom
+    domain. Skips domains in non-serving cert states. BYO certs ship
+    as inline ``kubernetes.io/tls`` Secrets; platform-managed zones
+    (ACM / GCM / Azure) reference the cert by annotation.
+
+    **Managed subdomain** — every ``AppEnvironment`` with a
+    ``managed_domain`` gets an Ingress for its platform-assigned
+    hostname (``{app}.{org}.{base-zone}``). This ensures external-dns
+    and the cloud LB controller (e.g. AWS LBC) converge on the right
+    DNS record + TLS cert automatically — no operator action required.
+    For ALB clusters the wildcard ACM cert ARN comes from
+    ``managed_domain.dns_config["certificate_arn"]``. For other
+    ingress classes (nginx, traefik) cert-manager handles issuance.
     """
     import base64
 
@@ -474,7 +476,10 @@ def _render_app_ingresses_and_tls(
 
     d = Deployment.all_objects.select_related(
         "registered_app",
+        "registered_app__organization",
         "app_environment",
+        "app_environment__managed_domain",
+        "app_environment__tenant_cluster",
     ).get(pk=deployment_id)
 
     # Find the public-facing workload + its port. If the app has no
@@ -615,6 +620,123 @@ def _render_app_ingresses_and_tls(
                 },
             }
         )
+
+    # --- Managed subdomain Ingress ---
+    # AppEnvironment.managed_domain provides the platform-assigned
+    # hostname. Emit an Ingress for it unconditionally so external-dns
+    # + the cluster's LB controller create the DNS record and attach
+    # the TLS cert on every deploy without operator involvement.
+    # Wildcard ACM cert ARN for ALB: managed_domain.dns_config["certificate_arn"].
+    env = d.app_environment
+    managed_domain = env.managed_domain if env and env.managed_domain_id else None
+    cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+    if managed_domain is not None and cluster is not None:
+        from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
+
+        org_slug = d.registered_app.organization.slug if d.registered_app.organization_id else ""
+        if org_slug:
+            computed = compute_hostnames(
+                manifest,
+                HostnameInputs(
+                    app_slug=d.registered_app.slug,
+                    org_slug=org_slug,
+                    base_zone=managed_domain.zone,
+                ),
+            )
+            cert_arn: str | None = (
+                managed_domain.dns_config.get("certificate_arn") if managed_domain.dns_config else None
+            )
+            if computed:
+                if cluster.ingress_class == "alb":
+                    from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
+
+                    alb_cfg = ALBConfig(
+                        region=cluster.region or "us-east-1",
+                        certificate_arn=cert_arn,
+                    )
+                    driver = ALBIngressDriver(config=alb_cfg)
+                    tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
+                    # One Ingress per workload; all hostnames for that
+                    # workload go into its rules list (ALB LBC handles
+                    # multi-host Ingress natively with one listener).
+                    by_workload: dict[str, list[str]] = {}
+                    for wh in computed:
+                        by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
+                    for workload_slug, hostnames in by_workload.items():
+                        for rendered in driver.render_ingress(
+                            app=d.registered_app.slug,
+                            workload=workload_slug,
+                            hostnames=hostnames,
+                            tls_strategy=tls_strategy,
+                        ):
+                            rendered.setdefault("metadata", {})["namespace"] = namespace
+                            rendered["metadata"].setdefault("labels", {})[
+                                "astrolift.dev/managed-subdomain"
+                            ] = "true"
+                            rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = (
+                                ingress_state_label
+                            )
+                            out.append(rendered)
+                else:
+                    # Generic Ingress for nginx, traefik, etc. All
+                    # managed hostnames share one Ingress + one cert
+                    # Secret (wildcard covers them all).
+                    all_hostnames = [wh.hostname for wh in computed]
+                    managed_annotations: dict[str, str] = {}
+                    if ingress_paused:
+                        managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
+                            'return 503 "Astrolift: app is paused";'
+                        )
+                    if not cert_arn:
+                        # No pre-provisioned cert — let cert-manager
+                        # issue via the cluster's ACME issuer.
+                        managed_annotations["cert-manager.io/cluster-issuer"] = "letsencrypt-prod"
+                    out.append(
+                        {
+                            "apiVersion": "networking.k8s.io/v1",
+                            "kind": "Ingress",
+                            "metadata": {
+                                "name": f"{d.registered_app.slug}-managed",
+                                "namespace": namespace,
+                                "annotations": managed_annotations,
+                                "labels": {
+                                    "astrolift.dev/app": d.registered_app.slug,
+                                    "astrolift.dev/managed-subdomain": "true",
+                                    "astrolift.dev/ingress-state": ingress_state_label,
+                                },
+                            },
+                            "spec": {
+                                "ingressClassName": cluster.ingress_class,
+                                "tls": [
+                                    {
+                                        "hosts": all_hostnames,
+                                        "secretName": f"{d.registered_app.slug}-managed-tls",
+                                    }
+                                ],
+                                "rules": [
+                                    {
+                                        "host": h,
+                                        "http": {
+                                            "paths": [
+                                                {
+                                                    "path": "/",
+                                                    "pathType": "Prefix",
+                                                    "backend": {
+                                                        "service": {
+                                                            "name": backend_service,
+                                                            "port": {"number": backend_port},
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    }
+                                    for h in all_hostnames
+                                ],
+                            },
+                        }
+                    )
+
     return out
 
 
