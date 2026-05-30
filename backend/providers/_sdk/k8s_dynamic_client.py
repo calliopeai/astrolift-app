@@ -617,13 +617,15 @@ class KubernetesDynamicClient:
 
         Used for live ops: rolling restart (restart annotation) and
         scale (spec.replicas). Returns the patched object as a dict.
+        Uses the dynamic client's resource.patch() which handles the
+        merge-patch content type correctly.
         """
         self._refresh_token()
-        apps_v1 = self._client_module.AppsV1Api(self._api_client)
-        result = apps_v1.patch_namespaced_deployment(
+        resource = self._resource_for("apps/v1", "Deployment")
+        result = resource.patch(
             name=name,
             namespace=namespace,
             body=patch,
-            _content_type="application/merge-patch+json",
+            content_type="application/merge-patch+json",
         )
         return self._to_dict(result)
