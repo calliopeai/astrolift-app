@@ -27,8 +27,10 @@ import {
   BellIcon,
   BadgeCheckIcon,
   ChevronsUpDownIcon,
+  KeyRoundIcon,
   LockIcon,
   LogOutIcon,
+  ShieldIcon,
   SparklesIcon,
   ZapIcon,
   AlertTriangleIcon,
@@ -134,6 +136,18 @@ export const NavUser = ({ ssrUser: _ssrUser }: { ssrUser: CurrentUser | null }) 
                 <DropdownMenuItem onSelect={() => setNotificationsOpen(true)}>
                   <BellIcon />
                   {t("notifications")}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/security">
+                    <ShieldIcon />
+                    {t("security")}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/tokens">
+                    <KeyRoundIcon />
+                    {t("apiTokens")}
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard?onboarding=1">

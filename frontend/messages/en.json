@@ -19,6 +19,8 @@
   "user": {
     "account": "Account",
     "notifications": "Notifications",
+    "security": "Security",
+    "apiTokens": "API Tokens",
     "rerunOnboarding": "Re-run onboarding",
     "logout": "Log out"
   },
