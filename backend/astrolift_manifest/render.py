@@ -63,6 +63,7 @@ _CONCURRENCY_POLICY_K8S = {
 def render_manifests(
     manifest: NormalizedManifest,
     *,
+    app_slug: str = "",
     namespace: str,
     image_tag: str,
     image_repository: str,
@@ -88,7 +89,9 @@ def render_manifests(
     after operator-authored bundles.
     """
     base_labels = {
-        "astrolift.dev/app": manifest.name,
+        # Use the app slug (DNS-safe) not the display name — K8s label
+        # values must match ([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9].
+        "astrolift.dev/app": app_slug or manifest.name,
         "astrolift.dev/environment": environment_name,
         **(labels or {}),
     }

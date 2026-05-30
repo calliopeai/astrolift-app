@@ -211,6 +211,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
     manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
     return _render(
         manifest,
+        app_slug=app.slug,
         namespace=namespace_for_app(app),
         image_tag=deployment.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
