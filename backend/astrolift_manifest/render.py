@@ -198,7 +198,25 @@ def render_manifests(
                     env_from_secret_refs=env_from,
                 )
             )
-        # statefulset / job land in follow-up render modules.
+        elif w.kind == "statefulset":
+            # StatefulSet + headless Service for stable DNS per pod.
+            # VolumeClaimTemplates are added when storage_size is set.
+            sts, headless_svc = _render_statefulset(
+                w,
+                namespace=namespace,
+                image_tag=image_tag,
+                image_repository=image_repository,
+                labels=wl_labels,
+                env_from_secret_refs=env_from,
+            )
+            out.append(sts)
+            out.append(headless_svc)
+            # Also emit a regular Service if the workload has a port,
+            # so the StatefulSet is reachable via a stable ClusterIP.
+            svc = _render_service(w, namespace=namespace, labels=wl_labels)
+            if svc is not None:
+                out.append(svc)
+        # job lands in a follow-up render module.
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))
 
@@ -735,3 +753,93 @@ def _render_function(
             }
         },
     }
+
+
+def _render_statefulset(
+    w: WorkloadManifest,
+    *,
+    namespace: str,
+    image_tag: str,
+    image_repository: str,
+    labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Render a ``kind: statefulset`` workload.
+
+    Returns a 2-tuple: (StatefulSet, headless Service). The headless
+    Service (``clusterIP: None``) gives each pod a stable DNS name:
+    ``<pod-name>.<svc-name>.<namespace>.svc.cluster.local``.
+
+    When ``storage_size`` is set, a ``volumeClaimTemplate`` is emitted
+    so each pod gets its own persistent volume.
+    """
+    selector = {
+        "astrolift.dev/workload": w.name,
+        "astrolift.dev/app": labels["astrolift.dev/app"],
+    }
+    headless_svc_name = f"{w.name}-headless"
+
+    pod_spec = _pod_spec(
+        w,
+        image_tag=image_tag,
+        image_repository=image_repository,
+        env_from_secret_refs=env_from_secret_refs,
+    )
+
+    volume_claim_templates: list[dict[str, Any]] = []
+    if w.storage_size:
+        volume_claim_templates.append(
+            {
+                "metadata": {"name": f"{w.name}-data"},
+                "spec": {
+                    "accessModes": ["ReadWriteOnce"],
+                    "resources": {"requests": {"storage": w.storage_size}},
+                    **({"storageClassName": w.storage_class} if w.storage_class else {}),
+                },
+            }
+        )
+
+    sts: dict[str, Any] = {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "metadata": {
+            "name": w.name,
+            "namespace": namespace,
+            "labels": labels,
+        },
+        "spec": {
+            "serviceName": headless_svc_name,
+            "replicas": int(w.replicas),
+            "selector": {"matchLabels": selector},
+            "template": {
+                "metadata": {"labels": {**labels, **selector}},
+                "spec": pod_spec,
+            },
+        },
+    }
+    if volume_claim_templates:
+        sts["spec"]["volumeClaimTemplates"] = volume_claim_templates
+
+    # Headless Service — required for stable pod DNS in StatefulSet.
+    headless: dict[str, Any] = {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+            "name": headless_svc_name,
+            "namespace": namespace,
+            "labels": {**labels, "astrolift.dev/headless": "true"},
+        },
+        "spec": {
+            "clusterIP": "None",
+            "selector": selector,
+            "ports": [],
+        },
+    }
+    # Populate headless service ports from the primary container.
+    primary = _primary_container(w)
+    if primary and primary.port > 0:
+        headless["spec"]["ports"] = [
+            {"name": "app", "port": primary.port, "targetPort": primary.port}
+        ]
+
+    return sts, headless
