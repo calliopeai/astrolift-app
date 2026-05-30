@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   HammerIcon,
   Loader2Icon,
@@ -460,15 +461,13 @@ function WorkloadRow({
   }, [workload.replicas]);
 
   const dirty = pending !== initial;
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   // V1 hard ceiling — env overrides only tighten this; the server
   // is authoritative on validation.
   const HARD_UPPER = 20;
   const HARD_LOWER = 0;
 
   async function handleRestart() {
-    if (!window.confirm(t("confirmRestart", { workload: workload.name, env: envName }))) {
-      return;
-    }
     const { data } = await restart({ variables: { input: { workloadId: workload.id } } });
     const payload = data?.restartAstroliftWorkload;
     if (payload?.ok) {
@@ -476,6 +475,7 @@ function WorkloadRow({
     } else {
       toast.error(payload?.errors?.[0]?.message ?? t("toastRestartFailed"));
     }
+    setRestartConfirmOpen(false);
   }
 
   async function handleApply() {
@@ -550,7 +550,7 @@ function WorkloadRow({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleRestart}
+                onClick={() => setRestartConfirmOpen(true)}
                 disabled={restarting}
                 className="gap-1.5"
               >
@@ -565,6 +565,14 @@ function WorkloadRow({
             <TooltipContent className="max-w-xs">{t("rollingRestartTooltip")}</TooltipContent>
           </Tooltip>
         </div>
+        <ConfirmDialog
+          open={restartConfirmOpen}
+          onOpenChange={setRestartConfirmOpen}
+          title={t("confirmRestart", { workload: workload.name, env: envName })}
+          description=""
+          confirmLabel={t("rollingRestart")}
+          onConfirm={handleRestart}
+        />
 
         {/* Mobile: kebab dropdown carrying the same actions. Pattern
             mirrors clusters-client.tsx renderRowMenu from #412 — keeps
@@ -623,7 +631,7 @@ function WorkloadRow({
                 {t("applyScale", { count: pending })}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => void handleRestart()} disabled={restarting}>
+              <DropdownMenuItem onSelect={() => setRestartConfirmOpen(true)} disabled={restarting}>
                 {restarting ? (
                   <Loader2Icon className="size-4 animate-spin" />
                 ) : (
