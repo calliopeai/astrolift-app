@@ -375,7 +375,9 @@ export function AstroliftNav() {
   }
 
   return (
-    <>
+    // overflow-x-hidden prevents horizontal wobble when sidebar items are
+    // wider than the sidebar's collapsed/expanded width during transitions.
+    <div className="min-w-0 overflow-x-hidden">
       {sections.map((section) => {
         // Sections use either flat `items` or structured `subGroups`.
         const allItems: NavItem[] = section.subGroups
@@ -456,7 +458,7 @@ export function AstroliftNav() {
             <SidebarGroup>
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="group/section hover:text-sidebar-foreground flex w-full items-center justify-between">
-                  <span>{section.label}</span>
+                  <span className="text-[12px] font-bold uppercase tracking-widest">{section.label}</span>
                   <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>
@@ -465,6 +467,6 @@ export function AstroliftNav() {
           </Collapsible>
         );
       })}
-    </>
+    </div>
   );
 }
