@@ -11,7 +11,6 @@ import {
   HardDriveIcon,
   LayersIcon,
   Loader2Icon,
-  LockIcon,
   NetworkIcon,
   ServerIcon,
   ShieldCheckIcon,
@@ -92,7 +91,6 @@ const LIFECYCLE_CONFIG: Record<
 type CapKey =
   | "cert_manager"
   | "ingress"
-  | "service_mesh"
   | "external_dns"
   | "storage_classes"
   | "metrics_server"
@@ -109,10 +107,6 @@ const CAPABILITY_META: Record<
   ingress: {
     label: "Ingress",
     icon: <NetworkIcon className="size-4" />,
-  },
-  service_mesh: {
-    label: "Service mesh",
-    icon: <LockIcon className="size-4" />,
   },
   external_dns: {
     label: "external-dns",
