@@ -4,7 +4,6 @@ import {
   ActivityIcon,
   BarChart3Icon,
   BellIcon,
-  GitBranchIcon,
   LayoutDashboardIcon,
   ScrollIcon,
   BookOpenIcon,
