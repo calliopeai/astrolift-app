@@ -40,6 +40,7 @@ class Workload(NamedBaseCoreModel):
         # process deployment. The DB migration for all new Kind values
         # (TASK/AGENT/WORKFLOW/FUNCTION) lands together in #805.
         WORKFLOW = "workflow"
+        FUNCTION = "function"
 
     class ConcurrencyPolicy(models.TextChoices):
         # Mirrors Kubernetes ``CronJob.spec.concurrencyPolicy``:

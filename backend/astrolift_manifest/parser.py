@@ -45,7 +45,7 @@ class ManifestError(ValueError):
         self.column = column
 
 
-_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob", "task", "agent", "workflow"}
+_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob", "task", "agent", "workflow", "function"}
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
 
@@ -183,6 +183,11 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         temporal_namespace=str(d.get("temporal_namespace", "default")),
         max_concurrent_activities=int(d.get("max_concurrent_activities", 20)),
         max_concurrent_workflows=int(d.get("max_concurrent_workflows", 10)),
+        # ``kind == "function"`` Knative autoscaling parameters.
+        min_scale=int(d.get("min_scale", 0)),
+        max_scale=int(d.get("max_scale", 10)),
+        function_concurrency=int(d.get("concurrency", 1)),
+        function_timeout_seconds=int(d.get("timeout_seconds", 300)),
     )
 
 
