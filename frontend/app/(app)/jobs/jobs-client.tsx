@@ -111,7 +111,7 @@ function consoleHrefForCommandRun(run: AstroliftCommandRun): string {
 
 export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const t = useTranslations("jobs");
-  const [tab, setTab] = React.useState<"scheduled" | "commands">("scheduled");
+  const [tab, setTab] = React.useState<"schedules" | "runs" | "failures" | "commands">("schedules");
   const variables = appSlug ? { appSlug, limit: 100 } : { limit: 100 };
   const { data: jobsData, loading: jobsLoading } = useQuery<JobResp>(LIST_SCHEDULED_JOB_RUNS, {
     variables,
@@ -134,6 +134,15 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
 
   const jobs = jobsData?.astroliftScheduledJobRuns ?? [];
   const cmds = cmdData?.astroliftCommandRuns ?? [];
+  // Failures tab is a pure client-side slice of the same run history —
+  // ``status`` is the stored discriminator on ScheduledJobRun and
+  // "failed" is the only terminal-error value (see RunStatusBadge).
+  // Memoize off the query result, not the ``jobs`` fallback, so the
+  // ``[] ?? `` default doesn't churn the dep on every render.
+  const failedJobs = React.useMemo(
+    () => (jobsData?.astroliftScheduledJobRuns ?? []).filter((j) => j.status === "failed"),
+    [jobsData?.astroliftScheduledJobRuns]
+  );
   const cronWorkloads: WorkloadCronCardData[] = React.useMemo(() => {
     const rows = wlData?.astroliftWorkloads ?? [];
     return rows
@@ -162,20 +171,40 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
     >
       {tabs}
 
-      {appSlug && cronWorkloads.length > 0 ? (
-        <CronWorkloadsCard appSlug={appSlug} workloads={cronWorkloads} />
-      ) : null}
-
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
-          variant={tab === "scheduled" ? "default" : "outline"}
+          variant={tab === "schedules" ? "default" : "outline"}
           size="sm"
-          onClick={() => setTab("scheduled")}
+          onClick={() => setTab("schedules")}
           className="gap-2"
         >
-          <CalendarClockIcon className="size-4" /> {t("tabs.scheduled")}
+          <CalendarClockIcon className="size-4" /> {t("tabs.schedules")}
+          {appSlug ? (
+            <Badge variant="secondary" className="ml-1">
+              {cronWorkloads.length}
+            </Badge>
+          ) : null}
+        </Button>
+        <Button
+          variant={tab === "runs" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setTab("runs")}
+          className="gap-2"
+        >
+          <HistoryIcon className="size-4" /> {t("tabs.runs")}
           <Badge variant="secondary" className="ml-1">
             {jobs.length}
+          </Badge>
+        </Button>
+        <Button
+          variant={tab === "failures" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setTab("failures")}
+          className="gap-2"
+        >
+          <XCircleIcon className="size-4" /> {t("tabs.failures")}
+          <Badge variant={failedJobs.length > 0 ? "destructive" : "secondary"} className="ml-1">
+            {failedJobs.length}
           </Badge>
         </Button>
         <Button
@@ -191,7 +220,35 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
         </Button>
       </div>
 
-      {tab === "scheduled" && (
+      {tab === "schedules" &&
+        (!appSlug ? (
+          <Card>
+            <CardContent className="p-6">
+              <EmptyState
+                icon={<CalendarClockIcon className="size-5" />}
+                title={t("schedules.emptyTitle")}
+                description={t("schedules.emptyForFleet")}
+              />
+            </CardContent>
+          </Card>
+        ) : cronWorkloads.length > 0 ? (
+          <CronWorkloadsCard appSlug={appSlug} workloads={cronWorkloads} />
+        ) : (
+          <Card>
+            <CardContent className="p-6">
+              <EmptyState
+                icon={<CalendarClockIcon className="size-5" />}
+                title={t("schedules.emptyTitle")}
+                description={t("schedules.emptyDescription")}
+                learnMoreHref="https://github.com/calliopeai/astrolift-docs/blob/main/reference/manifest.md#jobs"
+                learnMoreLabel={t("schedules.emptyLearnMore")}
+                secondary={<ScheduledJobsExample caption={t("scheduled.emptyExampleCaption")} />}
+              />
+            </CardContent>
+          </Card>
+        ))}
+
+      {tab === "runs" && (
         <Card>
           <CardContent className="p-0">
             {jobsLoading && jobs.length === 0 ? (
@@ -202,7 +259,7 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
             ) : jobs.length === 0 ? (
               <div className="p-6">
                 <EmptyState
-                  icon={<CalendarClockIcon className="size-5" />}
+                  icon={<HistoryIcon className="size-5" />}
                   title={t("scheduled.emptyTitle")}
                   description={t("scheduled.emptyDescription")}
                   learnMoreHref="https://github.com/calliopeai/astrolift-docs/blob/main/reference/manifest.md#jobs"
@@ -212,6 +269,29 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
               </div>
             ) : (
               <ScheduledJobRunsTable jobs={jobs} />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "failures" && (
+        <Card>
+          <CardContent className="p-0">
+            {jobsLoading && jobs.length === 0 ? (
+              <div className="space-y-2 p-6">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : failedJobs.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<XCircleIcon className="size-5" />}
+                  title={t("failures.emptyTitle")}
+                  description={t("failures.emptyDescription")}
+                />
+              </div>
+            ) : (
+              <ScheduledJobRunsTable jobs={failedJobs} />
             )}
           </CardContent>
         </Card>
@@ -324,9 +404,7 @@ function CronWorkloadsCard({
                   {envList.length > 1 && (
                     <Select
                       value={envName}
-                      onValueChange={(v) =>
-                        setPerRowEnv((prev) => ({ ...prev, [w.slug]: v }))
-                      }
+                      onValueChange={(v) => setPerRowEnv((prev) => ({ ...prev, [w.slug]: v }))}
                     >
                       <SelectTrigger className="h-8 w-32 text-xs">
                         <SelectValue placeholder="env" />
