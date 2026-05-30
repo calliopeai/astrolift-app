@@ -45,7 +45,7 @@ class ManifestError(ValueError):
         self.column = column
 
 
-_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob", "task"}
+_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob", "task", "agent", "workflow"}
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
 
@@ -135,6 +135,14 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
             path=f"{path}.concurrency_policy",
         )
 
+    # Workflow-worker fields (#796). ``workflow_type`` + ``task_queue``
+    # are required when ``kind == "workflow"`` — a worker that doesn't
+    # know which workflow type to register or which task queue to poll
+    # is a silent no-op in the cluster, so reject it at parse time.
+    if kind == "workflow":
+        _require_str(d, "workflow_type", f"{path}.workflow_type")
+        _require_str(d, "task_queue", f"{path}.task_queue")
+
     containers = tuple(
         _parse_container(item, f"{path}.containers[{i}]") for i, item in enumerate(d.get("containers", []))
     )
@@ -159,6 +167,22 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         storage_size=d.get("storage_size"),
         containers=containers,
         volumes=volumes,
+        # Agent dispatch tuning (#795). Only meaningful when
+        # ``kind == "agent"``; other kinds carry the defaults and ignore
+        # them. Read unconditionally so a manifest that sets them on a
+        # non-agent workload round-trips without error.
+        max_retries=int(d.get("max_retries", 5)),
+        tool_timeout_seconds=int(d.get("tool_timeout_seconds", 300)),
+        result_ttl_hours=int(d.get("result_ttl_hours", 72)),
+        # Temporal worker config (#796). Required pair validated above for
+        # ``kind == "workflow"``; other kinds carry the empty/default
+        # values and ignore them. Read unconditionally so a manifest that
+        # sets them on a non-workflow workload round-trips without error.
+        workflow_type=str(d.get("workflow_type", "")),
+        task_queue=str(d.get("task_queue", "")),
+        temporal_namespace=str(d.get("temporal_namespace", "default")),
+        max_concurrent_activities=int(d.get("max_concurrent_activities", 20)),
+        max_concurrent_workflows=int(d.get("max_concurrent_workflows", 10)),
     )
 
 

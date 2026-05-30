@@ -141,6 +141,15 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "hpa_target_cpu_pct": w.hpa_target_cpu_pct,
         "storage_class": w.storage_class,
         "storage_size": w.storage_size,
+        # Temporal worker config (#796) participates in the manifest hash
+        # so a change to e.g. ``task_queue`` is detected as a real change
+        # rather than collapsing to a silent no-op deploy. Only set on
+        # ``kind == "workflow"`` workloads; defaults elsewhere.
+        "workflow_type": w.workflow_type,
+        "task_queue": w.task_queue,
+        "temporal_namespace": w.temporal_namespace,
+        "max_concurrent_activities": w.max_concurrent_activities,
+        "max_concurrent_workflows": w.max_concurrent_workflows,
         "containers": [_container_dict(c) for c in w.containers],
     }
 
