@@ -5,21 +5,30 @@ import {
   BarChart3Icon,
   BellIcon,
   BookOpenIcon,
-  BoxIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
   ChevronRightIcon,
+  CreditCardIcon,
+  FingerprintIcon,
+  FolderIcon,
+  GitBranchIcon,
   GitPullRequestIcon,
   CloudIcon,
   DownloadIcon,
   GaugeIcon,
   GlobeIcon,
+  KeyRoundIcon,
   LayersIcon,
+  LockIcon,
   RocketIcon,
   ScrollTextIcon,
+  ServerIcon,
   Settings2Icon,
   ShieldCheckIcon,
   ShieldIcon,
+  SlidersHorizontalIcon,
+  UsersIcon,
+  UsersRoundIcon,
   WebhookIcon,
   WorkflowIcon,
 } from "lucide-react";
@@ -59,9 +68,19 @@ interface NavItem {
   tourTarget?: string;
 }
 
-interface NavSection {
+interface NavSubGroup {
+  /** Short muted label rendered above the group's items (e.g. "Infrastructure"). */
   label: string;
   items: NavItem[];
+}
+
+interface NavSection {
+  label: string;
+  /** Flat item list — used when no sub-grouping is needed. */
+  items?: NavItem[];
+  /** Labeled sub-groups within the section — used for Control where
+   * Infrastructure / Org Governance / Org Config are distinct concerns. */
+  subGroups?: NavSubGroup[];
 }
 
 // Required-permission annotations mirror the @require_permission
@@ -152,34 +171,122 @@ const sections: NavSection[] = [
     ],
   },
   {
-    // Control — platform configuration: clusters, DNS, cloud providers,
-    // and webhooks. Setup-once surfaces that govern the runtime plane.
+    // Control — platform governance split into three concerns:
+    // Infrastructure (runtime plane setup), Org Governance (identity,
+    // access, compliance), and Org Config (integrations + domain config).
     label: "Control",
-    items: [
+    subGroups: [
       {
-        label: "Clusters",
-        href: "/clusters",
-        icon: <LayersIcon />,
-        permission: { anyOf: ["cluster.register", "provider_plugin.read"] },
-        tourTarget: "clusters-nav",
+        label: "Infrastructure",
+        items: [
+          {
+            label: "Clusters",
+            href: "/clusters",
+            icon: <LayersIcon />,
+            permission: { anyOf: ["cluster.register", "provider_plugin.read"] },
+            tourTarget: "clusters-nav",
+          },
+          {
+            label: "Domains",
+            href: "/domains",
+            icon: <GlobeIcon />,
+            permission: { anyOf: ["cluster.register", "app.read"] },
+          },
+          {
+            label: "Providers",
+            href: "/providers",
+            icon: <CloudIcon />,
+            permission: "provider_plugin.read",
+          },
+          {
+            label: "Webhooks",
+            href: "/webhooks",
+            icon: <WebhookIcon />,
+            permission: { anyOf: ["webhook.create", "webhook.update"] },
+          },
+        ],
       },
       {
-        label: "Domains",
-        href: "/domains",
-        icon: <GlobeIcon />,
-        permission: { anyOf: ["cluster.register", "app.read"] },
+        label: "Org Governance",
+        items: [
+          {
+            label: "Members",
+            href: "/administration/members",
+            icon: <UsersIcon />,
+            permission: "org.manage_members",
+          },
+          {
+            label: "Teams",
+            href: "/administration/teams",
+            icon: <UsersRoundIcon />,
+            permission: "team.read",
+          },
+          {
+            label: "Projects",
+            href: "/administration/projects",
+            icon: <FolderIcon />,
+            permission: "project.read",
+          },
+          {
+            label: "Policies",
+            href: "/settings/policies",
+            icon: <ShieldIcon />,
+            permission: "org.manage_members",
+          },
+          {
+            label: "Permissions",
+            href: "/settings/permissions",
+            icon: <LockIcon />,
+            permission: "org.manage_members",
+          },
+          {
+            label: "Tokens",
+            href: "/administration/tokens",
+            icon: <KeyRoundIcon />,
+            permission: "api_token.create",
+          },
+          {
+            label: "Cost",
+            href: "/administration/cost",
+            icon: <CreditCardIcon />,
+            permission: "billing.read",
+          },
+          {
+            label: "Quotas",
+            href: "/administration/quotas",
+            icon: <SlidersHorizontalIcon />,
+            permission: "org.manage_members",
+          },
+          {
+            label: "Audit",
+            href: "/audit",
+            icon: <ScrollTextIcon />,
+            permission: "audit_log.read",
+          },
+        ],
       },
       {
-        label: "Providers",
-        href: "/providers",
-        icon: <CloudIcon />,
-        permission: "provider_plugin.read",
-      },
-      {
-        label: "Webhooks",
-        href: "/webhooks",
-        icon: <WebhookIcon />,
-        permission: { anyOf: ["webhook.create", "webhook.update"] },
+        label: "Org Config",
+        items: [
+          {
+            label: "Identity Provider",
+            href: "/settings/identity-provider",
+            icon: <FingerprintIcon />,
+            permission: "org.manage_members",
+          },
+          {
+            label: "Source Providers",
+            href: "/settings/source-providers",
+            icon: <GitBranchIcon />,
+            permission: "org.manage_members",
+          },
+          {
+            label: "Managed Domains",
+            href: "/settings/managed-domains",
+            icon: <ServerIcon />,
+            permission: "provider_plugin.configure",
+          },
+        ],
       },
     ],
   },
@@ -197,27 +304,12 @@ const sections: NavSection[] = [
     ],
   },
   {
+    // Manage — personal settings + reference resources. Administration
+    // is now in Control / Org Governance. This section will be removed
+    // in #787 once Settings is split into org config (Control) and
+    // personal (avatar dropdown).
     label: "Manage",
-    // Administration (RBAC, tokens, cost/quotas), personal settings,
-    // and reference resources grouped under one section. The
-    // Administration sub-pages are reached through the horizontal tab
-    // bar inside /administration, not the sidebar.
     items: [
-      {
-        label: "Administration",
-        href: "/administration",
-        icon: <ShieldIcon />,
-        permission: {
-          anyOf: [
-            "team.read",
-            "project.read",
-            "org.manage_members",
-            "api_token.create",
-            "billing.read",
-            "app.read",
-          ],
-        },
-      },
       { label: "Settings", href: "/settings", icon: <Settings2Icon /> },
       { label: "Docs", href: "/resources/docs", icon: <BookOpenIcon /> },
       { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
@@ -268,7 +360,12 @@ export function AstroliftNav() {
   return (
     <>
       {sections.map((section) => {
-        const visibleItems = section.items.filter(
+        // Sections use either flat `items` or structured `subGroups`.
+        const allItems: NavItem[] = section.subGroups
+          ? section.subGroups.flatMap((g) => g.items)
+          : (section.items ?? []);
+
+        const visibleItems = allItems.filter(
           (item) =>
             !item.permission ||
             // While permissions are loading, show every item so the
@@ -279,37 +376,58 @@ export function AstroliftNav() {
         );
         if (visibleItems.length === 0) return null;
 
-        // Trust the operator's explicit toggle. Default is open
-        // (every section appears expanded for new operators).
-        // The PageHeader breadcrumb still shows where you are if
-        // the active item happens to live in a collapsed section.
-        // Unlabeled sections (empty label) are always visible — no
-        // collapsible wrapper and no section header.
+        // Helper to render a list of items as sidebar menu entries.
+        const renderItems = (items: NavItem[]) =>
+          items
+            .filter(
+              (item) =>
+                !item.permission || loading || can(item.permission)
+            )
+            .map((item) => {
+              const active =
+                pathname === item.href ||
+                (item.href !== "/" && pathname.startsWith(item.href + "/"));
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                    <Link href={item.href} data-onboarding-tour={item.tourTarget}>
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            });
+
+        // Trust the operator's explicit toggle. Default is open.
+        // Unlabeled sections are always visible — no collapsible wrapper.
         if (!section.label) {
           return (
             <SidebarGroup key="__top__">
-              <SidebarMenu>
-                {visibleItems.map((item) => {
-                  const active =
-                    pathname === item.href ||
-                    (item.href !== "/" && pathname.startsWith(item.href + "/"));
-                  return (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                        <Link href={item.href} data-onboarding-tour={item.tourTarget}>
-                          {item.icon}
-                          <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
+              <SidebarMenu>{renderItems(section.items ?? [])}</SidebarMenu>
             </SidebarGroup>
           );
         }
 
         const isOpen = !collapsed[section.label];
+
+        // Content — either flat items or labeled sub-groups.
+        const content = section.subGroups ? (
+          section.subGroups.map((group) => {
+            const groupItems = renderItems(group.items);
+            if (!groupItems.length) return null;
+            return (
+              <div key={group.label}>
+                <p className="text-muted-foreground/60 px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest">
+                  {group.label}
+                </p>
+                <SidebarMenu>{groupItems}</SidebarMenu>
+              </div>
+            );
+          })
+        ) : (
+          <SidebarMenu>{renderItems(section.items ?? [])}</SidebarMenu>
+        );
 
         return (
           <Collapsible
@@ -325,25 +443,7 @@ export function AstroliftNav() {
                   <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
                 </CollapsibleTrigger>
               </SidebarGroupLabel>
-              <CollapsibleContent>
-                <SidebarMenu>
-                  {visibleItems.map((item) => {
-                    const active =
-                      pathname === item.href ||
-                      (item.href !== "/" && pathname.startsWith(item.href + "/"));
-                    return (
-                      <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                          <Link href={item.href} data-onboarding-tour={item.tourTarget}>
-                            {item.icon}
-                            <span>{item.label}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </CollapsibleContent>
+              <CollapsibleContent>{content}</CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
         );
