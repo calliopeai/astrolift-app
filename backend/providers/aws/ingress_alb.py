@@ -114,9 +114,9 @@ class ALBIngressDriver(IngressDriver):
             "metadata": {
                 "name": f"{app}-{workload}",
                 "labels": {
-                    "astrolift.io/app": app,
-                    "astrolift.io/workload": workload,
-                    "astrolift.io/managed-by": "platform",
+                    "astrolift.dev/app": app,
+                    "astrolift.dev/workload": workload,
+                    "astrolift.dev/managed-by": "platform",
                 },
                 "annotations": annotations,
             },

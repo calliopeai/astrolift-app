@@ -214,7 +214,7 @@ def _workload_slug_for(metadata: Any, app_slug: str) -> str:
     """Pull the workload slug off the pod's labels, falling back to
     its owner-reference. Empty string when neither can be inferred."""
     labels = getattr(metadata, "labels", None) or {}
-    for key in ("astrolift.io/workload", "app.kubernetes.io/component"):
+    for key in ("astrolift.dev/workload", "astrolift.io/workload", "app.kubernetes.io/component"):
         v = labels.get(key)
         if v:
             return str(v)
@@ -286,7 +286,7 @@ class LivePodBackend:
         api_client = build_api_client(auth)
         core_v1 = k8s_client.CoreV1Api(api_client)
 
-        label_selector = f"astrolift.io/app={app_slug}"
+        label_selector = f"astrolift.dev/app={app_slug}"
         resp = core_v1.list_namespaced_pod(
             namespace=namespace,
             label_selector=label_selector,
