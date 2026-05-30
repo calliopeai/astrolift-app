@@ -98,6 +98,7 @@ from astrolift_workflows.activities.provision_managed_domain import (
     poll_cert_issuance,
     provision_dns_zone,
     register_managed_domain_row,
+    reissue_cert,
     request_wildcard_cert_for_zone,
 )
 from astrolift_workflows.activities.migration import (
@@ -201,6 +202,7 @@ __all__ = [
     "reconcile_cluster_capabilities",
     "refresh_secret_bundle_in_cluster",
     "register_managed_domain_row",
+    "reissue_cert",
     "reheal_webhook_subscriptions",
     "remove_platform_rbac",
     "render_manifests",
