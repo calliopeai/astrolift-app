@@ -319,18 +319,6 @@ const sections: NavSection[] = [
       },
     ],
   },
-  {
-    // Manage — personal settings + reference resources. Administration
-    // is now in Control / Org Governance. This section will be removed
-    // in #787 once Settings is split into org config (Control) and
-    // personal (avatar dropdown).
-    label: "Manage",
-    items: [
-      { label: "Settings", href: "/settings", icon: <Settings2Icon /> },
-      { label: "Docs", href: "/resources/docs", icon: <BookOpenIcon /> },
-      { label: "Downloads", href: "/downloads", icon: <DownloadIcon /> },
-    ],
-  },
 ];
 
 function loadCollapsedState(): Record<string, boolean> {

@@ -1,5 +1,7 @@
 "use client";
 
+import { BookOpenIcon, DownloadIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 import { AstroliftNav } from "@/components/AstroliftNav";
@@ -15,6 +17,9 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
@@ -57,6 +62,28 @@ export function AppSidebar({ ssrUser, ...props }: AppSidebarProps) {
         )}
       </SidebarContent>
       <SidebarFooter>
+        {/* Utility row — Docs and Downloads at the bottom of every sidebar.
+            Removed from the Manage nav section; footer placement keeps them
+            accessible without consuming a nav section slot. */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="sm" tooltip="Docs">
+              <Link href="/resources/docs">
+                <BookOpenIcon />
+                <span>Docs</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="sm" tooltip="Downloads">
+              <Link href="/downloads">
+                <DownloadIcon />
+                <span>Downloads</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarSeparator />
         <LanguageSwitcher />
         <ThemeToggle />
         <StatusPageLink />
