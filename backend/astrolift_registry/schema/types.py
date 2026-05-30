@@ -320,6 +320,7 @@ class RegisteredAppType:
     ecr_push_role_arn: str
     k8s_namespace: str
     subdomain: str
+    managed_hostname: str
     is_active: bool
     provisioning_status: str
     provisioning_error: str
@@ -729,6 +730,27 @@ def build_app_freshness(
     )
 
 
+def _compute_managed_hostname(app) -> str:
+    """Return the full platform-managed hostname for the app.
+
+    Pattern: ``<subdomain>.<zone>`` where zone comes from the platform
+    or org-scoped ManagedDomain. Returns "" when no domain is configured.
+    """
+    try:
+        from astrolift_clusters.models import resolve_managed_domain
+
+        org = getattr(app, "organization", None)
+        domain = resolve_managed_domain(org, for_preview=False)
+        if domain is None:
+            return ""
+        subdomain = (app.subdomain or app.slug or "").strip()
+        if not subdomain:
+            return ""
+        return f"{subdomain}.{domain.zone}"
+    except Exception:
+        return ""
+
+
 def app_to_type(
     app,
     *,
@@ -780,6 +802,7 @@ def app_to_type(
         ecr_push_role_arn=app.push_role_ref or "",
         k8s_namespace=app.k8s_namespace,
         subdomain=app.subdomain,
+        managed_hostname=_compute_managed_hostname(app),
         is_active=app.is_active,
         provisioning_status=app.provisioning_status,
         provisioning_error=app.provisioning_error,

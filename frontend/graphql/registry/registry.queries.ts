@@ -29,6 +29,7 @@ const APP_FIELDS = `
   ecrPushRoleArn
   k8sNamespace
   subdomain
+  managedHostname
   isActive
   provisioningStatus
   provisioningError

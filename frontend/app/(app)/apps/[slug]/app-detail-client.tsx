@@ -136,8 +136,12 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
   const wlList = workloads.data?.astroliftWorkloads ?? [];
   const publicCount = wlList.filter((w) => w.isPublic).length;
+  // Use the backend-computed managed hostname (e.g. app.astrolift.smdinfra.net).
+  // Fall back to the short subdomain only when no managed domain is configured.
   const primaryHost =
-    publicCount > 0 ? `${wlList.find((w) => w.isPublic)?.slug}.${a.subdomain}` : null;
+    publicCount > 0
+      ? (a.managedHostname || a.subdomain || null)
+      : null;
 
   const sourceLabel = SOURCE_KIND_LABEL[a.sourceKind] ?? a.sourceKind;
 
@@ -243,6 +247,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
         appId={a.id}
         appSlug={a.slug}
         subdomain={a.subdomain}
+        managedHostname={a.managedHostname}
         primaryWorkloadSlug={wlList.find((w) => w.isPublic)?.slug ?? null}
         provisioningStatus={a.provisioningStatus}
       />

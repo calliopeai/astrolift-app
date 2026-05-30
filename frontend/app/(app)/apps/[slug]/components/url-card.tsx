@@ -30,12 +30,15 @@ import { UrlHealthBadge } from "./url-health-badge";
 interface Props {
   appId: string;
   appSlug: string;
-  /**
-   * Full platform-managed subdomain (e.g. `acme-app.acme.astrolift.app`).
-   * Stored as one string on the backend — there's no separate apex.
-   */
+  /** Short subdomain label (e.g. `pickup-windows-tool`). Used in the edit field. */
   subdomain: string;
-  /** First public workload slug — used to render the primary host. */
+  /**
+   * Full platform-managed hostname (e.g. `pickup-windows-tool.astrolift.smdinfra.net`).
+   * Computed by the backend from subdomain + ManagedDomain.zone. Empty when no
+   * managed domain is configured — falls back to subdomain for display.
+   */
+  managedHostname: string;
+  /** First public workload slug — used to determine routability. */
   primaryWorkloadSlug: string | null;
   /**
    * Provisioning status of the parent app. Used to render the pending
@@ -113,6 +116,7 @@ export function UrlCard({
   appId,
   appSlug,
   subdomain,
+  managedHostname,
   primaryWorkloadSlug,
   provisioningStatus,
 }: Props) {
@@ -141,7 +145,9 @@ export function UrlCard({
     awaitRefetchQueries: true,
   });
 
-  const fullHost = primaryWorkloadSlug ? `${primaryWorkloadSlug}.${subdomain}` : subdomain;
+  // Use the backend-computed managed hostname when available; fall back to the
+  // short subdomain label for installs without a managed domain configured.
+  const fullHost = managedHostname || subdomain;
 
   // Routable === backend says provisioning is ready AND there's a
   // public workload to receive traffic. Anything else means the host

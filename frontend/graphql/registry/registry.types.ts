@@ -168,6 +168,12 @@ export type AstroliftRegisteredApp = Omit<
    * TypeScript types from the updated schema.graphql.
    */
   provisioningProgress?: ProvisioningProgress | null;
+  /**
+   * Full platform-managed hostname (e.g. `pickup-windows-tool.astrolift.smdinfra.net`).
+   * Computed from app.subdomain + ManagedDomain.zone. Empty string when no domain
+   * is configured. Manual entry until `make codegen` regenerates types.
+   */
+  managedHostname: string;
 };
 
 export type AstroliftWorkload = Omit<GeneratedWorkload, "kind"> & {
