@@ -572,3 +572,27 @@ export const LIST_MY_ALERT_SUBSCRIPTIONS = gql`
     }
   }
 `;
+
+// --- Task runs (#801) ---
+// The backend GQL layer is not yet wired; this query is a stub so the
+// FE can reference it with errorPolicy:"ignore" and degrade gracefully
+// to EmptyState until the resolver lands.
+export const LIST_TASK_RUNS = gql`
+  query ListTaskRuns($appSlug: String, $limit: Int) {
+    astroliftTaskRuns(appSlug: $appSlug, limit: $limit) {
+      id
+      registeredAppSlug
+      workloadSlug
+      triggerKind
+      triggeredByUsername
+      command
+      status
+      exitCode
+      startedAt
+      endedAt
+      durationSeconds
+      k8sJobName
+      createdAt
+    }
+  }
+`;

@@ -277,3 +277,25 @@ export type AstroliftUserAlertSubscription = GeneratedUserAlertSubscription;
 // #698
 export type BulkOperationResult = GeneratedBulkOperationResult;
 export type BulkAppResultItem = GeneratedBulkAppResultItem;
+
+// #801 — Task runs. The backend GQL type doesn't exist yet so we
+// define the shape manually here. Once `make codegen` runs after the
+// backend resolver lands, this can be replaced with a codegen import.
+export type TaskRunStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+export type TaskRunTriggerKind = "manual" | "api" | "workflow";
+
+export interface AstroliftTaskRun {
+  id: string;
+  registeredAppSlug: string;
+  workloadSlug: string;
+  triggerKind: TaskRunTriggerKind;
+  triggeredByUsername: string | null;
+  command: string[];
+  status: TaskRunStatus;
+  exitCode: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  k8sJobName: string;
+  createdAt: string;
+}
