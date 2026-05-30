@@ -23,6 +23,7 @@ from astrolift_identity.urls import (
     app_urlpatterns as identity_app_urls,
 )
 from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
+from astrolift_scm.urls import urlpatterns as scm_webhook_urls
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
 
@@ -105,6 +106,13 @@ urlpatterns = [
     # Builder ships against ``/api/builder/v1/dev-environments/...``
     # as a stable wire contract.
     *lifecycle_api_urls,
+    # SCM webhook receivers (#778). Mounted at the project root because
+    # the wire URLs the source host (GitHub / GitLab) was told to POST
+    # to — ``/api/webhooks/<kind>/<app_guid>/`` — must resolve without
+    # the ``/app/`` prefix that ``base`` adds to authenticated UI
+    # traffic. Each view performs its own HMAC verification before
+    # touching the request body.
+    *scm_webhook_urls,
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),
