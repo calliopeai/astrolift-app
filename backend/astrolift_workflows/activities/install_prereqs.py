@@ -62,6 +62,16 @@ def _merge_helm_values(
     return out
 
 
+# Maps a prometheus_storage option value to the Kubernetes StorageClass
+# name it requires to be pre-installed on the cluster. Used by the preflight
+# check that gates kube-prometheus-stack installation on StorageClass presence
+# so operators get an actionable error instead of a silent PVC binding failure.
+_PERSISTENT_STORAGE_CLASS_NAMES: dict[str, str] = {
+    "efs_persistent": "efs-prometheus",
+    "filestore_persistent": "filestore-prometheus",
+    "azurefile_persistent": "azurefile-prometheus",
+}
+
 # StorageSpec blocks for persistent Prometheus storage on each cloud.
 # Each entry is a ready-to-embed kube-prometheus-stack storageSpec value.
 # The StorageClass name must exist in the cluster before the HelmRelease
@@ -143,6 +153,46 @@ def _apply_semantic_options(
     prom_block["prometheusSpec"] = prom_spec
     result["prometheus"] = prom_block
     return result
+
+
+def _assert_storage_class_preflight(
+    driver: Any,
+    cluster_slug: str,
+    component_key: str,
+    component_options: dict[str, str],
+) -> None:
+    """Raise if a persistent storage mode is selected but the required
+    StorageClass is absent from the cluster.
+
+    Guards kube-prometheus-stack installation: if the operator picks
+    ``efs_persistent`` (or any other cloud-native persistent mode) but
+    hasn't applied the StorageClass manifest from the Terraform output
+    yet, the HelmRelease would otherwise bind the PVC to a non-existent
+    StorageClass and stall silently. This preflight surfaces the gap as
+    an actionable error before Flux even tries.
+
+    Falls back to a no-op if the driver doesn't implement
+    ``storage_class_exists`` (e.g. cloud-native drivers where the check
+    would need a different API surface — they get the old behavior).
+    """
+    if component_key != "kube-prometheus-stack":
+        return
+    storage_mode = component_options.get("prometheus_storage", "ephemeral")
+    required_sc = _PERSISTENT_STORAGE_CLASS_NAMES.get(storage_mode)
+    if not required_sc:
+        return
+    check = getattr(driver, "storage_class_exists", None)
+    if check is None:
+        return
+    if not check(cluster_slug, required_sc):
+        from core.app_deploy import AppDeployError
+        raise AppDeployError(
+            f"kube-prometheus-stack storage mode '{storage_mode}' requires "
+            f"StorageClass '{required_sc}' on cluster '{cluster_slug}' but it "
+            f"was not found. Apply the StorageClass manifest from the Terraform "
+            f"output (efs_prometheus_storage_class_yaml) before running the "
+            f"bootstrap recipe. See issue #772 for the Terraform setup."
+        )
 
 
 def _flux_crd_missing(errors: list) -> bool:
@@ -304,6 +354,7 @@ def _install_cluster_prereqs_sync(
         component_options = option_overrides.get(component.key, {})
         merged_values = _merge_helm_values(component.helm_values, component_options)
         merged_values = _apply_semantic_options(component.key, merged_values, component_options)
+        _assert_storage_class_preflight(driver, ctx.slug, component.key, component_options)
 
         # Slug the repo URL into a valid K8s resource name:
         # strip scheme, replace non-alphanumeric with '-', truncate to 52 chars
