@@ -1004,11 +1004,9 @@ def _wait_dns_sync(deployment_id: int, timeout_seconds: int) -> int:
         host = getattr(md, "hostname", "") or getattr(md, "fqdn", "")
         if host:
             hostnames.append(host)
-    # Per-app custom domains pointing at this env. CustomDomain has
-    # registered_app + app_environment FKs.
+    # Per-app custom domains (CustomDomain is app-scoped, not env-scoped).
     for cd in CustomDomain.objects.filter(
         registered_app=d.registered_app,
-        app_environment=d.app_environment,
         deleted_at__isnull=True,
     ):
         host = getattr(cd, "hostname", "")
