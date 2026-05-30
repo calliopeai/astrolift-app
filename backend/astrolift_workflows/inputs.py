@@ -327,6 +327,24 @@ class SyncDevEnvironmentFilesInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class ProvisionManagedDomainInput:
+    """Input for ``ProvisionManagedDomainWorkflow`` (#781).
+
+    Drives the five-step DNS zone provisioning flow: hosted-zone
+    creation, wildcard cert request, cert issuance poll, ManagedDomain
+    row registration, and activation.
+
+    ``cluster_id`` is the TenantCluster PK whose provider plugin's
+    ``DnsDriver`` is used for all cloud operations. ``zone`` is the
+    DNS zone name to provision (e.g. ``"apps.platform.example"``).
+    """
+
+    cluster_id: int
+    zone: str
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""
