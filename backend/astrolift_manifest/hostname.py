@@ -117,7 +117,9 @@ def compute_hostnames(manifest: NormalizedManifest, inputs: HostnameInputs) -> l
         return []
 
     base = _normalize_subdomain(inputs.subdomain_override or inputs.app_slug)
-    suffix = f"{inputs.org_slug}.{inputs.base_zone}"
+    # Hostname pattern: <app>.<base-zone> — org slug is not included in the
+    # public URL so customers get clean short hostnames.
+    suffix = inputs.base_zone
 
     if len(public) == 1:
         w = public[0]
@@ -139,10 +141,10 @@ def compute_preview_hostname(
     org_slug: str,
     base_zone: str,
 ) -> str:
-    """``pr-<n>-<app>.pr.<org>.<base-zone>`` per spec 05 §12.4."""
+    """``pr-<n>-<app>.pr.<base-zone>`` — org slug omitted for clean URLs."""
     if pr_number <= 0:
         raise ValueError(f"pr_number must be positive, got {pr_number}")
-    return f"pr-{pr_number}-{app_slug}.pr.{org_slug}.{base_zone}"
+    return f"pr-{pr_number}-{app_slug}.pr.{base_zone}"
 
 
 # ---- helpers ----------------------------------------------------------
