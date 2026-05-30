@@ -72,7 +72,6 @@ type Lifecycle = "registered" | "managing" | "managed" | "error";
 const CAPABILITY_KEYS = [
   "cert_manager",
   "ingress",
-  "service_mesh",
   "external_dns",
   "storage_classes",
   "metrics_server",
@@ -545,14 +544,6 @@ function formatCapability(
         [v.class && `class ${v.class}`, v.controller_version && `version ${v.controller_version}`]
           .filter(Boolean)
           .join(" · ") || "—",
-    };
-  }
-  if (key === "service_mesh") {
-    const v = (value ?? {}) as { installed?: boolean; kind?: string | null };
-    return {
-      label: "service mesh",
-      installed: !!v.installed,
-      detail: v.kind ?? "—",
     };
   }
   if (key === "external_dns") {
