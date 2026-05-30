@@ -240,7 +240,7 @@ export default function WorkflowsPage() {
                   className="flex items-center gap-3 rounded-md border px-4 py-3 text-sm"
                 >
                   <Badge
-                    variant={run.status === "COMPLETED" ? "default" : "destructive"}
+                    variant={run.status === "completed" ? "default" : "destructive"}
                     className="shrink-0"
                   >
                     {run.status}
