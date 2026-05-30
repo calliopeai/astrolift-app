@@ -253,6 +253,15 @@ class Route53Driver(DnsDriver):
         ]
         return {"cert_id": cert_arn, "validation_records": validation_records}
 
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.revoke_cert")
+    def revoke_cert(self, zone: str, cert_id: str) -> None:
+        del zone  # not needed for ACM delete by ARN
+        acm = self._acm_client()
+        try:
+            acm.delete_certificate(CertificateArn=cert_id)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
     @driver_op(cloud="aws", driver="dns")
     def poll_cert_status(self, zone: str, cert_id: str) -> dict[str, Any]:
         del zone  # not needed for ACM lookup by ARN

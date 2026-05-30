@@ -239,3 +239,91 @@ async def mark_managed_domain_active(cluster_id: int, zone: str) -> None:
         zone,
         extra={"cluster_id": cluster_id},
     )
+
+
+def _reissue_cert_sync(
+    cluster_id: int,
+    zone: str,
+    cert_id: str,
+    zone_id: str,
+) -> dict[str, Any]:
+    """Revoke the existing cert and request a fresh wildcard cert.
+
+    Reads is_wildcard_managed from the ManagedDomain row to determine
+    whether this is a platform-managed zone whose validation records we
+    own and must write into DNS.
+    """
+    from astrolift_clusters.models import ManagedDomain
+
+    _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
+
+    # Delete the old cert so the CA slot is freed.
+    dns_driver.revoke_cert(zone, cert_id)
+
+    # Request a new wildcard cert for *.<zone>.
+    result = dns_driver.request_wildcard_cert(zone, zone_id)
+    new_cert_id: str = result.get("cert_id", "")
+    validation_records: list[dict] = result.get("validation_records", [])
+
+    # For platform-managed zones write each DNS-01 CNAME into the zone.
+    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    if domain is not None and domain.is_wildcard_managed:
+        for record in validation_records:
+            try:
+                dns_driver.ensure_record(
+                    zone=zone,
+                    name=record["name"].rstrip("."),
+                    type="CNAME",
+                    value=record["value"],
+                    ttl=300,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "reissue_cert: failed to write validation record %s: %s",
+                    record.get("name"),
+                    exc,
+                )
+
+        domain.provision_cert_id = new_cert_id
+        domain.provision_validation_records = validation_records
+        domain.provision_state = "configure_cert_policy"
+        domain.save(
+            update_fields=[
+                "provision_cert_id",
+                "provision_validation_records",
+                "provision_state",
+                "updated_at",
+                "version",
+            ]
+        )
+
+    return {"cert_id": new_cert_id, "validation_records": validation_records}
+
+
+@activity.defn(name="astrolift.managed_domain.reissue_cert")
+async def reissue_cert(
+    cluster_id: int,
+    zone: str,
+    cert_id: str,
+    zone_id: str,
+) -> dict[str, Any]:
+    """Revoke ``cert_id`` and request a new wildcard cert for ``*.<zone>``.
+
+    If the zone is platform-managed (``is_wildcard_managed=True`` on the
+    ``ManagedDomain`` row) the DNS-01 CNAME validation records are written
+    directly into the zone via ``DnsDriver.ensure_record``, and the row's
+    ``provision_cert_id``, ``provision_validation_records``, and
+    ``provision_state`` are updated.
+
+    Returns ``{"cert_id": str, "validation_records": list}``."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    result = await sync_to_async(_reissue_cert_sync)(cluster_id, zone, cert_id, zone_id)
+    log.info(
+        "reissue_cert zone=%s new_cert_id=%s",
+        zone,
+        result.get("cert_id"),
+        extra={"cluster_id": cluster_id},
+    )
+    return result

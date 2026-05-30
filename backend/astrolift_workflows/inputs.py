@@ -337,10 +337,16 @@ class ProvisionManagedDomainInput:
     ``cluster_id`` is the TenantCluster PK whose provider plugin's
     ``DnsDriver`` is used for all cloud operations. ``zone`` is the
     DNS zone name to provision (e.g. ``"apps.platform.example"``).
+
+    ``is_platform_managed_zone`` controls whether Step 1
+    (``provision_dns_zone``) is executed. When False the caller owns
+    the DNS zone and only the cert request + issuance poll are needed;
+    Step 1 is skipped and ``zone_id`` is left empty.
     """
 
     cluster_id: int
     zone: str
+    is_platform_managed_zone: bool
     actor: Actor
 
 

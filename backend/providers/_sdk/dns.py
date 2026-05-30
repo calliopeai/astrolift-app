@@ -113,3 +113,16 @@ class DnsDriver(Protocol):
         raise UnsupportedOperationError(
             f"dns.poll_cert_status({zone=}, {cert_id=}) not supported on this driver",
         )
+
+    def revoke_cert(self, zone: str, cert_id: str) -> None:
+        """Delete / revoke the cert identified by cert_id so a fresh one can be
+        requested. Called by the reissue path when the operator clicks
+        'Reissue certificate' to force re-validation.
+
+        Implementations: AWS → ACM delete_certificate; GCP → delete managed
+        cert; Azure → delete Key Vault cert; k8s-native → delete Certificate CR.
+        """
+        from _sdk import UnsupportedOperationError
+        raise UnsupportedOperationError(
+            f"dns.revoke_cert({zone=}, {cert_id=}) not supported on this driver",
+        )

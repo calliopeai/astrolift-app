@@ -36,12 +36,13 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
-from astrolift_workflows.client import start_workflow
+from astrolift_workflows.client import signal_workflow, start_workflow
 from astrolift_workflows.inputs import (
     Actor,
     BringClusterIntoManagementInput,
     DecommissionClusterInput,
     InstallClusterPrereqsInput,
+    ProvisionManagedDomainInput,
 )
 from core.decorators import tenant_scoped
 from core.events import Event
@@ -313,6 +314,20 @@ class ProvisionManagedDomainPayload:
     zone: str
     workflow_id: str
     nameservers: list[str]
+    message: str
+
+
+@strawberry.type
+class RevalidateManagedDomainPayload:
+    zone: str
+    signaled: bool
+    message: str
+
+
+@strawberry.type
+class ReissueManagedDomainCertPayload:
+    zone: str
+    signaled: bool
     message: str
 
 
@@ -798,12 +813,21 @@ class ClustersMutation:
         info: Info,
         cluster_id: GUID,
         zone: str,
+        is_platform_managed_zone: bool = False,
     ) -> MutationResultType[ProvisionManagedDomainPayload]:
-        """Kick off the ProvisionManagedDomainWorkflow to automate DNS zone
-        creation, wildcard cert issuance, and ManagedDomain registration (#781).
-        """
-        from astrolift_workflows.inputs import ProvisionManagedDomainInput
+        """Start the two-step domain provisioning workflow (#781).
 
+        If is_platform_managed_zone=True: creates the DNS zone and returns
+        the NS records for registrar delegation.
+        Either way: requests the wildcard cert and returns CNAME validation
+        records the operator must add to their zone.
+
+        Workflow polls every 30s for cert issuance. Once issued: registers
+        the ManagedDomain row and marks it active. Use revalidateManagedDomain
+        to force an immediate check; reissueManagedDomainCert to delete and
+        re-request the cert (sometimes forces ACM/GCP/Azure to pick up
+        recently-added validation records).
+        """
         if not zone or "." not in zone:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -823,6 +847,7 @@ class ClustersMutation:
                 ProvisionManagedDomainInput(
                     cluster_id=cluster.pk,
                     zone=zone,
+                    is_platform_managed_zone=is_platform_managed_zone,
                     actor=actor,
                 ),
             ],
@@ -834,8 +859,91 @@ class ClustersMutation:
                 workflow_id=workflow_id,
                 nameservers=[],
                 message=(
-                    "Provisioning started — check the cluster's managed domains"
-                    " page for NS records to delegate at your registrar."
+                    "Provisioning started. Check the Managed Domains page for"
+                    " NS records (if platform-managed) and certificate validation records."
+                ),
+            )
+        )
+
+    @strawberry.mutation
+    @mutation_audit(action="cluster.managed_domain.revalidate")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def revalidate_managed_domain(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        zone: str,
+    ) -> MutationResultType[RevalidateManagedDomainPayload]:
+        """Signal the running ProvisionManagedDomainWorkflow to check cert
+        issuance immediately without waiting for the next 30s poll tick.
+        Use after adding validation CNAME records to your DNS zone.
+        """
+        if not zone or "." not in zone:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "zone must be a valid domain name (non-empty, contains a dot)",
+                field="zone",
+            )
+
+        cluster = TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+
+        workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
+        signaled = signal_workflow(workflow_id, "revalidate")
+        return gql_success(
+            RevalidateManagedDomainPayload(
+                zone=zone,
+                signaled=signaled,
+                message=(
+                    "Revalidation signal sent — the workflow will check cert"
+                    " issuance on the next activity slot."
+                    if signaled
+                    else "Temporal is disabled or the workflow was not found;"
+                    " no signal sent."
+                ),
+            )
+        )
+
+    @strawberry.mutation
+    @mutation_audit(action="cluster.managed_domain.reissue_cert")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def reissue_managed_domain_cert(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        zone: str,
+    ) -> MutationResultType[ReissueManagedDomainCertPayload]:
+        """Signal the running workflow to delete the current cert and request
+        a fresh one. This resets the validation CNAME records — re-add them
+        after calling this. Sometimes forces ACM/GCP/Azure to pick up
+        recently-delegated zones.
+        """
+        if not zone or "." not in zone:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "zone must be a valid domain name (non-empty, contains a dot)",
+                field="zone",
+            )
+
+        cluster = TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+
+        workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
+        signaled = signal_workflow(workflow_id, "reissue")
+        return gql_success(
+            ReissueManagedDomainCertPayload(
+                zone=zone,
+                signaled=signaled,
+                message=(
+                    "Reissue signal sent — the workflow will delete and re-request"
+                    " the cert. Re-add the new validation CNAME records when they appear."
+                    if signaled
+                    else "Temporal is disabled or the workflow was not found;"
+                    " no signal sent."
                 ),
             )
         )
