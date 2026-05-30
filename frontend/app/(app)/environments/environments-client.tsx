@@ -15,6 +15,8 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { ViewToggle } from "@/components/ViewToggle";
+import { useViewToggle } from "@/hooks/use-view-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,6 +85,7 @@ export function EnvironmentsClient({
 
   const canPause = can("app.deploy");
   const [pauseTarget, setPauseTarget] = React.useState<AstroliftAppEnvironment | null>(null);
+  const [viewMode, setViewMode] = useViewToggle("astrolift_view_environments", "list");
 
   return (
     <PageShell
@@ -96,6 +99,7 @@ export function EnvironmentsClient({
           t("description")
         )
       }
+      actions={<ViewToggle mode={viewMode} onChange={setViewMode} />}
     >
       {tabs}
       <Card>

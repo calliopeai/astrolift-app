@@ -24,6 +24,8 @@ import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { ViewToggle } from "@/components/ViewToggle";
+import { useViewToggle } from "@/hooks/use-view-toggle";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,6 +140,7 @@ export function DeploymentsClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [openCreate, setOpenCreate] = React.useState(false);
+  const [viewMode, setViewMode] = useViewToggle("astrolift_view_deployments", "list");
 
   // Filters synced to URL so refresh / back-button preserves the view.
   const rawBucket = searchParams.get("status") as StatusBucket | null;
@@ -456,12 +459,15 @@ export function DeploymentsClient() {
       title={t("title")}
       description={t("description")}
       actions={
-        <Can permission="app.deploy">
-          <Button onClick={() => setOpenCreate(true)}>
-            <PlusIcon className="size-4" />
-            {t("start")}
-          </Button>
-        </Can>
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <Can permission="app.deploy">
+            <Button onClick={() => setOpenCreate(true)}>
+              <PlusIcon className="size-4" />
+              {t("start")}
+            </Button>
+          </Can>
+        </div>
       }
     >
       <div className="flex flex-wrap items-center gap-2">
