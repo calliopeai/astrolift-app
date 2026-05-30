@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "Ejecuciones de trabajos programados y comandos ad-hoc en todas tus apps.",
     "descriptionForApp": "Ejecuciones de trabajos programados y comandos ad-hoc para {app}.",
     "tabs": {
-      "scheduled": "Programados",
+      "schedules": "Programaciones",
+      "runs": "Ejecuciones",
+      "failures": "Fallos",
       "commands": "Comandos"
+    },
+    "schedules": {
+      "emptyTitle": "Sin workloads cronjob",
+      "emptyDescription": "Declara una entrada [[jobs]] con una programación cron en tu astrolift.toml y aparecerá aquí, lista para ejecutarse bajo demanda.",
+      "emptyLearnMore": "Ver la referencia de jobs en astrolift.toml",
+      "emptyForFleet": "Las programaciones cronjob se configuran por app. Abre la pestaña Jobs de una app para ver y ejecutar sus workloads programados."
+    },
+    "failures": {
+      "emptyTitle": "Sin ejecuciones fallidas",
+      "emptyDescription": "Las ejecuciones de trabajos programados que terminan con un código distinto de cero aparecen aquí para que puedas analizarlas sin revisar todo el historial."
     },
     "scheduled": {
       "emptyTitle": "Aún no hay ejecuciones de trabajos programados",

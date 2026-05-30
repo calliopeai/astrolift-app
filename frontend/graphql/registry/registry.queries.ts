@@ -59,6 +59,11 @@ const APP_FIELDS = `
   webhookDeploysPausedByEmail
   webhookDeploysPauseReason
   activePreviewCount
+  securityPolicy {
+    blockOnCriticalCves
+    blockOnMissingSignature
+    blockOnHighCveThreshold
+  }
   createdAt
   updatedAt
   deletedAt

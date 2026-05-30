@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "Geplante Job-Läufe und Ad-hoc-Befehlsausführungen über alle Apps hinweg.",
     "descriptionForApp": "Geplante Job-Läufe und Ad-hoc-Befehlsausführungen für {app}.",
     "tabs": {
-      "scheduled": "Geplant",
+      "schedules": "Zeitpläne",
+      "runs": "Läufe",
+      "failures": "Fehler",
       "commands": "Befehle"
+    },
+    "schedules": {
+      "emptyTitle": "Keine Cronjob-Workloads",
+      "emptyDescription": "Deklarieren Sie einen [[jobs]]-Eintrag mit einem Cron-Zeitplan in Ihrer astrolift.toml, und er erscheint hier, bereit zur Ausführung auf Abruf.",
+      "emptyLearnMore": "astrolift.toml-Jobs-Referenz ansehen",
+      "emptyForFleet": "Cronjob-Zeitpläne werden pro App konfiguriert. Öffnen Sie den Jobs-Tab einer App, um ihre geplanten Workloads anzuzeigen und auszuführen."
+    },
+    "failures": {
+      "emptyTitle": "Keine fehlgeschlagenen Läufe",
+      "emptyDescription": "Geplante Job-Läufe, die mit einem Exit-Code ungleich null enden, erscheinen hier, damit Sie sie ohne Durchsuchen der gesamten Historie sichten können."
     },
     "scheduled": {
       "emptyTitle": "Noch keine geplanten Job-Läufe",

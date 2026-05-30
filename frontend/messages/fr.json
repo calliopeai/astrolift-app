@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "Exécutions de tâches planifiées et commandes ad-hoc sur toutes vos apps.",
     "descriptionForApp": "Exécutions de tâches planifiées et commandes ad-hoc pour {app}.",
     "tabs": {
-      "scheduled": "Planifiées",
+      "schedules": "Planifications",
+      "runs": "Exécutions",
+      "failures": "Échecs",
       "commands": "Commandes"
+    },
+    "schedules": {
+      "emptyTitle": "Aucun workload cronjob",
+      "emptyDescription": "Déclarez une entrée [[jobs]] avec une planification cron dans votre astrolift.toml et elle apparaîtra ici, prête à être exécutée à la demande.",
+      "emptyLearnMore": "Voir la référence des jobs dans astrolift.toml",
+      "emptyForFleet": "Les planifications cronjob se configurent par application. Ouvrez l'onglet Jobs d'une application pour afficher et exécuter ses workloads planifiés."
+    },
+    "failures": {
+      "emptyTitle": "Aucune exécution en échec",
+      "emptyDescription": "Les exécutions de tâches planifiées qui se terminent avec un code non nul apparaissent ici, pour les trier sans parcourir tout l'historique."
     },
     "scheduled": {
       "emptyTitle": "Aucune exécution de tâche planifiée",

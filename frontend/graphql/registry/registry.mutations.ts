@@ -393,3 +393,27 @@ export const RESTORE_APP = gql`
     }
   }
 `;
+
+// #313 — deploy-gating supply-chain policy. Full policy is always
+// submitted; nullable blockOnHighCveThreshold clears the count gate.
+export const UPDATE_SECURITY_POLICY = gql`
+  mutation UpdateSecurityPolicy($input: UpdateSecurityPolicyInput!) {
+    updateAstroliftSecurityPolicy(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        securityPolicy {
+          blockOnCriticalCves
+          blockOnMissingSignature
+          blockOnHighCveThreshold
+        }
+      }
+    }
+  }
+`;

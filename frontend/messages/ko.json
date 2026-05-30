@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "모든 앱의 예약된 작업 실행 및 임시 명령 실행.",
     "descriptionForApp": "{app}의 예약된 작업 실행 및 임시 명령 실행.",
     "tabs": {
-      "scheduled": "예약됨",
+      "schedules": "예약",
+      "runs": "실행",
+      "failures": "실패",
       "commands": "명령"
+    },
+    "schedules": {
+      "emptyTitle": "Cronjob 워크로드가 없습니다",
+      "emptyDescription": "astrolift.toml에 cron 일정이 포함된 [[jobs]] 항목을 선언하면 여기에 표시되어 필요할 때 실행할 수 있습니다.",
+      "emptyLearnMore": "astrolift.toml jobs 레퍼런스 보기",
+      "emptyForFleet": "Cronjob 일정은 앱별로 구성됩니다. 앱의 Jobs 탭을 열어 예약된 워크로드를 보고 실행하세요."
+    },
+    "failures": {
+      "emptyTitle": "실패한 실행이 없습니다",
+      "emptyDescription": "0이 아닌 코드로 종료된 예약 작업 실행이 여기에 표시되어 전체 기록을 살펴보지 않고도 분류할 수 있습니다."
     },
     "scheduled": {
       "emptyTitle": "아직 예약된 작업 실행이 없습니다",

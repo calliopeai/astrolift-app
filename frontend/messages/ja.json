@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "全アプリにわたるスケジュールされたジョブ実行とアドホックコマンド実行。",
     "descriptionForApp": "{app} のスケジュールされたジョブ実行とアドホックコマンド実行。",
     "tabs": {
-      "scheduled": "スケジュール済み",
+      "schedules": "スケジュール",
+      "runs": "実行",
+      "failures": "失敗",
       "commands": "コマンド"
+    },
+    "schedules": {
+      "emptyTitle": "Cronjob ワークロードがありません",
+      "emptyDescription": "astrolift.toml に cron スケジュール付きの [[jobs]] エントリを宣言すると、ここに表示され、オンデマンドで実行できます。",
+      "emptyLearnMore": "astrolift.toml の jobs リファレンスを見る",
+      "emptyForFleet": "Cronjob スケジュールはアプリごとに設定します。アプリの Jobs タブを開いて、スケジュールされたワークロードの表示と実行を行ってください。"
+    },
+    "failures": {
+      "emptyTitle": "失敗した実行はありません",
+      "emptyDescription": "ゼロ以外で終了したスケジュール済みジョブ実行がここに表示され、全履歴を確認せずにトリアージできます。"
     },
     "scheduled": {
       "emptyTitle": "まだスケジュールされたジョブ実行はありません",
