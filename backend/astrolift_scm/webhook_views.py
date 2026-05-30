@@ -173,7 +173,11 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     # the same shape. The full FQDN with the install's base zone is
     # resolved by the BuildPreviewWorkflow at apply time from the
     # cluster's ingress config; the row stores the stable per-PR label.
-    hostname = f"pr-{pr_ctx.pr_number}.{app_slug}.{org_slug}".lower()
+    from astrolift_clusters.models import resolve_managed_domain
+
+    _managed_domain = resolve_managed_domain(org, for_preview=True)
+    base_zone = getattr(_managed_domain, "zone", None) or org_slug
+    hostname = f"pr-{pr_ctx.pr_number}.{app_slug}.{org_slug}.{base_zone}".lower()
     env_name = env_slug_for_preview(pr_number=pr_ctx.pr_number)
 
     with transaction.atomic():
@@ -182,6 +186,7 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
             tenant_cluster=cluster,
             name=env_name,
             url=f"https://{hostname}",
+            managed_domain=_managed_domain,
             required_approvals=0,
         )
         preview = PreviewEnvironment.objects.create(

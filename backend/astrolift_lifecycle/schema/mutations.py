@@ -2178,7 +2178,11 @@ class LifecycleMutation:
         # ingress-target resolution happens at apply time in the
         # BuildPreviewWorkflow; here we just record the stable name
         # the operator-facing surfaces (#751 FE, audit log) cite.
-        hostname = f"preview-{branch_slug}.{app.slug}.{org_slug}".lower()
+        from astrolift_clusters.models import resolve_managed_domain
+
+        _managed_domain = resolve_managed_domain(app.organization, for_preview=True)
+        base_zone = getattr(_managed_domain, "zone", None) or org_slug
+        hostname = f"preview-{branch_slug}.{app.slug}.{org_slug}.{base_zone}".lower()
 
         with transaction.atomic():
             env = AppEnvironment.objects.create(
@@ -2186,6 +2190,7 @@ class LifecycleMutation:
                 tenant_cluster=cluster,
                 name=environment_name,
                 url=f"https://{hostname}",
+                managed_domain=_managed_domain,
                 required_approvals=0,
             )
             preview = PreviewEnvironment.objects.create(
