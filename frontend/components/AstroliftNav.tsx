@@ -4,6 +4,8 @@ import {
   ActivityIcon,
   BarChart3Icon,
   BellIcon,
+  BoxIcon,
+  ClipboardListIcon,
   LayoutDashboardIcon,
   ScrollIcon,
   BookOpenIcon,
@@ -109,12 +111,21 @@ const sections: NavSection[] = [
         icon: <HammerIcon />,
         permission: "cluster.register",
       },
+      {
+        label: "Workflow Definitions",
+        href: "/workflows",
+        icon: <WorkflowIcon />,
+        permission: "app.read",
+      },
     ],
   },
   {
-    // Run — active app operations: deployments, environments, release
-    // workflows, scheduled jobs, and PR preview deployments. Mirrors
-    // the "Run" pillar in the Calliope BROCS positioning.
+    // Run — the three runtime primitives Astrolift manages:
+    //   Apps (Deployments + gate management)
+    //   Agents (agent dispatch and scheduling)
+    //   Workflows (automation workflow instances)
+    // Environments and Previews are app-scoped → app tab bar.
+    // Workflow definitions (authoring) live in BUILD.
     label: "Run",
     items: [
       {
@@ -124,9 +135,15 @@ const sections: NavSection[] = [
         permission: "app.read",
       },
       {
-        label: "Environments",
-        href: "/environments",
-        icon: <CloudIcon />,
+        label: "Approvals",
+        href: "/approvals",
+        icon: <CheckCircle2Icon />,
+        permission: "app.approve_deploy",
+      },
+      {
+        label: "Agents",
+        href: "/agents",
+        icon: <BoxIcon />,
         permission: "app.read",
       },
       {
@@ -142,16 +159,10 @@ const sections: NavSection[] = [
         permission: "app.read_logs",
       },
       {
-        label: "Previews",
-        href: "/previews",
-        icon: <GitPullRequestIcon />,
+        label: "Tasks",
+        href: "/tasks",
+        icon: <ClipboardListIcon />,
         permission: "app.read",
-      },
-      {
-        label: "Approvals",
-        href: "/approvals",
-        icon: <CheckCircle2Icon />,
-        permission: "app.approve_deploy",
       },
     ],
   },
@@ -196,6 +207,12 @@ const sections: NavSection[] = [
         href: "/alerts",
         icon: <BellIcon />,
         permission: "org.read",
+      },
+      {
+        label: "Platform Activity",
+        href: "/platform-activity",
+        icon: <ActivityIcon />,
+        permission: "cluster.register",
       },
     ],
   },
