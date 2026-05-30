@@ -72,7 +72,34 @@ from core.permissions import Permission, require_permission
 
 
 @strawberry.type
+@strawberry.type(name="AstroliftUserProfile")
+class UserProfileType:
+    id: str
+    username: str | None
+
+
+@strawberry.type(name="AstroliftMe")
+class MeType:
+    id: str
+    profile: UserProfileType | None
+
+
 class IdentityQuery:
+    @strawberry.field
+    def me(self, info: Info) -> MeType | None:
+        """Return the currently authenticated user."""
+        request = info.context.request
+        user = getattr(request, "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            return None
+        return MeType(
+            id=str(user.pk),
+            profile=UserProfileType(
+                id=str(user.pk),
+                username=user.get_username() or None,
+            ),
+        )
+
     @strawberry.field
     @require_permission(Permission.ORG_READ)
     @tenant_scoped()
