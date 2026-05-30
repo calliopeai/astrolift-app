@@ -42,6 +42,31 @@ class WorkloadManifest:
     # parsing the TOML. Kept as dicts (not VolumeDecl) so this module
     # stays independent of security_volumes.py.
     volumes: tuple[dict, ...] = ()
+    # Agent dispatch tuning (#795). Only meaningful when
+    # ``kind == "agent"`` — the renderer injects ``max_retries`` /
+    # ``tool_timeout_seconds`` as the ``ASTROLIFT_MAX_RETRIES`` /
+    # ``ASTROLIFT_TOOL_TIMEOUT`` env vars on the agent's primary
+    # container so the in-pod agent runtime can read its retry budget
+    # and per-tool timeout. ``result_ttl_hours`` governs how long the
+    # platform retains an AgentRun's result (#804) and does not affect
+    # rendered K8s output. Defaults mirror the manifest spec.
+    max_retries: int = 5
+    tool_timeout_seconds: int = 300
+    result_ttl_hours: int = 72
+    # Temporal worker config (#796). Only meaningful when
+    # ``kind == "workflow"`` — the renderer stamps a
+    # ``astrolift.dev/workload-kind: workflow`` pod annotation and injects
+    # ``ASTROLIFT_WORKFLOW_TYPE`` / ``ASTROLIFT_TASK_QUEUE`` /
+    # ``TEMPORAL_NAMESPACE`` so the in-pod worker registers the right
+    # workflow type and polls the right task queue against the platform
+    # Temporal cluster. ``workflow_type`` / ``task_queue`` are required by
+    # the parser for workflow workloads; the concurrency caps tune the
+    # worker's poller and default to the Temporal SDK's common values.
+    workflow_type: str = ""
+    task_queue: str = ""
+    temporal_namespace: str = "default"
+    max_concurrent_activities: int = 20
+    max_concurrent_workflows: int = 10
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

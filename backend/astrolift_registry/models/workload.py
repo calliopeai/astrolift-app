@@ -25,6 +25,21 @@ class Workload(NamedBaseCoreModel):
         # from the legacy ``JOB`` choice — ``task`` is the kind the
         # manifest parser / renderer support end-to-end.
         TASK = "task"
+        # Long-running AI agent (#795). Renders to the same K8s shape as
+        # ``DEPLOYMENT`` (Deployment + Service + HPA) but carries agent
+        # dispatch tuning and an ``astrolift.dev/workload-kind: agent``
+        # pod annotation; per-dispatch results land on AgentRun (#804).
+        AGENT = "agent"
+        # Temporal workflow worker (#796). Renders to the same K8s shape
+        # as ``DEPLOYMENT`` (Deployment + Service + HPA) but carries an
+        # ``astrolift.dev/workload-kind: workflow`` pod annotation and
+        # injected ``ASTROLIFT_WORKFLOW_TYPE`` / ``ASTROLIFT_TASK_QUEUE`` /
+        # ``TEMPORAL_NAMESPACE`` env so the worker registers against the
+        # platform Temporal cluster. Distinct from ``WorkflowDefinition``
+        # (the BUILD-concern state-machine model) — this is the worker
+        # process deployment. The DB migration for all new Kind values
+        # (TASK/AGENT/WORKFLOW/FUNCTION) lands together in #805.
+        WORKFLOW = "workflow"
 
     class ConcurrencyPolicy(models.TextChoices):
         # Mirrors Kubernetes ``CronJob.spec.concurrencyPolicy``:
@@ -76,6 +91,18 @@ class Workload(NamedBaseCoreModel):
     # volume cards without re-parsing the TOML. Each dict mirrors the
     # TOML ``[[workloads.<name>.volumes]]`` shape.
     volumes = models.JSONField(default=list, blank=True)
+
+    # Agent dispatch tuning (#795). Only meaningful when
+    # ``kind == AGENT``; other kinds carry the defaults and ignore them.
+    # ``max_retries`` / ``tool_timeout_seconds`` are injected into the
+    # agent pod as ``ASTROLIFT_MAX_RETRIES`` / ``ASTROLIFT_TOOL_TIMEOUT``
+    # env vars by the renderer; ``result_ttl_hours`` governs how long an
+    # AgentRun result is retained (#804). Defaults mirror the manifest
+    # spec, so a deployment/task/cronjob row keeps them at the no-op
+    # values and the migration is a no-op for existing rows.
+    max_retries = models.PositiveIntegerField(default=5)
+    tool_timeout_seconds = models.PositiveIntegerField(default=300)
+    result_ttl_hours = models.PositiveIntegerField(default=72)
 
     class Meta:
         constraints = [

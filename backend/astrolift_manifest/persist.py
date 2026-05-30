@@ -124,6 +124,9 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
                 storage_class=m.storage_class or "",
                 storage_size=m.storage_size or "",
                 volumes=list(m.volumes),
+                max_retries=m.max_retries,
+                tool_timeout_seconds=m.tool_timeout_seconds,
+                result_ttl_hours=m.result_ttl_hours,
             )
             result.workloads_created += 1
         elif _workload_changed(row, m):
@@ -142,6 +145,9 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
             row.storage_class = m.storage_class or ""
             row.storage_size = m.storage_size or ""
             row.volumes = list(m.volumes)
+            row.max_retries = m.max_retries
+            row.tool_timeout_seconds = m.tool_timeout_seconds
+            row.result_ttl_hours = m.result_ttl_hours
             row.save()
             result.workloads_updated += 1
 
@@ -228,6 +234,9 @@ def _workload_changed(row, m: WorkloadManifest) -> bool:
         or (row.storage_class or "") != (m.storage_class or "")
         or (row.storage_size or "") != (m.storage_size or "")
         or list(row.volumes or []) != list(m.volumes)
+        or row.max_retries != m.max_retries
+        or row.tool_timeout_seconds != m.tool_timeout_seconds
+        or row.result_ttl_hours != m.result_ttl_hours
     )
 
 

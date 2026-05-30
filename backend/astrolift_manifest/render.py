@@ -15,6 +15,10 @@ What this renderer covers today
   ``schedule``).
 * ``workload.kind = task`` → ``batch/v1 Job`` (one-shot, runs once;
   ``completions: 1`` / ``backoffLimit: 0`` / ``restartPolicy: Never``).
+* ``workload.kind = agent`` → ``apps/v1 Deployment`` (same shape as
+  ``deployment``) + a ``astrolift.dev/workload-kind: agent`` pod
+  annotation + injected ``ASTROLIFT_*`` dispatch env vars, plus the
+  matching Service and HPA.
 * HPA when ``hpa_min`` / ``hpa_max`` are set on a deployment workload
   → ``autoscaling/v2 HorizontalPodAutoscaler``.
 * Healthchecks (``http`` / ``tcp`` / ``exec``) → ``livenessProbe``
@@ -145,6 +149,44 @@ def render_manifests(
                     env_from_secret_refs=env_from,
                 )
             )
+        elif w.kind == "agent":
+            # Agents are deployments with platform annotations + injected
+            # dispatch env vars; they still get a Service + HPA.
+            out.append(
+                _render_agent(
+                    w,
+                    namespace=namespace,
+                    image_tag=image_tag,
+                    image_repository=image_repository,
+                    labels=wl_labels,
+                    env_from_secret_refs=env_from,
+                )
+            )
+            svc = _render_service(w, namespace=namespace, labels=wl_labels)
+            if svc is not None:
+                out.append(svc)
+            hpa = _render_hpa(w, namespace=namespace, labels=wl_labels)
+            if hpa is not None:
+                out.append(hpa)
+        elif w.kind == "workflow":
+            # Workflow workers are deployments with platform annotations +
+            # injected Temporal env vars; they still get a Service + HPA.
+            out.append(
+                _render_workflow_worker(
+                    w,
+                    namespace=namespace,
+                    image_tag=image_tag,
+                    image_repository=image_repository,
+                    labels=wl_labels,
+                    env_from_secret_refs=env_from,
+                )
+            )
+            svc = _render_service(w, namespace=namespace, labels=wl_labels)
+            if svc is not None:
+                out.append(svc)
+            hpa = _render_hpa(w, namespace=namespace, labels=wl_labels)
+            if hpa is not None:
+                out.append(hpa)
         # statefulset / job land in follow-up render modules.
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))
@@ -276,6 +318,123 @@ def _render_task(
             },
         },
     }
+
+
+def _render_agent(
+    w: WorkloadManifest,
+    *,
+    namespace: str,
+    image_tag: str,
+    image_repository: str,
+    labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Render an ``agent`` workload into an ``apps/v1 Deployment``.
+
+    An agent is a long-running deployment (same K8s shape as
+    ``kind = deployment`` — the caller still emits the matching Service
+    and HPA) plus two platform extensions:
+
+    * a ``astrolift.dev/workload-kind: agent`` pod-template annotation so
+      the control plane can identify agent pods without re-reading the
+      manifest, and
+    * three ``ASTROLIFT_*`` env vars injected into the primary container
+      (``ASTROLIFT_WORKLOAD_KIND`` / ``ASTROLIFT_MAX_RETRIES`` /
+      ``ASTROLIFT_TOOL_TIMEOUT``) so the in-pod agent runtime reads its
+      dispatch budget from the environment.
+
+    The env vars are prepended ahead of any manifest-authored ``env:``
+    so an operator who sets, say, ``ASTROLIFT_MAX_RETRIES`` explicitly on
+    the container shadows the injected default (later entries win under
+    k8s env semantics).
+    """
+    dep = _render_deployment(
+        w,
+        namespace=namespace,
+        image_tag=image_tag,
+        image_repository=image_repository,
+        labels=labels,
+        env_from_secret_refs=env_from_secret_refs,
+    )
+    template = dep["spec"]["template"]
+    template["metadata"]["annotations"] = {"astrolift.dev/workload-kind": "agent"}
+
+    injected = [
+        {"name": "ASTROLIFT_WORKLOAD_KIND", "value": "agent"},
+        {"name": "ASTROLIFT_MAX_RETRIES", "value": str(int(w.max_retries))},
+        {"name": "ASTROLIFT_TOOL_TIMEOUT", "value": str(int(w.tool_timeout_seconds))},
+    ]
+    primary = _primary_container(w)
+    pod_containers = template["spec"]["containers"]
+    target = next((c for c in pod_containers if primary is not None and c["name"] == primary.name), None)
+    if target is None and pod_containers:
+        target = pod_containers[0]
+    if target is not None:
+        target["env"] = injected + target.get("env", [])
+    return dep
+
+
+def _render_workflow_worker(
+    w: WorkloadManifest,
+    *,
+    namespace: str,
+    image_tag: str,
+    image_repository: str,
+    labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Render a ``workflow`` workload into an ``apps/v1 Deployment``.
+
+    A workflow worker is a long-running deployment (same K8s shape as
+    ``kind = deployment``) that registers Temporal workflow + activity
+    functions against the platform Temporal cluster. On top of the base
+    deployment it adds two platform extensions:
+
+    * a ``astrolift.dev/workload-kind: workflow`` pod-template annotation
+      so the control plane can identify worker pods without re-reading the
+      manifest, and
+    * three ``ASTROLIFT_*`` / ``TEMPORAL_*`` env vars injected into the
+      primary container (``ASTROLIFT_WORKFLOW_TYPE`` / ``ASTROLIFT_TASK_QUEUE``
+      / ``TEMPORAL_NAMESPACE``) so the in-pod worker reads which workflow
+      type to register, which task queue to poll, and which Temporal
+      namespace to connect to.
+
+    The env vars are prepended ahead of any manifest-authored ``env:`` so
+    an operator who sets, say, ``TEMPORAL_NAMESPACE`` explicitly on the
+    container shadows the injected value (later entries win under k8s env
+    semantics). The poller concurrency caps
+    (``max_concurrent_activities`` / ``max_concurrent_workflows``) tune the
+    worker but are not rendered as K8s output — the worker reads them from
+    the platform Temporal config — so they intentionally do not appear in
+    the pod spec.
+
+    Like ``kind = deployment``, the caller still emits the matching
+    Service (when the primary container exposes a port) and HPA.
+    """
+    dep = _render_deployment(
+        w,
+        namespace=namespace,
+        image_tag=image_tag,
+        image_repository=image_repository,
+        labels=labels,
+        env_from_secret_refs=env_from_secret_refs,
+    )
+    template = dep["spec"]["template"]
+    template["metadata"]["annotations"] = {"astrolift.dev/workload-kind": "workflow"}
+
+    injected = [
+        {"name": "ASTROLIFT_WORKFLOW_TYPE", "value": w.workflow_type},
+        {"name": "ASTROLIFT_TASK_QUEUE", "value": w.task_queue},
+        {"name": "TEMPORAL_NAMESPACE", "value": w.temporal_namespace or "default"},
+    ]
+    primary = _primary_container(w)
+    pod_containers = template["spec"]["containers"]
+    target = next((c for c in pod_containers if primary is not None and c["name"] == primary.name), None)
+    if target is None and pod_containers:
+        target = pod_containers[0]
+    if target is not None:
+        target["env"] = injected + target.get("env", [])
+    return dep
 
 
 def _render_service(

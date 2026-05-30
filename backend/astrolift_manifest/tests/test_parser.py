@@ -480,6 +480,60 @@ kind = "task"
     assert raw.workloads[0].schedule is None
 
 
+# ---- agent kind (#795) ------------------------------------------------
+
+
+def test_agent_kind_accepted_with_dispatch_fields():
+    """``kind = "agent"`` parses and its three dispatch fields round-trip."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "data-pipeline-agent"
+kind = "agent"
+replicas = 1
+cpu_request = "500m"
+memory_request = "1Gi"
+max_retries = 8
+tool_timeout_seconds = 120
+result_ttl_hours = 24
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+  command = ["python", "-m", "myagent"]
+"""
+    raw = parse_raw(toml)
+    w = raw.workloads[0]
+    assert w.kind == "agent"
+    assert w.max_retries == 8
+    assert w.tool_timeout_seconds == 120
+    assert w.result_ttl_hours == 24
+    assert w.containers[0].command == ("python", "-m", "myagent")
+
+
+def test_agent_dispatch_fields_default_when_omitted():
+    """An agent that omits the dispatch keys gets the manifest-spec
+    defaults (5 / 300 / 72), so a minimal agent manifest is valid."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "agent"
+kind = "agent"
+
+  [[workloads.containers]]
+  name = "agent"
+  is_primary = true
+  command = ["python", "-m", "myagent"]
+"""
+    raw = parse_raw(toml)
+    w = raw.workloads[0]
+    assert w.max_retries == 5
+    assert w.tool_timeout_seconds == 300
+    assert w.result_ttl_hours == 72
+
+
 def test_parse_missing_name_is_error():
     toml = """
 [[workloads]]
@@ -508,3 +562,103 @@ kind = "deployment"
     with pytest.raises(ManifestError) as exc:
         parse_raw(toml)
     assert "healthcheck" in str(exc.value).lower()
+
+
+# ---- workflow worker kind (#796) --------------------------------------
+
+
+def test_parse_workflow_worker_fields():
+    """A ``kind = "workflow"`` workload carries the Temporal worker
+    config; the optional concurrency caps + namespace default when
+    omitted."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "approval-worker"
+kind = "workflow"
+replicas = 2
+workflow_type = "ApprovalWorkflow"
+task_queue = "approvals"
+
+  [[workloads.containers]]
+  name = "worker"
+  is_primary = true
+  command = ["python", "-m", "myapp.workers.approvals"]
+"""
+    raw = parse_raw(toml)
+    w = raw.workloads[0]
+    assert w.kind == "workflow"
+    assert w.replicas == 2
+    assert w.workflow_type == "ApprovalWorkflow"
+    assert w.task_queue == "approvals"
+    # Optional fields take their documented defaults when omitted.
+    assert w.temporal_namespace == "default"
+    assert w.max_concurrent_activities == 20
+    assert w.max_concurrent_workflows == 10
+
+
+def test_parse_workflow_worker_optional_fields_round_trip():
+    """The optional caps + namespace are read when present."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "approval-worker"
+kind = "workflow"
+workflow_type = "ApprovalWorkflow"
+task_queue = "approvals"
+temporal_namespace = "prod"
+max_concurrent_activities = 50
+max_concurrent_workflows = 25
+
+  [[workloads.containers]]
+  name = "worker"
+  is_primary = true
+"""
+    raw = parse_raw(toml)
+    w = raw.workloads[0]
+    assert w.temporal_namespace == "prod"
+    assert w.max_concurrent_activities == 50
+    assert w.max_concurrent_workflows == 25
+
+
+def test_parse_workflow_worker_requires_workflow_type():
+    """``workflow_type`` is required for a workflow workload — a worker
+    that doesn't know which workflow type to register is a silent
+    no-op, so reject it at parse time."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "approval-worker"
+kind = "workflow"
+task_queue = "approvals"
+
+  [[workloads.containers]]
+  name = "worker"
+  is_primary = true
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "workflow_type" in str(exc.value)
+
+
+def test_parse_workflow_worker_requires_task_queue():
+    """``task_queue`` is required for a workflow workload — a worker
+    with no queue to poll never receives work."""
+    toml = """
+name = "hello"
+
+[[workloads]]
+name = "approval-worker"
+kind = "workflow"
+workflow_type = "ApprovalWorkflow"
+
+  [[workloads.containers]]
+  name = "worker"
+  is_primary = true
+"""
+    with pytest.raises(ManifestError) as exc:
+        parse_raw(toml)
+    assert "task_queue" in str(exc.value)

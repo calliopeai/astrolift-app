@@ -395,6 +395,58 @@ def test_env_from_propagates_to_task_pods():
     ]
 
 
+# ---- agent → Deployment + annotations + env (#795) -------------------
+
+
+def test_agent_renders_deployment_service_hpa_with_annotation_and_env():
+    w = WorkloadManifest(
+        name="data-pipeline-agent",
+        kind="agent",
+        replicas=2,
+        cpu_request="500m",
+        memory_request="1Gi",
+        hpa_min=1,
+        hpa_max=5,
+        max_retries=8,
+        tool_timeout_seconds=120,
+        result_ttl_hours=24,
+        containers=(_container(name="agent", port=8080, env=(("MY_FLAG", "1"),)),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+    )
+
+    # Agent renders the same trio as a deployment.
+    kinds = sorted(r["kind"] for r in out)
+    assert kinds == ["Deployment", "HorizontalPodAutoscaler", "Service"]
+
+    dep = next(r for r in out if r["kind"] == "Deployment")
+    assert dep["apiVersion"] == "apps/v1"
+    assert dep["spec"]["replicas"] == 2
+
+    # Pod-template annotation marks this as an agent for the control plane.
+    annotations = dep["spec"]["template"]["metadata"]["annotations"]
+    assert annotations["astrolift.dev/workload-kind"] == "agent"
+
+    # Dispatch env vars are injected ahead of the manifest-authored env,
+    # so an explicit operator override (later entry) wins under k8s.
+    container = dep["spec"]["template"]["spec"]["containers"][0]
+    assert container["env"] == [
+        {"name": "ASTROLIFT_WORKLOAD_KIND", "value": "agent"},
+        {"name": "ASTROLIFT_MAX_RETRIES", "value": "8"},
+        {"name": "ASTROLIFT_TOOL_TIMEOUT", "value": "120"},
+        {"name": "MY_FLAG", "value": "1"},
+    ]
+
+    # HPA targets the agent's Deployment by name.
+    hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
+    assert hpa["spec"]["scaleTargetRef"]["name"] == "data-pipeline-agent"
+
+
 # ---- envFrom injection (#353) ----------------------------------------
 
 
@@ -550,3 +602,59 @@ def test_cronjob_without_schedule_raises():
             image_repository="r",
             environment_name="e",
         )
+
+
+# ---- workflow → Deployment + Temporal annotations + env (#796) --------
+
+
+def test_workflow_worker_renders_deployment_service_hpa_with_annotation_and_env():
+    w = WorkloadManifest(
+        name="approval-worker",
+        kind="workflow",
+        replicas=2,
+        cpu_request="500m",
+        memory_request="1Gi",
+        hpa_min=1,
+        hpa_max=5,
+        workflow_type="ApprovalWorkflow",
+        task_queue="approvals",
+        temporal_namespace="prod",
+        max_concurrent_activities=50,
+        max_concurrent_workflows=25,
+        containers=(_container(name="worker", port=8080, env=(("MY_FLAG", "1"),)),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+    )
+
+    # A workflow worker renders the same trio as a deployment.
+    kinds = sorted(r["kind"] for r in out)
+    assert kinds == ["Deployment", "HorizontalPodAutoscaler", "Service"]
+
+    dep = next(r for r in out if r["kind"] == "Deployment")
+    assert dep["apiVersion"] == "apps/v1"
+    assert dep["spec"]["replicas"] == 2
+
+    # Pod-template annotation marks this as a workflow worker for the
+    # control plane.
+    annotations = dep["spec"]["template"]["metadata"]["annotations"]
+    assert annotations["astrolift.dev/workload-kind"] == "workflow"
+
+    # Temporal env vars are injected ahead of the manifest-authored env,
+    # so an explicit operator override (later entry) wins under k8s.
+    # The poller concurrency caps are not rendered as K8s output.
+    container = dep["spec"]["template"]["spec"]["containers"][0]
+    assert container["env"] == [
+        {"name": "ASTROLIFT_WORKFLOW_TYPE", "value": "ApprovalWorkflow"},
+        {"name": "ASTROLIFT_TASK_QUEUE", "value": "approvals"},
+        {"name": "TEMPORAL_NAMESPACE", "value": "prod"},
+        {"name": "MY_FLAG", "value": "1"},
+    ]
+
+    # HPA targets the worker's Deployment by name.
+    hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
+    assert hpa["spec"]["scaleTargetRef"]["name"] == "approval-worker"
