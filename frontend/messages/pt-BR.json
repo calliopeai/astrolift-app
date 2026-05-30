@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "Execuções de tarefas agendadas e comandos ad-hoc em todas as suas apps.",
     "descriptionForApp": "Execuções de tarefas agendadas e comandos ad-hoc para {app}.",
     "tabs": {
-      "scheduled": "Agendadas",
+      "schedules": "Agendamentos",
+      "runs": "Execuções",
+      "failures": "Falhas",
       "commands": "Comandos"
+    },
+    "schedules": {
+      "emptyTitle": "Sem workloads cronjob",
+      "emptyDescription": "Declare uma entrada [[jobs]] com um agendamento cron no seu astrolift.toml e ela aparecerá aqui, pronta para ser executada sob demanda.",
+      "emptyLearnMore": "Ver a referência de jobs do astrolift.toml",
+      "emptyForFleet": "Agendamentos cronjob são configurados por app. Abra a aba Jobs de um app para ver e executar seus workloads agendados."
+    },
+    "failures": {
+      "emptyTitle": "Sem execuções com falha",
+      "emptyDescription": "Execuções de tarefas agendadas que terminam com código diferente de zero aparecem aqui para você triar sem percorrer todo o histórico."
     },
     "scheduled": {
       "emptyTitle": "Ainda sem execuções de tarefas agendadas",

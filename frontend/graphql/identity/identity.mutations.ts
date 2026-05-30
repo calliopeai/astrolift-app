@@ -690,3 +690,26 @@ export const GENERATE_INSTALL_ENROLLMENT_QR = gql`
     }
   }
 `;
+
+// #312 — GDPR right-to-delete. Anonymizes a user's PII while preserving
+// audit-log structural records. Self-anonymization is always allowed;
+// anonymizing another user requires org.manage_members.
+export const ANONYMIZE_USER = gql`
+  mutation AnonymizeUser($input: AstroliftAnonymizeUserInput!) {
+    astroliftAnonymizeUser(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        anonymizedUserId
+        wasSelf
+        requiresLogout
+        lifecycle
+        anonymizedAt
+      }
+    }
+  }
+`;

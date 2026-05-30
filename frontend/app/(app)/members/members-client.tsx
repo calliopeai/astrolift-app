@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  ANONYMIZE_USER,
   BULK_REVOKE_ROLE_BINDINGS,
   REVOKE_INVITATION,
   REVOKE_ROLE_BINDING,
@@ -170,6 +171,18 @@ export function MembersClient() {
     refetchQueries: [{ query: LIST_INVITATIONS }],
     awaitRefetchQueries: true,
   });
+  const [anonymizeUser] = useMutation<{
+    astroliftAnonymizeUser: MutationResult<{
+      anonymizedUserId: string;
+      wasSelf: boolean;
+      requiresLogout: boolean;
+      lifecycle: string;
+      anonymizedAt: string;
+    }>;
+  }>(ANONYMIZE_USER, {
+    refetchQueries: [{ query: LIST_MEMBERS }],
+    awaitRefetchQueries: true,
+  });
 
   async function handleRevokeInvite(inv: AstroliftInvitation) {
     const { data } = await revokeInvite({
@@ -246,7 +259,7 @@ export function MembersClient() {
   // is not on main yet; the affordance ships gated + disabled so the
   // permission gate, copy, and double-confirm flow are reviewable. The
   // `coming soon` banner inside the dialog makes the gap explicit.
-  const ANONYMIZE_BACKEND_READY = false;
+  const ANONYMIZE_BACKEND_READY = true;
   const [anonymizeTarget, setAnonymizeTarget] = React.useState<AstroliftMember | null>(null);
   const [anonymizeAcknowledged, setAnonymizeAcknowledged] = React.useState(false);
 
@@ -255,20 +268,14 @@ export function MembersClient() {
     setAnonymizeTarget(m);
   }
 
-  async function handleAnonymize(_m: AstroliftMember) {
-    if (!ANONYMIZE_BACKEND_READY) {
-      throw new Error(
-        "anonymizeUser mutation not on main yet — tracked in #312. Re-enable once the backend wiring lands."
-      );
+  async function handleAnonymize(m: AstroliftMember) {
+    const { data } = await anonymizeUser({
+      variables: { input: { userGid: m.user.id } },
+    });
+    if (!data?.astroliftAnonymizeUser.ok) {
+      throw new Error(data?.astroliftAnonymizeUser.errors?.[0]?.message ?? "Anonymize failed");
     }
-    // Wiring placeholder. When #312 lands:
-    //   const { data } = await anonymizeUser({
-    //     variables: { input: { userGid: m.user.id } },
-    //   });
-    //   if (!data?.anonymizeUser.ok) {
-    //     throw new Error(data?.anonymizeUser.errors?.[0]?.message ?? "Anonymize failed");
-    //   }
-    //   toast.success("User data anonymized.");
+    toast.success("User data anonymized.");
   }
 
   const memberList = members.data?.astroliftMembers ?? [];

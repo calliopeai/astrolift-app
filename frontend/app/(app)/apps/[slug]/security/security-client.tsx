@@ -1,8 +1,7 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
-  AlertTriangleIcon,
   CheckCircle2Icon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -36,20 +35,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
+import { UPDATE_SECURITY_POLICY } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
+import type {
+  AstroliftRegisteredAppMutationResult,
+  AstroliftSecurityPolicy,
+} from "@/graphql/__generated__/operations";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import { AppTabs } from "../components/app-tabs";
 
-// Backend wiring tracked under #313. Until the security_policy
-// fields + appSlug arg on astroliftEvents land, the toggles are
-// disabled and the panels surface a 'backend wiring pending' banner
-// with the contract the UI is reading against.
-const BACKEND_READY = false;
-
-// Default policy shown when the backend doesn't expose
-// RegisteredApp.securityPolicy yet. Matches the strict-defaults
-// proposal on #313 so the UI shows the safest stance up front.
 const DEFAULT_POLICY = {
   blockOnCriticalCves: true,
   blockOnMissingSignature: true,
@@ -194,22 +189,10 @@ export function AppSecurityClient({ slug }: { slug: string }) {
     >
       <AppTabs slug={a.slug} active="security" />
 
-      {!BACKEND_READY && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
-            <AlertTriangleIcon className="mt-0.5 size-4 text-amber-700 dark:text-amber-300" />
-            <div className="flex-1">
-              <CardTitle className="text-sm">{t("backendPending.title")}</CardTitle>
-              <CardDescription>{t("backendPending.description")}</CardDescription>
-            </div>
-          </CardHeader>
-        </Card>
-      )}
-
       <SigningCard event={latestSigning} loading={events.loading && !events.data} />
       <SbomCard event={latestSbom} loading={events.loading && !events.data} />
       <ScanCard event={latestScan} loading={events.loading && !events.data} />
-      <PolicyCard backendReady={BACKEND_READY} />
+      <PolicyCard appSlug={a.slug} initialPolicy={a.securityPolicy ?? DEFAULT_POLICY} />
     </PageShell>
   );
 }
@@ -486,10 +469,23 @@ function SeverityCount({
   );
 }
 
-function PolicyCard({ backendReady }: { backendReady: boolean }) {
+function PolicyCard({
+  appSlug,
+  initialPolicy,
+}: {
+  appSlug: string;
+  initialPolicy: AstroliftSecurityPolicy | typeof DEFAULT_POLICY;
+}) {
   const t = useTranslations("apps.security.policy");
-  const [policy, setPolicy] = React.useState(DEFAULT_POLICY);
+  const [policy, setPolicy] = React.useState({
+    blockOnCriticalCves: initialPolicy.blockOnCriticalCves,
+    blockOnMissingSignature: initialPolicy.blockOnMissingSignature,
+    blockOnHighCveThreshold: initialPolicy.blockOnHighCveThreshold ?? null,
+  });
   const [dirty, setDirty] = React.useState(false);
+  const [updatePolicy, { loading: saving }] = useMutation<{
+    updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
+  }>(UPDATE_SECURITY_POLICY);
 
   function update<K extends keyof typeof DEFAULT_POLICY>(
     key: K,
@@ -500,8 +496,28 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
   }
 
   function reset() {
-    setPolicy(DEFAULT_POLICY);
+    setPolicy({
+      blockOnCriticalCves: initialPolicy.blockOnCriticalCves,
+      blockOnMissingSignature: initialPolicy.blockOnMissingSignature,
+      blockOnHighCveThreshold: initialPolicy.blockOnHighCveThreshold ?? null,
+    });
     setDirty(false);
+  }
+
+  async function handleSave() {
+    const { data } = await updatePolicy({
+      variables: {
+        input: {
+          appSlug,
+          blockOnCriticalCves: policy.blockOnCriticalCves,
+          blockOnMissingSignature: policy.blockOnMissingSignature,
+          blockOnHighCveThreshold: policy.blockOnHighCveThreshold,
+        },
+      },
+    });
+    if (data?.updateAstroliftSecurityPolicy?.ok) {
+      setDirty(false);
+    }
   }
 
   return (
@@ -518,14 +534,14 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
           label={t("blockCves")}
           description={t("blockCvesDesc")}
           checked={policy.blockOnCriticalCves}
-          disabled={!backendReady}
+          disabled={saving}
           onChange={(v) => update("blockOnCriticalCves", v)}
         />
         <ToggleRow
           label={t("blockSig")}
           description={t("blockSigDesc")}
           checked={policy.blockOnMissingSignature}
-          disabled={!backendReady}
+          disabled={saving}
           onChange={(v) => update("blockOnMissingSignature", v)}
         />
 
@@ -538,7 +554,7 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
             <select
               className="border-input bg-background rounded-md border px-2 py-1 text-sm disabled:opacity-50"
               value={policy.blockOnHighCveThreshold ?? ""}
-              disabled={!backendReady}
+              disabled={saving}
               onChange={(e) =>
                 update(
                   "blockOnHighCveThreshold",
@@ -557,11 +573,11 @@ function PolicyCard({ backendReady }: { backendReady: boolean }) {
 
         <Can permission="app.update">
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" disabled={!dirty || !backendReady} onClick={reset}>
+            <Button variant="outline" disabled={!dirty || saving} onClick={reset}>
               {t("reset")}
             </Button>
-            <Button disabled={!dirty || !backendReady}>
-              {backendReady ? t("save") : t("pending")}
+            <Button disabled={!dirty || saving} onClick={handleSave}>
+              {t("save")}
             </Button>
           </div>
         </Can>

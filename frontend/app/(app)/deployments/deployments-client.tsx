@@ -101,24 +101,44 @@ const IN_FLIGHT: ReadonlySet<DeploymentStatus> = new Set([
 
 const TERMINAL: ReadonlySet<DeploymentStatus> = new Set(["failed", "rolled_back", "superseded"]);
 
-type StatusBucket = "all" | "active" | "running" | "failed";
+// Sub-navigation tabs (#797). Previews and the approval queue are
+// subdivisions of the deployment fleet, not separate primitives, so
+// they live as tabs here rather than as top-level nav entries. The tab
+// replaces the older status-filter pills — the pills were themselves a
+// status axis, so stacking both would be redundant.
+type DeploymentTab = "active" | "previews" | "pending" | "history";
 
-interface BucketCount {
-  bucket: StatusBucket;
+const DEPLOYMENT_TABS: readonly DeploymentTab[] = ["active", "previews", "pending", "history"];
+
+interface TabCount {
+  tab: DeploymentTab;
   count: number;
   labelKey: string;
 }
 
-function bucketMatches(bucket: StatusBucket, status: DeploymentStatus): boolean {
-  switch (bucket) {
-    case "all":
-      return true;
+// A preview deployment is bound to a pull request. ``prNumber`` is a
+// non-null Int that defaults to 0 when there's no PR, so the test is
+// ``> 0`` — never ``!= null`` (which would match every row).
+function isPreview(d: AstroliftDeployment): boolean {
+  return d.prNumber > 0;
+}
+
+function tabMatches(tab: DeploymentTab, d: AstroliftDeployment): boolean {
+  switch (tab) {
     case "active":
-      return IN_FLIGHT.has(status);
-    case "running":
-      return status === "running";
-    case "failed":
-      return status === "failed";
+      // Everything currently moving or live, excluding the approval
+      // queue (its own tab) and previews (their own tab).
+      return (
+        !isPreview(d) &&
+        d.status !== "pending_approval" &&
+        (IN_FLIGHT.has(d.status) || d.status === "running")
+      );
+    case "previews":
+      return isPreview(d);
+    case "pending":
+      return d.status === "pending_approval";
+    case "history":
+      return TERMINAL.has(d.status);
   }
 }
 
@@ -143,17 +163,16 @@ export function DeploymentsClient() {
   const [viewMode, setViewMode] = useViewToggle("astrolift_view_deployments", "list");
 
   // Filters synced to URL so refresh / back-button preserves the view.
-  const rawBucket = searchParams.get("status") as StatusBucket | null;
-  const validBuckets: StatusBucket[] = ["all", "active", "running", "failed"];
-  const statusBucket: StatusBucket =
-    rawBucket && validBuckets.includes(rawBucket) ? rawBucket : "all";
+  const rawTab = searchParams.get("tab") as DeploymentTab | null;
+  const tab: DeploymentTab =
+    rawTab && DEPLOYMENT_TABS.includes(rawTab) ? rawTab : "active";
   const [appFilter, setAppFilter] = React.useState<string>(
     () => searchParams.get("app") ?? ""
   );
 
-  function updateFilter(key: string, value: string) {
+  function updateFilter(key: string, value: string, defaultValue = "") {
     const params = new URLSearchParams(searchParams.toString());
-    if (value && value !== "all" && value !== "") {
+    if (value && value !== defaultValue) {
       params.set(key, value);
     } else {
       params.delete(key);
@@ -161,7 +180,9 @@ export function DeploymentsClient() {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  const setStatusBucket = (v: StatusBucket) => updateFilter("status", v);
+  // ``active`` is the default tab, so omit it from the URL to keep the
+  // canonical /deployments link clean.
+  const setTab = (v: DeploymentTab) => updateFilter("tab", v, "active");
 
   React.useEffect(() => {
     const id = setTimeout(() => updateFilter("app", appFilter), 300);
@@ -187,13 +208,13 @@ export function DeploymentsClient() {
 
   const list = React.useMemo(() => {
     return allDeployments.filter((d) => {
-      if (!bucketMatches(statusBucket, d.status)) return false;
+      if (!tabMatches(tab, d)) return false;
       if (appFilter && !d.registeredAppSlug.toLowerCase().includes(appFilter.toLowerCase())) {
         return false;
       }
       return true;
     });
-  }, [allDeployments, statusBucket, appFilter]);
+  }, [allDeployments, tab, appFilter]);
 
   // Live push: any status transition for any deployment in the org
   // triggers a list refetch. The backend dedupes per-row, and refetch
@@ -222,27 +243,16 @@ export function DeploymentsClient() {
     [list, selected]
   );
 
-  const counts = React.useMemo<BucketCount[]>(() => {
-    const tally = (predicate: (d: AstroliftDeployment) => boolean): number =>
-      allDeployments.reduce((acc, d) => (predicate(d) ? acc + 1 : acc), 0);
-    return [
-      { bucket: "all", count: allDeployments.length, labelKey: "pills.all" },
-      {
-        bucket: "active",
-        count: tally((d) => IN_FLIGHT.has(d.status)),
-        labelKey: "pills.active",
-      },
-      {
-        bucket: "running",
-        count: tally((d) => d.status === "running"),
-        labelKey: "pills.running",
-      },
-      {
-        bucket: "failed",
-        count: tally((d) => d.status === "failed"),
-        labelKey: "pills.failed",
-      },
-    ];
+  // Tab badge counts pull from the unfiltered ``allDeployments`` so each
+  // tab shows its true total regardless of the active app filter. The
+  // Pending badge doubles as the live approval-queue size — kept fresh
+  // by the lifecycle subscription refetch below.
+  const counts = React.useMemo<TabCount[]>(() => {
+    return DEPLOYMENT_TABS.map((tabKey) => ({
+      tab: tabKey,
+      count: allDeployments.reduce((acc, d) => (tabMatches(tabKey, d) ? acc + 1 : acc), 0),
+      labelKey: `tabs.${tabKey}`,
+    }));
   }, [allDeployments]);
 
   const refetch = [{ query: LIST_DEPLOYMENTS, variables: { limit: 100 } }];
@@ -470,6 +480,47 @@ export function DeploymentsClient() {
         </div>
       }
     >
+      {/* Sub-navigation: Active | Previews | Pending | History (#797).
+          Sits directly under the page header, above the filter row.
+          Each tab carries a live count badge; Pending's badge is the
+          approval-queue size. */}
+      <div
+        role="tablist"
+        aria-label={t("tabs.ariaLabel")}
+        className="bg-muted/40 inline-flex flex-wrap rounded-md border p-1"
+      >
+        {counts.map(({ tab: tabKey, count, labelKey }) => {
+          const active = tab === tabKey;
+          return (
+            <button
+              key={tabKey}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(tabKey)}
+              className={
+                "inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm font-medium transition " +
+                (active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground")
+              }
+            >
+              <span>{t(labelKey)}</span>
+              {count > 0 && (
+                <span
+                  className={
+                    "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs tabular-nums " +
+                    (active ? "bg-muted text-foreground" : "bg-muted/70 text-muted-foreground")
+                  }
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <Input
           placeholder={t("filterApp")}
@@ -477,41 +528,6 @@ export function DeploymentsClient() {
           onChange={(e) => setAppFilter(e.target.value)}
           className="max-w-xs"
         />
-        {/* Scope 1 — status filter pills. Counts pull from the
-            unfiltered ``allDeployments`` so the bucket badges show the
-            true totals regardless of the app filter. */}
-        <div
-          role="tablist"
-          aria-label={t("pills.ariaLabel")}
-          className="flex flex-wrap items-center gap-1"
-        >
-          {counts.map(({ bucket, count, labelKey }) => {
-            const active = statusBucket === bucket;
-            return (
-              <button
-                key={bucket}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setStatusBucket(bucket)}
-                className={
-                  active
-                    ? "border-foreground bg-foreground text-background inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-medium"
-                    : "border-border text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-medium"
-                }
-              >
-                <span>{t(labelKey)}</span>
-                <span
-                  className={
-                    active ? "text-background/70" : "text-muted-foreground/70 tabular-nums"
-                  }
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
         <span className="text-muted-foreground ml-auto text-xs">
           {t("counts", { filtered: list.length, total: allDeployments.length })}
         </span>

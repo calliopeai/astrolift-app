@@ -1704,12 +1704,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2459,8 +2459,20 @@
     "descriptionGlobal": "Scheduled job runs and ad-hoc command executions across all your apps.",
     "descriptionForApp": "Scheduled job runs and ad-hoc command executions for {app}.",
     "tabs": {
-      "scheduled": "Scheduled",
+      "schedules": "Schedules",
+      "runs": "Runs",
+      "failures": "Failures",
       "commands": "Commands"
+    },
+    "schedules": {
+      "emptyTitle": "No cronjob workloads",
+      "emptyDescription": "Declare a [[jobs]] entry with a cron schedule in your astrolift.toml and it appears here, ready to run on demand.",
+      "emptyLearnMore": "See astrolift.toml jobs reference",
+      "emptyForFleet": "Cronjob schedules are configured per app. Open an app's Jobs tab to view and run its scheduled workloads."
+    },
+    "failures": {
+      "emptyTitle": "No failed runs",
+      "emptyDescription": "Scheduled job runs that exit non-zero land here so you can triage them without scanning the full history."
     },
     "scheduled": {
       "emptyTitle": "No scheduled job runs yet",

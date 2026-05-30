@@ -2240,12 +2240,12 @@
         "actions": "Actions"
       },
       "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
-      "pills": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
+      "tabs": {
+        "ariaLabel": "Deployment views",
         "active": "Active",
-        "running": "Running",
-        "failed": "Failed"
+        "previews": "Previews",
+        "pending": "Pending",
+        "history": "History"
       },
       "actions": {
         "label": "Actions",
@@ -2444,8 +2444,20 @@
     "descriptionGlobal": "所有应用的计划任务运行和临时命令执行。",
     "descriptionForApp": "{app} 的计划任务运行和临时命令执行。",
     "tabs": {
-      "scheduled": "计划",
+      "schedules": "计划",
+      "runs": "运行",
+      "failures": "失败",
       "commands": "命令"
+    },
+    "schedules": {
+      "emptyTitle": "暂无 cronjob 工作负载",
+      "emptyDescription": "在 astrolift.toml 中声明带有 cron 计划的 [[jobs]] 条目，它会显示在此处，可按需运行。",
+      "emptyLearnMore": "查看 astrolift.toml jobs 参考",
+      "emptyForFleet": "Cronjob 计划按应用配置。打开某个应用的 Jobs 标签页即可查看并运行其计划工作负载。"
+    },
+    "failures": {
+      "emptyTitle": "暂无失败的运行",
+      "emptyDescription": "以非零代码结束的计划任务运行会显示在此处，便于您无需翻看完整历史即可排查。"
     },
     "scheduled": {
       "emptyTitle": "尚无计划任务运行",

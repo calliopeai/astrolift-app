@@ -6,9 +6,11 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ClockIcon,
+  HistoryIcon,
   Loader2Icon,
   PlayIcon,
   TerminalIcon,
+  XCircleIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
