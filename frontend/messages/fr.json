@@ -608,6 +608,30 @@
         "environmentPlaceholder": "Sélectionnez un environnement",
         "workloadPlaceholder": "Sélectionnez une charge de travail"
       },
+      "logExport": {
+        "title": "Exporter les journaux",
+        "description": "Exporter les journaux tamponnés pour {pod} sous forme de fichier téléchargeable.",
+        "descriptionNoPod": "Sélectionnez un pod ci-dessus pour délimiter l'export.",
+        "formatLabel": "Format",
+        "formatPlaceholder": "Sélectionner un format",
+        "formatTxt": "Texte brut",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "Depuis",
+        "untilLabel": "Jusqu'à",
+        "levelLabel": "Niveau de journal",
+        "levelPlaceholder": "ex. error",
+        "regexLabel": "Filtre regex",
+        "regexPlaceholder": "ex. Exception",
+        "submittingButton": "Export en cours…",
+        "submitButton": "Exporter",
+        "missingPod": "Sélectionnez un pod avant d'exporter.",
+        "toastStart": "Préparation de l'export des journaux…",
+        "toastReady": "Export prêt · {rows} lignes · {format}",
+        "toastReadyTruncated": "Export prêt · {rows} lignes · {format} (tronqué)",
+        "toastDownload": "Télécharger",
+        "toastFailure": "Échec de l'export des journaux"
+      },
       "events": {
         "warningCount": "{count, plural, =1 {1 avertissement} other {# avertissements}} au cours de la dernière heure",
         "warningBadgeLabel": "Avertissement",
@@ -647,7 +671,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "Exporter les journaux",
+        "exportTitle": "Exporter les journaux tamponnés vers un fichier téléchargeable"
       },
       "title": "{name} · Observability",
       "description": "{slug} · pod state and log stream from the runtime cluster",
@@ -1490,6 +1516,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# proposition de changement de secret en attente} other {# propositions de changement de secret en attente}}",
+        "appWide": "toute l'app",
+        "votes": "{received}/{required} approbations",
+        "seeAll": "Voir toutes les {count} propositions →"
       }
     },
     "security": {
@@ -2171,6 +2203,23 @@
         "copyFailed": "Échec de la copie — sélectionnez et copiez manuellement"
       }
     },
+    "secretProposalsQueue": {
+      "title": "Propositions de changement de secret",
+      "empty": {
+        "title": "Aucune proposition en attente",
+        "description": "Les propositions de changement de secret apparaissent ici lorsqu'un opérateur propose un changement nécessitant une approbation."
+      },
+      "row": {
+        "appWide": "toute l'app",
+        "typeBadge": "changement de secret",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} approbations",
+        "summary": "{summary}",
+        "proposer": "par {name}",
+        "received": "reçu {rel}",
+        "review": "Examiner"
+      }
+    },
     "deployments": {
       "title": "Deployments",
       "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
@@ -2506,5 +2555,64 @@
   },
   "a11y": {
     "skipToContent": "Skip to main content"
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "Proposition de secret"
+      },
+      "notFound": {
+        "title": "Proposition introuvable",
+        "description": "La proposition n'existe pas ou vous n'avez pas la permission de la consulter."
+      },
+      "title": "{app} → {env}",
+      "appWide": "toute l'app",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} approbations",
+      "proposedBy": "Proposé par {name} · {rel}",
+      "unknownProposer": "inconnu",
+      "expiresIn": "Expire {rel}",
+      "applyError": "Erreur d'application : {message}",
+      "withdraw": "Retirer",
+      "reject": "Rejeter",
+      "approve": "Approuver",
+      "confirmApprove": {
+        "title": "Approuver ce changement de secret ?",
+        "description": "Le changement sera appliqué une fois que les approbations requises seront obtenues.",
+        "confirm": "Approuver"
+      },
+      "confirmReject": {
+        "title": "Rejeter ce changement de secret ?",
+        "description": "La proposition sera marquée comme rejetée et aucun changement ne sera appliqué.",
+        "reasonLabel": "Motif du rejet",
+        "reasonPlaceholder": "Pourquoi cette proposition est-elle rejetée ?",
+        "reasonRequired": "Motif requis",
+        "confirm": "Rejeter"
+      },
+      "confirmWithdraw": {
+        "title": "Retirer cette proposition ?",
+        "description": "La proposition sera annulée et aucun changement ne sera appliqué.",
+        "confirm": "Retirer"
+      },
+      "toasts": {
+        "approveOk": "Proposition approuvée.",
+        "approveFailed": "Échec de l'approbation.",
+        "rejectOk": "Proposition rejetée.",
+        "rejectFailed": "Échec du rejet.",
+        "withdrawOk": "Proposition retirée.",
+        "withdrawFailed": "Échec du retrait."
+      },
+      "diff": {
+        "title": "Changement proposé",
+        "before": "Avant",
+        "after": "Après",
+        "maskNote": "Les valeurs des secrets sont masquées — le contenu brut n'est pas renvoyé par cette interface."
+      },
+      "approvers": {
+        "title": "Approbations",
+        "empty": "Aucune approbation enregistrée pour l'instant.",
+        "unknownApprover": "inconnu"
+      }
+    }
   }
 }

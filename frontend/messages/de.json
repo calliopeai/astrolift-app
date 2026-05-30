@@ -647,7 +647,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "Protokolle exportieren",
+        "exportTitle": "Gepufferte Protokolle als Datei exportieren"
       },
       "title": "{name} · Observability",
       "description": "{slug} · pod state and log stream from the runtime cluster",
@@ -666,6 +668,30 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "logExport": {
+        "title": "Protokolle exportieren",
+        "description": "Gepufferte Protokolle für {pod} als herunterladbare Datei exportieren.",
+        "descriptionNoPod": "Wählen Sie oben einen Pod aus, um den Export einzugrenzen.",
+        "formatLabel": "Format",
+        "formatPlaceholder": "Format auswählen",
+        "formatTxt": "Nur Text",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "Von",
+        "untilLabel": "Bis",
+        "levelLabel": "Log-Ebene",
+        "levelPlaceholder": "z. B. error",
+        "regexLabel": "Regex-Filter",
+        "regexPlaceholder": "z. B. Exception",
+        "submittingButton": "Exportieren…",
+        "submitButton": "Exportieren",
+        "missingPod": "Bitte wählen Sie zuerst einen Pod aus.",
+        "toastStart": "Protokollexport wird vorbereitet…",
+        "toastReady": "Protokollexport bereit · {rows} Zeilen · {format}",
+        "toastReadyTruncated": "Protokollexport bereit · {rows} Zeilen · {format} (gekürzt)",
+        "toastDownload": "Herunterladen",
+        "toastFailure": "Protokollexport fehlgeschlagen"
       }
     },
     "tokens": {
@@ -1490,6 +1516,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# ausstehender Geheimnisänderungsantrag} other {# ausstehende Geheimnisänderungsanträge}}",
+        "appWide": "app-weit",
+        "votes": "{received}/{required} Genehmigungen",
+        "seeAll": "Alle {count} Anträge anzeigen →"
       }
     },
     "security": {
@@ -2171,6 +2203,23 @@
         "copyFailed": "Kopieren fehlgeschlagen — manuell auswählen und kopieren"
       }
     },
+    "secretProposalsQueue": {
+      "title": "Geheimnisänderungsanträge",
+      "empty": {
+        "title": "Keine ausstehenden Anträge",
+        "description": "Geheimnisänderungsanträge erscheinen hier, wenn ein Operator eine Änderung vorschlägt, die eine Genehmigung erfordert."
+      },
+      "row": {
+        "appWide": "app-weit",
+        "typeBadge": "Geheimnisänderung",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} Genehmigungen",
+        "summary": "{summary}",
+        "proposer": "von {name}",
+        "received": "eingegangen {rel}",
+        "review": "Prüfen"
+      }
+    },
     "deployments": {
       "title": "Deployments",
       "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
@@ -2506,5 +2555,64 @@
   },
   "a11y": {
     "skipToContent": "Skip to main content"
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "Geheimnisantrag"
+      },
+      "notFound": {
+        "title": "Antrag nicht gefunden",
+        "description": "Der Antrag existiert nicht oder Sie haben keine Berechtigung, ihn anzuzeigen."
+      },
+      "title": "{app} → {env}",
+      "appWide": "app-weit",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} Genehmigungen",
+      "proposedBy": "Vorgeschlagen von {name} · {rel}",
+      "unknownProposer": "unbekannt",
+      "expiresIn": "Läuft ab {rel}",
+      "applyError": "Anwendungsfehler: {message}",
+      "withdraw": "Zurückziehen",
+      "reject": "Ablehnen",
+      "approve": "Genehmigen",
+      "confirmApprove": {
+        "title": "Diese Geheimnisänderung genehmigen?",
+        "description": "Die Änderung wird angewendet, sobald die erforderlichen Genehmigungen vorliegen.",
+        "confirm": "Genehmigen"
+      },
+      "confirmReject": {
+        "title": "Diese Geheimnisänderung ablehnen?",
+        "description": "Der Antrag wird als abgelehnt markiert und keine Änderung wird vorgenommen.",
+        "reasonLabel": "Ablehnungsgrund",
+        "reasonPlaceholder": "Warum wird dieser Antrag abgelehnt?",
+        "reasonRequired": "Grund erforderlich",
+        "confirm": "Ablehnen"
+      },
+      "confirmWithdraw": {
+        "title": "Diesen Antrag zurückziehen?",
+        "description": "Der Antrag wird abgebrochen und keine Änderung wird vorgenommen.",
+        "confirm": "Zurückziehen"
+      },
+      "toasts": {
+        "approveOk": "Antrag genehmigt.",
+        "approveFailed": "Genehmigung fehlgeschlagen.",
+        "rejectOk": "Antrag abgelehnt.",
+        "rejectFailed": "Ablehnung fehlgeschlagen.",
+        "withdrawOk": "Antrag zurückgezogen.",
+        "withdrawFailed": "Zurückziehen fehlgeschlagen."
+      },
+      "diff": {
+        "title": "Vorgeschlagene Änderung",
+        "before": "Vorher",
+        "after": "Nachher",
+        "maskNote": "Geheimniswerte sind maskiert — roher Inhalt wird von dieser Oberfläche nicht zurückgegeben."
+      },
+      "approvers": {
+        "title": "Genehmigungen",
+        "empty": "Noch keine Genehmigungen erfasst.",
+        "unknownApprover": "unbekannt"
+      }
+    }
   }
 }

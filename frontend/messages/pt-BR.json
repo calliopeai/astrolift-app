@@ -608,6 +608,30 @@
         "environmentPlaceholder": "Selecione um ambiente",
         "workloadPlaceholder": "Selecione um workload"
       },
+      "logExport": {
+        "title": "Exportar registros",
+        "description": "Exportar registros em buffer de {pod} como arquivo para download.",
+        "descriptionNoPod": "Selecione um pod acima para definir o escopo da exportação.",
+        "formatLabel": "Formato",
+        "formatPlaceholder": "Selecionar formato",
+        "formatTxt": "Texto simples",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "Desde",
+        "untilLabel": "Até",
+        "levelLabel": "Nível de registro",
+        "levelPlaceholder": "ex. error",
+        "regexLabel": "Filtro regex",
+        "regexPlaceholder": "ex. Exception",
+        "submittingButton": "Exportando…",
+        "submitButton": "Exportar",
+        "missingPod": "Selecione um pod antes de exportar.",
+        "toastStart": "Preparando exportação de registros…",
+        "toastReady": "Exportação pronta · {rows} linhas · {format}",
+        "toastReadyTruncated": "Exportação pronta · {rows} linhas · {format} (truncado)",
+        "toastDownload": "Baixar",
+        "toastFailure": "Exportação de registros falhou"
+      },
       "events": {
         "warningCount": "{count, plural, =1 {1 aviso} other {# avisos}} na última hora",
         "warningBadgeLabel": "Aviso",
@@ -647,7 +671,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "Exportar registros",
+        "exportTitle": "Exportar registros em buffer para um arquivo para download"
       },
       "title": "{name} · Observability",
       "description": "{slug} · pod state and log stream from the runtime cluster",
@@ -1490,6 +1516,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# proposta de alteração de segredo pendente} other {# propostas de alteração de segredo pendentes}}",
+        "appWide": "todo o app",
+        "votes": "{received}/{required} aprovações",
+        "seeAll": "Ver todas as {count} propostas →"
       }
     },
     "security": {
@@ -2171,6 +2203,23 @@
         "copyFailed": "Falha ao copiar — selecione e copie manualmente"
       }
     },
+    "secretProposalsQueue": {
+      "title": "Propostas de alteração de segredo",
+      "empty": {
+        "title": "Nenhuma proposta pendente",
+        "description": "Propostas de alteração de segredo aparecem aqui quando um operador propõe uma alteração que requer aprovação."
+      },
+      "row": {
+        "appWide": "todo o app",
+        "typeBadge": "alteração de segredo",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} aprovações",
+        "summary": "{summary}",
+        "proposer": "por {name}",
+        "received": "recebido {rel}",
+        "review": "Revisar"
+      }
+    },
     "deployments": {
       "title": "Deployments",
       "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
@@ -2502,6 +2551,65 @@
       "passwordRequired": "A senha é obrigatória.",
       "generic": "Não foi possível confirmar sua senha. Tente novamente.",
       "network": "Não foi possível contatar o servidor. Verifique sua conexão e tente novamente."
+    }
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "Proposta de segredo"
+      },
+      "notFound": {
+        "title": "Proposta não encontrada",
+        "description": "A proposta não existe ou você não tem permissão para visualizá-la."
+      },
+      "title": "{app} → {env}",
+      "appWide": "todo o app",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} aprovações",
+      "proposedBy": "Proposto por {name} · {rel}",
+      "unknownProposer": "desconhecido",
+      "expiresIn": "Expira {rel}",
+      "applyError": "Erro ao aplicar: {message}",
+      "withdraw": "Retirar",
+      "reject": "Rejeitar",
+      "approve": "Aprovar",
+      "confirmApprove": {
+        "title": "Aprovar esta alteração de segredo?",
+        "description": "A alteração será aplicada assim que as aprovações necessárias forem obtidas.",
+        "confirm": "Aprovar"
+      },
+      "confirmReject": {
+        "title": "Rejeitar esta alteração de segredo?",
+        "description": "A proposta será marcada como rejeitada e nenhuma alteração será aplicada.",
+        "reasonLabel": "Motivo da rejeição",
+        "reasonPlaceholder": "Por que esta proposta está sendo rejeitada?",
+        "reasonRequired": "Motivo obrigatório",
+        "confirm": "Rejeitar"
+      },
+      "confirmWithdraw": {
+        "title": "Retirar esta proposta?",
+        "description": "A proposta será cancelada e nenhuma alteração será aplicada.",
+        "confirm": "Retirar"
+      },
+      "toasts": {
+        "approveOk": "Proposta aprovada.",
+        "approveFailed": "Aprovação falhou.",
+        "rejectOk": "Proposta rejeitada.",
+        "rejectFailed": "Rejeição falhou.",
+        "withdrawOk": "Proposta retirada.",
+        "withdrawFailed": "Retirada falhou."
+      },
+      "diff": {
+        "title": "Alteração proposta",
+        "before": "Antes",
+        "after": "Depois",
+        "maskNote": "Os valores dos segredos estão mascarados — o conteúdo bruto não é retornado por esta interface."
+      },
+      "approvers": {
+        "title": "Aprovações",
+        "empty": "Nenhuma aprovação registrada ainda.",
+        "unknownApprover": "desconhecido"
+      }
     }
   }
 }

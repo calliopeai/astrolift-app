@@ -608,6 +608,30 @@
         "environmentPlaceholder": "选择环境",
         "workloadPlaceholder": "选择工作负载"
       },
+      "logExport": {
+        "title": "导出日志",
+        "description": "将 {pod} 的缓冲日志导出为可下载文件。",
+        "descriptionNoPod": "请在上方选择一个 Pod 以确定导出范围。",
+        "formatLabel": "格式",
+        "formatPlaceholder": "选择格式",
+        "formatTxt": "纯文本",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "开始时间",
+        "untilLabel": "结束时间",
+        "levelLabel": "日志级别",
+        "levelPlaceholder": "例如：error",
+        "regexLabel": "正则过滤器",
+        "regexPlaceholder": "例如：Exception",
+        "submittingButton": "导出中…",
+        "submitButton": "导出",
+        "missingPod": "请在导出前选择一个 Pod。",
+        "toastStart": "正在准备日志导出…",
+        "toastReady": "日志导出完成 · {rows} 行 · {format}",
+        "toastReadyTruncated": "日志导出完成 · {rows} 行 · {format}（已截断）",
+        "toastDownload": "下载",
+        "toastFailure": "日志导出失败"
+      },
       "events": {
         "warningCount": "过去 1 小时内有 {count} 条警告",
         "warningBadgeLabel": "警告",
@@ -647,7 +671,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "导出日志",
+        "exportTitle": "将缓冲日志导出为可下载文件"
       },
       "title": "{name} · Observability",
       "description": "{slug} · pod state and log stream from the runtime cluster",
@@ -1490,6 +1516,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# 个待处理的密钥变更提案} other {# 个待处理的密钥变更提案}}",
+        "appWide": "应用全局",
+        "votes": "{received}/{required} 个审批",
+        "seeAll": "查看全部 {count} 个提案 →"
       }
     },
     "security": {
@@ -2171,6 +2203,23 @@
         "copyFailed": "复制失败 — 手动选择并复制"
       }
     },
+    "secretProposalsQueue": {
+      "title": "密钥变更提案",
+      "empty": {
+        "title": "暂无待处理提案",
+        "description": "当运营人员提出需要审批的变更时，密钥变更提案将显示在此处。"
+      },
+      "row": {
+        "appWide": "应用全局",
+        "typeBadge": "密钥变更",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} 个审批",
+        "summary": "{summary}",
+        "proposer": "由 {name} 提交",
+        "received": "{rel} 收到",
+        "review": "审查"
+      }
+    },
     "deployments": {
       "title": "Deployments",
       "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
@@ -2502,6 +2551,65 @@
       "passwordRequired": "需要密码。",
       "generic": "无法确认您的密码。请重试。",
       "network": "无法连接到服务器。请检查您的连接后重试。"
+    }
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "密钥提案"
+      },
+      "notFound": {
+        "title": "未找到提案",
+        "description": "该提案不存在或您无权查看。"
+      },
+      "title": "{app} → {env}",
+      "appWide": "应用全局",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} 个审批",
+      "proposedBy": "由 {name} 提交 · {rel}",
+      "unknownProposer": "未知",
+      "expiresIn": "{rel} 到期",
+      "applyError": "应用错误：{message}",
+      "withdraw": "撤回",
+      "reject": "拒绝",
+      "approve": "批准",
+      "confirmApprove": {
+        "title": "批准此密钥变更？",
+        "description": "达到所需审批数后，变更将被应用。",
+        "confirm": "批准"
+      },
+      "confirmReject": {
+        "title": "拒绝此密钥变更？",
+        "description": "提案将被标记为已拒绝，不会应用任何变更。",
+        "reasonLabel": "拒绝原因",
+        "reasonPlaceholder": "拒绝此提案的原因是什么？",
+        "reasonRequired": "原因为必填项",
+        "confirm": "拒绝"
+      },
+      "confirmWithdraw": {
+        "title": "撤回此提案？",
+        "description": "提案将被取消，不会应用任何变更。",
+        "confirm": "撤回"
+      },
+      "toasts": {
+        "approveOk": "提案已批准。",
+        "approveFailed": "批准失败。",
+        "rejectOk": "提案已拒绝。",
+        "rejectFailed": "拒绝失败。",
+        "withdrawOk": "提案已撤回。",
+        "withdrawFailed": "撤回失败。"
+      },
+      "diff": {
+        "title": "建议的变更",
+        "before": "变更前",
+        "after": "变更后",
+        "maskNote": "密钥值已被遮蔽——此界面不会返回原始内容。"
+      },
+      "approvers": {
+        "title": "审批记录",
+        "empty": "暂无审批记录。",
+        "unknownApprover": "未知"
+      }
     }
   }
 }

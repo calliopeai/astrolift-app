@@ -608,6 +608,30 @@
         "environmentPlaceholder": "환경 선택",
         "workloadPlaceholder": "워크로드 선택"
       },
+      "logExport": {
+        "title": "로그 내보내기",
+        "description": "{pod}의 버퍼된 로그를 다운로드 가능한 파일로 내보냅니다.",
+        "descriptionNoPod": "내보내기 범위를 지정하려면 위에서 파드를 선택하세요.",
+        "formatLabel": "형식",
+        "formatPlaceholder": "형식 선택",
+        "formatTxt": "일반 텍스트",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "시작",
+        "untilLabel": "종료",
+        "levelLabel": "로그 수준",
+        "levelPlaceholder": "예: error",
+        "regexLabel": "정규식 필터",
+        "regexPlaceholder": "예: Exception",
+        "submittingButton": "내보내는 중…",
+        "submitButton": "내보내기",
+        "missingPod": "내보내기 전에 파드를 선택하세요.",
+        "toastStart": "로그 내보내기 준비 중…",
+        "toastReady": "로그 내보내기 완료 · {rows}행 · {format}",
+        "toastReadyTruncated": "로그 내보내기 완료 · {rows}행 · {format} (잘림)",
+        "toastDownload": "다운로드",
+        "toastFailure": "로그 내보내기 실패"
+      },
       "events": {
         "warningCount": "지난 1시간 동안 경고 {count}건",
         "warningBadgeLabel": "경고",
@@ -647,7 +671,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "로그 내보내기",
+        "exportTitle": "버퍼된 로그를 다운로드 가능한 파일로 내보내기"
       },
       "title": "{name} · Observability",
       "description": "{slug} · pod state and log stream from the runtime cluster",
@@ -1490,6 +1516,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# 개의 보류 중인 시크릿 변경 제안} other {# 개의 보류 중인 시크릿 변경 제안}}",
+        "appWide": "앱 전체",
+        "votes": "{received}/{required} 승인",
+        "seeAll": "모든 {count}개의 제안 보기 →"
       }
     },
     "security": {
@@ -2171,6 +2203,23 @@
         "copyFailed": "복사 실패 — 수동으로 선택하여 복사하세요"
       }
     },
+    "secretProposalsQueue": {
+      "title": "시크릿 변경 제안",
+      "empty": {
+        "title": "보류 중인 제안 없음",
+        "description": "운영자가 승인이 필요한 변경을 제안하면 시크릿 변경 제안이 여기에 표시됩니다."
+      },
+      "row": {
+        "appWide": "앱 전체",
+        "typeBadge": "시크릿 변경",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} 승인",
+        "summary": "{summary}",
+        "proposer": "{name} 제안",
+        "received": "{rel}에 수신됨",
+        "review": "검토"
+      }
+    },
     "deployments": {
       "title": "Deployments",
       "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
@@ -2502,6 +2551,65 @@
       "passwordRequired": "비밀번호가 필요합니다.",
       "generic": "비밀번호를 확인할 수 없습니다. 다시 시도하세요.",
       "network": "서버에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요."
+    }
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "시크릿 제안"
+      },
+      "notFound": {
+        "title": "제안을 찾을 수 없음",
+        "description": "제안이 존재하지 않거나 볼 권한이 없습니다."
+      },
+      "title": "{app} → {env}",
+      "appWide": "앱 전체",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} 승인",
+      "proposedBy": "{name} 제안 · {rel}",
+      "unknownProposer": "알 수 없음",
+      "expiresIn": "{rel}에 만료",
+      "applyError": "적용 오류: {message}",
+      "withdraw": "철회",
+      "reject": "거부",
+      "approve": "승인",
+      "confirmApprove": {
+        "title": "이 시크릿 변경을 승인하시겠습니까?",
+        "description": "필요한 승인이 충족되면 변경 사항이 적용됩니다.",
+        "confirm": "승인"
+      },
+      "confirmReject": {
+        "title": "이 시크릿 변경을 거부하시겠습니까?",
+        "description": "제안은 거부됨으로 표시되며 변경 사항이 적용되지 않습니다.",
+        "reasonLabel": "거부 이유",
+        "reasonPlaceholder": "이 제안을 거부하는 이유는 무엇입니까?",
+        "reasonRequired": "이유가 필요합니다",
+        "confirm": "거부"
+      },
+      "confirmWithdraw": {
+        "title": "이 제안을 철회하시겠습니까?",
+        "description": "제안이 취소되며 변경 사항이 적용되지 않습니다.",
+        "confirm": "철회"
+      },
+      "toasts": {
+        "approveOk": "제안이 승인되었습니다.",
+        "approveFailed": "승인에 실패했습니다.",
+        "rejectOk": "제안이 거부되었습니다.",
+        "rejectFailed": "거부에 실패했습니다.",
+        "withdrawOk": "제안이 철회되었습니다.",
+        "withdrawFailed": "철회에 실패했습니다."
+      },
+      "diff": {
+        "title": "제안된 변경 사항",
+        "before": "변경 전",
+        "after": "변경 후",
+        "maskNote": "시크릿 값은 마스킹됩니다 — 이 화면에서는 원시 콘텐츠가 반환되지 않습니다."
+      },
+      "approvers": {
+        "title": "승인",
+        "empty": "아직 기록된 승인이 없습니다.",
+        "unknownApprover": "알 수 없음"
+      }
     }
   }
 }

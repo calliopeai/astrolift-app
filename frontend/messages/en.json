@@ -697,7 +697,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "Export logs",
+        "exportTitle": "Export buffered logs to a downloadable file"
       },
       "events": {
         "title": "Recent platform events",
@@ -717,6 +719,30 @@
         "allWorkloads": "All workloads",
         "environmentPlaceholder": "Select an environment",
         "workloadPlaceholder": "Select a workload"
+      },
+      "logExport": {
+        "title": "Export logs",
+        "description": "Export buffered logs for {pod} as a downloadable file.",
+        "descriptionNoPod": "Select a pod above to scope the export.",
+        "formatLabel": "Format",
+        "formatPlaceholder": "Select format",
+        "formatTxt": "Plain text",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "Since",
+        "untilLabel": "Until",
+        "levelLabel": "Log level",
+        "levelPlaceholder": "e.g. error",
+        "regexLabel": "Regex filter",
+        "regexPlaceholder": "e.g. Exception",
+        "submittingButton": "Exporting…",
+        "submitButton": "Export",
+        "missingPod": "Select a pod before exporting.",
+        "toastStart": "Preparing log export…",
+        "toastReady": "Log export ready · {rows} rows · {format}",
+        "toastReadyTruncated": "Log export ready · {rows} rows · {format} (truncated)",
+        "toastDownload": "Download",
+        "toastFailure": "Log export failed"
       }
     },
     "topology": {
@@ -1059,6 +1085,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# pending secret-change proposal} other {# pending secret-change proposals}}",
+        "appWide": "app-wide",
+        "votes": "{received}/{required} approvals",
+        "seeAll": "See all {count} proposals →"
       }
     },
     "security": {
@@ -2340,6 +2372,23 @@
         "linkCopied": "Accept link copied",
         "copyFailed": "Copy failed — select and copy manually"
       }
+    },
+    "secretProposalsQueue": {
+      "title": "Secret-change proposals",
+      "empty": {
+        "title": "No pending proposals",
+        "description": "Secret-change proposals appear here when an operator proposes a change that requires approval."
+      },
+      "row": {
+        "appWide": "app-wide",
+        "typeBadge": "secret change",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} approvals",
+        "summary": "{summary}",
+        "proposer": "by {name}",
+        "received": "received {rel}",
+        "review": "Review"
+      }
     }
   },
   "settingsIndex": {
@@ -2577,5 +2626,64 @@
     "active": "Admin elevated",
     "expires": "Expires {time}",
     "deelevate": "Drop elevation"
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "Secret proposal"
+      },
+      "notFound": {
+        "title": "Proposal not found",
+        "description": "The proposal doesn't exist or you don't have permission to view it."
+      },
+      "title": "{app} → {env}",
+      "appWide": "app-wide",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} approvals",
+      "proposedBy": "Proposed by {name} · {rel}",
+      "unknownProposer": "unknown",
+      "expiresIn": "Expires {rel}",
+      "applyError": "Apply error: {message}",
+      "withdraw": "Withdraw",
+      "reject": "Reject",
+      "approve": "Approve",
+      "confirmApprove": {
+        "title": "Approve this secret change?",
+        "description": "The change will be applied once the required approvals are met.",
+        "confirm": "Approve"
+      },
+      "confirmReject": {
+        "title": "Reject this secret change?",
+        "description": "The proposal will be marked as rejected and no change will be applied.",
+        "reasonLabel": "Reason for rejection",
+        "reasonPlaceholder": "Why is this proposal being rejected?",
+        "reasonRequired": "Reason required",
+        "confirm": "Reject"
+      },
+      "confirmWithdraw": {
+        "title": "Withdraw this proposal?",
+        "description": "The proposal will be cancelled and no change will be applied.",
+        "confirm": "Withdraw"
+      },
+      "toasts": {
+        "approveOk": "Proposal approved.",
+        "approveFailed": "Approve failed.",
+        "rejectOk": "Proposal rejected.",
+        "rejectFailed": "Reject failed.",
+        "withdrawOk": "Proposal withdrawn.",
+        "withdrawFailed": "Withdraw failed."
+      },
+      "diff": {
+        "title": "Proposed change",
+        "before": "Before",
+        "after": "After",
+        "maskNote": "Secret values are masked — raw content is not returned by this surface."
+      },
+      "approvers": {
+        "title": "Approvals",
+        "empty": "No approvals recorded yet.",
+        "unknownApprover": "unknown"
+      }
+    }
   }
 }
