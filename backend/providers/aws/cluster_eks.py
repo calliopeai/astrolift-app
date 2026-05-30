@@ -331,6 +331,20 @@ class EKSClusterDriver(ClusterDriver):
             phase=ns.get("status", {}).get("phase", "Active"),
         )
 
+    def storage_class_exists(self, cluster: str, name: str) -> bool:
+        """Return True if a StorageClass with the given name exists on the cluster.
+
+        Used by the bootstrap preflight to gate persistent-storage HelmRelease
+        installs on the required StorageClass being present (#772).
+        """
+        client = self._k8s(cluster)
+        sc = client.get(
+            kind="StorageClass",
+            namespace=None,
+            name=name,
+        )
+        return sc is not None
+
     @driver_op(cloud="aws", driver="cluster")
     def ensure_namespace(
         self,
@@ -958,9 +972,10 @@ class EKSClusterDriver(ClusterDriver):
                 # storageclass:efs-prometheus must be present when the operator
                 # selects the efs_persistent storage mode. Apply the StorageClass
                 # manifest emitted by the Terraform output before running this
-                # recipe. The bootstrap recipe doesn't enforce this automatically
-                # yet — the Flux HelmRelease will fail with a PVC-binding error
-                # if the StorageClass is absent.
+                # recipe. The install activity enforces this via
+                # _assert_storage_class_preflight (#772): if the StorageClass is
+                # absent, the workflow surfaces an actionable error before Flux
+                # tries to bind the PVC.
                 requires=[],
                 options=[
                     BootstrapOption(
