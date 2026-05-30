@@ -7,6 +7,7 @@ import {
   BookOpenIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
+  HammerIcon,
   ChevronRightIcon,
   CreditCardIcon,
   FingerprintIcon,
@@ -94,6 +95,21 @@ interface NavSection {
 // leaves now; "Teams" and "Projects" remain as the flat management
 // list pages and have been folded into Administration.
 const sections: NavSection[] = [
+  {
+    // Build — CI pipelines, image builder, artifact management.
+    // This pillar is on the product roadmap; the page is an enable/
+    // onboarding gateway following the same pattern as Zentinelle.
+    // Gated on cluster.register so only platform admins see it.
+    label: "Build",
+    items: [
+      {
+        label: "Build",
+        href: "/build",
+        icon: <HammerIcon />,
+        permission: "cluster.register",
+      },
+    ],
+  },
   {
     // Run — active app operations: deployments, environments, release
     // workflows, scheduled jobs, and PR preview deployments. Mirrors
