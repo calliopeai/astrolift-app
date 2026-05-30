@@ -418,6 +418,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     namespace = app.k8s_namespace or f"{app.organization.slug}-{app.slug}"
     resources = _render(
         manifest,
+        app_slug=app.slug,
         namespace=namespace,
         image_tag=d.image_tag or "latest",
         image_repository=app.registry_repo_uri or app.slug,
