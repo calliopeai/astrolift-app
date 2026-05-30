@@ -67,8 +67,12 @@ class ClustersQuery:
         tenant = get_current_tenant()
         if tenant is None or tenant.organization_id is None:
             return 0
+        # Platform-level clusters (organization=None) are available to all
+        # orgs. Org-scoped clusters are only available to their own org.
+        from django.db.models import Q
+
         return TenantCluster.objects.filter(
-            organization_id=tenant.organization_id,
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             deleted_at__isnull=True,
             is_active=True,
             lifecycle=TenantCluster.Lifecycle.MANAGED.value,
