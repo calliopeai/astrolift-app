@@ -97,25 +97,31 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
       }
     }
 
-    const { data } = await createDomain({
-      variables: {
-        input: {
-          zone: zone.trim(),
-          dnsDriver,
-          defaultFor,
-          isWildcardManaged: wildcard,
-          organizationScoped: orgScoped,
-          dnsConfig: parsedConfig,
+    try {
+      const { data } = await createDomain({
+        variables: {
+          input: {
+            zone: zone.trim(),
+            dnsDriver,
+            defaultFor,
+            isWildcardManaged: wildcard,
+            organizationScoped: orgScoped,
+            dnsConfig: parsedConfig,
+          },
         },
-      },
-    });
+      });
 
-    if (data?.createManagedDomain.ok) {
-      toast.success(`Added ${data.createManagedDomain.data?.zone ?? zone}`);
-      onOpenChange(false);
-    } else {
+      if (data?.createManagedDomain.ok) {
+        toast.success(`Added ${data.createManagedDomain.data?.zone ?? zone}`);
+        onOpenChange(false);
+      } else {
+        setSubmitError(
+          data?.createManagedDomain.errors?.[0]?.message ?? "Failed to add domain"
+        );
+      }
+    } catch (err) {
       setSubmitError(
-        data?.createManagedDomain.errors?.[0]?.message ?? "Failed to add domain"
+        err instanceof Error ? err.message : "Unexpected error — check console"
       );
     }
   }

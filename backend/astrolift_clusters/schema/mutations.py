@@ -720,7 +720,7 @@ class ClustersMutation:
     def create_managed_domain(
         self, info: Info, input: CreateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
-        if ManagedDomain.objects.filter(zone=input.zone).exists():
+        if ManagedDomain.objects.filter(zone=input.zone, deleted_at__isnull=True).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
                 f"zone {input.zone!r} already registered",

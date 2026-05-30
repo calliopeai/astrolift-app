@@ -48,10 +48,27 @@ class TenantClusterAdmin(_AllObjectsAdmin):
 
 @admin.register(ManagedDomain)
 class ManagedDomainAdmin(_AllObjectsAdmin):
-    list_display = ("zone", "organization", "dns_driver", "default_for", "deleted_at")
-    list_filter = ("dns_driver", "default_for")
+    list_display = ("zone", "organization", "dns_driver", "default_for", "is_wildcard_managed", "deleted_at")
+    list_filter = ("dns_driver", "default_for", "is_wildcard_managed")
     search_fields = ("zone",)
     readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+    DNS_DRIVER_CHOICES = [
+        ("route53", "AWS Route 53"),
+        ("cloud_dns", "Google Cloud DNS"),
+        ("azure_dns", "Azure DNS"),
+    ]
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        from django import forms
+
+        if db_field.name == "dns_driver":
+            kwargs["widget"] = forms.Select(choices=self.DNS_DRIVER_CHOICES)
+        if db_field.name == "default_for":
+            kwargs["widget"] = forms.Select(
+                choices=ManagedDomain.DefaultFor.choices
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 @admin.register(ManagedServiceCatalogEntry)
