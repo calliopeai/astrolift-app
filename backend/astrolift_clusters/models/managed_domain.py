@@ -30,6 +30,31 @@ class ManagedDomain(BaseCoreModel):
     )
     dns_driver = models.CharField(max_length=64)
     dns_config = models.JSONField(default=dict, blank=True)
+    provision_state = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=(
+            "Current ZoneRegistrationStep. Empty = not started; "
+            "'mark_active' = fully provisioned."
+        ),
+    )
+    provision_nameservers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="NS records returned when the zone was created. Shown to operator for registrar delegation.",
+    )
+    provision_cert_id = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="Cloud cert ID/ARN — used for poll and reissue operations.",
+    )
+    provision_validation_records = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="DNS validation CNAME records the operator must add (cloud cert DNS-01 challenge).",
+    )
     default_for = models.CharField(
         max_length=32,
         choices=DefaultFor.choices,

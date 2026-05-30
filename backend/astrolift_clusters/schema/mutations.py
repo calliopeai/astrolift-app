@@ -309,6 +309,14 @@ class _SoftDeletePayload:
 
 
 @strawberry.type
+class ProvisionManagedDomainPayload:
+    zone: str
+    workflow_id: str
+    nameservers: list[str]
+    message: str
+
+
+@strawberry.type
 class _ProviderPluginConfigPayload:
     plugin_slug: str
     organization_scoped: bool
@@ -780,6 +788,57 @@ class ClustersMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         domain.soft_delete()
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.mutation
+    @mutation_audit(action="cluster.managed_domain.provision")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def provision_managed_domain(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        zone: str,
+    ) -> MutationResultType[ProvisionManagedDomainPayload]:
+        """Kick off the ProvisionManagedDomainWorkflow to automate DNS zone
+        creation, wildcard cert issuance, and ManagedDomain registration (#781).
+        """
+        from astrolift_workflows.inputs import ProvisionManagedDomainInput
+
+        if not zone or "." not in zone:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "zone must be a valid domain name (non-empty, contains a dot)",
+                field="zone",
+            )
+
+        cluster = TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+
+        workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
+        actor = _actor_from_request(info)
+        start_workflow(
+            "ProvisionManagedDomainWorkflow",
+            args=[
+                ProvisionManagedDomainInput(
+                    cluster_id=cluster.pk,
+                    zone=zone,
+                    actor=actor,
+                ),
+            ],
+            workflow_id=workflow_id,
+        )
+        return gql_success(
+            ProvisionManagedDomainPayload(
+                zone=zone,
+                workflow_id=workflow_id,
+                nameservers=[],
+                message=(
+                    "Provisioning started — check the cluster's managed domains"
+                    " page for NS records to delegate at your registrar."
+                ),
+            )
+        )
 
     # ---- ProviderPlugin config -------------------------------------
 

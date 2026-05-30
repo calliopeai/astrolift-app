@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -88,4 +88,28 @@ class DnsDriver(Protocol):
 
         raise UnsupportedOperationError(
             f"dns.list_records_for_app({zone_or_app=}) not supported on this driver",
+        )
+
+    def provision_zone(self, zone: str) -> dict[str, Any]:
+        """Provision a new hosted zone for the given domain. Returns zone metadata including the authoritative nameservers to set at the registrar."""
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            f"dns.provision_zone({zone=}) not supported on this driver",
+        )
+
+    def request_wildcard_cert(self, zone: str, zone_id: str) -> dict[str, Any]:
+        """Request a wildcard cert for *.<zone> via the cloud cert service. Returns cert metadata and DNS validation records to write into the zone."""
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            f"dns.request_wildcard_cert({zone=}, {zone_id=}) not supported on this driver",
+        )
+
+    def poll_cert_status(self, zone: str, cert_id: str) -> dict[str, Any]:
+        """Poll the issuance status of a cert by its cert_id. Returns status ('pending'/'issued'/'failed') and the final cert identifier once issued."""
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError(
+            f"dns.poll_cert_status({zone=}, {cert_id=}) not supported on this driver",
         )

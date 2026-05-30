@@ -9,9 +9,11 @@ HostedZoneId once + caches per-instance.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any
 
+from _sdk import UnsupportedOperationError  # noqa: F401 (re-exported via raises)
 from _sdk._telemetry import driver_op
 from _sdk.dns import DnsDriver, DnsRecord, Record
 from aws._errors import NotFoundError, map_client_error
@@ -41,6 +43,7 @@ class Route53Driver(DnsDriver):
                 region_name=self._config.region,
             )
         self._zone_cache: dict[str, str] = {}
+        self._acm: Any | None = None
 
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.ensure_record")
     def ensure_record(
@@ -198,7 +201,93 @@ class Route53Driver(DnsDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+    # ---- zone + cert provisioning (#781) -------------------------
+
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.provision_zone")
+    def provision_zone(self, zone: str) -> dict[str, Any]:
+        caller_ref = f"astrolift-{zone}-{int(time.time())}"
+        try:
+            response = self._r53.create_hosted_zone(
+                Name=zone,
+                CallerReference=caller_ref,
+            )
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        raw_id: str = response["HostedZone"]["Id"]
+        zone_id = raw_id.rsplit("/", 1)[-1]
+        nameservers: list[str] = response.get("DelegationSet", {}).get("NameServers", [])
+        # Seed the zone cache so subsequent calls skip the lookup.
+        canonical = zone.rstrip(".") + "."
+        self._zone_cache[canonical] = zone_id
+        return {"zone_id": zone_id, "nameservers": nameservers}
+
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.request_wildcard_cert")
+    def request_wildcard_cert(self, zone: str, zone_id: str) -> dict[str, Any]:
+        acm = self._acm_client()
+        try:
+            cert_response = acm.request_certificate(
+                DomainName=f"*.{zone}",
+                ValidationMethod="DNS",
+                SubjectAlternativeNames=[zone, f"*.{zone}"],
+            )
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        cert_arn: str = cert_response["CertificateArn"]
+        # ACM needs a moment to populate DomainValidationOptions.
+        time.sleep(1)
+        try:
+            desc = acm.describe_certificate(CertificateArn=cert_arn)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        options = (
+            desc.get("Certificate", {}).get("DomainValidationOptions", []) or []
+        )
+        validation_records = [
+            {
+                "name": r["ResourceRecord"]["Name"],
+                "type": r["ResourceRecord"]["Type"],
+                "value": r["ResourceRecord"]["Value"],
+            }
+            for r in options
+            if "ResourceRecord" in r
+        ]
+        return {"cert_id": cert_arn, "validation_records": validation_records}
+
+    @driver_op(cloud="aws", driver="dns")
+    def poll_cert_status(self, zone: str, cert_id: str) -> dict[str, Any]:
+        del zone  # not needed for ACM lookup by ARN
+        acm = self._acm_client()
+        try:
+            desc = acm.describe_certificate(CertificateArn=cert_id)
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        raw_status: str = desc.get("Certificate", {}).get("Status", "")
+        if raw_status == "ISSUED":
+            status = "issued"
+        elif raw_status == "PENDING_VALIDATION":
+            status = "pending"
+        else:
+            # FAILED, EXPIRED, REVOKED, INACTIVE, VALIDATION_TIMED_OUT, …
+            status = "failed"
+        return {
+            "status": status,
+            "cert_arn": cert_id if status == "issued" else None,
+        }
+
     # ---- internals ------------------------------------------------
+
+    def _acm_client(self) -> Any:
+        if self._acm is None:
+            import boto3
+
+            # ACM certs for CloudFront + global ALBs must be in us-east-1;
+            # the driver defaults to us-east-1 via Route53Config, which is
+            # also the correct region for ACM DNS-validated wildcard certs.
+            self._acm = boto3.client(
+                "acm",
+                region_name=self._config.region,
+            )
+        return self._acm
 
     def _resolve_zone_or_app(self, zone_or_app: str) -> str:
         """Resolve a zone name OR app-slug tag-lookup to a zone name.
