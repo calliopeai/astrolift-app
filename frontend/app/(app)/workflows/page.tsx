@@ -24,7 +24,12 @@ import { PageShell } from "@/components/PageShell";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useWorkflows, useDeleteWorkflow } from "@/graphql/workflows/workflows.hooks";
 import { LIST_WORKFLOW_RUNS } from "@/graphql/operations/operations.queries";
+import type { AstroliftWorkflowRun } from "@/graphql/operations/operations.types";
 import type { WorkflowDefinition } from "@/graphql/workflows/workflows.types";
+
+interface WorkflowRunsResp {
+  astroliftWorkflowRuns: AstroliftWorkflowRun[];
+}
 
 import { WorkflowInstancesPanel } from "./instances-panel";
 
@@ -60,7 +65,7 @@ export default function WorkflowsPage() {
   const confirm = useConfirm();
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
-  const { data: runsData, loading: runsLoading } = useQuery(LIST_WORKFLOW_RUNS, {
+  const { data: runsData, loading: runsLoading } = useQuery<WorkflowRunsResp>(LIST_WORKFLOW_RUNS, {
     variables: { limit: 50 },
     skip: tab !== "history",
     fetchPolicy: "cache-and-network",
@@ -229,23 +234,23 @@ export default function WorkflowsPage() {
           )}
           {historyRuns.length > 0 && (
             <div className="flex flex-col gap-2">
-              {historyRuns.map((run: any) => (
+              {historyRuns.map((run) => (
                 <div
-                  key={run.id ?? run.workflowId}
+                  key={`${run.workflowId}-${run.runId}`}
                   className="flex items-center gap-3 rounded-md border px-4 py-3 text-sm"
                 >
                   <Badge
-                    variant={run.status === "succeeded" ? "default" : "destructive"}
+                    variant={run.status === "COMPLETED" ? "default" : "destructive"}
                     className="shrink-0"
                   >
                     {run.status}
                   </Badge>
-                  <span className="min-w-0 flex-1 truncate font-medium font-mono text-xs">
-                    {run.workflowType ?? run.workflowId}
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium">
+                    {run.workflowKind}
                   </span>
-                  {run.registeredAppSlug && (
+                  {run.registeredAppId && (
                     <Badge variant="outline" className="shrink-0 text-xs">
-                      {run.registeredAppSlug}
+                      {run.registeredAppId}
                     </Badge>
                   )}
                   <span className="text-muted-foreground shrink-0 text-xs">
