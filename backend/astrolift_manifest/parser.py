@@ -45,7 +45,7 @@ class ManifestError(ValueError):
         self.column = column
 
 
-_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob"}
+_VALID_WORKLOAD_KINDS = {"deployment", "statefulset", "job", "cronjob", "task"}
 _VALID_HEALTHCHECK = {"none", "http", "tcp", "exec"}
 _VALID_CONCURRENCY_POLICY = {"forbid", "queue", "replace"}
 
@@ -73,9 +73,17 @@ def parse_raw(toml_text: str) -> RawManifest:
     # rendering / validation only ever sees one workload format.
     desugared_jobs = tuple(_desugar_job(item, f"jobs[{i}]") for i, item in enumerate(data.get("jobs", [])))
 
-    # Reject collisions between [[workloads]] and [[jobs]] sharing a
-    # name — the resulting Workload rows would conflict on the unique
-    # constraint, and silently dropping one is a footgun.
+    # ``[[tasks]]`` is a shorthand for a single-container one-shot Job
+    # (no schedule). Desugar into the same WorkloadManifest shape — with
+    # ``kind == "task"`` — so downstream rendering / validation only ever
+    # sees one workload format.
+    desugared_tasks = tuple(
+        _desugar_task(item, f"tasks[{i}]") for i, item in enumerate(data.get("tasks", []))
+    )
+
+    # Reject collisions between [[workloads]], [[jobs]], and [[tasks]]
+    # sharing a name — the resulting Workload rows would conflict on the
+    # unique constraint, and silently dropping one is a footgun.
     workload_names = {w.name for w in workloads}
     for j in desugared_jobs:
         if j.name in workload_names:
@@ -83,7 +91,15 @@ def parse_raw(toml_text: str) -> RawManifest:
                 f"job name {j.name!r} collides with an existing workload",
                 path="jobs",
             )
-    workloads = workloads + desugared_jobs
+        workload_names.add(j.name)
+    for t in desugared_tasks:
+        if t.name in workload_names:
+            raise ManifestError(
+                f"task name {t.name!r} collides with an existing workload",
+                path="tasks",
+            )
+        workload_names.add(t.name)
+    workloads = workloads + desugared_jobs + desugared_tasks
 
     managed = tuple(
         _parse_managed_service(item, f"managed_services[{i}]")
@@ -224,6 +240,58 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
         memory_request=d.get("memory_request"),
         memory_limit=d.get("memory_limit"),
         # HPA + storage don't apply to one-shot jobs.
+        hpa_min=None,
+        hpa_max=None,
+        hpa_target_cpu_pct=80,
+        storage_class=None,
+        storage_size=None,
+        containers=(container,),
+    )
+
+
+def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
+    """Lift a ``[[tasks]]`` shorthand into a full WorkloadManifest.
+
+    A task is a single-container one-shot Job — it runs to completion
+    once and is not rescheduled. Unlike ``[[jobs]]`` (which desugars to
+    a cronjob and requires a ``schedule``), a task has no schedule and
+    no concurrency policy: ``schedule`` stays ``None`` and the renderer
+    emits a bare ``batch/v1 Job``.
+    """
+    name = _require_str(d, "name", f"{path}.name")
+
+    env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
+
+    container = ContainerManifest(
+        name=name,
+        is_primary=True,
+        image_ref=d.get("image_ref"),
+        dockerfile_path=str(d.get("dockerfile_path", d.get("dockerfile", "Dockerfile"))),
+        build_context=str(d.get("build_context", ".")),
+        port=0,  # tasks don't expose ports
+        command=tuple(map(str, d.get("command", []) or ())),
+        args=tuple(map(str, d.get("args", []) or ())),
+        env=env_pairs,
+        # tasks don't carry liveness/readiness probes — k8s tracks
+        # success/failure via the Job controller's exit code.
+        healthcheck_kind="none",
+        healthcheck_value="",
+        healthcheck_port=None,
+    )
+
+    return WorkloadManifest(
+        name=name,
+        kind="task",
+        is_public=False,
+        # One-shot: no schedule, no concurrency policy.
+        schedule=None,
+        concurrency_policy="forbid",
+        replicas=1,
+        cpu_request=d.get("cpu_request"),
+        cpu_limit=d.get("cpu_limit"),
+        memory_request=d.get("memory_request"),
+        memory_limit=d.get("memory_limit"),
+        # HPA + storage don't apply to one-shot tasks.
         hpa_min=None,
         hpa_max=None,
         hpa_target_cpu_pct=80,

@@ -338,6 +338,63 @@ def test_cronjob_renders_with_schedule():
     assert all(r["kind"] != "Service" for r in out)
 
 
+# ---- task → batch/v1 Job (#792) --------------------------------------
+
+
+def test_task_renders_as_one_shot_job():
+    w = WorkloadManifest(
+        name="migrate",
+        kind="task",
+        cpu_request="50m",
+        memory_request="64Mi",
+        containers=(_container(name="job", port=0, command=("/bin/migrate",)),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+    )
+    job = next(r for r in out if r["kind"] == "Job")
+    assert job["apiVersion"] == "batch/v1"
+    assert job["metadata"]["name"] == "migrate"
+    # One-shot: run exactly once, no retries.
+    assert job["spec"]["completions"] == 1
+    assert job["spec"]["backoffLimit"] == 0
+    # No CronJob-only fields and no jobTemplate wrapper — the pod spec
+    # sits directly under spec.template.
+    assert "schedule" not in job["spec"]
+    assert "concurrencyPolicy" not in job["spec"]
+    assert "jobTemplate" not in job["spec"]
+    pod = job["spec"]["template"]["spec"]
+    assert pod["restartPolicy"] == "Never"
+    assert pod["containers"][0]["command"] == ["/bin/migrate"]
+    assert pod["containers"][0]["resources"]["requests"] == {"cpu": "50m", "memory": "64Mi"}
+    # A task should not get a Service or an HPA.
+    assert all(r["kind"] not in ("Service", "HorizontalPodAutoscaler") for r in out)
+
+
+def test_env_from_propagates_to_task_pods():
+    w = WorkloadManifest(
+        name="migrate",
+        kind="task",
+        containers=(_container(name="job", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="hello-prod",
+        image_tag="abc123",
+        image_repository="ghcr.io/acme/hello",
+        environment_name="prod",
+        env_from_secret_refs=["astrolift-bindings-hello"],
+    )
+    pod = next(r for r in out if r["kind"] == "Job")["spec"]["template"]["spec"]
+    assert pod["containers"][0]["envFrom"] == [
+        {"secretRef": {"name": "astrolift-bindings-hello"}},
+    ]
+
+
 # ---- envFrom injection (#353) ----------------------------------------
 
 

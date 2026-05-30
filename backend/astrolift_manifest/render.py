@@ -13,6 +13,8 @@ What this renderer covers today
   + a ``v1 Service`` per primary container with ``port > 0``.
 * ``workload.kind = cronjob`` → ``batch/v1 CronJob`` (requires
   ``schedule``).
+* ``workload.kind = task`` → ``batch/v1 Job`` (one-shot, runs once;
+  ``completions: 1`` / ``backoffLimit: 0`` / ``restartPolicy: Never``).
 * HPA when ``hpa_min`` / ``hpa_max`` are set on a deployment workload
   → ``autoscaling/v2 HorizontalPodAutoscaler``.
 * Healthchecks (``http`` / ``tcp`` / ``exec``) → ``livenessProbe``
@@ -132,6 +134,17 @@ def render_manifests(
                     env_from_secret_refs=env_from,
                 )
             )
+        elif w.kind == "task":
+            out.append(
+                _render_task(
+                    w,
+                    namespace=namespace,
+                    image_tag=image_tag,
+                    image_repository=image_repository,
+                    labels=wl_labels,
+                    env_from_secret_refs=env_from,
+                )
+            )
         # statefulset / job land in follow-up render modules.
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))
@@ -214,6 +227,51 @@ def _render_cronjob(
                             "restartPolicy": "OnFailure",
                         },
                     },
+                },
+            },
+        },
+    }
+
+
+def _render_task(
+    w: WorkloadManifest,
+    *,
+    namespace: str,
+    image_tag: str,
+    image_repository: str,
+    labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Render a ``task`` workload into a one-shot ``batch/v1 Job``.
+
+    Unlike the CronJob renderer there is no ``schedule`` or
+    ``concurrencyPolicy`` and no ``jobTemplate`` wrapper — the pod spec
+    sits directly under ``spec.template``. ``completions: 1`` /
+    ``backoffLimit: 0`` make this run exactly once with no retries, and
+    ``restartPolicy: Never`` surfaces a failed run as a failed Pod
+    rather than a crash-looping container.
+    """
+    return {
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": {
+            "name": w.name,
+            "namespace": namespace,
+            "labels": labels,
+        },
+        "spec": {
+            "completions": 1,
+            "backoffLimit": 0,
+            "template": {
+                "metadata": {"labels": labels},
+                "spec": {
+                    **_pod_spec(
+                        w,
+                        image_tag=image_tag,
+                        image_repository=image_repository,
+                        env_from_secret_refs=env_from_secret_refs,
+                    ),
+                    "restartPolicy": "Never",
                 },
             },
         },
