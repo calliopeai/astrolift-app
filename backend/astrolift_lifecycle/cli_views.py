@@ -334,6 +334,8 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     return JsonResponse(
         {
             "deployment_id": str(deployment.guid),
+            # workflow_id is what the CLI logs as "Deploy enqueued: <id>"
+            "workflow_id": wf_id,
             "workflow_run_id": handle.run_id if handle.enqueued else "",
             "polling_url": polling_url,
             "status": deployment.status,
@@ -342,25 +344,47 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
     )
 
 
+# Map Deployment.Status → CLI terminal state vocabulary.
+# The CLI polls for "state" and checks terminal set
+# {succeeded, completed, failed, cancelled, timed_out}.
+_STATUS_TO_CLI_STATE: dict[str, str] = {
+    "pending": "pending",
+    "pending_approval": "pending_approval",
+    "deploying": "deploying",
+    "running": "succeeded",  # terminal success
+    "failed": "failed",  # terminal failure
+    "aborted": "cancelled",  # terminal — aborted by signal
+}
+
+
 @require_http_methods(["GET"])
 def deployment_status(request: HttpRequest, guid: str) -> JsonResponse:
     """GET /api/cli/v1/deployments/<guid>/status/
 
     Return the current status of a deployment. The caller (``astro ci deploy``
-    in ``--wait`` mode) polls this until the status is terminal.
+    in ``--wait`` mode) polls this every 5s until the status is terminal.
 
-    Terminal statuses: ``running``, ``failed``, ``aborted``.
-    In-progress statuses: ``pending``, ``pending_approval``, ``deploying``.
+    The ``state`` field uses the CLI's terminal vocabulary:
+      * ``succeeded``  — deployment reached ``running`` status.
+      * ``failed``     — deployment failed.
+      * ``cancelled``  — deployment was aborted.
+      * ``pending`` / ``deploying`` — in-progress (not terminal).
+
+    The ``status`` field preserves the raw Deployment.Status value for
+    callers that need the platform-native vocabulary.
     """
     token, deployment, err = _resolve_deploy_token_for_deployment(request, guid)
     if err is not None:
         return err
 
+    raw_status = deployment.status
+    cli_state = _STATUS_TO_CLI_STATE.get(raw_status, raw_status)
+
     return JsonResponse(
         {
             "deployment_id": str(deployment.guid),
-            "status": deployment.status,
-            "message": deployment.status_message if hasattr(deployment, "status_message") else "",
+            "state": cli_state,  # CLI polls this field for terminal detection
+            "status": raw_status,  # platform-native value preserved
             "image_tag": deployment.image_tag,
             "commit_sha": deployment.commit_sha,
             "branch": deployment.branch,
