@@ -399,6 +399,29 @@ class EKSClusterDriver(ClusterDriver):
     # ---- workload status ------------------------------------------
 
     @driver_op(cloud="aws", driver="cluster")
+    def patch_workload(
+        self,
+        cluster: str,
+        namespace: str,
+        kind: str,
+        name: str,
+        patch: dict,
+    ) -> dict:
+        """Apply a JSON merge patch to a workload (Deployment).
+
+        Used for live ops: rollout restart (restart annotation) and
+        replica scaling. Returns the patched object.
+        """
+        if kind != "Deployment":
+            raise NotImplementedError(f"patch_workload only supports Deployment, got {kind!r}")
+        client = self._k8s(cluster)
+        return client.merge_patch_deployment(
+            namespace=namespace,
+            name=name,
+            patch=patch,
+        )
+
+    @driver_op(cloud="aws", driver="cluster")
     def get_workload_status(
         self,
         cluster: str,

@@ -605,3 +605,25 @@ class KubernetesDynamicClient:
         self._refresh_token()
         apps_v1 = self._client_module.AppsV1Api(self._api_client)
         return apps_v1.list_namespaced_deployment(namespace, **kwargs)
+
+    def merge_patch_deployment(
+        self,
+        *,
+        namespace: str,
+        name: str,
+        patch: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Apply a JSON merge patch to a namespaced Deployment.
+
+        Used for live ops: rolling restart (restart annotation) and
+        scale (spec.replicas). Returns the patched object as a dict.
+        """
+        self._refresh_token()
+        apps_v1 = self._client_module.AppsV1Api(self._api_client)
+        result = apps_v1.patch_namespaced_deployment(
+            name=name,
+            namespace=namespace,
+            body=patch,
+            _content_type="application/merge-patch+json",
+        )
+        return self._to_dict(result)
