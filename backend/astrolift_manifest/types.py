@@ -68,6 +68,15 @@ class WorkloadManifest:
     max_concurrent_activities: int = 20
     max_concurrent_workflows: int = 10
 
+    # ``kind == "function"`` — Knative Serving autoscaling parameters.
+    # ``min_scale = 0`` enables scale-to-zero. ``max_scale`` caps the
+    # replica count. ``concurrency`` is Knative ``containerConcurrency``.
+    # ``function_timeout_seconds`` is Knative ``timeoutSeconds``.
+    min_scale: int = 0
+    max_scale: int = 10
+    function_concurrency: int = 1
+    function_timeout_seconds: int = 300
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class ContainerManifest:

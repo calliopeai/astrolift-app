@@ -187,6 +187,17 @@ def render_manifests(
             hpa = _render_hpa(w, namespace=namespace, labels=wl_labels)
             if hpa is not None:
                 out.append(hpa)
+        elif w.kind == "function":
+            out.append(
+                _render_function(
+                    w,
+                    namespace=namespace,
+                    image_tag=image_tag,
+                    image_repository=image_repository,
+                    labels=wl_labels,
+                    env_from_secret_refs=env_from,
+                )
+            )
         # statefulset / job land in follow-up render modules.
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))
@@ -647,3 +658,80 @@ def _primary_container(w: WorkloadManifest) -> ContainerManifest | None:
         if c.is_primary:
             return c
     return w.containers[0] if w.containers else None
+
+
+def _render_function(
+    w: WorkloadManifest,
+    *,
+    namespace: str,
+    image_tag: str,
+    image_repository: str,
+    labels: dict[str, str],
+    env_from_secret_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Render a ``kind: function`` workload as a Knative Service.
+
+    Requires Knative Serving on the tenant cluster. The Service replaces
+    both the Deployment and HPA — Knative's autoscaler owns replica count
+    and implements scale-to-zero via ``min_scale = 0``.
+    """
+    primary = _primary_container(w)
+    if primary is None:
+        raise ValueError(f"function workload {w.name!r} has no containers")
+
+    image = (
+        primary.image_ref
+        if primary.image_ref
+        else f"{image_repository}:{image_tag}"
+    )
+    container_spec: dict[str, Any] = {
+        "image": image,
+        "resources": _resource_spec(w),
+    }
+    if primary.port > 0:
+        container_spec["ports"] = [{"containerPort": primary.port, "name": "http1"}]
+    if primary.command:
+        container_spec["command"] = list(primary.command)
+    if primary.args:
+        container_spec["args"] = list(primary.args)
+
+    env = list(primary.env)
+    if env_from_secret_refs:
+        container_spec["envFrom"] = [
+            {"secretRef": {"name": ref}} for ref in env_from_secret_refs
+        ]
+    if env:
+        container_spec["env"] = [{"name": k, "value": v} for k, v in env]
+
+    return {
+        "apiVersion": "serving.knative.dev/v1",
+        "kind": "Service",
+        "metadata": {
+            "name": w.name,
+            "namespace": namespace,
+            "labels": labels,
+            "annotations": {
+                "autoscaling.knative.dev/minScale": str(w.min_scale),
+                "autoscaling.knative.dev/maxScale": str(w.max_scale),
+            },
+        },
+        "spec": {
+            "template": {
+                "metadata": {
+                    "labels": {
+                        **labels,
+                        "astrolift.dev/workload-kind": "function",
+                    },
+                    "annotations": {
+                        "autoscaling.knative.dev/minScale": str(w.min_scale),
+                        "autoscaling.knative.dev/maxScale": str(w.max_scale),
+                    },
+                },
+                "spec": {
+                    "containerConcurrency": w.function_concurrency,
+                    "timeoutSeconds": w.function_timeout_seconds,
+                    "containers": [container_spec],
+                },
+            }
+        },
+    }
