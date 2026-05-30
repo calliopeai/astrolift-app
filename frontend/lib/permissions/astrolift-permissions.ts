@@ -70,6 +70,7 @@ export type AstroliftPermission =
   | "cluster.unregister"
   | "cluster.manage"
   | "provider_plugin.read"
+  | "provider_plugin.configure"
   // SCM integration
   | "scm.read"
   | "scm.connect"

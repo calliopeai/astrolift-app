@@ -1655,6 +1655,10 @@
         "title": "Provedores de código-fonte",
         "description": "Conecte GitHub / GitLab / Gitea + gerencie chaves SSH de deploy."
       },
+      "managedDomains": {
+        "title": "Domínios gerenciados",
+        "description": "Zonas DNS gerenciadas pela plataforma para apps de tenants e ambientes de preview."
+      },
       "policies": {
         "title": "Políticas ABAC",
         "description": "Predicados de runtime sobre o RBAC."
