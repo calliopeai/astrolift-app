@@ -90,6 +90,12 @@ class ScheduleKind(StrEnum):
     because ``last_seen_at`` is bumped by the session middleware on
     every authed request (#498)."""
 
+    EXPIRE_PENDING_APPROVAL_DEPLOYMENTS = "expire_pending_approval_deployments"
+    """Every 1 hr — auto-fail pending_approval Deployments whose
+    magic-link expiry (``approval_token_expires_at``) has passed
+    (#779, spec §06 §4.6). Prevents deployments from dangling
+    in pending_approval forever after the approval window closes."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -226,6 +232,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.PRUNE_STALE_SESSIONS,
         ),
         description="Soft-revoke stale AstroliftSession rows (#498)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.EXPIRE_PENDING_APPROVAL_DEPLOYMENTS,
+        workflow_name="ExpirePendingApprovalDeploymentsWorkflow",
+        interval_seconds=60 * 60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.EXPIRE_PENDING_APPROVAL_DEPLOYMENTS,
+        ),
+        description="Auto-fail pending_approval deployments past magic-link expiry (#779)",
     ),
 )
 
