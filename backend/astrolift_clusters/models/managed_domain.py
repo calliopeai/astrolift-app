@@ -45,3 +45,39 @@ class ManagedDomain(BaseCoreModel):
                 name="managed_domain_zone_unique_active",
             ),
         ]
+
+
+def resolve_managed_domain(
+    organization: object | None,
+    for_preview: bool = False,
+) -> ManagedDomain | None:
+    """Return the best ManagedDomain for a new AppEnvironment.
+
+    Resolution order:
+    1. ``organization.default_managed_domain`` when set and not deleted.
+    2. A platform-level domain (``organization=None``) whose
+       ``default_for`` covers the requested use-case.
+    3. ``None`` — no managed domain; the env gets no platform hostname.
+
+    ``for_preview=True`` matches ``preview_envs`` and ``both``;
+    ``for_preview=False`` (default) matches ``tenant_apps`` and ``both``.
+    """
+    if organization is not None:
+        org_default = getattr(organization, "default_managed_domain", None)
+        if org_default is not None and getattr(org_default, "deleted_at", None) is None:
+            return org_default  # type: ignore[return-value]
+
+    target_values = (
+        [ManagedDomain.DefaultFor.PREVIEW_ENVS, ManagedDomain.DefaultFor.BOTH]
+        if for_preview
+        else [ManagedDomain.DefaultFor.TENANT_APPS, ManagedDomain.DefaultFor.BOTH]
+    )
+    return (
+        ManagedDomain.objects.filter(
+            organization__isnull=True,
+            default_for__in=target_values,
+            deleted_at__isnull=True,
+        )
+        .order_by("pk")
+        .first()
+    )
