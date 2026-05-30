@@ -27,6 +27,7 @@ with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.scheduled import (
         capture_platform_cost_snapshot,
         detect_drift,
+        expire_pending_approval_deployments,
         gc_stale_previews,
         poll_scheduled_job_runs,
         prune_audit_log,
@@ -148,3 +149,16 @@ class PruneStaleSessionsWorkflow:
             ok=True,
             message=f"pruned {n} stale session{'' if n == 1 else 's'}",
         )
+
+
+@workflow.defn(name="ExpirePendingApprovalDeploymentsWorkflow")
+class ExpirePendingApprovalDeploymentsWorkflow:
+    """Auto-fail pending_approval deployments past their magic-link expiry."""
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            expire_pending_approval_deployments,
+            start_to_close_timeout=_TIMEOUT,
+        )
+        return WorkflowResult(ok=True, message=f"expired {n} pending approval deployment(s)")
