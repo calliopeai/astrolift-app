@@ -71,7 +71,6 @@ from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 
 
-@strawberry.type
 @strawberry.type(name="AstroliftUserProfile")
 class UserProfileType:
     id: str
@@ -84,6 +83,7 @@ class MeType:
     profile: UserProfileType | None
 
 
+@strawberry.type
 class IdentityQuery:
     @strawberry.field
     def me(self, info: Info) -> MeType | None:
