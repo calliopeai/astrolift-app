@@ -148,12 +148,6 @@ const sections: NavSection[] = [
         permission: "app.read",
       },
       {
-        label: "Workflows",
-        href: "/workflows",
-        icon: <WorkflowIcon />,
-        permission: "app.read",
-      },
-      {
         label: "Jobs",
         href: "/jobs",
         icon: <CalendarClockIcon />,
