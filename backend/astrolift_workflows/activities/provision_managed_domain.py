@@ -49,18 +49,38 @@ def _get_cluster_and_dns_driver(cluster_id: int) -> tuple[Any, Any]:
 
 
 def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
-    _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
+    from astrolift_clusters.models import ManagedDomain, TenantCluster
+
+    cluster, dns_driver = _get_cluster_and_dns_driver(cluster_id)
     result = dns_driver.provision_zone(zone)
-    return {
-        "zone_id": result.get("zone_id", ""),
-        "nameservers": result.get("nameservers", []),
-    }
+    zone_id: str = result.get("zone_id", "")
+    nameservers: list = result.get("nameservers", [])
+
+    plugin_slug = cluster.provider_plugin.slug
+    existing = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    if existing is not None:
+        existing.provision_state = "validate_ns_delegation"
+        existing.provision_nameservers = nameservers
+        existing.save(update_fields=["provision_state", "provision_nameservers", "updated_at", "version"])
+    else:
+        ManagedDomain.objects.create(
+            zone=zone,
+            dns_driver=plugin_slug,
+            dns_config={},
+            is_wildcard_managed=True,
+            default_for=ManagedDomain.DefaultFor.NONE,
+            provision_state="validate_ns_delegation",
+            provision_nameservers=nameservers,
+        )
+
+    return {"zone_id": zone_id, "nameservers": nameservers}
 
 
 @activity.defn(name="astrolift.managed_domain.provision_dns_zone")
 async def provision_dns_zone(cluster_id: int, zone: str) -> dict[str, Any]:
-    """Create the hosted zone via the cluster's DnsDriver. Returns
-    ``{"zone_id": str, "nameservers": list[str]}``."""
+    """Create the hosted zone via the cluster's DnsDriver, persist NS records
+    to ManagedDomain, and set provision_state='validate_ns_delegation'.
+    Returns ``{"zone_id": str, "nameservers": list[str]}``."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
@@ -76,14 +96,17 @@ async def provision_dns_zone(cluster_id: int, zone: str) -> dict[str, Any]:
 
 
 def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str:
+    from astrolift_clusters.models import ManagedDomain
+
     _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
     result = dns_driver.request_wildcard_cert(zone, zone_id)
     cert_id: str = result.get("cert_id", "")
+    validation_records: list = result.get("validation_records", [])
 
     # Write each DNS-01 CNAME validation record the cert authority
     # requires. The driver returns them as a list of
     # {"name": str, "value": str} dicts (CNAME target).
-    for record in result.get("validation_records", []):
+    for record in validation_records:
         try:
             dns_driver.ensure_record(
                 zone=zone,
@@ -98,6 +121,17 @@ def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str
                 record.get("name"),
                 exc,
             )
+
+    # Persist cert state so the UI can surface CNAME records immediately.
+    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    if domain is not None:
+        domain.provision_cert_id = cert_id
+        domain.provision_validation_records = validation_records
+        domain.provision_state = "configure_cert_policy"
+        domain.save(update_fields=[
+            "provision_cert_id", "provision_validation_records",
+            "provision_state", "updated_at", "version",
+        ])
 
     return cert_id
 
@@ -173,7 +207,11 @@ def _register_managed_domain_row_sync(
         existing.dns_driver = plugin_slug
         existing.dns_config = dns_config
         existing.is_wildcard_managed = True
-        existing.save(update_fields=["dns_driver", "dns_config", "is_wildcard_managed", "updated_at", "version"])
+        existing.provision_state = "register_managed_domain"
+        existing.save(update_fields=[
+            "dns_driver", "dns_config", "is_wildcard_managed",
+            "provision_state", "updated_at", "version",
+        ])
         return existing.pk
 
     domain = ManagedDomain.objects.create(
@@ -182,6 +220,7 @@ def _register_managed_domain_row_sync(
         dns_config=dns_config,
         is_wildcard_managed=True,
         default_for=ManagedDomain.DefaultFor.NONE,
+        provision_state="register_managed_domain",
     )
     return domain.pk
 
@@ -216,20 +255,14 @@ def _mark_active_sync(cluster_id: int, zone: str) -> None:
         zone=zone,
         deleted_at__isnull=True,
     ).get()
-    # ManagedDomain inherits BaseCoreModel which doesn't have is_active —
-    # the field is is_wildcard_managed + dns_config for capability; the
-    # "active" semantic is modelled in dns_config or caller convention.
-    # Use dns_config["active"] = True as the flag the workflow sets.
-    cfg = dict(domain.dns_config or {})
-    cfg["active"] = True
-    domain.dns_config = cfg
-    domain.save(update_fields=["dns_config", "updated_at", "version"])
+    domain.provision_state = "mark_active"
+    domain.save(update_fields=["provision_state", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.managed_domain.mark_active")
 async def mark_managed_domain_active(cluster_id: int, zone: str) -> None:
-    """Set ``dns_config["active"] = True`` on the ManagedDomain row so
-    the platform treats the zone as live."""
+    """Set ``provision_state='mark_active'`` on the ManagedDomain row so
+    the platform and UI treat the zone as fully provisioned."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
