@@ -30,7 +30,8 @@ export type SourceKind = "github" | "gitlab" | "bitbucket" | "gitea" | "git_url"
 
 export type TriggerMode = "auto_on_push" | "manual" | "external_ci" | "cron";
 
-export type WorkloadKind = "deployment" | "statefulset" | "job" | "cronjob";
+// "agent" was added in backend migration 0022 (#792, #795).
+export type WorkloadKind = "deployment" | "statefulset" | "job" | "cronjob" | "agent";
 
 export type ManifestSyncState = "in_sync" | "db_ahead" | "repo_ahead" | "diverged";
 
