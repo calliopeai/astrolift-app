@@ -110,10 +110,33 @@ class IdentityQuery:
         return organization_to_type(org)
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
-    @tenant_scoped()
     def astrolift_organizations(self, info: Info) -> list[OrganizationType]:
-        return [organization_to_type(o) for o in Organization.objects.all()[:100]]
+        """Return the organizations accessible to the current user.
+
+        Not wrapped with @tenant_scoped() because this is the bootstrap
+        resolver — the frontend calls it to discover which org to set as
+        the active tenant. Requiring a tenant context here creates a
+        chicken-and-egg: you need the org to get the org.
+
+        Superusers see all orgs. Regular users see only orgs they are
+        active members of.
+        """
+        request = info.context.request
+        user = getattr(request, "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            return []
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            orgs = Organization.objects.filter(deleted_at__isnull=True).order_by("name")[:100]
+        else:
+            from astrolift_identity.models import Member
+
+            member_org_ids = (
+                Member.objects.filter(user_id=user.pk, scope_kind="ORG", is_active=True)
+                .values_list("scope_id", flat=True)
+                .distinct()
+            )
+            orgs = Organization.objects.filter(pk__in=member_org_ids, deleted_at__isnull=True).order_by("name")[:100]
+        return [organization_to_type(o) for o in orgs]
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ)
