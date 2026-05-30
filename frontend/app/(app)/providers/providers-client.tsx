@@ -5,6 +5,8 @@ import { CheckCircle2Icon, CloudIcon, XCircleIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { ViewToggle } from "@/components/ViewToggle";
+import { useViewToggle } from "@/hooks/use-view-toggle";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -24,11 +26,13 @@ interface Resp {
 export function ProvidersClient() {
   const { data, loading } = useQuery<Resp>(LIST_PROVIDER_PLUGINS);
   const list = data?.astroliftProviderPlugins ?? [];
+  const [viewMode, setViewMode] = useViewToggle("astrolift_view_providers", "card");
 
   return (
     <PageShell
       title="Provider plugins"
       description="Driver implementations registered with the platform — per-cloud bundles of ClusterDriver, IngressDriver, DnsDriver, and so on."
+      actions={<ViewToggle mode={viewMode} onChange={setViewMode} />}
     >
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -45,6 +49,28 @@ export function ProvidersClient() {
             />
           </CardContent>
         </Card>
+      ) : viewMode === "list" ? (
+        <div className="flex flex-col gap-1">
+          {list.map((p) => {
+            const drivers = Object.keys(p.capabilitiesManifest ?? {});
+            return (
+              <div key={p.id} className="hover:bg-accent/50 flex items-center gap-3 rounded-md border px-4 py-2.5 transition-colors">
+                {p.isEnabled ? (
+                  <CheckCircle2Icon className="text-emerald-600 size-4 shrink-0" />
+                ) : (
+                  <XCircleIcon className="text-muted-foreground size-4 shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium">{p.name}</span>
+                  <span className="text-muted-foreground ml-2 font-mono text-xs">{p.slug} · v{p.version}</span>
+                </div>
+                <Badge variant="outline" className="shrink-0 text-xs">
+                  {drivers.length} driver{drivers.length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {list.map((p) => {

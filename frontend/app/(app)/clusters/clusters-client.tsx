@@ -20,6 +20,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
+import { ViewToggle } from "@/components/ViewToggle";
+import { useViewToggle } from "@/hooks/use-view-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -119,6 +121,7 @@ function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: st
 
 export function ClustersClient() {
   const fmt = useFormatters();
+  const [viewMode, setViewMode] = useViewToggle("astrolift_view_clusters", "card");
   const [open, setOpen] = React.useState(false);
   const [unregisterTarget, setUnregisterTarget] = React.useState<AstroliftTenantCluster | null>(
     null
@@ -318,14 +321,45 @@ export function ClustersClient() {
       title="Clusters"
       description="Tenant Kubernetes clusters registered with the platform. Register a cluster to record its metadata, then click Bring into management when its prereqs (cert-manager, ingress controller) are installed."
       actions={
-        <Can permission="cluster.register">
-          <Button onClick={() => setOpen(true)}>
-            <PlusIcon className="size-4" />
-            Register cluster
-          </Button>
-        </Can>
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <Can permission="cluster.register">
+            <Button onClick={() => setOpen(true)}>
+              <PlusIcon className="size-4" />
+              Register cluster
+            </Button>
+          </Can>
+        </div>
       }
     >
+      {/* Card view */}
+      {viewMode === "card" && list.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {list.map((c) => (
+            <a key={c.id} href={`/clusters/${c.slug}`} className="block">
+              <Card className="hover:bg-accent/30 transition-colors">
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{c.name}</div>
+                      <div className="text-muted-foreground font-mono text-xs">{c.slug}</div>
+                    </div>
+                    <StatusDot status={c.isActive ? "ok" : "muted"} />
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Badge variant="outline">{c.providerPluginSlug}</Badge>
+                    <Badge variant="secondary">{c.region || "—"}</Badge>
+                    <Badge variant="outline">{c.ingressClass}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {/* List view (table) — also used during loading and empty states */}
+      {(viewMode === "list" || list.length === 0 || loading) && (
       <Card>
         <CardContent className="p-0">
           {loading && list.length === 0 ? (
@@ -451,6 +485,7 @@ export function ClustersClient() {
           )}
         </CardContent>
       </Card>
+      )}
 
       <RegisterClusterDialog open={open} onOpenChange={setOpen} />
 
