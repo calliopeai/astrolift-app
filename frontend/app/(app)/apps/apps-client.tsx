@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { ViewToggle } from "@/components/ViewToggle";
+import { useViewToggle } from "@/hooks/use-view-toggle";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,6 +147,7 @@ function pillFromParam(value: string | null): Pill {
 
 export function AppsClient() {
   const t = useTranslations("apps.list");
+  const [viewMode, setViewMode] = useViewToggle("astrolift_view_apps", "card");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -375,14 +378,17 @@ export function AppsClient() {
       title={t("title")}
       description={t("description")}
       actions={
-        <Can permission="app.create">
-          <Button asChild>
-            <Link href="/apps/new">
-              <PlusIcon className="size-4" />
-              {t("register")}
-            </Link>
-          </Button>
-        </Can>
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
+          <Can permission="app.create">
+            <Button asChild>
+              <Link href="/apps/new">
+                <PlusIcon className="size-4" />
+                {t("register")}
+              </Link>
+            </Button>
+          </Can>
+        </div>
       }
     >
       {error && (
@@ -568,10 +574,36 @@ export function AppsClient() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className={viewMode === "card" ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3" : "flex flex-col gap-1"}>
             {apps.map((app) => {
               const isPinned = pinnedSet.has(app.slug);
               const isSelected = selectedSlugs.has(app.slug);
+
+              // ── List row ─────────────────────────────────────────────
+              if (viewMode === "list") {
+                return (
+                  <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
+                    <div className="hover:bg-accent/50 flex items-center gap-3 rounded-md border px-4 py-2.5 transition-colors">
+                      <StatusDot status={statusDot[app.provisioningStatus]} />
+                      <div className="min-w-0 flex-1">
+                        <span className="truncate font-medium">{app.name}</span>
+                        <span className="text-muted-foreground ml-2 font-mono text-xs">{app.slug}</span>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 text-xs">
+                        {app.provisioningStatus}
+                      </Badge>
+                      {app.latestDeployment && (
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          {app.latestDeployment.imageTag}
+                        </span>
+                      )}
+                      <ExternalLinkIcon className="text-muted-foreground size-3.5 shrink-0" />
+                    </div>
+                  </Link>
+                );
+              }
+
+              // ── Card ──────────────────────────────────────────────────
               return (
               <Link key={app.id} href={`/apps/${app.slug}`} className="contents">
                 <Card className="hover:bg-accent/30 group relative transition-colors">
