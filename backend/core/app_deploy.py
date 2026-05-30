@@ -244,7 +244,7 @@ def render_resources_for_deployment(deployment: Deployment) -> list[dict[str, An
 
 
 def _render_managed_subdomain_ingress(
-    deployment: "Deployment",
+    deployment: Deployment,
     manifest: Any,
     namespace: str,
     managed_domain: Any,
@@ -254,9 +254,13 @@ def _render_managed_subdomain_ingress(
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
 
     app = deployment.registered_app
-    org_slug = app.organization.slug if app.organization_id else ""
-    if not org_slug:
-        return []
+    org_slug = app.organization.slug if app.organization_id else "none"
+
+    log.info(
+        "render_managed_subdomain_ingress: app=%s org_slug=%s managed_domain=%s ingress_class=%s",
+        app.slug, org_slug, getattr(managed_domain, "zone", None),
+        getattr(cluster, "ingress_class", None),
+    )
 
     computed = compute_hostnames(
         manifest,
@@ -266,6 +270,7 @@ def _render_managed_subdomain_ingress(
             base_zone=managed_domain.zone,
         ),
     )
+    log.info("render_managed_subdomain_ingress: computed hostnames=%s", [h.hostname for h in computed])
     if not computed:
         return []
 
