@@ -5,6 +5,7 @@ from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.dev_environment import DevEnvironment
 from astrolift_lifecycle.models.environment_setting import EnvironmentSetting
+from astrolift_lifecycle.models.function_invocation import FunctionInvocation
 from astrolift_lifecycle.models.ingress import (
     CustomDomain,
     DomainPathRoute,
@@ -28,6 +29,7 @@ __all__ = [
     "DomainPathRoute",
     "DomainRedirectRule",
     "EnvironmentSetting",
+    "FunctionInvocation",
     "IngressRule",
     "PreviewEnvironment",
     "ProjectIngress",
