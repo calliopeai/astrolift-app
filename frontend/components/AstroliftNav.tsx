@@ -3,6 +3,7 @@
 import {
   ActivityIcon,
   BarChart3Icon,
+  BellIcon,
   BookOpenIcon,
   BoxIcon,
   CalendarClockIcon,
@@ -120,7 +121,8 @@ const sections: NavSection[] = [
   },
   {
     // Observe — passive visibility: live ops dashboard, event stream,
-    // audit trail, and cross-app metrics. Read-only surfaces.
+    // cross-app metrics, and operational alerts. Read-only surfaces.
+    // Audit (governance evidence) lives in Control / Org Governance.
     label: "Observe",
     items: [
       {
@@ -136,16 +138,16 @@ const sections: NavSection[] = [
         permission: "audit_log.read",
       },
       {
-        label: "Audit",
-        href: "/audit",
-        icon: <ScrollTextIcon />,
-        permission: "audit_log.read",
-      },
-      {
         label: "Metrics",
         href: "/metrics",
         icon: <BarChart3Icon />,
         permission: { anyOf: ["app.read", "app.read_metrics"] },
+      },
+      {
+        label: "Alerts",
+        href: "/alerts",
+        icon: <BellIcon />,
+        permission: "org.read",
       },
     ],
   },
