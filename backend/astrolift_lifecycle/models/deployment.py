@@ -264,3 +264,18 @@ class Deployment(BaseCoreModel):
             import logging
 
             logging.getLogger(__name__).warning("deployment.lifecycle publish failed", exc_info=True)
+
+        # Append a log entry for every status transition so the deployment
+        # detail page lifecycle log is non-empty and operators can audit
+        # the exact times each phase was reached.
+        try:
+            from astrolift_lifecycle.models.deployment_log import DeploymentLog
+
+            DeploymentLog.objects.create(
+                deployment=self,
+                status=new_status.value,
+            )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning("DeploymentLog write failed", exc_info=True)
