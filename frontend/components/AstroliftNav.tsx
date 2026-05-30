@@ -4,6 +4,9 @@ import {
   ActivityIcon,
   BarChart3Icon,
   BellIcon,
+  GitBranchIcon,
+  LayoutDashboardIcon,
+  ScrollIcon,
   BookOpenIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
@@ -16,7 +19,6 @@ import {
   GitPullRequestIcon,
   CloudIcon,
   DownloadIcon,
-  GaugeIcon,
   GlobeIcon,
   KeyRoundIcon,
   LayersIcon,
@@ -155,28 +157,40 @@ const sections: NavSection[] = [
     ],
   },
   {
-    // Observe — passive visibility: live ops dashboard, event stream,
-    // cross-app metrics, and operational alerts. Read-only surfaces.
+    // Observe — passive visibility across the signal pyramid:
+    // SLO dashboard → Metrics → Logs → Traces → Events → Alerts.
     // Audit (governance evidence) lives in Control / Org Governance.
     label: "Observe",
     items: [
       {
-        label: "Ops dashboard",
+        label: "Dashboard",
         href: "/ops",
-        icon: <GaugeIcon />,
+        icon: <LayoutDashboardIcon />,
         permission: "org.read",
-      },
-      {
-        label: "Events",
-        href: "/events",
-        icon: <ActivityIcon />,
-        permission: "audit_log.read",
       },
       {
         label: "Metrics",
         href: "/metrics",
         icon: <BarChart3Icon />,
         permission: { anyOf: ["app.read", "app.read_metrics"] },
+      },
+      {
+        label: "Logs",
+        href: "/logs",
+        icon: <ScrollIcon />,
+        permission: "app.read_logs",
+      },
+      {
+        label: "Traces",
+        href: "/traces",
+        icon: <GitBranchIcon />,
+        permission: "app.read",
+      },
+      {
+        label: "Events",
+        href: "/events",
+        icon: <ActivityIcon />,
+        permission: "audit_log.read",
       },
       {
         label: "Alerts",
