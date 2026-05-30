@@ -89,6 +89,7 @@ from astrolift_workflows.activities import (
 )
 from astrolift_workflows.workflows import (
     BringClusterIntoManagementWorkflow,
+    BuildPreviewWorkflow,
     CapturePlatformCostSnapshotWorkflow,
     CreateDevEnvironmentWorkflow,
     CronDeployTickWorkflow,
@@ -121,6 +122,7 @@ from astrolift_workflows.workflows import (
 
 WORKFLOWS = (
     BringClusterIntoManagementWorkflow,
+    BuildPreviewWorkflow,
     CapturePlatformCostSnapshotWorkflow,
     CreateDevEnvironmentWorkflow,
     CronDeployTickWorkflow,
