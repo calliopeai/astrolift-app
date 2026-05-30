@@ -97,11 +97,17 @@ def _task_queue() -> str:
 @async_to_sync
 async def _start(workflow: str, *, args: list[Any], workflow_id: str, task_queue: str) -> tuple[str, str]:
     client = await _get_client_async()
+    from temporalio.common import WorkflowIDReusePolicy
+
     handle = await client.start_workflow(
         workflow,
         *args,
         id=workflow_id,
         task_queue=task_queue,
+        # Supersede any still-running workflow with the same ID so a
+        # new deploy can always start even if the previous one is mid-
+        # cancel (e.g. operator aborted but Temporal hasn't drained yet).
+        id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
     )
     return handle.id, handle.result_run_id or handle.first_execution_run_id or ""
 
