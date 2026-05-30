@@ -38,6 +38,7 @@ from astrolift_workflows.workflows.rollback_deployment import RollbackDeployment
 from astrolift_workflows.workflows.scheduled import (
     CapturePlatformCostSnapshotWorkflow,
     DriftDetectionWorkflow,
+    ExpirePendingApprovalDeploymentsWorkflow,
     PollScheduledJobRunsWorkflow,
     PreviewGarbageCollectWorkflow,
     PruneAuditLogWorkflow,
@@ -68,6 +69,7 @@ __all__ = [
     "DeprovisionManagedServiceWorkflow",
     "DeregisterAppWorkflow",
     "DriftDetectionWorkflow",
+    "ExpirePendingApprovalDeploymentsWorkflow",
     "InstallClusterPrereqsWorkflow",
     "MigrateAppWorkflow",
     "NamespaceProvisionWorkflow",

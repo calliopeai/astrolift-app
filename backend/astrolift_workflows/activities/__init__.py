@@ -103,6 +103,7 @@ from astrolift_workflows.activities.migration import (
 from astrolift_workflows.activities.scheduled import (
     capture_platform_cost_snapshot,
     detect_drift,
+    expire_pending_approval_deployments,
     gc_stale_previews,
     poll_scheduled_job_runs,
     prune_audit_log,
@@ -145,6 +146,7 @@ __all__ = [
     "drain_source_cluster",
     "ensure_cluster_drained",
     "ensure_platform_managed_records",
+    "expire_pending_approval_deployments",
     "finalize_managed_service_deletion",
     "gc_stale_previews",
     "health_check",

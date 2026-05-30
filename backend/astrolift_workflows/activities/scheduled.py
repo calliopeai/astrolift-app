@@ -622,9 +622,55 @@ async def prune_stale_sessions() -> int:
     return await sync_to_async(_prune_stale_sessions_sync)()
 
 
+# ---- Approval timeout sweep (#779) --------------------------------
+
+
+def _expire_pending_approval_deployments_sync() -> int:
+    """Transition pending_approval Deployments past their magic-link expiry
+    to failed with reason ``approval_timeout``.
+
+    Called hourly by ``ExpirePendingApprovalDeploymentsWorkflow``. The
+    approval policy (``astrolift_lifecycle.approval``) sets the magic-link
+    expiry at 7 days by default; operators can configure per-environment
+    approval_timeout_seconds. We use ``approval_token_expires_at`` as the
+    deadline — it's set by the same policy and is already persisted.
+
+    Returns the count of deployments transitioned.
+    """
+    from django.utils import timezone
+
+    from astrolift_lifecycle.models import Deployment
+
+    now = timezone.now()
+    expired = Deployment.objects.filter(
+        status=Deployment.Status.PENDING_APPROVAL.value,
+        approval_token_expires_at__lt=now,
+        deleted_at__isnull=True,
+    )
+    n = 0
+    for deployment in expired.iterator():
+        deployment.aborted_reason = "approval_timeout"
+        deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
+        deployment.transition_to(Deployment.Status.FAILED)
+        n += 1
+    return n
+
+
+@activity.defn(name="astrolift.scheduled.expire_pending_approval_deployments")
+async def expire_pending_approval_deployments() -> int:
+    """Auto-fail pending_approval deployments past their magic-link expiry."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    n = await sync_to_async(_expire_pending_approval_deployments_sync)()
+    log.info("expire_pending_approval_deployments: transitioned %d deployment(s) to failed", n)
+    return n
+
+
 __all__ = [
     "capture_platform_cost_snapshot",
     "detect_drift",
+    "expire_pending_approval_deployments",
     "gc_stale_previews",
     "poll_scheduled_job_runs",
     "prune_audit_log",
