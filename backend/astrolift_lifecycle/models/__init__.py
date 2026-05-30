@@ -1,3 +1,4 @@
+from astrolift_lifecycle.models.agent_run import AgentRun
 from astrolift_lifecycle.models.app_environment import AppEnvironment
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
@@ -13,8 +14,10 @@ from astrolift_lifecycle.models.ingress import (
 )
 from astrolift_lifecycle.models.jobs import CommandRun, ScheduledJobRun
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
+from astrolift_lifecycle.models.task_run import TaskRun
 
 __all__ = [
+    "AgentRun",
     "AppEnvironment",
     "CommandRun",
     "CustomDomain",
@@ -29,4 +32,5 @@ __all__ = [
     "PreviewEnvironment",
     "ProjectIngress",
     "ScheduledJobRun",
+    "TaskRun",
 ]
