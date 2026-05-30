@@ -141,6 +141,13 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "hpa_target_cpu_pct": w.hpa_target_cpu_pct,
         "storage_class": w.storage_class,
         "storage_size": w.storage_size,
+        # Agent dispatch tuning (#795) participates in the manifest hash
+        # so a change to e.g. ``max_retries`` is detected as a real change
+        # rather than collapsing to a silent no-op deploy. Only meaningful
+        # on ``kind == "agent"`` workloads; defaults elsewhere.
+        "max_retries": w.max_retries,
+        "tool_timeout_seconds": w.tool_timeout_seconds,
+        "result_ttl_hours": w.result_ttl_hours,
         # Temporal worker config (#796) participates in the manifest hash
         # so a change to e.g. ``task_queue`` is detected as a real change
         # rather than collapsing to a silent no-op deploy. Only set on
