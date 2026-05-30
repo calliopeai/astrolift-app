@@ -26,8 +26,15 @@ interface OrganizationsResp {
  * a future customer asks. See #269.
  */
 export function useActiveOrg() {
+  // cache-and-network (not cache-first) so the client always fetches fresh
+  // data from the backend. The server-side PreloadQuery runs unauthenticated
+  // (Next.js server → Django backend, no session cookie forwarded), so it
+  // seeds an empty Apollo cache. cache-first would read that empty result and
+  // never re-fetch, locking the user in "control plane" mode. cache-and-network
+  // uses the cached value immediately for fast first paint, then overwrites it
+  // with the live network result — fixing the org context on every mount.
   const { data, loading, error } = useQuery<OrganizationsResp>(LIST_ORGANIZATIONS, {
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
   });
   const org = data?.astroliftOrganizations[0] ?? null;
 
