@@ -647,7 +647,9 @@
         "pressStream": "Press \"Stream\" to start tailing.",
         "pickPod": "Pick a pod above first.",
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI"
+        "installCli": "Install the CLI",
+        "export": "ログをエクスポート",
+        "exportTitle": "バッファーされたログをダウンロード可能なファイルとしてエクスポート"
       },
       "title": "{name} · Observability",
       "description": "{slug} · pod state and log stream from the runtime cluster",
@@ -666,6 +668,30 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "logExport": {
+        "title": "ログをエクスポート",
+        "description": "{pod} のバッファーされたログをダウンロード可能なファイルとしてエクスポートします。",
+        "descriptionNoPod": "エクスポートの範囲を絞り込むには、上からポッドを選択してください。",
+        "formatLabel": "フォーマット",
+        "formatPlaceholder": "フォーマットを選択",
+        "formatTxt": "プレーンテキスト",
+        "formatNdjson": "NDJSON",
+        "formatCsv": "CSV",
+        "sinceLabel": "開始日時",
+        "untilLabel": "終了日時",
+        "levelLabel": "ログレベル",
+        "levelPlaceholder": "例: error",
+        "regexLabel": "正規表現フィルター",
+        "regexPlaceholder": "例: Exception",
+        "submittingButton": "エクスポート中…",
+        "submitButton": "エクスポート",
+        "missingPod": "エクスポートの前にポッドを選択してください。",
+        "toastStart": "ログエクスポートを準備中…",
+        "toastReady": "ログエクスポート完了 · {rows} 行 · {format}",
+        "toastReadyTruncated": "ログエクスポート完了 · {rows} 行 · {format}（切り詰め済み）",
+        "toastDownload": "ダウンロード",
+        "toastFailure": "ログエクスポートに失敗しました"
       }
     },
     "tokens": {
@@ -1490,6 +1516,12 @@
         "keyCountUnknown": "?",
         "orderHint": "lowest-first; app literals override",
         "perEnvBadge": "{env}"
+      },
+      "pendingProposals": {
+        "title": "{count, plural, one {# 件の保留中のシークレット変更提案} other {# 件の保留中のシークレット変更提案}}",
+        "appWide": "アプリ全体",
+        "votes": "{received}/{required} 件の承認",
+        "seeAll": "すべての {count} 件の提案を表示 →"
       }
     },
     "security": {
@@ -2171,6 +2203,23 @@
         "copyFailed": "コピー失敗 — 手動で選択してコピーしてください"
       }
     },
+    "secretProposalsQueue": {
+      "title": "シークレット変更提案",
+      "empty": {
+        "title": "保留中の提案はありません",
+        "description": "オペレーターが承認を必要とする変更を提案すると、シークレット変更提案がここに表示されます。"
+      },
+      "row": {
+        "appWide": "アプリ全体",
+        "typeBadge": "シークレット変更",
+        "opLabel": "{op}",
+        "approvalsCount": "{received}/{required} 件の承認",
+        "summary": "{summary}",
+        "proposer": "{name} による",
+        "received": "{rel} に受信",
+        "review": "確認"
+      }
+    },
     "deployments": {
       "title": "Deployments",
       "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
@@ -2502,6 +2551,65 @@
       "passwordRequired": "パスワードを入力してください。",
       "generic": "パスワードを確認できませんでした。もう一度お試しください。",
       "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
+    }
+  },
+  "approvals": {
+    "secretProposalDetail": {
+      "loading": {
+        "title": "シークレット提案"
+      },
+      "notFound": {
+        "title": "提案が見つかりません",
+        "description": "提案が存在しないか、表示する権限がありません。"
+      },
+      "title": "{app} → {env}",
+      "appWide": "アプリ全体",
+      "opLabel": "{op}",
+      "approvalsCount": "{received}/{required} 件の承認",
+      "proposedBy": "{name} による提案 · {rel}",
+      "unknownProposer": "不明",
+      "expiresIn": "{rel} に期限切れ",
+      "applyError": "適用エラー: {message}",
+      "withdraw": "撤回",
+      "reject": "拒否",
+      "approve": "承認",
+      "confirmApprove": {
+        "title": "このシークレット変更を承認しますか？",
+        "description": "必要な承認が揃い次第、変更が適用されます。",
+        "confirm": "承認"
+      },
+      "confirmReject": {
+        "title": "このシークレット変更を拒否しますか？",
+        "description": "提案は拒否済みとしてマークされ、変更は適用されません。",
+        "reasonLabel": "拒否の理由",
+        "reasonPlaceholder": "この提案を拒否する理由は何ですか？",
+        "reasonRequired": "理由が必要です",
+        "confirm": "拒否"
+      },
+      "confirmWithdraw": {
+        "title": "この提案を撤回しますか？",
+        "description": "提案はキャンセルされ、変更は適用されません。",
+        "confirm": "撤回"
+      },
+      "toasts": {
+        "approveOk": "提案が承認されました。",
+        "approveFailed": "承認に失敗しました。",
+        "rejectOk": "提案が拒否されました。",
+        "rejectFailed": "拒否に失敗しました。",
+        "withdrawOk": "提案が撤回されました。",
+        "withdrawFailed": "撤回に失敗しました。"
+      },
+      "diff": {
+        "title": "提案された変更",
+        "before": "変更前",
+        "after": "変更後",
+        "maskNote": "シークレットの値はマスクされています — この画面からは生のコンテンツは返されません。"
+      },
+      "approvers": {
+        "title": "承認",
+        "empty": "まだ承認が記録されていません。",
+        "unknownApprover": "不明"
+      }
     }
   }
 }
