@@ -41,6 +41,25 @@ def app_urls(app) -> list[str]:
         if normalized:
             urls.append(normalized)
 
+    # Managed-domain hostname: <subdomain>.<zone> from the platform ManagedDomain.
+    # This is the canonical public URL after the managed-domain setup.
+    if app.subdomain:
+        try:
+            from astrolift_clusters.models import resolve_managed_domain
+
+            org = getattr(app, "organization", None)
+            if org is None and app.organization_id:
+                from astrolift_identity.models import Organization
+
+                org = Organization.objects.filter(pk=app.organization_id).first()
+            md = resolve_managed_domain(org, for_preview=False)
+            if md:
+                managed_url = _normalize(f"https://{app.subdomain}.{md.zone}/")
+                if managed_url:
+                    urls.append(managed_url)
+        except Exception:
+            pass
+
     if app.subdomain:
         public_workloads = Workload.objects.filter(
             registered_app=app, is_public=True, deleted_at__isnull=True
