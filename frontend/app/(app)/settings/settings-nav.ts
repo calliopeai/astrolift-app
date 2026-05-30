@@ -3,6 +3,7 @@ import {
   BuildingIcon,
   FileBoxIcon,
   GitBranchIcon,
+  GlobeIcon,
   KeyIcon,
   KeyRoundIcon,
   ScaleIcon,
@@ -35,6 +36,7 @@ export type SettingsSectionKey =
   | "projects"
   | "identityProvider"
   | "sourceProviders"
+  | "managedDomains"
   | "policies"
   | "permissions"
   | "profile"
@@ -97,6 +99,12 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
         href: "/settings/source-providers",
         icon: GitBranchIcon,
         i18nKey: "sourceProviders",
+      },
+      {
+        key: "managedDomains",
+        href: "/settings/managed-domains",
+        icon: GlobeIcon,
+        i18nKey: "managedDomains",
       },
       {
         key: "policies",

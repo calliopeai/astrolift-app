@@ -2373,6 +2373,10 @@
         "title": "Source providers",
         "description": "Connect GitHub / GitLab / Gitea + manage SSH deploy keys."
       },
+      "managedDomains": {
+        "title": "Managed domains",
+        "description": "DNS zones the platform manages for tenant apps and previews."
+      },
       "policies": {
         "title": "ABAC policies",
         "description": "Runtime predicates layered on top of RBAC."

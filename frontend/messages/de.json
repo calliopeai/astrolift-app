@@ -1655,6 +1655,10 @@
         "title": "Quellanbieter",
         "description": "GitHub / GitLab / Gitea verbinden + SSH-Deploy-Keys verwalten."
       },
+      "managedDomains": {
+        "title": "Verwaltete Domains",
+        "description": "DNS-Zonen, die die Plattform für Tenant-Apps und Vorschauen verwaltet."
+      },
       "policies": {
         "title": "ABAC-Richtlinien",
         "description": "Laufzeitprädikate über RBAC."
