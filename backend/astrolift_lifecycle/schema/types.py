@@ -352,6 +352,22 @@ class PreviewEnvironmentType:
     is unreachable — workspace rule forbids hard-coded fallbacks."""
 
 
+def _env_url(env) -> str:
+    """Compute the public URL for an AppEnvironment.
+
+    Prefers the managed-domain-derived hostname when the environment has
+    a ManagedDomain bound (set by backfill or at creation). Falls back to
+    the stored url field for environments that pre-date the managed domain
+    setup.
+    """
+    if env.managed_domain_id and env.managed_domain:
+        app = env.registered_app
+        subdomain = (app.subdomain or app.slug or "").strip()
+        if subdomain:
+            return f"https://{subdomain}.{env.managed_domain.zone}"
+    return env.url or ""
+
+
 def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType:
     raw = list(env.settings.filter(deleted_at__isnull=True))
     if keys is not None:
@@ -359,7 +375,7 @@ def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType
     return AppEnvironmentType(
         id=GUID(str(env.guid)),
         name=env.name,
-        url=env.url or "",
+        url=_env_url(env),
         deploys_paused=env.deploys_paused,
         ingress_paused=env.ingress_paused,
         required_approvals=env.required_approvals,
