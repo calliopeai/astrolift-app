@@ -658,3 +658,93 @@ def test_workflow_worker_renders_deployment_service_hpa_with_annotation_and_env(
     # HPA targets the worker's Deployment by name.
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
     assert hpa["spec"]["scaleTargetRef"]["name"] == "approval-worker"
+
+
+# ---- statefulset → StatefulSet + headless Service (#798) ---------------
+
+
+def test_statefulset_basic_renders_statefulset_and_headless_service():
+    w = WorkloadManifest(
+        name="postgres",
+        kind="statefulset",
+        replicas=3,
+        containers=(_container("pg", port=5432),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="pg-prod",
+        image_tag="14.9",
+        image_repository="ghcr.io/acme/postgres",
+        environment_name="prod",
+    )
+
+    kinds = sorted(r["kind"] for r in out)
+    # StatefulSet + headless Service + regular Service (port 5432 is set)
+    assert kinds == ["Service", "Service", "StatefulSet"]
+
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    assert sts["apiVersion"] == "apps/v1"
+    assert sts["spec"]["replicas"] == 3
+    assert sts["spec"]["serviceName"] == "postgres-headless"
+    # No volumeClaimTemplates when storage_size is unset
+    assert "volumeClaimTemplates" not in sts["spec"]
+
+    headless = next(
+        r for r in out
+        if r["kind"] == "Service" and r["metadata"]["name"] == "postgres-headless"
+    )
+    assert headless["spec"]["clusterIP"] == "None"
+    assert headless["spec"]["ports"][0]["port"] == 5432
+
+
+def test_statefulset_with_storage_emits_volume_claim_template():
+    w = WorkloadManifest(
+        name="redis",
+        kind="statefulset",
+        replicas=1,
+        storage_class="gp3",
+        storage_size="10Gi",
+        containers=(_container("redis", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="cache",
+        image_tag="7",
+        image_repository="ghcr.io/acme/redis",
+        environment_name="prod",
+    )
+
+    sts = next(r for r in out if r["kind"] == "StatefulSet")
+    vct = sts["spec"]["volumeClaimTemplates"]
+    assert len(vct) == 1
+    assert vct[0]["metadata"]["name"] == "redis-data"
+    assert vct[0]["spec"]["resources"]["requests"]["storage"] == "10Gi"
+    assert vct[0]["spec"]["storageClassName"] == "gp3"
+    assert vct[0]["spec"]["accessModes"] == ["ReadWriteOnce"]
+
+
+def test_statefulset_no_port_omits_headless_ports():
+    w = WorkloadManifest(
+        name="etcd",
+        kind="statefulset",
+        replicas=3,
+        containers=(_container("etcd", port=0),),
+    )
+    out = render_manifests(
+        _normalized(w),
+        namespace="infra",
+        image_tag="v3.5",
+        image_repository="ghcr.io/acme/etcd",
+        environment_name="prod",
+    )
+    headless = next(
+        r for r in out
+        if r["kind"] == "Service" and r["metadata"]["name"] == "etcd-headless"
+    )
+    assert headless["spec"]["ports"] == []
+    # No regular Service for a port-less workload
+    non_headless = [
+        r for r in out
+        if r["kind"] == "Service" and r["metadata"]["name"] != "etcd-headless"
+    ]
+    assert non_headless == []
