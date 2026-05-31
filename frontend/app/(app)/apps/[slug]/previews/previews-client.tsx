@@ -13,6 +13,8 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ListControls } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyBadge } from "@/components/CopyBadge";
 import { EmptyState } from "@/components/EmptyState";
@@ -256,10 +258,22 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   const list = previews.data?.astroliftPreviewEnvironments ?? [];
 
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
-  const filtered = React.useMemo(
+  const statusFiltered = React.useMemo(
     () => list.filter((p) => matchesFilter(p, statusFilter)),
     [list, statusFilter]
   );
+  const ctrl = useListControls({
+    data: statusFiltered,
+    searchFn: (p) => [p.branchName ?? "", String(p.prNumber ?? ""), p.headSha ?? ""].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, s) => {
+      const dir = s.dir === "asc" ? 1 : -1;
+      if (s.key === "branch") return ((a.branchName ?? "").localeCompare(b.branchName ?? "")) * dir;
+      if (s.key === "status") return a.status.localeCompare(b.status) * dir;
+      return 0;
+    },
+  });
+  const filtered = ctrl.rows;
 
   const counts = React.useMemo(
     () => ({
@@ -454,12 +468,17 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
                 </Button>
               ))}
             </div>
-            <div className="text-muted-foreground text-xs">
-              {t("groupSummary", {
-                running: counts.running,
-                failed: counts.failed,
-                tornDown: counts.tornDown,
-              })}
+            <div className="flex items-center gap-3">
+              <div className="text-muted-foreground text-xs">
+                {t("groupSummary", {
+                  running: counts.running,
+                  failed: counts.failed,
+                  tornDown: counts.tornDown,
+                })}
+              </div>
+              {statusFiltered.length > 0 && (
+                <ListControls controls={ctrl} searchPlaceholder="Search by branch or PR…" hideSearch={false} />
+              )}
             </div>
           </CardHeader>
         )}
