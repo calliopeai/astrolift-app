@@ -22,6 +22,8 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ListControls } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -270,7 +272,18 @@ export function WebhooksClient({
     toast.success("Copied");
   }
 
-  const list = subs.data?.astroliftWebhookSubscriptions ?? [];
+  const allSubs = subs.data?.astroliftWebhookSubscriptions ?? [];
+  const subsCtrl = useListControls({
+    data: allSubs,
+    searchFn: (s) => [s.url ?? "", ...(s.events ?? [])].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      if (sort.key === "url") return ((a.url ?? "").localeCompare(b.url ?? "")) * dir;
+      return 0;
+    },
+  });
+  const list = subsCtrl.rows;
 
   return (
     <PageShell
@@ -336,6 +349,9 @@ export function WebhooksClient({
 
       {testResult && <TestResultCard result={testResult} onDismiss={() => setTestResult(null)} />}
 
+      {allSubs.length > 0 && (
+        <ListControls controls={subsCtrl} searchPlaceholder="Search webhooks…" className="mb-3" />
+      )}
       <Card>
         <CardContent className="p-0">
           {subs.loading ? (
@@ -696,7 +712,13 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
     variables: { subscriptionId: subscription.id, limit: 10 },
     fetchPolicy: "cache-and-network",
   });
-  const rows = data?.astroliftWebhookDeliveries ?? [];
+  const allDeliveries = data?.astroliftWebhookDeliveries ?? [];
+  const deliveriesCtrl = useListControls({
+    data: allDeliveries,
+    searchFn: (d) => [d.eventType ?? "", d.status ?? ""].join(" "),
+    initialPageSize: 25,
+  });
+  const rows = deliveriesCtrl.rows;
 
   return (
     <div className="space-y-3 p-4">
@@ -722,9 +744,14 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
       </div>
 
       <div>
-        <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
-          Recent deliveries
-        </p>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            Recent deliveries
+          </p>
+          {allDeliveries.length > 0 && (
+            <ListControls controls={deliveriesCtrl} hideSearch className="!mb-0" />
+          )}
+        </div>
         {loading && rows.length === 0 ? (
           <Skeleton className="h-16 w-full" />
         ) : rows.length === 0 ? (
