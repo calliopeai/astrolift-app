@@ -934,3 +934,25 @@ export const CLEAR_ALERT_SUBSCRIPTION = gql`
     }
   }
 `;
+
+// --- Task run (#801) ---
+// Stub mutation for triggering a one-off task run against a registered
+// task workload. The backend resolver doesn't exist yet; this stub lets
+// the FE compile and render the "Run now" button before the backend
+// lands. The mutation will return { ok: false, errors: [...] } until
+// the resolver is wired.
+export const RUN_TASK = gql`
+  mutation RunTask($input: RunTaskInput!) {
+    runTask(input: $input) {
+      ok
+      errors { code message field }
+      data {
+        id
+        registeredAppSlug
+        workloadSlug
+        status
+        createdAt
+      }
+    }
+  }
+`;
