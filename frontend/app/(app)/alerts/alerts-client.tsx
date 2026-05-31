@@ -68,6 +68,8 @@ import {
   UNMUTE_ALERT_RULE,
 } from "@/graphql/operations/alerts.queries";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { ListControls, SortableHeader } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 
 interface AlertMute {
   id: string;
@@ -115,6 +117,14 @@ const SEVERITY_TONE: Record<string, "ok" | "warn" | "error" | "muted"> = {
   warning: "warn",
   critical: "error",
   error: "error",
+};
+
+const SEVERITY_ORDER: Record<string, number> = {
+  info: 0,
+  warn: 1,
+  warning: 1,
+  critical: 2,
+  error: 2,
 };
 
 const TARGETS = ["app", "env", "workload", "global"];
@@ -185,6 +195,44 @@ export function AlertsClient() {
     ? ruleList
     : ruleList.filter((r) => !r.activeMute);
   const mutedCount = ruleList.filter((r) => r.activeMute).length;
+
+  const rulesCtrl = useListControls({
+    data: visibleRules,
+    searchFn: (r) => [r.name, r.target, r.severity].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      if (sort.key === "name") {
+        const cmp = a.name.localeCompare(b.name);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "severity") {
+        const cmp = (SEVERITY_ORDER[a.severity] ?? 0) - (SEVERITY_ORDER[b.severity] ?? 0);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "createdAt") {
+        const cmp = a.createdAt.localeCompare(b.createdAt);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      return 0;
+    },
+  });
+
+  const eventsCtrl = useListControls({
+    data: eventList,
+    searchFn: (e) => [e.summary, e.severity].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      if (sort.key === "severity") {
+        const cmp = (SEVERITY_ORDER[a.severity] ?? 0) - (SEVERITY_ORDER[b.severity] ?? 0);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "firedAt") {
+        const cmp = a.firedAt.localeCompare(b.firedAt);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      return 0;
+    },
+  });
 
   async function handleDelete(r: AlertRule) {
     const { data } = await deleteRule({ variables: { input: { id: r.id } } });
@@ -351,19 +399,44 @@ export function AlertsClient() {
               />
             </div>
           ) : (
+            <>
+              <div className="px-4 py-2 border-b">
+                <ListControls controls={rulesCtrl} searchPlaceholder="Search rules…" />
+              </div>
+              {rulesCtrl.rows.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    icon={<BellIcon className="size-5" />}
+                    title={t("rules.emptyTitle")}
+                    description={t("rules.emptyDescription")}
+                  />
+                </div>
+              ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead>{t("rules.columns.name")}</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="name" sort={rulesCtrl.sort} onToggle={rulesCtrl.toggleSort}>
+                      {t("rules.columns.name")}
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead>{t("rules.columns.target")}</TableHead>
-                  <TableHead>{t("rules.columns.severity")}</TableHead>
-                  <TableHead>{t("rules.columns.created")}</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="severity" sort={rulesCtrl.sort} onToggle={rulesCtrl.toggleSort}>
+                      {t("rules.columns.severity")}
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="createdAt" sort={rulesCtrl.sort} onToggle={rulesCtrl.toggleSort}>
+                      {t("rules.columns.created")}
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleRules.map((r) => (
+                {rulesCtrl.rows.map((r) => (
                   <TableRow key={r.id} className={r.activeMute ? "opacity-70" : undefined}>
                     <TableCell className="w-8">
                       {r.activeMute ? (
@@ -476,6 +549,8 @@ export function AlertsClient() {
                 ))}
               </TableBody>
             </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -500,19 +575,40 @@ export function AlertsClient() {
               />
             </div>
           ) : (
+            <>
+              <div className="px-4 py-2 border-b">
+                <ListControls controls={eventsCtrl} searchPlaceholder="Search events…" />
+              </div>
+              {eventsCtrl.rows.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    icon={<BellIcon className="size-5" />}
+                    title={t("events.emptyTitle")}
+                    description={t("events.emptyDescription")}
+                  />
+                </div>
+              ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
                   <TableHead>{t("events.columns.summary")}</TableHead>
-                  <TableHead>{t("events.columns.severity")}</TableHead>
-                  <TableHead>{t("events.columns.fired")}</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="severity" sort={eventsCtrl.sort} onToggle={eventsCtrl.toggleSort}>
+                      {t("events.columns.severity")}
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="firedAt" sort={eventsCtrl.sort} onToggle={eventsCtrl.toggleSort}>
+                      {t("events.columns.fired")}
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead>{t("events.columns.state")}</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {eventList.map((e) => (
+                {eventsCtrl.rows.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="w-8">
                       <StatusDot status={SEVERITY_TONE[e.severity] ?? "muted"} />
@@ -556,6 +652,8 @@ export function AlertsClient() {
                 ))}
               </TableBody>
             </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
