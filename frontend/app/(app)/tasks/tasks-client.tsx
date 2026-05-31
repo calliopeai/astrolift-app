@@ -14,6 +14,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,8 @@ import { RUN_TASK } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_TASK_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftTaskRun, TaskRunStatus } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { useListControls } from "@/hooks/use-list-controls";
+import type { SortState } from "@/hooks/use-list-controls";
 
 // ── types ─────────────────────────────────────────────────────────────────
 
@@ -300,6 +303,7 @@ export function TasksClient() {
           loading={runsLoading}
           emptyTitle="No recent task runs"
           emptyDescription="Task runs from the last 7 days will appear here."
+          searchPlaceholder="Search recent runs…"
         />
       )}
       {tab === "history" && (
@@ -308,6 +312,7 @@ export function TasksClient() {
           loading={runsLoading}
           emptyTitle="No task runs yet"
           emptyDescription="Once tasks are run they'll appear here. Use the Templates tab to trigger one."
+          searchPlaceholder="Search history…"
         />
       )}
     </PageShell>
@@ -315,6 +320,13 @@ export function TasksClient() {
 }
 
 // ── Templates tab ─────────────────────────────────────────────────────────
+
+function templateSortFn(a: TaskWorkload, b: TaskWorkload, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  if (sort.key === "name") return a.name.localeCompare(b.name) * dir;
+  if (sort.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug) * dir;
+  return 0;
+}
 
 interface TemplatesTabProps {
   workloads: TaskWorkload[];
@@ -331,6 +343,13 @@ function TemplatesTab({
   onRunNow,
   mutationLoading,
 }: TemplatesTabProps) {
+  const ctrl = useListControls({
+    data: workloads,
+    searchFn: (w) => [w.name, w.slug, w.registeredAppSlug].join(" "),
+    initialPageSize: 25,
+    sortFn: templateSortFn,
+  });
+
   if (loading && workloads.length === 0) {
     return (
       <Card>
@@ -358,9 +377,9 @@ function TemplatesTab({
     );
   }
 
-  // Group by app.
+  // Group by app from the paginated+filtered slice.
   const byApp = new Map<string, TaskWorkload[]>();
-  for (const w of workloads) {
+  for (const w of ctrl.rows) {
     const group = byApp.get(w.registeredAppSlug) ?? [];
     group.push(w);
     byApp.set(w.registeredAppSlug, group);
@@ -368,69 +387,113 @@ function TemplatesTab({
 
   return (
     <div className="space-y-4">
-      {Array.from(byApp.entries()).map(([appSlug, appWorkloads]) => (
-        <Card key={appSlug}>
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 border-b px-4 py-3">
-              <TerminalIcon className="text-muted-foreground size-4" />
-              <span className="font-medium">{appSlug}</span>
-              <Badge variant="secondary" className="ml-auto text-xs">
-                {appWorkloads.length} {appWorkloads.length === 1 ? "template" : "templates"}
-              </Badge>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead className="w-28 text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {appWorkloads.map((w) => {
-                  const isRunning = runningWorkloadId === w.id;
-                  return (
-                    <TableRow key={w.id}>
-                      <TableCell className="font-medium">{w.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {w.slug}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          disabled={mutationLoading || isRunning}
-                          onClick={() => onRunNow(w)}
-                        >
-                          {isRunning ? (
-                            <Loader2Icon className="size-3.5 animate-spin" />
-                          ) : (
-                            <PlayIcon className="size-3.5" />
-                          )}
-                          Run now
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+      <ListControls controls={ctrl} searchPlaceholder="Search templates…" />
+      {ctrl.rows.length === 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <EmptyState
+              icon={<ClipboardListIcon className="size-5" />}
+              title="No matching templates"
+              description="Adjust your search to find task templates."
+            />
           </CardContent>
         </Card>
-      ))}
+      ) : (
+        Array.from(byApp.entries()).map(([appSlug, appWorkloads]) => (
+          <Card key={appSlug}>
+            <CardContent className="p-0">
+              <div className="flex items-center gap-2 border-b px-4 py-3">
+                <TerminalIcon className="text-muted-foreground size-4" />
+                <span className="font-medium">{appSlug}</span>
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {appWorkloads.length} {appWorkloads.length === 1 ? "template" : "templates"}
+                </Badge>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                        Name
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>Slug</TableHead>
+                    <TableHead className="w-28 text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {appWorkloads.map((w) => {
+                    const isRunning = runningWorkloadId === w.id;
+                    return (
+                      <TableRow key={w.id}>
+                        <TableCell className="font-medium">{w.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {w.slug}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            disabled={mutationLoading || isRunning}
+                            onClick={() => onRunNow(w)}
+                          >
+                            {isRunning ? (
+                              <Loader2Icon className="size-3.5 animate-spin" />
+                            ) : (
+                              <PlayIcon className="size-3.5" />
+                            )}
+                            Run now
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ))
+      )}
     </div>
   );
 }
 
 // ── Runs tab (shared by Recent + History) ─────────────────────────────────
 
+function runSortFn(a: AstroliftTaskRun, b: AstroliftTaskRun, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  if (sort.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug) * dir;
+  if (sort.key === "workload") return (a.workloadSlug ?? "").localeCompare(b.workloadSlug ?? "") * dir;
+  if (sort.key === "status") return a.status.localeCompare(b.status) * dir;
+  if (sort.key === "started") {
+    const at = (a.startedAt ?? "").localeCompare(b.startedAt ?? "");
+    return at * dir;
+  }
+  if (sort.key === "duration") {
+    return ((a.durationSeconds ?? 0) - (b.durationSeconds ?? 0)) * dir;
+  }
+  return 0;
+}
+
 interface RunsTabProps {
   runs: AstroliftTaskRun[];
   loading: boolean;
   emptyTitle: string;
   emptyDescription: string;
+  searchPlaceholder?: string;
 }
 
-function RunsTab({ runs, loading, emptyTitle, emptyDescription }: RunsTabProps) {
+function RunsTab({ runs, loading, emptyTitle, emptyDescription, searchPlaceholder }: RunsTabProps) {
+  const ctrl = useListControls({
+    data: runs,
+    searchFn: (r) =>
+      [r.registeredAppSlug, r.workloadSlug, r.status, r.triggeredByUsername, r.triggerKind]
+        .filter(Boolean)
+        .join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "started", dir: "desc" },
+    sortFn: runSortFn,
+  });
+
   if (loading && runs.length === 0) {
     return (
       <Card>
@@ -457,52 +520,88 @@ function RunsTab({ runs, loading, emptyTitle, emptyDescription }: RunsTabProps) 
   }
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>App</TableHead>
-              <TableHead>Workload</TableHead>
-              <TableHead>Command</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Started</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {runs.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.registeredAppSlug}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
-                  {r.workloadSlug}
-                </TableCell>
-                <TableCell className="max-w-48 truncate font-mono text-xs">
-                  {Array.isArray(r.command) ? r.command.join(" ") : r.command || "—"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANT[r.status as TaskRunStatus] ?? "secondary"}>
-                    {r.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-mono text-xs">
-                  <span className="inline-flex items-center gap-1">
-                    <ClockIcon className="size-3" />
-                    {formatDuration(r.durationSeconds)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {r.triggeredByUsername ?? r.triggerKind ?? "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {r.startedAt ? new Date(r.startedAt).toLocaleString() : "—"}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <ListControls
+        controls={ctrl}
+        searchPlaceholder={searchPlaceholder ?? "Search runs…"}
+      />
+      <Card>
+        <CardContent className="p-0">
+          {ctrl.rows.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<HistoryIcon className="size-5" />}
+                title="No matching runs"
+                description="Adjust your search to find task runs."
+              />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      App
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="workload" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Workload
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>Command</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Status
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="duration" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Duration
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>Actor</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="started" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Started
+                    </SortableHeader>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ctrl.rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.registeredAppSlug}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {r.workloadSlug}
+                    </TableCell>
+                    <TableCell className="max-w-48 truncate font-mono text-xs">
+                      {Array.isArray(r.command) ? r.command.join(" ") : r.command || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANT[r.status as TaskRunStatus] ?? "secondary"}>
+                        {r.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <span className="inline-flex items-center gap-1">
+                        <ClockIcon className="size-3" />
+                        {formatDuration(r.durationSeconds)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {r.triggeredByUsername ?? r.triggerKind ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {r.startedAt ? new Date(r.startedAt).toLocaleString() : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
