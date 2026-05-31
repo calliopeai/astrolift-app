@@ -17,6 +17,7 @@ import astrolift_identity.schema as AstroliftIdentitySchema  # noqa: E402
 import astrolift_lifecycle.schema as AstroliftLifecycleSchema  # noqa: E402
 import astrolift_observability.schema as AstroliftObservabilitySchema  # noqa: E402
 import astrolift_operations.schema as AstroliftOperationsSchema  # noqa: E402
+import astrolift_pipelines.schema as AstroliftPipelinesSchema  # noqa: E402
 import astrolift_registry.schema as AstroliftRegistrySchema  # noqa: E402
 import astrolift_scm.schema as AstroliftScmSchema  # noqa: E402
 import astrolift_services.schema as AstroliftServicesSchema  # noqa: E402
@@ -50,6 +51,7 @@ _query_bases = [
     AstroliftObservabilitySchema.LogHistoryQuery,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
     AstroliftFormsSchema.FormsQuery,
+    AstroliftPipelinesSchema.PipelinesQuery,
 ]
 _mutation_bases = [
     CoreMutations.Mutation,
@@ -64,6 +66,7 @@ _mutation_bases = [
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsMutation,
     AstroliftBillingSchema.BillingMutation,
     AstroliftFormsSchema.FormsMutation,
+    AstroliftPipelinesSchema.PipelinesMutation,
 ]
 
 if is_enabled(Feature.WORKFLOWS):
