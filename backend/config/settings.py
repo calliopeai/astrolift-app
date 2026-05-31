@@ -363,6 +363,7 @@ INSTALLED_APPS = [
     "astrolift_billing",
     "astrolift_scm",
     "astrolift_forms",
+    "astrolift_pipelines",
     # End of Astrolift
     "constance",
     "constance.backends.database",
