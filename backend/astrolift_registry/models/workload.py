@@ -93,6 +93,22 @@ class Workload(NamedBaseCoreModel):
     # TOML ``[[workloads.<name>.volumes]]`` shape.
     volumes = models.JSONField(default=list, blank=True)
 
+    class AgentVariant(models.TextChoices):
+        # Matches the three canonical agent base images (#40).
+        # ``headless`` — no display, full CLI toolchain.
+        # ``terminal_novnc`` — headless + noVNC terminal UI.
+        # ``terminal_novnc_browser`` — headless + noVNC + Chromium.
+        HEADLESS = "headless"
+        TERMINAL_NOVNC = "terminal_novnc"
+        TERMINAL_NOVNC_BROWSER = "terminal_novnc_browser"
+
+    class AgentRuntime(models.TextChoices):
+        # Second axis: the underlying LLM runtime the agent is tuned for.
+        CLAUDE = "claude"
+        GEMINI = "gemini"
+        CODEX = "codex"
+        UNIVERSAL = "universal"
+
     # Agent dispatch tuning (#795). Only meaningful when
     # ``kind == AGENT``; other kinds carry the defaults and ignore them.
     # ``max_retries`` / ``tool_timeout_seconds`` are injected into the
@@ -104,6 +120,25 @@ class Workload(NamedBaseCoreModel):
     max_retries = models.PositiveIntegerField(default=5)
     tool_timeout_seconds = models.PositiveIntegerField(default=300)
     result_ttl_hours = models.PositiveIntegerField(default=72)
+
+    # Agent image variant (#40). Selects the canonical base image for the
+    # workload's container. Null means the caller supplies image_ref
+    # directly. Only meaningful when ``kind == AGENT``.
+    agent_variant = models.CharField(
+        max_length=32,
+        choices=AgentVariant.choices,
+        blank=True,
+        default="",
+    )
+    # Agent LLM runtime (#40). Second axis — selects the runtime preset
+    # injected into the pod. Null means no preset; the container image
+    # carries its own defaults.
+    agent_runtime = models.CharField(
+        max_length=32,
+        choices=AgentRuntime.choices,
+        blank=True,
+        default="",
+    )
 
     class Meta:
         constraints = [
