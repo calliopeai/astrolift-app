@@ -11,12 +11,18 @@ from strawberry.types import Info
 
 from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
-from workflows.models import WorkflowDefinition, WorkflowInstance
+from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
+from workflows.schema.types import WorkflowStageType
 
 
 @strawberry.type
 class StartWorkflowResult(MutationResult):
     instance_id: Optional[strawberry.ID] = None
+
+
+@strawberry.type
+class CreateWorkflowStageResult(MutationResult):
+    stage: Optional[WorkflowStageType] = None
 
 
 def _require_staff(user):
@@ -213,3 +219,73 @@ class Mutation:
             raise GraphQLError(f'Failed to delete workflow definition: {e}')
 
         return MutationResult.success()
+
+    @strawberry.mutation(description="Add a stage to an agent workflow definition (staff only).")
+    def create_workflow_stage(
+        self,
+        info: Info,
+        workflow_slug: str,
+        order: int,
+        kind: str,
+        on_failure: str = "fail",
+        timeout_seconds: int = 300,
+        agent_definition_guid: Optional[str] = None,
+        skill_refs: Optional[strawberry.scalars.JSON] = None,
+        fan_out_count: Optional[int] = None,
+    ) -> CreateWorkflowStageResult:
+        user = info.context.user
+        _require_staff(user)
+
+        workflow = WorkflowDefinition.objects.filter(slug=workflow_slug).first()
+        if not workflow:
+            return CreateWorkflowStageResult(
+                ok=False,
+                errors=[GQLValidationError(field='workflow_slug', messages=[f'Workflow "{workflow_slug}" not found'])],
+            )
+
+        # Validate kind
+        valid_kinds = {c[0] for c in WorkflowStage.StageKind.choices}
+        if kind not in valid_kinds:
+            return CreateWorkflowStageResult(
+                ok=False,
+                errors=[GQLValidationError(field='kind', messages=[f'Invalid stage kind "{kind}"'])],
+            )
+
+        # Validate on_failure
+        valid_failures = {c[0] for c in WorkflowStage.OnFailure.choices}
+        if on_failure not in valid_failures:
+            return CreateWorkflowStageResult(
+                ok=False,
+                errors=[GQLValidationError(field='on_failure', messages=[f'Invalid on_failure "{on_failure}"'])],
+            )
+
+        # Resolve optional agent definition
+        agent_definition = None
+        if agent_definition_guid:
+            from astrolift_registry.models import Workload
+            agent_definition = Workload.objects.filter(guid=agent_definition_guid).first()
+            if agent_definition is None:
+                return CreateWorkflowStageResult(
+                    ok=False,
+                    errors=[GQLValidationError(field='agent_definition_guid', messages=['Workload not found'])],
+                )
+
+        stage = WorkflowStage(
+            definition=workflow,
+            order=order,
+            kind=kind,
+            on_failure=on_failure,
+            timeout_seconds=timeout_seconds,
+            agent_definition=agent_definition,
+            skill_refs=skill_refs or [],
+            fan_out_count=fan_out_count,
+            created_by=user,
+            updated_by=user,
+        )
+
+        try:
+            stage.save()
+        except Exception as e:
+            raise GraphQLError(f'Failed to create workflow stage: {e}')
+
+        return CreateWorkflowStageResult(ok=True, stage=stage)
