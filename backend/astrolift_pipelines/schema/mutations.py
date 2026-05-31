@@ -19,6 +19,7 @@ from astrolift_pipelines.schema.types import (
     pipeline_to_type,
     trigger_to_type,
 )
+from astrolift_workflows.client import signal_workflow, start_workflow
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode
 from core.permissions import Permission, require_permission
@@ -64,9 +65,7 @@ class PipelinesMutation:
     @strawberry.field
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
-    def create_pipeline(
-        self, info: Info, input: CreatePipelineInput
-    ) -> MutationResultType[PipelineType]:
+    def create_pipeline(self, info: Info, input: CreatePipelineInput) -> MutationResultType[PipelineType]:
         name = (input.name or "").strip()
         if not name:
             return gql_failure(
@@ -203,9 +202,7 @@ class PipelinesMutation:
     @strawberry.field
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
-    def create_trigger(
-        self, info: Info, input: CreateTriggerInput
-    ) -> MutationResultType[TriggerType]:
+    def create_trigger(self, info: Info, input: CreateTriggerInput) -> MutationResultType[TriggerType]:
         kind = (input.kind or "").strip().lower()
         if kind not in _VALID_TRIGGER_KINDS:
             return gql_failure(
@@ -221,14 +218,11 @@ class PipelinesMutation:
                 "tenant context required",
             )
 
-        pipeline = (
-            Pipeline.objects.filter(
-                guid=str(input.pipeline_id),
-                organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        pipeline = Pipeline.objects.filter(
+            guid=str(input.pipeline_id),
+            organization_id=tenant.organization_id,
+            deleted_at__isnull=True,
+        ).first()
         if pipeline is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "pipeline not found")
 
@@ -256,9 +250,17 @@ class PipelinesMutation:
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def trigger_pipeline_run(
-        self, info: Info, pipeline_id: GUID, ref: str | None = None
+        self,
+        info: Info,
+        pipeline_id: GUID,
+        ref: str | None = None,
     ) -> MutationResultType[PipelineRunType]:
-        """Stub — execution triggers land in M3. Returns a pending run row."""
+        """Dispatch a manual PipelineRunWorkflow via Temporal (#75).
+
+        Creates a PipelineRun with trigger_kind=manual, writes the
+        Temporal workflow id onto the row, then starts the workflow.
+        The actor is set from the authenticated request user.
+        """
         tenant = get_current_tenant()
         if tenant is None or tenant.organization_id is None:
             return gql_failure(
@@ -266,16 +268,25 @@ class PipelinesMutation:
                 "tenant context required",
             )
 
-        pipeline = (
-            Pipeline.objects.filter(
-                guid=str(pipeline_id),
-                organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        pipeline = Pipeline.objects.filter(
+            guid=str(pipeline_id),
+            organization_id=tenant.organization_id,
+            deleted_at__isnull=True,
+        ).first()
         if pipeline is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "pipeline not found")
+
+        trigger_ref = (ref or pipeline.default_branch or "").strip()
+
+        # Resolve the caller identity for the trigger_actor field.
+        request = (
+            info.context.get("request")
+            if isinstance(info.context, dict)
+            else getattr(info.context, "request", None)
+        )
+        trigger_actor = ""
+        if request is not None and hasattr(request, "user") and request.user.is_authenticated:
+            trigger_actor = getattr(request.user, "email", "") or str(request.user)
 
         last_run_number = (
             PipelineRun.objects.filter(
@@ -287,26 +298,42 @@ class PipelinesMutation:
             .first()
             or 0
         )
+        run_number = last_run_number + 1
+
+        # Workflow id is deterministic so a duplicate UI click collides
+        # on the same workflow id rather than spawning a parallel run.
+        workflow_id = f"pipeline-run-{pipeline.pk}-{run_number}"
 
         with transaction.atomic():
             run = PipelineRun.objects.create(
                 pipeline=pipeline,
-                run_number=last_run_number + 1,
+                run_number=run_number,
                 trigger_kind=PipelineRun.TriggerKind.MANUAL,
-                trigger_ref=(ref or "").strip(),
-                trigger_actor="",
+                trigger_ref=trigger_ref,
+                trigger_actor=trigger_actor,
+                temporal_workflow_id=workflow_id,
                 status=PipelineRun.Status.PENDING,
             )
+
+        start_workflow(
+            "PipelineRunWorkflow",
+            args=[run.pk],
+            workflow_id=workflow_id,
+        )
 
         return gql_success(pipeline_run_to_type(run))
 
     @strawberry.field
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
-    def cancel_pipeline_run(
-        self, info: Info, run_id: GUID
-    ) -> MutationResultType[PipelineRunType]:
-        """Stub — cancellation wires to the Temporal workflow in M3."""
+    def cancel_pipeline_run(self, info: Info, run_id: GUID) -> MutationResultType[PipelineRunType]:
+        """Send a cancel signal to the running PipelineRunWorkflow (#68, #75).
+
+        Sends the ``cancel`` signal to the Temporal workflow. The workflow
+        handles cleanup (cancelling in-flight K8s Jobs, marking job runs
+        cancelled) before transitioning the run to CANCELLED. If Temporal
+        is disabled the status is flipped locally.
+        """
         tenant = get_current_tenant()
         if tenant is None or tenant.organization_id is None:
             return gql_failure(
@@ -335,6 +362,14 @@ class PipelinesMutation:
                 f"run is in status {run.status!r} — only pending/running runs can be cancelled",
             )
 
+        # Signal the Temporal workflow to cancel cleanly. When Temporal
+        # is disabled, signal_workflow returns False and we fall through
+        # to a local status flip so the DB stays consistent.
+        if run.temporal_workflow_id:
+            signal_workflow(run.temporal_workflow_id, "cancel")
+
+        # Optimistically flip status so the UI reflects the cancel
+        # immediately, even before the workflow drains.
         run.status = PipelineRun.Status.CANCELLED
         run.finished_at = timezone.now()
         run.save(update_fields=["status", "finished_at", "updated_at", "version"])
