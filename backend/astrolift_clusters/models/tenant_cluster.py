@@ -20,6 +20,19 @@ class TenantCluster(NamedBaseCoreModel):
         EXEC_PLUGIN = "exec_plugin"
         SERVICE_ACCOUNT_TOKEN = "service_account_token"
 
+    class NodeOs(models.TextChoices):
+        """Operating system of the cluster's node pool (#80)."""
+
+        LINUX = "linux"
+        WINDOWS = "windows"
+        MACOS = "macos"
+
+    class NodeArch(models.TextChoices):
+        """CPU architecture of the cluster's node pool (#80)."""
+
+        AMD64 = "amd64"
+        ARM64 = "arm64"
+
     class Lifecycle(models.TextChoices):
         """Cluster management lifecycle (#316).
 
@@ -121,6 +134,32 @@ class TenantCluster(NamedBaseCoreModel):
     path prefix for the GitOps modes; nothing for direct_api).
     Shape is mode-specific — see services/delivery for what each
     mode reads."""
+
+    # Node pool platform capability fields (#80).
+    # Used by the dispatch router (#82) for ``runs_on`` label matching.
+    # Defaults are safe-guess values for existing clusters (linux/amd64);
+    # operators can correct via mutation after the cluster is registered.
+    node_os = models.CharField(
+        max_length=16,
+        choices=NodeOs.choices,
+        default=NodeOs.LINUX,
+        blank=True,
+    )
+    node_arch = models.CharField(
+        max_length=8,
+        choices=NodeArch.choices,
+        default="",
+        blank=True,
+    )
+    node_labels = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Arbitrary operator-defined labels for runs_on matching "
+            "(e.g. ['gpu', 'high-memory', 'spot']). "
+            "Case-insensitive in dispatch matching."
+        ),
+    )
 
     class Meta:
         constraints = [
