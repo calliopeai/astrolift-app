@@ -102,12 +102,12 @@ export function ManagedDomainsClient() {
   const allDomains = data?.astroliftManagedDomains ?? [];
   const ctrl = useListControls({
     data: allDomains,
-    searchFn: (d) => [d.zone, d.provider ?? "", d.status ?? ""].join(" "),
+    searchFn: (d) => [d.zone, d.dnsDriver, d.defaultFor].join(" "),
     initialPageSize: 25,
     sortFn: (a, b, s) => {
       const dir = s.dir === "asc" ? 1 : -1;
       if (s.key === "zone") return a.zone.localeCompare(b.zone) * dir;
-      if (s.key === "status") return ((a.status ?? "").localeCompare(b.status ?? "")) * dir;
+      if (s.key === "driver") return a.dnsDriver.localeCompare(b.dnsDriver) * dir;
       return 0;
     },
   });
@@ -166,7 +166,7 @@ export function ManagedDomainsClient() {
                   <TableHead>Driver</TableHead>
                   <TableHead>Default for</TableHead>
                   <TableHead>Wildcard</TableHead>
-                  <TableHead><SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>Added</SortableHeader></TableHead>
+                  <TableHead>Added</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

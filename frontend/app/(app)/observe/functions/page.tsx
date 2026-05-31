@@ -41,9 +41,9 @@ function FleetTab() {
   const ctrl = useListControls({
     data: workloads,
     searchFn: (w) => [w.name, w.registeredAppSlug].join(" "),
-    sortFn: (key, a, b) => {
-      if (key === "name") return a.name.localeCompare(b.name);
-      if (key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug);
+    sortFn: (a, b, sort) => {
+      if (sort.key === "name") return a.name.localeCompare(b.name);
+      if (sort.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug);
       return 0;
     },
     initialPageSize: 25,
