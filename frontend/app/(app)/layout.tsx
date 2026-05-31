@@ -10,7 +10,7 @@ import { ScmCallbackToast } from "@/components/ScmCallbackToast";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { StepUpPrompt } from "@/components/StepUpPrompt";
-import { PreloadQuery, getClient } from "@/lib/apollo";
+import { getClient } from "@/lib/apollo";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
 import { LIST_ORGANIZATIONS } from "@/graphql/identity/identity.queries";
@@ -30,43 +30,48 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   try {
     const client = await getClient();
-    const { data } = await client.query<MeQueryData, MeQueryVariables>({ query: GET_ME });
-    ssrUser = data?.me ?? null;
+    // Fetch all three identity queries in parallel (#822).
+    // Previously nested PreloadQuery components created a sequential
+    // waterfall (GET_ME → GET_MY_PERMISSIONS → LIST_ORGANIZATIONS) that
+    // caused a 1-2s blank screen before the sidebar and page content
+    // rendered. Promise.all reduces this to one round-trip time. getClient()
+    // serialises all results into the Apollo SSR cache automatically, so
+    // client-side useQuery hooks find data immediately (no loading flash).
+    const [meResult] = await Promise.all([
+      client.query<MeQueryData, MeQueryVariables>({ query: GET_ME }),
+      client.query({ query: GET_MY_PERMISSIONS }),
+      client.query({ query: LIST_ORGANIZATIONS }),
+    ]);
+    ssrUser = meResult.data?.me ?? null;
   } catch {
     // network error or invalid token — don't redirect here,
     // let client-side Apollo errorLink handle UNAUTHENTICATED
   }
 
   return (
-    <PreloadQuery query={GET_ME}>
-      <PreloadQuery query={GET_MY_PERMISSIONS}>
-        <PreloadQuery query={LIST_ORGANIZATIONS}>
-          <LiveRegionProvider>
-            <SkipToContent />
-            <div className="flex min-h-svh flex-col">
-              <PlatformIncidentBanner />
-              <SidebarProvider className="flex-1">
-                <AppSidebar ssrUser={ssrUser} />
-                <SidebarInset>
-                  <PageHeader />
-                  <main
-                    id="main-content"
-                    tabIndex={-1}
-                    className="flex flex-1 flex-col outline-none"
-                  >
-                    {children}
-                  </main>
-                </SidebarInset>
-                <CommandPalette />
-                <KeyboardShortcuts />
-                <ScmCallbackToast />
-                <SessionExpiredModal />
-                <StepUpPrompt />
-              </SidebarProvider>
-            </div>
-          </LiveRegionProvider>
-        </PreloadQuery>
-      </PreloadQuery>
-    </PreloadQuery>
+    <LiveRegionProvider>
+      <SkipToContent />
+      <div className="flex min-h-svh flex-col">
+        <PlatformIncidentBanner />
+        <SidebarProvider className="flex-1">
+          <AppSidebar ssrUser={ssrUser} />
+          <SidebarInset>
+            <PageHeader />
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="flex flex-1 flex-col outline-none"
+            >
+              {children}
+            </main>
+          </SidebarInset>
+          <CommandPalette />
+          <KeyboardShortcuts />
+          <ScmCallbackToast />
+          <SessionExpiredModal />
+          <StepUpPrompt />
+        </SidebarProvider>
+      </div>
+    </LiveRegionProvider>
   );
 }
