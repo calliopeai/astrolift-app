@@ -6,10 +6,12 @@ import { AlertCircleIcon, BarChart3Icon, BoltIcon, GaugeIcon, LayersIcon, Scroll
 import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useListControls } from "@/hooks/use-list-controls";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
@@ -36,6 +38,17 @@ function FleetTab() {
   );
   const workloads = (data?.astroliftWorkloads ?? []).filter((w) => w.kind === "function");
 
+  const ctrl = useListControls({
+    data: workloads,
+    searchFn: (w) => [w.name, w.registeredAppSlug].join(" "),
+    sortFn: (key, a, b) => {
+      if (key === "name") return a.name.localeCompare(b.name);
+      if (key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug);
+      return 0;
+    },
+    initialPageSize: 25,
+  });
+
   if (loading && workloads.length === 0)
     return <div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>;
 
@@ -45,28 +58,35 @@ function FleetTab() {
       actionHref="/functions" actionLabel="Go to Functions" />;
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Workload</TableHead>
-          <TableHead>App</TableHead>
-          <TableHead>Min scale</TableHead>
-          <TableHead>Max scale</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {workloads.map((w) => (
-          <TableRow key={w.id}>
-            <TableCell className="font-medium">
-              <Link href={`/apps/${w.registeredAppSlug}/workloads`} className="hover:underline">{w.name}</Link>
-            </TableCell>
-            <TableCell><Badge variant="outline">{w.registeredAppSlug}</Badge></TableCell>
-            <TableCell className="text-muted-foreground text-sm">{w.hpaMinReplicas ?? 0}</TableCell>
-            <TableCell className="text-muted-foreground text-sm">{w.hpaMaxReplicas ?? "—"}</TableCell>
+    <>
+      <ListControls controls={ctrl} searchPlaceholder="Filter workloads..." />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>
+              <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>Workload</SortableHeader>
+            </TableHead>
+            <TableHead>
+              <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>App</SortableHeader>
+            </TableHead>
+            <TableHead>Min scale</TableHead>
+            <TableHead>Max scale</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {ctrl.rows.map((w) => (
+            <TableRow key={w.id}>
+              <TableCell className="font-medium">
+                <Link href={`/apps/${w.registeredAppSlug}/workloads`} className="hover:underline">{w.name}</Link>
+              </TableCell>
+              <TableCell><Badge variant="outline">{w.registeredAppSlug}</Badge></TableCell>
+              <TableCell className="text-muted-foreground text-sm">{w.hpaMinReplicas ?? 0}</TableCell>
+              <TableCell className="text-muted-foreground text-sm">{w.hpaMaxReplicas ?? "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
 
