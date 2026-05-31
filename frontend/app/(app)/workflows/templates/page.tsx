@@ -226,7 +226,6 @@ function TemplateCard({ template }: { template: Template }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export const metadata = { title: "Workflow Templates · Astrolift" };
 
 export default function WorkflowTemplatesPage() {
   return (

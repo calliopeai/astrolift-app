@@ -76,6 +76,17 @@ const TRIGGER_PIPELINE_RUN = gql`
 `;
 
 // ---------------------------------------------------------------------------
+// Mutation response type
+
+interface TriggerPipelineRunResp {
+  triggerPipelineRun: {
+    ok: boolean;
+    errors: { code: string; message: string }[];
+    data: { id: string; runNumber: number; status: string } | null;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -143,7 +154,7 @@ export function PipelinesClient() {
     router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
   }
 
-  const [triggerPipelineRun, { loading: triggering }] = useMutation(TRIGGER_PIPELINE_RUN);
+  const [triggerPipelineRun, { loading: triggering }] = useMutation<TriggerPipelineRunResp>(TRIGGER_PIPELINE_RUN);
 
   async function handleManualTrigger(pipeline: Pipeline) {
     const { data } = await triggerPipelineRun({

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BotIcon, ClipboardCopyIcon, Loader2Icon, RefreshCwIcon } from "lucide-react";
-import { gql, useQuery } from "@apollo/client";
+import { gql } from "@apollo/client";
+import { useQuery } from "@apollo/client/react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,6 @@ function elapsedLabel(startedAt: string | null): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const metadata = { title: "Agent Gallery · Astrolift" };
 
 export default function AgentGalleryPage() {
   const [elapsed, setElapsed] = useState(0);

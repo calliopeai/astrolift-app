@@ -7,5 +7,5 @@ export default function PipelineSecretsPage({
 }: {
   params: { id: string };
 }) {
-  return <PipelineDetailClient id={params.id} />;
+  return <PipelineDetailClient pipelineId={params.id} />;
 }

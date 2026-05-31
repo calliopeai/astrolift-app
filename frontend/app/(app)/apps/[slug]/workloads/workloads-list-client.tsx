@@ -4,8 +4,11 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
+  BoltIcon,
+  BotIcon,
   BoxIcon,
   CalendarClockIcon,
+  ClipboardListIcon,
   GlobeIcon,
   HardDriveIcon,
   LayersIcon,
@@ -147,6 +150,10 @@ const KIND_ICON: Record<
   statefulset: HardDriveIcon,
   job: WorkflowIcon,
   cronjob: CalendarClockIcon,
+  task: ClipboardListIcon,
+  agent: BotIcon,
+  workflow: WorkflowIcon,
+  function: BoltIcon,
 };
 
 const KIND_LABEL: Record<WorkloadKind, string> = {
@@ -154,6 +161,10 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
   statefulset: "StatefulSet",
   job: "Job",
   cronjob: "CronJob",
+  task: "Task",
+  agent: "Agent",
+  workflow: "Workflow",
+  function: "Function",
 };
 
 export function WorkloadsListClient({ slug }: { slug: string }) {
