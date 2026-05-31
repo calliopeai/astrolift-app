@@ -79,6 +79,22 @@ from _sdk.base import (
 )
 
 # Cross-cutting protocols
+from _sdk.blob_store import (
+    ABSBlobStoreDriver,
+    BlobInfo,
+    BlobStoreDriver,
+    BlobStoreError,
+    BlobStoreNotConfiguredError,
+    BlobStoreNotFoundError,
+    BlobStoreSizeError,
+    GCSBlobStoreDriver,
+    LocalFsBlobStoreDriver,
+    MinioBlobStoreDriver,
+    S3BlobStoreDriver,
+    artifact_blob_key,
+    get_blob_driver,
+    run_blob_prefix,
+)
 from _sdk.build import BuildDriver
 from _sdk.capabilities import (
     BindingValidation,
@@ -190,6 +206,20 @@ from _sdk.variant_migration import (
 )
 
 __all__ = [
+    "ABSBlobStoreDriver",
+    "BlobInfo",
+    "BlobStoreDriver",
+    "BlobStoreError",
+    "BlobStoreNotConfiguredError",
+    "BlobStoreNotFoundError",
+    "BlobStoreSizeError",
+    "GCSBlobStoreDriver",
+    "LocalFsBlobStoreDriver",
+    "MinioBlobStoreDriver",
+    "S3BlobStoreDriver",
+    "artifact_blob_key",
+    "get_blob_driver",
+    "run_blob_prefix",
     "DEFAULT_PROFILE",
     "KINDS",
     "OPTIONAL_ROLES",
