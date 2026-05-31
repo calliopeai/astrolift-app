@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("astrolift_identity", "0001_initial"),
-        ("astrolift_lifecycle", "0001_initial"),
+        ("astrolift_lifecycle", "0024_task_run_agent_run"),
         ("astrolift_registry", "0025_workload_agent_variant_runtime"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
