@@ -17,8 +17,9 @@ export default function ApprovalsPage() {
         query={LIST_SECRET_CHANGE_PROPOSALS}
         variables={{ appSlug: null, status: "pending" }}
       >
-        <ApprovalsQueueClient />
-        <SecretProposalsQueueClient />
+        <ApprovalsQueueClient>
+          <SecretProposalsQueueClient />
+        </ApprovalsQueueClient>
       </PreloadQuery>
     </PreloadQuery>
   );
