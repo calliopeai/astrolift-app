@@ -91,6 +91,21 @@ class PipelineRunType:
     created_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftRegisteredAppStub")
+class RegisteredAppStubType:
+    """Minimal registered-app projection surfaced on PipelineType.
+
+    The full RegisteredApp type lives in astrolift_registry/schema/types.py.
+    We emit a stub here to avoid a circular import between the two schema
+    modules while still giving callers the fields they need to link back to
+    the app (guid + name + slug).
+    """
+
+    id: GUID
+    name: str
+    slug: str
+
+
 @strawberry.type(name="AstroliftPipeline")
 class PipelineType:
     id: GUID
@@ -98,6 +113,9 @@ class PipelineType:
     repo_url: str
     default_branch: str
     toml_path: str
+    # The RegisteredApp this pipeline deploys, if any. None for pure-CI
+    # pipelines that have no deploy step.
+    astrolift_app: RegisteredAppStubType | None
     triggers: list[TriggerType]
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -201,14 +219,24 @@ def pipeline_run_to_type(pr) -> PipelineRunType:
     )
 
 
+def registered_app_stub_to_type(app) -> RegisteredAppStubType:
+    return RegisteredAppStubType(
+        id=GUID(str(app.guid)),
+        name=app.name,
+        slug=app.slug,
+    )
+
+
 def pipeline_to_type(p) -> PipelineType:
     triggers = list(p.triggers.filter(deleted_at__isnull=True).order_by("kind"))
+    app_stub = registered_app_stub_to_type(p.registered_app) if p.registered_app_id else None
     return PipelineType(
         id=GUID(str(p.guid)),
         name=p.name,
         repo_url=p.repo_url or "",
         default_branch=p.default_branch or "main",
         toml_path=p.toml_path or "",
+        astrolift_app=app_stub,
         triggers=[trigger_to_type(t) for t in triggers],
         created_at=p.created_at,
         updated_at=p.updated_at,
