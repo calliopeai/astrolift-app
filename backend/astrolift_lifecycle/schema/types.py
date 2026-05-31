@@ -798,6 +798,113 @@ def command_run_to_type(r) -> CommandRunType:
     )
 
 
+@strawberry.type(name="AstroliftTaskRun")
+class TaskRunType:
+    """One operator-initiated execution of a ``kind: task`` workload (#801)."""
+
+    id: GUID
+    registered_app_slug: str
+    workload_slug: str
+    trigger_kind: str
+    triggered_by_username: str | None
+    command: JSON
+    status: str
+    exit_code: int | None
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    duration_seconds: int | None
+    k8s_job_name: str
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftTaskRunPayload")
+class TaskRunPayloadType:
+    """Mutation payload — the created TaskRun row (#801)."""
+
+    id: GUID
+    registered_app_slug: str
+    workload_slug: str
+    status: str
+    created_at: dt.datetime
+
+
+def task_run_to_type(r) -> TaskRunType:
+    return TaskRunType(
+        id=GUID(str(r.guid)),
+        registered_app_slug=r.workload.registered_app.slug,
+        workload_slug=r.workload.slug,
+        trigger_kind=r.trigger_kind,
+        triggered_by_username=(
+            r.triggered_by_user.username if r.triggered_by_user_id else None
+        ),
+        command=r.command or [],
+        status=r.status,
+        exit_code=r.exit_code,
+        started_at=r.started_at,
+        ended_at=r.ended_at,
+        duration_seconds=r.duration_seconds,
+        k8s_job_name=r.k8s_job_name or "",
+        created_at=r.created_at,
+    )
+
+
+def task_run_to_payload(r) -> TaskRunPayloadType:
+    return TaskRunPayloadType(
+        id=GUID(str(r.guid)),
+        registered_app_slug=r.workload.registered_app.slug,
+        workload_slug=r.workload.slug,
+        status=r.status,
+        created_at=r.created_at,
+    )
+
+
+@strawberry.type(name="AstroliftAgentRun")
+class AgentRunType:
+    """One dispatch execution of a ``kind: agent`` workload (#798)."""
+
+    id: GUID
+    registered_app_slug: str
+    workload_slug: str
+    trigger_kind: str
+    triggered_by_username: str | None
+    status: str
+    input: JSON | None
+    output: JSON | None
+    reasoning_trace_url: str
+    tool_calls_count: int
+    retry_count: int
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+    duration_seconds: int | None
+    k8s_pod_name: str
+    result_ttl_hours: int
+    created_at: dt.datetime
+
+
+def agent_run_to_type(r) -> AgentRunType:
+    return AgentRunType(
+        id=GUID(str(r.guid)),
+        registered_app_slug=r.workload.registered_app.slug,
+        workload_slug=r.workload.slug,
+        trigger_kind=r.trigger_kind,
+        triggered_by_username=(
+            r.triggered_by_user.username if r.triggered_by_user_id else None
+        ),
+        status=r.status,
+        input=r.input,
+        output=r.output,
+        reasoning_trace_url=r.reasoning_trace_url or "",
+        tool_calls_count=r.tool_calls_count,
+        retry_count=r.retry_count,
+        started_at=r.started_at,
+        ended_at=r.ended_at,
+        duration_seconds=r.duration_seconds,
+        k8s_pod_name=r.k8s_pod_name or "",
+        result_ttl_hours=r.result_ttl_hours,
+        created_at=r.created_at,
+    )
+
+
 def preview_to_type(
     p,
     *,

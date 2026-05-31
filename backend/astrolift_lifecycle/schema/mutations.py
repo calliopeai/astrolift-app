@@ -45,6 +45,7 @@ from astrolift_lifecycle.models import (
     DomainRedirectRule,
     EnvironmentSetting,
     PreviewEnvironment,
+    TaskRun,
 )
 from astrolift_lifecycle.schema.types import (
     AppDomainType,
@@ -53,12 +54,14 @@ from astrolift_lifecycle.schema.types import (
     DeployTokenType,
     EnvironmentSettingType,
     PreviewEnvironmentType,
+    TaskRunPayloadType,
     app_domain_to_type,
     app_env_to_type,
     deploy_token_to_type,
     deployment_to_type,
     env_setting_to_type,
     preview_to_type,
+    task_run_to_payload,
 )
 from astrolift_operations.models import WorkflowRun
 from astrolift_registry.models import RegisteredApp
@@ -4156,6 +4159,98 @@ class LifecycleMutation:
         setting.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
         return gql_success(env_setting_to_type(setting))
 
+    # ----------------------------------------------------------------
+    # #801 — run_task: operator-initiated execution of a task workload.
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="task.run")
+    @require_permission(Permission.APP_UPDATE)
+    @tenant_scoped()
+    def run_task(
+        self,
+        info: Info,
+        input: "RunTaskInput",
+    ) -> "MutationResultType[TaskRunPayloadType]":
+        """Trigger a one-shot execution of a ``kind: task`` workload.
+
+        Creates a ``TaskRun`` record in ``pending`` status and returns it.
+        The actual K8s Job dispatch happens via the task runner service
+        (to be wired in a follow-up); the record is immediately queryable
+        so the Tasks fleet page can show the run in the Recent tab.
+
+        The ``command`` field overrides the container's default command
+        when provided — useful for one-off script variations without
+        requiring a new workload declaration. Omit it to use the
+        workload's declared command.
+        """
+        from astrolift_registry.models import Workload
+
+        workload_slug = (input.workload_slug or "").strip()
+        app_slug = (input.app_slug or "").strip()
+        if not workload_slug or not app_slug:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "workload_slug and app_slug are required",
+                field="workloadSlug",
+            )
+
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .first()
+        )
+        if app is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"app {app_slug!r} not found",
+                field="appSlug",
+            )
+
+        workload = (
+            Workload.objects.filter(
+                slug=workload_slug,
+                registered_app=app,
+                kind="task",
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if workload is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"task workload {workload_slug!r} not found on app {app_slug!r}",
+                field="workloadSlug",
+            )
+
+        env = None
+        if (input.environment_name or "").strip():
+            env = (
+                AppEnvironment.objects.filter(
+                    registered_app=app,
+                    name=input.environment_name,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if env is None:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"environment {input.environment_name!r} not found",
+                    field="environmentName",
+                )
+
+        actor = info.context.request.user
+        run = TaskRun.objects.create(
+            workload=workload,
+            app_environment=env,
+            trigger_kind=TaskRun.TriggerKind.MANUAL,
+            triggered_by_user=actor if actor.is_authenticated else None,
+            command=input.command or [],
+            status=TaskRun.Status.PENDING,
+        )
+        return gql_success(task_run_to_payload(run))
+
 
 # ---------------------------------------------------------------------------
 # #389 input / payload types — force-redeploy recovery. Defined at
@@ -4533,3 +4628,29 @@ class ValidateAstroliftCiSecretsPayload:
 
     repo: str
     results: list[CiSecretValidationType]
+
+
+# ---------------------------------------------------------------------------
+# #801 RunTaskInput — operator-initiated one-shot task execution.
+# Defined at module scope so Strawberry discovers it before the mutation
+# method references it via the forward-reference string.
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class RunTaskInput:
+    """Input for the ``runTask`` mutation (#801).
+
+    ``app_slug`` + ``workload_slug`` identify the ``kind: task``
+    workload to execute.  ``environment_name`` picks the target
+    cluster; when omitted the app's default environment is used.
+    ``command`` overrides the container command so the same workload
+    can run one-off variations (e.g. ``["python", "manage.py",
+    "migrate", "--database", "secondary"]``) without a manifest edit.
+    Pass an empty list (the default) to run the declared command as-is.
+    """
+
+    app_slug: str
+    workload_slug: str
+    environment_name: str | None = None
+    command: list[str] = strawberry.field(default_factory=list)

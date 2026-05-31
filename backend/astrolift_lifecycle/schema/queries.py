@@ -10,6 +10,7 @@ from strawberry.types import Info
 
 from astrolift_graphql import GUID
 from astrolift_lifecycle.models import (
+    AgentRun,
     AppEnvironment,
     CommandRun,
     CustomDomain,
@@ -18,6 +19,7 @@ from astrolift_lifecycle.models import (
     DeployToken,
     PreviewEnvironment,
     ScheduledJobRun,
+    TaskRun,
 )
 from astrolift_lifecycle.schema.types import (
     AppCertificateType,
@@ -53,9 +55,13 @@ from astrolift_lifecycle.schema.types import (
     dns_record_to_type,
     identity_binding_to_type,
     pod_info_to_type,
+    AgentRunType,
+    TaskRunType,
+    agent_run_to_type,
     preview_to_type,
     release_notes_to_type,
     scheduled_job_run_to_type,
+    task_run_to_type,
 )
 from astrolift_registry.models import RegisteredApp
 from core.cluster_observability import (
@@ -1301,6 +1307,71 @@ class LifecycleQuery:
             environment_name=environment_name,
             in_flight_deployments=rows,
         )
+
+    # ----------------------------------------------------------------
+    # TaskRun + AgentRun fleet queries (#801, #798)
+    # ----------------------------------------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ_LOGS)
+    @tenant_scoped()
+    def astrolift_task_runs(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        workload_slug: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[TaskRunType]:
+        """Operator-initiated task executions, most-recent-first.
+
+        Filtered by app, workload, and/or status. Capped at 500 to keep
+        the response bounded; callers that need deeper history should add
+        pagination (future ticket).
+        """
+        qs = TaskRun.objects.select_related(
+            "workload",
+            "workload__registered_app",
+            "app_environment",
+            "triggered_by_user",
+        ).order_by("-created_at")
+        if app_slug:
+            qs = qs.filter(workload__registered_app__slug=app_slug)
+        if workload_slug:
+            qs = qs.filter(workload__slug=workload_slug)
+        if status:
+            qs = qs.filter(status=status)
+        return [task_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_agent_runs(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        workload_slug: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[AgentRunType]:
+        """AI agent dispatch executions, most-recent-first.
+
+        Filtered by app, workload, and/or status. ``status="running"``
+        is the Active tab query; omitting status gives the full History.
+        """
+        qs = AgentRun.objects.select_related(
+            "workload",
+            "workload__registered_app",
+            "app_environment",
+            "triggered_by_user",
+        ).order_by("-created_at")
+        if app_slug:
+            qs = qs.filter(workload__registered_app__slug=app_slug)
+        if workload_slug:
+            qs = qs.filter(workload__slug=workload_slug)
+        if status:
+            qs = qs.filter(status=status)
+        return [agent_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
 
 def _preview_with_cost(p) -> PreviewEnvironmentType:
