@@ -2,6 +2,8 @@
 
 import { useQuery } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { PipelineSecretsTab } from "./secrets-tab";
 import {
   ActivityIcon,
   DownloadIcon,
@@ -43,14 +45,15 @@ const GET_PIPELINE_RUNS = gql`
   }
 `;
 
-type DetailTab = "runs" | "logs" | "artifacts" | "triggers" | "runners";
-const TABS: readonly DetailTab[] = ["runs", "logs", "artifacts", "triggers", "runners"];
+type DetailTab = "runs" | "logs" | "artifacts" | "triggers" | "runners" | "secrets";
+const TABS: readonly DetailTab[] = ["runs", "logs", "artifacts", "triggers", "runners", "secrets"];
 const TAB_LABELS: Record<DetailTab, string> = {
   runs: "Runs",
   logs: "Logs",
   artifacts: "Artifacts",
   triggers: "Triggers",
   runners: "Runners",
+  secrets: "Secrets",
 };
 
 interface PipelineRun {
@@ -167,6 +170,11 @@ export function PipelineDetailClient({ pipelineId }: { pipelineId: string }) {
           title="Runner management"
           description="Self-hosted runners registered for this pipeline. Add runners to run jobs on your own infrastructure."
         />
+      )}
+
+      {/* Secrets tab (#100) */}
+      {tab === "secrets" && (
+        <PipelineSecretsTab pipelineId={pipelineId} />
       )}
     </div>
   );
