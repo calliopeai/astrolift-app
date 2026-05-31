@@ -61,7 +61,7 @@ interface BulkRejectResp {
  * outcomes. The footer's CTA disables itself with an inline hint when
  * the current selection spans more than one env.
  */
-export function ApprovalsQueueClient() {
+export function ApprovalsQueueClient({ children }: { children?: React.ReactNode }) {
   const t = useTranslations("lists.approvalsQueue");
   const fmt = useFormatters();
   const { can } = useMyPermissions();
@@ -202,6 +202,7 @@ export function ApprovalsQueueClient() {
     return (
       <PageShell title={t("title")} description={t("description")}>
         <Skeleton className="h-24 w-full" />
+        {children}
       </PageShell>
     );
   }
@@ -214,6 +215,7 @@ export function ApprovalsQueueClient() {
           description={t("empty.description")}
           icon={<ShieldCheckIcon className="size-6" aria-hidden />}
         />
+        {children}
       </PageShell>
     );
   }
@@ -329,7 +331,8 @@ export function ApprovalsQueueClient() {
         destructive
         onConfirm={handleBulkReject}
       />
-    </PageShell>
+        {children}
+      </PageShell>
   );
 }
 
