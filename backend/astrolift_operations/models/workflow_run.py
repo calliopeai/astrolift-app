@@ -62,6 +62,18 @@ class WorkflowRun(BaseCoreModel):
     trigger_actor_token_kind = models.CharField(max_length=32, blank=True, default="")
     trigger_actor_token_id = models.BigIntegerField(null=True, blank=True)
 
+    # Quick-access pointer for operator polling: which stage is running right now.
+    # Null for workflows that have not yet started stage execution or for
+    # top-level single-stage runs. Updated by the Temporal worker via the
+    # Controller API (not direct DB writes from the worker process).
+    current_stage_execution = models.ForeignKey(
+        "workflows.WorkflowStageExecution",
+        related_name="+",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
     result = models.JSONField(null=True, blank=True)
     failure = models.JSONField(null=True, blank=True)
 
