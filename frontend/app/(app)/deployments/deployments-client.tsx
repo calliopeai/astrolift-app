@@ -20,6 +20,8 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ListControls, SortableHeader } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialogWithReason } from "@/components/ConfirmDialogWithReason";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { EmptyState } from "@/components/EmptyState";
@@ -215,6 +217,21 @@ export function DeploymentsClient() {
       return true;
     });
   }, [allDeployments, tab, appFilter]);
+
+  // Pagination + sort layered on top of the tab/app-filter result.
+  const ctrl = useListControls({
+    data: list,
+    // Search already handled by appFilter above; we add sort + pagination only.
+    initialPageSize: 25,
+    sortFn: (a, b, s) => {
+      const dir = s.dir === "asc" ? 1 : -1;
+      if (s.key === "app") return a.registeredAppSlug.localeCompare(b.registeredAppSlug) * dir;
+      if (s.key === "status") return a.status.localeCompare(b.status) * dir;
+      if (s.key === "started")
+        return ((a.startedAt ?? "").localeCompare(b.startedAt ?? "")) * dir;
+      return 0;
+    },
+  });
 
   // Live push: any status transition for any deployment in the org
   // triggers a list refetch. The backend dedupes per-row, and refetch
@@ -528,9 +545,7 @@ export function DeploymentsClient() {
           onChange={(e) => setAppFilter(e.target.value)}
           className="max-w-xs"
         />
-        <span className="text-muted-foreground ml-auto text-xs">
-          {t("counts", { filtered: list.length, total: allDeployments.length })}
-        </span>
+        <ListControls controls={ctrl} hideSearch className="ml-auto" />
       </div>
 
       <Card>
@@ -571,17 +586,17 @@ export function DeploymentsClient() {
                       )}
                     </TableHead>
                     <TableHead className="w-6"></TableHead>
-                    <TableHead>{t("columns.appEnv")}</TableHead>
+                    <TableHead><SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.appEnv")}</SortableHeader></TableHead>
                     <TableHead>{t("columns.image")}</TableHead>
                     <TableHead>{t("columns.trigger")}</TableHead>
-                    <TableHead>{t("columns.status")}</TableHead>
+                    <TableHead><SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.status")}</SortableHeader></TableHead>
                     <TableHead>{t("columns.duration")}</TableHead>
-                    <TableHead>{t("columns.started")}</TableHead>
+                    <TableHead><SortableHeader sortKey="started" sort={ctrl.sort} onToggle={ctrl.toggleSort}>{t("columns.started")}</SortableHeader></TableHead>
                     <TableHead className="w-44 text-right">{t("columns.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {list.map((d) => (
+                  {ctrl.rows.map((d) => (
                     <DeploymentRow
                       key={d.id}
                       deployment={d}
