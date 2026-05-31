@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import {
   AlertDialog,
@@ -49,6 +50,8 @@ import {
 } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_APP_DEPLOY_TOKENS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { useListControls } from "@/hooks/use-list-controls";
+import type { SortState } from "@/hooks/use-list-controls";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -117,6 +120,28 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
   const busy = createState.loading || rotateState.loading || revokeState.loading;
   const list = tokens.data?.astroliftAppDeployTokens ?? [];
 
+  const ctrl = useListControls({
+    data: list,
+    searchFn: (token) =>
+      [token.name, token.last4, token.scopes.join(" ")].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort: SortState) => {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      if (sort.key === "name") {
+        return a.name.localeCompare(b.name) * dir;
+      }
+      if (sort.key === "createdAt") {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+      }
+      if (sort.key === "lastUsedAt") {
+        const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+        const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+        return (aTime - bTime) * dir;
+      }
+      return 0;
+    },
+  });
+
   async function handleRotate(t: DeployToken) {
     const { data } = await rotateToken({ variables: { input: { id: t.id } } });
     if (data?.rotateDeployToken.ok) {
@@ -154,6 +179,7 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
       }
     >
       <AppTabs slug={slug} active="secrets" />
+      <ListControls controls={ctrl} searchPlaceholder={tr("searchPlaceholder")} />
       <TooltipProvider>
         <Card>
           <CardContent className="p-0">
@@ -174,17 +200,25 @@ export function AppDeployTokensClient({ slug }: { slug: string }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{tr("columns.name")}</TableHead>
+                    <TableHead>
+                      <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                        {tr("columns.name")}
+                      </SortableHeader>
+                    </TableHead>
                     <TableHead>{tr("columns.last4")}</TableHead>
                     <TableHead>{tr("columns.scopes")}</TableHead>
-                    <TableHead>{tr("columns.lastUsed")}</TableHead>
+                    <TableHead>
+                      <SortableHeader sortKey="lastUsedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                        {tr("columns.lastUsed")}
+                      </SortableHeader>
+                    </TableHead>
                     <TableHead>{tr("columns.expires")}</TableHead>
                     <TableHead>{tr("columns.state")}</TableHead>
                     <TableHead className="text-right">{tr("columns.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {list.map((token) => (
+                  {ctrl.rows.map((token) => (
                     <TableRow key={token.id}>
                       <TableCell className="font-medium">{token.name}</TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
