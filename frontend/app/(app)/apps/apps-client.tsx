@@ -23,9 +23,11 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { ViewToggle } from "@/components/ViewToggle";
 import { useViewToggle } from "@/hooks/use-view-toggle";
+import { useListControls } from "@/hooks/use-list-controls";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -312,6 +314,29 @@ export function AppsClient() {
     return [...pins, ...rest];
   }, [rawApps, pinnedSet, sortKey]);
 
+  const ctrl = useListControls({
+    data: apps,
+    searchFn: (app) =>
+      [app.name, app.slug, app.teamSlug, app.projectSlug, app.sourceKind].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      if (sort.key === "name") {
+        const cmp = a.name.localeCompare(b.name);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "status") {
+        const cmp = a.provisioningStatus.localeCompare(b.provisioningStatus);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "createdAt") {
+        const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+        return sort.dir === "asc" ? ta - tb : tb - ta;
+      }
+      return 0;
+    },
+  });
+
   // `/` global shortcut focuses the search input — but only when the
   // user isn't already typing into a form control / contenteditable,
   // and no modifier key is held (so it doesn't intercept browser
@@ -491,7 +516,7 @@ export function AppsClient() {
         </div>
         {totalCount > 0 && (
           <p className="text-muted-foreground text-xs">
-            {t("count", { shown: apps.length, total: totalCount })}
+            {t("count", { shown: ctrl.totalFiltered, total: totalCount })}
           </p>
         )}
       </div>
@@ -574,8 +599,23 @@ export function AppsClient() {
         </Card>
       ) : (
         <>
+          <ListControls controls={ctrl} searchPlaceholder="Filter loaded apps…" hideSearch={false} />
+          {viewMode === "list" && (
+            <div className="flex items-center gap-3 px-4 py-1">
+              <div className="w-4 shrink-0" />
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                  Name
+                </SortableHeader>
+              </div>
+              <SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                Status
+              </SortableHeader>
+              <div className="w-24 shrink-0" />
+            </div>
+          )}
           <div className={viewMode === "card" ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3" : "flex flex-col gap-1"}>
-            {apps.map((app) => {
+            {ctrl.rows.map((app) => {
               const isPinned = pinnedSet.has(app.slug);
               const isSelected = selectedSlugs.has(app.slug);
 
