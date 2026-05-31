@@ -23,6 +23,7 @@ from astrolift_identity.urls import (
     app_urlpatterns as identity_app_urls,
 )
 from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
+from astrolift_agents.urls import urlpatterns as agents_api_urls
 from astrolift_scm.urls import urlpatterns as scm_webhook_urls
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
@@ -106,6 +107,12 @@ urlpatterns = [
     # Builder ships against ``/api/builder/v1/dev-environments/...``
     # as a stable wire contract.
     *lifecycle_api_urls,
+    # Agent Dispatch REST surface (#58). Mounted at the project root so
+    # the wire URL — ``/api/agents/v1/tasks/<id>/vnc/ws/`` — resolves
+    # without the ``/app/`` prefix. The noVNC proxy stub returns 501
+    # until ASGI/Channels is configured; the URL is registered now so
+    # the front-end can target a stable endpoint.
+    *agents_api_urls,
     # SCM webhook receivers (#778). Mounted at the project root because
     # the wire URLs the source host (GitHub / GitLab) was told to POST
     # to — ``/api/webhooks/<kind>/<app_guid>/`` — must resolve without

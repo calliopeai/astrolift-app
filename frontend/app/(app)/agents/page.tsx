@@ -1,6 +1,8 @@
-import { BotIcon, ExternalLinkIcon, ZapIcon, LayoutListIcon } from "lucide-react";
+import Link from "next/link";
+import { BotIcon, ExternalLinkIcon, RadioIcon, ZapIcon, LayoutListIcon } from "lucide-react";
 
 import { PageShell } from "@/components/PageShell";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata = { title: "Agents · Astrolift" };
@@ -19,6 +21,13 @@ export default function AgentsPage() {
     <PageShell
       title="Agents"
       description="Dispatch, schedule, and monitor AI agent workloads across the fleet."
+      actions={
+        <Button asChild size="sm">
+          <Link href="/agents/gallery">
+            <RadioIcon className="mr-1 h-4 w-4" /> Active gallery
+          </Link>
+        </Button>
+      }
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
