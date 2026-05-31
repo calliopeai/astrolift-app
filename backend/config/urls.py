@@ -115,8 +115,9 @@ urlpatterns = [
     # traffic. Each view performs its own HMAC verification before
     # touching the request body.
     *scm_webhook_urls,
-    *pipeline_webhook_urls,
-    *dispatch_api_urls,
+    # Pipeline webhooks + runner API + Dispatch Service API
+    *pipeline_webhook_urls,   # includes /webhooks/pipelines/*, /api/pipelines/v1/runners/*
+    *dispatch_api_urls,       # /api/dispatch/v1/*
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),

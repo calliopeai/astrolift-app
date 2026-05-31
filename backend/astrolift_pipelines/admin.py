@@ -8,6 +8,7 @@ from astrolift_pipelines.models import (
     JobRun,
     Pipeline,
     PipelineRun,
+    Runner,
     Step,
     StepRun,
     Trigger,
@@ -22,7 +23,6 @@ class _AllObjectsAdmin(admin.ModelAdmin):
 @admin.register(Pipeline)
 class PipelineAdmin(_AllObjectsAdmin):
     list_display = ("name", "organization", "repo_url", "default_branch", "deleted_at")
-    list_filter = ("default_branch",)
     search_fields = ("name", "repo_url")
     readonly_fields = ("guid", "created_at", "updated_at", "version")
 
@@ -30,8 +30,7 @@ class PipelineAdmin(_AllObjectsAdmin):
 @admin.register(PipelineRun)
 class PipelineRunAdmin(_AllObjectsAdmin):
     list_display = ("pipeline", "run_number", "trigger_kind", "status", "started_at", "finished_at")
-    list_filter = ("trigger_kind", "status")
-    search_fields = ("trigger_ref", "trigger_actor", "temporal_workflow_id")
+    list_filter = ("status", "trigger_kind")
     readonly_fields = ("guid", "created_at", "updated_at", "version")
 
 
@@ -42,10 +41,37 @@ class JobAdmin(_AllObjectsAdmin):
     readonly_fields = ("guid", "created_at", "updated_at", "version")
 
 
+@admin.register(Runner)
+class RunnerAdmin(_AllObjectsAdmin):
+    list_display = (
+        "slug",
+        "name",
+        "organization",
+        "status",
+        "os",
+        "arch",
+        "version_string",
+        "last_heartbeat_at",
+        "deleted_at",
+    )
+    list_filter = ("status", "os", "arch", "organization")
+    search_fields = ("slug", "name", "organization__slug")
+    readonly_fields = ("guid", "created_at", "updated_at", "version", "registration_token_hash", "api_key_hash")
+
+
 @admin.register(JobRun)
 class JobRunAdmin(_AllObjectsAdmin):
-    list_display = ("pipeline_run", "job", "status", "started_at", "finished_at")
+    # Enhanced from workflow agent: shows organization + claimed runner
+    list_display = (
+        "guid",
+        "job",
+        "status",
+        "started_at",
+        "finished_at",
+        "deleted_at",
+    )
     list_filter = ("status",)
+    search_fields = ("guid",)
     readonly_fields = ("guid", "created_at", "updated_at", "version")
 
 

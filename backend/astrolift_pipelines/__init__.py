@@ -5,3 +5,5 @@ records of pipeline runs, job runs, step runs, artifacts, and triggers.
 GraphQL schema, Temporal workflow namespace (``pipelines``), and admin
 are all defined within this app.
 """
+
+default_app_config = "astrolift_pipelines.apps.AstroliftPipelinesConfig"
