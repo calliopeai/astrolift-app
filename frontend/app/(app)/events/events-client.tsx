@@ -7,6 +7,7 @@ import NextLink from "next/link";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   LIST_EVENTS_AGGREGATED,
 } from "@/graphql/operations/operations.queries";
 import type { AstroliftEvent } from "@/graphql/operations/operations.types";
+import { useListControls } from "@/hooks/use-list-controls";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 interface RawResp {
@@ -83,6 +85,26 @@ function RawList({ eventTypeFilter }: { eventTypeFilter: string }) {
   });
   const list = data?.astroliftEvents ?? [];
 
+  const ctrl = useListControls({
+    data: list,
+    searchFn: (e) =>
+      [e.eventType, e.resourceKind ?? "", e.resourceId ?? ""].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "occurredAt", dir: "desc" },
+    sortFn: (a, b, sort) => {
+      if (sort.key === "occurredAt") {
+        const diff =
+          new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime();
+        return sort.dir === "asc" ? diff : -diff;
+      }
+      if (sort.key === "eventType") {
+        const diff = a.eventType.localeCompare(b.eventType);
+        return sort.dir === "asc" ? diff : -diff;
+      }
+      return 0;
+    },
+  });
+
   if (loading && list.length === 0) {
     return (
       <Card>
@@ -108,15 +130,35 @@ function RawList({ eventTypeFilter }: { eventTypeFilter: string }) {
   }
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <ul className="divide-y">
-          {list.map((e) => (
-            <EventRow key={e.id} event={e} />
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <SortableHeader
+          sortKey="eventType"
+          sort={ctrl.sort}
+          onToggle={ctrl.toggleSort}
+        >
+          Type
+        </SortableHeader>
+        <SortableHeader
+          sortKey="occurredAt"
+          sort={ctrl.sort}
+          onToggle={ctrl.toggleSort}
+        >
+          Time
+        </SortableHeader>
+        <div className="flex-1" />
+        <ListControls controls={ctrl} searchPlaceholder={t("filterPlaceholder")} />
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          <ul className="divide-y">
+            {ctrl.rows.map((e) => (
+              <EventRow key={e.id} event={e} />
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -132,6 +174,26 @@ function AggregatedList({ eventTypeFilter }: { eventTypeFilter: string }) {
     fetchPolicy: "cache-and-network",
   });
   const buckets = data?.astroliftEventsAggregated ?? [];
+
+  const ctrl = useListControls({
+    data: buckets,
+    searchFn: (b) =>
+      [b.eventType, b.resourceKind ?? "", b.resourceId ?? ""].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "lastAt", dir: "desc" },
+    sortFn: (a, b, sort) => {
+      if (sort.key === "lastAt") {
+        const diff =
+          new Date(a.lastAt).getTime() - new Date(b.lastAt).getTime();
+        return sort.dir === "asc" ? diff : -diff;
+      }
+      if (sort.key === "eventType") {
+        const diff = a.eventType.localeCompare(b.eventType);
+        return sort.dir === "asc" ? diff : -diff;
+      }
+      return 0;
+    },
+  });
 
   if (loading && buckets.length === 0) {
     return (
@@ -158,18 +220,38 @@ function AggregatedList({ eventTypeFilter }: { eventTypeFilter: string }) {
   }
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <ul className="divide-y">
-          {buckets.map((b) => (
-            <BucketRow
-              key={`${b.eventType}|${b.resourceKind}|${b.resourceId}|${b.representative.id}`}
-              bucket={b}
-            />
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <SortableHeader
+          sortKey="eventType"
+          sort={ctrl.sort}
+          onToggle={ctrl.toggleSort}
+        >
+          Type
+        </SortableHeader>
+        <SortableHeader
+          sortKey="lastAt"
+          sort={ctrl.sort}
+          onToggle={ctrl.toggleSort}
+        >
+          Time
+        </SortableHeader>
+        <div className="flex-1" />
+        <ListControls controls={ctrl} searchPlaceholder={t("filterPlaceholder")} />
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          <ul className="divide-y">
+            {ctrl.rows.map((b) => (
+              <BucketRow
+                key={`${b.eventType}|${b.resourceKind}|${b.resourceId}|${b.representative.id}`}
+                bucket={b}
+              />
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
