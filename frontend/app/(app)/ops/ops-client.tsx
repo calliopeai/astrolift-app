@@ -542,11 +542,14 @@ function KpiTile({ icon: Icon, label, value, sub, href, tone }: KpiTileProps) {
         </CardHeader>
         <CardContent>
           {value == null ? (
-            <Skeleton className="h-8 w-16" />
+            <>
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="mt-1 h-3 w-32" />
+            </>
           ) : (
             <p className="text-2xl font-bold tabular-nums">{value}</p>
           )}
-          {sub != null && (
+          {value != null && sub != null && (
             <p className="text-muted-foreground mt-1 text-xs">{sub}</p>
           )}
         </CardContent>
