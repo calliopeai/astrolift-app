@@ -111,6 +111,15 @@ class Permission(enum.StrEnum):
     FORM_SUBMIT = "form.submit"
     FORM_MODERATE = "form.moderate"
 
+    # --- Pipelines (#86) ------------------------------------------
+    PIPELINE_READ = "pipeline.read"
+    PIPELINE_CREATE = "pipeline.create"
+    PIPELINE_UPDATE = "pipeline.update"
+    PIPELINE_DELETE = "pipeline.delete"
+    PIPELINE_TRIGGER = "pipeline.trigger"      # dispatch a manual run
+    PIPELINE_CANCEL = "pipeline.cancel"        # cancel a running run
+    PIPELINE_SECRET_MANAGE = "pipeline.secret_manage"  # add/rotate pipeline secrets
+
     # --- Admin elevation ------------------------------------------
     ADMIN_ELEVATE = "admin.elevate"
 
