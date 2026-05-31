@@ -66,12 +66,12 @@ export function PoliciesClient() {
   const allPolicies = policies.data?.astroliftPolicies ?? [];
   const ctrl = useListControls({
     data: allPolicies,
-    searchFn: (p) => [p.name ?? "", p.policyType ?? "", p.scopeType ?? ""].join(" "),
+    searchFn: (p) => [p.name, p.scopeLevel, p.effect, p.description].join(" "),
     initialPageSize: 25,
     sortFn: (a, b, s) => {
       const dir = s.dir === "asc" ? 1 : -1;
-      if (s.key === "name") return ((a.name ?? "").localeCompare(b.name ?? "")) * dir;
-      if (s.key === "type") return ((a.policyType ?? "").localeCompare(b.policyType ?? "")) * dir;
+      if (s.key === "name") return a.name.localeCompare(b.name) * dir;
+      if (s.key === "scope") return a.scopeLevel.localeCompare(b.scopeLevel) * dir;
       return 0;
     },
   });

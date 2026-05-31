@@ -264,11 +264,11 @@ export function AppPreviewsClient({ slug }: { slug: string }) {
   );
   const ctrl = useListControls({
     data: statusFiltered,
-    searchFn: (p) => [p.branchName ?? "", String(p.prNumber ?? ""), p.headSha ?? ""].join(" "),
+    searchFn: (p) => [p.branch, String(p.prNumber), p.commitSha].join(" "),
     initialPageSize: 25,
     sortFn: (a, b, s) => {
       const dir = s.dir === "asc" ? 1 : -1;
-      if (s.key === "branch") return ((a.branchName ?? "").localeCompare(b.branchName ?? "")) * dir;
+      if (s.key === "branch") return a.branch.localeCompare(b.branch) * dir;
       if (s.key === "status") return a.status.localeCompare(b.status) * dir;
       return 0;
     },

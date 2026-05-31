@@ -715,7 +715,7 @@ function ExpandedRow({ subscription }: { subscription: AstroliftWebhookSubscript
   const allDeliveries = data?.astroliftWebhookDeliveries ?? [];
   const deliveriesCtrl = useListControls({
     data: allDeliveries,
-    searchFn: (d) => [d.eventType ?? "", d.status ?? ""].join(" "),
+    searchFn: (d) => [d.eventType, d.success ? "success" : "failed"].join(" "),
     initialPageSize: 25,
   });
   const rows = deliveriesCtrl.rows;

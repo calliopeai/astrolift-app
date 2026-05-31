@@ -169,14 +169,14 @@ export function SourceProvidersClient() {
   const allConnections = conns.data?.astroliftSourceConnections ?? [];
   const connCtrl = useListControls({
     data: allConnections,
-    searchFn: (c) => [c.kind ?? "", c.baseUrl ?? "", c.slug ?? ""].join(" "),
+    searchFn: (c) => [c.kind, c.apiBaseUrl, c.accountLogin, c.displayName].join(" "),
     initialPageSize: 25,
   });
   const connectionList = connCtrl.rows;
   const allKeys = keys.data?.astroliftSshDeployKeys ?? [];
   const keyCtrl = useListControls({
     data: allKeys,
-    searchFn: (k) => [k.name ?? "", k.fingerprint ?? ""].join(" "),
+    searchFn: (k) => [k.name, k.fingerprintSha256, k.registeredAppSlug ?? ""].join(" "),
     initialPageSize: 25,
   });
   const keyList = keyCtrl.rows;
