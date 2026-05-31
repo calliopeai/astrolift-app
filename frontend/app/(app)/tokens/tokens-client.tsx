@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useListControls } from "@/hooks/use-list-controls";
 import { CREATE_API_TOKEN, REVOKE_API_TOKEN } from "@/graphql/identity/identity.mutations";
 import { LIST_API_TOKENS } from "@/graphql/identity/identity.queries";
 import type {
@@ -157,6 +159,30 @@ export function TokensClient() {
 
   const list = tokens.data?.astroliftApiTokens ?? [];
 
+  const ctrl = useListControls({
+    data: list,
+    searchFn: (t) => [t.name, t.tokenLast4, ...t.scopes].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "createdAt", dir: "desc" },
+    sortFn: (a, b, sort) => {
+      if (sort.key === "name") {
+        const cmp = a.name.localeCompare(b.name);
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "createdAt") {
+        const cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      if (sort.key === "lastUsedAt") {
+        const at = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+        const bt = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+        const cmp = at - bt;
+        return sort.dir === "asc" ? cmp : -cmp;
+      }
+      return 0;
+    },
+  });
+
   return (
     <TooltipProvider>
       <PageShell
@@ -218,21 +244,37 @@ export function TokensClient() {
                 />
               </div>
             ) : (
-              <Table>
+              <>
+                <div className="border-b px-4 py-2">
+                  <ListControls controls={ctrl} searchPlaceholder="Search tokens…" />
+                </div>
+                <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>
+                      <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                        Name
+                      </SortableHeader>
+                    </TableHead>
                     <TableHead>Suffix</TableHead>
                     <TableHead>Scopes</TableHead>
-                    <TableHead>Last used</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>
+                      <SortableHeader sortKey="lastUsedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                        Last used
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader sortKey="createdAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                        Created
+                      </SortableHeader>
+                    </TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {list.map((t) => (
+                  {ctrl.rows.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell className="font-medium">{t.name}</TableCell>
                       <TableCell className="font-mono text-xs">…{t.tokenLast4}</TableCell>
@@ -285,6 +327,7 @@ export function TokensClient() {
                   ))}
                 </TableBody>
               </Table>
+              </>
             )}
           </CardContent>
         </Card>
