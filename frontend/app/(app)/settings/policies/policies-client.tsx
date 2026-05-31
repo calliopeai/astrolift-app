@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { BookOpenIcon, PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
+import { ListControls } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -61,7 +63,19 @@ export function PoliciesClient() {
     }
   }
 
-  const list = policies.data?.astroliftPolicies ?? [];
+  const allPolicies = policies.data?.astroliftPolicies ?? [];
+  const ctrl = useListControls({
+    data: allPolicies,
+    searchFn: (p) => [p.name ?? "", p.policyType ?? "", p.scopeType ?? ""].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, s) => {
+      const dir = s.dir === "asc" ? 1 : -1;
+      if (s.key === "name") return ((a.name ?? "").localeCompare(b.name ?? "")) * dir;
+      if (s.key === "type") return ((a.policyType ?? "").localeCompare(b.policyType ?? "")) * dir;
+      return 0;
+    },
+  });
+  const list = ctrl.rows;
 
   return (
     <PageShell
@@ -82,6 +96,9 @@ export function PoliciesClient() {
         </>
       }
     >
+      {allPolicies.length > 0 && (
+        <ListControls controls={ctrl} searchPlaceholder="Search policies…" className="mb-3" />
+      )}
       <Card>
         <CardContent className="p-0">
           {policies.loading ? (
