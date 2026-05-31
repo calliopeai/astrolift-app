@@ -7,7 +7,68 @@ import strawberry
 import strawberry_django
 from strawberry.types import Info
 
-from workflows.models import TransitionLog, WorkflowDefinition, WorkflowInstance
+from workflows.models import (
+    TransitionLog,
+    WorkflowDefinition,
+    WorkflowInstance,
+    WorkflowStage,
+    WorkflowStageExecution,
+)
+
+
+@strawberry_django.type(WorkflowStage)
+class WorkflowStageType:
+    guid: strawberry.ID
+    order: int
+    kind: str
+    skill_refs: strawberry.scalars.JSON
+    fan_out_count: Optional[int]
+    on_failure: str
+    timeout_seconds: int
+    created_at: datetime
+
+    @strawberry_django.field
+    def agent_definition_guid(self) -> Optional[str]:
+        if self.agent_definition_id is None:
+            return None
+        return str(self.agent_definition.guid)
+
+    @strawberry_django.field
+    def agent_definition_name(self) -> Optional[str]:
+        if self.agent_definition_id is None:
+            return None
+        return self.agent_definition.name
+
+
+@strawberry_django.type(WorkflowStageExecution)
+class WorkflowStageExecutionType:
+    guid: strawberry.ID
+    status: str
+    attempt_number: int
+    started_at: Optional[datetime]
+    ended_at: Optional[datetime]
+    output: Optional[strawberry.scalars.JSON]
+    failure: Optional[strawberry.scalars.JSON]
+    error_message: str
+    created_at: datetime
+
+    @strawberry_django.field
+    def stage_guid(self) -> str:
+        return str(self.stage.guid)
+
+    @strawberry_django.field
+    def stage_kind(self) -> str:
+        return self.stage.kind
+
+    @strawberry_django.field
+    def stage_order(self) -> int:
+        return self.stage.order
+
+    @strawberry_django.field
+    def agent_run_guid(self) -> Optional[str]:
+        if self.agent_run_id is None:
+            return None
+        return str(self.agent_run.guid)
 
 
 @strawberry_django.type(WorkflowDefinition)
@@ -16,6 +77,7 @@ class WorkflowDefinitionType:
     slug: str
     description: Optional[str]
     model_label: str
+    pattern_kind: str
     states: strawberry.scalars.JSON
     transitions: strawberry.scalars.JSON
     is_enabled: bool
@@ -28,6 +90,10 @@ class WorkflowDefinitionType:
     @strawberry_django.field
     def active_instance_count(self) -> int:
         return self.instances.filter(completed_at__isnull=True).count()
+
+    @strawberry_django.field
+    def workflow_stages(self) -> list[WorkflowStageType]:
+        return self.stages.select_related("agent_definition").order_by("order")
 
 
 @strawberry.type

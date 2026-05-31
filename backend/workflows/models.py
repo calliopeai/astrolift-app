@@ -34,6 +34,30 @@ class WorkflowDefinition(BaseCoreModel):
           "actions": [{"type": "notify_user", "user": "form_owner"}],
           "timeout_hours": null}]
     """
+
+    class PatternKind(models.TextChoices):
+        # One agent, one task — synchronous or async.
+        SINGLE = "single"
+        # Tasks run in sequence; each stage receives the prior stage's output.
+        CHAINED = "chained"
+        # One trigger spawns N parallel tasks; results are aggregated before
+        # the next stage begins.
+        FAN_OUT = "fan_out"
+        # Supervisor agent routes sub-tasks to worker agents dynamically.
+        SUPERVISOR_WORKER = "supervisor_worker"
+        # Agent produces output → human gate approves/rejects → agent iterates.
+        REVIEW_LOOP = "review_loop"
+        # Agent runs in read-only observe mode alongside another task.
+        ADVISOR = "advisor"
+
+    pattern_kind = models.CharField(
+        max_length=32,
+        choices=PatternKind.choices,
+        default=PatternKind.SINGLE,
+        db_index=True,
+        help_text="Multi-agent composition pattern for this workflow definition.",
+    )
+
     model_label = models.CharField(
         max_length=100,
         help_text='Django model this workflow applies to (e.g. "forms.FormSubmission")',
@@ -299,3 +323,194 @@ class TransitionLog(models.Model):
 
     def __str__(self):
         return f'{self.from_state} → {self.to_state} at {self.timestamp}'
+
+
+class WorkflowStage(BaseCoreModel):
+    """One ordered stage within an agent WorkflowDefinition.
+
+    A stage declares what happens at position ``order`` in the sequence —
+    dispatching an agent, waiting on a human gate, aggregating fan-out
+    results, or capturing a checkpoint. Stages are the static definition;
+    per-run execution records live on WorkflowStageExecution.
+    """
+
+    class StageKind(models.TextChoices):
+        # Dispatches an agent workload (requires agent_definition).
+        AGENT_DISPATCH = "agent_dispatch"
+        # Pause for human approval / rejection before proceeding.
+        HUMAN_GATE = "human_gate"
+        # Intermediate checkpoint — snapshot state, no external dispatch.
+        CHECKPOINT = "checkpoint"
+        # Collect and merge outputs from a preceding fan_out stage.
+        AGGREGATION = "aggregation"
+
+    class OnFailure(models.TextChoices):
+        FAIL = "fail"
+        RETRY = "retry"
+        SKIP = "skip"
+        ESCALATE = "escalate"
+
+    definition = models.ForeignKey(
+        WorkflowDefinition,
+        related_name="stages",
+        on_delete=models.CASCADE,
+    )
+    order = models.IntegerField(
+        help_text="0-based position of this stage within the workflow sequence.",
+    )
+    kind = models.CharField(
+        max_length=32,
+        choices=StageKind.choices,
+        default=StageKind.AGENT_DISPATCH,
+    )
+    # Nullable — only AGENT_DISPATCH stages reference a Workload. The FK is a
+    # soft guard; callers should validate kind == "agent" on the Workload.
+    agent_definition = models.ForeignKey(
+        "astrolift_registry.Workload",
+        related_name="workflow_stages",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Agent workload to dispatch at this stage (kind=agent_dispatch only).",
+    )
+    # Ordered list of Skill slugs injected into the agent at dispatch time.
+    skill_refs = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Ordered list of Skill slugs injected at dispatch.",
+    )
+    # For FAN_OUT pattern: max parallel tasks to spawn. Null means derive
+    # the count dynamically from the prior stage's output list length.
+    fan_out_count = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Max parallel tasks for fan_out stages. Null → dynamic from prior output.",
+    )
+    on_failure = models.CharField(
+        max_length=16,
+        choices=OnFailure.choices,
+        default=OnFailure.FAIL,
+        help_text="What to do if this stage fails.",
+    )
+    timeout_seconds = models.IntegerField(
+        default=300,
+        help_text="Maximum wall-clock time for this stage before it times out.",
+    )
+
+    class Meta:
+        ordering = ["definition", "order"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["definition", "order"],
+                name="workflowstage_definition_order_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["definition", "order"], name="wfstage_def_order_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.definition.name} stage {self.order} ({self.kind})"
+
+
+class WorkflowStageExecution(BaseCoreModel):
+    """Per-run execution record for one WorkflowStage.
+
+    Created by the Temporal worker when a stage begins; status is
+    updated via the Controller API (workers do not write DB directly).
+
+    One WorkflowStageExecution per spawned task for FAN_OUT stages — the
+    aggregation stage references all fan-out executions that fed it via
+    the ``fan_out_sources`` reverse relation.
+
+    Append-only after reaching a terminal status: COMPLETED / FAILED /
+    SKIPPED / ESCALATED. Enforcement is handled at the application layer
+    (and optionally a DB trigger added in a follow-up migration).
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        RUNNING = "running"
+        COMPLETED = "completed"
+        FAILED = "failed"
+        SKIPPED = "skipped"
+        ESCALATED = "escalated"
+        CANCELLED = "cancelled"
+
+    TERMINAL_STATUSES = {
+        Status.COMPLETED,
+        Status.FAILED,
+        Status.SKIPPED,
+        Status.ESCALATED,
+        Status.CANCELLED,
+    }
+
+    workflow_run = models.ForeignKey(
+        "astrolift_operations.WorkflowRun",
+        related_name="stage_executions",
+        on_delete=models.CASCADE,
+    )
+    stage = models.ForeignKey(
+        WorkflowStage,
+        related_name="executions",
+        on_delete=models.PROTECT,
+    )
+    # Set when the stage dispatches an agent run. Null for HUMAN_GATE /
+    # CHECKPOINT stages which have no associated agent dispatch.
+    agent_run = models.ForeignKey(
+        "astrolift_lifecycle.AgentRun",
+        related_name="stage_executions",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    # For fan_out aggregation stages: which fan-out executions fed this one.
+    fan_out_sources = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="aggregated_by",
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    attempt_number = models.IntegerField(
+        default=1,
+        help_text="1-based retry count — incremented each time the stage is retried.",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    # Stage output for chaining into the next stage.
+    output = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Stage result payload passed as input to the next stage.",
+    )
+    failure = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Structured failure details (error kind, message, stack excerpt).",
+    )
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["workflow_run", "stage"],
+                name="wfstageexec_run_stage_idx",
+            ),
+            models.Index(
+                fields=["workflow_run", "-started_at"],
+                name="wfstageexec_run_started_idx",
+            ),
+        ]
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in self.TERMINAL_STATUSES
+
+    def __str__(self) -> str:
+        return f"StageExecution {self.stage} run={self.workflow_run_id} [{self.status}]"
