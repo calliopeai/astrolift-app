@@ -113,6 +113,12 @@ const sections: NavSection[] = [
         permission: "cluster.register",
       },
       {
+        label: "Pipelines",
+        href: "/pipelines",
+        icon: <GitBranchIcon />,
+        permission: "pipeline.read",
+      },
+      {
         label: "Workflow Definitions",
         href: "/workflows",
         icon: <WorkflowIcon />,

@@ -76,7 +76,15 @@ export type AstroliftPermission =
   | "scm.connect"
   | "scm.disconnect"
   | "scm.key_create"
-  | "scm.key_delete";
+  | "scm.key_delete"
+  // Pipelines
+  | "pipeline.read"
+  | "pipeline.create"
+  | "pipeline.update"
+  | "pipeline.delete"
+  | "pipeline.trigger"
+  | "pipeline.cancel"
+  | "pipeline.secret_manage";
 
 export type PermissionCheck =
   | AstroliftPermission
