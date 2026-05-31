@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,8 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { useListControls } from "@/hooks/use-list-controls";
+import type { SortState } from "@/hooks/use-list-controls";
 
 import { AppTabs } from "../components/app-tabs";
 
@@ -78,6 +81,28 @@ export function AppMembersClient({ slug }: { slug: string }) {
 
   // Roles relevant to APP scope.
   const appRoles = roleList.filter((r) => r.scopeLevel === "APP");
+
+  const ctrl = useListControls({
+    data: appBindings,
+    searchFn: (rb) =>
+      [rb.user?.username ?? "", rb.user?.email ?? "", rb.groupExternalId ?? "", rb.role.slug].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort: SortState) => {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      if (sort.key === "user") {
+        const aVal = a.user?.username ?? a.groupExternalId ?? "";
+        const bVal = b.user?.username ?? b.groupExternalId ?? "";
+        return aVal.localeCompare(bVal) * dir;
+      }
+      if (sort.key === "role") {
+        return a.role.slug.localeCompare(b.role.slug) * dir;
+      }
+      if (sort.key === "grantedAt") {
+        return (new Date(a.grantedAt).getTime() - new Date(b.grantedAt).getTime()) * dir;
+      }
+      return 0;
+    },
+  });
 
   async function handleRevoke(rb: AstroliftRoleBinding) {
     const { data } = await revoke({ variables: { input: { id: rb.id } } });
@@ -143,6 +168,8 @@ export function AppMembersClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
 
+      <ListControls controls={ctrl} searchPlaceholder={t("searchPlaceholder")} />
+
       <Card>
         <CardContent className="p-0">
           {bindings.loading && appBindings.length === 0 ? (
@@ -164,15 +191,27 @@ export function AppMembersClient({ slug }: { slug: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("columns.user")}</TableHead>
-                  <TableHead>{t("columns.role")}</TableHead>
-                  <TableHead>{t("columns.granted")}</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="user" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      {t("columns.user")}
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="role" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      {t("columns.role")}
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="grantedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      {t("columns.granted")}
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead>{t("columns.expires")}</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {appBindings.map((rb) => (
+                {ctrl.rows.map((rb) => (
                   <TableRow key={rb.id}>
                     <TableCell>
                       {rb.user ? (
