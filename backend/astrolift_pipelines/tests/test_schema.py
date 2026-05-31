@@ -1,0 +1,342 @@
+"""Schema tests for astrolift_pipelines — Pipeline CRUD + tenant isolation (#67).
+
+Coverage:
+* createPipeline happy path creates a Pipeline row and returns it in the result.
+* createPipeline with missing name returns a VALIDATION error.
+* astroliftPipelines query returns only pipelines for the current tenant —
+  another org's pipelines must not leak.
+* astroliftPipeline (single) returns None for a pipeline in another org.
+* updatePipeline changes only the supplied fields.
+* deletePipeline soft-deletes the row (deleted_at is set).
+* createTrigger happy path creates a Trigger row for the pipeline.
+* createTrigger with unknown kind returns VALIDATION error.
+* triggerPipelineRun (stub) creates a pending PipelineRun row.
+* cancelPipelineRun transitions a pending run to cancelled.
+"""
+
+from __future__ import annotations
+
+import pytest
+from django.contrib.auth import get_user_model
+
+from astrolift_identity.models import Organization
+from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
+from astrolift_pipelines.schema.mutations import (
+    CreatePipelineInput,
+    CreateTriggerInput,
+    PipelinesMutation,
+    UpdatePipelineInput,
+)
+from astrolift_pipelines.schema.queries import PipelinesQuery
+from core.tenancy import TenantContext, tenant_context
+
+pytestmark = pytest.mark.django_db
+
+User = get_user_model()
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_opensearch(monkeypatch):
+    monkeypatch.setattr(
+        "core.documents.ProfileDocument.index_profile",
+        classmethod(lambda cls, profile: None),
+    )
+    monkeypatch.setattr(
+        "core.documents.ProfileDocument.delete_profile",
+        classmethod(lambda cls, profile_gid: None),
+    )
+
+
+@pytest.fixture
+def org():
+    return Organization.objects.create(name="Acme Corp", slug="acme-corp")
+
+
+@pytest.fixture
+def other_org():
+    return Organization.objects.create(name="Rival Inc", slug="rival-inc")
+
+
+@pytest.fixture
+def user(org):
+    return User.objects.create_user(
+        username="pipeline-ops",
+        email="ops@example.com",
+        password="x",
+    )
+
+
+@pytest.fixture
+def pipeline(org):
+    return Pipeline.objects.create(
+        organization=org,
+        name="deploy-pipeline",
+        repo_url="https://github.com/acme/app",
+        default_branch="main",
+    )
+
+
+@pytest.fixture
+def other_pipeline(other_org):
+    return Pipeline.objects.create(
+        organization=other_org,
+        name="rival-pipeline",
+        repo_url="https://github.com/rival/app",
+        default_branch="main",
+    )
+
+
+def _admin_info(user):
+    """Minimal request info with all permissions for mutation calls."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        context=SimpleNamespace(
+            request=SimpleNamespace(user=user, auth=None)
+        )
+    )
+
+
+def _readonly_info(user):
+    """Info object with only APP_READ permission."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        context=SimpleNamespace(
+            request=SimpleNamespace(user=user, auth=None)
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# createPipeline
+# ---------------------------------------------------------------------------
+
+
+def test_create_pipeline_happy_path(user, org):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.create_pipeline(
+            info,
+            input=CreatePipelineInput(
+                name="ci-pipeline",
+                repo_url="https://github.com/acme/ci",
+                default_branch="main",
+            ),
+        )
+    assert result.ok, result.errors
+    assert result.data is not None
+    assert result.data.name == "ci-pipeline"
+    assert result.data.repo_url == "https://github.com/acme/ci"
+    assert result.data.default_branch == "main"
+    # Verify the row was persisted
+    assert Pipeline.objects.filter(organization=org, name="ci-pipeline").exists()
+
+
+def test_create_pipeline_missing_name_returns_validation_error(user, org):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.create_pipeline(
+            info,
+            input=CreatePipelineInput(name="", repo_url="https://github.com/acme/app"),
+        )
+    assert not result.ok
+    assert result.errors
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "name"
+
+
+def test_create_pipeline_duplicate_name_returns_conflict(user, org, pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.create_pipeline(
+            info,
+            input=CreatePipelineInput(
+                name="deploy-pipeline",
+                repo_url="https://github.com/acme/other",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "CONFLICT"
+
+
+# ---------------------------------------------------------------------------
+# updatePipeline
+# ---------------------------------------------------------------------------
+
+
+def test_update_pipeline_changes_fields(user, org, pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.update_pipeline(
+            info,
+            id=str(pipeline.guid),
+            input=UpdatePipelineInput(default_branch="release"),
+        )
+    assert result.ok, result.errors
+    assert result.data.default_branch == "release"
+    pipeline.refresh_from_db()
+    assert pipeline.default_branch == "release"
+
+
+def test_update_pipeline_not_found_for_other_org(user, org, other_pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.update_pipeline(
+            info,
+            id=str(other_pipeline.guid),
+            input=UpdatePipelineInput(default_branch="main"),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# deletePipeline
+# ---------------------------------------------------------------------------
+
+
+def test_delete_pipeline_soft_deletes(user, org, pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.delete_pipeline(info, id=str(pipeline.guid))
+    assert result.ok, result.errors
+    pipeline.refresh_from_db()
+    assert pipeline.deleted_at is not None
+
+
+# ---------------------------------------------------------------------------
+# astroliftPipelines — tenant isolation
+# ---------------------------------------------------------------------------
+
+
+def test_astrolift_pipelines_returns_only_own_org(user, org, pipeline, other_pipeline):
+    """Pipelines belonging to another org must not appear in the response."""
+    query = PipelinesQuery()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        results = query.astrolift_pipelines(info)
+
+    ids = {str(p.id) for p in results}
+    assert str(pipeline.guid) in ids
+    assert str(other_pipeline.guid) not in ids
+
+
+def test_astrolift_pipeline_single_is_tenant_scoped(user, org, other_pipeline):
+    """astroliftPipeline must return None for a pipeline in another org."""
+    query = PipelinesQuery()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = query.astrolift_pipeline(info, id=str(other_pipeline.guid))
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# createTrigger
+# ---------------------------------------------------------------------------
+
+
+def test_create_trigger_happy_path(user, org, pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.create_trigger(
+            info,
+            input=CreateTriggerInput(
+                pipeline_id=str(pipeline.guid),
+                kind="push",
+                config='{"branches": ["main"]}',
+            ),
+        )
+    assert result.ok, result.errors
+    assert result.data is not None
+    assert result.data.kind == "push"
+    assert result.data.config == {"branches": ["main"]}
+    assert Trigger.objects.filter(pipeline=pipeline, kind="push").exists()
+
+
+def test_create_trigger_unknown_kind(user, org, pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.create_trigger(
+            info,
+            input=CreateTriggerInput(
+                pipeline_id=str(pipeline.guid),
+                kind="unknown-kind",
+                config="{}",
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "VALIDATION"
+    assert result.errors[0].field == "kind"
+
+
+# ---------------------------------------------------------------------------
+# triggerPipelineRun (stub)
+# ---------------------------------------------------------------------------
+
+
+def test_trigger_pipeline_run_creates_pending_run(user, org, pipeline):
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.trigger_pipeline_run(
+            info,
+            pipeline_id=str(pipeline.guid),
+            ref="refs/heads/main",
+        )
+    assert result.ok, result.errors
+    assert result.data.status == "pending"
+    assert result.data.run_number == 1
+    assert PipelineRun.objects.filter(pipeline=pipeline, status="pending").exists()
+
+
+# ---------------------------------------------------------------------------
+# cancelPipelineRun
+# ---------------------------------------------------------------------------
+
+
+def test_cancel_pipeline_run_transitions_to_cancelled(user, org, pipeline):
+    run = PipelineRun.objects.create(
+        pipeline=pipeline,
+        run_number=1,
+        trigger_kind=PipelineRun.TriggerKind.MANUAL,
+        trigger_ref="refs/heads/main",
+        status=PipelineRun.Status.PENDING,
+    )
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.cancel_pipeline_run(info, run_id=str(run.guid))
+    assert result.ok, result.errors
+    assert result.data.status == "cancelled"
+    run.refresh_from_db()
+    assert run.status == "cancelled"
+    assert run.finished_at is not None
+
+
+def test_cancel_pipeline_run_already_finished(user, org, pipeline):
+    run = PipelineRun.objects.create(
+        pipeline=pipeline,
+        run_number=2,
+        trigger_kind=PipelineRun.TriggerKind.PUSH,
+        status=PipelineRun.Status.SUCCESS,
+    )
+    mutation = PipelinesMutation()
+    info = _admin_info(user)
+    with tenant_context(TenantContext(organization_id=org.id, user_id=user.id)):
+        result = mutation.cancel_pipeline_run(info, run_id=str(run.guid))
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
