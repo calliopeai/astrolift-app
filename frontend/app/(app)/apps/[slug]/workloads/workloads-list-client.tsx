@@ -23,6 +23,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useListControls } from "@/hooks/use-list-controls";
+import type { SortState } from "@/hooks/use-list-controls";
 import { SCALE_WORKLOAD } from "@/graphql/lifecycle/lifecycle.mutations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
@@ -196,6 +199,29 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
     [list, podList],
   );
 
+  const ctrl = useListControls({
+    data: list,
+    searchFn: (w) =>
+      [w.name, w.slug, KIND_LABEL[w.kind] ?? w.kind, w.schedule ?? ""].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort: SortState) => {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      if (sort.key === "name") return a.name.localeCompare(b.name) * dir;
+      if (sort.key === "kind") return a.kind.localeCompare(b.kind) * dir;
+      if (sort.key === "replicas") {
+        const aLive = liveStatus.get(a.slug);
+        const bLive = liveStatus.get(b.slug);
+        const aReady = aLive?.ready ?? 0;
+        const bReady = bLive?.ready ?? 0;
+        return (aReady - bReady) * dir;
+      }
+      if (sort.key === "public") {
+        return ((a.isPublic ? 1 : 0) - (b.isPublic ? 1 : 0)) * dir;
+      }
+      return 0;
+    },
+  });
+
   if (app.loading && !a) {
     return (
       <PageShell title="Loading…">
@@ -275,20 +301,49 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
               />
             </div>
           ) : (
+            <>
+              <div className="px-4 pt-4">
+                <ListControls controls={ctrl} searchPlaceholder="Filter workloads..." />
+              </div>
+              {ctrl.totalFiltered === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    icon={<BoxIcon className="size-5" />}
+                    title="No workloads match"
+                    description="Try a different search term."
+                  />
+                </div>
+              ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Ready / desired</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Name
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="kind" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Kind
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="replicas" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Ready / desired
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead>Restarts</TableHead>
-                  <TableHead>Public</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="public" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Public
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead>Resources</TableHead>
                   <TableHead>Schedule</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.map((w) => {
+                {ctrl.rows.map((w) => {
                   const Icon = KIND_ICON[w.kind] ?? BoxIcon;
                   const live = liveStatus.get(w.slug) ?? {
                     ready: 0,
@@ -411,6 +466,8 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
                 })}
               </TableBody>
             </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
