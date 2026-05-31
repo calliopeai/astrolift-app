@@ -73,6 +73,22 @@ export function WorkflowInstancesPanel({
     limit: 50,
   });
 
+  // When there are no instances and the user hasn't searched/filtered,
+  // show a single centered empty state instead of the awkward two-panel
+  // layout with empty left and "Select an instance" instruction on right.
+  const isDefaultView = !typeFilter.trim() && statusFilter === "ALL";
+  if (!loading && !error && instances.length === 0 && isDefaultView) {
+    return (
+      <div className="text-muted-foreground rounded-md border border-dashed p-12 text-center text-sm">
+        <p className="font-medium text-foreground mb-1">No active Temporal workflows</p>
+        <p>
+          Platform workflows (deploys, provisioning, drift detection) appear here while
+          running. The engine is idle — everything is up to date.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
       <div className="flex flex-col gap-3">

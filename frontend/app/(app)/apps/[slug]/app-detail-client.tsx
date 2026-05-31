@@ -159,7 +159,14 @@ export function AppDetailClient({ slug }: { slug: string }) {
           <span>{a.name}</span>
           <Badge variant="outline" className="gap-1">
             <StatusDot status={statusDot[a.provisioningStatus]} />
-            <span className="capitalize">{a.provisioningStatus}</span>
+            <span className="capitalize">
+              {/* "Ready" = manifest valid + app record healthy. When the
+                  managed domain is live, surface "Live" so operators
+                  immediately know traffic is routing. */}
+              {a.provisioningStatus === "ready" && a.managedHostname
+                ? "Live"
+                : a.provisioningStatus}
+            </span>
           </Badge>
         </span>
       }

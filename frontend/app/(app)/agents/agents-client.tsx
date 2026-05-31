@@ -76,9 +76,9 @@ function ActiveTab() {
     <Card>
       <CardContent className="p-6">
         <EmptyState
-          icon={<Loader2Icon className="size-5" />}
+          icon={<BotIcon className="size-5" />}
           title="No active agent runs"
-          description="No agent runs recorded yet — agent dispatch coming soon."
+          description="No agent runs recorded yet. Dispatch an agent from the Dispatch tab to see active runs here."
         />
       </CardContent>
     </Card>
