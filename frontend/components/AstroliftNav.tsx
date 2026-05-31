@@ -373,15 +373,24 @@ const sections: NavSection[] = [
   },
 ];
 
+// Sections that start collapsed so BUILD + RUN + top of OBSERVE fit
+// in one viewport without scrolling (#811).
+const DEFAULT_COLLAPSED: Record<string, boolean> = {
+  Observe: true,
+  Control: true,
+  Secure: true,
+};
+
 function loadCollapsedState(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
+  if (typeof window === "undefined") return DEFAULT_COLLAPSED;
   try {
     const raw = window.localStorage.getItem(COLLAPSED_KEY);
-    if (!raw) return {};
+    // If the user has never saved a preference, use the defaults.
+    if (!raw) return DEFAULT_COLLAPSED;
     const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
+    return typeof parsed === "object" && parsed !== null ? parsed : DEFAULT_COLLAPSED;
   } catch {
-    return {};
+    return DEFAULT_COLLAPSED;
   }
 }
 
@@ -400,7 +409,7 @@ export function AstroliftNav() {
 
   // Collapsed sections persist in localStorage so refreshes keep
   // the layout the operator chose. Default: every section open.
-  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>(DEFAULT_COLLAPSED);
   React.useEffect(() => {
     setCollapsed(loadCollapsedState());
   }, []);
