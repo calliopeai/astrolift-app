@@ -24,6 +24,7 @@ from astrolift_identity.urls import (
 )
 from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
 from astrolift_scm.urls import urlpatterns as scm_webhook_urls
+from astrolift_pipelines.urls import urlpatterns as pipelines_runner_urls
 from .schema import schema, schema_auth
 from .views import app_root_view, metrics_view, root_view, test_open_telemetry
 
@@ -113,6 +114,10 @@ urlpatterns = [
     # traffic. Each view performs its own HMAC verification before
     # touching the request body.
     *scm_webhook_urls,
+    # Runner agent REST surface (#83). Mounted at the project root so
+    # the wire URLs the agent ships against — POST /api/pipelines/v1/... —
+    # resolve without the /app/ prefix.
+    *pipelines_runner_urls,
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),
