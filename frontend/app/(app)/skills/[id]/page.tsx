@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { gql, useMutation, useQuery } from "@apollo/client";
+import { gql } from "@apollo/client";
+import { useMutation, useQuery } from "@apollo/client/react";
 import {
   ChevronRightIcon,
   CodeIcon,

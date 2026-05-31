@@ -205,7 +205,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
 
     // Forward terminal keystrokes to the WS — when the WS is mid-reconnect
     // we queue them locally so the operator's input isn't lost.
-    const dataDisposable = term.onData((data) => {
+    const dataDisposable = term.onData((data: string) => {
       const live = wsRef.current;
       if (live && live.readyState === WebSocket.OPEN) {
         live.send(JSON.stringify({ type: "stdin", data }));

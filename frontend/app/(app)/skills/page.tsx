@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { gql, useQuery } from "@apollo/client";
+import { gql } from "@apollo/client";
+import { useQuery } from "@apollo/client/react";
 import { BookOpenIcon, Loader2Icon, PlusIcon, WrenchIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,6 @@ const LIST_SKILLS = gql`
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export const metadata = { title: "Skills · Astrolift" };
 
 export default function SkillsPage() {
   const { data, loading, error } = useQuery<SkillsData>(LIST_SKILLS, {

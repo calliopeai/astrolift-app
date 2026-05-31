@@ -265,7 +265,7 @@ export function PipelineSecretsTab({ pipelineId }: { pipelineId: string }) {
                       {new Date(s.updatedAt).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Can permission="pipeline.secret.write">
+                      <Can permission="pipeline.secret_manage">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -288,7 +288,7 @@ export function PipelineSecretsTab({ pipelineId }: { pipelineId: string }) {
 
       {/* "Add secret" action — only when the form is not already open */}
       {!addOpen && (
-        <Can permission="pipeline.secret.write">
+        <Can permission="pipeline.secret_manage">
           <Button
             variant="outline"
             size="sm"
