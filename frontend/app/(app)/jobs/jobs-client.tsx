@@ -21,6 +21,7 @@ import { CronSchedulePreview } from "@/components/jobs/CronSchedulePreview";
 import { RunOutputPanel } from "@/components/jobs/RunOutputPanel";
 import { RunStatusBadge, commandRunStatus } from "@/components/jobs/RunStatusBadge";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ import type {
   AstroliftScheduledJobRun,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
+import { useListControls, type ListControlsResult, type SortState } from "@/hooks/use-list-controls";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +111,53 @@ function consoleHrefForCommandRun(run: AstroliftCommandRun): string {
   return `/apps/${run.registeredAppSlug}/logs?${params.toString()}`;
 }
 
+function jobRunSortFn(a: AstroliftScheduledJobRun, b: AstroliftScheduledJobRun, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "app":
+      return dir * a.registeredAppSlug.localeCompare(b.registeredAppSlug);
+    case "status":
+      return dir * a.status.localeCompare(b.status);
+    case "duration":
+      return dir * ((a.durationSeconds ?? 0) - (b.durationSeconds ?? 0));
+    case "startedAt":
+      return dir * ((a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
+    default:
+      return 0;
+  }
+}
+
+function cmdRunSortFn(a: AstroliftCommandRun, b: AstroliftCommandRun, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "app":
+      return dir * a.registeredAppSlug.localeCompare(b.registeredAppSlug);
+    case "status": {
+      const aStatus = commandRunStatus({ endedAt: a.endedAt, exitCode: a.exitCode });
+      const bStatus = commandRunStatus({ endedAt: b.endedAt, exitCode: b.exitCode });
+      return dir * aStatus.localeCompare(bStatus);
+    }
+    case "invokedBy":
+      return dir * ((a.invokedByUsername ?? "").localeCompare(b.invokedByUsername ?? ""));
+    case "startedAt":
+      return dir * ((a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
+    default:
+      return 0;
+  }
+}
+
+function cronWorkloadSortFn(a: WorkloadCronCardData, b: WorkloadCronCardData, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "slug":
+      return dir * a.slug.localeCompare(b.slug);
+    case "schedule":
+      return dir * a.schedule.localeCompare(b.schedule);
+    default:
+      return 0;
+  }
+}
+
 export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.ReactNode } = {}) {
   const t = useTranslations("jobs");
   const [tab, setTab] = React.useState<"schedules" | "runs" | "failures" | "commands">("schedules");
@@ -155,6 +204,42 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
         concurrencyPolicy: w.concurrencyPolicy,
       }));
   }, [wlData?.astroliftWorkloads]);
+
+  const runsCtrl = useListControls({
+    data: jobs,
+    searchFn: (j) => [j.registeredAppSlug, j.workloadSlug, j.k8sJobName, j.status, j.environmentName].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "startedAt", dir: "desc" },
+    sortFn: jobRunSortFn,
+  });
+
+  const failuresCtrl = useListControls({
+    data: failedJobs,
+    searchFn: (j) => [j.registeredAppSlug, j.workloadSlug, j.k8sJobName, j.environmentName].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "startedAt", dir: "desc" },
+    sortFn: jobRunSortFn,
+  });
+
+  const cmdsCtrl = useListControls({
+    data: cmds,
+    searchFn: (c) => [
+      c.registeredAppSlug,
+      c.workloadSlug ?? "",
+      c.invokedByUsername ?? "",
+      Array.isArray(c.command) ? (c.command as string[]).join(" ") : JSON.stringify(c.command),
+    ].join(" "),
+    initialPageSize: 25,
+    initialSort: { key: "startedAt", dir: "desc" },
+    sortFn: cmdRunSortFn,
+  });
+
+  const schedulesCtrl = useListControls({
+    data: cronWorkloads,
+    searchFn: (w) => [w.slug, w.name, w.schedule].join(" "),
+    initialPageSize: 25,
+    sortFn: cronWorkloadSortFn,
+  });
 
   return (
     <PageShell
@@ -232,7 +317,7 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
             </CardContent>
           </Card>
         ) : cronWorkloads.length > 0 ? (
-          <CronWorkloadsCard appSlug={appSlug} workloads={cronWorkloads} />
+          <CronWorkloadsCard appSlug={appSlug} workloads={schedulesCtrl.rows} ctrl={schedulesCtrl} />
         ) : (
           <Card>
             <CardContent className="p-6">
@@ -268,7 +353,12 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
                 />
               </div>
             ) : (
-              <ScheduledJobRunsTable jobs={jobs} />
+              <>
+                <div className="px-4 pt-4 pb-2">
+                  <ListControls controls={runsCtrl} searchPlaceholder="Filter runs…" />
+                </div>
+                <ScheduledJobRunsTable jobs={runsCtrl.rows} ctrl={runsCtrl} />
+              </>
             )}
           </CardContent>
         </Card>
@@ -291,7 +381,12 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
                 />
               </div>
             ) : (
-              <ScheduledJobRunsTable jobs={failedJobs} />
+              <>
+                <div className="px-4 pt-4 pb-2">
+                  <ListControls controls={failuresCtrl} searchPlaceholder="Filter failures…" />
+                </div>
+                <ScheduledJobRunsTable jobs={failuresCtrl.rows} ctrl={failuresCtrl} />
+              </>
             )}
           </CardContent>
         </Card>
@@ -314,7 +409,12 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
                 />
               </div>
             ) : (
-              <CommandRunsTable cmds={cmds} />
+              <>
+                <div className="px-4 pt-4 pb-2">
+                  <ListControls controls={cmdsCtrl} searchPlaceholder="Filter commands…" />
+                </div>
+                <CommandRunsTable cmds={cmdsCtrl.rows} ctrl={cmdsCtrl} />
+              </>
             )}
           </CardContent>
         </Card>
@@ -326,9 +426,11 @@ export function JobsClient({ appSlug, tabs }: { appSlug?: string; tabs?: React.R
 function CronWorkloadsCard({
   appSlug,
   workloads,
+  ctrl,
 }: {
   appSlug: string;
   workloads: WorkloadCronCardData[];
+  ctrl: ListControlsResult<WorkloadCronCardData>;
 }) {
   const t = useTranslations("jobs.workloadCard");
   // #670 — environments + run-now mutation. Defaults to the first env
@@ -384,6 +486,7 @@ function CronWorkloadsCard({
             {t("countLabel", { count: workloads.length })}
           </span>
         </div>
+        <ListControls controls={ctrl} searchPlaceholder="Filter schedules…" />
         <ul className="divide-border divide-y">
           {workloads.map((w) => {
             const envName = perRowEnv[w.slug] ?? defaultEnv;
@@ -466,7 +569,13 @@ function ScheduledJobsExample({ caption }: { caption: string }) {
   );
 }
 
-function ScheduledJobRunsTable({ jobs }: { jobs: AstroliftScheduledJobRun[] }) {
+function ScheduledJobRunsTable({
+  jobs,
+  ctrl,
+}: {
+  jobs: AstroliftScheduledJobRun[];
+  ctrl: ListControlsResult<AstroliftScheduledJobRun>;
+}) {
   const t = useTranslations("jobs.scheduled");
   const fmt = useFormatters();
   const formatTime = (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
@@ -486,11 +595,27 @@ function ScheduledJobRunsTable({ jobs }: { jobs: AstroliftScheduledJobRun[] }) {
       <TableHeader>
         <TableRow>
           <TableHead className="w-8" />
-          <TableHead>{t("columns.app")}</TableHead>
+          <TableHead>
+            <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.app")}
+            </SortableHeader>
+          </TableHead>
           <TableHead>{t("columns.k8sJob")}</TableHead>
-          <TableHead>{t("columns.status")}</TableHead>
-          <TableHead>{t("columns.duration")}</TableHead>
-          <TableHead>{t("columns.started")}</TableHead>
+          <TableHead>
+            <SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.status")}
+            </SortableHeader>
+          </TableHead>
+          <TableHead>
+            <SortableHeader sortKey="duration" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.duration")}
+            </SortableHeader>
+          </TableHead>
+          <TableHead>
+            <SortableHeader sortKey="startedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.started")}
+            </SortableHeader>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -551,7 +676,13 @@ function ScheduledJobRunsTable({ jobs }: { jobs: AstroliftScheduledJobRun[] }) {
   );
 }
 
-function CommandRunsTable({ cmds }: { cmds: AstroliftCommandRun[] }) {
+function CommandRunsTable({
+  cmds,
+  ctrl,
+}: {
+  cmds: AstroliftCommandRun[];
+  ctrl: ListControlsResult<AstroliftCommandRun>;
+}) {
   const t = useTranslations("jobs.commands");
   const fmt = useFormatters();
   const formatTime = (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
@@ -571,11 +702,27 @@ function CommandRunsTable({ cmds }: { cmds: AstroliftCommandRun[] }) {
       <TableHeader>
         <TableRow>
           <TableHead className="w-8" />
-          <TableHead>{t("columns.app")}</TableHead>
+          <TableHead>
+            <SortableHeader sortKey="app" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.app")}
+            </SortableHeader>
+          </TableHead>
           <TableHead>{t("columns.command")}</TableHead>
-          <TableHead>{t("columns.status")}</TableHead>
-          <TableHead>{t("columns.invokedBy")}</TableHead>
-          <TableHead>{t("columns.started")}</TableHead>
+          <TableHead>
+            <SortableHeader sortKey="status" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.status")}
+            </SortableHeader>
+          </TableHead>
+          <TableHead>
+            <SortableHeader sortKey="invokedBy" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.invokedBy")}
+            </SortableHeader>
+          </TableHead>
+          <TableHead>
+            <SortableHeader sortKey="startedAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+              {t("columns.started")}
+            </SortableHeader>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
