@@ -18,9 +18,11 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { ListControls, SortableHeader } from "@/components/ListControls";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { ViewToggle } from "@/components/ViewToggle";
+import { useListControls } from "@/hooks/use-list-controls";
 import { useViewToggle } from "@/hooks/use-view-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -135,6 +137,39 @@ export function ClustersClient() {
   // terminal state — Apollo will hold the cache for follow-up renders.
   const list = data?.astroliftClusters ?? [];
   const anyManaging = list.some((c) => c.lifecycle === "managing");
+
+  const lifecycleOrder: Record<string, number> = {
+    managing: 0,
+    error: 1,
+    registered: 2,
+    managed: 3,
+  };
+
+  const ctrl = useListControls({
+    data: list,
+    searchFn: (c) =>
+      [c.slug, c.name, c.providerPluginSlug, c.region].filter(Boolean).join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      let cmp = 0;
+      if (sort.key === "name") {
+        cmp = (a.name ?? "").localeCompare(b.name ?? "");
+      } else if (sort.key === "provider") {
+        cmp = (a.providerPluginSlug ?? "").localeCompare(b.providerPluginSlug ?? "");
+      } else if (sort.key === "region") {
+        cmp = (a.region ?? "").localeCompare(b.region ?? "");
+      } else if (sort.key === "lifecycle") {
+        cmp =
+          (lifecycleOrder[a.lifecycle ?? ""] ?? 99) -
+          (lifecycleOrder[b.lifecycle ?? ""] ?? 99);
+      } else if (sort.key === "lastProbeAt") {
+        const at = (c: AstroliftTenantCluster) =>
+          c.capabilitiesProbedAt ? new Date(c.capabilitiesProbedAt).getTime() : 0;
+        cmp = at(a) - at(b);
+      }
+      return sort.dir === "asc" ? cmp : -cmp;
+    },
+  });
   React.useEffect(() => {
     if (anyManaging) {
       startPolling(POLL_INTERVAL_MS);
@@ -334,8 +369,10 @@ export function ClustersClient() {
     >
       {/* Card view */}
       {viewMode === "card" && list.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {list.map((c) => (
+        <>
+          <ListControls controls={ctrl} searchPlaceholder="Search clusters..." />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {ctrl.rows.map((c) => (
             <a key={c.id} href={`/clusters/${c.slug}`} className="block">
               <Card className="hover:bg-accent/30 transition-colors">
                 <CardContent className="flex flex-col gap-3 p-5">
@@ -355,11 +392,16 @@ export function ClustersClient() {
               </Card>
             </a>
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       {/* List view (table) — also used during loading and empty states */}
       {(viewMode === "list" || list.length === 0 || loading) && (
+      <>
+      {!loading && list.length > 0 && (
+        <ListControls controls={ctrl} searchPlaceholder="Search clusters..." />
+      )}
       <Card>
         <CardContent className="p-0">
           {loading && list.length === 0 ? (
@@ -422,17 +464,37 @@ export function ClustersClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead></TableHead>
-                  <TableHead>Cluster</TableHead>
-                  <TableHead>Lifecycle</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Region</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Cluster
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="lifecycle" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Lifecycle
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="provider" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Provider
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="region" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Region
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead>Ingress</TableHead>
-                  <TableHead>Last probe</TableHead>
+                  <TableHead>
+                    <SortableHeader sortKey="lastProbeAt" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                      Last probe
+                    </SortableHeader>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.map((c) => (
+                {ctrl.rows.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="w-8">
                       <StatusDot status={c.isActive ? "ok" : "muted"} />
@@ -485,6 +547,7 @@ export function ClustersClient() {
           )}
         </CardContent>
       </Card>
+      </>
       )}
 
       <RegisterClusterDialog open={open} onOpenChange={setOpen} />
