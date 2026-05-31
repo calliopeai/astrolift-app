@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { gql } from "@apollo/client";
+import { ListControls, SortableHeader } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 
 // ---------------------------------------------------------------------------
 // GraphQL
@@ -227,6 +229,21 @@ function PipelineListTab({
 
   const pipelines = data?.astroliftPipelines ?? [];
 
+  const ctrl = useListControls({
+    data: pipelines,
+    searchFn: (p) => [p.name, p.repoUrl, p.defaultBranch].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      let av = "";
+      let bv = "";
+      if (sort.key === "name") { av = a.name; bv = b.name; }
+      else if (sort.key === "repo") { av = a.repoUrl; bv = b.repoUrl; }
+      else if (sort.key === "branch") { av = a.defaultBranch; bv = b.defaultBranch; }
+      const cmp = av.localeCompare(bv);
+      return sort.dir === "asc" ? cmp : -cmp;
+    },
+  });
+
   if (loading && pipelines.length === 0) {
     return (
       <div className="space-y-2">
@@ -249,46 +266,61 @@ function PipelineListTab({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Repository</TableHead>
-          <TableHead>Default branch</TableHead>
-          <TableHead>TOML path</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {pipelines.map((p) => (
-          <TableRow key={p.id}>
-            <TableCell className="font-medium">
-              <Link href={`/pipelines/${p.id}`} className="hover:underline">
-                {p.name}
-              </Link>
-            </TableCell>
-            <TableCell className="text-muted-foreground text-sm">
-              <a href={p.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                {p.repoUrl.replace(/^https?:\/\//, "")}
-              </a>
-            </TableCell>
-            <TableCell className="font-mono text-xs">{p.defaultBranch}</TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">{p.tomlPath}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={triggering}
-                onClick={() => onTrigger(p)}
-              >
-                <PlayIcon className="mr-1 size-3" />
-                Run
-              </Button>
-            </TableCell>
+    <div className="space-y-3">
+      <ListControls controls={ctrl} searchPlaceholder="Search pipelines…" />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>
+              <SortableHeader sortKey="name" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                Name
+              </SortableHeader>
+            </TableHead>
+            <TableHead>
+              <SortableHeader sortKey="repo" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                Repository
+              </SortableHeader>
+            </TableHead>
+            <TableHead>
+              <SortableHeader sortKey="branch" sort={ctrl.sort} onToggle={ctrl.toggleSort}>
+                Default branch
+              </SortableHeader>
+            </TableHead>
+            <TableHead>TOML path</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {ctrl.rows.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell className="font-medium">
+                <Link href={`/pipelines/${p.id}`} className="hover:underline">
+                  {p.name}
+                </Link>
+              </TableCell>
+              <TableCell className="text-muted-foreground text-sm">
+                <a href={p.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                  {p.repoUrl.replace(/^https?:\/\//, "")}
+                </a>
+              </TableCell>
+              <TableCell className="font-mono text-xs">{p.defaultBranch}</TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">{p.tomlPath}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={triggering}
+                  onClick={() => onTrigger(p)}
+                >
+                  <PlayIcon className="mr-1 size-3" />
+                  Run
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
