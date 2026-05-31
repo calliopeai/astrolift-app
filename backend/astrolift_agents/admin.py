@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from astrolift_agents.models import Brief, BriefSkillRef, Skill, TaskToolDef, ToolDef, WorkloadToolDef
+from astrolift_agents.models import (
+    AgentTask,
+    Brief,
+    BriefSkillRef,
+    DispatcherInstance,
+    Skill,
+    TaskToolDef,
+    ToolDef,
+    WorkloadToolDef,
+)
 
 
 class _AllObjectsAdmin(admin.ModelAdmin):
@@ -49,4 +58,36 @@ class WorkloadToolDefAdmin(_AllObjectsAdmin):
 @admin.register(TaskToolDef)
 class TaskToolDefAdmin(_AllObjectsAdmin):
     list_display = ("agent_run", "tool_def")
+    readonly_fields = ("guid", "created_at", "updated_at", "version")
+
+
+@admin.register(DispatcherInstance)
+class DispatcherInstanceAdmin(_AllObjectsAdmin):
+    list_display = (
+        "slug",
+        "organization",
+        "cloud",
+        "backend",
+        "status",
+        "last_heartbeat_at",
+        "deleted_at",
+    )
+    list_filter = ("cloud", "backend", "status")
+    search_fields = ("name", "slug", "endpoint")
+    readonly_fields = ("guid", "created_at", "updated_at", "version", "api_key_hash")
+
+
+@admin.register(AgentTask)
+class AgentTaskAdmin(_AllObjectsAdmin):
+    list_display = (
+        "guid",
+        "organization",
+        "status",
+        "dispatcher",
+        "queued_at",
+        "ended_at",
+        "deleted_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("external_id", "telemetry_key")
     readonly_fields = ("guid", "created_at", "updated_at", "version")
