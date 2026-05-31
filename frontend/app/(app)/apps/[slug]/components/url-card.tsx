@@ -154,7 +154,12 @@ export function UrlCard({
   // is either still being brought up or has nothing serving on it yet,
   // and the URL probe would always read as down. Surface a friendlier
   // "provisioning · ~2 min" badge instead. (#407 B)
-  const isRoutable = provisioningStatus === "ready" && !!primaryWorkloadSlug;
+  // isRoutable: full platform-managed deploy exists (workload live + cluster
+  // reports ready). OR the managed domain is already resolving (app deployed
+  // outside the platform pipeline) — in that case the URL IS live and we
+  // should probe it rather than show the "not yet assigned" badge.
+  const isRoutable =
+    (provisioningStatus === "ready" && !!primaryWorkloadSlug) || !!managedHostname;
   const isProvisioning = provisioningStatus === "pending" || provisioningStatus === "provisioning";
 
   const isDirty = draft.trim() !== subdomain;
