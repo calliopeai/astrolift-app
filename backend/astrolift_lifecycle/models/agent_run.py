@@ -75,6 +75,10 @@ class AgentRun(BaseCoreModel):
     # at dispatch time so changes to the workload don't retroactively alter
     # existing run retention policies.
     result_ttl_hours = models.IntegerField(default=72)
+    # Streaming log excerpt from the Dispatch Service (#51).
+    # Ring buffer capped at 10k lines by the log_collector service.
+    # Full log is in object storage; this field is the live-view source.
+    log_excerpt = models.TextField(blank=True, default="")
 
     class Meta:
         indexes = [
