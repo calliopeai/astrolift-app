@@ -26,6 +26,8 @@ import { useWorkflows, useDeleteWorkflow } from "@/graphql/workflows/workflows.h
 import { LIST_WORKFLOW_RUNS } from "@/graphql/operations/operations.queries";
 import type { AstroliftWorkflowRun } from "@/graphql/operations/operations.types";
 import type { WorkflowDefinition } from "@/graphql/workflows/workflows.types";
+import { ListControls, SortableHeader } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 
 interface WorkflowRunsResp {
   astroliftWorkflowRuns: AstroliftWorkflowRun[];
@@ -64,6 +66,22 @@ export default function WorkflowsPage() {
   const [deleteWorkflow] = useDeleteWorkflow();
   const confirm = useConfirm();
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
+
+  const defsCtrl = useListControls<WorkflowDefinition>({
+    data: workflows,
+    searchFn: (wf) => [wf.name, wf.description ?? "", wf.modelLabel ?? ""].join(" "),
+    initialPageSize: 25,
+    sortFn: (a, b, sort) => {
+      let cmp = 0;
+      if (sort.key === "name") cmp = a.name.localeCompare(b.name);
+      else if (sort.key === "status") {
+        const av = a.isEnabled ? 1 : 0;
+        const bv = b.isEnabled ? 1 : 0;
+        cmp = av - bv;
+      }
+      return sort.dir === "asc" ? cmp : -cmp;
+    },
+  });
 
   const { data: runsData, loading: runsLoading } = useQuery<WorkflowRunsResp>(LIST_WORKFLOW_RUNS, {
     variables: { limit: 50 },
@@ -155,8 +173,21 @@ export default function WorkflowsPage() {
               actionLabel="New Workflow"
             />
           )}
+          {workflows.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <ListControls controls={defsCtrl} searchPlaceholder="Search workflows…" />
+              <div className="flex items-center gap-2 ml-auto shrink-0">
+                <SortableHeader sortKey="name" sort={defsCtrl.sort} onToggle={defsCtrl.toggleSort}>
+                  Name
+                </SortableHeader>
+                <SortableHeader sortKey="status" sort={defsCtrl.sort} onToggle={defsCtrl.toggleSort}>
+                  Status
+                </SortableHeader>
+              </div>
+            </div>
+          )}
           <div className="grid gap-4">
-            {workflows.map((wf) => {
+            {defsCtrl.rows.map((wf) => {
               const isExpanded = expandedSlug === wf.slug;
               return (
                 <div key={wf.slug} className="flex flex-col gap-3 rounded-lg border p-4">
