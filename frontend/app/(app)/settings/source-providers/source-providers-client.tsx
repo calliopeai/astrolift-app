@@ -19,6 +19,8 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import { ListControls } from "@/components/ListControls";
+import { useListControls } from "@/hooks/use-list-controls";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -164,9 +166,21 @@ export function SourceProvidersClient() {
     }
   }
 
-  const connectionList = conns.data?.astroliftSourceConnections ?? [];
-  const keyList = keys.data?.astroliftSshDeployKeys ?? [];
-  const incompleteClientIdConnections = connectionList.filter((c) => c.needsClientId);
+  const allConnections = conns.data?.astroliftSourceConnections ?? [];
+  const connCtrl = useListControls({
+    data: allConnections,
+    searchFn: (c) => [c.kind ?? "", c.baseUrl ?? "", c.slug ?? ""].join(" "),
+    initialPageSize: 25,
+  });
+  const connectionList = connCtrl.rows;
+  const allKeys = keys.data?.astroliftSshDeployKeys ?? [];
+  const keyCtrl = useListControls({
+    data: allKeys,
+    searchFn: (k) => [k.name ?? "", k.fingerprint ?? ""].join(" "),
+    initialPageSize: 25,
+  });
+  const keyList = keyCtrl.rows;
+  const incompleteClientIdConnections = allConnections.filter((c) => c.needsClientId);
 
   async function handleDisconnect(c: AstroliftSourceConnection) {
     const { data } = await disconnect({ variables: { input: { id: c.id } } });
@@ -279,6 +293,9 @@ export function SourceProvidersClient() {
                 </div>
               </div>
             </div>
+          )}
+          {allConnections.length > 0 && (
+            <ListControls controls={connCtrl} searchPlaceholder="Search connections…" className="mb-3" />
           )}
           {conns.loading && connectionList.length === 0 ? (
             <div className="space-y-2 p-6">
@@ -456,6 +473,9 @@ export function SourceProvidersClient() {
           </Can>
         </CardHeader>
         <CardContent className="p-0">
+          {allKeys.length > 0 && (
+            <ListControls controls={keyCtrl} searchPlaceholder="Search deploy keys…" className="mb-3" />
+          )}
           {keys.loading && keyList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-12 w-full" />
