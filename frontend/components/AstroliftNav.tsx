@@ -175,8 +175,11 @@ const sections: NavSection[] = [
   },
   {
     // Observe — passive visibility across the signal pyramid:
-    // SLO dashboard → Metrics → Logs → Traces → Events → Alerts.
-    // Audit (governance evidence) lives in Control / Org Governance.
+    // Observe — organised by runtime primitive so each workload type
+    // gets a tailored signal surface (Deployments see rollout health +
+    // request latency; Agents see token usage + reasoning traces; etc.).
+    // Global signals (Events, Alerts, Platform Activity) stay flat at
+    // the bottom — they cross all primitive boundaries.
     label: "Observe",
     items: [
       {
@@ -186,21 +189,33 @@ const sections: NavSection[] = [
         permission: "org.read",
       },
       {
-        label: "Metrics",
-        href: "/metrics",
-        icon: <BarChart3Icon />,
-        permission: { anyOf: ["app.read", "app.read_metrics"] },
+        label: "Deployments",
+        href: "/observe/deployments",
+        icon: <RocketIcon />,
+        permission: "app.read",
       },
       {
-        label: "Logs",
-        href: "/logs",
-        icon: <ScrollIcon />,
+        label: "Agents",
+        href: "/observe/agents",
+        icon: <BoxIcon />,
+        permission: "app.read",
+      },
+      {
+        label: "Jobs",
+        href: "/observe/jobs",
+        icon: <CalendarClockIcon />,
         permission: "app.read_logs",
       },
       {
-        label: "Traces",
-        href: "/traces",
-        icon: <GitBranchIcon />,
+        label: "Tasks",
+        href: "/observe/tasks",
+        icon: <ClipboardListIcon />,
+        permission: "app.read",
+      },
+      {
+        label: "Functions",
+        href: "/observe/functions",
+        icon: <BoltIcon />,
         permission: "app.read",
       },
       {
