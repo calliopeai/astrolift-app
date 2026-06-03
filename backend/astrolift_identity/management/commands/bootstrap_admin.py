@@ -76,7 +76,7 @@ class Command(BaseCommand):
             default=_truthy(_env("ASTROLIFT_ADMIN_SUPERUSER")),
             help=(
                 "Mark the bootstrap user as a Django superuser. "
-                "Recommended only for solo / single-operator installs; "
+                "Recommended only for single-operator installs; "
                 "leave off and rely on the org_owner RoleBinding for "
                 "multi-operator deployments."
             ),
