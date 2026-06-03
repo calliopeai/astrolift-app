@@ -38,15 +38,17 @@ export default function PlatformActivityPage() {
                 platform-level scheduled sweeps. Filter by type, status, or app.
               </p>
             </div>
-            <Button variant="outline" size="sm" className="w-fit gap-1.5" asChild>
-              <a
-                href="https://temporal-ui.astrolift.example.com"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open Temporal UI
-              </a>
-            </Button>
+            {process.env.NEXT_PUBLIC_TEMPORAL_UI_URL && (
+              <Button variant="outline" size="sm" className="w-fit gap-1.5" asChild>
+                <a
+                  href={process.env.NEXT_PUBLIC_TEMPORAL_UI_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open Temporal UI
+                </a>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
