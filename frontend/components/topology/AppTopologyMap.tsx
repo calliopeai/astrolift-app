@@ -14,7 +14,6 @@ import {
   type Node,
   type NodeProps,
   type NodeTypes,
-  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -198,7 +197,7 @@ export function AppTopologyMap({
   // nodes correctly. Show a skeleton until onInit fires so the graph
   // never flashes blank or with nodes stacked at origin.
   const [isReady, setIsReady] = React.useState(false);
-  const handleInit = React.useCallback((_: ReactFlowInstance) => {
+  const handleInit = React.useCallback(() => {
     setIsReady(true);
   }, []);
 
