@@ -6,8 +6,8 @@ name: Build and Publish
 # stitch amd64 + arm64 into one tag on Docker Hub + GHCR.
 #
 # Triggers:
-#   - Tag push    backend-v* / frontend-v*    -> :{version}, :latest
-#   - Push to main (path-filtered)            -> :latest, :main-{sha}
+#   - Tag push    backend-v* / frontend-v*    -> :{version}
+#   - Push to main (path-filtered)            -> :main-{sha}, :main
 #   - workflow_dispatch (product + version)   -> manual builds
 
 on:
@@ -220,12 +220,15 @@ jobs:
           VERSION="${{ needs.matrix.outputs.version }}"
           IS_RELEASE="${{ needs.matrix.outputs.is_release }}"
           BASE_TAG="$VERSION"
-          EXTRA_TAGS="latest"
+          # Never alias :latest — deployers must pin to an explicit SHA tag
+          # (main-<sha> or a version tag). A :latest alias makes it impossible
+          # to know which commit is running and prevents safe rollbacks.
+          EXTRA_TAGS=""
 
           if [ -z "$VERSION" ]; then
-            # main push without a release: tag with main-<sha>; still alias :latest
+            # main push: use main-<sha> as the canonical tag; no :latest alias
             BASE_TAG="main-${GITHUB_SHA::7}"
-            EXTRA_TAGS="latest main"
+            EXTRA_TAGS="main"
           fi
 
           echo "base_tag=${BASE_TAG}" >> "$GITHUB_OUTPUT"
