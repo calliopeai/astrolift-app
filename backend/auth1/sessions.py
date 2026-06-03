@@ -550,7 +550,7 @@ class Auth1SessionWorkflow:
         email isn't verified.
 
         Configured by env var ASTROLIFT_AUTO_SIGNUP_DOMAINS — comma-
-        separated, case-insensitive (e.g. "steadymd.com,calliope.ai").
+        separated, case-insensitive (e.g. "acmecorp.com,example.org").
         Leave it unset to keep the strict-lookup default.
         """
         raw = os.environ.get("ASTROLIFT_AUTO_SIGNUP_DOMAINS", "")
