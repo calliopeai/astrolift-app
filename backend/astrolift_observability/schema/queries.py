@@ -34,6 +34,7 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
+from core.cluster_observability import namespace_for_app
 from astrolift_observability.schema.types import (
     AppEndpointMetric,
     AppGoldenSignal,
@@ -212,7 +213,12 @@ class GoldenSignalsQuery:
         the cluster has no Prometheus endpoint, or Prometheus errors.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        app = RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True).only("id", "slug").first()
+        app = (
+            RegisteredApp.objects.filter(slug=app_slug, deleted_at__isnull=True)
+            .select_related("organization")
+            .only("id", "slug", "k8s_namespace", "organization__slug")
+            .first()
+        )
         if app is None:
             return []
 
@@ -224,6 +230,11 @@ class GoldenSignalsQuery:
         end_unix = int(now.timestamp())
         start_unix = end_unix - seconds
         step = prom_queries.pick_step_seconds(seconds)
+
+        # cAdvisor / kube-state-metrics series carry namespace/pod/container
+        # labels, not the app-instrumentation "app" label. Pass the app's
+        # Kubernetes namespace so saturation queries use the correct selector.
+        app_namespace = namespace_for_app(app)
 
         builders: list[tuple[GoldenSignalKind, str, Callable[..., prom_queries.QueryPlan], dict]] = [
             (
@@ -270,7 +281,7 @@ class GoldenSignalsQuery:
                 GoldenSignalKind.SATURATION_CPU,
                 "ratio",
                 prom_queries.build_cpu_saturation_query,
-                {},
+                {"namespace": app_namespace},
             ),
             # #642 — memory saturation completes the SATURATION pair.
             # Same PromQL shape as CPU but on working-set bytes vs the
@@ -279,7 +290,7 @@ class GoldenSignalsQuery:
                 GoldenSignalKind.SATURATION_MEMORY,
                 "ratio",
                 prom_queries.build_memory_saturation_query,
-                {},
+                {"namespace": app_namespace},
             ),
         ]
 

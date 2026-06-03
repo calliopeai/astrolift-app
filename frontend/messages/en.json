@@ -90,8 +90,8 @@
         "emptyCta": "Register your first app"
       },
       "deployments": {
-        "label": "Active deployments",
-        "emptyCta": "Trigger a deployment"
+        "label": "Running apps",
+        "emptyCta": "No deployments yet"
       },
       "costMtd": {
         "label": "Cost (MTD)",
@@ -134,7 +134,7 @@
       "title": "Registered apps",
       "description": "Repositories registered for deployment.",
       "emptyTitle": "No apps registered",
-      "emptyDescription": "The app registry surface lands in the next milestone — once it's wired you can register a Git repo and roll a deployment from this card.",
+      "emptyDescription": "Register a Git repository to start deploying. Astrolift will provision a namespace, registry repo, and roll the first deployment.",
       "emptyAction": "Open registry"
     }
   },
@@ -376,7 +376,11 @@
         "running": "Running",
         "failed": "Failed",
         "inflight": "In-flight",
-        "notDeployed": "Not deployed"
+        "notDeployed": "Not deployed",
+        "ok": "Healthy",
+        "degraded": "Degraded",
+        "stale": "Stale",
+        "never_deployed": "Not deployed"
       },
       "noMatch": {
         "title": "No apps match the current filter",
@@ -398,7 +402,8 @@
           "STALE": "No recent deploys",
           "NEVER": "Never deployed"
         }
-      }
+      },
+      "count": "Showing {shown} of {total}"
     },
     "tabs": {
       "ariaLabel": "App sections",
@@ -701,7 +706,17 @@
         "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
         "installCli": "Install the CLI",
         "export": "Export logs",
-        "exportTitle": "Export buffered logs to a downloadable file"
+        "exportTitle": "Export buffered logs to a downloadable file",
+        "allReplicas": "All replicas",
+        "allReplicasDescription": "Streaming from all running replicas.",
+        "pressStreamAll": "Press “Stream” to tail all replicas.",
+        "range": {
+          "live": "Live",
+          "15m": "Last 15 min",
+          "1h": "Last 1 hour",
+          "6h": "Last 6 hours",
+          "24h": "Last 24 hours"
+        }
       },
       "events": {
         "title": "Recent platform events",
@@ -1182,7 +1197,8 @@
         "fallbackTitle": "Revoke role?",
         "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
         "confirm": "Revoke role"
-      }
+      },
+      "searchPlaceholder": "Search members…"
     },
     "config": {
       "title": "{name} · config",

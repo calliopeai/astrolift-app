@@ -20,12 +20,13 @@ Cognito, and local-account installs.
 
 Inputs (CLI flag overrides env var):
 
-  --email     ASTROLIFT_ADMIN_EMAIL
-  --org       ASTROLIFT_ORG_SLUG          (default 'acme')
-  --org-name  ASTROLIFT_ORG_NAME          (default = slug.title())
-  --password  ASTROLIFT_ADMIN_PASSWORD    (optional; only used if the
-                                           local IdP is enabled)
-  --is-superuser     ASTROLIFT_ADMIN_SUPERUSER ('true'/'1' to enable)
+  --email        ASTROLIFT_ADMIN_EMAIL
+  --org          ASTROLIFT_ORG_SLUG          (default 'acme')
+  --org-name     ASTROLIFT_ORG_NAME          (default = slug.title())
+  --org-website  ASTROLIFT_ORG_WEBSITE       (optional; left blank if omitted)
+  --password     ASTROLIFT_ADMIN_PASSWORD    (optional; only used if the
+                                              local IdP is enabled)
+  --is-superuser ASTROLIFT_ADMIN_SUPERUSER   ('true'/'1' to enable)
 
 Why a flag *and* an env var: the env-var form makes this safe to
 invoke from a deploy script without baking secrets into shell
@@ -67,6 +68,7 @@ class Command(BaseCommand):
         # demo screen ships with "Acme".
         parser.add_argument("--org", default=_env("ASTROLIFT_ORG_SLUG"))
         parser.add_argument("--org-name", default=_env("ASTROLIFT_ORG_NAME"))
+        parser.add_argument("--org-website", default=_env("ASTROLIFT_ORG_WEBSITE"))
         parser.add_argument("--password", default=_env("ASTROLIFT_ADMIN_PASSWORD"))
         parser.add_argument(
             "--is-superuser",
@@ -86,6 +88,7 @@ class Command(BaseCommand):
         email: str | None,
         org: str | None,
         org_name: str | None,
+        org_website: str | None,
         password: str | None,
         is_superuser: bool,
         **opts,
@@ -114,12 +117,20 @@ class Command(BaseCommand):
                 slug=org,
                 defaults={
                     "name": org_name or org.title(),
-                    "website": f"https://{org}.example",
+                    # Use the provided website, or leave blank — never store a
+                    # placeholder like https://{org}.example that leaks into UI.
+                    "website": org_website or None,
                 },
             )
+            update_fields: list[str] = []
             if org_name and org_row.name != org_name:
                 org_row.name = org_name
-                org_row.save(update_fields=["name", "updated_at", "version"])
+                update_fields.append("name")
+            if org_website and org_row.website != org_website:
+                org_row.website = org_website
+                update_fields.append("website")
+            if update_fields:
+                org_row.save(update_fields=[*update_fields, "updated_at", "version"])
 
             User = get_user_model()
             user, user_created = User.objects.get_or_create(

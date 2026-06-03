@@ -273,7 +273,7 @@ export function AppDetailClient({ slug }: { slug: string }) {
 
       <GithubConnectCallout sourceKind={a.sourceKind} />
 
-      <ActivityTimeline appId={a.id} limit={20} />
+      <ActivityTimeline appSlug={a.slug} limit={20} />
 
       <LatestDeploymentRow appSlug={a.slug} />
 

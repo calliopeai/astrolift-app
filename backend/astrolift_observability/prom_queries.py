@@ -113,6 +113,7 @@ def _build_labels(
     app_slug: str,
     environment_name: str | None,
     workload_slug: str | None = None,
+    namespace: str | None = None,
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Build the label-matcher dict for ``app_slug`` (+ env + workload).
@@ -124,11 +125,22 @@ def _build_labels(
     ``workload_slug`` narrows the metric stream to a single workload
     (api / worker / scheduler / ...). When omitted the query rolls up
     every workload under the app — current pre-#422 behavior.
+
+    ``namespace`` switches the primary identifier from ``app=<slug>``
+    (app-level instrumentation label) to ``namespace=<ns>`` (Kubernetes
+    namespace). Use this for cAdvisor / kube-state-metrics queries
+    where the cAdvisor series only carries namespace/pod/container,
+    not a user-defined ``app`` label.
     """
-    labels: dict[str, str] = {"app": sanitize_label_value(app_slug)}
-    if environment_name:
+    if namespace:
+        labels: dict[str, str] = {"namespace": sanitize_label_value(namespace)}
+    else:
+        labels: dict[str, str] = {"app": sanitize_label_value(app_slug)}
+    if environment_name and not namespace:
+        # environment label is app-instrumentation convention; skip for
+        # namespace-scoped k8s metric queries.
         labels["environment"] = sanitize_label_value(environment_name)
-    if workload_slug:
+    if workload_slug and not namespace:
         labels["workload"] = sanitize_label_value(workload_slug)
     if extra:
         for k, v in extra.items():
@@ -252,24 +264,28 @@ def build_cpu_saturation_query(
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Saturation — actual CPU vs. requested limit.
 
-    ``sum(rate(container_cpu_usage_seconds_total{app=...}[<w>])) / sum(kube_pod_container_resource_limits{app=...,resource="cpu"})``
+    When ``namespace`` is supplied the query uses Kubernetes-native
+    namespace/container labels (cAdvisor series) instead of the
+    app-instrumentation ``app`` label. The ``container!=""`` exclusion
+    drops the pod-level roll-up series cAdvisor emits alongside
+    per-container series.
 
-    Series is a ratio in [0, 1+] (>1 = over-limit / throttling). The
-    UI shells this into a percent. ``kube_pod_container_resource_limits``
-    comes from kube-state-metrics which the bootstrap recipe already
-    installs.
+    ``sum(rate(container_cpu_usage_seconds_total{namespace=...}[<w>])) / sum(kube_pod_container_resource_limits{namespace=...,resource="cpu"})``
     """
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        namespace=namespace,
     )
     rate_window = pick_rate_window(range_seconds)
-    usage_match = _render_label_match(labels)
-    limits_match = _render_label_match_with_extra(labels, 'resource="cpu"')
+    container_filter = ',container!=""' if namespace else ""
+    usage_match = _render_label_match_with_extra(labels, container_filter.lstrip(",") or None)
+    limits_match = _render_label_match_with_extra(labels, f'resource="cpu"{container_filter}')
     expr = (
         f"sum(rate(container_cpu_usage_seconds_total{usage_match}[{rate_window}])) "
         f"/ clamp_min(sum(kube_pod_container_resource_limits{limits_match}), 1e-9)"
@@ -283,28 +299,25 @@ def build_memory_saturation_query(
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Saturation — working-set memory vs. requested limit (#642).
 
-    ``sum(container_memory_working_set_bytes{app=...}) / sum(kube_pod_container_resource_limits{app=...,resource="memory"})``
+    When ``namespace`` is supplied uses Kubernetes-native namespace
+    label (cAdvisor series) instead of ``app``.
 
-    Series is a ratio in [0, 1+] (>1 = over-limit ⇒ OOMKill imminent).
-    Working-set bytes is what the kubelet uses for OOM accounting; the
-    request/limit gauge comes from kube-state-metrics same as CPU.
-
-    No ``rate(...)`` wrapper — memory is a gauge, not a counter, so
-    the value at the latest scrape is what we want. Prometheus's
-    ``query_range`` still produces one sample per ``step`` (the
-    last-scrape value within each window).
+    ``sum(container_memory_working_set_bytes{namespace=...}) / sum(kube_pod_container_resource_limits{namespace=...,resource="memory"})``
     """
     labels = _build_labels(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        namespace=namespace,
     )
     rate_window = pick_rate_window(range_seconds)
-    usage_match = _render_label_match(labels)
-    limits_match = _render_label_match_with_extra(labels, 'resource="memory"')
+    container_filter = ',container!=""' if namespace else ""
+    usage_match = _render_label_match_with_extra(labels, container_filter.lstrip(",") or None)
+    limits_match = _render_label_match_with_extra(labels, f'resource="memory"{container_filter}')
     expr = (
         f"sum(container_memory_working_set_bytes{usage_match}) "
         f"/ clamp_min(sum(kube_pod_container_resource_limits{limits_match}), 1e-9)"

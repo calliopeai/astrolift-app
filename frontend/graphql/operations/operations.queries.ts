@@ -20,8 +20,8 @@ export const GET_RECENT_ACTIVITY = gql`
 `;
 
 export const LIST_EVENTS = gql`
-  query ListEvents($limit: Int, $eventType: String) {
-    astroliftEvents(limit: $limit, eventType: $eventType) {
+  query ListEvents($limit: Int, $eventType: String, $appSlug: String) {
+    astroliftEvents(limit: $limit, eventType: $eventType, appSlug: $appSlug) {
       id
       eventType
       payload
