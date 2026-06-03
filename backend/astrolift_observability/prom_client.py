@@ -56,8 +56,14 @@ def resolve_prometheus_endpoint(
     env = qs.order_by("name").first()
     if env is None or env.tenant_cluster_id is None:
         return None
+    # Check provider_config first (operator-set), then fall back to
+    # capabilities (probe-discovered, e.g. set via bringClusterIntoManagement).
+    # Mirrors the same two-source lookup in astrolift_clusters/schema/queries.py.
     cfg = env.tenant_cluster.provider_config or {}
     endpoint = (cfg.get("prometheus_endpoint") or "").strip()
+    if not endpoint:
+        caps = env.tenant_cluster.capabilities or {}
+        endpoint = (caps.get("prometheus_endpoint") or "").strip()
     return endpoint or None
 
 
