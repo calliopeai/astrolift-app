@@ -36,18 +36,18 @@ interface EventsResp {
 }
 
 interface Props {
-  appId: string;
+  /** App slug — used for server-side filtering so only this app's events are fetched. */
+  appSlug: string;
   limit?: number;
 }
 
 /**
  * Recent platform events for this app — deploys, config changes, token
- * rotations, etc. The events feed is org-wide, so we filter client-side on
- * `registeredAppId`. The query is cheap (capped at 100) and shared with
- * the dashboard, so this incurs no extra round-trip when the dashboard
- * already primed it.
+ * rotations, etc. Server-side filtered by appSlug so we only load events
+ * belonging to this app (fixes the empty-feed bug where client-side filtering
+ * compared the app GUID against the integer PK serialised as a string).
  */
-export function ActivityTimeline({ appId, limit = 20 }: Props) {
+export function ActivityTimeline({ appSlug, limit = 20 }: Props) {
   const fmt = useFormatters();
   // #711 — local filter state (event type chip + free-text search).
   // Defaults to 'all' and empty so the existing summary view is
@@ -56,13 +56,11 @@ export function ActivityTimeline({ appId, limit = 20 }: Props) {
   const [search, setSearch] = React.useState("");
 
   const { data, loading } = useQuery<EventsResp>(LIST_EVENTS, {
-    variables: { limit: 100 },
+    variables: { limit: 100, appSlug },
     fetchPolicy: "cache-and-network",
   });
 
-  const allForApp = (data?.astroliftEvents ?? []).filter(
-    (e) => e.registeredAppId === appId,
-  );
+  const allForApp = data?.astroliftEvents ?? [];
 
   const activeFilter = TYPE_FILTERS.find((f) => f.key === typeKey) ?? TYPE_FILTERS[0];
   const needle = search.trim().toLowerCase();

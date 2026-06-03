@@ -99,6 +99,13 @@ export function DashboardClient() {
     (a) => a.hasRecentFailure && a.latestDeploymentStatus === "running"
   ).length;
   const noDeployCount = apps.filter((a) => a.latestDeploymentStatus == null).length;
+  // "Running apps" tile: count apps whose latest deployment reached RUNNING
+  // (includes apps that had a recent hiccup but are currently up — those
+  // apps ARE running even if they had a failure in the recent window).
+  // inFlight is preserved for the deployment-metrics chart below.
+  const deployedCount = apps.filter(
+    (a) => a.latestDeploymentStatus === "running"
+  ).length;
   const inFlightCount = metrics.data?.astroliftDeploymentMetrics.inFlight ?? 0;
 
   const recentProjects = projects.data?.astroliftProjects.slice(0, 5) ?? [];
@@ -162,8 +169,8 @@ export function DashboardClient() {
         <KpiTile
           label={t("tiles.deployments.label")}
           icon={BoxIcon}
-          value={inFlightCount}
-          loading={metrics.loading}
+          value={health.loading ? undefined : deployedCount}
+          loading={health.loading}
           href="/deployments"
           emptyCta={t("tiles.deployments.emptyCta")}
         />
