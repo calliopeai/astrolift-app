@@ -177,7 +177,7 @@ export type AstroliftRegisteredApp = Omit<
    */
   provisioningProgress?: ProvisioningProgress | null;
   /**
-   * Full platform-managed hostname (e.g. `pickup-windows-tool.astrolift.smdinfra.net`).
+   * Full platform-managed hostname (e.g. `my-app.astrolift.example.com`).
    * Computed from app.subdomain + ManagedDomain.zone. Empty string when no domain
    * is configured. Manual entry until `make codegen` regenerates types.
    */

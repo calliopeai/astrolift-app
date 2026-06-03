@@ -30,10 +30,10 @@ import { UrlHealthBadge } from "./url-health-badge";
 interface Props {
   appId: string;
   appSlug: string;
-  /** Short subdomain label (e.g. `pickup-windows-tool`). Used in the edit field. */
+  /** Short subdomain label (e.g. `my-app`). Used in the edit field. */
   subdomain: string;
   /**
-   * Full platform-managed hostname (e.g. `pickup-windows-tool.astrolift.smdinfra.net`).
+   * Full platform-managed hostname (e.g. `my-app.astrolift.example.com`).
    * Computed by the backend from subdomain + ManagedDomain.zone. Empty when no
    * managed domain is configured — falls back to subdomain for display.
    */
