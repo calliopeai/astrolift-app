@@ -719,8 +719,32 @@ class ClustersQuery:
         )
         if cluster is None:
             return []
+
+        # Collect the Kubernetes namespaces for every app environment bound to
+        # this cluster so the workload-health table includes app workloads, not
+        # just the astrolift-system namespace.
+        from astrolift_lifecycle.models.app_environment import AppEnvironment
+        from core.cluster_observability import namespace_for_app
+
+        app_envs = (
+            AppEnvironment.objects.filter(
+                tenant_cluster=cluster,
+                registered_app__deleted_at__isnull=True,
+            )
+            .select_related("registered_app__organization")
+            .only(
+                "registered_app__slug",
+                "registered_app__k8s_namespace",
+                "registered_app__organization__slug",
+            )
+        )
+        app_namespaces = list({namespace_for_app(ae.registered_app) for ae in app_envs})
+
         try:
-            rows = cluster_workload_health_dispatch(cluster=cluster)
+            rows = cluster_workload_health_dispatch(
+                cluster=cluster,
+                namespaces=["astrolift-system", *app_namespaces] if app_namespaces else None,
+            )
         except ClusterManagementError:
             return []
         return [

@@ -14,6 +14,7 @@ import {
   type Node,
   type NodeProps,
   type NodeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -28,6 +29,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { autoLayout } from "./layout";
@@ -192,6 +194,14 @@ export function AppTopologyMap({
   const [flowNodes, , onNodesChange] = useNodesState(initialNodes);
   const [flowEdges, , onEdgesChange] = useEdgesState(initialEdges);
 
+  // ReactFlow needs a DOM-measurement pass before fitView can position
+  // nodes correctly. Show a skeleton until onInit fires so the graph
+  // never flashes blank or with nodes stacked at origin.
+  const [isReady, setIsReady] = React.useState(false);
+  const handleInit = React.useCallback((_: ReactFlowInstance) => {
+    setIsReady(true);
+  }, []);
+
   const handleNodeClick = React.useCallback(
     (_: React.MouseEvent, node: Node<TopologyNode>) => {
       if (onNodeClick) {
@@ -207,9 +217,14 @@ export function AppTopologyMap({
 
   return (
     <div
-      className={cn("rounded-md border bg-card", className)}
+      className={cn("relative rounded-md border bg-card", className)}
       style={{ height: typeof height === "number" ? `${height}px` : height }}
     >
+      {!isReady && (
+        <div className="absolute inset-0 z-10 p-4">
+          <Skeleton className="h-full w-full" />
+        </div>
+      )}
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
@@ -217,6 +232,7 @@ export function AppTopologyMap({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onInit={handleInit}
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
         minZoom={0.4}
