@@ -27,13 +27,17 @@ with a doc link.
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from collections import defaultdict
 from collections.abc import Callable
+from typing import Any
 
 import strawberry
 from strawberry.types import Info
 
 from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
+
+log = logging.getLogger(__name__)
 from core.cluster_observability import namespace_for_app
 from astrolift_observability.schema.types import (
     AppEndpointMetric,
@@ -94,6 +98,105 @@ def _samples_from_pairs(pairs: list[tuple[float, float]]) -> list[TimeSeriesPoin
         )
         for ts, value in pairs
     ]
+
+
+def _backfill_from_cloudwatch(
+    *,
+    out: list[AppGoldenSignal],
+    app: Any,
+    environment_name: str | None,
+    app_namespace: str,
+    start_unix: int,
+    end_unix: int,
+    step: int,
+    seconds: int,
+) -> list[AppGoldenSignal]:
+    """Replace empty HTTP-kind signals with CloudWatch ALB data.
+
+    Called only when Prometheus has no HTTP series (uninstrumented apps).
+    Falls back silently on any error or non-AWS cluster — the original
+    empty-series list is returned unchanged in those cases.
+    """
+    from astrolift_lifecycle.models.app_environment import AppEnvironment
+
+    env = (
+        AppEnvironment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+        )
+        .select_related("tenant_cluster__provider_plugin")
+        .order_by("name")
+        .first()
+    )
+    if env is None or env.tenant_cluster_id is None:
+        return out
+
+    cluster = env.tenant_cluster
+    plugin_slug = (cluster.provider_plugin.slug if cluster.provider_plugin else "").lower()
+    if plugin_slug != "aws":
+        return out
+
+    try:
+        from core.cluster_management import (  # noqa: PLC0415
+            ClusterManagementError,
+            cluster_alb_http_metrics_dispatch,
+        )
+
+        cw_data = cluster_alb_http_metrics_dispatch(
+            cluster=cluster,
+            app_namespace=app_namespace,
+            start_unix=start_unix,
+            end_unix=end_unix,
+            step_seconds=step,
+        )
+    except Exception as exc:
+        log.info("cloudwatch fallback failed app=%s err=%s", app.slug, exc)
+        return out
+
+    if not any(cw_data.values()):
+        return out
+
+    log.info("cloudwatch fallback: filling HTTP signals for app=%s", app.slug)
+
+    # Map CloudWatch key → GoldenSignalKind value string
+    _CW_KIND_MAP = {
+        "rps":          GoldenSignalKind.TRAFFIC.value,
+        "error_rate":   GoldenSignalKind.ERRORS.value,
+        "latency_p50":  GoldenSignalKind.LATENCY_P50.value,
+        "latency_p95":  GoldenSignalKind.LATENCY_P95.value,
+        "latency_p99":  GoldenSignalKind.LATENCY_P99.value,
+    }
+    _CW_UNIT_MAP = {
+        "rps":          "rps",
+        "error_rate":   "ratio",
+        "latency_p50":  "seconds",
+        "latency_p95":  "seconds",
+        "latency_p99":  "seconds",
+    }
+    # p90 is kept in the wire shape for backwards compat; alias to p95
+    _CW_ALIAS = {GoldenSignalKind.LATENCY_P90.value: cw_data.get("latency_p95", [])}
+
+    # Rebuild the list: swap in CloudWatch data for any empty HTTP signal
+    patched: list[AppGoldenSignal] = []
+    for sig in out:
+        cw_key = next(
+            (k for k, kind_val in _CW_KIND_MAP.items() if kind_val == sig.name), None
+        )
+        alias_pairs = _CW_ALIAS.get(sig.name)
+        if (cw_key and cw_data.get(cw_key)) or alias_pairs:
+            pairs = cw_data.get(cw_key, alias_pairs or [])
+            patched.append(
+                AppGoldenSignal(
+                    name=sig.name,
+                    range_seconds=seconds,
+                    samples=_samples_from_pairs(pairs),
+                    promql=f"# CloudWatch ALB — {sig.name}",
+                    unit=_CW_UNIT_MAP.get(cw_key or "", sig.unit),
+                )
+            )
+        else:
+            patched.append(sig)
+    return patched
 
 
 def _classify_status_code(code: str) -> str:
@@ -329,6 +432,43 @@ class GoldenSignalsQuery:
                     unit=unit,
                 )
             )
+
+        # CloudWatch ALB fallback for HTTP signals.
+        #
+        # Prometheus only has Traffic / Errors / Latency when the app
+        # exposes http_requests_total (application-level instrumentation).
+        # On AWS clusters every managed app sits behind an ALB that emits
+        # RequestCount, HTTPCode_Target_5XX_Count, and TargetResponseTime
+        # to CloudWatch automatically — no app changes needed.
+        #
+        # If ALL three HTTP signal kinds came back empty from Prometheus,
+        # try CloudWatch and backfill whichever signals it can supply.
+        _HTTP_KINDS = {
+            GoldenSignalKind.TRAFFIC,
+            GoldenSignalKind.ERRORS,
+            GoldenSignalKind.LATENCY_P50,
+            GoldenSignalKind.LATENCY_P90,
+            GoldenSignalKind.LATENCY_P95,
+            GoldenSignalKind.LATENCY_P99,
+        }
+        signals_by_kind = {s.name: s for s in out}
+        http_all_empty = all(
+            not signals_by_kind[k.value].samples
+            for k in _HTTP_KINDS
+            if k.value in signals_by_kind
+        )
+        if http_all_empty:
+            out = _backfill_from_cloudwatch(
+                out=out,
+                app=app,
+                environment_name=environment_name,
+                app_namespace=app_namespace,
+                start_unix=start_unix,
+                end_unix=end_unix,
+                step=step,
+                seconds=seconds,
+            )
+
         return out
 
     @strawberry.field

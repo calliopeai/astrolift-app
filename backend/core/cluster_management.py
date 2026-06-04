@@ -327,11 +327,45 @@ def cluster_workload_health_dispatch(
     ]
 
 
+def cluster_alb_http_metrics_dispatch(
+    *,
+    cluster: TenantCluster,
+    app_namespace: str,
+    start_unix: int,
+    end_unix: int,
+    step_seconds: int,
+) -> dict[str, list[tuple[Any, Any]]]:
+    """Return CloudWatch ALB HTTP metrics for *app_namespace* on *cluster*.
+
+    Delegates to the driver's ``get_alb_http_metrics`` method when available
+    (currently only ``EKSClusterDriver``). Returns an empty dict of lists on
+    any failure or when the driver doesn't implement the method — callers
+    treat missing data as "metrics not yet flowing" rather than an error.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "get_alb_http_metrics"):
+        return {"rps": [], "error_rate": [], "latency_p50": [], "latency_p95": [], "latency_p99": []}
+    ctx = _context_for_cluster(cluster)
+    try:
+        return driver.get_alb_http_metrics(
+            ctx,
+            app_namespace=app_namespace,
+            start_unix=start_unix,
+            end_unix=end_unix,
+            step_seconds=step_seconds,
+        )
+    except Exception as exc:
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: get_alb_http_metrics raised {exc}",
+        ) from exc
+
+
 __all__ = [
     "ClusterManagementError",
     "ClusterObservabilityError",  # re-exported so callers have one import
     "bootstrap_components_dispatch",
     "bring_cluster_into_management",
+    "cluster_alb_http_metrics_dispatch",
     "cluster_health_dispatch",
     "cluster_workload_health_dispatch",
     "probe_cluster_capabilities_dispatch",
