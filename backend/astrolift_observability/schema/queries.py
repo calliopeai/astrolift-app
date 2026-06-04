@@ -129,10 +129,17 @@ def _backfill_from_cloudwatch(
         .first()
     )
     if env is None or env.tenant_cluster_id is None:
+        log.warning("cloudwatch fallback: no env/cluster for app=%s", app.slug)
         return out
 
     cluster = env.tenant_cluster
-    plugin_slug = (cluster.provider_plugin.slug if cluster.provider_plugin else "").lower()
+    plugin_slug = (
+        cluster.provider_plugin.slug if cluster.provider_plugin_id and cluster.provider_plugin else ""
+    ).lower()
+    log.warning(
+        "cloudwatch fallback: app=%s cluster=%s plugin=%s",
+        app.slug, cluster.slug, plugin_slug or "(none)",
+    )
     if plugin_slug != "aws":
         return out
 
@@ -150,21 +157,25 @@ def _backfill_from_cloudwatch(
             step_seconds=step,
         )
     except Exception as exc:
-        log.info("cloudwatch fallback failed app=%s err=%s", app.slug, exc)
+        log.warning("cloudwatch fallback: dispatch failed app=%s err=%s", app.slug, exc)
         return out
 
-    if not any(cw_data.values()):
+    has_data = any(bool(v) for v in cw_data.values())
+    log.warning(
+        "cloudwatch fallback: app=%s has_data=%s keys=%s",
+        app.slug, has_data,
+        {k: len(v) for k, v in cw_data.items()},
+    )
+    if not has_data:
         return out
 
-    log.info("cloudwatch fallback: filling HTTP signals for app=%s", app.slug)
-
-    # Map CloudWatch key → GoldenSignalKind value string
-    _CW_KIND_MAP = {
-        "rps":          GoldenSignalKind.TRAFFIC.value,
-        "error_rate":   GoldenSignalKind.ERRORS.value,
-        "latency_p50":  GoldenSignalKind.LATENCY_P50.value,
-        "latency_p95":  GoldenSignalKind.LATENCY_P95.value,
-        "latency_p99":  GoldenSignalKind.LATENCY_P99.value,
+    # Map CloudWatch key → GoldenSignalKind enum (for sig.name comparison)
+    _CW_KIND_MAP: dict[str, GoldenSignalKind] = {
+        "rps":          GoldenSignalKind.TRAFFIC,
+        "error_rate":   GoldenSignalKind.ERRORS,
+        "latency_p50":  GoldenSignalKind.LATENCY_P50,
+        "latency_p95":  GoldenSignalKind.LATENCY_P95,
+        "latency_p99":  GoldenSignalKind.LATENCY_P99,
     }
     _CW_UNIT_MAP = {
         "rps":          "rps",
@@ -173,24 +184,28 @@ def _backfill_from_cloudwatch(
         "latency_p95":  "seconds",
         "latency_p99":  "seconds",
     }
-    # p90 is kept in the wire shape for backwards compat; alias to p95
-    _CW_ALIAS = {GoldenSignalKind.LATENCY_P90.value: cw_data.get("latency_p95", [])}
+    # p90 kept for wire compat — alias it to the p95 CloudWatch series
+    _CW_ALIAS: dict[GoldenSignalKind, list] = {
+        GoldenSignalKind.LATENCY_P90: cw_data.get("latency_p95", []),
+    }
 
-    # Rebuild the list: swap in CloudWatch data for any empty HTTP signal
+    # Rebuild the list: swap in CloudWatch data for any HTTP signal
     patched: list[AppGoldenSignal] = []
     for sig in out:
+        # sig.name is a GoldenSignalKind enum instance
         cw_key = next(
-            (k for k, kind_val in _CW_KIND_MAP.items() if kind_val == sig.name), None
+            (k for k, kind_enum in _CW_KIND_MAP.items() if kind_enum == sig.name), None
         )
-        alias_pairs = _CW_ALIAS.get(sig.name)
-        if (cw_key and cw_data.get(cw_key)) or alias_pairs:
-            pairs = cw_data.get(cw_key, alias_pairs or [])
+        alias_pairs = _CW_ALIAS.get(sig.name)  # type: ignore[arg-type]
+        cw_pairs = cw_data.get(cw_key, []) if cw_key else []
+        if cw_pairs or alias_pairs:
+            pairs = cw_pairs or alias_pairs or []
             patched.append(
                 AppGoldenSignal(
                     name=sig.name,
                     range_seconds=seconds,
                     samples=_samples_from_pairs(pairs),
-                    promql=f"# CloudWatch ALB — {sig.name}",
+                    promql=f"# CloudWatch ALB — {sig.name.value if hasattr(sig.name, 'value') else sig.name}",
                     unit=_CW_UNIT_MAP.get(cw_key or "", sig.unit),
                 )
             )
