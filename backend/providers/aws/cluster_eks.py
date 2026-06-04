@@ -1282,6 +1282,82 @@ class EKSClusterDriver(ClusterDriver):
             namespaces=default_namespaces(namespaces),
         )
 
+    def get_alb_http_metrics(
+        self,
+        cluster: ClusterContext,
+        *,
+        app_namespace: str,
+        start_unix: int,
+        end_unix: int,
+        step_seconds: int,
+    ) -> dict[str, list[tuple[float, float]]]:
+        """CloudWatch ALB HTTP metrics for an app namespace.
+
+        Returns a dict with keys 'rps', 'error_rate', 'latency_p50',
+        'latency_p95', 'latency_p99'. Values are (unix_ts, value) lists.
+        All lists are empty on any failure (driver degrades gracefully).
+
+        Looks up the ALB by finding the Kubernetes Ingress in the app
+        namespace and resolving its load-balancer hostname to an ALB ARN
+        via elbv2 DescribeLoadBalancers. CloudWatch is then queried for
+        RequestCount, HTTPCode_Target_5XX_Count, and TargetResponseTime.
+        """
+        import boto3
+
+        from aws.timeseries_cloudwatch import (
+            alb_arn_for_app_namespace,
+            error_rate,
+            latency,
+            request_rate,
+        )
+
+        empty: dict[str, list[tuple[float, float]]] = {
+            "rps": [],
+            "error_rate": [],
+            "latency_p50": [],
+            "latency_p95": [],
+            "latency_p99": [],
+        }
+
+        try:
+            k8s = self._k8s(cluster.slug)
+        except Exception as exc:
+            log.warning("get_alb_http_metrics: k8s build failed cluster=%s: %s", cluster.slug, exc)
+            return empty
+
+        region = self._config.region
+        elbv2 = boto3.client("elbv2", region_name=region)
+        cw = boto3.client("cloudwatch", region_name=region)
+
+        alb_arn = alb_arn_for_app_namespace(
+            k8s_client=k8s,
+            elbv2_client=elbv2,
+            namespace=app_namespace,
+        )
+        if not alb_arn:
+            log.info(
+                "get_alb_http_metrics: no ALB found for ns=%s cluster=%s",
+                app_namespace,
+                cluster.slug,
+            )
+            return empty
+
+        period = max(step_seconds, 60)
+        kwargs = dict(
+            cw=cw,
+            alb_arn=alb_arn,
+            start_unix=start_unix,
+            end_unix=end_unix,
+            period=period,
+        )
+        return {
+            "rps":          request_rate(**kwargs),
+            "error_rate":   error_rate(**kwargs),
+            "latency_p50":  latency(**kwargs, stat="p50"),
+            "latency_p95":  latency(**kwargs, stat="p95"),
+            "latency_p99":  latency(**kwargs, stat="p99"),
+        }
+
     # ---- internals ------------------------------------------------
 
     def _k8s(self, cluster: str) -> Any:
