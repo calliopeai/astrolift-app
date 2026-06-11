@@ -7,7 +7,9 @@ import {
   ChevronDownIcon,
   CloudIcon,
   GlobeIcon,
+  KeyRoundIcon,
   Loader2Icon,
+  PencilIcon,
   PlayIcon,
   RefreshCcwIcon,
   RocketIcon,
@@ -38,6 +40,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -55,6 +58,7 @@ import {
   INSTALL_CLUSTER_PREREQS,
   LIST_CLUSTERS,
   REFRESH_CLUSTER_MANAGEMENT,
+  UPDATE_TENANT_CLUSTER,
 } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -329,6 +333,10 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
           <Field label="Registered" value={fmt.formatDateTime(cluster.createdAt)} />
         </CardContent>
       </Card>
+
+      <Can permission="cluster.update">
+        <IngressAuthCard cluster={cluster} />
+      </Can>
 
       <Card>
         <CardHeader>
@@ -1043,5 +1051,172 @@ function BootstrapHistoryList({ slug }: { slug: string }) {
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+// ---- Ingress auth card (#851) --------------------------------------
+
+interface IngressAuthConfig {
+  user_pool_arn: string;
+  user_pool_client_id: string;
+  user_pool_domain: string;
+}
+
+function isAlbAuthConfig(v: unknown): v is IngressAuthConfig {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "user_pool_arn" in v &&
+    "user_pool_client_id" in v &&
+    "user_pool_domain" in v
+  );
+}
+
+function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
+  const [editing, setEditing] = React.useState(false);
+  const existing = isAlbAuthConfig(cluster.albAuthConfig) ? cluster.albAuthConfig : null;
+  const [poolArn, setPoolArn] = React.useState(existing?.user_pool_arn ?? "");
+  const [clientId, setClientId] = React.useState(existing?.user_pool_client_id ?? "");
+  const [domain, setDomain] = React.useState(existing?.user_pool_domain ?? "");
+
+  const [update, { loading }] = useMutation<{
+    updateTenantCluster: MutationResult<AstroliftTenantCluster>;
+  }>(UPDATE_TENANT_CLUSTER, {
+    refetchQueries: [{ query: LIST_CLUSTERS }],
+    awaitRefetchQueries: true,
+  });
+
+  async function handleSave() {
+    const config =
+      poolArn && clientId && domain
+        ? { user_pool_arn: poolArn, user_pool_client_id: clientId, user_pool_domain: domain }
+        : null;
+    const { data } = await update({
+      variables: { input: { id: cluster.id, albAuthConfig: config } },
+    });
+    if (data?.updateTenantCluster.ok) {
+      toast.success(config ? "Ingress auth config saved." : "Ingress auth config cleared.");
+      setEditing(false);
+    } else {
+      toast.error(data?.updateTenantCluster.errors?.[0]?.message ?? "Save failed.");
+    }
+  }
+
+  function handleEdit() {
+    const existing = isAlbAuthConfig(cluster.albAuthConfig) ? cluster.albAuthConfig : null;
+    setPoolArn(existing?.user_pool_arn ?? "");
+    setClientId(existing?.user_pool_client_id ?? "");
+    setDomain(existing?.user_pool_domain ?? "");
+    setEditing(true);
+  }
+
+  function handleCancel() {
+    setEditing(false);
+  }
+
+  const isAlb = cluster.ingressClass === "alb";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <KeyRoundIcon className="size-4" />
+              Ingress auth
+            </CardTitle>
+            <CardDescription className="mt-1">
+              {isAlb
+                ? "Cognito authenticate-cognito config written into every new ALB ingress rule for this cluster."
+                : "Ingress-level auth is only supported when ingressClass = alb."}
+            </CardDescription>
+          </div>
+          {isAlb && !editing && (
+            <Button size="sm" variant="outline" onClick={handleEdit} className="gap-1.5 shrink-0">
+              <PencilIcon className="size-3.5" />
+              {existing ? "Edit" : "Configure"}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!isAlb ? (
+          <p className="text-muted-foreground text-sm">
+            Change <span className="font-mono">ingressClass</span> to{" "}
+            <span className="font-mono">alb</span> to enable Cognito auth gate.
+          </p>
+        ) : editing ? (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium">User pool ARN</label>
+              <Input
+                value={poolArn}
+                onChange={(e) => setPoolArn(e.target.value)}
+                placeholder="arn:aws:cognito-idp:us-west-2:…"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">App client ID</label>
+              <Input
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                placeholder="abc123…"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">User pool domain</label>
+              <Input
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="my-domain (without .auth.region.amazoncognito.com)"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" onClick={handleSave} disabled={loading} className="gap-1.5">
+                {loading && <Loader2Icon className="size-3.5 animate-spin" />}
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancel} disabled={loading}>
+                Cancel
+              </Button>
+              {existing && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    const { data } = await update({
+                      variables: { input: { id: cluster.id, albAuthConfig: null } },
+                    });
+                    if (data?.updateTenantCluster.ok) {
+                      toast.success("Ingress auth config cleared.");
+                      setEditing(false);
+                    } else {
+                      toast.error(data?.updateTenantCluster.errors?.[0]?.message ?? "Clear failed.");
+                    }
+                  }}
+                  disabled={loading}
+                  className="text-muted-foreground ml-auto hover:text-destructive"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : existing ? (
+          <div className="space-y-2 text-sm">
+            <Field label="User pool ARN" mono value={existing.user_pool_arn} />
+            <Field label="App client ID" mono value={existing.user_pool_client_id} />
+            <Field label="Domain" mono value={existing.user_pool_domain} />
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm italic">
+            No auth config — all ingress rules are unauthenticated. Click Configure to add Cognito.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

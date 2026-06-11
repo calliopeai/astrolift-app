@@ -2486,6 +2486,7 @@ export type AstroliftTemplateSendStatPoint = {
 };
 
 export type AstroliftTenantCluster = {
+  albAuthConfig?: Maybe<Scalars['JSON']['output']>;
   authMethod: Scalars['String']['output'];
   bootstrapRuns: Array<AstroliftClusterBootstrapRun>;
   capabilities: Scalars['JSON']['output'];
@@ -6571,6 +6572,7 @@ export type UpdateTeamInput = {
 };
 
 export type UpdateTenantClusterInput = {
+  albAuthConfig?: InputMaybe<Scalars['JSON']['input']>;
   endpoint: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   ingressClass: InputMaybe<Scalars['String']['input']>;

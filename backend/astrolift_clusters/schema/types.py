@@ -37,6 +37,7 @@ class TenantClusterType:
     endpoint: str
     auth_method: str
     ingress_class: str
+    alb_auth_config: JSON | None
     is_active: bool
     capabilities: JSON
     capabilities_probed_at: dt.datetime | None
@@ -125,6 +126,7 @@ def cluster_to_type(cluster) -> TenantClusterType:
         endpoint=cluster.endpoint or "",
         auth_method=cluster.auth_method,
         ingress_class=cluster.ingress_class,
+        alb_auth_config=cluster.alb_auth_config,
         is_active=cluster.is_active,
         capabilities=cluster.capabilities or {},
         capabilities_probed_at=cluster.capabilities_probed_at,

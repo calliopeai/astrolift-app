@@ -98,6 +98,7 @@ export const LIST_CLUSTERS = gql`
       endpoint
       authMethod
       ingressClass
+      albAuthConfig
       isActive
       capabilities
       capabilitiesProbedAt
@@ -115,6 +116,25 @@ export const LIST_CLUSTERS = gql`
         startedAt
         endedAt
         triggeredByUsername
+      }
+    }
+  }
+`;
+
+export const UPDATE_TENANT_CLUSTER = gql`
+  mutation UpdateTenantCluster($input: UpdateTenantClusterInput!) {
+    updateTenantCluster(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        ingressClass
+        albAuthConfig
       }
     }
   }

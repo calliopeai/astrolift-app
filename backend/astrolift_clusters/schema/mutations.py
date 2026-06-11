@@ -184,6 +184,7 @@ class UpdateTenantClusterInput:
     region: str | None = None
     endpoint: str | None = None
     ingress_class: str | None = None
+    alb_auth_config: JSON | None = strawberry.UNSET
 
 
 @strawberry.input
@@ -405,6 +406,8 @@ class ClustersMutation:
             cluster.endpoint = input.endpoint
         if input.ingress_class is not None:
             cluster.ingress_class = input.ingress_class
+        if input.alb_auth_config is not strawberry.UNSET:
+            cluster.alb_auth_config = input.alb_auth_config
         cluster.save()
         return gql_success(cluster_to_type(cluster))
 
