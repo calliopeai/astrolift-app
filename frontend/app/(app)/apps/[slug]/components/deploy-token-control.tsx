@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  AlertTriangleIcon,
   CheckIcon,
   CopyIcon,
   KeyRoundIcon,
@@ -134,11 +135,17 @@ export function DeployTokenControl({ appSlug }: Props) {
     }
   }
 
+  const missingToken = !loading && !active;
+
   return (
-    <section className="rounded-lg border p-5">
+    <section className={`rounded-lg border p-5${missingToken ? " border-amber-400/60 bg-amber-500/5 dark:border-amber-500/40" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <KeyRoundIcon className="text-muted-foreground mt-0.5 size-4" />
+          {missingToken ? (
+            <AlertTriangleIcon className="mt-0.5 size-4 text-amber-600 dark:text-amber-400" />
+          ) : (
+            <KeyRoundIcon className="text-muted-foreground mt-0.5 size-4" />
+          )}
           <div>
             <p className="text-sm font-medium">Deploy token</p>
             <p className="text-muted-foreground mt-0.5 max-w-md text-xs">
@@ -158,9 +165,9 @@ export function DeployTokenControl({ appSlug }: Props) {
                 </span>
               </div>
             )}
-            {!loading && !active && (
-              <p className="text-muted-foreground mt-2 text-xs italic">
-                No token configured yet — generate one below.
+            {missingToken && (
+              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                No token — CI cannot trigger deployments until one is generated.
               </p>
             )}
           </div>
@@ -200,7 +207,12 @@ export function DeployTokenControl({ appSlug }: Props) {
                 </Button>
               </>
             ) : (
-              <Button size="sm" onClick={handleCreate} disabled={creating} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                disabled={creating}
+                className="gap-1.5 border-amber-400/60 bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
+              >
                 {creating ? (
                   <Loader2Icon className="size-3.5 animate-spin" />
                 ) : (
