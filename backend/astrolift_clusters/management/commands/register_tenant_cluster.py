@@ -140,6 +140,17 @@ class Command(BaseCommand):
         ingress_class = opts["ingress_class"] or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS") or "alb"
         org_slug = opts["org_slug"] or _env("ASTROLIFT_CLUSTER_ORG_SLUG") or ""
 
+        _alb_auth_pool_arn = _env("ASTROLIFT_CLUSTER_ALB_AUTH_USER_POOL_ARN")
+        _alb_auth_client_id = _env("ASTROLIFT_CLUSTER_ALB_AUTH_CLIENT_ID")
+        _alb_auth_domain = _env("ASTROLIFT_CLUSTER_ALB_AUTH_DOMAIN")
+        alb_auth_config = None
+        if _alb_auth_pool_arn and _alb_auth_client_id and _alb_auth_domain:
+            alb_auth_config = {
+                "user_pool_arn": _alb_auth_pool_arn,
+                "user_pool_client_id": _alb_auth_client_id,
+                "user_pool_domain": _alb_auth_domain,
+            }
+
         auto_discover = opts["auto_discover_aws"]
         if auto_discover is None:
             auto_discover = _env_bool("ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS")
@@ -204,6 +215,7 @@ class Command(BaseCommand):
             "auth_config": auth_config,
             "provider_config": provider_config,
             "ingress_class": ingress_class,
+            "alb_auth_config": alb_auth_config,
             "is_active": True,
             "deleted_at": None,
             "deleted_by": None,

@@ -97,6 +97,17 @@ class TenantCluster(NamedBaseCoreModel):
     auth_method = models.CharField(max_length=32, choices=AuthMethod.choices)
     auth_config = models.JSONField(default=dict, blank=True)
     ingress_class = models.CharField(max_length=64, default="nginx")
+    alb_auth_config = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Cognito IDP config for ALB authenticate-cognito rules. "
+            "Keys: user_pool_arn, user_pool_client_id, user_pool_domain. "
+            "When set, every ALB Ingress rendered for this cluster carries "
+            "the Cognito auth annotations. Null = no auth gate."
+        ),
+    )
     default_namespace_prefix = models.CharField(max_length=64, blank=True, default="")
     capabilities = models.JSONField(default=dict, blank=True)
     capabilities_probed_at = models.DateTimeField(null=True, blank=True)

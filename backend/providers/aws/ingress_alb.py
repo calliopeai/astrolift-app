@@ -15,11 +15,28 @@ in-cluster Ingress via the ClusterDriver (#29).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.ingress import IngressDriver, Manifest
+
+
+@dataclass(frozen=True)
+class CognitoAuthConfig:
+    """Cognito IDP config for ALB authenticate-cognito listener rules.
+
+    These values map directly to the alb.ingress.kubernetes.io/auth-idp-cognito
+    annotation that LBC translates into an ALB authenticate-cognito action.
+    """
+
+    user_pool_arn: str
+    user_pool_client_id: str
+    user_pool_domain: str
+    on_unauthenticated_request: str = "authenticate"
+    scope: str = "openid email profile"
+    session_cookie_name: str = "AWSELBAuthSessionCookie"
+    session_timeout: int = 86400
 
 
 @dataclass(frozen=True)
@@ -56,6 +73,11 @@ class ALBConfig:
     """Optional ClusterDriver instance for update/delete operations.
     When None, the driver renders manifests but can't mutate live
     state — caller passes one in for full lifecycle ops."""
+
+    cognito_auth: CognitoAuthConfig | None = None
+    """When set, LBC annotates the Ingress with Cognito authenticate
+    rules. Apps inherit the cluster's IDP config by default; omit to
+    leave the ALB unauthenticated (internal/private apps)."""
 
 
 class ALBIngressDriver(IngressDriver):
@@ -209,6 +231,8 @@ class ALBIngressDriver(IngressDriver):
         tls_strategy: str,
     ) -> dict[str, str]:
         """Translate config + tls strategy into LBC annotations."""
+        import json
+
         annotations: dict[str, str] = {
             "alb.ingress.kubernetes.io/scheme": self._config.scheme,
             "alb.ingress.kubernetes.io/target-type": self._config.target_type,
@@ -221,6 +245,20 @@ class ALBIngressDriver(IngressDriver):
             annotations["alb.ingress.kubernetes.io/ssl-redirect"] = "443"
         if tls_strategy in ("acm_dns_validated", "provided") and self._config.certificate_arn:
             annotations["alb.ingress.kubernetes.io/certificate-arn"] = self._config.certificate_arn
+        if self._config.cognito_auth:
+            auth = self._config.cognito_auth
+            annotations["alb.ingress.kubernetes.io/auth-type"] = "cognito"
+            annotations["alb.ingress.kubernetes.io/auth-idp-cognito"] = json.dumps({
+                "UserPoolArn": auth.user_pool_arn,
+                "UserPoolClientId": auth.user_pool_client_id,
+                "UserPoolDomain": auth.user_pool_domain,
+            })
+            annotations["alb.ingress.kubernetes.io/auth-on-unauthenticated-request"] = (
+                auth.on_unauthenticated_request
+            )
+            annotations["alb.ingress.kubernetes.io/auth-scope"] = auth.scope
+            annotations["alb.ingress.kubernetes.io/auth-session-cookie"] = auth.session_cookie_name
+            annotations["alb.ingress.kubernetes.io/auth-session-timeout"] = str(auth.session_timeout)
         return annotations
 
 

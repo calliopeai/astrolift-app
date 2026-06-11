@@ -282,12 +282,24 @@ def _render_managed_subdomain_ingress(
     out: list[dict[str, Any]] = []
 
     if getattr(cluster, "ingress_class", None) == "alb":
-        from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver
+        from providers.aws.ingress_alb import ALBConfig, ALBIngressDriver, CognitoAuthConfig
+
+        cognito_auth = None
+        alb_auth_cfg = getattr(cluster, "alb_auth_config", None)
+        if alb_auth_cfg and all(
+            k in alb_auth_cfg for k in ("user_pool_arn", "user_pool_client_id", "user_pool_domain")
+        ):
+            cognito_auth = CognitoAuthConfig(
+                user_pool_arn=alb_auth_cfg["user_pool_arn"],
+                user_pool_client_id=alb_auth_cfg["user_pool_client_id"],
+                user_pool_domain=alb_auth_cfg["user_pool_domain"],
+            )
 
         driver = ALBIngressDriver(
             config=ALBConfig(
                 region=cluster.region or "us-east-1",
                 certificate_arn=cert_arn,
+                cognito_auth=cognito_auth,
             )
         )
         tls_strategy = "acm_dns_validated" if cert_arn else "letsencrypt"
