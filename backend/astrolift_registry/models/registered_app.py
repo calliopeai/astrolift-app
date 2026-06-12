@@ -18,6 +18,12 @@ from core.models.base import NamedBaseCoreModel
 
 
 class RegisteredApp(NamedBaseCoreModel):
+    class BuildMode(models.TextChoices):
+        OFF = "off"
+        DOCKERFILE = "dockerfile"
+        BUILDPACKS = "buildpacks"
+        NIXPACKS = "nixpacks"
+
     class SourceKind(models.TextChoices):
         GITHUB = "github"
         GITLAB = "gitlab"
@@ -222,6 +228,18 @@ class RegisteredApp(NamedBaseCoreModel):
     # defaults for any unset key so callers never need to know which
     # keys are populated. Empty dict means "use defaults everywhere".
     security_policy = models.JSONField(default=dict, blank=True)
+
+    # Build mode (#867). Controls whether the platform builds a container
+    # image from source before deploying. ``off`` (default) means the
+    # caller supplies a pre-built image tag; the other modes invoke the
+    # BuildDriver with the chosen build strategy. ``dockerfile`` uses the
+    # repo's Dockerfile; ``buildpacks`` and ``nixpacks`` use the
+    # respective build tools without a Dockerfile.
+    build_mode = models.CharField(
+        max_length=32,
+        choices=BuildMode.choices,
+        default=BuildMode.OFF,
+    )
 
     class Meta:
         constraints = [

@@ -335,6 +335,11 @@ class RegisteredAppType:
     deploy_branch: str
     preview_screenshot_url: str
 
+    # Build mode (#867). "off" means the caller supplies a pre-built image;
+    # "dockerfile" / "buildpacks" / "nixpacks" trigger the build pipeline
+    # before the deploy activities run.
+    build_mode: str
+
     # App-global webhook-deploy pause (#399). Independent of the
     # per-env axes. ``webhook_deploys_paused_by_email`` is rendered
     # by the Settings card as "Paused by <email>"; null when no actor
@@ -815,6 +820,7 @@ def app_to_type(
         cron_paused=bool(app.cron_paused),
         deploy_branch=app.deploy_branch,
         preview_screenshot_url=app.preview_screenshot_url or "",
+        build_mode=app.build_mode or "off",
         is_archived=bool(app.archived_at),
         archived_at=app.archived_at,
         archived_by_email=_archived_by_email(app),

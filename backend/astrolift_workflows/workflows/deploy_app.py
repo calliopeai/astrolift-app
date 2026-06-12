@@ -28,6 +28,11 @@ with workflow.unsafe.imports_passed_through():
         update_secrets,
         wait_dns,
     )
+    from astrolift_workflows.activities.build_image import (
+        BuildImageInput,
+        build_image,
+        fetch_app_build_mode,
+    )
 
 
 # Fargate cold-starts + image-pull can exceed 15m on first rollout (#359).
@@ -54,6 +59,33 @@ class DeployAppWorkflow:
 
         await workflow.execute_activity(pre_flight, deployment_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(mark_deploying, deployment_id, start_to_close_timeout=_TIMEOUT)
+
+        # Build step (#865, #867): when build_mode != "off" the platform
+        # builds the container image from source before deploying. The
+        # fetch_app_build_mode activity keeps Django imports out of this
+        # sandbox. We use the first workload's image_tag from the input as
+        # the target tag; when multiple workloads are present the first tag
+        # is used as the build output and all workloads share it — this is
+        # intentional for v1 (one build per deploy).
+        build_mode = await workflow.execute_activity(
+            fetch_app_build_mode,
+            args=[input.registered_app_id],
+            start_to_close_timeout=_TIMEOUT,
+        )
+        if build_mode != "off":
+            _image_tags: dict = input.image_tags or {}
+            _image_tag = next(iter(_image_tags.values()), "")
+            _commit_sha = ""  # TODO: thread commit_sha through DeployAppInput (#865)
+            await workflow.execute_activity(
+                build_image,
+                args=[BuildImageInput(
+                    app_guid=str(input.registered_app_id),
+                    image_tag=_image_tag,
+                    commit_sha=_commit_sha,
+                )],
+                start_to_close_timeout=_TIMEOUT,
+            )
+
         # provision_namespace runs *before* render so the namespace
         # exists when apply_manifests creates Services/Secrets in it.
         await workflow.execute_activity(
