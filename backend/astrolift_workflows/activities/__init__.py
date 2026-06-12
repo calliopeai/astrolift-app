@@ -93,6 +93,13 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     finalize_managed_service_deletion,
     mark_managed_service_deprovisioning,
 )
+from astrolift_workflows.activities.migration import (
+    apply_to_target_cluster,
+    drain_source_cluster,
+    poll_rollout_on_target,
+    switch_app_env_binding,
+    validate_migration_target,
+)
 from astrolift_workflows.activities.provision_managed_domain import (
     mark_managed_domain_active,
     poll_cert_issuance,
@@ -100,13 +107,6 @@ from astrolift_workflows.activities.provision_managed_domain import (
     register_managed_domain_row,
     reissue_cert,
     request_wildcard_cert_for_zone,
-)
-from astrolift_workflows.activities.migration import (
-    apply_to_target_cluster,
-    drain_source_cluster,
-    poll_rollout_on_target,
-    switch_app_env_binding,
-    validate_migration_target,
 )
 from astrolift_workflows.activities.scheduled import (
     capture_platform_cost_snapshot,

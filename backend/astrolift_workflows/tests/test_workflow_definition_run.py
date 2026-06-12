@@ -27,7 +27,6 @@ from astrolift_workflows.workflows.workflow_definition_run import (
     resolve_fan_out_count,
 )
 
-
 # ---------------------------------------------------------------------------
 # decide_after_agent_run
 # ---------------------------------------------------------------------------

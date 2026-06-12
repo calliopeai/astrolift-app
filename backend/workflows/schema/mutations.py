@@ -117,11 +117,12 @@ class Mutation:
         # Imports kept local so this engine app's schema module doesn't pull
         # the Temporal client + operations models at import time (the app is
         # feature-gated).
+        from django.utils import timezone
+
         from astrolift_operations.models import WorkflowRun
         from astrolift_workflows.client import start_workflow
         from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
         from core.tenancy import get_current_tenant
-        from django.utils import timezone
 
         tenant = get_current_tenant()
         organization_id = getattr(tenant, "organization_id", None) if tenant else None
