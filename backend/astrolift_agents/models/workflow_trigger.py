@@ -11,6 +11,20 @@ enabling/disabling is done via the ``enabled`` flag, not deletion.
 Soft-delete is not used here because webhook slugs must not be recycled
 (an old, deleted webhook URL could be re-registered and confuse an
 external system that still POSTs to it).
+
+SCM routing (#863):
+WorkflowWebhook gains optional SCM filter fields so the push/PR
+webhook handlers in auth1 and astrolift_scm can fan-out to matching
+workflow triggers in addition to the core deploy path.
+
+  scm_repo       — "owner/repo" exact match; blank matches any repo
+  branch_pattern — glob-style branch filter (fnmatch); blank matches
+                   any branch. "main", "feature/*", "*" are all valid.
+  organization   — scopes the trigger to one org so lookups are
+                   O(enabled webhooks per org) rather than a full-table
+                   scan. Nullable for backward compat: rows created
+                   before this column are org-agnostic and match any
+                   org's SCM events when scm_repo is blank.
 """
 
 from __future__ import annotations
@@ -80,6 +94,21 @@ class WorkflowWebhook(models.Model):
     once at creation and never stored. The endpoint uses
     ``hmac.compare_digest`` against this hash to verify the incoming
     ``X-Astrolift-Signature`` header.
+
+    SCM routing fields (#863)
+    -------------------------
+    When ``scm_repo`` or ``branch_pattern`` are set the webhook fires
+    automatically for matching SCM push / PR events without requiring
+    the SCM host to POST to this endpoint directly.  Leave both blank
+    to fire on any SCM event delivered to the org.  Set only
+    ``scm_repo`` to restrict to one repo regardless of branch.  Set
+    only ``branch_pattern`` (glob) to restrict to branches across all
+    repos.
+
+    ``organization`` scopes the trigger so the push-handler can look
+    up matching webhooks in O(rows per org) rather than scanning the
+    full table.  Legacy rows without an org are excluded from SCM
+    routing automatically.
     """
 
     workflow_definition = models.ForeignKey(
@@ -109,9 +138,44 @@ class WorkflowWebhook(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # SCM routing (#863) — all three are nullable/blank for backward compat.
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="workflow_webhooks",
+        help_text=(
+            "Org that owns this trigger. Required for SCM routing; "
+            "rows without an org are not matched by the SCM handler."
+        ),
+    )
+    scm_repo = models.CharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text=(
+            "SCM repo full name (owner/repo) this trigger matches. "
+            "Blank matches any repo delivered to the org's webhook."
+        ),
+    )
+    branch_pattern = models.CharField(
+        max_length=256,
+        blank=True,
+        default="",
+        help_text=(
+            "Glob pattern matched against the pushed branch name (fnmatch). "
+            "Blank matches any branch. Examples: 'main', 'release/*', '*'."
+        ),
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["slug", "enabled"], name="wfwebhook_slug_enabled_idx"),
+            models.Index(
+                fields=["organization", "enabled"],
+                name="wfwebhook_org_enabled_idx",
+            ),
         ]
 
     def __str__(self) -> str:

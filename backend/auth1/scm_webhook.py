@@ -326,6 +326,28 @@ def _handle(
         delivery_row.triggered_deployment = last_deploy
         delivery_row.save(update_fields=["triggered_deployment"])
 
+    # Route the push event to any matching WorkflowWebhook triggers (#863).
+    # This is best-effort: failures are logged but do not affect the HTTP
+    # response so an SCM host never sees a 5xx from the workflow layer.
+    try:
+        from astrolift_agents.services.workflow_triggers import (
+            ScmEvent,
+            route_scm_push_to_workflow_webhooks,
+        )
+
+        scm_event = ScmEvent(
+            organization_id=conn.organization_id,
+            repo_full_name=full_name,
+            branch=branch,
+            head_sha=head_sha,
+            event_kind="push",
+        )
+        route_scm_push_to_workflow_webhooks(scm_event)
+    except Exception:
+        logger.exception(
+            "scm_webhook: WorkflowWebhook routing failed for %s/%s", full_name, branch
+        )
+
     return JsonResponse(
         {"ok": True, "fired": fired, "repo": full_name, "branch": branch},
         status=202,

@@ -262,6 +262,11 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     if pr_ctx is None:
         return JsonResponse({"detail": "missing required pull_request fields"}, status=200)
 
+    # Route the pull_request event to WorkflowWebhook triggers (#863).
+    # Runs before the preview dispatch so the workflow fire is not
+    # gated on whether preview environments are enabled on the app.
+    _route_pr_to_workflow_webhooks(app, pr_ctx)
+
     app_ctx = github_pr_dispatch.AppPreviewContext(
         registered_app_id=app.pk,
         preview_enabled=app.preview_enabled,
@@ -323,3 +328,38 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     # Defensive: dispatcher only ever returns one of the three kinds
     # above. Treat anything else as an ack so GitHub doesn't retry.
     return JsonResponse({"detail": "no-op"}, status=200)
+
+
+def _route_pr_to_workflow_webhooks(
+    app,
+    pr_ctx,
+) -> None:
+    """Fan-out a pull_request event to matching WorkflowWebhook triggers (#863).
+
+    Best-effort; exceptions are logged but never propagate to the caller
+    so GitHub's retry queue stays clean.
+    """
+    try:
+        from astrolift_agents.services.workflow_triggers import (
+            ScmEvent,
+            route_scm_push_to_workflow_webhooks,
+        )
+
+        scm_event = ScmEvent(
+            organization_id=app.organization_id,
+            repo_full_name=pr_ctx.repo_full_name,
+            branch=pr_ctx.head_branch,
+            head_sha=pr_ctx.head_sha,
+            event_kind="pull_request",
+            raw_payload={
+                "pr_number": pr_ctx.pr_number,
+                "action": pr_ctx.raw_action,
+            },
+        )
+        route_scm_push_to_workflow_webhooks(scm_event)
+    except Exception:
+        logger.exception(
+            "pr_webhook: WorkflowWebhook routing failed for %s PR#%s",
+            getattr(pr_ctx, "repo_full_name", "?"),
+            getattr(pr_ctx, "pr_number", "?"),
+        )

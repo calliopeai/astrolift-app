@@ -35,6 +35,8 @@ schedule.
 
 from __future__ import annotations
 
+import dataclasses
+import fnmatch
 import hashlib
 import logging
 import secrets
@@ -187,6 +189,101 @@ def create_webhook_workflow_trigger(
         "signing_secret": plaintext_secret,
         "webhook_id": hook.pk,
     }
+
+
+# ── SCM routing (#863) ───────────────────────────────────────────────────────
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ScmEvent:
+    """Normalised SCM push or PR event for WorkflowWebhook routing."""
+
+    organization_id: int
+    repo_full_name: str
+    branch: str
+    head_sha: str
+    event_kind: str  # "push" | "pull_request"
+    # Additional payload forwarded as workflow input.
+    raw_payload: dict = dataclasses.field(default_factory=dict)
+
+
+def route_scm_push_to_workflow_webhooks(event: ScmEvent) -> list[WorkflowInstance]:
+    """Fire all enabled WorkflowWebhooks whose SCM filters match *event*.
+
+    Lookup is scoped to *event.organization_id* so only webhooks
+    belonging to the delivering org are considered. The matching rules
+    are:
+
+    * ``scm_repo`` — exact match against ``event.repo_full_name``; blank
+      means "match any repo".
+    * ``branch_pattern`` — ``fnmatch`` glob against ``event.branch``;
+      blank means "match any branch".
+
+    For each matching webhook ``trigger_workflow_instance`` is called
+    with ``trigger_kind="scm_<event_kind>"`` and the normalised SCM
+    payload merged into the trigger input.  The ``last_triggered_at``
+    timestamp is updated in a single bulk UPDATE after all instances
+    are created so the loop stays O(1) DB round-trips per webhook.
+
+    Returns the list of created ``WorkflowInstance`` objects (may be
+    empty when no webhooks match).
+    """
+    from astrolift_agents.models.workflow_trigger import WorkflowWebhook
+
+    candidates = list(
+        WorkflowWebhook.objects.filter(
+            organization_id=event.organization_id,
+            enabled=True,
+        ).select_related("workflow_definition")
+    )
+
+    instances: list[WorkflowInstance] = []
+    fired_ids: list[int] = []
+
+    for hook in candidates:
+        if not _scm_event_matches(hook, event):
+            continue
+        input_data = {
+            "scm_repo": event.repo_full_name,
+            "branch": event.branch,
+            "head_sha": event.head_sha,
+            "event_kind": event.event_kind,
+            **event.raw_payload,
+        }
+        try:
+            instance = trigger_workflow_instance(
+                hook.workflow_definition,
+                input_data=input_data,
+                trigger_kind=f"scm_{event.event_kind}",
+            )
+        except Exception:
+            log.exception(
+                "route_scm_push_to_workflow_webhooks: failed to trigger "
+                "instance for webhook %s (def=%s)",
+                hook.pk,
+                hook.workflow_definition_id,
+            )
+            continue
+        instances.append(instance)
+        fired_ids.append(hook.pk)
+
+    if fired_ids:
+        now = timezone.now()
+        WorkflowWebhook.objects.filter(pk__in=fired_ids).update(
+            last_triggered_at=now,
+            updated_at=now,
+        )
+
+    return instances
+
+
+def _scm_event_matches(hook, event: ScmEvent) -> bool:
+    """Return True when *hook*'s SCM filters are satisfied by *event*."""
+    if hook.scm_repo and hook.scm_repo != event.repo_full_name:
+        return False
+    if hook.branch_pattern and not fnmatch.fnmatch(event.branch, hook.branch_pattern):
+        return False
+    return True
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
