@@ -341,6 +341,18 @@ class InstallClusterPrereqsInputType:
     )
 
 
+@strawberry.input
+class DeployClusterAgentInput:
+    """``deployClusterAgent`` mutation input (#873).
+
+    ``cluster_id`` is the cluster the keep-alive agent Deployment is
+    applied to. The agent reads its credentials from the pre-created
+    ``astrolift-agent`` Secret (created from the snippet surfaced by
+    ``issueClusterAgentKey``), so no key material rides on this input."""
+
+    cluster_id: GUID
+
+
 @strawberry.type
 class ReconcileClusterIngressesResult:
     """Outcome of re-applying the ALB auth gate across a cluster's
@@ -508,6 +520,84 @@ class ClustersMutation:
                 rotated=rotated,
             )
         )
+
+    @strawberry.field
+    @mutation_audit(
+        action="cluster.deploy_agent",
+        target=lambda root, info, input: ("cluster", str(input.cluster_id)),
+    )
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def deploy_cluster_agent(
+        self, info: Info, input: DeployClusterAgentInput
+    ) -> MutationResultType[TenantClusterType]:
+        """Deploy the in-cluster keep-alive agent to a cluster (#873).
+
+        Applies the agent's Namespace + Deployment manifests via the
+        cluster's driver (server-side apply, idempotent — re-running
+        converges the Deployment). The agent reads ``heartbeat_url`` and
+        ``agent_key`` from the ``astrolift-agent`` Secret, which this
+        mutation does NOT create: the raw key is surfaced exactly once at
+        ``issueClusterAgentKey`` and never persisted, so the control
+        plane has no key to put in the Secret. The operator applies the
+        Secret from the install snippet first; this then lands the
+        Deployment that references it.
+
+        Gated on ``cluster.manage`` — same actor who issues the agent key.
+        Tenant-scoped: the lookup is constrained to the caller's org (or
+        a platform-shared cluster), so an out-of-scope guid reads as
+        NOT_FOUND, identical to a guid that doesn't exist.
+        """
+        from django.db.models import Q
+
+        from core.cluster_management import ClusterManagementError, deploy_agent_dispatch
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"cluster {input.cluster_id!r} not found",
+                field="clusterId",
+            )
+        if not cluster.agent_key_hash:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "issue an agent key first before deploying the agent",
+                field="clusterId",
+            )
+        if not cluster.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cluster is inactive — re-activate before deploying the agent",
+            )
+
+        # Apply the Namespace + Deployment via the cluster driver. Two
+        # failure shapes are persisted to last_management_error (so the
+        # settings card surfaces them) and returned as INTERNAL: the
+        # driver couldn't be built / doesn't support apply_manifests
+        # (ClusterManagementError), or the apply itself reported per-
+        # manifest errors (ApplyResult.ok is False).
+        try:
+            result = deploy_agent_dispatch(cluster=cluster)
+        except ClusterManagementError as exc:
+            cluster.last_management_error = str(exc)
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            return gql_failure(ErrorCode.INTERNAL.value, str(exc))
+
+        if not result.ok:
+            message = "agent deploy failed: " + "; ".join(str(e) for e in result.errors)
+            cluster.last_management_error = message
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            return gql_failure(ErrorCode.INTERNAL.value, message)
+
+        cluster.last_management_error = ""
+        cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+        return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
     @mutation_audit(action="cluster.update")

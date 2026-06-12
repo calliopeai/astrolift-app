@@ -466,6 +466,30 @@ export const INSTALL_CLUSTER_PREREQS = gql`
   }
 `;
 
+// Deploy the in-cluster keep-alive agent (#873). Applies the agent's
+// Namespace + Deployment via the cluster driver; the agent reads its
+// credentials from the astrolift-agent Secret the operator created from
+// the issueClusterAgentKey snippet. Returns the cluster so the card's
+// agentProvisioned + heartbeatStatus stay consistent.
+export const DEPLOY_CLUSTER_AGENT = gql`
+  mutation DeployClusterAgent($input: DeployClusterAgentInput!) {
+    deployClusterAgent(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        agentProvisioned
+        heartbeatStatus
+      }
+    }
+  }
+`;
+
 export const LIST_PROVIDER_PLUGINS = gql`
   query ListProviderPlugins {
     astroliftProviderPlugins {

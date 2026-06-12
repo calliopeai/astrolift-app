@@ -67,6 +67,7 @@ import {
   COGNITO_USER_POOL_CLIENTS,
   COGNITO_USER_POOLS,
   DECOMMISSION_CLUSTER,
+  DEPLOY_CLUSTER_AGENT,
   INSTALL_CLUSTER_PREREQS,
   ISSUE_CLUSTER_AGENT_KEY,
   LIST_CLUSTERS,
@@ -1102,6 +1103,13 @@ interface AgentKeyIssuedData {
   rotated: boolean;
 }
 
+interface AgentDeployedData {
+  id: string;
+  slug: string;
+  agentProvisioned: boolean;
+  heartbeatStatus: string;
+}
+
 function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
   const [issue, { loading: issuing }] = useMutation<{
     issueClusterAgentKey: MutationResult<AgentKeyIssuedData>;
@@ -1109,6 +1117,13 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
     // The mutation flips agentProvisioned + may change the interval;
     // refetch so the card's "provisioned" state and the live badge stay
     // consistent without a reload.
+    refetchQueries: [{ query: LIST_CLUSTERS }],
+  });
+  const [deploy, { loading: deploying }] = useMutation<{
+    deployClusterAgent: MutationResult<AgentDeployedData>;
+  }>(DEPLOY_CLUSTER_AGENT, {
+    // The deploy lands the agent Deployment; the cluster starts pulsing
+    // shortly after, so refetch to let the live badge flip to Connected.
     refetchQueries: [{ query: LIST_CLUSTERS }],
   });
   const [issued, setIssued] = React.useState<AgentKeyIssuedData | null>(null);
@@ -1130,6 +1145,17 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
       );
     } else {
       toast.error(data?.issueClusterAgentKey.errors?.[0]?.message ?? "Failed to issue key");
+    }
+  }
+
+  async function handleDeploy() {
+    const { data } = await deploy({
+      variables: { input: { clusterId: cluster.id } },
+    });
+    if (data?.deployClusterAgent.ok) {
+      toast.success("Agent deployed — the cluster connects within a couple of heartbeat intervals.");
+    } else {
+      toast.error(data?.deployClusterAgent.errors?.[0]?.message ?? "Failed to deploy agent");
     }
   }
 
@@ -1211,30 +1237,64 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
                   {snippet}
                 </pre>
                 <p className="text-muted-foreground text-xs">
-                  Then deploy the agent chart (it reads the key + URL from this Secret). The cluster
+                  Then deploy the agent (it reads the key + URL from this Secret). The cluster
                   appears as Connected within a couple of heartbeat intervals.
                 </p>
               </div>
             )}
-            <Button size="sm" variant="ghost" onClick={() => setIssued(null)}>
-              Done
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={handleDeploy} disabled={deploying} className="gap-1.5">
+                {deploying ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <RocketIcon className="size-3.5" />
+                )}
+                Deploy agent to cluster
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setIssued(null)}>
+                Done
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Applies the agent Deployment — make sure you&apos;ve created the{" "}
+              <code className="font-mono text-xs">astrolift-agent</code> Secret first using the
+              snippet above.
+            </p>
           </>
         ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button size="sm" onClick={handleIssue} disabled={issuing} className="gap-1.5">
-              {issuing ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <KeyRoundIcon className="size-3.5" />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {provisioned && (
+                <Button size="sm" onClick={handleDeploy} disabled={deploying} className="gap-1.5">
+                  {deploying ? (
+                    <Loader2Icon className="size-3.5 animate-spin" />
+                  ) : (
+                    <RocketIcon className="size-3.5" />
+                  )}
+                  Deploy agent to cluster
+                </Button>
               )}
-              {provisioned ? "Rotate agent key" : "Issue agent key"}
-            </Button>
+              <Button
+                size="sm"
+                variant={provisioned ? "outline" : "default"}
+                onClick={handleIssue}
+                disabled={issuing}
+                className="gap-1.5"
+              >
+                {issuing ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <KeyRoundIcon className="size-3.5" />
+                )}
+                {provisioned ? "Rotate agent key" : "Issue agent key"}
+              </Button>
+            </div>
             {provisioned && (
               <p className="text-muted-foreground text-xs">
-                An agent key has already been issued. Rotating it invalidates the old key — the
-                current agent will start failing its heartbeat until you redeploy it with the new
-                key.
+                Deploying applies the agent Deployment — it reads the key + URL from the{" "}
+                <code className="font-mono text-xs">astrolift-agent</code> Secret you created when
+                the key was issued. Rotating the key invalidates the old one, so the running agent
+                will fail its heartbeat until you redeploy with the new key.
               </p>
             )}
           </div>

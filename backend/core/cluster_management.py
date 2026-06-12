@@ -21,6 +21,7 @@ contacting a real apiserver.
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from astrolift_drivers.registry import DriverNotFound, plugins
@@ -367,6 +368,127 @@ def bootstrap_components_dispatch(*, cluster: TenantCluster) -> list[Any]:
         raise ClusterManagementError(
             f"cluster {cluster.slug}: driver bootstrap_components raised {exc}",
         ) from exc
+
+
+# ---- Keep-alive agent deploy (#873) -------------------------------
+
+# Namespace the keep-alive agent runs in. Same one the bootstrap
+# prereqs land in, so the agent sits alongside cert-manager / ingress.
+AGENT_NAMESPACE = "astrolift-system"
+
+# The agent reads heartbeat_url + agent_key from this Secret. The
+# Deployment references it by name via secretKeyRef; the mutation does
+# NOT create it (the raw agent key is surfaced exactly once at
+# issueClusterAgentKey and never persisted, so the control plane has no
+# key to put in the Secret). The operator applies the Secret from the
+# snippet in the cluster settings agent card before deploying.
+AGENT_SECRET_NAME = "astrolift-agent"
+
+# Container image for the keep-alive agent. Override via env so a
+# private-registry mirror or a pinned digest can be swapped in without a
+# code change; defaults to the public GHCR latest tag.
+AGENT_IMAGE = os.environ.get(
+    "ASTROLIFT_AGENT_IMAGE",
+    "ghcr.io/calliopeai/astrolift-agent:latest",
+)
+
+
+def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
+    """Render the keep-alive agent's Namespace + Deployment manifests.
+
+    Pure — no cluster API calls, no driver — so it's unit-testable in
+    isolation and the apply path stays a thin wrapper. The Deployment
+    pulls ``heartbeat_url`` + ``agent_key`` from the pre-created
+    ``astrolift-agent`` Secret (see :data:`AGENT_SECRET_NAME`) and pulses
+    on the cluster's configured ``heartbeat_interval_seconds``.
+
+    Ordering matters: the Namespace manifest is first so a server-side
+    apply that creates the namespace and the Deployment in one pass lands
+    the namespace before the workload that targets it.
+    """
+    labels = {"app": "astrolift-agent", "astrolift.io/managed-by": "platform"}
+    return [
+        {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": AGENT_NAMESPACE,
+                "labels": {"astrolift.io/managed-by": "platform"},
+            },
+        },
+        {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "astrolift-agent",
+                "namespace": AGENT_NAMESPACE,
+                "labels": labels,
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {"matchLabels": {"app": "astrolift-agent"}},
+                "template": {
+                    "metadata": {"labels": labels},
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "agent",
+                                "image": AGENT_IMAGE,
+                                "env": [
+                                    {
+                                        "name": "HEARTBEAT_URL",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "name": AGENT_SECRET_NAME,
+                                                "key": "heartbeat_url",
+                                            }
+                                        },
+                                    },
+                                    {
+                                        "name": "AGENT_KEY",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "name": AGENT_SECRET_NAME,
+                                                "key": "agent_key",
+                                            }
+                                        },
+                                    },
+                                    {
+                                        "name": "INTERVAL_SECONDS",
+                                        "value": str(cluster.heartbeat_interval_seconds),
+                                    },
+                                ],
+                            }
+                        ]
+                    },
+                },
+            },
+        },
+    ]
+
+
+def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
+    """Apply the keep-alive agent manifests to ``cluster``.
+
+    Resolves the cluster's ``ClusterDriver`` and applies the Namespace +
+    Deployment via ``apply_manifests`` (server-side apply, idempotent —
+    re-running converges the Deployment to the rendered spec). Returns
+    the driver's ``ApplyResult`` so the resolver can branch on ``ok`` and
+    surface structured errors.
+
+    Raises :class:`ClusterManagementError` when the driver can't be
+    constructed or doesn't implement ``apply_manifests`` (older provider)
+    — the resolver maps that to an INTERNAL MutationResult with the
+    message persisted to ``last_management_error``.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "apply_manifests"):
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver does not implement apply_manifests",
+        )
+    ctx = _context_for_cluster(cluster)
+    manifests = build_agent_manifests(cluster)
+    return driver.apply_manifests(ctx.slug, AGENT_NAMESPACE, manifests)
 
 
 def cluster_health_dispatch(
