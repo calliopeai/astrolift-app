@@ -506,12 +506,60 @@ def cluster_alb_http_metrics_dispatch(
         ) from exc
 
 
+def cluster_certificates_dispatch(*, cluster: TenantCluster) -> dict[str, Any]:
+    """Return the cluster provider's available TLS certificates (#858).
+
+    Backs the SNI / custom-domain cert picker. Delegates to the driver's
+    ``list_certificates`` method (currently only ``EKSClusterDriver`` via
+    ACM). Returns::
+
+        {"supported": bool, "certificates": [{"arn", "name",
+          "domain_name", "status"}, ...]}
+
+    ``supported`` is ``False`` (with an empty list) when the cluster's
+    provider driver doesn't implement cert listing yet (GCP / Azure /
+    k8s_native) OR when the driver can't be built (plugin missing,
+    config invalid) — the UI falls back to a free-text ARN field in
+    both cases. A driver that *does* implement the method but fails the
+    cloud API call (no creds, throttled) is still ``supported=True``
+    with an empty list: the capability exists, the data just isn't
+    reachable, so the UI keeps the picker (with an empty state) rather
+    than silently reverting to manual entry.
+    """
+    try:
+        driver = _driver_for_cluster(cluster)
+    except ClusterManagementError:
+        return {"supported": False, "certificates": []}
+    if not hasattr(driver, "list_certificates"):
+        return {"supported": False, "certificates": []}
+    ctx = _context_for_cluster(cluster)
+    try:
+        certs = driver.list_certificates(ctx)
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_certificates raised {exc}",
+        ) from exc
+    return {
+        "supported": True,
+        "certificates": [
+            {
+                "arn": c.arn,
+                "name": c.name,
+                "domain_name": c.domain_name,
+                "status": c.status,
+            }
+            for c in certs
+        ],
+    }
+
+
 __all__ = [
     "ClusterManagementError",
     "ClusterObservabilityError",  # re-exported so callers have one import
     "bootstrap_components_dispatch",
     "bring_cluster_into_management",
     "cluster_alb_http_metrics_dispatch",
+    "cluster_certificates_dispatch",
     "cluster_health_dispatch",
     "cluster_workload_health_dispatch",
     "cognito_user_pool_clients_dispatch",

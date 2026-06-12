@@ -584,3 +584,59 @@ export const CLUSTER_PROMETHEUS_RANGE_METRICS = gql`
     }
   }
 `;
+
+// Certificate picker for the SNI / custom-domain field (#858). Lists
+// the cluster provider's TLS certs (AWS → ACM via the EKS driver) so
+// the operator selects instead of pasting an ARN. `supported` is false
+// for providers without cert listing wired (GCP / Azure / k8s_native)
+// — the UI falls back to a free-text ARN field.
+export const CLUSTER_CERTIFICATES = gql`
+  query ClusterCertificates($clusterId: GUID!) {
+    astroliftClusterCertificates(clusterId: $clusterId) {
+      supported
+      certificates {
+        arn
+        name
+        domainName
+        status
+      }
+    }
+  }
+`;
+
+// DNS hosted-zone picker for the "Add managed domain" dialog (#861).
+// Keyed by the DNS-driver slug (no cluster context at dialog time);
+// selecting a zone auto-fills the dialog's config textarea from the
+// zone's pre-serialized configJson. `supported` is false for drivers
+// without zone discovery wired (cloud_dns / azure_dns today).
+export const DNS_ZONES = gql`
+  query DnsZones($dnsDriver: String!) {
+    astroliftDnsZones(dnsDriver: $dnsDriver) {
+      supported
+      zones {
+        id
+        name
+        private
+        configJson
+      }
+    }
+  }
+`;
+
+// Cert picker for the managed-domain dialog's certificate_arn key
+// (#858). Driver-keyed analog of CLUSTER_CERTIFICATES for the dialog,
+// which has no cluster context; for route53 the certs come from the
+// region-scoped ACM client.
+export const DNS_CERTIFICATES = gql`
+  query DnsCertificates($dnsDriver: String!) {
+    astroliftDnsCertificates(dnsDriver: $dnsDriver) {
+      supported
+      certificates {
+        arn
+        name
+        domainName
+        status
+      }
+    }
+  }
+`;

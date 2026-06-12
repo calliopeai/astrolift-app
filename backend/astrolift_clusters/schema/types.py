@@ -123,6 +123,76 @@ class ManagedDomainType:
     created_at: dt.datetime
 
 
+# ---- Certificate picker (#858) ------------------------------------
+
+
+@strawberry.type(name="AstroliftClusterCertificate")
+class ClusterCertificateType:
+    """One TLS certificate the cluster's (or DNS driver's) provider can
+    offer for an SNI / custom-domain binding (#858).
+
+    ``arn`` is the cloud-native identifier the platform persists on the
+    domain's SNI cert ref / ``dns_config['certificate_arn']`` — an ACM
+    ARN on AWS, a Certificate Manager resource name on GCP, a Key Vault
+    cert id on Azure. ``name`` is a short human label, ``domain_name``
+    the primary subject, ``status`` the cloud-reported issuance state.
+    """
+
+    arn: str
+    name: str
+    domain_name: str
+    status: str
+
+
+@strawberry.type(name="AstroliftClusterCertificates")
+class ClusterCertificatesType:
+    """Cert-picker payload (#858). ``supported`` is ``False`` when the
+    provider has no cert-listing capability wired yet (GCP / Azure /
+    k8s_native, or an unsupported DNS driver) — the UI falls back to a
+    free-text ARN field. ``certificates`` is empty when unsupported, or
+    when supported-but-unreachable (no creds / throttled); the
+    ``supported`` flag lets the UI tell those two cases apart."""
+
+    supported: bool
+    certificates: list[ClusterCertificateType]
+
+
+# ---- DNS hosted-zone picker (#861) --------------------------------
+
+
+@strawberry.type(name="AstroliftDnsZone")
+class DnsZoneType:
+    """One discoverable DNS hosted zone for the managed-domain zone
+    picker (#861).
+
+    ``id`` is the driver-native zone identifier (Route53 hosted-zone
+    id, GCP managed-zone name, Azure zone resource id). ``name`` is the
+    human-readable zone FQDN (``example.com.`` with the trailing dot
+    Route53 returns). ``private`` flags private/internal zones.
+    ``config_json`` is a pre-serialized JSON blob ready to drop into the
+    dialog's DNS-config textarea (e.g. ``{"zone_id": "Z1234ABC",
+    "certificate_arn": ""}``) — the key insight of #861: the backend
+    hands the operator the config shape rather than making them build it.
+    """
+
+    id: str
+    name: str
+    private: bool
+    config_json: str
+
+
+@strawberry.type(name="AstroliftDnsZones")
+class DnsZonesType:
+    """Zone-picker payload (#861). Same ``supported`` semantics as
+    ``ClusterCertificatesType`` — ``False`` for DNS drivers without zone
+    discovery wired (``cloud_dns`` / ``azure_dns`` today), which the UI
+    renders as a disabled picker + "not yet supported" note while
+    leaving the manual textarea editable."""
+
+    supported: bool
+    zones: list[DnsZoneType]
+
+
 @strawberry.type(name="AstroliftProviderPlugin")
 class ProviderPluginType:
     id: GUID

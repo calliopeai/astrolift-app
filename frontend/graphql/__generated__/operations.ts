@@ -6898,12 +6898,33 @@ export type ClusterWorkloadHealthQueryVariables = Exact<{
 
 export type ClusterWorkloadHealthQuery = { astroliftClusterWorkloadHealth: Array<{ namespace: string, workloadName: string, desiredReplicas: number, readyReplicas: number, restartCount24h: number, lastImageDeployedAt: string }> };
 
+export type ClusterCertificatesQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+}>;
+
+
+export type ClusterCertificatesQuery = { astroliftClusterCertificates: { supported: boolean, certificates: Array<{ arn: string, name: string, domainName: string, status: string }> } };
+
+export type DnsZonesQueryVariables = Exact<{
+  dnsDriver: Scalars['String']['input'];
+}>;
+
+
+export type DnsZonesQuery = { astroliftDnsZones: { supported: boolean, zones: Array<{ id: string, name: string, private: boolean, configJson: string }> } };
+
+export type DnsCertificatesQueryVariables = Exact<{
+  dnsDriver: Scalars['String']['input'];
+}>;
+
+
+export type DnsCertificatesQuery = { astroliftDnsCertificates: { supported: boolean, certificates: Array<{ arn: string, name: string, domainName: string, status: string }> } };
+
 export type ListEnvironmentsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type ListEnvironmentsQuery = { astroliftEnvironments: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, domainZone?: string | null, createdAt: string, settings: Array<{ id: string, key: string, value: string }> }> };
+export type ListEnvironmentsQuery = { astroliftEnvironments: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, clusterId?: string | null, clusterProviderPluginSlug?: string | null, domainZone?: string | null, createdAt: string, settings: Array<{ id: string, key: string, value: string }> }> };
 
 export type ListDeploymentsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

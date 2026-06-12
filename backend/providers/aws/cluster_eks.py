@@ -42,6 +42,7 @@ from _sdk.cluster import (
     ApplyResult,
     BootstrapComponent,
     BootstrapOption,
+    CertificateInfo,
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
@@ -231,6 +232,7 @@ class EKSClusterDriver(ClusterDriver):
         sts_client: Any | None = None,
         ec2_client: Any | None = None,
         cognito_idp_client: Any | None = None,
+        acm_client: Any | None = None,
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
@@ -262,6 +264,11 @@ class EKSClusterDriver(ClusterDriver):
         # to construct a client they never touch. Tests inject a stub
         # here; production resolves it in ``_cognito_idp`` below.
         self._cognito_idp = cognito_idp_client
+        # ACM client is built lazily on first ``list_certificates`` call
+        # (the cert-picker path, #858) so the common deploy / observability
+        # flows don't pay for a client they never use. Injectable for moto
+        # tests, mirroring eks/sts/ec2 above.
+        self._acm: Any | None = acm_client
         # Factory injection lets tests pass a stubbed kubernetes
         # client without contacting a real apiserver.
         self._k8s_factory = k8s_client_factory or _build_k8s_client
@@ -1662,7 +1669,84 @@ class EKSClusterDriver(ClusterDriver):
             self._cognito_idp = boto3.client("cognito-idp", region_name=self._config.region)
         return self._cognito_idp
 
+    # ---- certificate discovery (#858) ------------------------------
+
+    def list_certificates(self, cluster: ClusterContext) -> list[CertificateInfo]:
+        """List ACM certificates available in the cluster's region (#858).
+
+        Backs the SNI / custom-domain cert picker: rather than make the
+        operator paste an ACM ARN from the console, the UI offers the
+        certs the platform's IAM role can already see. Paginates
+        ``acm:ListCertificates`` filtered to ``ISSUED`` status (only
+        usable certs can terminate TLS), then ``acm:DescribeCertificate``
+        per cert to read the primary domain name. Returns newest-listed
+        first; the ARN is the identifier the platform persists.
+
+        ``cluster`` is accepted for protocol symmetry with the other
+        cloud-read methods but isn't needed — ACM is account+region
+        scoped, and the region comes from ``EKSConfig``. The describe
+        call is best-effort per cert: a transient describe failure on
+        one cert falls back to the list-level domain name rather than
+        dropping the cert from the picker.
+        """
+        del cluster  # ACM is account/region-scoped; region from config
+        acm = self._acm_client()
+        out: list[CertificateInfo] = []
+        try:
+            paginator = acm.get_paginator("list_certificates")
+            pages = paginator.paginate(CertificateStatuses=["ISSUED"])
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "list_certificates: ListCertificates failed region=%s: %s",
+                self._config.region,
+                exc,
+            )
+            return out
+        for page in pages:
+            for summary in page.get("CertificateSummaryList", []) or []:
+                arn = summary.get("CertificateArn", "")
+                if not arn:
+                    continue
+                domain_name = summary.get("DomainName", "")
+                status = summary.get("Status", "ISSUED")
+                label = domain_name
+                try:
+                    desc = acm.describe_certificate(CertificateArn=arn)
+                    cert = desc.get("Certificate", {}) or {}
+                    domain_name = cert.get("DomainName", domain_name) or domain_name
+                    status = cert.get("Status", status) or status
+                    sans = cert.get("SubjectAlternativeNames", []) or []
+                    if domain_name and len(sans) > 1:
+                        label = f"{domain_name} (+{len(sans) - 1})"
+                    else:
+                        label = domain_name
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "list_certificates: DescribeCertificate failed arn=%s: %s",
+                        arn,
+                        exc,
+                    )
+                out.append(
+                    CertificateInfo(
+                        arn=arn,
+                        name=label or arn,
+                        domain_name=domain_name,
+                        status=status,
+                    )
+                )
+        return out
+
     # ---- internals ------------------------------------------------
+
+    def _acm_client(self) -> Any:
+        """Lazily build (and cache) the ACM boto3 client for the cluster's
+        region. Mirrors the eks/sts/ec2 client construction; injectable
+        via the ``acm_client`` ctor kwarg for moto tests."""
+        if self._acm is None:
+            import boto3
+
+            self._acm = boto3.client("acm", region_name=self._config.region)
+        return self._acm
 
     def _k8s(self, cluster: str) -> Any:
         """Get / build the cached kubernetes client for the cluster.
