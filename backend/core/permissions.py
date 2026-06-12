@@ -111,6 +111,20 @@ class Permission(enum.StrEnum):
     FORM_SUBMIT = "form.submit"
     FORM_MODERATE = "form.moderate"
 
+    # --- Agent skills + tool defs (skill registry) ----------------
+    SKILL_READ = "skill.read"        # list/read Skill + ToolDef catalog
+    SKILL_WRITE = "skill.write"      # create/update/delete org skills + tool defs
+    SKILL_IMPORT = "skill.import"    # import skills/tools from a github config repo
+
+    # --- Agent environment specs (agent platform foundation) ------
+    # CRUD on the reusable, org-scoped container-environment recipe an
+    # agent task launches into (image, runtime, tool preset, secret
+    # refs). Scoped per-org; no platform-shared rows.
+    AGENT_ENV_SPEC_READ = "agent_env_spec.read"
+    AGENT_ENV_SPEC_CREATE = "agent_env_spec.create"
+    AGENT_ENV_SPEC_UPDATE = "agent_env_spec.update"
+    AGENT_ENV_SPEC_DELETE = "agent_env_spec.delete"
+
     # --- Pipelines (#86) ------------------------------------------
     PIPELINE_READ = "pipeline.read"
     PIPELINE_CREATE = "pipeline.create"

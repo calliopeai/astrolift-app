@@ -35,6 +35,10 @@ _READ_ALL = (
     # role grant (see ``team_viewer`` / ``team_developer`` below) so
     # auditors don't accidentally submit on a published form.
     Permission.FORM_READ,
+    # Skill registry: readers see the org's Skill + ToolDef catalog
+    # (plus the platform-global skills). Write/import live on the
+    # admin/developer roles below so auditors can't mutate the catalog.
+    Permission.SKILL_READ,
 )
 
 _DEPLOY_OPS = (
@@ -114,6 +118,11 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            # Skill registry: team owners maintain the agent Skill +
+            # ToolDef catalog and import skills from config repos.
+            Permission.SKILL_READ,
+            Permission.SKILL_WRITE,
+            Permission.SKILL_IMPORT,
         ),
     ),
     (
@@ -132,6 +141,10 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_CREATE,
             Permission.APP_UPDATE,
             *_DEPLOY_OPS,
+            # Skill registry: team admins maintain the agent catalog.
+            Permission.SKILL_READ,
+            Permission.SKILL_WRITE,
+            Permission.SKILL_IMPORT,
         ),
     ),
     (
@@ -147,6 +160,11 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             # Forms #453: developers can submit on the team's forms.
             Permission.FORM_READ,
             Permission.FORM_SUBMIT,
+            # Skill registry: developers read + import skills for the
+            # agents they wire into their apps. Catalog edits (write)
+            # stay on the admin roles.
+            Permission.SKILL_READ,
+            Permission.SKILL_IMPORT,
         ),
     ),
     (
