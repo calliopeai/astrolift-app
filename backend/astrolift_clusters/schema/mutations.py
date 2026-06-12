@@ -527,9 +527,31 @@ class ClustersMutation:
             cluster.endpoint = input.endpoint
         if input.ingress_class is not None:
             cluster.ingress_class = input.ingress_class
-        if input.alb_auth_config is not strawberry.UNSET:
+        auth_config_changed = input.alb_auth_config is not strawberry.UNSET
+        if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
         cluster.save()
+
+        # GitOps round-trip (#853): when the operator changes the ALB
+        # auth gate, mirror it back into every bound app's astrolift.toml
+        # so the repo (source of truth) doesn't drift from the DB. This
+        # is best-effort and must never block the UI save — a missing
+        # source connection is a graceful skip, and any SCM failure is
+        # swallowed here and surfaced only in the logs.
+        if auth_config_changed:
+            try:
+                from astrolift_clusters.services.toml_writeback import (
+                    write_auth_config_for_cluster,
+                )
+
+                actor = getattr(info.context, "user", None)
+                write_auth_config_for_cluster(cluster, actor)
+            except Exception:  # noqa: BLE001 — write-back never blocks the save
+                logger.exception(
+                    "auth config TOML write-back failed for cluster %s",
+                    cluster.slug,
+                )
+
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
