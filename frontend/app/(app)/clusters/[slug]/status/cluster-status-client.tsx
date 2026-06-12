@@ -312,15 +312,123 @@ export function ClusterStatusClient({ slug }: { slug: string }) {
       }
     >
       <ClusterTabs slug={slug} active="status" />
-      <div className="space-y-4">
-        <LiveStateSection clusterId={cluster.id} slug={slug} />
-        <ClusterMetricsSection clusterId={cluster.id} slug={slug} />
-        <WorkloadHealthSection clusterId={cluster.id} />
-        <LiveHealthSection clusterId={cluster.id} />
-        <RecentWorkflowsSection clusterId={cluster.id} />
-        <LifecycleSection clusterId={cluster.id} />
-      </div>
+      <ClusterStatusSections clusterId={cluster.id} slug={slug} />
     </PageShell>
+  );
+}
+
+// The driver-dependent cards (saturation, workload health, live health,
+// recent workflows) each fire a synchronous driver / Prometheus /
+// Temporal call. When the cluster is offline those calls hang until they
+// time out, which is exactly the "tabs spin forever" problem the
+// keep-alive heartbeat (#808) was built to short-circuit. So we read the
+// cheap live state once here and, when the cluster isn't reachable,
+// render a targeted offline placeholder INSTEAD of mounting the section —
+// the section component owns the useQuery, so not mounting it means the
+// query never fires. The Lifecycle timeline is sourced from the audit log
+// (not the cluster), so it always renders.
+function ClusterStatusSections({ clusterId, slug }: { clusterId: string; slug: string }) {
+  const { data } = useQuery<LiveStateResp>(CLUSTER_LIVE_STATE, {
+    variables: { clusterId },
+    pollInterval: 30000,
+  });
+  const state = data?.astroliftClusterLiveState ?? null;
+  const status: HeartbeatStatus = state?.status ?? "never_seen";
+  const age = state?.heartbeatAgeSeconds ?? null;
+  const live = isClusterLive(status);
+
+  return (
+    <div className="space-y-4">
+      <LiveStateSection clusterId={clusterId} slug={slug} />
+      {live ? (
+        <>
+          <ClusterMetricsSection clusterId={clusterId} slug={slug} />
+          <WorkloadHealthSection clusterId={clusterId} />
+          <LiveHealthSection clusterId={clusterId} />
+          <RecentWorkflowsSection clusterId={clusterId} />
+        </>
+      ) : (
+        <>
+          <OfflineCard
+            icon={<BarChart3Icon className="size-4" />}
+            title="Cluster saturation"
+            status={status}
+            age={age}
+            slug={slug}
+          />
+          <OfflineCard
+            icon={<ServerIcon className="size-4" />}
+            title="Workload health"
+            status={status}
+            age={age}
+            slug={slug}
+          />
+          <OfflineCard
+            icon={<ActivityIcon className="size-4" />}
+            title="Live health"
+            status={status}
+            age={age}
+            slug={slug}
+          />
+          <OfflineCard
+            icon={<GitBranchIcon className="size-4" />}
+            title="Recent workflows"
+            status={status}
+            age={age}
+            slug={slug}
+          />
+        </>
+      )}
+      <LifecycleSection clusterId={clusterId} />
+    </div>
+  );
+}
+
+// Offline stand-in for a driver-dependent card. Rendered in place of the
+// real section while the cluster is offline / has no agent, so the
+// section's live query is never mounted. Names the cluster's last-seen
+// cue and links to settings (where the agent is installed / rotated).
+function OfflineCard({
+  icon,
+  title,
+  status,
+  age,
+  slug,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  status: HeartbeatStatus;
+  age: number | null;
+  slug: string;
+}) {
+  return (
+    <SectionCard
+      icon={icon}
+      title={title}
+      action={
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+          {status === "never_seen" ? (
+            <ServerOffIcon className="size-3.5" />
+          ) : (
+            <WifiOffIcon className="size-3.5" />
+          )}
+          {status === "never_seen" ? "No agent" : "Offline"}
+        </span>
+      }
+    >
+      <div className="border-border/70 text-muted-foreground flex items-start gap-3 rounded-md border border-dashed px-3 py-4 text-sm">
+        <WifiOffIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
+        <div className="space-y-1">
+          <p>{clusterOfflineMessage(status, age)}</p>
+          <Link
+            href={`/clusters/${slug}/settings`}
+            className="text-primary inline-block text-xs underline-offset-4 hover:underline"
+          >
+            Check cluster settings →
+          </Link>
+        </div>
+      </div>
+    </SectionCard>
   );
 }
 
