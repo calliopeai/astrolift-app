@@ -2388,6 +2388,18 @@
         "title": "Rollback {app}/{env}?",
         "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "confirm": "Rollback"
+      },
+      "delete": "删除",
+      "retire": "停用",
+      "confirmDelete": {
+        "title": "删除 {app}/{env} 的部署？",
+        "description": "将此部署从列表中移除。该行将被软删除——没有正在运行的内容需要拆除。此操作无法撤消。",
+        "confirm": "删除部署",
+        "retireTitle": "停用 {app}/{env} 正在运行的部署？",
+        "retireDescription": "将此次发布标记为已被取代，使其不再是活动修订版本。集群资源将保留——不会拆除正在运行的应用。",
+        "retireConfirm": "停用部署",
+        "success": "已忽略部署",
+        "failed": "删除失败"
       }
     },
     "environments": {

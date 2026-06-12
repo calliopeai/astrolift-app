@@ -4117,6 +4117,7 @@ type Mutation {
   approveDeploymentByToken(input: ApproveByTokenInput!): AstroliftDeploymentMutationResult!
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
+  deleteDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!

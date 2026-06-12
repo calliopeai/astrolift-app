@@ -1,8 +1,16 @@
 "use client";
 
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
-import { CheckIcon, ClockIcon, RotateCcwIcon, StopCircleIcon, UndoIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ClockIcon,
+  RotateCcwIcon,
+  StopCircleIcon,
+  Trash2Icon,
+  UndoIcon,
+} from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -20,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ABORT_DEPLOYMENT,
   APPROVE_DEPLOYMENT,
+  DELETE_DEPLOYMENT,
   REDEPLOY_APP,
   ROLLBACK_DEPLOYMENT,
 } from "@/graphql/lifecycle/lifecycle.mutations";
@@ -107,6 +116,7 @@ const IN_FLIGHT: DeploymentStatus[] = ["pending_approval", "pending", "deploying
 export function DeploymentDetailClient({ id }: { id: string }) {
   const t = useTranslations("lists.deploymentDetail");
   const { can } = useMyPermissions();
+  const router = useRouter();
 
   const {
     data: dData,
@@ -202,9 +212,16 @@ export function DeploymentDetailClient({ id }: { id: string }) {
   const [redeploy, redeployState] = useMutation<{
     redeployApp: MutationResultLite<AstroliftDeployment>;
   }>(REDEPLOY_APP, { refetchQueries: refetch });
+  const [deleteDeployment, deleteState] = useMutation<{
+    deleteDeployment: MutationResultLite<Pick<AstroliftDeployment, "id" | "status">>;
+  }>(DELETE_DEPLOYMENT);
 
   const busy =
-    approveState.loading || abortState.loading || rollbackState.loading || redeployState.loading;
+    approveState.loading ||
+    abortState.loading ||
+    rollbackState.loading ||
+    redeployState.loading ||
+    deleteState.loading;
 
   const d = dData?.astroliftDeployment ?? null;
   const log = lData?.astroliftDeploymentLog ?? [];
@@ -223,6 +240,7 @@ export function DeploymentDetailClient({ id }: { id: string }) {
 
   const [confirmAbort, setConfirmAbort] = React.useState(false);
   const [confirmRollback, setConfirmRollback] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   if (dLoading && !d) {
     return (
@@ -257,6 +275,15 @@ export function DeploymentDetailClient({ id }: { id: string }) {
   const showAbort = inFlight && can("app.deploy");
   const showRollback = d.status === "running" && can("app.rollback");
   const showRedeploy = (d.status === "running" || d.status === "failed") && can("app.deploy");
+  // Dismiss / delete: terminal rows (failed / superseded / rolled_back)
+  // soft-delete; a running row is superseded. Same app.deploy gate as
+  // abort. Hidden for in-flight rows — those abort first.
+  const showDelete =
+    (d.status === "failed" ||
+      d.status === "superseded" ||
+      d.status === "rolled_back" ||
+      d.status === "running") &&
+    can("app.deploy");
 
   return (
     <PageShell
@@ -324,6 +351,19 @@ export function DeploymentDetailClient({ id }: { id: string }) {
                 }}
               >
                 <RotateCcwIcon className="size-4" /> {t("redeploy")}
+              </Button>
+            </Can>
+          )}
+          {showDelete && (
+            <Can permission="app.deploy">
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2Icon className="size-4" />{" "}
+                {d.status === "running" ? t("retire") : t("delete")}
               </Button>
             </Can>
           )}
@@ -667,6 +707,38 @@ export function DeploymentDetailClient({ id }: { id: string }) {
         onConfirm={async () => {
           const { data } = await rollback({ variables: { input: { id: d.id } } });
           reportResult("rollbackDeployment", data?.rollbackDeployment);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={
+          d.status === "running"
+            ? t("confirmDelete.retireTitle", { app: d.registeredAppSlug, env: d.environmentName })
+            : t("confirmDelete.title", { app: d.registeredAppSlug, env: d.environmentName })
+        }
+        description={
+          d.status === "running"
+            ? t("confirmDelete.retireDescription")
+            : t("confirmDelete.description")
+        }
+        confirmLabel={
+          d.status === "running" ? t("confirmDelete.retireConfirm") : t("confirmDelete.confirm")
+        }
+        destructive
+        onConfirm={async () => {
+          const { data } = await deleteDeployment({ variables: { input: { id: d.id } } });
+          const result = data?.deleteDeployment;
+          if (result?.ok) {
+            // Running rows are superseded (stay in history); terminal
+            // rows are soft-deleted. Either way the operator is done
+            // here, so bounce back to the list.
+            toast.success(t("confirmDelete.success"));
+            router.push("/deployments");
+          } else if (result) {
+            throw new Error(result.errors[0]?.message ?? t("confirmDelete.failed"));
+          }
         }}
       />
     </PageShell>

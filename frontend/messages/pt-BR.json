@@ -2388,6 +2388,18 @@
         "title": "Rollback {app}/{env}?",
         "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "confirm": "Rollback"
+      },
+      "delete": "Excluir",
+      "retire": "Aposentar",
+      "confirmDelete": {
+        "title": "Excluir a implantação de {app}/{env}?",
+        "description": "Remove esta implantação das listas. A linha é excluída de forma reversível — não há nada em execução para desmontar. Isto não pode ser desfeito.",
+        "confirm": "Excluir implantação",
+        "retireTitle": "Aposentar a implantação em execução de {app}/{env}?",
+        "retireDescription": "Marca esta implantação como substituída para que deixe de ser a revisão ativa. Os recursos do cluster são mantidos — o app em execução não é desmontado.",
+        "retireConfirm": "Aposentar implantação",
+        "success": "Implantação descartada",
+        "failed": "Falha ao excluir"
       }
     },
     "environments": {

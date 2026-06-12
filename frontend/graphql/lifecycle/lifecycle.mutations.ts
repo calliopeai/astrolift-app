@@ -239,6 +239,28 @@ export const ABORT_DEPLOYMENT = gql`
   }
 `;
 
+// Dismiss / delete a deployment the operator is done with. Terminal
+// rows (failed / superseded / rolled_back) are soft-deleted; a running
+// row is superseded (no k8s teardown here). Same `app.deploy` gate as
+// abort. The detail page only consumes ok/errors to decide the
+// redirect, so the payload stays minimal.
+export const DELETE_DEPLOYMENT = gql`
+  mutation DeleteDeployment($input: DeploymentByIdInput!) {
+    deleteDeployment(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        status
+      }
+    }
+  }
+`;
+
 export const REJECT_DEPLOYMENT = gql`
   mutation RejectDeployment($input: AbortDeploymentInput!) {
     rejectDeployment(input: $input) {
