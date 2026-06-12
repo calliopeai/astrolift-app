@@ -338,7 +338,7 @@ class LifecycleQuery:
     @tenant_scoped()
     def astrolift_environments(self, info: Info, app_slug: str | None = None) -> list[AppEnvironmentType]:
         qs = AppEnvironment.objects.select_related(
-            "registered_app", "tenant_cluster", "managed_domain"
+            "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
         ).prefetch_related("settings").order_by("registered_app__slug", "name")
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)

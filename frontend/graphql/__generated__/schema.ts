@@ -369,6 +369,8 @@ export type AstroliftAppEndpointMetric = {
 };
 
 export type AstroliftAppEnvironment = {
+  clusterId?: Maybe<Scalars['GUID']['output']>;
+  clusterProviderPluginSlug?: Maybe<Scalars['String']['output']>;
   clusterSlug?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   deploysPaused: Scalars['Boolean']['output'];
@@ -832,6 +834,18 @@ export type AstroliftClusterBootstrapRun = {
   triggeredByUsername?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftClusterCertificate = {
+  arn: Scalars['String']['output'];
+  domainName: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
+export type AstroliftClusterCertificates = {
+  certificates: Array<AstroliftClusterCertificate>;
+  supported: Scalars['Boolean']['output'];
+};
+
 export type AstroliftClusterEvent = {
   count: Scalars['Int']['output'];
   firstSeen: Scalars['String']['output'];
@@ -1215,6 +1229,18 @@ export type AstroliftDisconnectUserSourceProviderPayloadMutationResult = {
   data?: Maybe<AstroliftDisconnectUserSourceProviderPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftDnsZone = {
+  configJson: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  private: Scalars['Boolean']['output'];
+};
+
+export type AstroliftDnsZones = {
+  supported: Scalars['Boolean']['output'];
+  zones: Array<AstroliftDnsZone>;
 };
 
 export type AstroliftDomainPathRoute = {
@@ -5189,6 +5215,7 @@ export type Query = {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftClusterBootstrapPlan?: Maybe<AstroliftClusterBootstrapPlan>;
+  astroliftClusterCertificates: AstroliftClusterCertificates;
   astroliftClusterCount: Scalars['Int']['output'];
   astroliftClusterHealth?: Maybe<AstroliftClusterHealth>;
   astroliftClusterLifecycleAudit: Array<AstroliftClusterLifecycleAuditEntry>;
@@ -5207,6 +5234,8 @@ export type Query = {
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
   astroliftDeploymentReleaseNotes?: Maybe<AstroliftReleaseNotes>;
   astroliftDeployments: Array<AstroliftDeployment>;
+  astroliftDnsCertificates: AstroliftClusterCertificates;
+  astroliftDnsZones: AstroliftDnsZones;
   astroliftElevationStatus: AstroliftElevationStatus;
   astroliftEmailEngagementMetrics?: Maybe<AstroliftEmailEngagementMetrics>;
   astroliftEmailMessages: Array<AstroliftEmailMessage>;
@@ -5524,6 +5553,11 @@ export type QueryAstroliftClusterBootstrapPlanArgs = {
 };
 
 
+export type QueryAstroliftClusterCertificatesArgs = {
+  clusterId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftClusterHealthArgs = {
   clusterId: Scalars['GUID']['input'];
   eventLimit?: Scalars['Int']['input'];
@@ -5607,6 +5641,16 @@ export type QueryAstroliftDeploymentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftDnsCertificatesArgs = {
+  dnsDriver: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftDnsZonesArgs = {
+  dnsDriver: Scalars['String']['input'];
 };
 
 

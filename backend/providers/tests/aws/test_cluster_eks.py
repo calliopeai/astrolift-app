@@ -514,3 +514,124 @@ def test_discover_backend_sg_returns_empty_on_describe_error(fake_k8s_client) ->
         driver._ec2.describe_security_groups.side_effect = RuntimeError("boom")
 
         assert driver._discover_backend_sg(_CLUSTER) == ""
+
+
+# ---- list_certificates (#858) -------------------------------------
+
+
+def _cert_driver(acm_client: Any) -> EKSClusterDriver:
+    """An EKS driver wired only with an injected ACM client — enough to
+    exercise list_certificates, which doesn't touch eks/sts/k8s."""
+    return EKSClusterDriver(
+        config=EKSConfig(region="us-east-1", cluster_name="test-cluster"),
+        eks_client=MagicMock(),
+        sts_client=MagicMock(),
+        ec2_client=MagicMock(),
+        acm_client=acm_client,
+        k8s_client_factory=lambda **kw: MagicMock(),
+    )
+
+
+def _stub_acm(certs: list[dict[str, Any]], describe: dict[str, dict[str, Any]] | None = None) -> Any:
+    """A stub ACM client returning canned ListCertificates +
+    DescribeCertificate responses.
+
+    Used instead of moto for the ISSUED-cert path because moto's ACM
+    leaves ``request_certificate`` certs at PENDING_VALIDATION (correct
+    real-AWS behavior — DNS-validated certs aren't ISSUED until
+    validated), so a moto cert would never pass the driver's
+    ISSUED-only filter. The stub tests the list/describe/map/label
+    contract deterministically, independent of moto's issuance
+    semantics. The moto-backed tests cover the empty + API-error paths.
+    """
+    describe = describe or {}
+
+    class _Paginator:
+        def paginate(self, **kwargs: Any) -> list[dict[str, Any]]:
+            # The driver filters to ISSUED via CertificateStatuses; the
+            # stub returns whatever it was seeded with (already ISSUED).
+            assert kwargs.get("CertificateStatuses") == ["ISSUED"]
+            return [{"CertificateSummaryList": certs}]
+
+    acm = MagicMock()
+    acm.get_paginator.return_value = _Paginator()
+    acm.describe_certificate.side_effect = lambda CertificateArn: {
+        "Certificate": describe.get(CertificateArn, {}),
+    }
+    return acm
+
+
+def test_list_certificates_returns_issued_acm_certs() -> None:
+    """list_certificates surfaces ISSUED ACM certs (arn + domain +
+    status), enriched via DescribeCertificate."""
+    arn = "arn:aws:acm:us-east-1:123456789012:certificate/abc"
+    acm = _stub_acm(
+        certs=[{"CertificateArn": arn, "DomainName": "api.acme.example", "Status": "ISSUED"}],
+        describe={arn: {"DomainName": "api.acme.example", "Status": "ISSUED", "SubjectAlternativeNames": ["api.acme.example"]}},
+    )
+    driver = _cert_driver(acm)
+
+    certs = driver.list_certificates(ClusterContext(slug="aws-prod", auth_method="exec_plugin"))
+
+    assert len(certs) == 1
+    assert certs[0].arn == arn
+    assert certs[0].domain_name == "api.acme.example"
+    assert certs[0].status == "ISSUED"
+    assert certs[0].name == "api.acme.example"
+
+
+def test_list_certificates_multi_san_label() -> None:
+    """A multi-SAN cert annotates the label with the extra-SAN count so
+    the operator can tell wildcard / multi-domain certs apart."""
+    arn = "arn:aws:acm:us-east-1:123456789012:certificate/def"
+    acm = _stub_acm(
+        certs=[{"CertificateArn": arn, "DomainName": "acme.example", "Status": "ISSUED"}],
+        describe={arn: {"DomainName": "acme.example", "Status": "ISSUED", "SubjectAlternativeNames": ["acme.example", "*.acme.example"]}},
+    )
+    driver = _cert_driver(acm)
+
+    certs = driver.list_certificates(ClusterContext(slug="aws-prod", auth_method="exec_plugin"))
+
+    assert len(certs) == 1
+    # 2 SANs → "(+1)" suffix on the label.
+    assert certs[0].name == "acme.example (+1)"
+
+
+def test_list_certificates_describe_failure_falls_back_to_list_data() -> None:
+    """A per-cert DescribeCertificate failure keeps the cert in the list
+    using the list-level domain/status rather than dropping it."""
+    arn = "arn:aws:acm:us-east-1:123456789012:certificate/ghi"
+    acm = _stub_acm(
+        certs=[{"CertificateArn": arn, "DomainName": "fallback.example", "Status": "ISSUED"}],
+    )
+    acm.describe_certificate.side_effect = RuntimeError("describe boom")
+    driver = _cert_driver(acm)
+
+    certs = driver.list_certificates(ClusterContext(slug="aws-prod", auth_method="exec_plugin"))
+
+    assert len(certs) == 1
+    assert certs[0].arn == arn
+    assert certs[0].domain_name == "fallback.example"
+    assert certs[0].status == "ISSUED"
+
+
+def test_list_certificates_empty_when_none(acm_client) -> None:
+    """No certs → empty list (moto, no certs requested)."""
+    driver = _cert_driver(acm_client)
+    assert driver.list_certificates(ClusterContext(slug="aws-prod", auth_method="exec_plugin")) == []
+
+
+def test_list_certificates_swallows_list_error() -> None:
+    """A ListCertificates API failure degrades to an empty list rather
+    than raising — the UI falls back to manual ARN entry."""
+    bad_acm = MagicMock()
+    bad_acm.get_paginator.side_effect = RuntimeError("boom")
+    driver = EKSClusterDriver(
+        config=EKSConfig(region="us-east-1", cluster_name="test-cluster"),
+        eks_client=MagicMock(),
+        sts_client=MagicMock(),
+        ec2_client=MagicMock(),
+        acm_client=bad_acm,
+        k8s_client_factory=lambda **kw: MagicMock(),
+    )
+    assert driver.list_certificates(ClusterContext(slug="aws-prod", auth_method="exec_plugin")) == []

@@ -29,6 +29,14 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -67,8 +75,10 @@ import {
   SET_DOMAIN_REDIRECTS,
   UPLOAD_CUSTOM_DOMAIN_CERTIFICATE,
 } from "@/graphql/lifecycle/lifecycle.mutations";
+import { CLUSTER_CERTIFICATES } from "@/graphql/clusters/clusters.queries";
 import { LIST_APP_DOMAINS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
+import type { ClusterCertificatesQuery } from "@/graphql/__generated__/operations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import { DOC_LINKS } from "@/lib/docs/urls";
@@ -242,6 +252,23 @@ export function AppDomainsClient({ slug }: { slug: string }) {
     variables,
     fetchPolicy: "cache-and-network",
   });
+
+  // #858 — the SNI cert picker needs the app's bound cluster (guid +
+  // provider) to fetch clusterCertificates. The domains surface already
+  // loads environments, each carrying its cluster binding; derive the
+  // app's cluster from them. Prefer a production-named env, then any env
+  // with a cluster bound. Wrapped in a memo so the AddDomainSheet's
+  // CLUSTER_CERTIFICATES query gets a stable clusterId.
+  const sniCluster = React.useMemo(() => {
+    const envList = envs.data?.astroliftEnvironments ?? [];
+    const bound = envList.filter((e) => e.clusterId);
+    if (bound.length === 0) return null;
+    const prod = bound.find((e) => /^prod/i.test(e.name)) ?? bound[0];
+    return {
+      clusterId: prod.clusterId as string,
+      providerSlug: prod.clusterProviderPluginSlug ?? "",
+    };
+  }, [envs.data]);
 
   const refetch = [
     { query: LIST_APP_DOMAINS, variables },
@@ -551,6 +578,8 @@ export function AppDomainsClient({ slug }: { slug: string }) {
           return false;
         }}
         busy={busy}
+        clusterId={sniCluster?.clusterId ?? null}
+        clusterProviderSlug={sniCluster?.providerSlug ?? null}
       />
 
       <ConfirmDialog
@@ -621,6 +650,8 @@ function AddDomainSheet({
   onOpenChange,
   onSubmit,
   busy,
+  clusterId,
+  clusterProviderSlug,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -631,6 +662,11 @@ function AddDomainSheet({
     sniCertRef: string
   ) => Promise<boolean>;
   busy: boolean;
+  // #858 — the app's bound cluster, derived from its environments.
+  // Null when no env is bound to a cluster yet → the SNI field stays a
+  // free-text input.
+  clusterId: string | null;
+  clusterProviderSlug: string | null;
 }) {
   const t = useTranslations("apps.domains");
   const tCommon = useTranslations("apps.common");
@@ -650,6 +686,30 @@ function AddDomainSheet({
       setSniCertRef("");
     }
   }, [open]);
+
+  // #858 — cert picker. Cloud providers (aws/gcp/azure) can list their
+  // certs; k8s_native (local issuer) and unbound apps keep the free-
+  // text input. The query is skipped until the picker is actually shown
+  // (wildcard sheet open, cloud provider, cluster known) so we don't
+  // fire ACM list calls on every sheet open.
+  const providerSupportsCertList =
+    clusterProviderSlug === "aws" ||
+    clusterProviderSlug === "gcp" ||
+    clusterProviderSlug === "azure";
+  const certPickerEligible = open && isWildcard && providerSupportsCertList && !!clusterId;
+  const certsQuery = useQuery<ClusterCertificatesQuery>(CLUSTER_CERTIFICATES, {
+    variables: { clusterId: clusterId ?? "" },
+    skip: !certPickerEligible,
+    fetchPolicy: "cache-and-network",
+  });
+  const certsPayload = certsQuery.data?.astroliftClusterCertificates;
+  // Show the combobox when the provider supports listing AND the backend
+  // confirmed support; otherwise fall through to the free-text input
+  // (k8s_native, unsupported clouds, or a cluster whose driver can't be
+  // built). `supported=true` with an empty list still shows the
+  // combobox (with its empty state) rather than reverting to free text.
+  const showCertCombobox = certPickerEligible && (certsPayload?.supported ?? false);
+  const certs = certsPayload?.certificates ?? [];
 
   const isByo = method === "byo_cert";
 
@@ -730,18 +790,86 @@ function AddDomainSheet({
                   SNI cert ref{" "}
                   <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
-                <Input
-                  id="d-sni-ref"
-                  value={sniCertRef}
-                  onChange={(e) => setSniCertRef(e.target.value)}
-                  placeholder="arn:aws:acm:… / projects/…/certificates/… / cert-name"
-                  spellCheck={false}
-                  className="font-mono text-xs"
-                />
-                <p className="text-muted-foreground text-xs">
-                  ACM ARN, GCP cert name, Azure cert ID, or k8s Secret ref. Leave
-                  blank for platform-managed.
-                </p>
+                {showCertCombobox ? (
+                  // #858 — provider-backed cert picker. The combobox's
+                  // own input doubles as free entry: a chosen item sets
+                  // the underlying ARN; typing a value that matches no
+                  // item is still captured via onInputValueChange, so an
+                  // operator can paste an ARN the list didn't surface.
+                  <>
+                    <Combobox
+                      items={certs}
+                      itemToStringLabel={(c) => {
+                        const cert = c as { domainName: string; name: string };
+                        return cert.domainName || cert.name;
+                      }}
+                      onValueChange={(v) => {
+                        if (v && typeof v === "object" && "arn" in v) {
+                          setSniCertRef((v as { arn: string }).arn);
+                        }
+                      }}
+                      inputValue={sniCertRef}
+                      onInputValueChange={(v) => setSniCertRef(v ?? "")}
+                    >
+                      <ComboboxInput
+                        id="d-sni-ref"
+                        placeholder={
+                          certsQuery.loading && certs.length === 0
+                            ? "Loading certificates…"
+                            : `Search ${certs.length} certificate${certs.length === 1 ? "" : "s"}…`
+                        }
+                        spellCheck={false}
+                        className="font-mono text-xs"
+                      />
+                      <ComboboxContent>
+                        <ComboboxEmpty>
+                          No matching certificates — type an ARN to use it directly.
+                        </ComboboxEmpty>
+                        <ComboboxList>
+                          {(item) => {
+                            const c = item as {
+                              arn: string;
+                              name: string;
+                              domainName: string;
+                              status: string;
+                            };
+                            return (
+                              <ComboboxItem key={c.arn} value={c}>
+                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                  <span className="truncate text-xs">
+                                    {c.domainName || c.name}
+                                  </span>
+                                  <span className="text-muted-foreground truncate font-mono text-[10px]">
+                                    {c.arn}
+                                  </span>
+                                </div>
+                              </ComboboxItem>
+                            );
+                          }}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                    <p className="text-muted-foreground text-xs">
+                      Pick an issued certificate from the {clusterProviderSlug?.toUpperCase()}{" "}
+                      cluster, or paste a ref. Leave blank for platform-managed.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      id="d-sni-ref"
+                      value={sniCertRef}
+                      onChange={(e) => setSniCertRef(e.target.value)}
+                      placeholder="arn:aws:acm:… / projects/…/certificates/… / cert-name"
+                      spellCheck={false}
+                      className="font-mono text-xs"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      ACM ARN, GCP cert name, Azure cert ID, or k8s Secret ref. Leave
+                      blank for platform-managed.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>

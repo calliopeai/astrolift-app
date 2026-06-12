@@ -622,6 +622,34 @@ class WorkloadHealth:
     last_image_deployed_at: str
 
 
+@dataclass(frozen=True)
+class CertificateInfo:
+    """One TLS certificate the cluster's provider can offer for an SNI /
+    custom-domain binding (#858).
+
+    Returned by the cloud-specific ``list_certificates`` method (AWS →
+    ACM; GCP → Certificate Manager; Azure → Key Vault). The cert picker
+    in the UI stores ``arn`` (the cloud-native identifier the platform
+    persists on the domain's ``sni_cert_ref`` / ``dns_config
+    ['certificate_arn']``) and shows ``domain_name`` + ``status`` so the
+    operator picks the right one without leaving the form.
+
+    ``arn`` is the canonical identifier regardless of cloud — an ACM
+    ARN on AWS, a Certificate Manager resource name on GCP, a Key Vault
+    cert id on Azure. ``name`` is a short human label (often the cert's
+    primary domain or a console-assigned name); ``domain_name`` is the
+    primary subject (CN or first SAN). ``status`` is mirrored from the
+    cloud (``ISSUED`` / ``PENDING_VALIDATION`` / ``ACTIVE`` / ...); the
+    dispatch layer filters to issued/usable certs so the picker never
+    offers a cert that can't terminate TLS yet.
+    """
+
+    arn: str
+    name: str
+    domain_name: str
+    status: str
+
+
 class ClusterDriver(Protocol):
     """Protocol for applying, querying, and managing Kubernetes objects on a target cluster.
 

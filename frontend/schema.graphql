@@ -353,6 +353,8 @@ type AstroliftAppEnvironment {
   requiredApprovals: Int!
   registeredAppSlug: String!
   clusterSlug: String
+  clusterId: GUID
+  clusterProviderPluginSlug: String
   domainZone: String
   createdAt: DateTime!
   settings: [AstroliftEnvironmentSetting!]!
@@ -811,6 +813,18 @@ type AstroliftClusterBootstrapRun {
   triggeredByUsername: String
 }
 
+type AstroliftClusterCertificate {
+  arn: String!
+  name: String!
+  domainName: String!
+  status: String!
+}
+
+type AstroliftClusterCertificates {
+  supported: Boolean!
+  certificates: [AstroliftClusterCertificate!]!
+}
+
 type AstroliftClusterEvent {
   namespace: String!
   name: String!
@@ -1194,6 +1208,18 @@ type AstroliftDisconnectUserSourceProviderPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftDisconnectUserSourceProviderPayload
+}
+
+type AstroliftDnsZone {
+  id: String!
+  name: String!
+  private: Boolean!
+  configJson: String!
+}
+
+type AstroliftDnsZones {
+  supported: Boolean!
+  zones: [AstroliftDnsZone!]!
 }
 
 type AstroliftDomainPathRoute {
@@ -4135,6 +4161,9 @@ type Query {
   astroliftClusterHealth(clusterId: GUID!, eventLimit: Int! = 50): AstroliftClusterHealth
   astroliftClusterBootstrapPlan(clusterId: GUID!): AstroliftClusterBootstrapPlan
   astroliftClusterWorkloadHealth(clusterId: GUID!): [AstroliftClusterWorkloadHealth!]!
+  astroliftClusterCertificates(clusterId: GUID!): AstroliftClusterCertificates!
+  astroliftDnsZones(dnsDriver: String!): AstroliftDnsZones!
+  astroliftDnsCertificates(dnsDriver: String!): AstroliftClusterCertificates!
   astroliftQuotas: [AstroliftQuota!]!
   astroliftBudgets: [AstroliftBudget!]!
   astroliftCostSnapshots(days: Int = null, window: CostWindow = null, limit: Int! = 200): [AstroliftCostSnapshot!]!

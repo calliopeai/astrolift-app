@@ -153,3 +153,85 @@ def test_zone_resolution_cached(driver_with_zone) -> None:
     )
     # Cache populated after first call
     assert "acme.platform.example." in driver._zone_cache
+
+
+# ---- list_zones (#861) --------------------------------------------
+
+
+def test_list_zones_returns_hosted_zones(route53_client) -> None:
+    """list_zones returns every hosted zone with a bare id, FQDN name,
+    private flag, and a pre-serialized config_json blob."""
+    import json
+
+    route53_client.create_hosted_zone(Name="acme.example.", CallerReference="z1")
+    route53_client.create_hosted_zone(Name="beta.example.", CallerReference="z2")
+    driver = Route53Driver(client=route53_client)
+
+    zones = driver.list_zones()
+
+    names = {z["name"] for z in zones}
+    assert "acme.example." in names
+    assert "beta.example." in names
+
+    acme = next(z for z in zones if z["name"] == "acme.example.")
+    # Bare hosted-zone id — no "/hostedzone/" prefix.
+    assert acme["id"].startswith("Z") or acme["id"]  # moto ids are opaque
+    assert "/hostedzone/" not in acme["id"]
+    assert acme["private"] is False
+    # config_json is drop-in for the dialog textarea: zone_id filled,
+    # certificate_arn left blank for the cert picker to populate.
+    parsed = json.loads(acme["config_json"])
+    assert parsed == {"zone_id": acme["id"], "certificate_arn": ""}
+
+
+def test_list_zones_empty_when_none(route53_client) -> None:
+    """No hosted zones → empty list (not an error)."""
+    driver = Route53Driver(client=route53_client)
+    assert driver.list_zones() == []
+
+
+# ---- list_certificates (#858) -------------------------------------
+
+
+def test_list_certificates_returns_issued() -> None:
+    """list_certificates surfaces ISSUED ACM certs with arn + domain.
+
+    Uses a stub ACM client rather than moto: moto leaves
+    ``request_certificate`` certs at PENDING_VALIDATION (correct
+    real-AWS behavior), so they'd never pass the driver's ISSUED-only
+    filter. The empty-list path below is moto-backed.
+    """
+    from unittest.mock import MagicMock
+
+    arn = "arn:aws:acm:us-east-1:123456789012:certificate/abc"
+
+    class _Paginator:
+        def paginate(self, **kwargs):
+            assert kwargs.get("CertificateStatuses") == ["ISSUED"]
+            return [{"CertificateSummaryList": [
+                {"CertificateArn": arn, "DomainName": "api.acme.example", "Status": "ISSUED"},
+            ]}]
+
+    acm = MagicMock()
+    acm.get_paginator.return_value = _Paginator()
+    acm.describe_certificate.return_value = {
+        "Certificate": {"DomainName": "api.acme.example", "Status": "ISSUED"},
+    }
+
+    driver = Route53Driver(client=None)
+    driver._acm = acm
+
+    certs = driver.list_certificates()
+
+    match = next((c for c in certs if c["arn"] == arn), None)
+    assert match is not None, f"expected cert {arn} in {certs}"
+    assert match["domain_name"] == "api.acme.example"
+    assert match["status"] == "ISSUED"
+    assert match["name"]  # human label is non-empty
+
+
+def test_list_certificates_empty_when_none(acm_client) -> None:
+    """No certs → empty list (moto, no certs requested)."""
+    driver = Route53Driver(client=None)
+    driver._acm = acm_client
+    assert driver.list_certificates() == []

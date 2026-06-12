@@ -148,6 +148,108 @@ class Route53Driver(DnsDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+    # ---- zone + cert discovery for the picker (#861 / #858) -------
+
+    @driver_op(cloud="aws", driver="dns")
+    def list_zones(self) -> list[dict[str, Any]]:
+        """List Route53 hosted zones for the managed-domain zone picker
+        (#861).
+
+        Rather than make the operator paste a hosted-zone id from the
+        console, the UI offers the zones the platform's IAM role can
+        already see. Paginates ``route53:ListHostedZones`` and returns a
+        list of dicts the resolver maps to the GraphQL type:
+
+            {"id": "Z123ABC",            # bare hosted-zone id
+             "name": "example.com.",      # FQDN with trailing dot
+             "private": False,            # private/internal zone
+             "config_json": '{"zone_id": "Z123ABC", "certificate_arn": ""}'}
+
+        ``config_json`` is the pre-serialized blob the operator drops
+        into the dialog's DNS-config textarea — ``zone_id`` filled,
+        ``certificate_arn`` left blank for the cert picker (#858) to
+        populate. Raises a mapped client error on API failure; the
+        resolver swallows that into an empty list so the UI degrades to
+        manual entry.
+        """
+        import json
+
+        out: list[dict[str, Any]] = []
+        try:
+            paginator = self._r53.get_paginator("list_hosted_zones")
+            pages = paginator.paginate()
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        for page in pages:
+            for z in page.get("HostedZones", []) or []:
+                zone_id = z.get("Id", "").rsplit("/", 1)[-1]
+                if not zone_id:
+                    continue
+                name = z.get("Name", "")
+                private = bool(z.get("Config", {}).get("PrivateZone", False))
+                config_json = json.dumps(
+                    {"zone_id": zone_id, "certificate_arn": ""},
+                )
+                out.append(
+                    {
+                        "id": zone_id,
+                        "name": name,
+                        "private": private,
+                        "config_json": config_json,
+                    }
+                )
+        return out
+
+    @driver_op(cloud="aws", driver="dns")
+    def list_certificates(self) -> list[dict[str, Any]]:
+        """List ISSUED ACM certificates in the driver's region for the
+        managed-domain cert picker (#858).
+
+        The managed-domain dialog has no cluster context, so the cert
+        list is resolved through the DNS driver's region-scoped ACM
+        client (the same client the wildcard-cert provisioning path
+        already uses). Paginates ``acm:ListCertificates`` filtered to
+        ``ISSUED`` and enriches each with the primary domain name via
+        ``acm:DescribeCertificate``. Returns dicts the resolver maps to
+        the GraphQL cert type:
+
+            {"arn": "...", "name": "...", "domain_name": "...", "status": "ISSUED"}
+
+        Raises a mapped client error on ListCertificates failure; the
+        resolver swallows that into an empty list so the dialog degrades
+        to manual ARN entry. The per-cert describe is best-effort.
+        """
+        acm = self._acm_client()
+        out: list[dict[str, Any]] = []
+        try:
+            paginator = acm.get_paginator("list_certificates")
+            pages = paginator.paginate(CertificateStatuses=["ISSUED"])
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        for page in pages:
+            for summary in page.get("CertificateSummaryList", []) or []:
+                arn = summary.get("CertificateArn", "")
+                if not arn:
+                    continue
+                domain_name = summary.get("DomainName", "")
+                status = summary.get("Status", "ISSUED")
+                try:
+                    desc = acm.describe_certificate(CertificateArn=arn)
+                    cert = desc.get("Certificate", {}) or {}
+                    domain_name = cert.get("DomainName", domain_name) or domain_name
+                    status = cert.get("Status", status) or status
+                except Exception:  # noqa: BLE001 — describe is best-effort
+                    pass
+                out.append(
+                    {
+                        "arn": arn,
+                        "name": domain_name or arn,
+                        "domain_name": domain_name,
+                        "status": status,
+                    }
+                )
+        return out
+
     # ---- observability reads (#377) -------------------------------
 
     @driver_op(cloud="aws", driver="dns")

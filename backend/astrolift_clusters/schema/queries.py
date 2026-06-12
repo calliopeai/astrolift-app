@@ -12,6 +12,8 @@ from astrolift_clusters.models import (
 )
 from astrolift_clusters.schema.types import (
     BootstrapPlanType,
+    ClusterCertificatesType,
+    ClusterCertificateType,
     ClusterEventType,
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
@@ -21,6 +23,8 @@ from astrolift_clusters.schema.types import (
     ClusterPrometheusRangeSeriesType,
     ClusterWorkflowRunType,
     ClusterWorkloadHealthType,
+    DnsZonesType,
+    DnsZoneType,
     ManagedDomainType,
     PodPhaseSummaryType,
     ProviderPluginType,
@@ -758,3 +762,136 @@ class ClustersQuery:
             )
             for row in rows
         ]
+
+    @strawberry.field
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def astrolift_cluster_certificates(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> ClusterCertificatesType:
+        """TLS certificates the cluster's provider can offer for an SNI /
+        custom-domain binding (#858).
+
+        Backs the cert picker on the app Domains page: rather than make
+        the operator paste an ACM ARN, the picker offers the certs the
+        platform's IAM role can already see. Gated on ``APP_DEPLOY``
+        (not ``CLUSTER_REGISTER``) because the natural caller is the app
+        author configuring a domain, mirroring the page's other
+        domain-mutation gates.
+
+        For AWS the certs come from ACM via the EKS driver. GCP / Azure
+        / k8s_native return ``supported=False`` (empty list) until their
+        cert APIs land — the UI falls back to a free-text ARN field.
+        Missing / soft-deleted clusters and driver-resolution failures
+        also yield ``supported=False`` rather than erroring, so the form
+        degrades gracefully.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cluster_certificates_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
+            )
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return ClusterCertificatesType(supported=False, certificates=[])
+        try:
+            payload = cluster_certificates_dispatch(cluster=cluster)
+        except ClusterManagementError:
+            # Driver implements the method but the cloud call blew up
+            # (no creds / throttled). The capability exists, so keep
+            # supported=True with an empty list — the picker shows an
+            # empty state rather than silently reverting to manual entry.
+            return ClusterCertificatesType(supported=True, certificates=[])
+        return ClusterCertificatesType(
+            supported=bool(payload["supported"]),
+            certificates=[
+                ClusterCertificateType(
+                    arn=c["arn"],
+                    name=c["name"],
+                    domain_name=c["domain_name"],
+                    status=c["status"],
+                )
+                for c in payload["certificates"]
+            ],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    @tenant_scoped()
+    def astrolift_dns_zones(
+        self,
+        info: Info,
+        dns_driver: str,
+    ) -> DnsZonesType:
+        """Discoverable DNS hosted zones for ``dns_driver`` (#861).
+
+        Backs the zone picker on the "Add managed domain" dialog —
+        selecting a zone auto-fills the dialog's DNS-config textarea
+        from the zone's pre-serialized ``config_json``. Keyed by the
+        DNS-driver slug (``route53`` / ``cloud_dns`` / ``azure_dns``)
+        rather than a cluster, because the dialog runs before any
+        cluster is in the loop; route53 lists hosted zones through the
+        platform's ambient AWS credentials.
+
+        Gated on ``PROVIDER_PLUGIN_READ`` to match the managed-domains
+        admin surface. ``cloud_dns`` / ``azure_dns`` return
+        ``supported=False`` until their list APIs land — the UI disables
+        the picker and leaves the textarea editable for manual entry.
+        """
+        from core.dns_discovery import dns_zones_dispatch
+
+        payload = dns_zones_dispatch(dns_driver=dns_driver)
+        return DnsZonesType(
+            supported=bool(payload["supported"]),
+            zones=[
+                DnsZoneType(
+                    id=z["id"],
+                    name=z["name"],
+                    private=bool(z["private"]),
+                    config_json=z["config_json"],
+                )
+                for z in payload["zones"]
+            ],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    @tenant_scoped()
+    def astrolift_dns_certificates(
+        self,
+        info: Info,
+        dns_driver: str,
+    ) -> ClusterCertificatesType:
+        """Discoverable TLS certificates for ``dns_driver`` (#858).
+
+        Driver-keyed analog of ``astroliftClusterCertificates`` for the
+        managed-domain dialog, which has no cluster context. Backs the
+        cert picker that fills the ``certificate_arn`` key in the
+        dialog's DNS-config JSON. For ``route53`` the certs come from
+        the region-scoped ACM client; other drivers report
+        ``supported=False``.
+        """
+        from core.dns_discovery import dns_certificates_dispatch
+
+        payload = dns_certificates_dispatch(dns_driver=dns_driver)
+        return ClusterCertificatesType(
+            supported=bool(payload["supported"]),
+            certificates=[
+                ClusterCertificateType(
+                    arn=c["arn"],
+                    name=c["name"],
+                    domain_name=c["domain_name"],
+                    status=c["status"],
+                )
+                for c in payload["certificates"]
+            ],
+        )
