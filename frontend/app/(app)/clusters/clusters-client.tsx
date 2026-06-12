@@ -183,7 +183,13 @@ export function ClustersClient() {
     null
   );
 
+  // cache-and-network ensures the first client-side render issues a live
+  // fetch with the correct X-Astrolift-Organization header. Without it
+  // the default cache-first policy reads the stale SSR-primed result
+  // (which was fetched server-side before the org cookie was set) and
+  // never re-fetches — producing an empty list even though clusters exist.
   const { data, loading, startPolling, stopPolling } = useQuery<Resp>(LIST_CLUSTERS, {
+    fetchPolicy: "cache-and-network",
     notifyOnNetworkStatusChange: true,
   });
 

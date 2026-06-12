@@ -139,8 +139,13 @@ const POLL_INTERVAL_MS = 4000;
 
 export function ClusterDetailClient({ slug }: { slug: string }) {
   const fmt = useFormatters();
+  // cache-and-network ensures a live fetch with the correct
+  // X-Astrolift-Organization header on first client mount. The default
+  // cache-first policy reads the stale SSR result (no org header) and
+  // leaves this page showing "not found" while the breadcrumb already
+  // reflects the cluster slug from the URL.
   const { data, loading, startPolling, stopPolling } =
-    useQuery<Resp>(LIST_CLUSTERS);
+    useQuery<Resp>(LIST_CLUSTERS, { fetchPolicy: "cache-and-network" });
   const cluster = (data?.astroliftClusters ?? []).find((c) => c.slug === slug);
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
