@@ -560,7 +560,7 @@
           "failed": "Retry to rebuild the registry repo and namespace.",
           "pending": "Kick it off to bring the app online.",
           "provisioning": "Sit tight — re-run only if it stalls.",
-          "ready_missing_registry": "Reprovision to rebuild the ECR repo and push role; deploys will silently no-op until then.",
+          "ready_missing_registry": "Reprovision to rebuild the container registry repo and push credential; deploys will silently no-op until then.",
           "unknown": "Reprovision to recover."
         },
         "elapsed": "started {minutes}m ago",

@@ -42,6 +42,21 @@ const DRIVER_OPTIONS: { value: DnsDriver; label: string }[] = [
   { value: "azure_dns", label: "Azure DNS" },
 ];
 
+const DNS_CONFIG_META: Record<DnsDriver, { placeholder: string; hint: string }> = {
+  route53: {
+    placeholder: '{"zone_id": "Z1234567890ABCDEF", "certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/..."}',
+    hint: "Route 53 hosted zone ID and optional ACM certificate ARN. Empty is fine — the driver will discover what it can.",
+  },
+  cloud_dns: {
+    placeholder: '{"project": "my-gcp-project", "managed_zone": "my-zone-name"}',
+    hint: "GCP project ID and Cloud DNS managed zone name. Empty is fine — the driver will discover what it can.",
+  },
+  azure_dns: {
+    placeholder: '{"resource_group": "my-resource-group", "zone_name": "example.com"}',
+    hint: "Azure resource group and DNS zone name. Empty is fine — the driver will discover what it can.",
+  },
+};
+
 const DEFAULT_FOR_OPTIONS: { value: DefaultFor; label: string }[] = [
   { value: "both", label: "Both" },
   { value: "tenant_apps", label: "Tenant apps" },
@@ -228,14 +243,12 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
               value={dnsConfig}
               onChange={(e) => setDnsConfig(e.target.value)}
               rows={4}
-              placeholder={'{"zone_id": "...", "certificate_arn": "..."}'}
+              placeholder={DNS_CONFIG_META[dnsDriver].placeholder}
               className="font-mono text-xs"
             />
             {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
             <p className="text-muted-foreground text-[11px]">
-              Driver-specific identifiers (hosted zone ID, ACM cert ARN, GCP
-              project, etc.). Empty is fine — the driver will discover what
-              it can.
+              {DNS_CONFIG_META[dnsDriver].hint}
             </p>
           </div>
 
