@@ -818,6 +818,11 @@ TEMPORAL_ADDRESS = env_str("TEMPORAL_ADDRESS", "localhost:7233")
 TEMPORAL_NAMESPACE = env_str("TEMPORAL_NAMESPACE", "default")
 TEMPORAL_TASK_QUEUE = env_str("TEMPORAL_TASK_QUEUE", "astrolift-main")
 
+# GitHub personal access token used by the agent Brief assembler to fetch
+# config-repo zipballs. Empty means unauthenticated requests (public repos
+# only, subject to GitHub's lower anonymous rate limit).
+GITHUB_PAT = env_str("GITHUB_PAT", "")
+
 
 # Structured logging: JSON in non-local envs, human-readable text
 # locally. ``core.logging.build_logging_config`` is the single source
