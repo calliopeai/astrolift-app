@@ -203,6 +203,11 @@ function EnvironmentRow({
       // here would be empty churn.
     }
   );
+  const { data: deploymentsData } = useQuery<{ astroliftDeployments: AstroliftDeployment[] }>(
+    LIST_DEPLOYMENTS,
+    { variables: { appSlug, environmentName: env.name, limit: 1 }, fetchPolicy: "cache-first" }
+  );
+  const lastTag = deploymentsData?.astroliftDeployments?.[0]?.imageTag ?? "";
   const [imageTag, setImageTag] = useState("");
 
   async function handleTogglePause() {
@@ -225,7 +230,7 @@ function EnvironmentRow({
   }
 
   async function handleDeploy() {
-    const tag = imageTag.trim() || "latest";
+    const tag = imageTag.trim() || lastTag || "latest";
     const { data } = await deploy({
       variables: {
         input: {
@@ -318,7 +323,7 @@ function EnvironmentRow({
             type="text"
             value={imageTag}
             onChange={(e) => setImageTag(e.target.value)}
-            placeholder={t("imageTagPlaceholder")}
+            placeholder={lastTag ? lastTag : t("imageTagPlaceholder")}
             className="border-input bg-background flex-1 rounded-md border px-2 py-1 font-mono text-xs"
           />
           <Button
