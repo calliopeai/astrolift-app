@@ -55,7 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <PlatformIncidentBanner />
         <SidebarProvider className="flex-1">
           <AppSidebar ssrUser={ssrUser} />
-          <SidebarInset>
+          <SidebarInset className="overflow-x-hidden">
             <PageHeader />
             <main
               id="main-content"
