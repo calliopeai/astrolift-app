@@ -46,6 +46,9 @@ class TenantClusterType:
     last_management_error: str
     managed_at: dt.datetime | None
     secrets_backend_provisioned_at: dt.datetime | None
+    # Heartbeat / keep-alive fields (#808)
+    last_heartbeat_at: dt.datetime | None
+    is_live: bool
 
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
@@ -135,6 +138,8 @@ def cluster_to_type(cluster) -> TenantClusterType:
         last_management_error=cluster.last_management_error or "",
         managed_at=cluster.managed_at,
         secrets_backend_provisioned_at=cluster.secrets_backend_provisioned_at,
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        is_live=cluster.is_live,
     )
 
 
@@ -431,3 +436,64 @@ class ClusterPrometheusRangeMetricsType:
     range_seconds: int
     step_seconds: int
     series: list[ClusterPrometheusRangeSeriesType]
+
+
+# ---- Provider picker types (#858-#861) ----------------------------
+
+
+@strawberry.type(name="AstroliftProviderRegion")
+class ProviderRegionType:
+    """One cloud region available to the configured provider plugin.
+    Used to populate the region picker in register-cluster-dialog
+    instead of a free-text input (#860)."""
+
+    value: str
+    """Cloud-native region identifier (e.g. ``us-west-2``)."""
+    label: str
+    """Human-readable display name (e.g. ``US West (Oregon)``)."""
+
+
+@strawberry.type(name="AstroliftProviderCert")
+class ProviderCertType:
+    """One ACM certificate available to the configured provider plugin.
+    Used to populate the certificate ARN picker in add-managed-domain-dialog
+    instead of free-text entry (#858)."""
+
+    arn: str
+    """ACM certificate ARN."""
+    domain: str
+    """Primary domain name on the certificate."""
+    status: str
+    """Certificate status (e.g. ``ISSUED``, ``PENDING_VALIDATION``)."""
+    not_after: str
+    """Expiry timestamp in ISO format, or empty when not yet issued."""
+
+
+@strawberry.type(name="AstroliftProviderCognitoPool")
+class ProviderCognitoPoolType:
+    """One Cognito user pool available to the configured provider plugin.
+    Used to populate the Cognito picker in cluster-settings-client
+    instead of free-text entry (#859)."""
+
+    pool_id: str
+    """Cognito user pool ID (e.g. ``us-west-2_XXXXXXXXX``)."""
+    pool_arn: str
+    """User pool ARN."""
+    name: str
+    """User pool display name."""
+    domain: str
+    """Cognito hosted domain prefix (without the regional suffix), or empty."""
+
+
+@strawberry.type(name="AstroliftProviderHostedZone")
+class ProviderHostedZoneType:
+    """One DNS hosted zone available to the configured provider plugin.
+    Used to populate the hosted zone picker in add-managed-domain-dialog
+    instead of free-text entry (#861)."""
+
+    zone_id: str
+    """Provider-specific zone ID (e.g. Route53 ``Z1234…``)."""
+    zone_name: str
+    """DNS zone name (e.g. ``example.com``)."""
+    record_count: int
+    """Approximate record count as reported by the provider; -1 when unknown."""

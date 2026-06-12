@@ -146,6 +146,16 @@ class TenantCluster(NamedBaseCoreModel):
     Shape is mode-specific — see services/delivery for what each
     mode reads."""
 
+    # Cluster keep-alive / heartbeat (#808).
+    # ``api_key_hash`` is a SHA-256 of the secret token issued to the
+    # in-cluster agent at registration time; it is stored hashed so
+    # that a DB read does not expose the plaintext.  Null until the
+    # cluster registers a heartbeat key.
+    # ``last_heartbeat_at`` is stamped by POST
+    # /api/dispatch/v1/clusters/<id>/heartbeat/.
+    api_key_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+
     # Node pool platform capability fields (#80).
     # Used by the dispatch router (#82) for ``runs_on`` label matching.
     # Defaults are safe-guess values for existing clusters (linux/amd64);
@@ -171,6 +181,17 @@ class TenantCluster(NamedBaseCoreModel):
             "Case-insensitive in dispatch matching."
         ),
     )
+
+    _HEARTBEAT_LIVE_SECONDS = 300  # 5 minutes
+
+    @property
+    def is_live(self) -> bool:
+        """True when the cluster sent a heartbeat within the last 5 minutes."""
+        if self.last_heartbeat_at is None:
+            return False
+        from django.utils import timezone
+        delta = timezone.now() - self.last_heartbeat_at
+        return delta.total_seconds() < self._HEARTBEAT_LIVE_SECONDS
 
     class Meta:
         constraints = [
