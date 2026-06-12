@@ -6,7 +6,8 @@ must be ``csrf_exempt`` — API/deploy-token callers have no CSRF token.
 
 Surfaces
 --------
-  * noVNC WebSocket proxy  (/api/agents/v1/, #58)
+  * noVNC WebSocket proxy        (/api/agents/v1/, #58)
+  * Skill AI assist              (/api/agents/v1/skills/ai-assist/, #884)
 
 Completion note — noVNC WebSocket proxy
 ---------------------------------------
@@ -21,6 +22,7 @@ from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
 from astrolift_agents.views.novnc_proxy import novnc_ws_proxy
+from astrolift_agents.views.skill_ai_assist import skill_ai_assist
 
 app_name = "astrolift_agents"
 
@@ -32,5 +34,13 @@ urlpatterns = [
         "api/agents/v1/tasks/<str:task_id>/vnc/ws/",
         csrf_exempt(novnc_ws_proxy),
         name="novnc-ws-proxy",
+    ),
+    # Skill AI assist (#884).
+    # Calls Anthropic directly to suggest a system prompt for a new skill.
+    # No agent dispatch or containers involved.
+    path(
+        "api/agents/v1/skills/ai-assist/",
+        skill_ai_assist,
+        name="skill-ai-assist",
     ),
 ]
