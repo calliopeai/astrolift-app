@@ -188,6 +188,11 @@ class UpdateTenantClusterInput:
 
 
 @strawberry.input
+class ReconcileClusterIngressesInput:
+    cluster_id: GUID
+
+
+@strawberry.input
 class UnregisterTenantClusterInput:
     id: GUID
 
@@ -305,6 +310,23 @@ class InstallClusterPrereqsInputType:
 
 
 @strawberry.type
+class ReconcileClusterIngressesResult:
+    """Outcome of re-applying the ALB auth gate across a cluster's
+    managed-subdomain Ingresses (#851).
+
+    ``reconciled_count`` is the number of Ingresses patched;
+    ``skipped_count`` is the number of bound app environments that had
+    no managed-subdomain Ingress to patch (not yet deployed, or removed
+    out-of-band); ``errors`` carries per-namespace / per-Ingress failure
+    strings so a single unreachable namespace doesn't fail the whole
+    operation."""
+
+    reconciled_count: int
+    skipped_count: int
+    errors: list[str]
+
+
+@strawberry.type
 class _SoftDeletePayload:
     id: GUID
     deleted: bool
@@ -410,6 +432,55 @@ class ClustersMutation:
             cluster.alb_auth_config = input.alb_auth_config
         cluster.save()
         return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(action="cluster.reconcile_ingresses")
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def reconcile_cluster_ingresses(
+        self, info: Info, input: ReconcileClusterIngressesInput
+    ) -> MutationResultType[ReconcileClusterIngressesResult]:
+        """Re-apply the ALB Cognito auth gate across every managed-subdomain
+        Ingress on the cluster (#851).
+
+        The operator sets ``alb_auth_config`` via ``updateTenantCluster``;
+        that only changes what the *next* deploy renders. This mutation
+        pushes the change onto the live Ingresses now — patching the
+        ``alb.ingress.kubernetes.io/auth-*`` annotations on every Ingress
+        labelled ``astrolift.dev/managed-subdomain=true`` so the AWS Load
+        Balancer Controller reconciles the listener rules on its next
+        sync. Removing ``alb_auth_config`` (null) strips the annotations,
+        leaving the apps public.
+
+        Only meaningful for the ALB ingress class — nginx / other classes
+        don't carry these annotations, so the mutation refuses with
+        PRECONDITION rather than silently no-op'ing. Per-namespace
+        failures surface in ``errors`` without aborting the sweep; the
+        envelope stays ``ok=true`` so the operator sees partial progress
+        plus the specific namespaces that couldn't be reached."""
+        cluster = TenantCluster.objects.filter(
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        if cluster.ingress_class != "alb":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "reconcile only supported for alb ingressClass",
+                field="clusterId",
+            )
+
+        from core.ingress_reconcile import reconcile_cluster_ingresses
+
+        result = reconcile_cluster_ingresses(cluster)
+        return gql_success(
+            ReconcileClusterIngressesResult(
+                reconciled_count=int(result["reconciled"]),
+                skipped_count=int(result["skipped"]),
+                errors=list(result["errors"]),
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="cluster.bring_into_management")

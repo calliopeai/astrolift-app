@@ -57,10 +57,14 @@ import {
   DECOMMISSION_CLUSTER,
   INSTALL_CLUSTER_PREREQS,
   LIST_CLUSTERS,
+  RECONCILE_CLUSTER_INGRESSES,
   REFRESH_CLUSTER_MANAGEMENT,
   UPDATE_TENANT_CLUSTER,
 } from "@/graphql/clusters/clusters.queries";
-import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
+import type {
+  AstroliftTenantCluster,
+  ReconcileClusterIngressesResult,
+} from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import { ClusterTabs } from "../components/cluster-tabs";
@@ -1072,49 +1076,177 @@ function isAlbAuthConfig(v: unknown): v is IngressAuthConfig {
   );
 }
 
+/**
+ * Accessible on/off switch. The repo has no shadcn/radix Switch
+ * primitive, so this is a small local toggle styled with the same
+ * Tailwind tokens the rest of the settings surface uses — not a new
+ * shared component. The "on" track is emerald so the enabled state
+ * reads as a security control rather than a neutral preference.
+ */
+function AuthGateToggle({
+  checked,
+  onChange,
+  disabled,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onChange}
+      className={cn(
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
+        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        checked ? "bg-emerald-600" : "bg-muted-foreground/30",
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block size-4 rounded-full bg-white shadow transition-transform",
+          checked ? "translate-x-4" : "translate-x-0.5",
+        )}
+      />
+    </button>
+  );
+}
+
 function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
-  const [editing, setEditing] = React.useState(false);
   const existing = isAlbAuthConfig(cluster.albAuthConfig) ? cluster.albAuthConfig : null;
+  const enabled = existing !== null;
+
+  const [editing, setEditing] = React.useState(false);
   const [poolArn, setPoolArn] = React.useState(existing?.user_pool_arn ?? "");
   const [clientId, setClientId] = React.useState(existing?.user_pool_client_id ?? "");
   const [domain, setDomain] = React.useState(existing?.user_pool_domain ?? "");
 
-  const [update, { loading }] = useMutation<{
+  const [update, { loading: updating }] = useMutation<{
     updateTenantCluster: MutationResult<AstroliftTenantCluster>;
   }>(UPDATE_TENANT_CLUSTER, {
     refetchQueries: [{ query: LIST_CLUSTERS }],
     awaitRefetchQueries: true,
   });
+  const [reconcile, { loading: reconciling }] = useMutation<{
+    reconcileClusterIngresses: MutationResult<ReconcileClusterIngressesResult>;
+  }>(RECONCILE_CLUSTER_INGRESSES);
 
-  async function handleSave() {
-    const config =
-      poolArn && clientId && domain
-        ? { user_pool_arn: poolArn, user_pool_client_id: clientId, user_pool_domain: domain }
-        : null;
-    const { data } = await update({
+  const busy = updating || reconciling;
+
+  /**
+   * Persist ``config`` (object = enable, null = disable) then push it
+   * onto every live managed-subdomain Ingress. The two mutations run in
+   * sequence: the save has to land before the reconcile reads the row.
+   * The reconcile envelope stays ``ok`` even on partial failure, so we
+   * surface the applied count and fold any per-namespace errors into a
+   * follow-up warning toast.
+   */
+  async function persistAndReconcile(config: IngressAuthConfig | null) {
+    const { data: updateData } = await update({
       variables: { input: { id: cluster.id, albAuthConfig: config } },
     });
-    if (data?.updateTenantCluster.ok) {
-      toast.success(config ? "Ingress auth config saved." : "Ingress auth config cleared.");
-      setEditing(false);
-    } else {
-      toast.error(data?.updateTenantCluster.errors?.[0]?.message ?? "Save failed.");
+    if (!updateData?.updateTenantCluster.ok) {
+      toast.error(updateData?.updateTenantCluster.errors?.[0]?.message ?? "Save failed.");
+      return false;
     }
+
+    const { data: reconcileData } = await reconcile({
+      variables: { input: { clusterId: cluster.id } },
+    });
+    const result = reconcileData?.reconcileClusterIngresses;
+    if (!result?.ok) {
+      toast.error(result?.errors?.[0]?.message ?? "Reconcile failed.");
+      return false;
+    }
+
+    const count = result.data?.reconciledCount ?? 0;
+    const noun = count === 1 ? "app" : "apps";
+    if (config) {
+      toast.success(`Auth gate applied to ${count} ${noun}.`);
+    } else {
+      toast.success(`Auth gate removed from ${count} ${noun}.`);
+    }
+    const reconcileErrors = result.data?.errors ?? [];
+    if (reconcileErrors.length > 0) {
+      toast.warning(`${reconcileErrors.length} ingress(es) could not be reconciled — check cluster events.`);
+    }
+    return true;
   }
 
-  function handleEdit() {
-    const existing = isAlbAuthConfig(cluster.albAuthConfig) ? cluster.albAuthConfig : null;
+  function configFromFields(): IngressAuthConfig | null {
+    if (poolArn && clientId && domain) {
+      return { user_pool_arn: poolArn, user_pool_client_id: clientId, user_pool_domain: domain };
+    }
+    return null;
+  }
+
+  function openForm() {
     setPoolArn(existing?.user_pool_arn ?? "");
     setClientId(existing?.user_pool_client_id ?? "");
     setDomain(existing?.user_pool_domain ?? "");
     setEditing(true);
   }
 
-  function handleCancel() {
-    setEditing(false);
+  async function handleToggle() {
+    if (busy) return;
+    if (enabled) {
+      // Flip off: clear config + strip annotations from live Ingresses.
+      await persistAndReconcile(null);
+      setEditing(false);
+    } else {
+      // Can't enable without config — open the form to collect it.
+      openForm();
+    }
+  }
+
+  // Re-apply the (already saved) config onto the cluster's Ingresses.
+  async function handleApply() {
+    if (busy) return;
+    await persistAndReconcile(existing);
+  }
+
+  // Save the form's config then apply it in one go.
+  async function handleSaveAndApply() {
+    if (busy) return;
+    const config = configFromFields();
+    if (config === null) {
+      toast.error("All three fields are required to enable the auth gate.");
+      return;
+    }
+    const ok = await persistAndReconcile(config);
+    if (ok) setEditing(false);
   }
 
   const isAlb = cluster.ingressClass === "alb";
+
+  if (!isAlb) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <KeyRoundIcon className="size-4" />
+            Auth gate
+          </CardTitle>
+          <CardDescription className="mt-1">
+            Ingress-level auth is only supported when ingressClass = alb.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm">
+            Change <span className="font-mono">ingressClass</span> to{" "}
+            <span className="font-mono">alb</span> to enable the Cognito auth gate.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -1122,30 +1254,38 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <KeyRoundIcon className="size-4" />
-              Ingress auth
+              {enabled ? (
+                <ShieldIcon className="size-4 text-emerald-600" />
+              ) : (
+                <KeyRoundIcon className="size-4" />
+              )}
+              Auth gate
             </CardTitle>
             <CardDescription className="mt-1">
-              {isAlb
-                ? "Cognito authenticate-cognito config written into every new ALB ingress rule for this cluster."
-                : "Ingress-level auth is only supported when ingressClass = alb."}
+              Cognito authenticate-cognito gate applied to every managed-subdomain ALB Ingress on
+              this cluster.
             </CardDescription>
           </div>
-          {isAlb && !editing && (
-            <Button size="sm" variant="outline" onClick={handleEdit} className="gap-1.5 shrink-0">
-              <PencilIcon className="size-3.5" />
-              {existing ? "Edit" : "Configure"}
-            </Button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            <AuthGateToggle
+              checked={enabled}
+              onChange={handleToggle}
+              disabled={busy}
+              label={enabled ? "Disable auth gate" : "Enable auth gate"}
+            />
+            <span
+              className={cn(
+                "text-xs font-medium",
+                enabled ? "text-emerald-600" : "text-muted-foreground",
+              )}
+            >
+              {enabled ? "Enabled" : "Disabled"}
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        {!isAlb ? (
-          <p className="text-muted-foreground text-sm">
-            Change <span className="font-mono">ingressClass</span> to{" "}
-            <span className="font-mono">alb</span> to enable Cognito auth gate.
-          </p>
-        ) : editing ? (
+        {editing ? (
           <div className="space-y-3">
             <div className="space-y-1">
               <label className="text-xs font-medium">User pool ARN</label>
@@ -1175,46 +1315,48 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
               />
             </div>
             <div className="flex items-center gap-2 pt-1">
-              <Button size="sm" onClick={handleSave} disabled={loading} className="gap-1.5">
-                {loading && <Loader2Icon className="size-3.5 animate-spin" />}
-                Save
+              <Button size="sm" onClick={handleSaveAndApply} disabled={busy} className="gap-1.5">
+                {busy && <Loader2Icon className="size-3.5 animate-spin" />}
+                Save &amp; Apply
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleCancel} disabled={loading}>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
                 Cancel
               </Button>
-              {existing && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={async () => {
-                    const { data } = await update({
-                      variables: { input: { id: cluster.id, albAuthConfig: null } },
-                    });
-                    if (data?.updateTenantCluster.ok) {
-                      toast.success("Ingress auth config cleared.");
-                      setEditing(false);
-                    } else {
-                      toast.error(data?.updateTenantCluster.errors?.[0]?.message ?? "Clear failed.");
-                    }
-                  }}
-                  disabled={loading}
-                  className="text-muted-foreground ml-auto hover:text-destructive"
-                >
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
-        ) : existing ? (
-          <div className="space-y-2 text-sm">
-            <Field label="User pool ARN" mono value={existing.user_pool_arn} />
-            <Field label="App client ID" mono value={existing.user_pool_client_id} />
-            <Field label="Domain" mono value={existing.user_pool_domain} />
+        ) : enabled ? (
+          <div className="space-y-3">
+            <div className="space-y-2 text-sm">
+              <Field label="User pool ARN" mono value={existing.user_pool_arn} />
+              <Field label="App client ID" mono value={existing.user_pool_client_id} />
+              <Field label="Domain" mono value={existing.user_pool_domain} />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" onClick={handleApply} disabled={busy} className="gap-1.5">
+                {reconciling && <Loader2Icon className="size-3.5 animate-spin" />}
+                <RocketIcon className="size-3.5" />
+                Apply to cluster
+              </Button>
+              <Button size="sm" variant="outline" onClick={openForm} disabled={busy} className="gap-1.5">
+                <PencilIcon className="size-3.5" />
+                Edit
+              </Button>
+            </div>
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm italic">
-            No auth config — all ingress rules are unauthenticated. Click Configure to add Cognito.
-          </p>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                All apps on this cluster are publicly accessible. Enable the auth gate to put every
+                managed-subdomain Ingress behind Cognito.
+              </p>
+            </div>
+            <Button size="sm" onClick={openForm} disabled={busy} className="gap-1.5">
+              <ShieldIcon className="size-3.5" />
+              Enable
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

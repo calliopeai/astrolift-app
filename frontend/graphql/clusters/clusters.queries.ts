@@ -140,6 +140,31 @@ export const UPDATE_TENANT_CLUSTER = gql`
   }
 `;
 
+// Push the cluster's current alb_auth_config onto every live
+// managed-subdomain Ingress (#851). updateTenantCluster only changes
+// what the next deploy renders; this applies (or removes) the
+// alb.ingress.kubernetes.io/auth-* annotations on the running
+// Ingresses now. The settings card fires updateTenantCluster first
+// (to persist config) then this, and surfaces reconciledCount in the
+// success toast.
+export const RECONCILE_CLUSTER_INGRESSES = gql`
+  mutation ReconcileClusterIngresses($input: ReconcileClusterIngressesInput!) {
+    reconcileClusterIngresses(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        reconciledCount
+        skippedCount
+        errors
+      }
+    }
+  }
+`;
+
 // Bootstrap-run history for a single cluster (#319). The 'View
 // history' disclosure on the Last bootstrap card fans this query
 // out when expanded; we don't pull the full history on the cluster

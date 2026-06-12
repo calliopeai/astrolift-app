@@ -3656,6 +3656,7 @@ export type Mutation = {
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
   pushManifestToRepo: ManifestpushpayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
+  reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
@@ -4406,6 +4407,11 @@ export type MutationPushManifestToRepoArgs = {
 
 export type MutationRecheckDomainValidationArgs = {
   input: RecheckDomainValidationInput;
+};
+
+
+export type MutationReconcileClusterIngressesArgs = {
+  input: ReconcileClusterIngressesInput;
 };
 
 
@@ -6007,6 +6013,22 @@ export type QueryWorkflowInstancesArgs = {
 
 export type RecheckDomainValidationInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type ReconcileClusterIngressesInput = {
+  clusterId: Scalars['GUID']['input'];
+};
+
+export type ReconcileClusterIngressesResult = {
+  errors: Array<Scalars['String']['output']>;
+  reconciledCount: Scalars['Int']['output'];
+  skippedCount: Scalars['Int']['output'];
+};
+
+export type ReconcileClusterIngressesResultMutationResult = {
+  data?: Maybe<ReconcileClusterIngressesResult>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type RecordClusterBootstrapRunInput = {

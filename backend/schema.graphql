@@ -3699,6 +3699,7 @@ type Mutation {
   bulkResyncManifest(input: BulkResyncManifestInput!): BulkOperationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
+  reconcileClusterIngresses(input: ReconcileClusterIngressesInput!): ReconcileClusterIngressesResultMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
   refreshClusterManagement(input: RefreshClusterManagementInputType!): AstroliftTenantClusterMutationResult!
   decommissionCluster(input: DecommissionClusterInputType!): AstroliftTenantClusterMutationResult!
@@ -4197,6 +4198,22 @@ type Query {
 
 input RecheckDomainValidationInput {
   id: GUID!
+}
+
+input ReconcileClusterIngressesInput {
+  clusterId: GUID!
+}
+
+type ReconcileClusterIngressesResult {
+  reconciledCount: Int!
+  skippedCount: Int!
+  errors: [String!]!
+}
+
+type ReconcileClusterIngressesResultMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ReconcileClusterIngressesResult
 }
 
 input RecordClusterBootstrapRunInput {

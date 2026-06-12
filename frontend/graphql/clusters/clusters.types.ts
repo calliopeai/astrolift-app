@@ -6,6 +6,7 @@ import type {
   AstroliftManagedDomain as GeneratedManagedDomain,
   AstroliftProviderPlugin as GeneratedProviderPlugin,
   AstroliftTenantCluster as GeneratedTenantCluster,
+  ReconcileClusterIngressesResult as GeneratedReconcileClusterIngressesResult,
 } from "@/graphql/__generated__/schema";
 
 export type AstroliftGuid = string;
@@ -22,3 +23,5 @@ export type AstroliftManagedDomain = Omit<
 };
 
 export type AstroliftProviderPlugin = GeneratedProviderPlugin;
+
+export type ReconcileClusterIngressesResult = GeneratedReconcileClusterIngressesResult;

@@ -606,6 +606,49 @@ class KubernetesDynamicClient:
         apps_v1 = self._client_module.AppsV1Api(self._api_client)
         return apps_v1.list_namespaced_deployment(namespace, **kwargs)
 
+    def list_namespaced_ingress(self, namespace: str, **kwargs: Any) -> Any:
+        """Proxy to ``NetworkingV1Api.list_namespaced_ingress``.
+
+        Accepts the same ``label_selector`` / ``field_selector`` kwargs
+        the official client supports and passes them through unchanged
+        (the ALB-metrics fallback in ``aws/timeseries_cloudwatch.py`` and
+        the cluster ingress reconcile in ``core/ingress_reconcile.py``
+        both call this). ``namespace`` is positional to match the
+        kubernetes-client signature the existing CloudWatch caller uses.
+        Token is refreshed first so short-lived cloud tokens (EKS: 15
+        min) don't expire mid-query."""
+        self._refresh_token()
+        net_v1 = self._client_module.NetworkingV1Api(self._api_client)
+        return net_v1.list_namespaced_ingress(namespace, **kwargs)
+
+    def merge_patch_ingress(
+        self,
+        *,
+        namespace: str,
+        name: str,
+        patch: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Apply a strategic-merge patch to a namespaced Ingress.
+
+        Used by the cluster ingress reconcile (#851) to add or remove the
+        ``alb.ingress.kubernetes.io/auth-*`` annotation keys on the
+        managed-subdomain Ingresses when a cluster's ``alb_auth_config``
+        changes. A ``null`` annotation value deletes that key (a bare
+        ``map[string]string`` has no merge-key directive, so strategic
+        merge degrades to JSON-merge semantics for the annotations map).
+        Returns the patched object as a dict. Uses the dynamic client's
+        ``resource.patch()`` which handles the merge content type
+        correctly — same shape as :meth:`merge_patch_deployment`."""
+        self._refresh_token()
+        resource = self._resource_for("networking.k8s.io/v1", "Ingress")
+        result = resource.patch(
+            name=name,
+            namespace=namespace,
+            body=patch,
+            content_type="application/strategic-merge-patch+json",
+        )
+        return self._to_dict(result)
+
     def merge_patch_deployment(
         self,
         *,
