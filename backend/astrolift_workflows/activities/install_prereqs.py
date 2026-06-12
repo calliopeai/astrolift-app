@@ -319,7 +319,7 @@ def _install_cluster_prereqs_sync(
     target_namespace = "astrolift-system"
 
     resources: list[dict[str, Any]] = []
-    applied: list[str] = []
+    applied: list[dict[str, str]] = []
     skipped: list[str] = []
 
     # Collect HelmRepository manifests first (one per unique repo URL,
@@ -348,7 +348,7 @@ def _install_cluster_prereqs_sync(
                 "skipping HelmRelease (cloud-native path)",
                 component.key,
             )
-            applied.append(component.key)
+            applied.append({"name": component.key, "version": ""})
             continue
 
         component_options = option_overrides.get(component.key, {})
@@ -429,7 +429,7 @@ def _install_cluster_prereqs_sync(
             },
         }
         resources.append(helm_release)
-        applied.append(component.key)
+        applied.append({"name": component.key, "version": component.chart_version})
 
     # Prepend HelmRepository manifests so Flux registers the chart
     # sources before the HelmRelease objects that reference them.
@@ -535,7 +535,7 @@ def _record_bootstrap_run_sync(
     cluster_id: int,
     actor_user_id: int | None,
     status: str,
-    applied: list[str],
+    applied: list[dict[str, str]],
     error_message: str,
     started_at_iso: str,
     ended_at_iso: str,
@@ -563,7 +563,7 @@ def _record_bootstrap_run_sync(
         tenant_cluster=cluster,
         triggered_by=user,
         status=status,
-        installed_releases=[{"name": key} for key in applied],
+        installed_releases=applied,
         chart_version="",  # Flux manages chart versions; not known at apply time
         cli_version="",
         host_info={"triggered_via": "ui"},
@@ -578,7 +578,7 @@ async def record_cluster_bootstrap_run(
     cluster_id: int,
     actor_user_id: int | None,
     status: str,
-    applied: list[str],
+    applied: list[dict[str, str]],
     error_message: str,
     started_at_iso: str,
     ended_at_iso: str,
