@@ -49,8 +49,8 @@ const KINDS: { value: IdpKind; label: string; hint: string }[] = [
 ];
 
 const COGNITO_TEMPLATE = `{
-  "user_pool_id": "us-east-1_XXXXXXXXX",
-  "region": "us-east-1"
+  "user_pool_id": "",
+  "region": ""
 }`;
 
 export function CreateIdentityProviderDialog({ open, onOpenChange }: Props) {

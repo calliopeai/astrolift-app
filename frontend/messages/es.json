@@ -2388,6 +2388,18 @@
         "title": "Rollback {app}/{env}?",
         "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "confirm": "Rollback"
+      },
+      "delete": "Eliminar",
+      "retire": "Retirar",
+      "confirmDelete": {
+        "title": "¿Eliminar el despliegue de {app}/{env}?",
+        "description": "Quita este despliegue de las listas. La fila se elimina de forma lógica: no hay nada en ejecución que desmontar. Esto no se puede deshacer.",
+        "confirm": "Eliminar despliegue",
+        "retireTitle": "¿Retirar el despliegue en ejecución de {app}/{env}?",
+        "retireDescription": "Marca este despliegue como reemplazado para que deje de ser la revisión activa. Los recursos del clúster se conservan: la aplicación en ejecución no se desmonta.",
+        "retireConfirm": "Retirar despliegue",
+        "success": "Despliegue descartado",
+        "failed": "Error al eliminar"
       }
     },
     "environments": {

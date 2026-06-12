@@ -2388,6 +2388,18 @@
         "title": "Rollback {app}/{env}?",
         "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "confirm": "Rollback"
+      },
+      "delete": "削除",
+      "retire": "停止",
+      "confirmDelete": {
+        "title": "{app}/{env} のデプロイを削除しますか？",
+        "description": "このデプロイを一覧から削除します。実行中のものはなく、行は論理削除されます。この操作は元に戻せません。",
+        "confirm": "デプロイを削除",
+        "retireTitle": "{app}/{env} の実行中デプロイを停止しますか？",
+        "retireDescription": "このロールアウトを置換済みにし、アクティブなリビジョンではなくします。クラスターのリソースはそのまま残り、実行中のアプリは削除されません。",
+        "retireConfirm": "デプロイを停止",
+        "success": "デプロイを破棄しました",
+        "failed": "削除に失敗しました"
       }
     },
     "environments": {

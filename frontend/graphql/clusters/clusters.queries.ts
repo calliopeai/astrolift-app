@@ -106,6 +106,11 @@ export const LIST_CLUSTERS = gql`
       lifecycle
       lastManagementError
       managedAt
+      lastHeartbeatAt
+      heartbeatIntervalSeconds
+      heartbeatStatus
+      heartbeatAgeSeconds
+      agentProvisioned
       lastBootstrapRun {
         id
         status
@@ -194,9 +199,7 @@ export const CLUSTER_BOOTSTRAP_RUNS = gql`
 // from the queries module so the type generation picks it up and
 // makes the mutation discoverable from the typed client.
 export const RECORD_CLUSTER_BOOTSTRAP_RUN = gql`
-  mutation RecordClusterBootstrapRun(
-    $input: RecordClusterBootstrapRunInput!
-  ) {
+  mutation RecordClusterBootstrapRun($input: RecordClusterBootstrapRunInput!) {
     recordClusterBootstrapRun(input: $input) {
       ok
       errors {
@@ -322,6 +325,54 @@ export const CLUSTER_HEALTH = gql`
   }
 `;
 
+// Cheap keep-alive liveness snapshot (#808). Reads only persisted
+// heartbeat fields — NO driver / Prometheus / Temporal call — so it
+// returns instantly even when the apiserver is unreachable. This is
+// the query the Status tab hits FIRST to decide whether to render the
+// live cards or the targeted 'cluster offline' empty-state.
+export const CLUSTER_LIVE_STATE = gql`
+  query ClusterLiveState($clusterId: GUID!) {
+    astroliftClusterLiveState(clusterId: $clusterId) {
+      clusterId
+      status
+      lastHeartbeatAt
+      heartbeatAgeSeconds
+      heartbeatIntervalSeconds
+      agentProvisioned
+      nodeCount
+      cpuUtilization
+      memoryUtilization
+      podTotal
+      podsByNamespace
+      ingressIps
+      agentVersion
+    }
+  }
+`;
+
+// Issue (or rotate) the in-cluster keep-alive agent key (#808). Returns
+// the raw scoped key EXACTLY ONCE — the settings UI shows it for the
+// operator to paste into the agent's Secret, then it's unrecoverable.
+export const ISSUE_CLUSTER_AGENT_KEY = gql`
+  mutation IssueClusterAgentKey($input: IssueClusterAgentKeyInput!) {
+    issueClusterAgentKey(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        clusterId
+        agentKey
+        intervalSeconds
+        heartbeatUrl
+        rotated
+      }
+    }
+  }
+`;
+
 // Recent Temporal workflow runs targeting this cluster (#394). Pulled
 // live from Temporal's visibility API; empty when Temporal is
 // disabled or the query fails.
@@ -415,6 +466,30 @@ export const INSTALL_CLUSTER_PREREQS = gql`
   }
 `;
 
+// Deploy the in-cluster keep-alive agent (#873). Applies the agent's
+// Namespace + Deployment via the cluster driver; the agent reads its
+// credentials from the astrolift-agent Secret the operator created from
+// the issueClusterAgentKey snippet. Returns the cluster so the card's
+// agentProvisioned + heartbeatStatus stay consistent.
+export const DEPLOY_CLUSTER_AGENT = gql`
+  mutation DeployClusterAgent($input: DeployClusterAgentInput!) {
+    deployClusterAgent(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        agentProvisioned
+        heartbeatStatus
+      }
+    }
+  }
+`;
+
 export const LIST_PROVIDER_PLUGINS = gql`
   query ListProviderPlugins {
     astroliftProviderPlugins {
@@ -424,6 +499,50 @@ export const LIST_PROVIDER_PLUGINS = gql`
       version
       capabilitiesManifest
       isEnabled
+    }
+  }
+`;
+
+// Driver-sourced region list for the cluster-register dialog's region
+// picker (#860). Keyed by the selected provider plugin slug — AWS goes
+// live via ec2:DescribeRegions (static fallback), GCP/Azure return
+// curated static lists, k8s_native returns []. The dialog layers
+// free-text entry on top so an empty/errored list degrades to the old
+// free-entry behavior.
+export const PROVIDER_REGIONS = gql`
+  query ProviderRegions($providerPluginSlug: String!) {
+    astroliftProviderRegions(providerPluginSlug: $providerPluginSlug) {
+      id
+      label
+      continent
+    }
+  }
+`;
+
+// Cognito user pools reachable in a cluster's region, for the ingress
+// auth-gate picker (#859). Replaces the free-text pool-ARN / domain
+// inputs; selecting a pool auto-fills the domain. AWS-only; non-AWS
+// clusters return []. Degrades to free-entry on driver/credential
+// failure.
+export const COGNITO_USER_POOLS = gql`
+  query CognitoUserPools($clusterId: GUID!) {
+    astroliftCognitoUserPools(clusterId: $clusterId) {
+      poolId
+      poolArn
+      name
+      domain
+      region
+    }
+  }
+`;
+
+// App clients within a selected Cognito user pool (#859). Populates the
+// dependent client picker once a pool is chosen.
+export const COGNITO_USER_POOL_CLIENTS = gql`
+  query CognitoUserPoolClients($clusterId: GUID!, $poolId: String!) {
+    astroliftCognitoUserPoolClients(clusterId: $clusterId, poolId: $poolId) {
+      clientId
+      clientName
     }
   }
 `;
@@ -461,71 +580,12 @@ export const CLUSTER_PROMETHEUS_METRICS = gql`
   }
 `;
 
-// ---- Provider picker queries (#858-#861) ---------------------------
-
-// Cloud regions available to the provider plugin (#860). Drives the region
-// picker in register-cluster-dialog. Returns [] for non-AWS plugins so
-// the caller falls back to free-text.
-export const PROVIDER_REGIONS = gql`
-  query ProviderRegions($pluginSlug: String!) {
-    astroliftProviderRegions(pluginSlug: $pluginSlug) {
-      value
-      label
-    }
-  }
-`;
-
-// ACM certificates visible to the provider plugin (#858). Drives the cert
-// picker in add-managed-domain-dialog. Returns [] on error; fallback to
-// free-text.
-export const PROVIDER_CERTS = gql`
-  query ProviderCerts($pluginSlug: String!, $region: String) {
-    astroliftProviderCerts(pluginSlug: $pluginSlug, region: $region) {
-      arn
-      domain
-      status
-      notAfter
-    }
-  }
-`;
-
-// Cognito user pools visible to the provider plugin (#859). Drives the pool
-// picker in cluster-settings-client instead of free-text ARN/ID entry.
-// Returns [] on error; fallback to free-text.
-export const PROVIDER_COGNITO_POOLS = gql`
-  query ProviderCognitoPools($pluginSlug: String!, $region: String) {
-    astroliftProviderCognitoPools(pluginSlug: $pluginSlug, region: $region) {
-      poolId
-      poolArn
-      name
-      domain
-    }
-  }
-`;
-
-// Route53 / Cloud DNS / Azure DNS hosted zones visible to the provider
-// plugin (#861). Drives the hosted-zone picker in add-managed-domain-dialog.
-// Returns [] on error; fallback to free-text.
-export const PROVIDER_HOSTED_ZONES = gql`
-  query ProviderHostedZones($pluginSlug: String!) {
-    astroliftProviderHostedZones(pluginSlug: $pluginSlug) {
-      zoneId
-      zoneName
-      recordCount
-    }
-  }
-`;
-
 // Prometheus range-query (historical) metrics for the Status tab sparkline
 // charts (#772). Returns one series per golden signal with dense point arrays.
 // rangeSeconds: 3600 (1h) | 21600 (6h) | 86400 (24h)
 // stepSeconds: auto-scaled to ~60-96 points per window.
 export const CLUSTER_PROMETHEUS_RANGE_METRICS = gql`
-  query ClusterPrometheusRangeMetrics(
-    $clusterId: GUID!
-    $rangeSeconds: Int
-    $stepSeconds: Int
-  ) {
+  query ClusterPrometheusRangeMetrics($clusterId: GUID!, $rangeSeconds: Int, $stepSeconds: Int) {
     astroliftClusterPrometheusRangeMetrics(
       clusterId: $clusterId
       rangeSeconds: $rangeSeconds
@@ -544,6 +604,62 @@ export const CLUSTER_PROMETHEUS_RANGE_METRICS = gql`
           ts
           value
         }
+      }
+    }
+  }
+`;
+
+// Certificate picker for the SNI / custom-domain field (#858). Lists
+// the cluster provider's TLS certs (AWS → ACM via the EKS driver) so
+// the operator selects instead of pasting an ARN. `supported` is false
+// for providers without cert listing wired (GCP / Azure / k8s_native)
+// — the UI falls back to a free-text ARN field.
+export const CLUSTER_CERTIFICATES = gql`
+  query ClusterCertificates($clusterId: GUID!) {
+    astroliftClusterCertificates(clusterId: $clusterId) {
+      supported
+      certificates {
+        arn
+        name
+        domainName
+        status
+      }
+    }
+  }
+`;
+
+// DNS hosted-zone picker for the "Add managed domain" dialog (#861).
+// Keyed by the DNS-driver slug (no cluster context at dialog time);
+// selecting a zone auto-fills the dialog's config textarea from the
+// zone's pre-serialized configJson. `supported` is false for drivers
+// without zone discovery wired (cloud_dns / azure_dns today).
+export const DNS_ZONES = gql`
+  query DnsZones($dnsDriver: String!) {
+    astroliftDnsZones(dnsDriver: $dnsDriver) {
+      supported
+      zones {
+        id
+        name
+        private
+        configJson
+      }
+    }
+  }
+`;
+
+// Cert picker for the managed-domain dialog's certificate_arn key
+// (#858). Driver-keyed analog of CLUSTER_CERTIFICATES for the dialog,
+// which has no cluster context; for route53 the certs come from the
+// region-scoped ACM client.
+export const DNS_CERTIFICATES = gql`
+  query DnsCertificates($dnsDriver: String!) {
+    astroliftDnsCertificates(dnsDriver: $dnsDriver) {
+      supported
+      certificates {
+        arn
+        name
+        domainName
+        status
       }
     }
   }

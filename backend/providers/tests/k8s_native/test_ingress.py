@@ -1,4 +1,4 @@
-"""Tests for k8s-native multi-variant IngressDriver (#49 + #8)."""
+"""Tests for k8s-native multi-variant IngressDriver (#49 + #8 + #852)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from k8s_native.ingress import (
     SUPPORTED_VARIANTS,
     K8sIngressConfig,
     K8sIngressDriver,
+    OIDCAuthConfig,
 )
 
 
@@ -223,3 +224,109 @@ def test_delete_attempts_all_variants() -> None:
     kinds = {s["kind"] for s in stubs}
     # All 3 variant kinds attempted
     assert kinds == {"Ingress", "HTTPRoute", "VirtualService"}
+
+
+# ---- OIDC edge auth (#852) ----------------------------------------
+
+
+def test_nginx_oidc_auth_injects_auth_url_annotation() -> None:
+    """When oidc_auth is set, nginx Ingress carries the auth-url annotation."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="nginx_ingress",
+        oidc_auth=OIDCAuthConfig(auth_proxy_host="auth.cluster.example.com"),
+    ))
+    [ing] = driver.render_ingress(
+        app="acme", workload="api",
+        hostnames=["api.acme.example"],
+        tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert annotations["nginx.ingress.kubernetes.io/auth-url"] == (
+        "https://auth.cluster.example.com/oauth2/auth"
+    )
+
+
+def test_nginx_oidc_auth_injects_auth_signin_annotation() -> None:
+    """auth-signin annotation points oauth2-proxy start endpoint with rd param."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="nginx_ingress",
+        oidc_auth=OIDCAuthConfig(auth_proxy_host="auth.cluster.example.com"),
+    ))
+    [ing] = driver.render_ingress(
+        app="a", workload="w", hostnames=["x.example"], tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert annotations["nginx.ingress.kubernetes.io/auth-signin"] == (
+        "https://auth.cluster.example.com/oauth2/start?rd=$escaped_request_uri"
+    )
+
+
+def test_nginx_oidc_auth_injects_response_headers_annotation() -> None:
+    """auth-response-headers annotation carries the configured header list."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="nginx_ingress",
+        oidc_auth=OIDCAuthConfig(auth_proxy_host="auth.cluster.example.com"),
+    ))
+    [ing] = driver.render_ingress(
+        app="a", workload="w", hostnames=["x.example"], tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert "nginx.ingress.kubernetes.io/auth-response-headers" in annotations
+    headers = annotations["nginx.ingress.kubernetes.io/auth-response-headers"].split(",")
+    assert "X-Auth-Request-User" in headers
+    assert "X-Auth-Request-Email" in headers
+
+
+def test_nginx_no_oidc_auth_omits_auth_annotations() -> None:
+    """Without oidc_auth, no nginx auth annotations are emitted."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="nginx_ingress",
+    ))
+    [ing] = driver.render_ingress(
+        app="a", workload="w", hostnames=["x.example"], tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert "nginx.ingress.kubernetes.io/auth-url" not in annotations
+    assert "nginx.ingress.kubernetes.io/auth-signin" not in annotations
+
+
+def test_traefik_oidc_auth_injects_auth_annotations() -> None:
+    """OIDC auth annotations also land on traefik Ingresses (same _render_nginx_style path)."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="traefik",
+        oidc_auth=OIDCAuthConfig(auth_proxy_host="auth.cluster.example.com"),
+    ))
+    [ing] = driver.render_ingress(
+        app="a", workload="w", hostnames=["x.example"], tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert "nginx.ingress.kubernetes.io/auth-url" in annotations
+
+
+def test_kong_oidc_auth_injects_auth_annotations() -> None:
+    """OIDC auth annotations also land on Kong Ingresses."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="kong",
+        oidc_auth=OIDCAuthConfig(auth_proxy_host="auth.cluster.example.com"),
+    ))
+    [ing] = driver.render_ingress(
+        app="a", workload="w", hostnames=["x.example"], tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert "nginx.ingress.kubernetes.io/auth-url" in annotations
+
+
+def test_oidc_auth_custom_response_headers() -> None:
+    """Caller can override the response_headers tuple."""
+    driver = K8sIngressDriver(config=K8sIngressConfig(
+        variant="nginx_ingress",
+        oidc_auth=OIDCAuthConfig(
+            auth_proxy_host="auth.example.com",
+            response_headers=("X-Custom-Header",),
+        ),
+    ))
+    [ing] = driver.render_ingress(
+        app="a", workload="w", hostnames=["x.example"], tls_strategy="letsencrypt",
+    )
+    annotations = ing["metadata"]["annotations"]
+    assert annotations["nginx.ingress.kubernetes.io/auth-response-headers"] == "X-Custom-Header"

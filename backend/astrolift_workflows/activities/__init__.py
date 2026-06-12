@@ -93,6 +93,13 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     finalize_managed_service_deletion,
     mark_managed_service_deprovisioning,
 )
+from astrolift_workflows.activities.migration import (
+    apply_to_target_cluster,
+    drain_source_cluster,
+    poll_rollout_on_target,
+    switch_app_env_binding,
+    validate_migration_target,
+)
 from astrolift_workflows.activities.provision_managed_domain import (
     mark_managed_domain_active,
     poll_cert_issuance,
@@ -100,13 +107,6 @@ from astrolift_workflows.activities.provision_managed_domain import (
     register_managed_domain_row,
     reissue_cert,
     request_wildcard_cert_for_zone,
-)
-from astrolift_workflows.activities.migration import (
-    apply_to_target_cluster,
-    drain_source_cluster,
-    poll_rollout_on_target,
-    switch_app_env_binding,
-    validate_migration_target,
 )
 from astrolift_workflows.activities.scheduled import (
     capture_platform_cost_snapshot,
@@ -130,8 +130,20 @@ from astrolift_workflows.activities.secret_rotation import (
     list_bundles_due_for_refresh,
     refresh_secret_bundle_in_cluster,
 )
+from astrolift_workflows.activities.workflow_stage_activities import (
+    aggregate_fan_out,
+    create_stage_execution,
+    dispatch_agent_for_stage,
+    get_workflow_stages,
+    mark_workflow_run,
+    poll_agent_run_status,
+    record_human_gate_decision,
+    snapshot_checkpoint,
+    update_stage_execution,
+)
 
 __all__ = [
+    "aggregate_fan_out",
     "apply_manifests",
     "build_image",
     "apply_platform_rbac",
@@ -144,6 +156,7 @@ __all__ = [
     "cleanup_cluster_irsa_roles",
     "create_promotion_deployment",
     "create_rollback_deployment",
+    "create_stage_execution",
     "delete_app_namespaces",
     "delete_app_source_webhook",
     "delete_preview_namespace",
@@ -155,6 +168,7 @@ __all__ = [
     "deprovision_app_registry_repo",
     "deprovision_managed_service",
     "detect_drift",
+    "dispatch_agent_for_stage",
     "dispatch_cron_deploys",
     "drain_source_cluster",
     "ensure_cluster_drained",
@@ -163,6 +177,7 @@ __all__ = [
     "fetch_app_build_mode",
     "finalize_managed_service_deletion",
     "gc_stale_previews",
+    "get_workflow_stages",
     "health_check",
     "install_cluster_prereqs",
     "record_cluster_bootstrap_run",
@@ -189,6 +204,8 @@ __all__ = [
     "mark_preview_running",
     "mark_preview_torn_down",
     "mark_running",
+    "mark_workflow_run",
+    "poll_agent_run_status",
     "poll_cert_issuance",
     "poll_rollout",
     "poll_rollout_on_target",
@@ -206,6 +223,7 @@ __all__ = [
     "prune_audit_log",
     "prune_stale_sessions",
     "reconcile_cluster_capabilities",
+    "record_human_gate_decision",
     "refresh_secret_bundle_in_cluster",
     "register_managed_domain_row",
     "reissue_cert",
@@ -216,12 +234,14 @@ __all__ = [
     "revoke_app_deploy_tokens",
     "revoke_app_secret_bundle_refs",
     "run_preflight_job",
+    "snapshot_checkpoint",
     "soft_delete_app_records",
     "switch_app_env_binding",
     "sync_dev_environment_files",
     "teardown_cluster_infra",
     "transition_domain_status",
     "update_secrets",
+    "update_stage_execution",
     "validate_migration_target",
     "verify_reachability",
     "wait_dns",

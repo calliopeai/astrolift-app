@@ -302,6 +302,19 @@ class RegisteredAppType:
     manifest_path: str
     default_branch: str
 
+    # Build configuration. ``build_mode`` is the string value of
+    # ``RegisteredApp.BuildMode`` (``ci_pushed`` / ``platform_build`` /
+    # ``none``) — kept as a plain ``str`` to match the existing
+    # ``source_kind`` / ``trigger_mode`` style on this type. The
+    # ``dockerfile_path`` / ``build_context`` / ``build_args`` trio is
+    # only consumed under ``platform_build`` but always surfaced so the
+    # Settings form can seed every field. ``build_args`` is a flat
+    # string→string map serialised as JSON.
+    build_mode: str
+    dockerfile_path: str
+    build_context: str
+    build_args: JSON
+
     manifest_hash: str
     raw_manifest: str
     raw_manifest_staged: str
@@ -318,6 +331,13 @@ class RegisteredAppType:
     # until provisioning lands the role ARN.
     ecr_repo_uri: str
     ecr_push_role_arn: str
+    # Provider-plugin slug of the app's default tenant cluster
+    # (``aws`` / ``gcp`` / ``azure`` / ``k8s_native``) — #854. Lets the
+    # Settings CI-setup card render provider-correct secret names and a
+    # matching reference workflow instead of the AWS-only hardcode. Empty
+    # string when the app has no default cluster assigned yet (the FK is
+    # nullable until provisioning binds a cluster).
+    provider_plugin_slug: str
     k8s_namespace: str
     subdomain: str
     managed_hostname: str
@@ -756,6 +776,20 @@ def _compute_managed_hostname(app) -> str:
         return ""
 
 
+def _provider_plugin_slug(app) -> str:
+    """Slug of the provider plugin backing the app's default cluster (#854).
+
+    Walks ``default_tenant_cluster -> provider_plugin -> slug``. The
+    cluster FK is nullable (an app may not have a default cluster bound
+    yet), so we return "" when it's unset; ``TenantCluster.provider_plugin``
+    is itself non-null, so once the cluster resolves the slug always does.
+    """
+    cluster = app.default_tenant_cluster if app.default_tenant_cluster_id else None
+    if cluster is None:
+        return ""
+    return cluster.provider_plugin.slug
+
+
 def app_to_type(
     app,
     *,
@@ -797,6 +831,10 @@ def app_to_type(
         source_url=app.source_url,
         manifest_path=app.manifest_path,
         default_branch=app.default_branch,
+        build_mode=app.build_mode,
+        dockerfile_path=app.dockerfile_path or "",
+        build_context=app.build_context or "",
+        build_args=dict(app.build_args or {}),
         manifest_hash=app.manifest_hash,
         raw_manifest=app.manifest_raw or "",
         raw_manifest_staged=app.manifest_raw_staged or "",
@@ -805,6 +843,7 @@ def app_to_type(
         registry_repo_uri=app.registry_repo_uri,
         ecr_repo_uri=app.registry_repo_uri,
         ecr_push_role_arn=app.push_role_ref or "",
+        provider_plugin_slug=_provider_plugin_slug(app),
         k8s_namespace=app.k8s_namespace,
         subdomain=app.subdomain,
         managed_hostname=_compute_managed_hostname(app),

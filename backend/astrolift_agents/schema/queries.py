@@ -1,228 +1,190 @@
-"""Read-only queries for the agent platform.
+"""Read-only queries for the Agent Dispatch Layer.
 
-Skill + ToolDef registry
-------------------------
-* ``skills(agentType?, scaffoldingTag?, includeGlobal?)`` — list the
-  caller's org skills plus the platform-global catalog, newest-edit
-  first. Optional filters narrow by target agent runtime and by a
-  single scaffolding tag.
-* ``skill(slug)`` — a single skill by slug, resolved against the org
-  catalog first and the global catalog second.
+Skills, ToolDefs, Briefs, and AgentTasks are org-scoped; the
+``dispatchers`` resolver is platform-level (the routing fabric spans
+tenants) and is staff/superuser-only.
 
-Both resolvers gate on ``Permission.SKILL_READ`` and carry
-``@tenant_scoped`` so a tenant context is required. ``@tenant_scoped``
-only *asserts* a context exists ([[tenant_scoped_asserts_not_filters]]);
-the actual scoping is the inline ``organization_id`` / ``is_global``
-filter in the resolver body, so global skills (org=None) stay visible
-to every org without leaking one org's private skills to another.
-
-AgentTask
----------
-* ``agentTasks(status?)`` — list org-scoped tasks, most-recently-created
-  first. Optional ``status`` filter narrows by lifecycle state.
-* ``agentTask(id)`` — single task by GUID.
-
-Brief
------
-* ``agentBriefs(status?)`` — list org-scoped briefs, newest first.
-* ``agentBrief(id)`` — single brief by GUID.
-
-AgentEnvironmentSpec
---------------------
-* ``agentEnvironmentSpecs()`` — list active env specs for the org.
-* ``agentEnvironmentSpec(slug)`` — single spec by slug.
+Every resolver carries ``@require_permission`` + ``@tenant_scoped`` per
+the tenancy guardrail. ``@tenant_scoped`` only asserts a tenant context
+exists — it does not filter — so each resolver applies its own org
+``Q`` and rejects an ``org_id`` argument that doesn't match the caller's
+active tenant (a non-superuser may not read another org's rows).
 """
 
 from __future__ import annotations
 
 import strawberry
-from django.db.models import Q
+from graphql import GraphQLError
 from strawberry.types import Info
 
-from astrolift_agents.models import AgentEnvironmentSpec, AgentTask, Brief, Skill
+from astrolift_agents.models import AgentTask, Brief, DispatcherInstance, Skill, ToolDef
 from astrolift_agents.schema.types import (
-    AgentEnvironmentSpecType,
     AgentTaskType,
     BriefType,
+    DispatcherInstanceType,
     SkillType,
-    agent_environment_spec_to_type,
+    ToolDefType,
     agent_task_to_type,
     brief_to_type,
+    dispatcher_to_type,
     skill_to_type,
+    tool_def_to_type,
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
-_LIST_LIMIT = 200
 
+def _caller_org_id(info: Info, org_id: strawberry.ID) -> int:
+    """Resolve the caller's active organization, asserting it matches
+    the requested ``org_id`` GUID.
 
-def _org_or_global(org_id: int) -> Q:
-    """Rows the caller may read: their own org's skills + global ones."""
-    return Q(organization_id=org_id) | Q(is_global=True)
+    ``@tenant_scoped`` guarantees a tenant context exists; this enforces
+    that the explicit ``org_id`` argument refers to that same org so a
+    caller can't read another tenant's rows by passing a foreign GUID.
+    Superusers bypass the match (their tenant context may differ).
+    """
+    tenant = get_current_tenant()
+    org = tenant.organization_id if tenant else None
+    if org is None:
+        raise GraphQLError("no active organization")
+
+    from astrolift_identity.models import Organization
+
+    requested = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
+    if requested is None:
+        raise GraphQLError("organization not found")
+
+    user = getattr(getattr(info.context, "request", None), "user", None)
+    is_super = bool(getattr(user, "is_superuser", False))
+    if requested.pk != org and not is_super:
+        raise GraphQLError("organization mismatch")
+    return requested.pk
 
 
 @strawberry.type
 class AgentsQuery:
     @strawberry.field
-    @require_permission(Permission.SKILL_READ)
+    @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def skills(
-        self,
-        info: Info,
-        agent_type: str | None = None,
-        scaffolding_tag: str | None = None,
-        include_global: bool = True,
+        self, info: Info, org_id: strawberry.ID, is_global: bool = False
     ) -> list[SkillType]:
-        tenant = get_current_tenant()
-        if include_global:
-            scope = _org_or_global(tenant.organization_id)
+        """Org skills plus all global skills.
+
+        ``is_global=True`` narrows to global skills only; otherwise the
+        org's own skills are unioned with the global catalog (both
+        readable by every org).
+        """
+        from django.db.models import Q
+
+        org_pk = _caller_org_id(info, org_id)
+        if is_global:
+            scope = Q(is_global=True)
         else:
-            scope = Q(organization_id=tenant.organization_id)
-        qs = Skill.objects.filter(scope, is_active=True)
-        if agent_type:
-            # "any"/"" skills are runtime-agnostic and always match a
-            # specific-runtime filter so a claude query still surfaces a
-            # shared skill.
-            qs = qs.filter(Q(agent_type=agent_type) | Q(agent_type="") | Q(agent_type="any"))
-        if scaffolding_tag:
-            qs = qs.filter(scaffolding_tags__contains=[scaffolding_tag])
-        qs = qs.prefetch_related("tool_defs").order_by("-updated_at")[:_LIST_LIMIT]
+            scope = Q(organization_id=org_pk) | Q(is_global=True)
+        qs = (
+            Skill.objects.filter(scope, deleted_at__isnull=True)
+            .order_by("-is_global", "slug")[:200]
+        )
         return [skill_to_type(s) for s in qs]
 
     @strawberry.field
-    @require_permission(Permission.SKILL_READ)
+    @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def skill(
-        self,
-        info: Info,
-        slug: str,
-    ) -> SkillType | None:
+    def skill(self, info: Info, id: strawberry.ID) -> SkillType | None:
+        """One skill by GUID, scoped to the caller's org or the global
+        catalog. Foreign-org skills resolve to null (not an error) so
+        the surface doesn't leak existence across tenants."""
+        from django.db.models import Q
+
         tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        row = (
+            Skill.objects.filter(
+                Q(organization_id=org_pk) | Q(is_global=True),
+                guid=str(id),
+                deleted_at__isnull=True,
+            ).first()
+        )
+        return skill_to_type(row) if row is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def tool_defs(self, info: Info, skill_id: strawberry.ID) -> list[ToolDefType]:
+        """ToolDefs attached to ``skill_id``. The parent skill must be
+        readable by the caller's org (or global), else an empty list."""
+        from django.db.models import Q
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
         skill = (
-            Skill.objects.filter(_org_or_global(tenant.organization_id), slug=slug)
-            .prefetch_related("tool_defs")
-            # Prefer the org's own skill over a global of the same slug.
-            .order_by("organization_id")
-            .first()
+            Skill.objects.filter(
+                Q(organization_id=org_pk) | Q(is_global=True),
+                guid=str(skill_id),
+                deleted_at__isnull=True,
+            ).first()
         )
         if skill is None:
-            return None
-        return skill_to_type(skill)
+            return []
+        qs = ToolDef.objects.filter(skill=skill, deleted_at__isnull=True).order_by("slug")[:200]
+        return [tool_def_to_type(t) for t in qs]
 
-    # -----------------------------------------------------------------------
-    # AgentTask queries
-    # -----------------------------------------------------------------------
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
+    def brief(self, info: Info, id: strawberry.ID) -> BriefType | None:
+        """One Brief by GUID, scoped to the caller's org."""
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        row = Brief.objects.filter(
+            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        return brief_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
     def agent_tasks(
-        self,
-        info: Info,
-        status: str | None = None,
-        limit: int = 100,
+        self, info: Info, org_id: strawberry.ID, status: str | None = None
     ) -> list[AgentTaskType]:
-        """List agent tasks for the current org, newest-created first."""
-        tenant = get_current_tenant()
-        qs = AgentTask.objects.filter(
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).order_by("-created_at")
+        """The org's AgentTasks, newest first, optionally filtered by
+        status. An unknown status string yields an empty list rather
+        than an error."""
+        org_pk = _caller_org_id(info, org_id)
+        qs = AgentTask.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
         if status:
             qs = qs.filter(status=status)
-        return [agent_task_to_type(t) for t in qs[: max(1, min(limit, 500))]]
+        qs = qs.order_by("-created_at")[:200]
+        return [agent_task_to_type(t) for t in qs]
 
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
-    def agent_task(
-        self,
-        info: Info,
-        id: str,
-    ) -> AgentTaskType | None:
-        """Single agent task by GUID, scoped to the current org."""
+    def agent_task(self, info: Info, id: strawberry.ID) -> AgentTaskType | None:
+        """One AgentTask by GUID, scoped to the caller's org."""
         tenant = get_current_tenant()
-        task = AgentTask.objects.filter(
-            guid=id,
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
+        org_pk = tenant.organization_id if tenant else None
+        row = AgentTask.objects.filter(
+            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
         ).first()
-        return agent_task_to_type(task) if task else None
-
-    # -----------------------------------------------------------------------
-    # Brief queries
-    # -----------------------------------------------------------------------
+        return agent_task_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.SKILL_READ)
-    @tenant_scoped()
-    def agent_briefs(
-        self,
-        info: Info,
-        status: str | None = None,
-        limit: int = 100,
-    ) -> list[BriefType]:
-        """List briefs for the current org, newest-created first."""
-        tenant = get_current_tenant()
-        qs = Brief.objects.filter(
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).order_by("-created_at")
-        if status:
-            qs = qs.filter(status=status)
-        return [brief_to_type(b) for b in qs[: max(1, min(limit, 500))]]
-
-    @strawberry.field
-    @require_permission(Permission.SKILL_READ)
-    @tenant_scoped()
-    def agent_brief(
-        self,
-        info: Info,
-        id: str,
-    ) -> BriefType | None:
-        """Single brief by GUID, scoped to the current org."""
-        tenant = get_current_tenant()
-        brief = Brief.objects.filter(
-            guid=id,
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).first()
-        return brief_to_type(brief) if brief else None
-
-    # -----------------------------------------------------------------------
-    # AgentEnvironmentSpec queries
-    # -----------------------------------------------------------------------
-
-    @strawberry.field
-    @require_permission(Permission.AGENT_ENV_SPEC_READ)
-    @tenant_scoped()
-    def agent_environment_specs(
-        self,
-        info: Info,
-        limit: int = 100,
-    ) -> list[AgentEnvironmentSpecType]:
-        """List active environment specs for the current org."""
-        tenant = get_current_tenant()
-        qs = AgentEnvironmentSpec.objects.filter(
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).order_by("name")
-        return [agent_environment_spec_to_type(s) for s in qs[: max(1, min(limit, 500))]]
-
-    @strawberry.field
-    @require_permission(Permission.AGENT_ENV_SPEC_READ)
-    @tenant_scoped()
-    def agent_environment_spec(
-        self,
-        info: Info,
-        slug: str,
-    ) -> AgentEnvironmentSpecType | None:
-        """Single environment spec by slug, scoped to the current org."""
-        tenant = get_current_tenant()
-        spec = AgentEnvironmentSpec.objects.filter(
-            slug=slug,
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).first()
-        return agent_environment_spec_to_type(spec) if spec else None
+    def dispatchers(self, info: Info) -> list[DispatcherInstanceType]:
+        # Platform-level routing fabric: DispatcherInstances span tenants
+        # (one per cluster/cloud/region), so this resolver intentionally
+        # escapes @tenant_scoped — same shape as astrolift_provider_plugins.
+        # Staff/superuser only; the api_key_hash is never surfaced (the
+        # type omits it). See EXEMPT entry in test_tenancy_guardrail.py.
+        user = getattr(getattr(info.context, "request", None), "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            raise GraphQLError("authentication required")
+        if not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
+            raise GraphQLError("staff access required")
+        qs = (
+            DispatcherInstance.objects.filter(deleted_at__isnull=True)
+            .order_by("slug")[:200]
+        )
+        return [dispatcher_to_type(d) for d in qs]

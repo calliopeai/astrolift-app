@@ -46,9 +46,24 @@ class TenantClusterType:
     last_management_error: str
     managed_at: dt.datetime | None
     secrets_backend_provisioned_at: dt.datetime | None
-    # Heartbeat / keep-alive fields (#808)
+
+    # ---- Keep-alive agent heartbeat (#808) ----------------------------
     last_heartbeat_at: dt.datetime | None
-    is_live: bool
+    heartbeat_interval_seconds: int
+    heartbeat_status: str
+    """Derived live status — never_seen | connected | degraded | offline.
+    Computed from ``last_heartbeat_at`` + ``heartbeat_interval_seconds``
+    at query time (see ``heartbeat_status`` policy)."""
+
+    heartbeat_age_seconds: float | None
+    """Seconds since the last heartbeat, or null when never seen. Lets
+    the UI render 'last seen X ago' without re-deriving from the
+    timestamp."""
+
+    agent_provisioned: bool
+    """Whether a scoped agent key has been issued for this cluster.
+    Surfaced (not the key itself) so the settings UI can show
+    issue-vs-rotate affordances."""
 
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
@@ -108,6 +123,76 @@ class ManagedDomainType:
     created_at: dt.datetime
 
 
+# ---- Certificate picker (#858) ------------------------------------
+
+
+@strawberry.type(name="AstroliftClusterCertificate")
+class ClusterCertificateType:
+    """One TLS certificate the cluster's (or DNS driver's) provider can
+    offer for an SNI / custom-domain binding (#858).
+
+    ``arn`` is the cloud-native identifier the platform persists on the
+    domain's SNI cert ref / ``dns_config['certificate_arn']`` — an ACM
+    ARN on AWS, a Certificate Manager resource name on GCP, a Key Vault
+    cert id on Azure. ``name`` is a short human label, ``domain_name``
+    the primary subject, ``status`` the cloud-reported issuance state.
+    """
+
+    arn: str
+    name: str
+    domain_name: str
+    status: str
+
+
+@strawberry.type(name="AstroliftClusterCertificates")
+class ClusterCertificatesType:
+    """Cert-picker payload (#858). ``supported`` is ``False`` when the
+    provider has no cert-listing capability wired yet (GCP / Azure /
+    k8s_native, or an unsupported DNS driver) — the UI falls back to a
+    free-text ARN field. ``certificates`` is empty when unsupported, or
+    when supported-but-unreachable (no creds / throttled); the
+    ``supported`` flag lets the UI tell those two cases apart."""
+
+    supported: bool
+    certificates: list[ClusterCertificateType]
+
+
+# ---- DNS hosted-zone picker (#861) --------------------------------
+
+
+@strawberry.type(name="AstroliftDnsZone")
+class DnsZoneType:
+    """One discoverable DNS hosted zone for the managed-domain zone
+    picker (#861).
+
+    ``id`` is the driver-native zone identifier (Route53 hosted-zone
+    id, GCP managed-zone name, Azure zone resource id). ``name`` is the
+    human-readable zone FQDN (``example.com.`` with the trailing dot
+    Route53 returns). ``private`` flags private/internal zones.
+    ``config_json`` is a pre-serialized JSON blob ready to drop into the
+    dialog's DNS-config textarea (e.g. ``{"zone_id": "Z1234ABC",
+    "certificate_arn": ""}``) — the key insight of #861: the backend
+    hands the operator the config shape rather than making them build it.
+    """
+
+    id: str
+    name: str
+    private: bool
+    config_json: str
+
+
+@strawberry.type(name="AstroliftDnsZones")
+class DnsZonesType:
+    """Zone-picker payload (#861). Same ``supported`` semantics as
+    ``ClusterCertificatesType`` — ``False`` for DNS drivers without zone
+    discovery wired (``cloud_dns`` / ``azure_dns`` today), which the UI
+    renders as a disabled picker + "not yet supported" note while
+    leaving the manual textarea editable."""
+
+    supported: bool
+    zones: list[DnsZoneType]
+
+
 @strawberry.type(name="AstroliftProviderPlugin")
 class ProviderPluginType:
     id: GUID
@@ -119,6 +204,21 @@ class ProviderPluginType:
 
 
 def cluster_to_type(cluster) -> TenantClusterType:
+    from django.utils import timezone
+
+    from astrolift_clusters.heartbeat_status import (
+        heartbeat_age_seconds,
+    )
+    from astrolift_clusters.heartbeat_status import (
+        resolve as resolve_heartbeat_status,
+    )
+
+    now = timezone.now()
+    status = resolve_heartbeat_status(
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        interval_seconds=cluster.heartbeat_interval_seconds,
+        now=now,
+    )
     return TenantClusterType(
         id=GUID(str(cluster.guid)),
         slug=cluster.slug,
@@ -139,7 +239,13 @@ def cluster_to_type(cluster) -> TenantClusterType:
         managed_at=cluster.managed_at,
         secrets_backend_provisioned_at=cluster.secrets_backend_provisioned_at,
         last_heartbeat_at=cluster.last_heartbeat_at,
-        is_live=cluster.is_live,
+        heartbeat_interval_seconds=cluster.heartbeat_interval_seconds,
+        heartbeat_status=status.value,
+        heartbeat_age_seconds=heartbeat_age_seconds(
+            last_heartbeat_at=cluster.last_heartbeat_at,
+            now=now,
+        ),
+        agent_provisioned=bool(cluster.agent_key_hash),
     )
 
 
@@ -262,6 +368,57 @@ def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
     )
 
 
+def cluster_live_state_to_type(cluster):
+    """Build the cheap liveness snapshot from a cluster row's persisted
+    heartbeat fields. No cluster API call — pure read of
+    ``last_heartbeat_at`` + ``last_heartbeat_payload``."""
+    from django.utils import timezone
+
+    from astrolift_clusters.heartbeat_status import (
+        heartbeat_age_seconds,
+    )
+    from astrolift_clusters.heartbeat_status import (
+        resolve as resolve_heartbeat_status,
+    )
+
+    now = timezone.now()
+    status = resolve_heartbeat_status(
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        interval_seconds=cluster.heartbeat_interval_seconds,
+        now=now,
+    )
+    payload = cluster.last_heartbeat_payload or {}
+    pods_by_ns = payload.get("pods_by_namespace") or {}
+    pod_total: int | None = None
+    if isinstance(pods_by_ns, dict) and pods_by_ns:
+        try:
+            pod_total = sum(int(v) for v in pods_by_ns.values())
+        except (TypeError, ValueError):
+            pod_total = None
+    ingress_ips = payload.get("ingress_ips") or []
+    if not isinstance(ingress_ips, list):
+        ingress_ips = []
+
+    return ClusterLiveStateType(
+        cluster_id=GUID(str(cluster.guid)),
+        status=status.value,
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        heartbeat_age_seconds=heartbeat_age_seconds(
+            last_heartbeat_at=cluster.last_heartbeat_at,
+            now=now,
+        ),
+        heartbeat_interval_seconds=cluster.heartbeat_interval_seconds,
+        agent_provisioned=bool(cluster.agent_key_hash),
+        node_count=payload.get("node_count"),
+        cpu_utilization=payload.get("cpu_utilization"),
+        memory_utilization=payload.get("memory_utilization"),
+        pod_total=pod_total,
+        pods_by_namespace=pods_by_ns if isinstance(pods_by_ns, dict) else {},
+        ingress_ips=[str(ip) for ip in ingress_ips],
+        agent_version=str(payload.get("agent_version") or ""),
+    )
+
+
 # ---- Cluster lifecycle audit timeline (#68 slice 2) ---------------
 
 
@@ -323,6 +480,41 @@ class ClusterHealthType:
     cluster_id: GUID
     pods: list[PodPhaseSummaryType]
     events: list[ClusterEventType]
+
+
+# ---- Cluster keep-alive live state (#808) -------------------------
+
+
+@strawberry.type(name="AstroliftClusterLiveState")
+class ClusterLiveStateType:
+    """Cheap liveness snapshot from the in-cluster keep-alive agent.
+
+    Unlike every other Status-tab card, this resolver does NO driver /
+    Prometheus / Temporal call — it reads one persisted timestamp +
+    the last heartbeat payload. That's what lets the UI render a status
+    badge (and short-circuit the expensive cards into an offline empty-
+    state) even when the apiserver is unreachable."""
+
+    cluster_id: GUID
+    status: str
+    """never_seen | connected | degraded | offline."""
+
+    last_heartbeat_at: dt.datetime | None
+    heartbeat_age_seconds: float | None
+    heartbeat_interval_seconds: int
+    agent_provisioned: bool
+
+    # Snapshot fields from the most recent heartbeat payload. All
+    # nullable because an older agent version may not report them.
+    node_count: int | None
+    cpu_utilization: float | None
+    memory_utilization: float | None
+    pod_total: int | None
+    """Sum of pod counts across all reported namespaces."""
+
+    pods_by_namespace: JSON
+    ingress_ips: list[str]
+    agent_version: str
 
 
 # ---- Recent cluster workflows (#394) -------------------------------
@@ -438,62 +630,54 @@ class ClusterPrometheusRangeMetricsType:
     series: list[ClusterPrometheusRangeSeriesType]
 
 
-# ---- Provider picker types (#858-#861) ----------------------------
+# ---- Provider region picker (#860) ---------------------------------
 
 
 @strawberry.type(name="AstroliftProviderRegion")
 class ProviderRegionType:
-    """One cloud region available to the configured provider plugin.
-    Used to populate the region picker in register-cluster-dialog
-    instead of a free-text input (#860)."""
+    """One selectable cloud region for the cluster-register dialog
+    (#860). Replaces the free-text region input with a driver-sourced
+    picker."""
 
-    value: str
-    """Cloud-native region identifier (e.g. ``us-west-2``)."""
+    id: str
+    """Wire-form region slug persisted on the cluster row —
+    'us-west-2' / 'us-central1' / 'eastus'."""
+
     label: str
-    """Human-readable display name (e.g. ``US West (Oregon)``)."""
+    """Operator-facing display name — 'US West (Oregon)'. Falls back to
+    the slug when the driver can't map a friendly label."""
+
+    continent: str
+    """Optional grouping for long lists — 'Americas' / 'Europe' /
+    'Asia Pacific' / 'Middle East' / 'Africa'. Empty when unclassified."""
 
 
-@strawberry.type(name="AstroliftProviderCert")
-class ProviderCertType:
-    """One ACM certificate available to the configured provider plugin.
-    Used to populate the certificate ARN picker in add-managed-domain-dialog
-    instead of free-text entry (#858)."""
-
-    arn: str
-    """ACM certificate ARN."""
-    domain: str
-    """Primary domain name on the certificate."""
-    status: str
-    """Certificate status (e.g. ``ISSUED``, ``PENDING_VALIDATION``)."""
-    not_after: str
-    """Expiry timestamp in ISO format, or empty when not yet issued."""
+# ---- Cognito user pool picker (#859) --------------------------------
 
 
-@strawberry.type(name="AstroliftProviderCognitoPool")
-class ProviderCognitoPoolType:
-    """One Cognito user pool available to the configured provider plugin.
-    Used to populate the Cognito picker in cluster-settings-client
-    instead of free-text entry (#859)."""
+@strawberry.type(name="AstroliftCognitoUserPool")
+class CognitoUserPoolType:
+    """One Cognito user pool for the ingress auth-gate picker (#859).
+    Replaces the free-text user-pool-ARN / domain inputs."""
 
     pool_id: str
-    """Cognito user pool ID (e.g. ``us-west-2_XXXXXXXXX``)."""
     pool_arn: str
-    """User pool ARN."""
+    """Composed arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id>
+    — what the ALB authenticate-cognito annotation consumes."""
+
     name: str
-    """User pool display name."""
     domain: str
-    """Cognito hosted domain prefix (without the regional suffix), or empty."""
+    """Cognito-hosted domain prefix (without the
+    .auth.<region>.amazoncognito.com suffix); empty when the pool has no
+    hosted domain. Auto-fills the domain field on pool selection."""
+
+    region: str
 
 
-@strawberry.type(name="AstroliftProviderHostedZone")
-class ProviderHostedZoneType:
-    """One DNS hosted zone available to the configured provider plugin.
-    Used to populate the hosted zone picker in add-managed-domain-dialog
-    instead of free-text entry (#861)."""
+@strawberry.type(name="AstroliftCognitoUserPoolClient")
+class CognitoUserPoolClientType:
+    """One app client within a Cognito user pool (#859). Populates the
+    dependent client picker after a pool is selected."""
 
-    zone_id: str
-    """Provider-specific zone ID (e.g. Route53 ``Z1234…``)."""
-    zone_name: str
-    """DNS zone name (e.g. ``example.com``)."""
-    record_count: int
-    """Approximate record count as reported by the provider; -1 when unknown."""
+    client_id: str
+    client_name: str

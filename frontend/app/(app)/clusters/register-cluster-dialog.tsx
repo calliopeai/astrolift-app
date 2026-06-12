@@ -5,6 +5,14 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,12 +41,8 @@ import type {
   AstroliftProviderPlugin,
   AstroliftTenantCluster,
 } from "@/graphql/clusters/clusters.types";
+import type { ProviderRegionsQuery } from "@/graphql/__generated__/operations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-
-interface ProviderRegion {
-  value: string;
-  label: string;
-}
 
 interface Props {
   open: boolean;
@@ -63,15 +67,6 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
   const [slugTouched, setSlugTouched] = React.useState(false);
   const [pluginSlug, setPluginSlug] = React.useState("");
   const [region, setRegion] = React.useState("");
-
-  const regions = useQuery<{ astroliftProviderRegions: ProviderRegion[] }>(
-    PROVIDER_REGIONS,
-    {
-      variables: { pluginSlug },
-      skip: !pluginSlug,
-    }
-  );
-  const regionOptions = regions.data?.astroliftProviderRegions ?? [];
   const [endpoint, setEndpoint] = React.useState("");
   const [authMethod, setAuthMethod] = React.useState("kubeconfig");
   const [authConfigText, setAuthConfigText] = React.useState("{}");
@@ -204,31 +199,7 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-              {regionOptions.length > 0 ? (
-                <Select value={region} onValueChange={setRegion}>
-                  <SelectTrigger id="region">
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {regionOptions.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>
-                        <span className="font-mono">{r.value}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  id="region"
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value)}
-                  placeholder="us-west-2"
-                  className="font-mono text-xs"
-                />
-              )}
-            </div>
+            <RegionPicker pluginSlug={pluginSlug} value={region} onChange={setRegion} />
           </div>
 
           <div className="space-y-2">
@@ -298,5 +269,91 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+type ProviderRegion = ProviderRegionsQuery["astroliftProviderRegions"][number];
+
+// Region picker for the register dialog (#860). Queries the selected
+// provider's regions and offers them as a searchable combobox while
+// still accepting free-text entry — the typed input value *is* the
+// region, and picking a suggestion just fills the slug. This keeps the
+// old "type any region" escape hatch (cross-account, brand-new, or
+// not-yet-in-our-table regions) working when the live driver list is
+// empty or the query errors.
+//
+// k8s_native has no region concept, so the field is hidden entirely
+// (the backend resolver returns [] for it anyway). The mutation already
+// sends `region: null` when the string is empty, so a hidden field
+// registers a region-less cluster cleanly.
+function RegionPicker({
+  pluginSlug,
+  value,
+  onChange,
+}: {
+  pluginSlug: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { data, loading } = useQuery<ProviderRegionsQuery>(PROVIDER_REGIONS, {
+    variables: { providerPluginSlug: pluginSlug },
+    skip: !pluginSlug || pluginSlug === "k8s_native",
+    // The list rarely changes within a session; cache-first avoids a
+    // refetch every time the operator re-opens the sheet.
+    fetchPolicy: "cache-first",
+  });
+
+  // k8s_native: no region concept — hide the field. Mirrors the
+  // provider-aware auth-gate card that hides AWS-specific controls on
+  // other clouds.
+  if (pluginSlug === "k8s_native") {
+    return null;
+  }
+
+  const regions = data?.astroliftProviderRegions ?? [];
+  const selected = regions.find((r) => r.id === value) ?? null;
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="region">Region</Label>
+      <Combobox<ProviderRegion>
+        items={regions}
+        itemToStringLabel={(r) => r.id}
+        value={selected}
+        onValueChange={(v) => {
+          if (v && typeof v === "object" && "id" in v) {
+            onChange(v.id);
+          }
+        }}
+        inputValue={value}
+        onInputValueChange={(v) => onChange(v ?? "")}
+      >
+        <ComboboxInput
+          id="region"
+          placeholder={loading ? "Loading regions…" : "us-west-2"}
+          className="font-mono text-xs"
+        />
+        <ComboboxContent>
+          <ComboboxEmpty>
+            {value
+              ? `Use "${value}" (not in the list — that's fine)`
+              : "No matching regions — type one in."}
+          </ComboboxEmpty>
+          <ComboboxList>
+            {(item: ProviderRegion) => (
+              <ComboboxItem key={item.id} value={item}>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="truncate font-mono text-xs">{item.id}</span>
+                  <span className="text-muted-foreground truncate text-xs">{item.label}</span>
+                </div>
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      <p className="text-muted-foreground text-xs">
+        Pick a region or type one in. Free-text is accepted for regions not in the list.
+      </p>
+    </div>
   );
 }

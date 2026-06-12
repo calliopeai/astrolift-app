@@ -40,6 +40,7 @@ from astrolift_lifecycle.models import (
     AppEnvironment,
     CustomDomain,
     Deployment,
+    DeploymentLog,
     DeployToken,
     DomainPathRoute,
     DomainRedirectRule,
@@ -1688,12 +1689,30 @@ class LifecycleMutation:
             Deployment.Status.PENDING.value,
             Deployment.Status.DEPLOYING.value,
             Deployment.Status.REDEPLOYING.value,
+            # A failed deploy is abortable too — there's no workflow left
+            # to stop, the operator is just dismissing the record so it
+            # drops off the lists. Handled below by a soft-delete rather
+            # than a state-machine transition (FAILED is terminal in
+            # _TRANSITIONS, so transition_to would reject it).
+            Deployment.Status.FAILED.value,
         }
         if deployment.status not in in_flight:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 f"deployment in status {deployment.status} is not in-flight",
             )
+
+        actor = _actor_from_request(info)
+
+        if deployment.status == Deployment.Status.FAILED.value:
+            # Nothing is running, so skip the Temporal cancellation. Mark
+            # the reason, then soft-delete to dismiss the record (FAILED
+            # is terminal — there's no legal forward transition).
+            with transaction.atomic():
+                deployment.aborted_reason = reason
+                deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
+                deployment.soft_delete()
+            return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
 
         if deployment.workflow_run_id:
             wf_id = deployment.workflow_run.workflow_id  # type: ignore[union-attr]
@@ -1706,7 +1725,68 @@ class LifecycleMutation:
             deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
             deployment.transition_to(Deployment.Status.FAILED)
 
+        return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
+
+    @strawberry.field
+    @mutation_audit(
+        action="deployment.delete",
+        target=_deployment_target_from_input,
+    )
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def delete_deployment(
+        self, info: Info, input: DeploymentByIdInput
+    ) -> MutationResultType[DeploymentType]:
+        """Dismiss / delete a deployment the operator is done with.
+
+        Two shapes, both gated on ``app.deploy`` (same as abort):
+
+        * Terminal rows (``failed`` / ``superseded`` / ``rolled_back``)
+          are soft-deleted so they drop off every list. There is nothing
+          running to tear down.
+        * A ``running`` row is *superseded* (a legal state-machine
+          transition) and a log note is written. We do NOT tear down the
+          k8s resources here — that's a separate teardown workflow; this
+          mutation only retires the record from the active rollout slot.
+        """
+        deployment = (
+            Deployment.objects.select_related("registered_app", "app_environment")
+            .filter(guid=str(input.id), deleted_at__isnull=True)
+            .first()
+        )
+        if deployment is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
+
+        terminal = {
+            Deployment.Status.FAILED.value,
+            Deployment.Status.SUPERSEDED.value,
+            Deployment.Status.ROLLED_BACK.value,
+        }
+        deletable = terminal | {Deployment.Status.RUNNING.value}
+        if deployment.status not in deletable:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"deployment in status {deployment.status} cannot be deleted "
+                "(abort it first if it is still in flight)",
+            )
+
         actor = _actor_from_request(info)
+
+        if deployment.status == Deployment.Status.RUNNING.value:
+            # Retire the active rollout: supersede + leave a paper trail.
+            # No k8s teardown here — that's a dedicated workflow.
+            with transaction.atomic():
+                deployment.transition_to(Deployment.Status.SUPERSEDED)
+                DeploymentLog.objects.create(
+                    deployment=deployment,
+                    status=Deployment.Status.SUPERSEDED.value,
+                    message="superseded via delete_deployment",
+                    by_user_id=actor.user_id,
+                )
+            return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
+
+        # Terminal row — soft-delete so it disappears from the lists.
+        deployment.soft_delete()
         return gql_success(deployment_to_type(deployment, viewer_user_id=actor.user_id))
 
     @strawberry.field

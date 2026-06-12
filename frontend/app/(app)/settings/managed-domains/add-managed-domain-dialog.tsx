@@ -1,10 +1,18 @@
 "use client";
 
-import { useLazyQuery, useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -23,24 +31,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { PROVIDER_CERTS, PROVIDER_HOSTED_ZONES } from "@/graphql/clusters/clusters.queries";
 import { CREATE_MANAGED_DOMAIN } from "@/graphql/clusters/managed-domains.mutations";
+import {
+  DNS_CERTIFICATES,
+  DNS_ZONES,
+} from "@/graphql/clusters/clusters.queries";
 import { LIST_MANAGED_DOMAINS } from "@/graphql/clusters/managed-domains.queries";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
+import type {
+  DnsCertificatesQuery,
+  DnsZonesQuery,
+} from "@/graphql/__generated__/operations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-
-interface ProviderCert {
-  arn: string;
-  domain: string;
-  status: string;
-  notAfter: string;
-}
-
-interface ProviderHostedZone {
-  zoneId: string;
-  zoneName: string;
-  recordCount: number;
-}
 
 interface Props {
   open: boolean;
@@ -55,6 +57,21 @@ const DRIVER_OPTIONS: { value: DnsDriver; label: string }[] = [
   { value: "cloud_dns", label: "Google Cloud DNS" },
   { value: "azure_dns", label: "Azure DNS" },
 ];
+
+const DNS_CONFIG_META: Record<DnsDriver, { placeholder: string; hint: string }> = {
+  route53: {
+    placeholder: '{"zone_id": "Z1234567890ABCDEF", "certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/..."}',
+    hint: "Route 53 hosted zone ID and optional ACM certificate ARN. Empty is fine — the driver will discover what it can.",
+  },
+  cloud_dns: {
+    placeholder: '{"project": "my-gcp-project", "managed_zone": "my-zone-name"}',
+    hint: "GCP project ID and Cloud DNS managed zone name. Empty is fine — the driver will discover what it can.",
+  },
+  azure_dns: {
+    placeholder: '{"resource_group": "my-resource-group", "zone_name": "example.com"}',
+    hint: "Azure resource group and DNS zone name. Empty is fine — the driver will discover what it can.",
+  },
+};
 
 const DEFAULT_FOR_OPTIONS: { value: DefaultFor; label: string }[] = [
   { value: "both", label: "Both" },
@@ -73,32 +90,6 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
-  // Picker state for route53 driver (#858, #861).
-  const [pickedZoneId, setPickedZoneId] = React.useState("");
-  const [pickedCertArn, setPickedCertArn] = React.useState("");
-
-  const [fetchHostedZones, hostedZonesResult] = useLazyQuery<{
-    astroliftProviderHostedZones: ProviderHostedZone[];
-  }>(PROVIDER_HOSTED_ZONES);
-
-  const [fetchCerts, certsResult] = useLazyQuery<{
-    astroliftProviderCerts: ProviderCert[];
-  }>(PROVIDER_CERTS);
-
-  // When driver flips to route53 and the dialog is open, fetch picker data.
-  React.useEffect(() => {
-    if (!open) return;
-    if (dnsDriver === "route53") {
-      fetchHostedZones({ variables: { pluginSlug: "aws" } });
-      fetchCerts({ variables: { pluginSlug: "aws" } });
-    }
-  }, [open, dnsDriver, fetchHostedZones, fetchCerts]);
-
-  const hostedZones = hostedZonesResult.data?.astroliftProviderHostedZones ?? [];
-  const certs = certsResult.data?.astroliftProviderCerts ?? [];
-  // Only show ISSUED certs in the picker; others go in the fallback textarea.
-  const issuedCerts = certs.filter((c) => c.status === "ISSUED");
-
   React.useEffect(() => {
     if (!open) {
       setZone("");
@@ -109,8 +100,6 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
       setOrgScoped(false);
       setJsonError(null);
       setSubmitError(null);
-      setPickedZoneId("");
-      setPickedCertArn("");
     }
   }, [open]);
 
@@ -121,41 +110,78 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
     awaitRefetchQueries: true,
   });
 
+  // #861 — hosted-zone discovery, keyed by the selected DNS driver.
+  // Re-fetches automatically when the driver dropdown changes (the
+  // variables change). `supported=false` for drivers without zone
+  // discovery wired (cloud_dns / azure_dns today) → the picker is
+  // hidden and the textarea stays the manual fallback.
+  const zonesQuery = useQuery<DnsZonesQuery>(DNS_ZONES, {
+    variables: { dnsDriver },
+    skip: !open,
+    fetchPolicy: "cache-and-network",
+  });
+  const zonesPayload = zonesQuery.data?.astroliftDnsZones;
+  const zones = zonesPayload?.zones ?? [];
+  const zonesSupported = zonesPayload?.supported ?? false;
+
+  // #858 — cert discovery for the certificate_arn key. Only route53
+  // surfaces certs today (ACM via ambient creds); selecting one merges
+  // it into the dnsConfig JSON without disturbing the operator's other
+  // keys.
+  const certsQuery = useQuery<DnsCertificatesQuery>(DNS_CERTIFICATES, {
+    variables: { dnsDriver },
+    skip: !open,
+    fetchPolicy: "cache-and-network",
+  });
+  const certsPayload = certsQuery.data?.astroliftDnsCertificates;
+  const certs = certsPayload?.certificates ?? [];
+  const certsSupported = certsPayload?.supported ?? false;
+
+  // Merge a chosen certificate ARN into the current DNS-config JSON.
+  // Parses what the operator currently has (defaulting to an empty
+  // object), sets certificate_arn, and re-serializes — so picking a
+  // cert never clobbers a hand-typed zone_id or other keys. If the
+  // current text isn't valid JSON we surface the parse error rather
+  // than silently overwriting their edits.
+  function applyCertArn(arn: string) {
+    setJsonError(null);
+    let base: Record<string, unknown> = {};
+    const trimmed = dnsConfig.trim();
+    if (trimmed.length > 0) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          base = parsed as Record<string, unknown>;
+        }
+      } catch {
+        setJsonError("Fix the DNS config JSON before applying a certificate.");
+        return;
+      }
+    }
+    base.certificate_arn = arn;
+    setDnsConfig(JSON.stringify(base, null, 2));
+  }
+
+  function certLabel(c: { name: string; domainName: string; status: string }): string {
+    const label = c.domainName || c.name;
+    return c.status && c.status !== "ISSUED" ? `${label} · ${c.status}` : label;
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setJsonError(null);
     setSubmitError(null);
 
-    // For route53, merge picker selections into the config object.
+    const trimmedConfig = dnsConfig.trim();
     let parsedConfig: unknown = null;
-    if (dnsDriver === "route53" && (pickedZoneId || pickedCertArn)) {
-      const pickerConfig: Record<string, string> = {};
-      if (pickedZoneId) pickerConfig.zone_id = pickedZoneId;
-      if (pickedCertArn) pickerConfig.certificate_arn = pickedCertArn;
-      // Merge with any manual JSON the operator also typed.
-      const trimmedManual = dnsConfig.trim();
-      if (trimmedManual.length > 0) {
-        try {
-          const manualParsed = JSON.parse(trimmedManual) as Record<string, unknown>;
-          parsedConfig = { ...manualParsed, ...pickerConfig };
-        } catch (err) {
-          setJsonError(err instanceof Error ? err.message : "DNS config is not valid JSON");
-          return;
-        }
-      } else {
-        parsedConfig = pickerConfig;
-      }
-    } else {
-      const trimmedConfig = dnsConfig.trim();
-      if (trimmedConfig.length > 0) {
-        try {
-          parsedConfig = JSON.parse(trimmedConfig);
-        } catch (err) {
-          setJsonError(
-            err instanceof Error ? err.message : "DNS config is not valid JSON"
-          );
-          return;
-        }
+    if (trimmedConfig.length > 0) {
+      try {
+        parsedConfig = JSON.parse(trimmedConfig);
+      } catch (err) {
+        setJsonError(
+          err instanceof Error ? err.message : "DNS config is not valid JSON"
+        );
+        return;
       }
     }
 
@@ -283,96 +309,128 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
             </span>
           </label>
 
-          {dnsDriver === "route53" ? (
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="hosted-zone">Hosted zone</Label>
-                {hostedZones.length > 0 ? (
-                  <Select value={pickedZoneId} onValueChange={(v) => {
-                    setPickedZoneId(v);
-                    // Auto-fill the zone name field when the operator picks a zone.
-                    const picked = hostedZones.find((z) => z.zoneId === v);
-                    if (picked && !zone) setZone(picked.zoneName);
-                  }}>
-                    <SelectTrigger id="hosted-zone">
-                      <SelectValue placeholder="Select hosted zone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hostedZones.map((z) => (
-                        <SelectItem key={z.zoneId} value={z.zoneId}>
-                          <span className="font-mono">{z.zoneName}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">{z.zoneId}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-muted-foreground text-xs">
-                    No hosted zones found — enter the zone ID in the config below.
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cert-arn">ACM certificate (optional)</Label>
-                {issuedCerts.length > 0 ? (
-                  <Select value={pickedCertArn} onValueChange={setPickedCertArn}>
-                    <SelectTrigger id="cert-arn">
-                      <SelectValue placeholder="Select certificate" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {issuedCerts.map((c) => (
-                        <SelectItem key={c.arn} value={c.arn}>
-                          <span className="font-mono">{c.domain}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">
-                            {c.notAfter ? `expires ${c.notAfter.slice(0, 10)}` : ""}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-muted-foreground text-xs">
-                    No ISSUED certificates found — leave blank or enter a cert ARN in the config below.
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dns-config">Additional config (JSON, optional)</Label>
-                <Textarea
-                  id="dns-config"
-                  value={dnsConfig}
-                  onChange={(e) => setDnsConfig(e.target.value)}
-                  rows={3}
-                  placeholder='{"zone_id": "...", "certificate_arn": "..."}'
-                  className="font-mono text-xs"
-                />
-                {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
-                <p className="text-muted-foreground text-[11px]">
-                  Override or add extra keys. Picker selections above take precedence over the same keys here.
-                </p>
-              </div>
-            </div>
-          ) : (
+          {/* #861 — hosted-zone picker. Selecting a zone auto-fills the
+              config textarea below from the zone's pre-serialized
+              configJson; the operator can still edit it afterward.
+              Shown only when the driver supports zone discovery. */}
+          {zonesSupported && (
             <div className="space-y-2">
-              <Label htmlFor="dns-config">DNS config (JSON, optional)</Label>
-              <Textarea
-                id="dns-config"
-                value={dnsConfig}
-                onChange={(e) => setDnsConfig(e.target.value)}
-                rows={4}
-                placeholder={'{"zone_id": "...", "certificate_arn": "..."}'}
-                className="font-mono text-xs"
-              />
-              {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
+              <Label htmlFor="dns-zone">Hosted zone</Label>
+              <Combobox
+                items={zones}
+                itemToStringLabel={(z) => (z as { name: string }).name}
+                onValueChange={(v) => {
+                  if (v && typeof v === "object" && "configJson" in v) {
+                    setJsonError(null);
+                    setDnsConfig((v as { configJson: string }).configJson);
+                  }
+                }}
+              >
+                <ComboboxInput
+                  id="dns-zone"
+                  placeholder={
+                    zonesQuery.loading && zones.length === 0
+                      ? "Loading zones…"
+                      : `Search ${zones.length} zone${zones.length === 1 ? "" : "s"}…`
+                  }
+                />
+                <ComboboxContent>
+                  <ComboboxEmpty>No matching zones.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(item) => {
+                      const z = item as {
+                        id: string;
+                        name: string;
+                        private: boolean;
+                      };
+                      return (
+                        <ComboboxItem key={z.id} value={z}>
+                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span className="truncate font-mono text-xs">{z.name}</span>
+                            <span className="text-muted-foreground text-[10px]">
+                              {z.id}
+                              {z.private ? " · private" : ""}
+                            </span>
+                          </div>
+                        </ComboboxItem>
+                      );
+                    }}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
               <p className="text-muted-foreground text-[11px]">
-                Driver-specific identifiers (hosted zone ID, ACM cert ARN, GCP
-                project, etc.). Empty is fine — the driver will discover what
-                it can.
+                Pick a discovered zone to pre-fill the config below, or skip
+                and enter it by hand.
               </p>
             </div>
           )}
+
+          {/* #858 — certificate picker. Fills the certificate_arn key in
+              the config JSON below without disturbing other keys. Shown
+              only when the driver can list certs (route53 → ACM). */}
+          {certsSupported && certs.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="dns-cert">Certificate (optional)</Label>
+              <Combobox
+                items={certs}
+                itemToStringLabel={(c) =>
+                  certLabel(c as { name: string; domainName: string; status: string })
+                }
+                onValueChange={(v) => {
+                  if (v && typeof v === "object" && "arn" in v) {
+                    applyCertArn((v as { arn: string }).arn);
+                  }
+                }}
+              >
+                <ComboboxInput
+                  id="dns-cert"
+                  placeholder={`Search ${certs.length} certificate${certs.length === 1 ? "" : "s"}…`}
+                />
+                <ComboboxContent>
+                  <ComboboxEmpty>No matching certificates.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(item) => {
+                      const c = item as {
+                        arn: string;
+                        name: string;
+                        domainName: string;
+                        status: string;
+                      };
+                      return (
+                        <ComboboxItem key={c.arn} value={c}>
+                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span className="truncate text-xs">{c.domainName || c.name}</span>
+                            <span className="text-muted-foreground truncate font-mono text-[10px]">
+                              {c.arn}
+                            </span>
+                          </div>
+                        </ComboboxItem>
+                      );
+                    }}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+              <p className="text-muted-foreground text-[11px]">
+                Sets <code className="font-mono">certificate_arn</code> in the config below.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="dns-config">DNS config (JSON, optional)</Label>
+            <Textarea
+              id="dns-config"
+              value={dnsConfig}
+              onChange={(e) => setDnsConfig(e.target.value)}
+              rows={4}
+              placeholder={DNS_CONFIG_META[dnsDriver].placeholder}
+              className="font-mono text-xs"
+            />
+            {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
+            <p className="text-muted-foreground text-[11px]">
+              {DNS_CONFIG_META[dnsDriver].hint}
+            </p>
+          </div>
 
           {submitError && (
             <p className="text-destructive text-sm">{submitError}</p>

@@ -48,7 +48,7 @@ export default function LogsPage() {
               <p className="font-semibold">Per-app log streaming (available now)</p>
               <p className="text-muted-foreground mt-1 text-sm">
                 Live log tailing and in-browser shell access are already available
-                from each app's <strong>Console</strong> tab. Navigate to any app
+                from each app&apos;s <strong>Console</strong> tab. Navigate to any app
                 and open the Console tab to start streaming.
               </p>
             </div>

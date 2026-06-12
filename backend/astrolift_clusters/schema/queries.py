@@ -8,29 +8,33 @@ from strawberry.types import Info
 from astrolift_clusters.models import (
     ManagedDomain,
     ProviderPlugin,
-    ProviderPluginConfig,
     TenantCluster,
 )
 from astrolift_clusters.schema.types import (
     BootstrapPlanType,
+    ClusterCertificatesType,
+    ClusterCertificateType,
     ClusterEventType,
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
+    ClusterLiveStateType,
     ClusterPrometheusMetricsType,
     ClusterPrometheusRangeMetricsType,
     ClusterPrometheusRangePointType,
     ClusterPrometheusRangeSeriesType,
     ClusterWorkflowRunType,
     ClusterWorkloadHealthType,
+    CognitoUserPoolClientType,
+    CognitoUserPoolType,
+    DnsZonesType,
+    DnsZoneType,
     ManagedDomainType,
     PodPhaseSummaryType,
-    ProviderCertType,
-    ProviderCognitoPoolType,
-    ProviderHostedZoneType,
     ProviderPluginType,
     ProviderRegionType,
     TenantClusterType,
     bootstrap_plan_to_type,
+    cluster_live_state_to_type,
     cluster_to_type,
     domain_to_type,
     plugin_to_type,
@@ -107,6 +111,44 @@ class ClustersQuery:
     @strawberry.field
     @require_permission(Permission.CLUSTER_REGISTER)
     @tenant_scoped()
+    def astrolift_provider_regions(
+        self,
+        info: Info,
+        provider_plugin_slug: str,
+    ) -> list[ProviderRegionType]:
+        """Selectable cloud regions for ``provider_plugin_slug`` (#860).
+
+        Backs the region picker on the cluster-register dialog. Called
+        with the plugin slug alone (no cluster row exists yet — the
+        operator is mid-register), so the dispatch builds the driver
+        from a minimal bootstrap config and calls its ``list_regions``.
+        AWS goes live (``ec2:DescribeRegions``, with its own static
+        fallback); GCP / Azure return curated static lists;
+        ``k8s_native`` has no region concept and returns an empty list
+        (the UI hides the field).
+
+        Driver-resolution failure (plugin not loaded) yields an empty
+        list rather than an error — the frontend keeps free-text entry
+        layered on top of the picker, so an empty list degrades to the
+        old free-entry behavior instead of blocking registration.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            provider_regions_dispatch,
+        )
+
+        try:
+            rows = provider_regions_dispatch(provider_plugin_slug=provider_plugin_slug)
+        except ClusterManagementError:
+            return []
+        return [
+            ProviderRegionType(id=r["id"], label=r["label"], continent=r["continent"])
+            for r in rows
+        ]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
     def astrolift_cluster_lifecycle_audit(
         self,
         info: Info,
@@ -158,6 +200,7 @@ class ClustersQuery:
                 "DecommissionCluster",
                 "InstallClusterPrereqs",
                 "RecordClusterBootstrapRun",
+                "IssueClusterAgentKey",
                 "CreateManagedDomain",
                 "UpdateManagedDomain",
                 "SoftDeleteManagedDomain",
@@ -327,6 +370,131 @@ class ClustersQuery:
                 for e in payload["events"]
             ],
         )
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_live_state(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> ClusterLiveStateType | None:
+        """Cheap keep-alive liveness snapshot for ``cluster_id`` (#808).
+
+        Reads only the persisted heartbeat fields — NO driver /
+        Prometheus / Temporal call — so it returns instantly even when
+        the apiserver is unreachable. This is the resolver the UI hits
+        first to decide whether to render the live cards or the targeted
+        'cluster offline' empty-state. Returns ``None`` when the cluster
+        row is missing or is outside the caller's tenant scope.
+        """
+        from django.db.models import Q
+
+        tenant = get_current_tenant()
+        # Platform-level clusters (organization=None) are visible to all
+        # orgs; org-scoped clusters only to their own org. Same scope
+        # filter as astrolift_cluster_count — a caller must never read
+        # the live state of a cluster in another tenant.
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return None
+        return cluster_live_state_to_type(cluster)
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_UPDATE)
+    @tenant_scoped()
+    def astrolift_cognito_user_pools(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> list[CognitoUserPoolType]:
+        """Cognito user pools reachable in ``cluster_id``'s region (#859).
+
+        Backs the user-pool picker in the ingress auth-gate card,
+        replacing the free-text pool-ARN / domain inputs. Gated on
+        ``cluster.update`` — the same permission the auth-gate save
+        path requires — so the picker is only offered to operators who
+        can actually persist the resulting config.
+
+        Calls the driver's ``list_cognito_user_pools``
+        (``cognito-idp:ListUserPools`` + per-pool DescribeUserPool for
+        the hosted domain) using the cluster's IAM role (the ambient
+        credential chain, same path the provisioner uses). AWS-only;
+        non-AWS clusters return an empty list. Missing / soft-deleted
+        cluster or any driver / credential failure yields an empty list
+        so the picker degrades to free-entry rather than erroring the
+        card.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cognito_user_pools_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return []
+        try:
+            rows = cognito_user_pools_dispatch(cluster=cluster)
+        except ClusterManagementError:
+            return []
+        return [
+            CognitoUserPoolType(
+                pool_id=r["pool_id"],
+                pool_arn=r["pool_arn"],
+                name=r["name"],
+                domain=r["domain"],
+                region=r["region"],
+            )
+            for r in rows
+        ]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_UPDATE)
+    @tenant_scoped()
+    def astrolift_cognito_user_pool_clients(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        pool_id: str,
+    ) -> list[CognitoUserPoolClientType]:
+        """App clients within Cognito user pool ``pool_id`` on
+        ``cluster_id`` (#859).
+
+        Populates the dependent client picker after the operator picks
+        a pool. Same permission gate, credential path, and
+        degrade-to-empty contract as ``astroliftCognitoUserPools``.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cognito_user_pool_clients_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return []
+        try:
+            rows = cognito_user_pool_clients_dispatch(cluster=cluster, pool_id=pool_id)
+        except ClusterManagementError:
+            return []
+        return [
+            CognitoUserPoolClientType(
+                client_id=r["client_id"],
+                client_name=r["client_name"],
+            )
+            for r in rows
+        ]
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_MANAGE)
@@ -764,216 +932,135 @@ class ClustersQuery:
             for row in rows
         ]
 
-    # ---- Provider picker queries (#858-#861) -----------------------
-
-    def _get_aws_plugin_config(self, plugin_slug: str) -> dict:
-        """Return the AWS ProviderPluginConfig.config dict for ``plugin_slug``.
-
-        Looks up org-scoped first, then platform-level. Returns ``{}``
-        when no config is present so callers can safely do
-        ``cfg.get("region", "us-east-1")`` without extra guard code.
-        """
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        qs = ProviderPluginConfig.objects.filter(provider_plugin__slug=plugin_slug)
-        if org_id:
-            cfg = qs.filter(organization_id=org_id).first()
-            if cfg:
-                return cfg.config or {}
-        cfg = qs.filter(organization_id__isnull=True).first()
-        return cfg.config if cfg else {}
-
     @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
-    def astrolift_provider_regions(
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def astrolift_cluster_certificates(
         self,
         info: Info,
-        plugin_slug: str,
-    ) -> list[ProviderRegionType]:
-        """Enumerate regions available to the provider plugin (#860).
+        cluster_id: GUID,
+    ) -> ClusterCertificatesType:
+        """TLS certificates the cluster's provider can offer for an SNI /
+        custom-domain binding (#858).
 
-        AWS: synthesises the region list from the ec2 ``describe_regions``
-        API using the credentials implied by the plugin's config. Returns
-        a hard-coded well-known list on error so the field never blocks
-        the form.
+        Backs the cert picker on the app Domains page: rather than make
+        the operator paste an ACM ARN, the picker offers the certs the
+        platform's IAM role can already see. Gated on ``APP_DEPLOY``
+        (not ``CLUSTER_REGISTER``) because the natural caller is the app
+        author configuring a domain, mirroring the page's other
+        domain-mutation gates.
 
-        Other providers: returns an empty list (caller falls back to
-        free-text).
+        For AWS the certs come from ACM via the EKS driver. GCP / Azure
+        / k8s_native return ``supported=False`` (empty list) until their
+        cert APIs land — the UI falls back to a free-text ARN field.
+        Missing / soft-deleted clusters and driver-resolution failures
+        also yield ``supported=False`` rather than erroring, so the form
+        degrades gracefully.
         """
-        if plugin_slug != "aws":
-            return []
-        cfg = self._get_aws_plugin_config(plugin_slug)
-        region = cfg.get("region", "us-east-1")
-        try:
-            import boto3
+        from core.cluster_management import (
+            ClusterManagementError,
+            cluster_certificates_dispatch,
+        )
 
-            ec2 = boto3.client("ec2", region_name=region)
-            resp = ec2.describe_regions(AllRegions=False)
-            rows = resp.get("Regions", []) or []
-            return [
-                ProviderRegionType(
-                    value=r["RegionName"],
-                    label=r["RegionName"],
-                )
-                for r in sorted(rows, key=lambda r: r["RegionName"])
-            ]
-        except Exception:  # noqa: BLE001
-            log.warning("astrolift_provider_regions: ec2.describe_regions failed for plugin=%s", plugin_slug)
-            return []
-
-    @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
-    def astrolift_provider_certs(
-        self,
-        info: Info,
-        plugin_slug: str,
-        region: str | None = None,
-    ) -> list[ProviderCertType]:
-        """List ACM certificates visible to the provider plugin (#858).
-
-        Iterates ACM's paginated ``list_certificates`` + fetches each
-        cert's ``NotAfter`` and ``Status`` via ``describe_certificate``.
-        Returns ``[]`` on any error so the caller falls back to
-        free-text entry. Region is the cluster's region when given;
-        falls back to the plugin config's region.
-        """
-        if plugin_slug != "aws":
-            return []
-        cfg = self._get_aws_plugin_config(plugin_slug)
-        effective_region = region or cfg.get("region", "us-east-1")
-        try:
-            import boto3
-
-            acm = boto3.client("acm", region_name=effective_region)
-            paginator = acm.get_paginator("list_certificates")
-            ids: list[str] = []
-            for page in paginator.paginate():
-                for summary in page.get("CertificateSummaryList", []) or []:
-                    ids.append(summary["CertificateArn"])
-
-            out: list[ProviderCertType] = []
-            for arn in ids:
-                try:
-                    detail = acm.describe_certificate(CertificateArn=arn)
-                except Exception:  # noqa: BLE001
-                    continue
-                cert = detail.get("Certificate", {})
-                not_after = cert.get("NotAfter")
-                not_after_str = not_after.isoformat() if hasattr(not_after, "isoformat") else (str(not_after) if not_after else "")
-                out.append(
-                    ProviderCertType(
-                        arn=arn,
-                        domain=cert.get("DomainName", ""),
-                        status=cert.get("Status", ""),
-                        not_after=not_after_str,
-                    )
-                )
-            return out
-        except Exception:  # noqa: BLE001
-            log.warning("astrolift_provider_certs: acm.list_certificates failed for plugin=%s region=%s", plugin_slug, effective_region)
-            return []
-
-    @strawberry.field
-    @require_permission(Permission.CLUSTER_REGISTER)
-    def astrolift_provider_cognito_pools(
-        self,
-        info: Info,
-        plugin_slug: str,
-        region: str | None = None,
-    ) -> list[ProviderCognitoPoolType]:
-        """List Cognito user pools visible to the provider plugin (#859).
-
-        Paginates ``cognito-idp.list_user_pools`` (max 60 per page) and
-        fetches the pool ARN via ``describe_user_pool``. Returns ``[]``
-        on any error; the caller falls back to free-text.
-        """
-        if plugin_slug != "aws":
-            return []
-        cfg = self._get_aws_plugin_config(plugin_slug)
-        effective_region = region or cfg.get("region", "us-east-1")
-        try:
-            import boto3
-
-            idp = boto3.client("cognito-idp", region_name=effective_region)
-            pools: list[dict] = []
-            next_token: str | None = None
-            while True:
-                kwargs: dict = {"MaxResults": 60}
-                if next_token:
-                    kwargs["NextToken"] = next_token
-                resp = idp.list_user_pools(**kwargs)
-                pools.extend(resp.get("UserPools", []) or [])
-                next_token = resp.get("NextToken")
-                if not next_token:
-                    break
-
-            out: list[ProviderCognitoPoolType] = []
-            for pool in pools:
-                pool_id: str = pool.get("Id", "")
-                try:
-                    detail = idp.describe_user_pool(UserPoolId=pool_id)
-                except Exception:  # noqa: BLE001
-                    # If describe fails, surface what list gave us (no ARN).
-                    out.append(
-                        ProviderCognitoPoolType(
-                            pool_id=pool_id,
-                            pool_arn="",
-                            name=pool.get("Name", ""),
-                            domain="",
-                        )
-                    )
-                    continue
-                up = detail.get("UserPool", {})
-                out.append(
-                    ProviderCognitoPoolType(
-                        pool_id=pool_id,
-                        pool_arn=up.get("Arn", ""),
-                        name=up.get("Name", pool.get("Name", "")),
-                        domain=up.get("Domain", ""),
-                    )
-                )
-            return out
-        except Exception:  # noqa: BLE001
-            log.warning(
-                "astrolift_provider_cognito_pools: cognito-idp.list_user_pools failed for plugin=%s region=%s",
-                plugin_slug,
-                effective_region,
+        cluster = (
+            TenantCluster.objects.filter(
+                guid=str(cluster_id),
+                deleted_at__isnull=True,
             )
-            return []
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return ClusterCertificatesType(supported=False, certificates=[])
+        try:
+            payload = cluster_certificates_dispatch(cluster=cluster)
+        except ClusterManagementError:
+            # Driver implements the method but the cloud call blew up
+            # (no creds / throttled). The capability exists, so keep
+            # supported=True with an empty list — the picker shows an
+            # empty state rather than silently reverting to manual entry.
+            return ClusterCertificatesType(supported=True, certificates=[])
+        return ClusterCertificatesType(
+            supported=bool(payload["supported"]),
+            certificates=[
+                ClusterCertificateType(
+                    arn=c["arn"],
+                    name=c["name"],
+                    domain_name=c["domain_name"],
+                    status=c["status"],
+                )
+                for c in payload["certificates"]
+            ],
+        )
 
     @strawberry.field
     @require_permission(Permission.PROVIDER_PLUGIN_READ)
-    def astrolift_provider_hosted_zones(
+    @tenant_scoped()
+    def astrolift_dns_zones(
         self,
         info: Info,
-        plugin_slug: str,
-    ) -> list[ProviderHostedZoneType]:
-        """List DNS hosted zones visible to the provider plugin (#861).
+        dns_driver: str,
+    ) -> DnsZonesType:
+        """Discoverable DNS hosted zones for ``dns_driver`` (#861).
 
-        AWS: paginates Route53 ``list_hosted_zones``. Returns ``[]``
-        on any error; the caller falls back to free-text.
+        Backs the zone picker on the "Add managed domain" dialog —
+        selecting a zone auto-fills the dialog's DNS-config textarea
+        from the zone's pre-serialized ``config_json``. Keyed by the
+        DNS-driver slug (``route53`` / ``cloud_dns`` / ``azure_dns``)
+        rather than a cluster, because the dialog runs before any
+        cluster is in the loop; route53 lists hosted zones through the
+        platform's ambient AWS credentials.
+
+        Gated on ``PROVIDER_PLUGIN_READ`` to match the managed-domains
+        admin surface. ``cloud_dns`` / ``azure_dns`` return
+        ``supported=False`` until their list APIs land — the UI disables
+        the picker and leaves the textarea editable for manual entry.
         """
-        if plugin_slug != "aws":
-            return []
-        cfg = self._get_aws_plugin_config(plugin_slug)
-        region = cfg.get("region", "us-east-1")
-        try:
-            import boto3
+        from core.dns_discovery import dns_zones_dispatch
 
-            r53 = boto3.client("route53", region_name=region)
-            zones: list[dict] = []
-            paginator = r53.get_paginator("list_hosted_zones")
-            for page in paginator.paginate():
-                zones.extend(page.get("HostedZones", []) or [])
-
-            return [
-                ProviderHostedZoneType(
-                    zone_id=z["Id"].rsplit("/", 1)[-1],
-                    zone_name=z.get("Name", "").rstrip("."),
-                    record_count=int(z.get("ResourceRecordSetCount", -1)),
+        payload = dns_zones_dispatch(dns_driver=dns_driver)
+        return DnsZonesType(
+            supported=bool(payload["supported"]),
+            zones=[
+                DnsZoneType(
+                    id=z["id"],
+                    name=z["name"],
+                    private=bool(z["private"]),
+                    config_json=z["config_json"],
                 )
-                for z in sorted(zones, key=lambda z: z.get("Name", ""))
-            ]
-        except Exception:  # noqa: BLE001
-            log.warning("astrolift_provider_hosted_zones: route53.list_hosted_zones failed for plugin=%s", plugin_slug)
-            return []
+                for z in payload["zones"]
+            ],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    @tenant_scoped()
+    def astrolift_dns_certificates(
+        self,
+        info: Info,
+        dns_driver: str,
+    ) -> ClusterCertificatesType:
+        """Discoverable TLS certificates for ``dns_driver`` (#858).
+
+        Driver-keyed analog of ``astroliftClusterCertificates`` for the
+        managed-domain dialog, which has no cluster context. Backs the
+        cert picker that fills the ``certificate_arn`` key in the
+        dialog's DNS-config JSON. For ``route53`` the certs come from
+        the region-scoped ACM client; other drivers report
+        ``supported=False``.
+        """
+        from core.dns_discovery import dns_certificates_dispatch
+
+        payload = dns_certificates_dispatch(dns_driver=dns_driver)
+        return ClusterCertificatesType(
+            supported=bool(payload["supported"]),
+            certificates=[
+                ClusterCertificateType(
+                    arn=c["arn"],
+                    name=c["name"],
+                    domain_name=c["domain_name"],
+                    status=c["status"],
+                )
+                for c in payload["certificates"]
+            ],
+        )

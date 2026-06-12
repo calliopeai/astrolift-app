@@ -42,6 +42,18 @@ class RegisteredApp(NamedBaseCoreModel):
         EXTERNAL_CI = "external_ci"
         CRON = "cron"
 
+    class BuildMode(models.TextChoices):
+        # CI builds and pushes the image; the platform only deploys the
+        # already-published tag. The historical behaviour and the
+        # default for every app registered before this field existed.
+        CI_PUSHED = "ci_pushed"
+        # The platform fetches the source tree and invokes a BuildDriver
+        # to build + push the image itself (no CI integration required).
+        PLATFORM_BUILD = "platform_build"
+        # The image tag is supplied directly and no build step runs at
+        # all — the operator points the app at a pre-built image.
+        NONE = "none"
+
     class ProvisioningStatus(models.TextChoices):
         PENDING = "pending"
         PROVISIONING = "provisioning"
@@ -76,6 +88,24 @@ class RegisteredApp(NamedBaseCoreModel):
     source_url = models.URLField(blank=True, default="")
     manifest_path = models.CharField(max_length=255, default="astrolift.toml")
     default_branch = models.CharField(max_length=128, default="main")
+
+    # How the deployable image is produced for this app. ``ci_pushed``
+    # (default) keeps the historical contract where CI publishes the
+    # image and the platform only rolls it out. ``platform_build`` hands
+    # the source tree to a BuildDriver; ``none`` skips building entirely
+    # and deploys a tag supplied directly. ``dockerfile_path`` /
+    # ``build_context`` / ``build_args`` are consumed only under
+    # ``platform_build`` (they're ignored for the other two modes but
+    # captured at registration so the contract is stable when the
+    # platform-build workflow lands).
+    build_mode = models.CharField(
+        max_length=32,
+        choices=BuildMode.choices,
+        default=BuildMode.CI_PUSHED,
+    )
+    dockerfile_path = models.CharField(max_length=512, default="Dockerfile", blank=True)
+    build_context = models.CharField(max_length=512, default=".", blank=True)
+    build_args = models.JSONField(default=dict, blank=True)
 
     manifest_raw = models.TextField(blank=True, default="")
     manifest_raw_staged = models.TextField(blank=True, default="")

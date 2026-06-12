@@ -72,6 +72,12 @@ _mutation_bases = [
     AstroliftAgentsSchema.AgentsMutation,
 ]
 
+if is_enabled(Feature.AGENTS):
+    import astrolift_agents.schema as AstroliftAgentsSchema
+
+    _query_bases.append(AstroliftAgentsSchema.AgentsQuery)
+    _mutation_bases.append(AstroliftAgentsSchema.AgentsMutation)
+
 if is_enabled(Feature.WORKFLOWS):
     import workflows.schema as WorkflowsSchema
 

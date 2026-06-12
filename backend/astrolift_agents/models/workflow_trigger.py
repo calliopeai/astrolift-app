@@ -116,6 +116,18 @@ class WorkflowWebhook(models.Model):
         on_delete=models.CASCADE,
         related_name="webhooks",
     )
+    # Source-host (SCM) webhooks scope to a RegisteredApp so the SCM
+    # ingest receiver can find "which workflows fire for this app's
+    # push/PR deliveries" without scanning every webhook in the system.
+    # Null/blank for the org-level ``POST /api/webhooks/workflow/<org>/
+    # <slug>`` webhooks, which resolve by slug and carry no app binding.
+    registered_app = models.ForeignKey(
+        "astrolift_registry.RegisteredApp",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="workflow_webhooks",
+    )
     slug = models.SlugField(
         max_length=64,
         unique=True,
@@ -175,6 +187,10 @@ class WorkflowWebhook(models.Model):
             models.Index(
                 fields=["organization", "enabled"],
                 name="wfwebhook_org_enabled_idx",
+            ),
+            models.Index(
+                fields=["registered_app", "enabled"],
+                name="wfwebhook_app_enabled_idx",
             ),
         ]
 

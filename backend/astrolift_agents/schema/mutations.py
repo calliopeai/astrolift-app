@@ -1,56 +1,31 @@
-"""Mutations for the agent platform.
+"""Mutations for the Agent Dispatch Layer.
 
-Skill + ToolDef registry
-------------------------
-* ``importSkillsFromRepo(repoUrl, branch?)`` — fetch a GitHub config
-  repo's ``astrolift.toml`` and materialize org-scoped Skill + ToolDef
-  rows from its ``[skills.*]`` / ``[tools.*]`` tables.
-* ``createSkill(input)`` — create a new org-scoped skill.
-* ``updateSkill(id, input)`` — update mutable fields of an existing skill.
-* ``deleteSkill(id)`` — soft-delete an org-scoped skill.
+Skill + ToolDef CRUD, Brief assembly, and Task launch/cancel. Every
+resolver carries ``@mutation_audit`` + ``@require_permission`` +
+``@tenant_scoped`` per the platform convention and the tenancy
+guardrail. ``@tenant_scoped`` only asserts a tenant context exists, so
+each resolver applies its own org filter / org binding explicitly.
 
-AgentTask
----------
-* ``enqueueAgentTask(input)`` — create a new task in DRAFT state then
-  immediately transition it to QUEUED.
-* ``cancelAgentTask(id)`` — cancel a task that is not yet in a terminal
-  state.
-
-AgentEnvironmentSpec
---------------------
-* ``createAgentEnvironmentSpec(input)`` — create a new container-env spec.
-* ``updateAgentEnvironmentSpec(slug, input)`` — update mutable fields.
-* ``deleteAgentEnvironmentSpec(slug)`` — soft-delete the spec.
-
-All mutations return the standard ``MutationResult`` envelope so the FE
-branches on ``ok`` / ``errors`` uniformly. Permission-denied and
-unexpected errors are surfaced via ``@mutation_audit`` so resolvers never
-raise.
+Permissions reuse the app-tier grants (Skills/Briefs/ToolDefs are
+agent-workload building blocks): ``APP_READ`` is implied by the read
+surface, writes gate on ``APP_CREATE`` / ``APP_UPDATE`` / ``APP_DELETE``,
+and dispatch (assemble/launch/cancel) gates on ``APP_DEPLOY``.
 """
 
 from __future__ import annotations
 
-import logging
+import hashlib
 
-import requests
 import strawberry
 from django.db import transaction
-from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_agents.models import AgentEnvironmentSpec, AgentTask, Skill
+from astrolift_agents.models import AgentTask, Brief, BriefSkillRef, Skill, ToolDef
 from astrolift_agents.schema.types import (
-    AgentEnvironmentSpecType,
-    AgentTaskType,
-    ImportSkillsResultType,
     SkillType,
-    agent_environment_spec_to_type,
-    agent_task_to_type,
+    ToolDefType,
     skill_to_type,
-)
-from astrolift_agents.services.skill_importer import (
-    InvalidRepoURLError,
-    import_skills_from_repo,
+    tool_def_to_type,
 )
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
@@ -61,489 +36,399 @@ from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
-log = logging.getLogger(__name__)
+JSON = strawberry.scalars.JSON
 
 
-def _resolve_org() -> Organization | None:
+# ---------------------------------------------------------------------------
+# Inputs
+# ---------------------------------------------------------------------------
+
+
+@strawberry.input
+class SkillInput:
+    name: str
+    slug: str
+    description: str
+    content: str
+    # Nullable-with-None default rather than a non-null []/{} default:
+    # Strawberry's SDL printer can't render an empty-collection literal
+    # on a JSON arg. The resolver coerces None → [] (mirrors the sibling
+    # JSON-input convention in astrolift_clusters).
+    dependencies: JSON | None = None
+
+
+@strawberry.input
+class ToolDefInput:
+    name: str
+    slug: str
+    description: str
+    adapter: str
+    input_schema: JSON
+    output_schema: JSON
+    handler_ref: str
+    # See SkillInput.dependencies — None default, resolver coerces to {}.
+    implementation_config: JSON | None = None
+
+
+# ---------------------------------------------------------------------------
+# Result payloads
+# ---------------------------------------------------------------------------
+
+
+@strawberry.type(name="AstroliftAssembleBriefResult")
+class AssembleBriefResult:
+    ok: bool
+    brief_id: GUID | None = None
+
+
+@strawberry.type(name="AstroliftLaunchTaskResult")
+class LaunchTaskResult:
+    ok: bool
+    task_id: GUID | None = None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _resolve_org(org_id: strawberry.ID) -> tuple[Organization | None, object | None]:
+    """Resolve ``org_id`` to an Organization, asserting it matches the
+    caller's active tenant (superusers bypass). Returns
+    ``(org, None)`` on success or ``(None, failure_envelope)``."""
     tenant = get_current_tenant()
-    if tenant is None or tenant.organization_id is None:
-        return None
-    return Organization.objects.filter(pk=tenant.organization_id).first()
+    active = tenant.organization_id if tenant else None
+    if active is None:
+        return None, gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+    org = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
+    if org is None:
+        return None, gql_failure(ErrorCode.NOT_FOUND.value, "organization not found", field="orgId")
+    if org.pk != active:
+        # The decorator established a tenant context; reject an org_id
+        # that points elsewhere so a caller can't write into a foreign
+        # org by passing its GUID.
+        return None, gql_failure(ErrorCode.PERMISSION_DENIED.value, "organization mismatch", field="orgId")
+    return org, None
 
 
 # ---------------------------------------------------------------------------
-# Input types
-# ---------------------------------------------------------------------------
-
-
-@strawberry.input
-class CreateSkillInput:
-    name: str
-    slug: str
-    description: str = ""
-    content: str = ""
-    agent_type: str = ""
-    is_global: bool = False
-
-
-@strawberry.input
-class UpdateSkillInput:
-    name: str | None = None
-    description: str | None = None
-    content: str | None = None
-    agent_type: str | None = None
-    is_active: bool | None = None
-
-
-@strawberry.input
-class EnqueueAgentTaskInput:
-    timeout_seconds: int = 300
-    callback_url: str = ""
-    source_ref: str = ""
-
-
-@strawberry.input
-class CreateAgentEnvironmentSpecInput:
-    name: str
-    slug: str
-    image_tag: str
-    agent_type: str
-    tool_preset: str = ""
-    allow_install: bool = False
-    vnc_enabled: bool = False
-    # Pass an empty list/dict when no refs/vars are needed; None is treated
-    # the same way in the resolver to keep the wire format forgiving.
-    secret_refs: strawberry.scalars.JSON | None = None
-    env_vars: strawberry.scalars.JSON | None = None
-    config_repo: str = ""
-    config_branch: str = "main"
-
-
-@strawberry.input
-class UpdateAgentEnvironmentSpecInput:
-    name: str | None = None
-    image_tag: str | None = None
-    tool_preset: str | None = None
-    allow_install: bool | None = None
-    vnc_enabled: bool | None = None
-    secret_refs: strawberry.scalars.JSON | None = None
-    env_vars: strawberry.scalars.JSON | None = None
-    config_repo: str | None = None
-    config_branch: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# Mutation type
+# Root mutation
 # ---------------------------------------------------------------------------
 
 
 @strawberry.type
 class AgentsMutation:
-    # -----------------------------------------------------------------------
-    # Skill + ToolDef registry
-    # -----------------------------------------------------------------------
-
     @strawberry.field
-    @mutation_audit(action="skill.import")
-    @require_permission(Permission.SKILL_IMPORT)
-    @tenant_scoped()
-    def import_skills_from_repo(
-        self,
-        info: Info,
-        repo_url: str,
-        branch: str = "main",
-    ) -> MutationResultType[ImportSkillsResultType]:
-        org = _resolve_org()
-        if org is None:
-            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
-
-        branch = (branch or "main").strip() or "main"
-
-        try:
-            result = import_skills_from_repo(
-                organization=org,
-                repo_url=repo_url,
-                branch=branch,
-            )
-        except InvalidRepoURLError as exc:
-            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="repoUrl")
-        except requests.HTTPError as exc:
-            # The repo/branch doesn't exist or our PAT can't reach it.
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"could not fetch repo: {exc}",
-                field="repoUrl",
-            )
-
-        return gql_success(
-            ImportSkillsResultType(
-                imported_skills=result.imported_skills,
-                imported_tools=result.imported_tools,
-                source_ref=result.source_ref,
-            )
-        )
-
-    @strawberry.field
-    @mutation_audit(action="skill.create")
-    @require_permission(Permission.SKILL_WRITE)
+    @mutation_audit(action="agents.skill.create")
+    @require_permission(Permission.APP_CREATE)
     @tenant_scoped()
     def create_skill(
-        self,
-        info: Info,
-        input: CreateSkillInput,
+        self, info: Info, input: SkillInput, org_id: strawberry.ID
     ) -> MutationResultType[SkillType]:
-        name = (input.name or "").strip()
-        if not name:
+        org, err = _resolve_org(org_id)
+        if err is not None:
+            return err
+        if not input.name.strip():
             return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
-        slug = (input.slug or "").strip()
-        if not slug:
+        if not input.slug.strip():
             return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
-
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
-
-        if Skill.objects.filter(
-            organization_id=tenant.organization_id,
-            slug=slug,
-            deleted_at__isnull=True,
-        ).exists():
-            return gql_failure(
-                ErrorCode.CONFLICT.value,
-                f"a skill with slug {slug!r} already exists in this organization",
-                field="slug",
-            )
 
         with transaction.atomic():
             skill = Skill.objects.create(
-                organization_id=tenant.organization_id,
-                name=name,
-                slug=slug,
-                description=(input.description or "").strip(),
-                content=(input.content or "").strip(),
-                agent_type=(input.agent_type or "").strip(),
-                is_global=input.is_global,
+                organization=org,
+                name=input.name.strip()[:255],
+                slug=input.slug.strip()[:128],
+                description=input.description or "",
+                content=input.content or "",
+                dependencies=list(input.dependencies or []),
+                content_hash=_content_hash(input.content or ""),
+                skill_version=1,
             )
-
         return gql_success(skill_to_type(skill))
 
     @strawberry.field
-    @mutation_audit(action="skill.update")
-    @require_permission(Permission.SKILL_WRITE)
+    @mutation_audit(action="agents.skill.update")
+    @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
     def update_skill(
-        self,
-        info: Info,
-        id: GUID,
-        input: UpdateSkillInput,
+        self, info: Info, id: strawberry.ID, input: SkillInput
     ) -> MutationResultType[SkillType]:
         tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
-
+        org_pk = tenant.organization_id if tenant else None
         skill = Skill.objects.filter(
-            guid=str(id),
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
+            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
         ).first()
         if skill is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "skill not found")
+        if not input.name.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
+        if not input.slug.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
 
-        update_fields: list[str] = ["updated_at", "version"]
-
-        if input.name is not None:
-            name = input.name.strip()
-            if not name:
-                return gql_failure(
-                    ErrorCode.VALIDATION.value,
-                    "name must not be empty",
-                    field="name",
-                )
-            skill.name = name
-            update_fields.append("name")
-
-        if input.description is not None:
-            skill.description = input.description
-            update_fields.append("description")
-
-        if input.content is not None:
-            skill.content = input.content
-            update_fields.append("content")
-
-        if input.agent_type is not None:
-            skill.agent_type = input.agent_type
-            update_fields.append("agent_type")
-
-        if input.is_active is not None:
-            skill.is_active = input.is_active
-            update_fields.append("is_active")
-
-        skill.save(update_fields=update_fields)
+        skill.name = input.name.strip()[:255]
+        skill.slug = input.slug.strip()[:128]
+        skill.description = input.description or ""
+        skill.content = input.content or ""
+        skill.dependencies = list(input.dependencies or [])
+        skill.content_hash = _content_hash(input.content or "")
+        skill.skill_version = skill.skill_version + 1
+        skill.save()
         return gql_success(skill_to_type(skill))
 
     @strawberry.field
-    @mutation_audit(action="skill.delete")
-    @require_permission(Permission.SKILL_WRITE)
+    @mutation_audit(action="agents.skill.delete")
+    @require_permission(Permission.APP_DELETE)
     @tenant_scoped()
-    def delete_skill(
-        self,
-        info: Info,
-        id: GUID,
-    ) -> MutationResultType[SkillType]:
+    def delete_skill(self, info: Info, id: strawberry.ID) -> MutationResultType[SkillType]:
         tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
-
-        skill = (
-            Skill.objects.filter(
-                guid=str(id),
-                organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
-            )
-            .prefetch_related("tool_defs")
-            .first()
-        )
+        org_pk = tenant.organization_id if tenant else None
+        skill = Skill.objects.filter(
+            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
+        ).first()
         if skill is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "skill not found")
-
-        snapshot = skill_to_type(skill)
-        skill.deleted_at = timezone.now()
-        skill.save(update_fields=["deleted_at", "updated_at", "version"])
-        return gql_success(snapshot)
-
-    # -----------------------------------------------------------------------
-    # AgentTask
-    # -----------------------------------------------------------------------
+        skill.soft_delete()
+        return gql_success(skill_to_type(skill))
 
     @strawberry.field
-    @mutation_audit(action="agent_task.enqueue")
+    @mutation_audit(action="agents.tool_def.create")
+    @require_permission(Permission.APP_CREATE)
+    @tenant_scoped()
+    def create_tool_def(
+        self, info: Info, skill_id: strawberry.ID, input: ToolDefInput
+    ) -> MutationResultType[ToolDefType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        skill = Skill.objects.filter(
+            guid=str(skill_id), organization_id=org_pk, deleted_at__isnull=True
+        ).first()
+        if skill is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "skill not found", field="skillId")
+        if not input.name.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
+        if not input.slug.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
+        if input.adapter not in ToolDef.Adapter.values:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown adapter {input.adapter!r}",
+                field="adapter",
+            )
+
+        with transaction.atomic():
+            tool = ToolDef.objects.create(
+                skill=skill,
+                name=input.name.strip()[:255],
+                slug=input.slug.strip()[:128],
+                description=input.description or "",
+                input_schema=input.input_schema or {},
+                output_schema=input.output_schema or {},
+                adapter=input.adapter,
+                handler_ref=input.handler_ref or "",
+                implementation_config=input.implementation_config or {},
+            )
+        return gql_success(tool_def_to_type(tool))
+
+    @strawberry.field
+    @mutation_audit(action="agents.tool_def.update")
     @require_permission(Permission.APP_UPDATE)
     @tenant_scoped()
-    def enqueue_agent_task(
+    def update_tool_def(
+        self, info: Info, id: strawberry.ID, input: ToolDefInput
+    ) -> MutationResultType[ToolDefType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        tool = ToolDef.objects.filter(
+            guid=str(id),
+            skill__organization_id=org_pk,
+            deleted_at__isnull=True,
+        ).first()
+        if tool is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "tool def not found")
+        if not input.name.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
+        if not input.slug.strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
+        if input.adapter not in ToolDef.Adapter.values:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"unknown adapter {input.adapter!r}",
+                field="adapter",
+            )
+
+        tool.name = input.name.strip()[:255]
+        tool.slug = input.slug.strip()[:128]
+        tool.description = input.description or ""
+        tool.input_schema = input.input_schema or {}
+        tool.output_schema = input.output_schema or {}
+        tool.adapter = input.adapter
+        tool.handler_ref = input.handler_ref or ""
+        tool.implementation_config = input.implementation_config or {}
+        tool.save()
+        return gql_success(tool_def_to_type(tool))
+
+    @strawberry.field
+    @mutation_audit(action="agents.tool_def.delete")
+    @require_permission(Permission.APP_DELETE)
+    @tenant_scoped()
+    def delete_tool_def(self, info: Info, id: strawberry.ID) -> MutationResultType[ToolDefType]:
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        tool = ToolDef.objects.filter(
+            guid=str(id),
+            skill__organization_id=org_pk,
+            deleted_at__isnull=True,
+        ).first()
+        if tool is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "tool def not found")
+        tool.soft_delete()
+        return gql_success(tool_def_to_type(tool))
+
+    @strawberry.field
+    @mutation_audit(action="agents.brief.assemble")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def assemble_brief(
         self,
         info: Info,
-        input: EnqueueAgentTaskInput,
-    ) -> MutationResultType[AgentTaskType]:
-        """Create a new AgentTask and immediately transition it to QUEUED."""
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
+        skill_ids: list[strawberry.ID],
+        org_id: strawberry.ID,
+        config: strawberry.scalars.JSON | None = None,
+    ) -> MutationResultType[AssembleBriefResult]:
+        """Assemble a Brief from the given Skills.
+
+        The Brief is content-addressed: ``content_hash`` is the SHA-256
+        of the canonical (skill guid, version) tuple list plus the
+        config payload, so two identical assemblies collide on the
+        unique hash. ``storage_key`` is left empty — the object-storage
+        write is future work; the row is the assembly record.
+        """
+        org, err = _resolve_org(org_id)
+        if err is not None:
+            return err
+        if not skill_ids:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "at least one skill is required", field="skillIds"
+            )
+
+        from django.db.models import Q
+
+        guids = [str(s) for s in skill_ids]
+        skills = list(
+            Skill.objects.filter(
+                Q(organization_id=org.pk) | Q(is_global=True),
+                guid__in=guids,
+                deleted_at__isnull=True,
+            )
+        )
+        found = {str(s.guid) for s in skills}
+        missing = [g for g in guids if g not in found]
+        if missing:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"skill(s) not found: {', '.join(missing)}",
+                field="skillIds",
+            )
+
+        cfg = config or {}
+        # Order by the caller's requested guid order so the hash is
+        # stable and independent of DB row ordering.
+        by_guid = {str(s.guid): s for s in skills}
+        ordered = [by_guid[g] for g in guids]
+        canonical = json_canonical(
+            {
+                "skills": [{"guid": str(s.guid), "version": s.skill_version} for s in ordered],
+                "config": cfg,
+            }
+        )
+        content_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+        existing = Brief.objects.filter(content_hash=content_hash, deleted_at__isnull=True).first()
+        if existing is not None:
+            # Identical payload already assembled — return it idempotently.
+            return gql_success(AssembleBriefResult(ok=True, brief_id=GUID(str(existing.guid))))
+
+        with transaction.atomic():
+            brief = Brief.objects.create(
+                organization=org,
+                content_hash=content_hash,
+                storage_key="",
+                manifest_snapshot=cfg,
+            )
+            for s in ordered:
+                BriefSkillRef.objects.create(brief=brief, skill=s, skill_version=s.skill_version)
+
+        return gql_success(AssembleBriefResult(ok=True, brief_id=GUID(str(brief.guid))))
+
+    @strawberry.field
+    @mutation_audit(action="agents.task.launch")
+    @require_permission(Permission.APP_DEPLOY)
+    @tenant_scoped()
+    def launch_task(
+        self,
+        info: Info,
+        brief_id: strawberry.ID,
+        org_id: strawberry.ID,
+        callback_url: str | None = None,
+    ) -> MutationResultType[LaunchTaskResult]:
+        """Create an AgentTask for ``brief_id`` and enqueue it.
+
+        The task is created in ``DRAFT`` then advanced to ``QUEUED`` via
+        the model's sanctioned ``transition_to`` so ``queued_at`` is
+        stamped and the state machine stays authoritative.
+        """
+        org, err = _resolve_org(org_id)
+        if err is not None:
+            return err
+        brief = Brief.objects.filter(
+            guid=str(brief_id), organization_id=org.pk, deleted_at__isnull=True
+        ).first()
+        if brief is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "brief not found", field="briefId")
 
         with transaction.atomic():
             task = AgentTask.objects.create(
-                organization_id=tenant.organization_id,
-                timeout_seconds=max(1, input.timeout_seconds),
-                callback_url=(input.callback_url or "").strip(),
-                source_ref=(input.source_ref or "").strip(),
+                organization=org,
+                brief=brief,
+                status=AgentTask.Status.DRAFT,
+                callback_url=(callback_url or "")[:200],
             )
             task.transition_to(AgentTask.Status.QUEUED)
-
-        return gql_success(agent_task_to_type(task))
+        return gql_success(LaunchTaskResult(ok=True, task_id=GUID(str(task.guid))))
 
     @strawberry.field
-    @mutation_audit(action="agent_task.cancel")
-    @require_permission(Permission.APP_UPDATE)
+    @mutation_audit(action="agents.task.cancel")
+    @require_permission(Permission.APP_DEPLOY)
     @tenant_scoped()
-    def cancel_agent_task(
-        self,
-        info: Info,
-        id: GUID,
-    ) -> MutationResultType[AgentTaskType]:
-        """Cancel an agent task that has not yet reached a terminal state."""
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
+    def cancel_task(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
+        """Cancel an AgentTask.
 
+        Only ``DRAFT`` / ``QUEUED`` / ``PROVISIONING`` tasks cancel
+        directly (a ``RUNNING`` task needs a stop signal to the
+        Dispatcher); an illegal transition surfaces as a PRECONDITION
+        failure rather than a 500.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
         task = AgentTask.objects.filter(
-            guid=str(id),
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
+            guid=str(id), organization_id=org_pk, deleted_at__isnull=True
         ).first()
         if task is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "agent task not found")
-
-        terminal = {
-            AgentTask.Status.COMPLETED,
-            AgentTask.Status.FAILED,
-            AgentTask.Status.TIMED_OUT,
-            AgentTask.Status.CANCELLED,
-        }
-        if task.status in terminal:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"task is in status {task.status!r} — only non-terminal tasks can be cancelled",
-            )
-
+            return gql_failure(ErrorCode.NOT_FOUND.value, "task not found")
         try:
             task.transition_to(AgentTask.Status.CANCELLED)
         except ValueError as exc:
             return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        return gql_success(None)
 
-        return gql_success(agent_task_to_type(task))
 
-    # -----------------------------------------------------------------------
-    # AgentEnvironmentSpec
-    # -----------------------------------------------------------------------
+def json_canonical(payload: dict) -> str:
+    """Deterministic JSON encoding for content-hashing (sorted keys,
+    no insignificant whitespace)."""
+    import json
 
-    @strawberry.field
-    @mutation_audit(action="agent_env_spec.create")
-    @require_permission(Permission.AGENT_ENV_SPEC_CREATE)
-    @tenant_scoped()
-    def create_agent_environment_spec(
-        self,
-        info: Info,
-        input: CreateAgentEnvironmentSpecInput,
-    ) -> MutationResultType[AgentEnvironmentSpecType]:
-        name = (input.name or "").strip()
-        if not name:
-            return gql_failure(ErrorCode.VALIDATION.value, "name is required", field="name")
-        slug = (input.slug or "").strip()
-        if not slug:
-            return gql_failure(ErrorCode.VALIDATION.value, "slug is required", field="slug")
-        image_tag = (input.image_tag or "").strip()
-        if not image_tag:
-            return gql_failure(
-                ErrorCode.VALIDATION.value, "imageTag is required", field="imageTag"
-            )
-
-        valid_agent_types = {c.value for c in AgentEnvironmentSpec.AgentType}
-        agent_type = (input.agent_type or "").strip()
-        if agent_type not in valid_agent_types:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"unknown agentType {agent_type!r}; valid values: {sorted(valid_agent_types)}",
-                field="agentType",
-            )
-
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
-
-        if AgentEnvironmentSpec.objects.filter(
-            organization_id=tenant.organization_id,
-            slug=slug,
-            deleted_at__isnull=True,
-        ).exists():
-            return gql_failure(
-                ErrorCode.CONFLICT.value,
-                f"an environment spec with slug {slug!r} already exists in this organization",
-                field="slug",
-            )
-
-        with transaction.atomic():
-            spec = AgentEnvironmentSpec.objects.create(
-                organization_id=tenant.organization_id,
-                name=name,
-                slug=slug,
-                image_tag=image_tag,
-                agent_type=agent_type,
-                tool_preset=(input.tool_preset or "").strip(),
-                allow_install=input.allow_install,
-                vnc_enabled=input.vnc_enabled,
-                # Accept None from the wire to mean "empty" for list/dict fields.
-                secret_refs=input.secret_refs if input.secret_refs is not None else [],
-                env_vars=input.env_vars if input.env_vars is not None else {},
-                config_repo=(input.config_repo or "").strip(),
-                config_branch=(input.config_branch or "main").strip() or "main",
-            )
-
-        return gql_success(agent_environment_spec_to_type(spec))
-
-    @strawberry.field
-    @mutation_audit(action="agent_env_spec.update")
-    @require_permission(Permission.AGENT_ENV_SPEC_UPDATE)
-    @tenant_scoped()
-    def update_agent_environment_spec(
-        self,
-        info: Info,
-        slug: str,
-        input: UpdateAgentEnvironmentSpecInput,
-    ) -> MutationResultType[AgentEnvironmentSpecType]:
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
-
-        spec = AgentEnvironmentSpec.objects.filter(
-            slug=slug,
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).first()
-        if spec is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
-
-        update_fields: list[str] = ["updated_at", "version"]
-
-        if input.name is not None:
-            name = input.name.strip()
-            if not name:
-                return gql_failure(
-                    ErrorCode.VALIDATION.value, "name must not be empty", field="name"
-                )
-            spec.name = name
-            update_fields.append("name")
-
-        if input.image_tag is not None:
-            image_tag = input.image_tag.strip()
-            if not image_tag:
-                return gql_failure(
-                    ErrorCode.VALIDATION.value, "imageTag must not be empty", field="imageTag"
-                )
-            spec.image_tag = image_tag
-            update_fields.append("image_tag")
-
-        if input.tool_preset is not None:
-            spec.tool_preset = input.tool_preset.strip()
-            update_fields.append("tool_preset")
-
-        if input.allow_install is not None:
-            spec.allow_install = input.allow_install
-            update_fields.append("allow_install")
-
-        if input.vnc_enabled is not None:
-            spec.vnc_enabled = input.vnc_enabled
-            update_fields.append("vnc_enabled")
-
-        if input.secret_refs is not None:
-            spec.secret_refs = input.secret_refs
-            update_fields.append("secret_refs")
-
-        if input.env_vars is not None:
-            spec.env_vars = input.env_vars
-            update_fields.append("env_vars")
-
-        if input.config_repo is not None:
-            spec.config_repo = input.config_repo.strip()
-            update_fields.append("config_repo")
-
-        if input.config_branch is not None:
-            spec.config_branch = (input.config_branch.strip() or "main")
-            update_fields.append("config_branch")
-
-        spec.save(update_fields=update_fields)
-        return gql_success(agent_environment_spec_to_type(spec))
-
-    @strawberry.field
-    @mutation_audit(action="agent_env_spec.delete")
-    @require_permission(Permission.AGENT_ENV_SPEC_DELETE)
-    @tenant_scoped()
-    def delete_agent_environment_spec(
-        self,
-        info: Info,
-        slug: str,
-    ) -> MutationResultType[AgentEnvironmentSpecType]:
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "tenant context required")
-
-        spec = AgentEnvironmentSpec.objects.filter(
-            slug=slug,
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).first()
-        if spec is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
-
-        snapshot = agent_environment_spec_to_type(spec)
-        spec.deleted_at = timezone.now()
-        spec.save(update_fields=["deleted_at", "updated_at", "version"])
-        return gql_success(snapshot)
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)

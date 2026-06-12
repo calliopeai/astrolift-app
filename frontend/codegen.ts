@@ -42,6 +42,11 @@ const config: CodegenConfig = {
     "!graphql/forms/forms.mutations.ts",
     "!graphql/permissions/permissions.queries.ts",
     "!graphql/employees/employees.queries.ts",
+    // Pipelines queries/mutations reference schema fields that don't exist yet
+    // (slug, description, secrets on AstroliftPipeline; SetPipelineSecretInput).
+    // Excluded until the backend schema catches up.
+    "!graphql/pipelines/pipelines.queries.ts",
+    "!graphql/pipelines/pipelines.mutations.ts",
   ],
   ignoreNoDocuments: true,
   generates: {

@@ -19,9 +19,12 @@ receiver:
    ``webhook_ingress.verify_signature``. The name is load-bearing: the
    ``test_webhook_signature_guard`` CI test (#529) AST-scans every
    ``/.../webhook/...`` view for one of the canonical verifier names.
-4. Filters to ``pull_request`` events only; every other event header
-   (``ping``, ``push``, ``installation``, …) returns 200 with a
-   ``not handled`` reason so GitHub stops retrying.
+4. Handles ``push`` and ``pull_request`` events. Both fan out to any
+   WorkflowWebhook rows bound to the resolved RegisteredApp (the SCM →
+   workflow trigger bridge); ``pull_request`` additionally drives the
+   preview lifecycle below. Every other event header (``ping``,
+   ``installation``, …) returns 200 with a ``not handled`` reason so
+   GitHub stops retrying.
 5. Projects the payload into the dispatcher's
    ``PrEventContext`` + ``AppPreviewContext`` and runs
    ``github_pr_dispatch.decide_dispatch`` — pure policy that classifies
@@ -203,9 +206,71 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     return preview, True
 
 
+def _dispatch_workflow_webhooks(event_kind: str, app, payload: dict) -> int:
+    """Fire every enabled WorkflowWebhook bound to ``app`` for an SCM
+    push / pull_request delivery.
+
+    The signature has already been verified by the caller, so the payload
+    is trusted by the time we get here. Each matching WorkflowWebhook
+    launches one WorkflowInstance via the shared
+    ``trigger_workflow_instance`` entry point; the whole raw payload is
+    handed through as the instance input (the workflow definition's own
+    input schema does the field projection downstream).
+
+    Routing failures are swallowed per-webhook: a misconfigured workflow
+    trigger must never turn a 200 SCM ack into a non-2xx that makes the
+    host retry the delivery. We return the count of webhooks we attempted
+    to dispatch so the caller can surface it in the ack body for
+    observability.
+    """
+    from astrolift_agents.models import WorkflowWebhook
+    from astrolift_agents.services.workflow_triggers import trigger_workflow_instance
+
+    webhooks = WorkflowWebhook.objects.filter(
+        registered_app=app,
+        enabled=True,
+    ).select_related("workflow_definition")
+
+    dispatched = 0
+    for wh in webhooks:
+        try:
+            trigger_workflow_instance(
+                wh.workflow_definition,
+                payload,
+                trigger_kind=f"scm_{event_kind}",
+            )
+        except Exception:
+            # Never let one bad workflow trigger break SCM ingest, and
+            # never let it stop the sibling webhooks from firing.
+            logger.exception(
+                "workflow webhook dispatch failed: webhook=%s event=%s app=%s",
+                wh.slug,
+                event_kind,
+                app.pk,
+            )
+            continue
+        dispatched += 1
+    return dispatched
+
+
 @require_http_methods(["POST"])
 def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
-    """POST /api/webhooks/github/<app_guid>/ — GitHub PR event receiver."""
+    """POST /api/webhooks/github/<app_guid>/ — GitHub push / PR receiver.
+
+    Two responsibilities share this endpoint because the platform installs
+    a single host-side webhook subscribed to both ``push`` and
+    ``pull_request`` (see ``install_github_webhook``):
+
+    1. ``pull_request`` events drive the preview-environment lifecycle
+       (BUILD / TEARDOWN), as documented in the module docstring.
+    2. ``push`` and ``pull_request`` events both fan out to any
+       :class:`WorkflowWebhook` rows bound to the resolved RegisteredApp,
+       launching workflow instances. This is the SCM → workflow trigger
+       bridge.
+
+    Every other event header (``ping``, ``installation``, …) is acked
+    with 200 / ``event not handled`` so the host stops retrying.
+    """
     # Imports inside the view per project convention so the URL module
     # stays importable without triggering Django ORM at import time.
     from astrolift_registry.models import RegisteredApp
@@ -247,7 +312,7 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
         return JsonResponse({"detail": "invalid signature"}, status=401)
 
     event = request.headers.get("X-GitHub-Event", "")
-    if event != "pull_request":
+    if event not in ("push", "pull_request"):
         return JsonResponse({"detail": "event not handled"}, status=200)
 
     try:
@@ -257,6 +322,20 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
 
     if not isinstance(payload, dict):
         return JsonResponse({"detail": "invalid payload shape"}, status=400)
+
+    # SCM → workflow trigger bridge: both push and PR deliveries fan out
+    # to any WorkflowWebhook rows bound to this app. Independent of the
+    # preview-env dispatch below — a push has no preview path, and a PR
+    # may fire workflows whether or not it builds a preview.
+    dispatched = _dispatch_workflow_webhooks(event, app, payload)
+
+    if event == "push":
+        # Push has no preview-environment lifecycle; the workflow
+        # dispatch above is the whole job. Ack so GitHub stops retrying.
+        return JsonResponse(
+            {"detail": "push handled", "workflows_dispatched": dispatched},
+            status=200,
+        )
 
     pr_ctx = _build_pr_context(payload)
     if pr_ctx is None:

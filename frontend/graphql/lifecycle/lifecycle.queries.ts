@@ -11,6 +11,8 @@ export const LIST_ENVIRONMENTS = gql`
       requiredApprovals
       registeredAppSlug
       clusterSlug
+      clusterId
+      clusterProviderPluginSlug
       domainZone
       createdAt
       settings {

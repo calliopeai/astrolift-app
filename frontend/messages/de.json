@@ -2388,6 +2388,18 @@
         "title": "Rollback {app}/{env}?",
         "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "confirm": "Rollback"
+      },
+      "delete": "Löschen",
+      "retire": "Stilllegen",
+      "confirmDelete": {
+        "title": "Deployment von {app}/{env} löschen?",
+        "description": "Entfernt dieses Deployment aus den Listen. Der Eintrag wird per Soft-Delete entfernt – es läuft nichts, das abgebaut werden müsste. Dies kann nicht rückgängig gemacht werden.",
+        "confirm": "Deployment löschen",
+        "retireTitle": "Laufendes Deployment von {app}/{env} stilllegen?",
+        "retireDescription": "Markiert dieses Rollout als abgelöst, sodass es nicht mehr die aktive Revision ist. Cluster-Ressourcen bleiben bestehen – die laufende App wird nicht abgebaut.",
+        "retireConfirm": "Deployment stilllegen",
+        "success": "Deployment verworfen",
+        "failed": "Löschen fehlgeschlagen"
       }
     },
     "environments": {

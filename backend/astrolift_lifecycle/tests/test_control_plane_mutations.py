@@ -321,6 +321,164 @@ def test_abort_refuses_when_not_in_flight(
     assert abort.errors[0].code == "PRECONDITION"
 
 
+def test_abort_failed_deployment_dismisses_and_skips_signal(
+    org, app, env, actor, fake_info, permission_resolver, temporal_recorder
+):
+    """A failed deploy is dismissable: there is no workflow left to
+    stop, so abort soft-deletes the record (drops it off the lists)
+    and never touches Temporal."""
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    deploy = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.FAILED.value,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        abort = mut.abort_deployment(
+            fake_info,
+            input=AbortDeploymentInput(id=deploy.guid, reason="dismissing failed run"),
+        )
+
+    assert abort.ok, abort.errors
+    # Reason persisted; record soft-deleted so it leaves every list.
+    assert abort.data.aborted_reason == "dismissing failed run"
+    assert not Deployment.objects.filter(guid=deploy.guid).exists()
+    assert Deployment.all_objects.get(guid=deploy.guid).deleted_at is not None
+    # No Temporal interaction — nothing was running.
+    assert not temporal_recorder.signals
+    assert not temporal_recorder.terminates
+
+
+# ---------------------------------------------------------------------------
+# delete_deployment
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        Deployment.Status.FAILED.value,
+        Deployment.Status.SUPERSEDED.value,
+        Deployment.Status.ROLLED_BACK.value,
+    ],
+)
+def test_delete_terminal_deployment_soft_deletes(
+    status, org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    """Terminal deploys (failed / superseded / rolled_back) soft-delete
+    so they disappear from the deployments lists."""
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    deploy = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=status,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        result = mut.delete_deployment(
+            fake_info,
+            input=DeploymentByIdInput(id=deploy.guid),
+        )
+
+    assert result.ok, result.errors
+    assert not Deployment.objects.filter(guid=deploy.guid).exists()
+    assert Deployment.all_objects.get(guid=deploy.guid).deleted_at is not None
+
+
+def test_delete_running_deployment_supersedes_and_logs(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    """A running deploy is retired by superseding it (a legal state
+    transition) and writing an operator-attributed log note. The row is
+    NOT soft-deleted — the superseded revision stays a rollback target —
+    and no k8s teardown is attempted here."""
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    deploy = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.RUNNING.value,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        result = mut.delete_deployment(
+            fake_info,
+            input=DeploymentByIdInput(id=deploy.guid),
+        )
+
+    assert result.ok, result.errors
+    deploy.refresh_from_db()
+    assert deploy.status == Deployment.Status.SUPERSEDED.value
+    assert deploy.deleted_at is None
+    # An operator-attributed note was written explaining the supersede.
+    note = deploy.logs.filter(message="superseded via delete_deployment").first()
+    assert note is not None
+    assert note.by_user_id == actor.id
+
+
+def test_delete_refuses_in_flight_deployment(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    """In-flight deploys can't be deleted — abort them first."""
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    deploy = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        triggered_by_user=actor,
+        trigger_kind="manual",
+        status=Deployment.Status.PENDING.value,
+        image_tag="v1.0.0",
+    )
+
+    with _tenant_for(org, actor):
+        result = mut.delete_deployment(
+            fake_info,
+            input=DeploymentByIdInput(id=deploy.guid),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    # Untouched.
+    deploy.refresh_from_db()
+    assert deploy.status == Deployment.Status.PENDING.value
+    assert deploy.deleted_at is None
+
+
+def test_delete_unknown_deployment_not_found(
+    org, app, env, actor, fake_info, permission_resolver, no_temporal
+):
+    _grant_all(permission_resolver, org.id)
+    mut = LifecycleMutation()
+
+    import uuid
+
+    with _tenant_for(org, actor):
+        result = mut.delete_deployment(
+            fake_info,
+            input=DeploymentByIdInput(id=str(uuid.uuid4())),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "NOT_FOUND"
+
+
 # ---------------------------------------------------------------------------
 # rollback_deployment
 # ---------------------------------------------------------------------------

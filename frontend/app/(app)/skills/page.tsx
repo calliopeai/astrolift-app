@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 import { BookOpenIcon, Loader2Icon, PlusIcon, WrenchIcon } from "lucide-react";
 
@@ -9,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
+import { LIST_SKILLS } from "@/graphql/agents/agents.queries";
+import { getActiveOrgGuid } from "@/lib/identity/active-org";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,39 +17,26 @@ type Skill = {
   id: string;
   name: string;
   slug: string;
-  description: string | null;
+  description: string;
   isActive: boolean;
-  toolCount: number;
 };
 
 type SkillsData = {
-  agentSkills: Skill[];
+  skills: Skill[];
 };
-
-// ─── GraphQL ─────────────────────────────────────────────────────────────────
-
-const LIST_SKILLS = gql`
-  query ListAgentSkills {
-    agentSkills {
-      id
-      name
-      slug
-      description
-      isActive
-      toolCount
-    }
-  }
-`;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-
 export default function SkillsPage() {
+  const orgId = getActiveOrgGuid() ?? "";
+
   const { data, loading, error } = useQuery<SkillsData>(LIST_SKILLS, {
+    variables: { orgId },
     fetchPolicy: "cache-and-network",
+    skip: !orgId,
   });
 
-  const skills = data?.agentSkills ?? [];
+  const skills = data?.skills ?? [];
 
   return (
     <PageShell
@@ -104,20 +92,13 @@ export default function SkillsPage() {
                   </Badge>
                 </div>
                 <span className="text-muted-foreground truncate text-sm">
-                  {skill.description ?? (
-                    <span className="italic">No description</span>
-                  )}
+                  {skill.description || <span className="italic">No description</span>}
                 </span>
               </div>
 
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <Badge variant="outline" className="text-xs">
-                  {skill.toolCount} {skill.toolCount === 1 ? "tool" : "tools"}
-                </Badge>
-                <span className="text-muted-foreground font-mono text-xs">
-                  {skill.slug}
-                </span>
-              </div>
+              <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                {skill.slug}
+              </span>
             </Link>
           ))}
         </div>

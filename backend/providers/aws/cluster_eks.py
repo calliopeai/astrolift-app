@@ -42,9 +42,12 @@ from _sdk.cluster import (
     ApplyResult,
     BootstrapComponent,
     BootstrapOption,
+    CertificateInfo,
     ClusterAuth,
     ClusterContext,
     ClusterDriver,
+    CognitoUserPoolClientInfo,
+    CognitoUserPoolInfo,
     DeleteResult,
     ExecResult,
     ManagementReport,
@@ -53,6 +56,7 @@ from _sdk.cluster import (
     PodInfo,
     PodLogLine,
     PortForwardSession,
+    RegionInfo,
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
@@ -94,6 +98,78 @@ from k8s_native.observability import (
     PodBackend,
     default_log_backend,
 )
+
+# Region slug -> (display label, continent grouping) for the
+# cluster-register picker (#860). ec2:DescribeRegions returns only the
+# slug + endpoint, so the friendly label + continent are mapped here.
+# Regions absent from this table still surface (the slug doubles as the
+# label) — the table is a UX nicety, not an allow-list. Continent
+# strings match the GCP/Azure static tables so the UI can bucket all
+# three clouds consistently.
+_AWS_REGION_LABELS: dict[str, tuple[str, str]] = {
+    "us-east-1": ("US East (N. Virginia)", "Americas"),
+    "us-east-2": ("US East (Ohio)", "Americas"),
+    "us-west-1": ("US West (N. California)", "Americas"),
+    "us-west-2": ("US West (Oregon)", "Americas"),
+    "ca-central-1": ("Canada (Central)", "Americas"),
+    "ca-west-1": ("Canada West (Calgary)", "Americas"),
+    "sa-east-1": ("South America (São Paulo)", "Americas"),
+    "mx-central-1": ("Mexico (Central)", "Americas"),
+    "eu-west-1": ("Europe (Ireland)", "Europe"),
+    "eu-west-2": ("Europe (London)", "Europe"),
+    "eu-west-3": ("Europe (Paris)", "Europe"),
+    "eu-central-1": ("Europe (Frankfurt)", "Europe"),
+    "eu-central-2": ("Europe (Zurich)", "Europe"),
+    "eu-north-1": ("Europe (Stockholm)", "Europe"),
+    "eu-south-1": ("Europe (Milan)", "Europe"),
+    "eu-south-2": ("Europe (Spain)", "Europe"),
+    "ap-east-1": ("Asia Pacific (Hong Kong)", "Asia Pacific"),
+    "ap-south-1": ("Asia Pacific (Mumbai)", "Asia Pacific"),
+    "ap-south-2": ("Asia Pacific (Hyderabad)", "Asia Pacific"),
+    "ap-northeast-1": ("Asia Pacific (Tokyo)", "Asia Pacific"),
+    "ap-northeast-2": ("Asia Pacific (Seoul)", "Asia Pacific"),
+    "ap-northeast-3": ("Asia Pacific (Osaka)", "Asia Pacific"),
+    "ap-southeast-1": ("Asia Pacific (Singapore)", "Asia Pacific"),
+    "ap-southeast-2": ("Asia Pacific (Sydney)", "Asia Pacific"),
+    "ap-southeast-3": ("Asia Pacific (Jakarta)", "Asia Pacific"),
+    "ap-southeast-4": ("Asia Pacific (Melbourne)", "Asia Pacific"),
+    "ap-southeast-5": ("Asia Pacific (Malaysia)", "Asia Pacific"),
+    "ap-southeast-7": ("Asia Pacific (Thailand)", "Asia Pacific"),
+    "me-south-1": ("Middle East (Bahrain)", "Middle East"),
+    "me-central-1": ("Middle East (UAE)", "Middle East"),
+    "il-central-1": ("Israel (Tel Aviv)", "Middle East"),
+    "af-south-1": ("Africa (Cape Town)", "Africa"),
+}
+
+# Fallback region list when ec2:DescribeRegions can't be called (no
+# credentials, throttled, network). Covers the commercial-partition
+# regions enabled by default on a standard account — enough for the
+# register picker to be useful while the operator wires credentials.
+_AWS_FALLBACK_REGIONS: tuple[str, ...] = (
+    "us-east-1",
+    "us-east-2",
+    "us-west-1",
+    "us-west-2",
+    "ca-central-1",
+    "sa-east-1",
+    "eu-west-1",
+    "eu-west-2",
+    "eu-west-3",
+    "eu-central-1",
+    "eu-north-1",
+    "ap-south-1",
+    "ap-northeast-1",
+    "ap-northeast-2",
+    "ap-southeast-1",
+    "ap-southeast-2",
+)
+
+
+def _region_info(slug: str) -> RegionInfo:
+    """Build a ``RegionInfo`` from a slug, decorating with the friendly
+    label + continent from ``_AWS_REGION_LABELS`` when known."""
+    label, continent = _AWS_REGION_LABELS.get(slug, (slug, ""))
+    return RegionInfo(id=slug, label=label, continent=continent)
 
 
 @dataclass(frozen=True)
@@ -155,6 +231,8 @@ class EKSClusterDriver(ClusterDriver):
         eks_client: Any | None = None,
         sts_client: Any | None = None,
         ec2_client: Any | None = None,
+        cognito_idp_client: Any | None = None,
+        acm_client: Any | None = None,
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
@@ -181,6 +259,16 @@ class EKSClusterDriver(ClusterDriver):
             import boto3
 
             self._ec2 = boto3.client("ec2", region_name=config.region)
+        # Cognito IDP client is built lazily on first use (the auth-gate
+        # picker path, #859) so the common apply/probe paths don't pay
+        # to construct a client they never touch. Tests inject a stub
+        # here; production resolves it in ``_cognito_idp`` below.
+        self._cognito_idp = cognito_idp_client
+        # ACM client is built lazily on first ``list_certificates`` call
+        # (the cert-picker path, #858) so the common deploy / observability
+        # flows don't pay for a client they never use. Injectable for moto
+        # tests, mirroring eks/sts/ec2 above.
+        self._acm: Any | None = acm_client
         # Factory injection lets tests pass a stubbed kubernetes
         # client without contacting a real apiserver.
         self._k8s_factory = k8s_client_factory or _build_k8s_client
@@ -954,6 +1042,13 @@ class EKSClusterDriver(ClusterDriver):
             alb_values["vpcId"] = vpc_id
         if backend_sg:
             alb_values["backendSecurityGroup"] = backend_sg
+            # When backendSecurityGroup is explicitly set we manage the SG
+            # rule ourselves (or let bootstrap set it once). The TGB
+            # reconciler's ENI-tag lookup fails when both the EKS cluster SG
+            # and the node shared SG carry kubernetes.io/cluster/<name>:owned,
+            # producing a FailedNetworkReconcile loop that blocks target-group
+            # health on every Ingress reconcile (e.g. auth-gate toggle).
+            alb_values["manageBackendSecurityGroupRules"] = False
 
         return [
             BootstrapComponent(
@@ -1429,7 +1524,229 @@ class EKSClusterDriver(ClusterDriver):
             "latency_p99":  latency(**kwargs, stat="p99"),
         }
 
+    # ---- region / Cognito discovery (#860 / #859) -----------------
+
+    @driver_op(cloud="aws", driver="cluster")
+    def list_regions(self) -> list[RegionInfo]:
+        """Live ``ec2:DescribeRegions`` for the cluster-register picker
+        (#860).
+
+        Lists the regions enabled on the account (``AllRegions=False``
+        — the default — so disabled / opt-in-not-yet-enabled regions
+        don't clutter the picker with regions a deploy can't land in).
+        On any failure (no credentials, throttle, network) falls back
+        to ``_AWS_FALLBACK_REGIONS`` so the picker is never empty —
+        the frontend keeps free-entry on top of this anyway. Results
+        are sorted by slug for a stable, scannable list.
+        """
+        try:
+            resp = self._ec2.describe_regions()
+            slugs = sorted(
+                r["RegionName"] for r in resp.get("Regions", []) if r.get("RegionName")
+            )
+            if not slugs:
+                raise ValueError("describe_regions returned no regions")
+        except Exception as exc:
+            log.warning(
+                "list_regions: ec2:DescribeRegions failed (%s) — falling back to static list",
+                exc,
+            )
+            slugs = list(_AWS_FALLBACK_REGIONS)
+        return [_region_info(s) for s in slugs]
+
+    @driver_op(cloud="aws", driver="cluster")
+    def list_cognito_user_pools(self) -> list[CognitoUserPoolInfo]:
+        """Live ``cognito-idp:ListUserPools`` for the auth-gate picker
+        (#859).
+
+        ListUserPools returns only ``Id`` + ``Name`` per pool, so the
+        ARN is composed from the caller's account id + region + pool
+        id, and the hosted domain is read from a per-pool
+        DescribeUserPool. Paginates the full pool list (``MaxResults``
+        caps at 60). Raises on credential / API failure — the resolver
+        swallows it into an empty list so the picker degrades to
+        free-entry. A failed per-pool DescribeUserPool degrades that
+        single pool to an empty domain rather than dropping it.
+        """
+        region = self._config.region
+        client = self._cognito_idp_client()
+
+        # Account id for ARN composition — Cognito pool ARNs are
+        # arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id>.
+        try:
+            account_id = self._sts.get_caller_identity()["Account"]
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+
+        pools: list[CognitoUserPoolInfo] = []
+        next_token: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {"MaxResults": 60}
+            if next_token:
+                kwargs["NextToken"] = next_token
+            try:
+                resp = client.list_user_pools(**kwargs)
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+            for p in resp.get("UserPools", []):
+                pool_id = p.get("Id", "")
+                if not pool_id:
+                    continue
+                pools.append(
+                    CognitoUserPoolInfo(
+                        pool_id=pool_id,
+                        pool_arn=f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{pool_id}",
+                        name=p.get("Name", ""),
+                        domain=self._cognito_pool_domain(client, pool_id),
+                        region=region,
+                    ),
+                )
+            next_token = resp.get("NextToken")
+            if not next_token:
+                break
+        return pools
+
+    @driver_op(cloud="aws", driver="cluster")
+    def list_cognito_user_pool_clients(self, pool_id: str) -> list[CognitoUserPoolClientInfo]:
+        """Live ``cognito-idp:ListUserPoolClients`` for ``pool_id`` (#859).
+
+        Paginates the full client list. Raises on credential / API
+        failure — the resolver swallows it into an empty list so the
+        dependent client picker degrades to free-entry.
+        """
+        client = self._cognito_idp_client()
+        clients: list[CognitoUserPoolClientInfo] = []
+        next_token: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {"UserPoolId": pool_id, "MaxResults": 60}
+            if next_token:
+                kwargs["NextToken"] = next_token
+            try:
+                resp = client.list_user_pool_clients(**kwargs)
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+            for c in resp.get("UserPoolClients", []):
+                client_id = c.get("ClientId", "")
+                if not client_id:
+                    continue
+                clients.append(
+                    CognitoUserPoolClientInfo(
+                        client_id=client_id,
+                        client_name=c.get("ClientName", ""),
+                    ),
+                )
+            next_token = resp.get("NextToken")
+            if not next_token:
+                break
+        return clients
+
+    def _cognito_pool_domain(self, client: Any, pool_id: str) -> str:
+        """Best-effort hosted-domain lookup for ``pool_id`` via
+        DescribeUserPool. Returns the bare domain prefix (what the ALB
+        auth annotation wants — without the
+        ``.auth.<region>.amazoncognito.com`` suffix). A pool with no
+        hosted domain, or a failed describe, yields an empty string so
+        the caller still surfaces the pool."""
+        try:
+            resp = client.describe_user_pool(UserPoolId=pool_id)
+        except Exception as exc:
+            log.warning(
+                "list_cognito_user_pools: describe_user_pool failed for %s (%s) — domain blank",
+                pool_id,
+                exc,
+            )
+            return ""
+        return resp.get("UserPool", {}).get("Domain", "") or ""
+
+    def _cognito_idp_client(self) -> Any:
+        """Lazily build (and cache) the cognito-idp boto3 client in the
+        cluster's region. Tests inject the client in the constructor;
+        production builds it here on first use via the ambient
+        credential chain (same as the eks/sts/ec2 clients)."""
+        if self._cognito_idp is None:
+            import boto3
+
+            self._cognito_idp = boto3.client("cognito-idp", region_name=self._config.region)
+        return self._cognito_idp
+
+    # ---- certificate discovery (#858) ------------------------------
+
+    def list_certificates(self, cluster: ClusterContext) -> list[CertificateInfo]:
+        """List ACM certificates available in the cluster's region (#858).
+
+        Backs the SNI / custom-domain cert picker: rather than make the
+        operator paste an ACM ARN from the console, the UI offers the
+        certs the platform's IAM role can already see. Paginates
+        ``acm:ListCertificates`` filtered to ``ISSUED`` status (only
+        usable certs can terminate TLS), then ``acm:DescribeCertificate``
+        per cert to read the primary domain name. Returns newest-listed
+        first; the ARN is the identifier the platform persists.
+
+        ``cluster`` is accepted for protocol symmetry with the other
+        cloud-read methods but isn't needed — ACM is account+region
+        scoped, and the region comes from ``EKSConfig``. The describe
+        call is best-effort per cert: a transient describe failure on
+        one cert falls back to the list-level domain name rather than
+        dropping the cert from the picker.
+        """
+        del cluster  # ACM is account/region-scoped; region from config
+        acm = self._acm_client()
+        out: list[CertificateInfo] = []
+        try:
+            paginator = acm.get_paginator("list_certificates")
+            pages = paginator.paginate(CertificateStatuses=["ISSUED"])
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "list_certificates: ListCertificates failed region=%s: %s",
+                self._config.region,
+                exc,
+            )
+            return out
+        for page in pages:
+            for summary in page.get("CertificateSummaryList", []) or []:
+                arn = summary.get("CertificateArn", "")
+                if not arn:
+                    continue
+                domain_name = summary.get("DomainName", "")
+                status = summary.get("Status", "ISSUED")
+                label = domain_name
+                try:
+                    desc = acm.describe_certificate(CertificateArn=arn)
+                    cert = desc.get("Certificate", {}) or {}
+                    domain_name = cert.get("DomainName", domain_name) or domain_name
+                    status = cert.get("Status", status) or status
+                    sans = cert.get("SubjectAlternativeNames", []) or []
+                    if domain_name and len(sans) > 1:
+                        label = f"{domain_name} (+{len(sans) - 1})"
+                    else:
+                        label = domain_name
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "list_certificates: DescribeCertificate failed arn=%s: %s",
+                        arn,
+                        exc,
+                    )
+                out.append(
+                    CertificateInfo(
+                        arn=arn,
+                        name=label or arn,
+                        domain_name=domain_name,
+                        status=status,
+                    )
+                )
+        return out
+
     # ---- internals ------------------------------------------------
+
+    def _acm_client(self) -> Any:
+        """Lazily build (and cache) the ACM boto3 client for the cluster's
+        region. Mirrors the eks/sts/ec2 client construction; injectable
+        via the ``acm_client`` ctor kwarg for moto tests."""
+        if self._acm is None:
+            import boto3
+
+            self._acm = boto3.client("acm", region_name=self._config.region)
+        return self._acm
 
     def _k8s(self, cluster: str) -> Any:
         """Get / build the cached kubernetes client for the cluster.

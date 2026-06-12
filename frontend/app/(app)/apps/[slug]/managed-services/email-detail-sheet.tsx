@@ -1117,7 +1117,7 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
         <>
           <p className="text-muted-foreground mb-2 text-xs">
             SES is publishing send / delivery / bounce / complaint / open / click events to the
-            platform's ingester via SNS. The recent-message log and engagement metrics below stay
+            platform&apos;s ingester via SNS. The recent-message log and engagement metrics below stay
             live.
           </p>
           <div className="bg-muted/40 mb-2 flex items-center gap-2 rounded-md border p-2 font-mono text-[11px]">
@@ -1142,13 +1142,13 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
       ) : (
         <div className="text-muted-foreground space-y-2 text-xs">
           <p>
-            SNS event publishing is not configured for this identity. Without it the platform can't
+            SNS event publishing is not configured for this identity. Without it the platform can&apos;t
             render the per-message log, bounce drill-in, or open/click engagement.
           </p>
           <p>
             Set{" "}
             <code className="text-foreground font-mono">ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN</code> in
-            the install's environment config and re-provision this managed service to wire the SES
+            the install&apos;s environment config and re-provision this managed service to wire the SES
             configuration set, SNS topic, and platform subscription.
           </p>
         </div>
@@ -1733,7 +1733,7 @@ function MessageLogPanel({ managedServiceId }: { managedServiceId: string }) {
       ) : messages.length === 0 ? (
         <p className="text-muted-foreground py-4 text-center text-xs">
           No messages match the current filter. Either nothing has been sent in the retention window
-          or SNS event publishing isn't configured.
+          or SNS event publishing isn&apos;t configured.
         </p>
       ) : (
         <Table>
@@ -2106,7 +2106,7 @@ function TemplateManagementPanel({ managedServiceId }: { managedServiceId: strin
             />
             {!creatingNew ? (
               <p className="text-muted-foreground text-[10px]">
-                Name is the template identifier and can't be changed.
+                Name is the template identifier and can&apos;t be changed.
               </p>
             ) : null}
           </div>

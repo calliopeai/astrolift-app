@@ -351,6 +351,30 @@ class ProvisionManagedDomainInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class WorkflowDefinitionRunInput:
+    """Input for ``WorkflowDefinitionRunWorkflow`` — the agent workflow
+    stage executor.
+
+    ``workflow_run_id`` is the ``astrolift_operations.WorkflowRun`` mirror
+    row's pk (as a string — the executor keys stage executions to it). The
+    ``runWorkflowDefinition`` mutation creates the WorkflowInstance +
+    WorkflowRun rows first, then passes that pk here.
+
+    ``only_stage_order`` / ``fan_out_index`` are set ONLY on the child runs
+    a FAN_OUT parent spawns: each child executes exactly the one stage at
+    ``only_stage_order`` and never re-fans-out. Top-level runs leave both
+    unset and execute every stage in order.
+    """
+
+    workflow_definition_slug: str
+    workflow_run_id: str
+    trigger_payload: dict[str, Any]
+    actor: Actor
+    only_stage_order: int | None = None
+    fan_out_index: int | None = None
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""

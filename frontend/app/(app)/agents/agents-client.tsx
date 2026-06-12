@@ -33,14 +33,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { getActiveOrgGuid } from "@/lib/identity/active-org";
 
-// TODO(#798): Import LIST_AGENT_RUNS and RUN_ASTROLIFT_AGENT once the
-// backend exposes them. The AgentRun model exists but has no GraphQL
-// surface yet. See backend/astrolift_lifecycle/schema/ — add
-// AstroliftAgentRunType, astroliftAgentRuns query, and
-// runAstroliftAgent mutation, then wire them here.
+type AgentTask = {
+  id: string;
+  status: string;
+  callbackUrl: string;
+  result: unknown;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+type AgentTasksData = {
+  agentTasks: AgentTask[];
+};
 
 type AgentTab = "active" | "dispatch" | "history" | "registry";
 const AGENT_TABS: readonly AgentTab[] = ["active", "dispatch", "history", "registry"];
@@ -57,29 +67,63 @@ interface WorkloadResp {
 }
 
 // ---------------------------------------------------------------------------
-// Active tab — running agent runs
+// Active tab — running agent tasks
 // ---------------------------------------------------------------------------
 
-function ActiveTab() {
-  // TODO(#798): Replace the EmptyState below with a real useQuery call
-  // once LIST_AGENT_RUNS (status: "running") is wired in the backend.
-  // Add pollInterval: 5000 so the list refreshes every 5 s while runs
-  // are executing.
-  //
-  // const { data, loading } = useQuery<{ astroliftAgentRuns: AgentRunPlaceholder[] }>(
-  //   LIST_AGENT_RUNS,
-  //   { variables: { status: "running" }, pollInterval: 5000 }
-  // );
-  // const runs = data?.astroliftAgentRuns ?? [];
+function ActiveTab({ orgId }: { orgId: string }) {
+  const { data, loading } = useQuery<AgentTasksData>(LIST_AGENT_TASKS, {
+    variables: { orgId, status: "running" },
+    pollInterval: 5000,
+    skip: !orgId,
+  });
+  const tasks = data?.agentTasks ?? [];
+
+  if (loading && tasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="space-y-2 p-6">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <EmptyState
+            icon={<BotIcon className="size-5" />}
+            title="No active agent tasks"
+            description="No agent tasks are currently running. Use the Dispatch tab to launch a task."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardContent className="p-6">
-        <EmptyState
-          icon={<BotIcon className="size-5" />}
-          title="No active agent runs"
-          description="No agent runs recorded yet. Dispatch an agent from the Dispatch tab to see active runs here."
-        />
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Started</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tasks.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                <TableCell><Badge variant="default">{t.status}</Badge></TableCell>
+                <TableCell className="text-muted-foreground text-sm">{t.startedAt ?? "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
@@ -213,28 +257,70 @@ function DispatchTab({ agentWorkloads, workloadsLoading }: DispatchTabProps) {
 }
 
 // ---------------------------------------------------------------------------
-// History tab — completed / terminal agent runs
+// History tab — completed / terminal agent tasks
 // ---------------------------------------------------------------------------
 
-function HistoryTab() {
-  // TODO(#798): Replace the EmptyState below with a real useQuery call
-  // once LIST_AGENT_RUNS is wired in the backend. Filter to terminal
-  // statuses: ["succeeded", "failed", "cancelled"].
-  //
-  // const { data, loading } = useQuery<{ astroliftAgentRuns: AgentRunPlaceholder[] }>(
-  //   LIST_AGENT_RUNS,
-  //   { variables: { status__in: ["succeeded", "failed", "cancelled"], limit: 100 } }
-  // );
-  // const runs = data?.astroliftAgentRuns ?? [];
+const TERMINAL_STATUSES = ["succeeded", "failed", "cancelled"];
+
+function HistoryTab({ orgId }: { orgId: string }) {
+  const { data, loading } = useQuery<AgentTasksData>(LIST_AGENT_TASKS, {
+    variables: { orgId },
+    skip: !orgId,
+  });
+  const tasks = (data?.agentTasks ?? []).filter((t) =>
+    TERMINAL_STATUSES.includes(t.status)
+  );
+
+  if (loading && tasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="space-y-2 p-6">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <EmptyState
+            icon={<ClockIcon className="size-5" />}
+            title="No task history"
+            description="No completed agent tasks yet. Tasks will appear here after they finish."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardContent className="p-6">
-        <EmptyState
-          icon={<ClockIcon className="size-5" />}
-          title="No run history"
-          description="No agent runs recorded yet — agent dispatch coming soon."
-        />
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Finished</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tasks.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                <TableCell>
+                  <Badge variant={t.status === "succeeded" ? "default" : "destructive"}>
+                    {t.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">{t.finishedAt ?? "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
@@ -334,6 +420,8 @@ export function AgentsClient() {
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
   }
 
+  const orgId = getActiveOrgGuid() ?? "";
+
   // Workloads are loaded here so both the Dispatch and Registry tabs
   // can share the single query result.
   const { data: workloadsData, loading: workloadsLoading } = useQuery<WorkloadResp>(
@@ -391,11 +479,11 @@ export function AgentsClient() {
         })}
       </div>
 
-      {tab === "active" && <ActiveTab />}
+      {tab === "active" && <ActiveTab orgId={orgId} />}
       {tab === "dispatch" && (
         <DispatchTab agentWorkloads={agentWorkloads} workloadsLoading={workloadsLoading} />
       )}
-      {tab === "history" && <HistoryTab />}
+      {tab === "history" && <HistoryTab orgId={orgId} />}
       {tab === "registry" && (
         <RegistryTab agentWorkloads={agentWorkloads} workloadsLoading={workloadsLoading} />
       )}

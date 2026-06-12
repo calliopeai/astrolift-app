@@ -320,70 +320,62 @@ def _render_managed_subdomain_ingress(
                 rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = ingress_state_label
                 out.append(rendered)
     else:
-        all_hostnames = [wh.hostname for wh in computed]
-        primary_workload = next(
-            (w for w in manifest.workloads if w.kind == "deployment"), None
+        from providers.k8s_native.ingress import (
+            K8sIngressConfig,
+            K8sIngressDriver,
+            OIDCAuthConfig,
         )
-        if primary_workload is None:
-            return []
-        primary_container = next(
-            (c for c in primary_workload.containers if c.is_primary),
-            primary_workload.containers[0] if primary_workload.containers else None,
-        )
-        if primary_container is None or primary_container.port <= 0:
-            return []
-        annotations: dict[str, str] = {}
-        if ingress_paused:
-            annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
-                'return 503 "Astrolift: app is paused";'
+
+        oidc_auth = None
+        oidc_auth_cfg = getattr(cluster, "oidc_auth_config", None)
+        if oidc_auth_cfg and all(
+            k in oidc_auth_cfg for k in ("discovery_url", "client_id", "auth_proxy_host")
+        ):
+            oidc_auth = OIDCAuthConfig(
+                auth_proxy_host=oidc_auth_cfg["auth_proxy_host"],
             )
-        if not cert_arn:
-            annotations["cert-manager.io/cluster-issuer"] = "letsencrypt-prod"
-        out.append(
-            {
-                "apiVersion": "networking.k8s.io/v1",
-                "kind": "Ingress",
-                "metadata": {
-                    "name": f"{app.slug}-managed",
-                    "namespace": namespace,
-                    "annotations": annotations,
-                    "labels": {
-                        "astrolift.dev/app": app.slug,
-                        "astrolift.dev/managed-subdomain": "true",
-                        "astrolift.dev/ingress-state": ingress_state_label,
-                    },
-                },
-                "spec": {
-                    "ingressClassName": cluster.ingress_class,
-                    "tls": [
-                        {
-                            "hosts": all_hostnames,
-                            "secretName": f"{app.slug}-managed-tls",
-                        }
-                    ],
-                    "rules": [
-                        {
-                            "host": h,
-                            "http": {
-                                "paths": [
-                                    {
-                                        "path": "/",
-                                        "pathType": "Prefix",
-                                        "backend": {
-                                            "service": {
-                                                "name": primary_workload.name,
-                                                "port": {"number": int(primary_container.port)},
-                                            }
-                                        },
-                                    }
-                                ]
-                            },
-                        }
-                        for h in all_hostnames
-                    ],
-                },
-            }
+
+        ingress_class = getattr(cluster, "ingress_class", "nginx")
+        # Map the cluster's ingress_class to the driver variant. "nginx" and
+        # "ingress-nginx" both map to nginx_ingress; "traefik", "kong" pass
+        # through; anything else (e.g. "haproxy") falls back to nginx_ingress.
+        _variant_map = {
+            "nginx": "nginx_ingress",
+            "ingress-nginx": "nginx_ingress",
+            "traefik": "traefik",
+            "kong": "kong",
+        }
+        variant = _variant_map.get(ingress_class, "nginx_ingress")
+
+        k8s_driver = K8sIngressDriver(
+            config=K8sIngressConfig(
+                variant=variant,
+                ingress_class_name=ingress_class,
+                cert_manager_issuer="letsencrypt-prod",
+                oidc_auth=oidc_auth,
+            )
         )
+        tls_strategy = "letsencrypt" if not cert_arn else "provided"
+        by_workload: dict[str, list[str]] = {}
+        for wh in computed:
+            by_workload.setdefault(wh.workload_slug, []).append(wh.hostname)
+        for workload_slug, hostnames in by_workload.items():
+            for rendered in k8s_driver.render_ingress(
+                app=app.slug,
+                workload=workload_slug,
+                hostnames=hostnames,
+                tls_strategy=tls_strategy,
+            ):
+                rendered.setdefault("metadata", {})["namespace"] = namespace
+                rendered["metadata"].setdefault("labels", {})[
+                    "astrolift.dev/managed-subdomain"
+                ] = "true"
+                rendered["metadata"]["labels"]["astrolift.dev/ingress-state"] = ingress_state_label
+                if ingress_paused:
+                    rendered["metadata"].setdefault("annotations", {})[
+                        "nginx.ingress.kubernetes.io/server-snippet"
+                    ] = 'return 503 "Astrolift: app is paused";'
+                out.append(rendered)
 
 
 def workloads_from_resources(

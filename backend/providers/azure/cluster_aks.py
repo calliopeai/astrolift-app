@@ -30,6 +30,7 @@ from _sdk.cluster import (
     NamespaceState,
     PodInfo,
     PodLogLine,
+    RegionInfo,
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
@@ -67,6 +68,53 @@ _AKS_KUBECONFIG_TTL_SECONDS = 50 * 60
 # ``_NotFound`` is aliased to the shared helper's ``NotFoundError`` at
 # the top-of-file imports so existing ``except _NotFound`` clauses keep
 # catching what the wrapper raises after the #567 fix.
+
+
+# Curated Azure regions for the cluster-register picker (#860). Live
+# subscriptions.list_locations needs a subscription + authenticated
+# management client; the register path has neither, so this static list
+# (slug, label, continent) backs the picker. Continent strings match
+# the AWS/GCP tables so the UI buckets all clouds consistently.
+_AZURE_REGIONS: tuple[tuple[str, str, str], ...] = (
+    ("eastus", "East US", "Americas"),
+    ("eastus2", "East US 2", "Americas"),
+    ("centralus", "Central US", "Americas"),
+    ("northcentralus", "North Central US", "Americas"),
+    ("southcentralus", "South Central US", "Americas"),
+    ("westcentralus", "West Central US", "Americas"),
+    ("westus", "West US", "Americas"),
+    ("westus2", "West US 2", "Americas"),
+    ("westus3", "West US 3", "Americas"),
+    ("canadacentral", "Canada Central", "Americas"),
+    ("canadaeast", "Canada East", "Americas"),
+    ("brazilsouth", "Brazil South", "Americas"),
+    ("mexicocentral", "Mexico Central", "Americas"),
+    ("northeurope", "North Europe", "Europe"),
+    ("westeurope", "West Europe", "Europe"),
+    ("francecentral", "France Central", "Europe"),
+    ("germanywestcentral", "Germany West Central", "Europe"),
+    ("italynorth", "Italy North", "Europe"),
+    ("norwayeast", "Norway East", "Europe"),
+    ("polandcentral", "Poland Central", "Europe"),
+    ("spaincentral", "Spain Central", "Europe"),
+    ("swedencentral", "Sweden Central", "Europe"),
+    ("switzerlandnorth", "Switzerland North", "Europe"),
+    ("uksouth", "UK South", "Europe"),
+    ("ukwest", "UK West", "Europe"),
+    ("eastasia", "East Asia", "Asia Pacific"),
+    ("southeastasia", "Southeast Asia", "Asia Pacific"),
+    ("australiaeast", "Australia East", "Asia Pacific"),
+    ("australiasoutheast", "Australia Southeast", "Asia Pacific"),
+    ("centralindia", "Central India", "Asia Pacific"),
+    ("southindia", "South India", "Asia Pacific"),
+    ("japaneast", "Japan East", "Asia Pacific"),
+    ("japanwest", "Japan West", "Asia Pacific"),
+    ("koreacentral", "Korea Central", "Asia Pacific"),
+    ("uaenorth", "UAE North", "Middle East"),
+    ("qatarcentral", "Qatar Central", "Middle East"),
+    ("israelcentral", "Israel Central", "Middle East"),
+    ("southafricanorth", "South Africa North", "Africa"),
+)
 
 
 @dataclass(frozen=True)
@@ -692,6 +740,20 @@ class AKSClusterDriver(ClusterDriver):
             client,
             namespaces=default_namespaces(namespaces),
         )
+
+    def list_regions(self) -> list[RegionInfo]:
+        """Curated static list of Azure regions for the register picker
+        (#860).
+
+        Live ``subscription_client.subscriptions.list_locations`` needs
+        a subscription id + an authenticated management client, neither
+        of which is available on the no-cluster register path — so this
+        returns a curated static list. The frontend keeps free-entry on
+        top for regions not listed here.
+        """
+        return [
+            RegionInfo(id=slug, label=label, continent=continent) for slug, label, continent in _AZURE_REGIONS
+        ]
 
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:

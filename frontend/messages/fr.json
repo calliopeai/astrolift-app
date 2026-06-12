@@ -2388,6 +2388,18 @@
         "title": "Rollback {app}/{env}?",
         "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
         "confirm": "Rollback"
+      },
+      "delete": "Supprimer",
+      "retire": "Retirer",
+      "confirmDelete": {
+        "title": "Supprimer le déploiement de {app}/{env} ?",
+        "description": "Retire ce déploiement des listes. La ligne est supprimée en douceur — il n'y a rien en cours à démonter. Cette action est irréversible.",
+        "confirm": "Supprimer le déploiement",
+        "retireTitle": "Retirer le déploiement en cours de {app}/{env} ?",
+        "retireDescription": "Marque ce déploiement comme remplacé afin qu'il ne soit plus la révision active. Les ressources du cluster sont conservées — l'application en cours d'exécution n'est pas démontée.",
+        "retireConfirm": "Retirer le déploiement",
+        "success": "Déploiement écarté",
+        "failed": "Échec de la suppression"
       }
     },
     "environments": {

@@ -675,6 +675,94 @@ class K8sNativeClusterDriver(ClusterDriver):
                 chart_version="65.1.0",
                 install_timeout="15m",
             ),
+            BootstrapComponent(
+                key="dex",
+                title="Dex (in-cluster OIDC provider)",
+                default_enabled=False,
+                rationale=(
+                    "Dex federates an upstream IdP (Google, GitHub, SAML, LDAP, "
+                    "generic OIDC) into a single in-cluster OIDC endpoint that "
+                    "oauth2-proxy authenticates against. Required when "
+                    "oidc_auth_config.kind = 'dex'. Operators who bring their "
+                    "own OIDC provider can skip Dex and point oauth2-proxy "
+                    "directly at the external discovery URL."
+                ),
+                helm_values={
+                    "config": {
+                        "issuer": "https://dex.example.com/dex",
+                        "storage": {"type": "kubernetes", "config": {"inCluster": True}},
+                        "oauth2": {"skipApprovalScreen": True},
+                        "staticClients": [],
+                        "connectors": [],
+                    },
+                    "service": {"type": "ClusterIP"},
+                    "ingress": {
+                        "enabled": True,
+                        "className": "nginx",
+                        "annotations": {
+                            "cert-manager.io/cluster-issuer": "letsencrypt-prod",
+                        },
+                    },
+                },
+                requires=["upstream IdP credentials (connector config)"],
+                options=[
+                    BootstrapOption(
+                        key="upstream_connector",
+                        label="Upstream IdP connector",
+                        choices=[
+                            ("google", "Google Workspace"),
+                            ("github", "GitHub (org/team membership)"),
+                            ("saml", "SAML 2.0 (Okta, OneLogin, ADFS)"),
+                            ("ldap", "LDAP / Active Directory"),
+                            ("oidc", "Generic OIDC (any upstream provider)"),
+                        ],
+                        default="google",
+                    ),
+                ],
+                chart_name="dex",
+                chart_repo_url="https://charts.dexidp.io",
+                chart_repo_type="default",
+                chart_version="0.19.1",
+            ),
+            BootstrapComponent(
+                key="oauth2-proxy",
+                title="oauth2-proxy (OIDC edge auth gate)",
+                default_enabled=False,
+                rationale=(
+                    "oauth2-proxy sits in front of every nginx-class Ingress and "
+                    "enforces OIDC authentication via the nginx "
+                    "auth_request sub-request mechanism. Works with Dex "
+                    "(in-cluster) or any external OIDC provider. Enable "
+                    "alongside Dex when oidc_auth_config is set."
+                ),
+                helm_values={
+                    "config": {
+                        "clientID": "astrolift-proxy",
+                        "cookieSecure": True,
+                        "cookieName": "_astrolift_oauth2",
+                        "emailDomains": ["*"],
+                        "scope": "openid email profile groups",
+                        "passAccessToken": True,
+                        "setXauthrequest": True,
+                        "upstreamInsecureSkipVerify": False,
+                    },
+                    "ingress": {
+                        "enabled": True,
+                        "className": "nginx",
+                        "annotations": {
+                            "cert-manager.io/cluster-issuer": "letsencrypt-prod",
+                        },
+                    },
+                    "replicaCount": 2,
+                },
+                requires=["dex or external OIDC provider", "oidc_auth_config set on cluster"],
+                options=[],
+                chart_name="oauth2-proxy",
+                chart_repo_url="https://oauth2-proxy.github.io/manifests",
+                chart_repo_type="default",
+                chart_version="7.7.14",
+                depends_on=["dex"],
+            ),
         ]
 
     # ---- Cluster health (#68 slice 1) -----------------------------

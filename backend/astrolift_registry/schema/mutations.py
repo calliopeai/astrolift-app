@@ -43,6 +43,19 @@ class RegisterAppInput:
     default_branch: str | None = None
     deploy_branch: str | None = None
     trigger_mode: str | None = None
+    # Build configuration. ``build_mode`` selects how the deployable
+    # image is produced: ``ci_pushed`` (default — CI publishes and the
+    # platform deploys), ``platform_build`` (platform fetches the source
+    # tree and invokes a BuildDriver), or ``none`` (a pre-built tag, no
+    # build). The ``dockerfile_path`` / ``build_context`` / ``build_args``
+    # trio is only meaningful under ``platform_build`` but is accepted in
+    # every mode so the wizard can capture it up front. ``build_args`` is
+    # a flat string→string map sent as JSON; None falls back to the empty
+    # default on the row.
+    build_mode: str = "ci_pushed"
+    dockerfile_path: str = "Dockerfile"
+    build_context: str = "."
+    build_args: strawberry.scalars.JSON | None = None
     # Five-field cron expression. Required when ``trigger_mode == 'cron'``
     # and ignored otherwise; the resolver enforces both rules.
     cron_expression: str | None = None
@@ -75,6 +88,14 @@ class UpdateAppInput:
     default_branch: str | None = None
     deploy_branch: str | None = None
     trigger_mode: str | None = None
+    # Build configuration. See ``RegisterAppInput`` for the per-field
+    # semantics. On update each is a None-sentinel: a field left None is
+    # untouched, so a caller can flip ``build_mode`` to ``platform_build``
+    # without having to re-send the Dockerfile path it already saved.
+    build_mode: str | None = None
+    dockerfile_path: str | None = None
+    build_context: str | None = None
+    build_args: strawberry.scalars.JSON | None = None
     cron_expression: str | None = None
     preview_enabled: bool | None = None
     is_active: bool | None = None
@@ -473,6 +494,65 @@ def _validate_effective_approval_policy(
     return None
 
 
+def _validate_build_mode(raw):
+    """Validate an incoming ``build_mode`` against the model choices.
+
+    Returns ``(value, error)``. ``value`` is the normalised string when
+    valid; ``error`` is the MutationResult failure envelope otherwise.
+    A None input (the update-mutation "leave untouched" sentinel) passes
+    straight through as ``(None, None)`` so callers can skip the field.
+    """
+    if raw is None:
+        return None, None
+    value = str(raw).strip()
+    valid = {choice.value for choice in RegisteredApp.BuildMode}
+    if value not in valid:
+        return None, gql_failure(
+            ErrorCode.VALIDATION.value,
+            f"buildMode must be one of {sorted(valid)}",
+            field="buildMode",
+        )
+    return value, None
+
+
+def _normalize_build_args(raw):
+    """Coerce the incoming ``build_args`` JSON into a flat str→str map.
+
+    Returns ``(args, error)``. ``args`` is a dict on success (the empty
+    dict when ``raw`` is None — the row default). ``build_args`` are
+    rendered as ``--build-arg KEY=VALUE`` pairs by the platform-build
+    path, so a non-object payload or a non-scalar value is a caller
+    error rather than something to silently coerce: refuse with a
+    field-tagged validation envelope. Scalar values (str / int / bool)
+    are stringified for convenience.
+    """
+    if raw is None:
+        return {}, None
+    if not isinstance(raw, dict):
+        return None, gql_failure(
+            ErrorCode.VALIDATION.value,
+            "buildArgs must be a JSON object of string keys to string values",
+            field="buildArgs",
+        )
+    out: dict[str, str] = {}
+    for key, val in raw.items():
+        if not isinstance(key, str):
+            return None, gql_failure(
+                ErrorCode.VALIDATION.value,
+                "buildArgs keys must be strings",
+                field="buildArgs",
+            )
+        if isinstance(val, (str, int, float, bool)):
+            out[key] = str(val)
+        else:
+            return None, gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"buildArgs[{key!r}] must be a string, number, or boolean",
+                field="buildArgs",
+            )
+    return out, None
+
+
 @strawberry.input
 class AssignAppToProjectInput:
     """Re-assign an app to a project, or unassign it (#391).
@@ -843,6 +923,13 @@ class RegistryMutation:
         if cross_err is not None:
             return cross_err
 
+        build_mode, build_mode_err = _validate_build_mode(input.build_mode)
+        if build_mode_err is not None:
+            return build_mode_err
+        build_args, build_args_err = _normalize_build_args(input.build_args)
+        if build_args_err is not None:
+            return build_args_err
+
         app = RegisteredApp.objects.create(
             organization=project.organization,
             team=project.team,
@@ -857,6 +944,10 @@ class RegistryMutation:
             manifest_raw=input.manifest_raw or "",
             default_branch=input.default_branch or "main",
             deploy_branch=input.deploy_branch or input.default_branch or "main",
+            build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
+            dockerfile_path=input.dockerfile_path or "Dockerfile",
+            build_context=input.build_context or ".",
+            build_args=build_args,
             trigger_mode=trigger_mode,
             cron_expression=cron_expression,
             k8s_namespace=f"{project.organization.slug}-{input.slug}",
@@ -974,6 +1065,13 @@ class RegistryMutation:
         if cross_err is not None:
             return cross_err
 
+        # Build config. ``build_mode`` is validated against the choices;
+        # ``build_args`` is normalised to a str→str map. Both are
+        # None-sentinel on update — a field left None stays as-is.
+        build_mode, build_mode_err = _validate_build_mode(input.build_mode)
+        if build_mode_err is not None:
+            return build_mode_err
+
         for field in (
             "name",
             "description",
@@ -981,6 +1079,8 @@ class RegistryMutation:
             "manifest_path",
             "default_branch",
             "deploy_branch",
+            "dockerfile_path",
+            "build_context",
             "preview_enabled",
             "is_active",
             "cron_paused",
@@ -988,6 +1088,13 @@ class RegistryMutation:
             new_value = getattr(input, field)
             if new_value is not None:
                 setattr(app, field, new_value)
+        if build_mode is not None:
+            app.build_mode = build_mode
+        if input.build_args is not None:
+            build_args, build_args_err = _normalize_build_args(input.build_args)
+            if build_args_err is not None:
+                return build_args_err
+            app.build_args = build_args
         app.trigger_mode = next_trigger_mode
         app.cron_expression = next_cron_raw
         # Flipping away from cron implicitly clears the paused flag —

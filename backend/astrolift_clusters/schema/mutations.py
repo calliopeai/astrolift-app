@@ -13,7 +13,9 @@ kick a Temporal workflow that talks to the real cluster.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import logging
+import secrets
 
 import strawberry
 from django.db import transaction
@@ -228,6 +230,36 @@ class ConfigureProviderPluginInput:
 
 
 @strawberry.input
+class IssueClusterAgentKeyInput:
+    """``issueClusterAgentKey`` mutation input (#808).
+
+    Issues (or rotates) the scoped key the in-cluster keep-alive agent
+    signs its heartbeat with. ``cluster_id`` is the cluster the key is
+    bound to. ``interval_seconds`` lets the operator tune the pulse
+    cadence; omitted leaves the existing cadence (default 30s)."""
+
+    cluster_id: GUID
+    interval_seconds: int | None = None
+
+
+@strawberry.type
+class _ClusterAgentKeyIssuedPayload:
+    """Return shape for ``issueClusterAgentKey``.
+
+    ``agent_key`` is the raw scoped key — surfaced EXACTLY ONCE, here,
+    at issuance; only its SHA-256 persists on the cluster row. The
+    operator pastes it into the agent's Secret. ``rotated`` is True when
+    this replaced a previously-issued key (so the UI can warn that the
+    old agent will start 401ing)."""
+
+    cluster_id: GUID
+    agent_key: str
+    interval_seconds: int
+    heartbeat_url: str
+    rotated: bool
+
+
+@strawberry.input
 class BringClusterIntoManagementInputType:
     cluster_id: GUID
 
@@ -307,6 +339,18 @@ class InstallClusterPrereqsInputType:
     option_overrides: list[BootstrapOptionOverride] = strawberry.field(
         default_factory=list,
     )
+
+
+@strawberry.input
+class DeployClusterAgentInput:
+    """``deployClusterAgent`` mutation input (#873).
+
+    ``cluster_id`` is the cluster the keep-alive agent Deployment is
+    applied to. The agent reads its credentials from the pre-created
+    ``astrolift-agent`` Secret (created from the snippet surfaced by
+    ``issueClusterAgentKey``), so no key material rides on this input."""
+
+    cluster_id: GUID
 
 
 @strawberry.type
@@ -411,6 +455,151 @@ class ClustersMutation:
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
+    @mutation_audit(
+        action="cluster.issue_agent_key",
+        target=lambda root, info, input: ("cluster", str(input.cluster_id)),
+    )
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def issue_cluster_agent_key(
+        self, info: Info, input: IssueClusterAgentKeyInput
+    ) -> MutationResultType[_ClusterAgentKeyIssuedPayload]:
+        """Issue (or rotate) the in-cluster keep-alive agent key (#808).
+
+        Generates a 256-bit scoped key, stores only its SHA-256, and
+        returns the plaintext exactly once so the operator can install
+        it in the agent's Secret. Re-running rotates the key — the old
+        one stops authenticating immediately.
+
+        Tenant-scoped: the lookup is constrained to the caller's org (or
+        a platform-shared cluster), so a tenant can never mint an agent
+        credential for another tenant's cluster — an out-of-scope guid
+        reads as NOT_FOUND, identical to a guid that doesn't exist.
+        """
+        from django.db.models import Q
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"cluster {input.cluster_id!r} not found",
+                field="clusterId",
+            )
+
+        rotated = bool(cluster.agent_key_hash)
+        raw_key = secrets.token_hex(32)  # 256-bit, 64 hex chars
+        cluster.agent_key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+
+        update_fields = ["agent_key_hash", "updated_at", "version"]
+        if input.interval_seconds is not None:
+            # Clamp to the AC ceiling (<=60s) and a sane floor so a typo
+            # can't make the agent hot-loop or look perpetually offline.
+            cluster.heartbeat_interval_seconds = max(5, min(int(input.interval_seconds), 60))
+            update_fields.append("heartbeat_interval_seconds")
+        cluster.save(update_fields=update_fields)
+
+        from django.conf import settings
+
+        # APP_BASE_URL is the platform's external origin (used elsewhere
+        # for the GitHub-App manifest callback URL). Empty in local dev,
+        # in which case we return the path-only form — the agent's
+        # install snippet templates the host in regardless.
+        base = (getattr(settings, "APP_BASE_URL", "") or "").rstrip("/")
+        heartbeat_path = f"/api/clusters/v1/{cluster.guid}/heartbeat/"
+        return gql_success(
+            _ClusterAgentKeyIssuedPayload(
+                cluster_id=GUID(str(cluster.guid)),
+                agent_key=raw_key,
+                interval_seconds=cluster.heartbeat_interval_seconds,
+                heartbeat_url=f"{base}{heartbeat_path}" if base else heartbeat_path,
+                rotated=rotated,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="cluster.deploy_agent",
+        target=lambda root, info, input: ("cluster", str(input.cluster_id)),
+    )
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def deploy_cluster_agent(
+        self, info: Info, input: DeployClusterAgentInput
+    ) -> MutationResultType[TenantClusterType]:
+        """Deploy the in-cluster keep-alive agent to a cluster (#873).
+
+        Applies the agent's Namespace + Deployment manifests via the
+        cluster's driver (server-side apply, idempotent — re-running
+        converges the Deployment). The agent reads ``heartbeat_url`` and
+        ``agent_key`` from the ``astrolift-agent`` Secret, which this
+        mutation does NOT create: the raw key is surfaced exactly once at
+        ``issueClusterAgentKey`` and never persisted, so the control
+        plane has no key to put in the Secret. The operator applies the
+        Secret from the install snippet first; this then lands the
+        Deployment that references it.
+
+        Gated on ``cluster.manage`` — same actor who issues the agent key.
+        Tenant-scoped: the lookup is constrained to the caller's org (or
+        a platform-shared cluster), so an out-of-scope guid reads as
+        NOT_FOUND, identical to a guid that doesn't exist.
+        """
+        from django.db.models import Q
+
+        from core.cluster_management import ClusterManagementError, deploy_agent_dispatch
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"cluster {input.cluster_id!r} not found",
+                field="clusterId",
+            )
+        if not cluster.agent_key_hash:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "issue an agent key first before deploying the agent",
+                field="clusterId",
+            )
+        if not cluster.is_active:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "cluster is inactive — re-activate before deploying the agent",
+            )
+
+        # Apply the Namespace + Deployment via the cluster driver. Two
+        # failure shapes are persisted to last_management_error (so the
+        # settings card surfaces them) and returned as INTERNAL: the
+        # driver couldn't be built / doesn't support apply_manifests
+        # (ClusterManagementError), or the apply itself reported per-
+        # manifest errors (ApplyResult.ok is False).
+        try:
+            result = deploy_agent_dispatch(cluster=cluster)
+        except ClusterManagementError as exc:
+            cluster.last_management_error = str(exc)
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            return gql_failure(ErrorCode.INTERNAL.value, str(exc))
+
+        if not result.ok:
+            message = "agent deploy failed: " + "; ".join(str(e) for e in result.errors)
+            cluster.last_management_error = message
+            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            return gql_failure(ErrorCode.INTERNAL.value, message)
+
+        cluster.last_management_error = ""
+        cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+        return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
     @mutation_audit(action="cluster.update")
     @require_permission(Permission.CLUSTER_UPDATE)
     @tenant_scoped()
@@ -428,9 +617,31 @@ class ClustersMutation:
             cluster.endpoint = input.endpoint
         if input.ingress_class is not None:
             cluster.ingress_class = input.ingress_class
-        if input.alb_auth_config is not strawberry.UNSET:
+        auth_config_changed = input.alb_auth_config is not strawberry.UNSET
+        if auth_config_changed:
             cluster.alb_auth_config = input.alb_auth_config
         cluster.save()
+
+        # GitOps round-trip (#853): when the operator changes the ALB
+        # auth gate, mirror it back into every bound app's astrolift.toml
+        # so the repo (source of truth) doesn't drift from the DB. This
+        # is best-effort and must never block the UI save — a missing
+        # source connection is a graceful skip, and any SCM failure is
+        # swallowed here and surfaced only in the logs.
+        if auth_config_changed:
+            try:
+                from astrolift_clusters.services.toml_writeback import (
+                    write_auth_config_for_cluster,
+                )
+
+                actor = getattr(info.context, "user", None)
+                write_auth_config_for_cluster(cluster, actor)
+            except Exception:  # noqa: BLE001 — write-back never blocks the save
+                logger.exception(
+                    "auth config TOML write-back failed for cluster %s",
+                    cluster.slug,
+                )
+
         return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
@@ -974,8 +1185,7 @@ class ClustersMutation:
                     "Revalidation signal sent — the workflow will check cert"
                     " issuance on the next activity slot."
                     if signaled
-                    else "Temporal is disabled or the workflow was not found;"
-                    " no signal sent."
+                    else "Temporal is disabled or the workflow was not found; no signal sent."
                 ),
             )
         )
@@ -1016,8 +1226,7 @@ class ClustersMutation:
                     "Reissue signal sent — the workflow will delete and re-request"
                     " the cert. Re-add the new validation CNAME records when they appear."
                     if signaled
-                    else "Temporal is disabled or the workflow was not found;"
-                    " no signal sent."
+                    else "Temporal is disabled or the workflow was not found; no signal sent."
                 ),
             )
         )

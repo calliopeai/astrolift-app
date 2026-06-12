@@ -122,6 +122,8 @@ class AppEnvironmentType:
     required_approvals: int
     registered_app_slug: str
     cluster_slug: str | None
+    cluster_id: GUID | None
+    cluster_provider_plugin_slug: str | None
     domain_zone: str | None
     created_at: dt.datetime
     settings: list[EnvironmentSettingType] = strawberry.field(default_factory=list)
@@ -381,6 +383,14 @@ def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType
         required_approvals=env.required_approvals,
         registered_app_slug=env.registered_app.slug,
         cluster_slug=env.tenant_cluster.slug if env.tenant_cluster_id else None,
+        # #858 — the SNI cert picker on the Domains page needs the bound
+        # cluster's guid + provider to fetch clusterCertificates. Both
+        # come off the already-loaded tenant_cluster FK; null when the
+        # env isn't bound to a cluster yet.
+        cluster_id=(GUID(str(env.tenant_cluster.guid)) if env.tenant_cluster_id else None),
+        cluster_provider_plugin_slug=(
+            env.tenant_cluster.provider_plugin.slug if env.tenant_cluster_id else None
+        ),
         domain_zone=env.managed_domain.zone if env.managed_domain_id else None,
         created_at=env.created_at,
         settings=[env_setting_to_type(s) for s in raw],
