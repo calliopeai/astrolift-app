@@ -236,12 +236,23 @@ class AgentEnvironmentSpecType:
     tool_preset: str
     allow_install: bool
     vnc_enabled: bool
-    secret_refs: strawberry.scalars.JSON
+    secret_ref_count: int
+    """Number of secret references wired into this spec. The references
+    themselves (the ARNs / vault URIs paired with target env-var names in
+    ``secret_refs``) are deliberately NEVER exposed over GraphQL — leaking
+    the pointer is enough to help an attacker locate the secret, and the
+    value never lives on this row. The UI shows "N secrets wired"; the
+    dispatcher resolves the refs to live values at launch time."""
     env_vars: strawberry.scalars.JSON
     config_repo: str
     config_branch: str
     created_at: dt.datetime
     updated_at: dt.datetime
+
+
+def _secret_ref_count(spec: AgentEnvironmentSpec) -> int:
+    refs = spec.secret_refs
+    return len(refs) if isinstance(refs, list) else 0
 
 
 def agent_environment_spec_to_type(spec: AgentEnvironmentSpec) -> AgentEnvironmentSpecType:
@@ -254,7 +265,7 @@ def agent_environment_spec_to_type(spec: AgentEnvironmentSpec) -> AgentEnvironme
         tool_preset=spec.tool_preset or "",
         allow_install=spec.allow_install,
         vnc_enabled=spec.vnc_enabled,
-        secret_refs=spec.secret_refs or [],
+        secret_ref_count=_secret_ref_count(spec),
         env_vars=spec.env_vars or {},
         config_repo=spec.config_repo or "",
         config_branch=spec.config_branch or "main",

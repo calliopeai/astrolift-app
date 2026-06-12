@@ -476,6 +476,66 @@ def test_create_agent_environment_spec_invalid_agent_type(user, org):
     assert result.errors[0].field == "agentType"
 
 
+def test_agent_environment_spec_type_exposes_count_not_refs():
+    """Regression guard: the GraphQL type must surface only the COUNT of
+    secret references, never the references (ARNs / vault URIs) themselves.
+    Leaking the pointer helps an attacker locate the secret even though the
+    value never lives on the row. See the agent-platform foundation work.
+    """
+    from astrolift_agents.schema.types import (
+        AgentEnvironmentSpecType,
+        agent_environment_spec_to_type,
+    )
+
+    # The type's GraphQL fields must include the count and must NOT include
+    # a raw secret_refs / secretRefs field.
+    field_names = {f.name for f in AgentEnvironmentSpecType.__strawberry_definition__.fields}
+    assert "secret_ref_count" in field_names
+    assert "secret_refs" not in field_names
+    assert "secretRefs" not in field_names
+
+    # The shaper returns the count, and the shaped object carries no
+    # attribute exposing the references.
+    spec = AgentEnvironmentSpec(
+        name="Has Secrets",
+        slug="has-secrets",
+        image_tag="img:v1",
+        agent_type=AgentEnvironmentSpec.AgentType.CLAUDE,
+        secret_refs=[
+            {"uri": "arn:aws:secretsmanager:us-west-2:1:secret:gh", "env_var": "GH_TOKEN"},
+            {"uri": "vault://secret/db", "env_var": "DB_PASSWORD"},
+        ],
+    )
+    shaped = agent_environment_spec_to_type(spec)
+    assert shaped.secret_ref_count == 2
+    assert not hasattr(shaped, "secret_refs")
+
+
+def test_create_agent_environment_spec_returns_secret_ref_count(user, org):
+    """End-to-end: creating a spec with secret refs returns the count, and
+    the refs are persisted on the row for the dispatcher (never surfaced)."""
+    mutation = AgentsMutation()
+    with _ctx(user, org):
+        result = mutation.create_agent_environment_spec(
+            _info(user),
+            input=CreateAgentEnvironmentSpecInput(
+                name="Secretful",
+                slug="secretful",
+                image_tag="123.dkr.ecr.us-west-2.amazonaws.com/agents:v1",
+                agent_type="claude",
+                secret_refs=[
+                    {"uri": "arn:aws:secretsmanager:us-west-2:1:secret:gh", "env_var": "GH_TOKEN"},
+                ],
+            ),
+        )
+    assert result.ok, result.errors
+    assert result.data.secret_ref_count == 1
+    # The references are stored on the row (the dispatcher needs them) but
+    # the GraphQL surface only ever returns the count.
+    spec = AgentEnvironmentSpec.objects.get(organization=org, slug="secretful")
+    assert len(spec.secret_refs) == 1
+
+
 def test_create_agent_environment_spec_duplicate_slug_returns_conflict(user, org, env_spec):
     mutation = AgentsMutation()
     with _ctx(user, org):
