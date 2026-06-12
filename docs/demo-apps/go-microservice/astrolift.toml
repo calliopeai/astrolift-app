@@ -1,0 +1,53 @@
+# Demo: Go microservice
+#
+# Topology tested:
+#   - Deploy from a pre-built image (no Dockerfile build)
+#   - Custom domain binding
+#   - Tight resource limits (Go binaries are small)
+#   - gRPC and HTTP on separate ports (ClusterIP for gRPC, Ingress for HTTP)
+
+[app]
+name        = "demo-go-svc"
+description = "Demo Go microservice — pre-built image, custom domain"
+
+[image]
+# Instead of building from source, Astrolift pulls this image directly.
+# The image tag is pinned; update it to roll forward.
+repository  = "ghcr.io/calliopeai/demo-go-svc"
+tag         = "latest"
+
+[workload]
+replicas    = 3
+port        = 8080
+
+[resources]
+# Go binaries are lean. Keep limits tight for realistic resource testing.
+cpu_request    = "50m"
+cpu_limit      = "200m"
+memory_request = "32Mi"
+memory_limit   = "64Mi"
+
+[health]
+readiness_path = "/readyz"
+liveness_path  = "/livez"
+initial_delay  = 3
+period         = 10
+timeout        = 2
+failure_threshold = 2
+
+[ingress]
+enabled     = true
+tls         = true
+# custom_domain triggers Astrolift to create a Certificate resource
+# and an Ingress rule for this hostname. Requires external-dns on the
+# cluster for automatic DNS record creation.
+custom_domain = "api.example.com"
+
+[environment]
+GO_ENV         = "production"
+LOG_FORMAT     = "json"
+GRPC_PORT      = "9090"
+
+[secrets]
+JWT_SIGNING_KEY = { secret = "demo-go-svc-jwt-key" }
+DATABASE_URL    = { secret = "demo-go-svc-db-url" }

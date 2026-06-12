@@ -1,0 +1,57 @@
+# Demo: Node.js web application
+#
+# Topology tested:
+#   - Single HTTP workload
+#   - Build from source (Dockerfile at repo root)
+#   - Auto-managed TLS via cert-manager
+#   - Environment variable injection from Astrolift secrets
+#   - Basic health probe
+
+[app]
+name        = "demo-nodejs-web"
+description = "Demo Node.js web application"
+
+[build]
+# Astrolift clones the repo at the specified ref and builds using
+# the Dockerfile at the repo root.
+dockerfile  = "Dockerfile"
+context     = "."
+
+[workload]
+replicas    = 2
+port        = 3000
+
+[resources]
+cpu_request    = "100m"
+cpu_limit      = "500m"
+memory_request = "128Mi"
+memory_limit   = "256Mi"
+
+[health]
+# Astrolift creates a Kubernetes readinessProbe and livenessProbe
+# from these values. The path must return HTTP 2xx when the app is ready.
+readiness_path = "/health"
+liveness_path  = "/health"
+initial_delay  = 5
+period         = 10
+timeout        = 3
+failure_threshold = 3
+
+[ingress]
+# enabled = true tells Astrolift to create an Ingress resource.
+# The hostname defaults to <slug>.<cluster-base-domain> if not set.
+enabled        = true
+tls            = true           # cert-manager issues the certificate
+
+[environment]
+# Non-secret environment variables. Values are injected as-is.
+NODE_ENV       = "production"
+LOG_LEVEL      = "info"
+PORT           = "3000"
+
+[secrets]
+# Secret names reference the Astrolift secrets store.
+# Each name maps to an environment variable in the running container.
+# Secrets are encrypted at rest and never appear in logs or API responses.
+DATABASE_URL    = { secret = "demo-nodejs-web-db-url" }
+SESSION_SECRET  = { secret = "demo-nodejs-web-session-secret" }

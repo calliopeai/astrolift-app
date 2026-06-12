@@ -50,10 +50,10 @@ const DOCS: DocLink[] = [
   {
     title: "Quickstart: deploy your first app",
     description:
-      "End-to-end walkthrough — register a cluster, point a manifest at it, deploy.",
-    href: `${DOCS_REPO_URL}/blob/main/quickstart.md`,
+      "End-to-end walkthrough — register a cluster, point a manifest at it, deploy. Zero to live URL in under 10 minutes.",
+    href: `/documentation/quickstart`,
     section: "Getting started",
-    tags: ["tutorial", "cli", "manifest"],
+    tags: ["tutorial", "cli", "manifest", "ga-criterion-1"],
   },
   {
     title: "astrolift.toml manifest",
@@ -125,6 +125,30 @@ const DOCS: DocLink[] = [
     href: `${DOCS_REPO_URL}/blob/main/cost.md`,
     section: "Operations",
     tags: ["cost", "billing", "quotas"],
+  },
+  {
+    title: "Operator runbooks",
+    description:
+      "Deploy workflow, rollback, cluster management, agent dispatch, and incident response procedures.",
+    href: `/documentation/runbooks`,
+    section: "Operations",
+    tags: ["runbooks", "deploy", "rollback", "incident", "ga-criterion-8"],
+  },
+  {
+    title: "Multi-cloud topology",
+    description:
+      "How Astrolift models workloads across AWS, GCP, Azure, and self-managed clusters — placement policies, Zentinelle enforcement, federated observability.",
+    href: `${DOCS_REPO_URL}/blob/main/specs/multi-cloud-topology.md`,
+    section: "Reference",
+    tags: ["multi-cloud", "topology", "placement", "zentinelle"],
+  },
+  {
+    title: "Demo sample app manifests",
+    description:
+      "Example astrolift.toml files for Node.js, Python FastAPI, Go, and multi-workload apps — use these to test deployment topologies.",
+    href: `${DOCS_REPO_URL}/tree/main/demo-apps`,
+    section: "Getting started",
+    tags: ["demo", "manifest", "sample", "topology"],
   },
   {
     title: "CLI reference",

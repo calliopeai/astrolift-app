@@ -1,0 +1,65 @@
+# Demo: Python FastAPI service
+#
+# Topology tested:
+#   - Build from source with a multi-stage Dockerfile
+#   - Managed Postgres provisioned and injected automatically
+#   - Health probe on the FastAPI /health endpoint
+#   - Autoscaling on CPU utilization (requires metrics-server)
+
+[app]
+name        = "demo-python-api"
+description = "Demo Python FastAPI service with managed Postgres"
+
+[build]
+dockerfile  = "Dockerfile"
+context     = "."
+
+[workload]
+replicas    = 1
+port        = 8000
+
+[resources]
+cpu_request    = "200m"
+cpu_limit      = "1000m"
+memory_request = "256Mi"
+memory_limit   = "512Mi"
+
+[health]
+readiness_path = "/health"
+liveness_path  = "/health"
+initial_delay  = 10
+period         = 15
+timeout        = 5
+failure_threshold = 3
+
+[ingress]
+enabled = true
+tls     = true
+
+[autoscale]
+# Horizontal pod autoscaling. Requires metrics-server on the cluster.
+enabled     = true
+min_replicas = 1
+max_replicas = 5
+# Scale up when average CPU across all pods exceeds 70%.
+cpu_target_percent = 70
+
+[managed_services]
+# Astrolift provisions a Postgres instance via the cluster's cloud
+# provider (RDS on AWS, Cloud SQL on GCP, Azure Database for Postgres
+# on Azure, or in-cluster via the Postgres operator on k8s_native).
+# The connection URL is injected as the named environment variable.
+[[managed_services.postgres]]
+name    = "demo-python-api-db"
+version = "15"
+size    = "small"
+inject_as = "DATABASE_URL"
+
+[environment]
+PYTHON_ENV     = "production"
+LOG_LEVEL      = "info"
+WORKERS        = "2"
+
+[secrets]
+SECRET_KEY          = { secret = "demo-python-api-secret-key" }
+THIRD_PARTY_API_KEY = { secret = "demo-python-api-third-party-key" }

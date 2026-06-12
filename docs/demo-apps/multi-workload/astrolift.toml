@@ -1,0 +1,93 @@
+# Demo: Multi-workload application (web server + background worker)
+#
+# Topology tested:
+#   - Multiple workloads from the same app registration
+#   - Shared secrets across workloads
+#   - Managed Redis injected into both workloads
+#   - Managed Postgres injected into the web workload only
+#   - Worker scales independently of the web server
+#   - Web server has ingress; worker has none
+
+[app]
+name        = "demo-multi-workload"
+description = "Demo app with a web server and a background worker sharing Redis"
+
+[build]
+dockerfile  = "Dockerfile"
+context     = "."
+
+# The [workloads] array replaces the single [workload] block when an
+# app needs multiple process types. Each workload gets its own
+# Deployment, but they share the same image, secrets, and managed
+# service connections.
+
+[[workloads]]
+name        = "web"
+command     = ["gunicorn", "app:app", "--bind", "0.0.0.0:8000"]
+replicas    = 2
+port        = 8000
+
+[workloads.resources]
+cpu_request    = "200m"
+cpu_limit      = "1000m"
+memory_request = "256Mi"
+memory_limit   = "512Mi"
+
+[workloads.health]
+readiness_path = "/health"
+liveness_path  = "/health"
+initial_delay  = 8
+period         = 10
+timeout        = 3
+
+[workloads.ingress]
+enabled = true
+tls     = true
+
+[[workloads]]
+name        = "worker"
+command     = ["celery", "-A", "app.celery", "worker", "--loglevel=info"]
+replicas    = 1
+# Workers have no port and no ingress — they only consume from the queue.
+
+[workloads.resources]
+cpu_request    = "100m"
+cpu_limit      = "500m"
+memory_request = "128Mi"
+memory_limit   = "256Mi"
+
+[workloads.autoscale]
+# Scale the worker pool based on queue depth (requires KEDA or a
+# custom HPA metric). Falls back to CPU-based autoscaling if KEDA
+# is not installed on the cluster.
+enabled          = true
+min_replicas     = 1
+max_replicas     = 10
+cpu_target_percent = 80
+
+# Managed services are available to all workloads in the app.
+
+[[managed_services.postgres]]
+name      = "demo-multi-db"
+version   = "15"
+size      = "small"
+inject_as = "DATABASE_URL"
+
+[[managed_services.redis]]
+name      = "demo-multi-redis"
+version   = "7"
+size      = "small"
+inject_as = "REDIS_URL"
+
+[environment]
+APP_ENV        = "production"
+LOG_LEVEL      = "info"
+CELERY_BROKER  = "redis"    # resolved to REDIS_URL at runtime
+
+[secrets]
+# Secrets are injected into all workloads unless workload-level overrides
+# are configured.
+SECRET_KEY          = { secret = "demo-multi-secret-key" }
+AWS_ACCESS_KEY_ID   = { secret = "demo-multi-aws-key-id" }
+AWS_SECRET_ACCESS_KEY = { secret = "demo-multi-aws-secret" }
+STORAGE_BUCKET      = { secret = "demo-multi-storage-bucket" }

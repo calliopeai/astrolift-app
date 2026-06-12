@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AlertTriangleIcon,
   BookOpenIcon,
   GitBranchIcon,
   GlobeIcon,
@@ -15,6 +16,7 @@ import {
   ServerCogIcon,
   SettingsIcon,
   WebhookIcon,
+  ZapIcon,
 } from "lucide-react";
 
 const navSections: { label: string; links: { href: string; label: string; icon: typeof BookOpenIcon }[] }[] = [
@@ -22,7 +24,8 @@ const navSections: { label: string; links: { href: string; label: string; icon: 
     label: "Getting started",
     links: [
       { href: "/documentation/introduction", label: "Introduction", icon: BookOpenIcon },
-      { href: "/documentation/get-started", label: "Get started", icon: RocketIcon },
+      { href: "/documentation/quickstart", label: "Quickstart", icon: ZapIcon },
+      { href: "/documentation/get-started", label: "Local dev setup", icon: RocketIcon },
       { href: "/documentation/tutorials", label: "Tutorials", icon: GraduationCapIcon },
     ],
   },
@@ -35,6 +38,12 @@ const navSections: { label: string; links: { href: string; label: string; icon: 
       { href: "/documentation/identity-providers", label: "Identity providers", icon: KeyRoundIcon },
       { href: "/documentation/policies", label: "ABAC policies", icon: ScaleIcon },
       { href: "/documentation/webhooks", label: "Webhooks", icon: WebhookIcon },
+    ],
+  },
+  {
+    label: "Runbooks",
+    links: [
+      { href: "/documentation/runbooks", label: "All runbooks", icon: AlertTriangleIcon },
     ],
   },
   {

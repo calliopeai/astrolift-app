@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  AlertTriangleIcon,
   ArrowRightIcon,
   BookOpenIcon,
   GitBranchIcon,
@@ -13,6 +14,7 @@ import {
   ServerCogIcon,
   SettingsIcon,
   WebhookIcon,
+  ZapIcon,
 } from "lucide-react";
 
 import {
@@ -41,9 +43,16 @@ const sections: { label: string; cards: DocCard[] }[] = [
         icon: BookOpenIcon,
       },
       {
+        href: "/documentation/quickstart",
+        title: "Quickstart",
+        description:
+          "Zero to a live URL in under 10 minutes — cluster, source, deploy.",
+        icon: ZapIcon,
+      },
+      {
         href: "/documentation/get-started",
-        title: "Get started",
-        description: "Bring up the stack locally in under five minutes.",
+        title: "Local dev setup",
+        description: "Bring up the full stack locally with Docker Compose.",
         icon: RocketIcon,
       },
       {
@@ -99,6 +108,18 @@ const sections: { label: string; cards: DocCard[] }[] = [
         description:
           "Subscribe external systems to Astrolift events with HMAC-signed deliveries.",
         icon: WebhookIcon,
+      },
+    ],
+  },
+  {
+    label: "Runbooks",
+    cards: [
+      {
+        href: "/documentation/runbooks",
+        title: "Operator runbooks",
+        description:
+          "Deploy workflow, rollback, cluster management, agent dispatch, and incident response.",
+        icon: AlertTriangleIcon,
       },
     ],
   },
