@@ -137,6 +137,17 @@ export function ConsoleClient({ slug }: { slug: string }) {
 
   const [streaming, setStreaming] = React.useState(false);
   const [logBuffer, setLogBuffer] = React.useState<AstroliftAppLogLine[]>([]);
+
+  // Pre-buffer on open: as soon as a pod resolves we flip streaming on
+  // once so the subscription connects and replays the last
+  // DEFAULT_TAIL_LINES before following. A one-shot guard keeps the
+  // 5s pod poll from re-arming the stream after the operator pauses.
+  // See: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [autoStreamed, setAutoStreamed] = React.useState(false);
+  if (!autoStreamed && selectedPod) {
+    setAutoStreamed(true);
+    setStreaming(true);
+  }
   // App-log export modal — same affordance as the observability tab,
   // operators on the console page also want to ship a bundle to a
   // vendor without bouncing tabs. (#483)
