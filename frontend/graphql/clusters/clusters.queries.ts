@@ -106,6 +106,11 @@ export const LIST_CLUSTERS = gql`
       lifecycle
       lastManagementError
       managedAt
+      lastHeartbeatAt
+      heartbeatIntervalSeconds
+      heartbeatStatus
+      heartbeatAgeSeconds
+      agentProvisioned
       lastBootstrapRun {
         id
         status
@@ -194,9 +199,7 @@ export const CLUSTER_BOOTSTRAP_RUNS = gql`
 // from the queries module so the type generation picks it up and
 // makes the mutation discoverable from the typed client.
 export const RECORD_CLUSTER_BOOTSTRAP_RUN = gql`
-  mutation RecordClusterBootstrapRun(
-    $input: RecordClusterBootstrapRunInput!
-  ) {
+  mutation RecordClusterBootstrapRun($input: RecordClusterBootstrapRunInput!) {
     recordClusterBootstrapRun(input: $input) {
       ok
       errors {
@@ -317,6 +320,54 @@ export const CLUSTER_HEALTH = gql`
         firstSeen
         lastSeen
         involvedObject
+      }
+    }
+  }
+`;
+
+// Cheap keep-alive liveness snapshot (#808). Reads only persisted
+// heartbeat fields — NO driver / Prometheus / Temporal call — so it
+// returns instantly even when the apiserver is unreachable. This is
+// the query the Status tab hits FIRST to decide whether to render the
+// live cards or the targeted 'cluster offline' empty-state.
+export const CLUSTER_LIVE_STATE = gql`
+  query ClusterLiveState($clusterId: GUID!) {
+    astroliftClusterLiveState(clusterId: $clusterId) {
+      clusterId
+      status
+      lastHeartbeatAt
+      heartbeatAgeSeconds
+      heartbeatIntervalSeconds
+      agentProvisioned
+      nodeCount
+      cpuUtilization
+      memoryUtilization
+      podTotal
+      podsByNamespace
+      ingressIps
+      agentVersion
+    }
+  }
+`;
+
+// Issue (or rotate) the in-cluster keep-alive agent key (#808). Returns
+// the raw scoped key EXACTLY ONCE — the settings UI shows it for the
+// operator to paste into the agent's Secret, then it's unrecoverable.
+export const ISSUE_CLUSTER_AGENT_KEY = gql`
+  mutation IssueClusterAgentKey($input: IssueClusterAgentKeyInput!) {
+    issueClusterAgentKey(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        clusterId
+        agentKey
+        intervalSeconds
+        heartbeatUrl
+        rotated
       }
     }
   }
@@ -466,11 +517,7 @@ export const CLUSTER_PROMETHEUS_METRICS = gql`
 // rangeSeconds: 3600 (1h) | 21600 (6h) | 86400 (24h)
 // stepSeconds: auto-scaled to ~60-96 points per window.
 export const CLUSTER_PROMETHEUS_RANGE_METRICS = gql`
-  query ClusterPrometheusRangeMetrics(
-    $clusterId: GUID!
-    $rangeSeconds: Int
-    $stepSeconds: Int
-  ) {
+  query ClusterPrometheusRangeMetrics($clusterId: GUID!, $rangeSeconds: Int, $stepSeconds: Int) {
     astroliftClusterPrometheusRangeMetrics(
       clusterId: $clusterId
       rangeSeconds: $rangeSeconds

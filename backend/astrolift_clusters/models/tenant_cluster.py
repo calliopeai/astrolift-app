@@ -113,6 +113,52 @@ class TenantCluster(NamedBaseCoreModel):
     capabilities_probed_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
+    # ---- In-cluster agent heartbeat (#808) ----------------------------
+    # The platform has no cheap liveness signal for a registered cluster:
+    # every Status-tab card does a synchronous driver / Prometheus /
+    # Temporal call, so the tabs hang when the apiserver is unreachable.
+    # The keep-alive is a lightweight in-cluster agent (Deployment in the
+    # astrolift-system namespace) that POSTs a heartbeat on a fixed
+    # interval, signed with the scoped agent key below. The persisted
+    # ``last_heartbeat_at`` + ``last_heartbeat_payload`` drive a derived
+    # live-status badge (see ``heartbeat_status`` policy) that short-
+    # circuits the expensive cards into a targeted offline empty-state.
+    agent_key_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=(
+            "SHA-256 of the scoped agent key the in-cluster keep-alive "
+            "agent signs its heartbeat with. The plaintext is surfaced "
+            "exactly once at issuance (issueClusterAgentKey); only the "
+            "hash persists. Empty = no agent provisioned yet."
+        ),
+    )
+    last_heartbeat_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Wall-clock time of the most recent agent heartbeat pulse.",
+    )
+    last_heartbeat_payload = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Snapshot from the most recent heartbeat — node count, pod "
+            "counts by namespace, CPU/memory utilization summary, ingress "
+            "IPs, agent version. Free-form JSON so the agent version can "
+            "evolve without a control-plane lockstep."
+        ),
+    )
+    heartbeat_interval_seconds = models.IntegerField(
+        default=30,
+        help_text=(
+            "Cadence (seconds) the agent should pulse at. Returned in the "
+            "heartbeat response so the agent can self-tune. The derived "
+            "live status treats a cluster as DEGRADED once it misses one "
+            "interval and OFFLINE once it misses three."
+        ),
+    )
+
     # Bring-into-management state machine (#316). Default ``registered``
     # so a row created via the existing register_tenant_cluster mutation
     # is metadata-only until the operator explicitly opts the cluster

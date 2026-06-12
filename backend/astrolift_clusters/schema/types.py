@@ -47,6 +47,24 @@ class TenantClusterType:
     managed_at: dt.datetime | None
     secrets_backend_provisioned_at: dt.datetime | None
 
+    # ---- Keep-alive agent heartbeat (#808) ----------------------------
+    last_heartbeat_at: dt.datetime | None
+    heartbeat_interval_seconds: int
+    heartbeat_status: str
+    """Derived live status — never_seen | connected | degraded | offline.
+    Computed from ``last_heartbeat_at`` + ``heartbeat_interval_seconds``
+    at query time (see ``heartbeat_status`` policy)."""
+
+    heartbeat_age_seconds: float | None
+    """Seconds since the last heartbeat, or null when never seen. Lets
+    the UI render 'last seen X ago' without re-deriving from the
+    timestamp."""
+
+    agent_provisioned: bool
+    """Whether a scoped agent key has been issued for this cluster.
+    Surfaced (not the key itself) so the settings UI can show
+    issue-vs-rotate affordances."""
+
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
         """Most recent ``astro cluster bootstrap`` invocation for this
@@ -116,6 +134,21 @@ class ProviderPluginType:
 
 
 def cluster_to_type(cluster) -> TenantClusterType:
+    from django.utils import timezone
+
+    from astrolift_clusters.heartbeat_status import (
+        heartbeat_age_seconds,
+    )
+    from astrolift_clusters.heartbeat_status import (
+        resolve as resolve_heartbeat_status,
+    )
+
+    now = timezone.now()
+    status = resolve_heartbeat_status(
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        interval_seconds=cluster.heartbeat_interval_seconds,
+        now=now,
+    )
     return TenantClusterType(
         id=GUID(str(cluster.guid)),
         slug=cluster.slug,
@@ -135,6 +168,14 @@ def cluster_to_type(cluster) -> TenantClusterType:
         last_management_error=cluster.last_management_error or "",
         managed_at=cluster.managed_at,
         secrets_backend_provisioned_at=cluster.secrets_backend_provisioned_at,
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        heartbeat_interval_seconds=cluster.heartbeat_interval_seconds,
+        heartbeat_status=status.value,
+        heartbeat_age_seconds=heartbeat_age_seconds(
+            last_heartbeat_at=cluster.last_heartbeat_at,
+            now=now,
+        ),
+        agent_provisioned=bool(cluster.agent_key_hash),
     )
 
 
@@ -257,6 +298,57 @@ def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
     )
 
 
+def cluster_live_state_to_type(cluster):
+    """Build the cheap liveness snapshot from a cluster row's persisted
+    heartbeat fields. No cluster API call — pure read of
+    ``last_heartbeat_at`` + ``last_heartbeat_payload``."""
+    from django.utils import timezone
+
+    from astrolift_clusters.heartbeat_status import (
+        heartbeat_age_seconds,
+    )
+    from astrolift_clusters.heartbeat_status import (
+        resolve as resolve_heartbeat_status,
+    )
+
+    now = timezone.now()
+    status = resolve_heartbeat_status(
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        interval_seconds=cluster.heartbeat_interval_seconds,
+        now=now,
+    )
+    payload = cluster.last_heartbeat_payload or {}
+    pods_by_ns = payload.get("pods_by_namespace") or {}
+    pod_total: int | None = None
+    if isinstance(pods_by_ns, dict) and pods_by_ns:
+        try:
+            pod_total = sum(int(v) for v in pods_by_ns.values())
+        except (TypeError, ValueError):
+            pod_total = None
+    ingress_ips = payload.get("ingress_ips") or []
+    if not isinstance(ingress_ips, list):
+        ingress_ips = []
+
+    return ClusterLiveStateType(
+        cluster_id=GUID(str(cluster.guid)),
+        status=status.value,
+        last_heartbeat_at=cluster.last_heartbeat_at,
+        heartbeat_age_seconds=heartbeat_age_seconds(
+            last_heartbeat_at=cluster.last_heartbeat_at,
+            now=now,
+        ),
+        heartbeat_interval_seconds=cluster.heartbeat_interval_seconds,
+        agent_provisioned=bool(cluster.agent_key_hash),
+        node_count=payload.get("node_count"),
+        cpu_utilization=payload.get("cpu_utilization"),
+        memory_utilization=payload.get("memory_utilization"),
+        pod_total=pod_total,
+        pods_by_namespace=pods_by_ns if isinstance(pods_by_ns, dict) else {},
+        ingress_ips=[str(ip) for ip in ingress_ips],
+        agent_version=str(payload.get("agent_version") or ""),
+    )
+
+
 # ---- Cluster lifecycle audit timeline (#68 slice 2) ---------------
 
 
@@ -318,6 +410,41 @@ class ClusterHealthType:
     cluster_id: GUID
     pods: list[PodPhaseSummaryType]
     events: list[ClusterEventType]
+
+
+# ---- Cluster keep-alive live state (#808) -------------------------
+
+
+@strawberry.type(name="AstroliftClusterLiveState")
+class ClusterLiveStateType:
+    """Cheap liveness snapshot from the in-cluster keep-alive agent.
+
+    Unlike every other Status-tab card, this resolver does NO driver /
+    Prometheus / Temporal call — it reads one persisted timestamp +
+    the last heartbeat payload. That's what lets the UI render a status
+    badge (and short-circuit the expensive cards into an offline empty-
+    state) even when the apiserver is unreachable."""
+
+    cluster_id: GUID
+    status: str
+    """never_seen | connected | degraded | offline."""
+
+    last_heartbeat_at: dt.datetime | None
+    heartbeat_age_seconds: float | None
+    heartbeat_interval_seconds: int
+    agent_provisioned: bool
+
+    # Snapshot fields from the most recent heartbeat payload. All
+    # nullable because an older agent version may not report them.
+    node_count: int | None
+    cpu_utilization: float | None
+    memory_utilization: float | None
+    pod_total: int | None
+    """Sum of pod counts across all reported namespaces."""
+
+    pods_by_namespace: JSON
+    ingress_ips: list[str]
+    agent_version: str
 
 
 # ---- Recent cluster workflows (#394) -------------------------------

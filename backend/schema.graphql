@@ -2487,8 +2487,29 @@ type AstroliftTenantCluster {
   lastManagementError: String!
   managedAt: DateTime
   secretsBackendProvisionedAt: DateTime
+  lastHeartbeatAt: DateTime
+  heartbeatIntervalSeconds: Int!
+  heartbeatStatus: String!
+  heartbeatAgeSeconds: Float
+  agentProvisioned: Boolean!
   lastBootstrapRun: AstroliftClusterBootstrapRun
   bootstrapRuns(limit: Int! = 10): [AstroliftClusterBootstrapRun!]!
+}
+
+type AstroliftClusterLiveState {
+  clusterId: GUID!
+  status: String!
+  lastHeartbeatAt: DateTime
+  heartbeatAgeSeconds: Float
+  heartbeatIntervalSeconds: Int!
+  agentProvisioned: Boolean!
+  nodeCount: Int
+  cpuUtilization: Float
+  memoryUtilization: Float
+  podTotal: Int
+  podsByNamespace: JSON!
+  ingressIps: [String!]!
+  agentVersion: String!
 }
 
 type AstroliftTenantClusterMutationResult {
@@ -2805,6 +2826,20 @@ type BootstraprunrecordedpayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Bootstraprunrecordedpayload
+}
+
+type Clusteragentkeyissuedpayload {
+  clusterId: GUID!
+  agentKey: String!
+  intervalSeconds: Int!
+  heartbeatUrl: String!
+  rotated: Boolean!
+}
+
+type ClusteragentkeyissuedpayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: Clusteragentkeyissuedpayload
 }
 
 input BringClusterIntoManagementInputType {
@@ -3705,6 +3740,7 @@ type Mutation {
   decommissionCluster(input: DecommissionClusterInputType!): AstroliftTenantClusterMutationResult!
   installClusterPrereqs(input: InstallClusterPrereqsInputType!): AstroliftTenantClusterMutationResult!
   recordClusterBootstrapRun(input: RecordClusterBootstrapRunInput!): BootstraprunrecordedpayloadMutationResult!
+  issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   unregisterTenantCluster(input: UnregisterTenantClusterInput!): SoftdeletepayloadMutationResult!
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
@@ -4133,6 +4169,7 @@ type Query {
   astroliftRecentClusterWorkflows(clusterId: GUID!, limit: Int! = 10): [AstroliftClusterWorkflowRun!]!
   astroliftAppCountForCluster(clusterId: GUID!): Int!
   astroliftClusterHealth(clusterId: GUID!, eventLimit: Int! = 50): AstroliftClusterHealth
+  astroliftClusterLiveState(clusterId: GUID!): AstroliftClusterLiveState
   astroliftClusterBootstrapPlan(clusterId: GUID!): AstroliftClusterBootstrapPlan
   astroliftClusterWorkloadHealth(clusterId: GUID!): [AstroliftClusterWorkloadHealth!]!
   astroliftQuotas: [AstroliftQuota!]!
@@ -4214,6 +4251,11 @@ type ReconcileClusterIngressesResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: ReconcileClusterIngressesResult
+}
+
+input IssueClusterAgentKeyInput {
+  clusterId: GUID!
+  intervalSeconds: Int = null
 }
 
 input RecordClusterBootstrapRunInput {

@@ -13,7 +13,9 @@ kick a Temporal workflow that talks to the real cluster.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import logging
+import secrets
 
 import strawberry
 from django.db import transaction
@@ -228,6 +230,36 @@ class ConfigureProviderPluginInput:
 
 
 @strawberry.input
+class IssueClusterAgentKeyInput:
+    """``issueClusterAgentKey`` mutation input (#808).
+
+    Issues (or rotates) the scoped key the in-cluster keep-alive agent
+    signs its heartbeat with. ``cluster_id`` is the cluster the key is
+    bound to. ``interval_seconds`` lets the operator tune the pulse
+    cadence; omitted leaves the existing cadence (default 30s)."""
+
+    cluster_id: GUID
+    interval_seconds: int | None = None
+
+
+@strawberry.type
+class _ClusterAgentKeyIssuedPayload:
+    """Return shape for ``issueClusterAgentKey``.
+
+    ``agent_key`` is the raw scoped key — surfaced EXACTLY ONCE, here,
+    at issuance; only its SHA-256 persists on the cluster row. The
+    operator pastes it into the agent's Secret. ``rotated`` is True when
+    this replaced a previously-issued key (so the UI can warn that the
+    old agent will start 401ing)."""
+
+    cluster_id: GUID
+    agent_key: str
+    interval_seconds: int
+    heartbeat_url: str
+    rotated: bool
+
+
+@strawberry.input
 class BringClusterIntoManagementInputType:
     cluster_id: GUID
 
@@ -409,6 +441,73 @@ class ClustersMutation:
             ingress_class=input.ingress_class or "nginx",
         )
         return gql_success(cluster_to_type(cluster))
+
+    @strawberry.field
+    @mutation_audit(
+        action="cluster.issue_agent_key",
+        target=lambda root, info, input: ("cluster", str(input.cluster_id)),
+    )
+    @require_permission(Permission.CLUSTER_MANAGE)
+    @tenant_scoped()
+    def issue_cluster_agent_key(
+        self, info: Info, input: IssueClusterAgentKeyInput
+    ) -> MutationResultType[_ClusterAgentKeyIssuedPayload]:
+        """Issue (or rotate) the in-cluster keep-alive agent key (#808).
+
+        Generates a 256-bit scoped key, stores only its SHA-256, and
+        returns the plaintext exactly once so the operator can install
+        it in the agent's Secret. Re-running rotates the key — the old
+        one stops authenticating immediately.
+
+        Tenant-scoped: the lookup is constrained to the caller's org (or
+        a platform-shared cluster), so a tenant can never mint an agent
+        credential for another tenant's cluster — an out-of-scope guid
+        reads as NOT_FOUND, identical to a guid that doesn't exist.
+        """
+        from django.db.models import Q
+
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                f"cluster {input.cluster_id!r} not found",
+                field="clusterId",
+            )
+
+        rotated = bool(cluster.agent_key_hash)
+        raw_key = secrets.token_hex(32)  # 256-bit, 64 hex chars
+        cluster.agent_key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+
+        update_fields = ["agent_key_hash", "updated_at", "version"]
+        if input.interval_seconds is not None:
+            # Clamp to the AC ceiling (<=60s) and a sane floor so a typo
+            # can't make the agent hot-loop or look perpetually offline.
+            cluster.heartbeat_interval_seconds = max(5, min(int(input.interval_seconds), 60))
+            update_fields.append("heartbeat_interval_seconds")
+        cluster.save(update_fields=update_fields)
+
+        from django.conf import settings
+
+        # APP_BASE_URL is the platform's external origin (used elsewhere
+        # for the GitHub-App manifest callback URL). Empty in local dev,
+        # in which case we return the path-only form — the agent's
+        # install snippet templates the host in regardless.
+        base = (getattr(settings, "APP_BASE_URL", "") or "").rstrip("/")
+        heartbeat_path = f"/api/clusters/v1/{cluster.guid}/heartbeat/"
+        return gql_success(
+            _ClusterAgentKeyIssuedPayload(
+                cluster_id=GUID(str(cluster.guid)),
+                agent_key=raw_key,
+                interval_seconds=cluster.heartbeat_interval_seconds,
+                heartbeat_url=f"{base}{heartbeat_path}" if base else heartbeat_path,
+                rotated=rotated,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="cluster.update")
@@ -974,8 +1073,7 @@ class ClustersMutation:
                     "Revalidation signal sent — the workflow will check cert"
                     " issuance on the next activity slot."
                     if signaled
-                    else "Temporal is disabled or the workflow was not found;"
-                    " no signal sent."
+                    else "Temporal is disabled or the workflow was not found; no signal sent."
                 ),
             )
         )
@@ -1016,8 +1114,7 @@ class ClustersMutation:
                     "Reissue signal sent — the workflow will delete and re-request"
                     " the cert. Re-add the new validation CNAME records when they appear."
                     if signaled
-                    else "Temporal is disabled or the workflow was not found;"
-                    " no signal sent."
+                    else "Temporal is disabled or the workflow was not found; no signal sent."
                 ),
             )
         )

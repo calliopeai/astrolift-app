@@ -24,6 +24,7 @@ from astrolift_identity.urls import (
 )
 from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
 from astrolift_agents.urls import urlpatterns as agents_api_urls
+from astrolift_clusters.urls import urlpatterns as clusters_api_urls
 from astrolift_dispatch.urls import urlpatterns as dispatch_api_urls
 from astrolift_pipelines.urls import urlpatterns as pipeline_webhook_urls
 from astrolift_scm.urls import urlpatterns as scm_webhook_urls
@@ -125,6 +126,12 @@ urlpatterns = [
     # Pipeline webhooks + runner API + Dispatch Service API
     *pipeline_webhook_urls,   # includes /webhooks/pipelines/*, /api/pipelines/v1/runners/*
     *dispatch_api_urls,       # /api/dispatch/v1/*
+    # In-cluster keep-alive agent heartbeat ingest (#808). Mounted at
+    # the project root so the agent's wire URL —
+    # /api/clusters/v1/<guid>/heartbeat/ — resolves without the /app/
+    # prefix. Scoped-Bearer-key auth, same shape as the runner/dispatch
+    # REST surfaces above.
+    *clusters_api_urls,       # /api/clusters/v1/<guid>/heartbeat/
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),

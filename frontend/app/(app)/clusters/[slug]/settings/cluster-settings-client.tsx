@@ -2,10 +2,12 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
+  ActivityIcon,
   AlertTriangleIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   CloudIcon,
+  CopyIcon,
   GlobeIcon,
   KeyRoundIcon,
   Loader2Icon,
@@ -56,6 +58,7 @@ import {
   CLUSTER_BOOTSTRAP_RUNS,
   DECOMMISSION_CLUSTER,
   INSTALL_CLUSTER_PREREQS,
+  ISSUE_CLUSTER_AGENT_KEY,
   LIST_CLUSTERS,
   RECONCILE_CLUSTER_INGRESSES,
   REFRESH_CLUSTER_MANAGEMENT,
@@ -66,11 +69,18 @@ import type {
   ReconcileClusterIngressesResult,
 } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 
 import { ClusterTabs } from "../components/cluster-tabs";
 
+// The committed codegen output lags the live backend, so the generated
+// AstroliftTenantCluster doesn't yet carry the heartbeat fields the
+// LIST_CLUSTERS query now selects (#808). Intersect them in locally.
+type ClusterWithHeartbeat = AstroliftTenantCluster & Partial<ClusterHeartbeatFields>;
+
 interface Resp {
-  astroliftClusters: AstroliftTenantCluster[];
+  astroliftClusters: ClusterWithHeartbeat[];
 }
 
 const POLL_INTERVAL_MS = 4000;
@@ -338,6 +348,10 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
         </CardContent>
       </Card>
 
+      <Can permission="cluster.manage">
+        <ClusterAgentCard cluster={cluster} />
+      </Can>
+
       <Can permission="cluster.update">
         <IngressAuthCard cluster={cluster} />
       </Can>
@@ -433,8 +447,8 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
               Danger zone
             </CardTitle>
             <CardDescription>
-              Decommissioning stops the platform from managing this cluster. Apps already bound
-              here must be migrated first; the workflow refuses when bindings are active.
+              Decommissioning stops the platform from managing this cluster. Apps already bound here
+              must be migrated first; the workflow refuses when bindings are active.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1058,6 +1072,164 @@ function BootstrapHistoryList({ slug }: { slug: string }) {
   );
 }
 
+// ---- Cluster keep-alive agent card (#808) --------------------------
+// Issues (or rotates) the scoped agent key the in-cluster keep-alive
+// agent signs its heartbeat with. The raw key is shown EXACTLY ONCE in
+// the mutation response — the operator copies it into the agent's
+// Secret, then it's unrecoverable (only its hash persists). Also shows
+// the live connection status and the install snippet templated with
+// this cluster's heartbeat URL.
+
+interface AgentKeyIssuedData {
+  clusterId: string;
+  agentKey: string;
+  intervalSeconds: number;
+  heartbeatUrl: string;
+  rotated: boolean;
+}
+
+function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
+  const [issue, { loading: issuing }] = useMutation<{
+    issueClusterAgentKey: MutationResult<AgentKeyIssuedData>;
+  }>(ISSUE_CLUSTER_AGENT_KEY, {
+    // The mutation flips agentProvisioned + may change the interval;
+    // refetch so the card's "provisioned" state and the live badge stay
+    // consistent without a reload.
+    refetchQueries: [{ query: LIST_CLUSTERS }],
+  });
+  const [issued, setIssued] = React.useState<AgentKeyIssuedData | null>(null);
+  const [keyCopied, copyKey] = useCopyToClipboard();
+  const [snippetCopied, copySnippet] = useCopyToClipboard();
+
+  const provisioned = cluster.agentProvisioned ?? false;
+
+  async function handleIssue() {
+    const { data } = await issue({
+      variables: { input: { clusterId: cluster.id } },
+    });
+    if (data?.issueClusterAgentKey.ok && data.issueClusterAgentKey.data) {
+      setIssued(data.issueClusterAgentKey.data);
+      toast.success(
+        data.issueClusterAgentKey.data.rotated
+          ? "Agent key rotated — the previous key no longer works."
+          : "Agent key issued — copy it now, it won't be shown again."
+      );
+    } else {
+      toast.error(data?.issueClusterAgentKey.errors?.[0]?.message ?? "Failed to issue key");
+    }
+  }
+
+  // Install snippet: a kubectl one-liner that creates the agent's Secret
+  // from the issued key + heartbeat URL. The agent Deployment reads both
+  // from this Secret. Path-only URL in local dev (no APP_BASE_URL) — the
+  // operator templates the host in then.
+  const heartbeatUrl = issued?.heartbeatUrl ?? `/api/clusters/v1/${cluster.id}/heartbeat/`;
+  const snippet = issued
+    ? [
+        "kubectl create secret generic astrolift-agent \\",
+        "  --namespace astrolift-system \\",
+        `  --from-literal=heartbeat_url='${heartbeatUrl}' \\`,
+        `  --from-literal=agent_key='${issued.agentKey}'`,
+      ].join("\n")
+    : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ActivityIcon className="size-4" />
+              Keep-alive agent
+            </CardTitle>
+            <CardDescription className="mt-1">
+              A lightweight agent in the cluster&apos;s{" "}
+              <code className="font-mono text-xs">astrolift-system</code> namespace POSTs a signed
+              heartbeat so the platform can show live pod, node, and resource state — and flag the
+              cluster offline when it stops. Pulses every {cluster.heartbeatIntervalSeconds ?? 30}s.
+            </CardDescription>
+          </div>
+          {provisioned && (
+            <Badge variant="outline" className="shrink-0 gap-1">
+              <CheckCircleIcon className="size-3" />
+              Key issued
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {issued ? (
+          <>
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                Copy this key now — it won&apos;t be shown again.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <code className="bg-background/60 flex-1 truncate rounded px-2 py-1 font-mono text-xs">
+                  {issued.agentKey}
+                </code>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copyKey(issued.agentKey)}
+                  className="gap-1.5"
+                >
+                  <CopyIcon className="size-3.5" />
+                  {keyCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </div>
+            {snippet && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium">Install the agent secret</p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => copySnippet(snippet)}
+                    className="h-7 gap-1.5"
+                  >
+                    <CopyIcon className="size-3" />
+                    {snippetCopied ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+                <pre className="bg-muted/40 overflow-x-auto rounded-md border p-3 font-mono text-xs whitespace-pre">
+                  {snippet}
+                </pre>
+                <p className="text-muted-foreground text-xs">
+                  Then deploy the agent chart (it reads the key + URL from this Secret). The cluster
+                  appears as Connected within a couple of heartbeat intervals.
+                </p>
+              </div>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setIssued(null)}>
+              Done
+            </Button>
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" onClick={handleIssue} disabled={issuing} className="gap-1.5">
+              {issuing ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <KeyRoundIcon className="size-3.5" />
+              )}
+              {provisioned ? "Rotate agent key" : "Issue agent key"}
+            </Button>
+            {provisioned && (
+              <p className="text-muted-foreground text-xs">
+                An agent key has already been issued. Rotating it invalidates the old key — the
+                current agent will start failing its heartbeat until you redeploy it with the new
+                key.
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ---- Ingress auth card (#851) --------------------------------------
 
 interface IngressAuthConfig {
@@ -1106,13 +1278,13 @@ function AuthGateToggle({
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
         "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        checked ? "bg-emerald-600" : "bg-muted-foreground/30",
+        checked ? "bg-emerald-600" : "bg-muted-foreground/30"
       )}
     >
       <span
         className={cn(
           "inline-block size-4 rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-4" : "translate-x-0.5",
+          checked ? "translate-x-4" : "translate-x-0.5"
         )}
       />
     </button>
@@ -1175,7 +1347,9 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
     }
     const reconcileErrors = result.data?.errors ?? [];
     if (reconcileErrors.length > 0) {
-      toast.warning(`${reconcileErrors.length} ingress(es) could not be reconciled — check cluster events.`);
+      toast.warning(
+        `${reconcileErrors.length} ingress(es) could not be reconciled — check cluster events.`
+      );
     }
     return true;
   }
@@ -1300,7 +1474,7 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
             </CardTitle>
             <CardDescription className="mt-1">{authMeta.description}</CardDescription>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <AuthGateToggle
               checked={enabled}
               onChange={handleToggle}
@@ -1310,7 +1484,7 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
             <span
               className={cn(
                 "text-xs font-medium",
-                enabled ? "text-emerald-600" : "text-muted-foreground",
+                enabled ? "text-emerald-600" : "text-muted-foreground"
               )}
             >
               {enabled ? "Enabled" : "Disabled"}
@@ -1371,7 +1545,13 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
                 <RocketIcon className="size-3.5" />
                 Apply to cluster
               </Button>
-              <Button size="sm" variant="outline" onClick={openForm} disabled={busy} className="gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openForm}
+                disabled={busy}
+                className="gap-1.5"
+              >
                 <PencilIcon className="size-3.5" />
                 Edit
               </Button>

@@ -15,6 +15,7 @@ from astrolift_clusters.schema.types import (
     ClusterEventType,
     ClusterHealthType,
     ClusterLifecycleAuditEntryType,
+    ClusterLiveStateType,
     ClusterPrometheusMetricsType,
     ClusterPrometheusRangeMetricsType,
     ClusterPrometheusRangePointType,
@@ -26,6 +27,7 @@ from astrolift_clusters.schema.types import (
     ProviderPluginType,
     TenantClusterType,
     bootstrap_plan_to_type,
+    cluster_live_state_to_type,
     cluster_to_type,
     domain_to_type,
     plugin_to_type,
@@ -153,6 +155,7 @@ class ClustersQuery:
                 "DecommissionCluster",
                 "InstallClusterPrereqs",
                 "RecordClusterBootstrapRun",
+                "IssueClusterAgentKey",
                 "CreateManagedDomain",
                 "UpdateManagedDomain",
                 "SoftDeleteManagedDomain",
@@ -322,6 +325,39 @@ class ClustersQuery:
                 for e in payload["events"]
             ],
         )
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster_live_state(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> ClusterLiveStateType | None:
+        """Cheap keep-alive liveness snapshot for ``cluster_id`` (#808).
+
+        Reads only the persisted heartbeat fields — NO driver /
+        Prometheus / Temporal call — so it returns instantly even when
+        the apiserver is unreachable. This is the resolver the UI hits
+        first to decide whether to render the live cards or the targeted
+        'cluster offline' empty-state. Returns ``None`` when the cluster
+        row is missing or is outside the caller's tenant scope.
+        """
+        from django.db.models import Q
+
+        tenant = get_current_tenant()
+        # Platform-level clusters (organization=None) are visible to all
+        # orgs; org-scoped clusters only to their own org. Same scope
+        # filter as astrolift_cluster_count — a caller must never read
+        # the live state of a cluster in another tenant.
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return None
+        return cluster_live_state_to_type(cluster)
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_MANAGE)
