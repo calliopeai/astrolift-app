@@ -461,6 +461,61 @@ export const CLUSTER_PROMETHEUS_METRICS = gql`
   }
 `;
 
+// ---- Provider picker queries (#858-#861) ---------------------------
+
+// Cloud regions available to the provider plugin (#860). Drives the region
+// picker in register-cluster-dialog. Returns [] for non-AWS plugins so
+// the caller falls back to free-text.
+export const PROVIDER_REGIONS = gql`
+  query ProviderRegions($pluginSlug: String!) {
+    astroliftProviderRegions(pluginSlug: $pluginSlug) {
+      value
+      label
+    }
+  }
+`;
+
+// ACM certificates visible to the provider plugin (#858). Drives the cert
+// picker in add-managed-domain-dialog. Returns [] on error; fallback to
+// free-text.
+export const PROVIDER_CERTS = gql`
+  query ProviderCerts($pluginSlug: String!, $region: String) {
+    astroliftProviderCerts(pluginSlug: $pluginSlug, region: $region) {
+      arn
+      domain
+      status
+      notAfter
+    }
+  }
+`;
+
+// Cognito user pools visible to the provider plugin (#859). Drives the pool
+// picker in cluster-settings-client instead of free-text ARN/ID entry.
+// Returns [] on error; fallback to free-text.
+export const PROVIDER_COGNITO_POOLS = gql`
+  query ProviderCognitoPools($pluginSlug: String!, $region: String) {
+    astroliftProviderCognitoPools(pluginSlug: $pluginSlug, region: $region) {
+      poolId
+      poolArn
+      name
+      domain
+    }
+  }
+`;
+
+// Route53 / Cloud DNS / Azure DNS hosted zones visible to the provider
+// plugin (#861). Drives the hosted-zone picker in add-managed-domain-dialog.
+// Returns [] on error; fallback to free-text.
+export const PROVIDER_HOSTED_ZONES = gql`
+  query ProviderHostedZones($pluginSlug: String!) {
+    astroliftProviderHostedZones(pluginSlug: $pluginSlug) {
+      zoneId
+      zoneName
+      recordCount
+    }
+  }
+`;
+
 // Prometheus range-query (historical) metrics for the Status tab sparkline
 // charts (#772). Returns one series per golden signal with dense point arrays.
 // rangeSeconds: 3600 (1h) | 21600 (6h) | 86400 (24h)

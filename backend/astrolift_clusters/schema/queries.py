@@ -8,6 +8,7 @@ from strawberry.types import Info
 from astrolift_clusters.models import (
     ManagedDomain,
     ProviderPlugin,
+    ProviderPluginConfig,
     TenantCluster,
 )
 from astrolift_clusters.schema.types import (
@@ -23,7 +24,11 @@ from astrolift_clusters.schema.types import (
     ClusterWorkloadHealthType,
     ManagedDomainType,
     PodPhaseSummaryType,
+    ProviderCertType,
+    ProviderCognitoPoolType,
+    ProviderHostedZoneType,
     ProviderPluginType,
+    ProviderRegionType,
     TenantClusterType,
     bootstrap_plan_to_type,
     cluster_to_type,
@@ -758,3 +763,217 @@ class ClustersQuery:
             )
             for row in rows
         ]
+
+    # ---- Provider picker queries (#858-#861) -----------------------
+
+    def _get_aws_plugin_config(self, plugin_slug: str) -> dict:
+        """Return the AWS ProviderPluginConfig.config dict for ``plugin_slug``.
+
+        Looks up org-scoped first, then platform-level. Returns ``{}``
+        when no config is present so callers can safely do
+        ``cfg.get("region", "us-east-1")`` without extra guard code.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        qs = ProviderPluginConfig.objects.filter(provider_plugin__slug=plugin_slug)
+        if org_id:
+            cfg = qs.filter(organization_id=org_id).first()
+            if cfg:
+                return cfg.config or {}
+        cfg = qs.filter(organization_id__isnull=True).first()
+        return cfg.config if cfg else {}
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    def astrolift_provider_regions(
+        self,
+        info: Info,
+        plugin_slug: str,
+    ) -> list[ProviderRegionType]:
+        """Enumerate regions available to the provider plugin (#860).
+
+        AWS: synthesises the region list from the ec2 ``describe_regions``
+        API using the credentials implied by the plugin's config. Returns
+        a hard-coded well-known list on error so the field never blocks
+        the form.
+
+        Other providers: returns an empty list (caller falls back to
+        free-text).
+        """
+        if plugin_slug != "aws":
+            return []
+        cfg = self._get_aws_plugin_config(plugin_slug)
+        region = cfg.get("region", "us-east-1")
+        try:
+            import boto3
+
+            ec2 = boto3.client("ec2", region_name=region)
+            resp = ec2.describe_regions(AllRegions=False)
+            rows = resp.get("Regions", []) or []
+            return [
+                ProviderRegionType(
+                    value=r["RegionName"],
+                    label=r["RegionName"],
+                )
+                for r in sorted(rows, key=lambda r: r["RegionName"])
+            ]
+        except Exception:  # noqa: BLE001
+            log.warning("astrolift_provider_regions: ec2.describe_regions failed for plugin=%s", plugin_slug)
+            return []
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    def astrolift_provider_certs(
+        self,
+        info: Info,
+        plugin_slug: str,
+        region: str | None = None,
+    ) -> list[ProviderCertType]:
+        """List ACM certificates visible to the provider plugin (#858).
+
+        Iterates ACM's paginated ``list_certificates`` + fetches each
+        cert's ``NotAfter`` and ``Status`` via ``describe_certificate``.
+        Returns ``[]`` on any error so the caller falls back to
+        free-text entry. Region is the cluster's region when given;
+        falls back to the plugin config's region.
+        """
+        if plugin_slug != "aws":
+            return []
+        cfg = self._get_aws_plugin_config(plugin_slug)
+        effective_region = region or cfg.get("region", "us-east-1")
+        try:
+            import boto3
+
+            acm = boto3.client("acm", region_name=effective_region)
+            paginator = acm.get_paginator("list_certificates")
+            ids: list[str] = []
+            for page in paginator.paginate():
+                for summary in page.get("CertificateSummaryList", []) or []:
+                    ids.append(summary["CertificateArn"])
+
+            out: list[ProviderCertType] = []
+            for arn in ids:
+                try:
+                    detail = acm.describe_certificate(CertificateArn=arn)
+                except Exception:  # noqa: BLE001
+                    continue
+                cert = detail.get("Certificate", {})
+                not_after = cert.get("NotAfter")
+                not_after_str = not_after.isoformat() if hasattr(not_after, "isoformat") else (str(not_after) if not_after else "")
+                out.append(
+                    ProviderCertType(
+                        arn=arn,
+                        domain=cert.get("DomainName", ""),
+                        status=cert.get("Status", ""),
+                        not_after=not_after_str,
+                    )
+                )
+            return out
+        except Exception:  # noqa: BLE001
+            log.warning("astrolift_provider_certs: acm.list_certificates failed for plugin=%s region=%s", plugin_slug, effective_region)
+            return []
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    def astrolift_provider_cognito_pools(
+        self,
+        info: Info,
+        plugin_slug: str,
+        region: str | None = None,
+    ) -> list[ProviderCognitoPoolType]:
+        """List Cognito user pools visible to the provider plugin (#859).
+
+        Paginates ``cognito-idp.list_user_pools`` (max 60 per page) and
+        fetches the pool ARN via ``describe_user_pool``. Returns ``[]``
+        on any error; the caller falls back to free-text.
+        """
+        if plugin_slug != "aws":
+            return []
+        cfg = self._get_aws_plugin_config(plugin_slug)
+        effective_region = region or cfg.get("region", "us-east-1")
+        try:
+            import boto3
+
+            idp = boto3.client("cognito-idp", region_name=effective_region)
+            pools: list[dict] = []
+            next_token: str | None = None
+            while True:
+                kwargs: dict = {"MaxResults": 60}
+                if next_token:
+                    kwargs["NextToken"] = next_token
+                resp = idp.list_user_pools(**kwargs)
+                pools.extend(resp.get("UserPools", []) or [])
+                next_token = resp.get("NextToken")
+                if not next_token:
+                    break
+
+            out: list[ProviderCognitoPoolType] = []
+            for pool in pools:
+                pool_id: str = pool.get("Id", "")
+                try:
+                    detail = idp.describe_user_pool(UserPoolId=pool_id)
+                except Exception:  # noqa: BLE001
+                    # If describe fails, surface what list gave us (no ARN).
+                    out.append(
+                        ProviderCognitoPoolType(
+                            pool_id=pool_id,
+                            pool_arn="",
+                            name=pool.get("Name", ""),
+                            domain="",
+                        )
+                    )
+                    continue
+                up = detail.get("UserPool", {})
+                out.append(
+                    ProviderCognitoPoolType(
+                        pool_id=pool_id,
+                        pool_arn=up.get("Arn", ""),
+                        name=up.get("Name", pool.get("Name", "")),
+                        domain=up.get("Domain", ""),
+                    )
+                )
+            return out
+        except Exception:  # noqa: BLE001
+            log.warning(
+                "astrolift_provider_cognito_pools: cognito-idp.list_user_pools failed for plugin=%s region=%s",
+                plugin_slug,
+                effective_region,
+            )
+            return []
+
+    @strawberry.field
+    @require_permission(Permission.PROVIDER_PLUGIN_READ)
+    def astrolift_provider_hosted_zones(
+        self,
+        info: Info,
+        plugin_slug: str,
+    ) -> list[ProviderHostedZoneType]:
+        """List DNS hosted zones visible to the provider plugin (#861).
+
+        AWS: paginates Route53 ``list_hosted_zones``. Returns ``[]``
+        on any error; the caller falls back to free-text.
+        """
+        if plugin_slug != "aws":
+            return []
+        cfg = self._get_aws_plugin_config(plugin_slug)
+        region = cfg.get("region", "us-east-1")
+        try:
+            import boto3
+
+            r53 = boto3.client("route53", region_name=region)
+            zones: list[dict] = []
+            paginator = r53.get_paginator("list_hosted_zones")
+            for page in paginator.paginate():
+                zones.extend(page.get("HostedZones", []) or [])
+
+            return [
+                ProviderHostedZoneType(
+                    zone_id=z["Id"].rsplit("/", 1)[-1],
+                    zone_name=z.get("Name", "").rstrip("."),
+                    record_count=int(z.get("ResourceRecordSetCount", -1)),
+                )
+                for z in sorted(zones, key=lambda z: z.get("Name", ""))
+            ]
+        except Exception:  # noqa: BLE001
+            log.warning("astrolift_provider_hosted_zones: route53.list_hosted_zones failed for plugin=%s", plugin_slug)
+            return []

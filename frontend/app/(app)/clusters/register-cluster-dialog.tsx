@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   LIST_CLUSTERS,
   LIST_PROVIDER_PLUGINS,
+  PROVIDER_REGIONS,
   REGISTER_TENANT_CLUSTER,
 } from "@/graphql/clusters/clusters.queries";
 import type {
@@ -33,6 +34,11 @@ import type {
   AstroliftTenantCluster,
 } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+
+interface ProviderRegion {
+  value: string;
+  label: string;
+}
 
 interface Props {
   open: boolean;
@@ -57,6 +63,15 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
   const [slugTouched, setSlugTouched] = React.useState(false);
   const [pluginSlug, setPluginSlug] = React.useState("");
   const [region, setRegion] = React.useState("");
+
+  const regions = useQuery<{ astroliftProviderRegions: ProviderRegion[] }>(
+    PROVIDER_REGIONS,
+    {
+      variables: { pluginSlug },
+      skip: !pluginSlug,
+    }
+  );
+  const regionOptions = regions.data?.astroliftProviderRegions ?? [];
   const [endpoint, setEndpoint] = React.useState("");
   const [authMethod, setAuthMethod] = React.useState("kubeconfig");
   const [authConfigText, setAuthConfigText] = React.useState("{}");
@@ -191,13 +206,28 @@ export function RegisterClusterDialog({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="region">Region</Label>
-              <Input
-                id="region"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                placeholder="us-west-2"
-                className="font-mono text-xs"
-              />
+              {regionOptions.length > 0 ? (
+                <Select value={region} onValueChange={setRegion}>
+                  <SelectTrigger id="region">
+                    <SelectValue placeholder="Select region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regionOptions.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        <span className="font-mono">{r.value}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="region"
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                  placeholder="us-west-2"
+                  className="font-mono text-xs"
+                />
+              )}
             </div>
           </div>
 

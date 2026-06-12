@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useLazyQuery, useMutation } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -23,10 +23,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { PROVIDER_CERTS, PROVIDER_HOSTED_ZONES } from "@/graphql/clusters/clusters.queries";
 import { CREATE_MANAGED_DOMAIN } from "@/graphql/clusters/managed-domains.mutations";
 import { LIST_MANAGED_DOMAINS } from "@/graphql/clusters/managed-domains.queries";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+
+interface ProviderCert {
+  arn: string;
+  domain: string;
+  status: string;
+  notAfter: string;
+}
+
+interface ProviderHostedZone {
+  zoneId: string;
+  zoneName: string;
+  recordCount: number;
+}
 
 interface Props {
   open: boolean;
@@ -59,6 +73,32 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
+  // Picker state for route53 driver (#858, #861).
+  const [pickedZoneId, setPickedZoneId] = React.useState("");
+  const [pickedCertArn, setPickedCertArn] = React.useState("");
+
+  const [fetchHostedZones, hostedZonesResult] = useLazyQuery<{
+    astroliftProviderHostedZones: ProviderHostedZone[];
+  }>(PROVIDER_HOSTED_ZONES);
+
+  const [fetchCerts, certsResult] = useLazyQuery<{
+    astroliftProviderCerts: ProviderCert[];
+  }>(PROVIDER_CERTS);
+
+  // When driver flips to route53 and the dialog is open, fetch picker data.
+  React.useEffect(() => {
+    if (!open) return;
+    if (dnsDriver === "route53") {
+      fetchHostedZones({ variables: { pluginSlug: "aws" } });
+      fetchCerts({ variables: { pluginSlug: "aws" } });
+    }
+  }, [open, dnsDriver, fetchHostedZones, fetchCerts]);
+
+  const hostedZones = hostedZonesResult.data?.astroliftProviderHostedZones ?? [];
+  const certs = certsResult.data?.astroliftProviderCerts ?? [];
+  // Only show ISSUED certs in the picker; others go in the fallback textarea.
+  const issuedCerts = certs.filter((c) => c.status === "ISSUED");
+
   React.useEffect(() => {
     if (!open) {
       setZone("");
@@ -69,6 +109,8 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
       setOrgScoped(false);
       setJsonError(null);
       setSubmitError(null);
+      setPickedZoneId("");
+      setPickedCertArn("");
     }
   }, [open]);
 
@@ -84,16 +126,36 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
     setJsonError(null);
     setSubmitError(null);
 
-    const trimmedConfig = dnsConfig.trim();
+    // For route53, merge picker selections into the config object.
     let parsedConfig: unknown = null;
-    if (trimmedConfig.length > 0) {
-      try {
-        parsedConfig = JSON.parse(trimmedConfig);
-      } catch (err) {
-        setJsonError(
-          err instanceof Error ? err.message : "DNS config is not valid JSON"
-        );
-        return;
+    if (dnsDriver === "route53" && (pickedZoneId || pickedCertArn)) {
+      const pickerConfig: Record<string, string> = {};
+      if (pickedZoneId) pickerConfig.zone_id = pickedZoneId;
+      if (pickedCertArn) pickerConfig.certificate_arn = pickedCertArn;
+      // Merge with any manual JSON the operator also typed.
+      const trimmedManual = dnsConfig.trim();
+      if (trimmedManual.length > 0) {
+        try {
+          const manualParsed = JSON.parse(trimmedManual) as Record<string, unknown>;
+          parsedConfig = { ...manualParsed, ...pickerConfig };
+        } catch (err) {
+          setJsonError(err instanceof Error ? err.message : "DNS config is not valid JSON");
+          return;
+        }
+      } else {
+        parsedConfig = pickerConfig;
+      }
+    } else {
+      const trimmedConfig = dnsConfig.trim();
+      if (trimmedConfig.length > 0) {
+        try {
+          parsedConfig = JSON.parse(trimmedConfig);
+        } catch (err) {
+          setJsonError(
+            err instanceof Error ? err.message : "DNS config is not valid JSON"
+          );
+          return;
+        }
       }
     }
 
@@ -221,23 +283,96 @@ export function AddManagedDomainDialog({ open, onOpenChange }: Props) {
             </span>
           </label>
 
-          <div className="space-y-2">
-            <Label htmlFor="dns-config">DNS config (JSON, optional)</Label>
-            <Textarea
-              id="dns-config"
-              value={dnsConfig}
-              onChange={(e) => setDnsConfig(e.target.value)}
-              rows={4}
-              placeholder={'{"zone_id": "...", "certificate_arn": "..."}'}
-              className="font-mono text-xs"
-            />
-            {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
-            <p className="text-muted-foreground text-[11px]">
-              Driver-specific identifiers (hosted zone ID, ACM cert ARN, GCP
-              project, etc.). Empty is fine — the driver will discover what
-              it can.
-            </p>
-          </div>
+          {dnsDriver === "route53" ? (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="hosted-zone">Hosted zone</Label>
+                {hostedZones.length > 0 ? (
+                  <Select value={pickedZoneId} onValueChange={(v) => {
+                    setPickedZoneId(v);
+                    // Auto-fill the zone name field when the operator picks a zone.
+                    const picked = hostedZones.find((z) => z.zoneId === v);
+                    if (picked && !zone) setZone(picked.zoneName);
+                  }}>
+                    <SelectTrigger id="hosted-zone">
+                      <SelectValue placeholder="Select hosted zone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hostedZones.map((z) => (
+                        <SelectItem key={z.zoneId} value={z.zoneId}>
+                          <span className="font-mono">{z.zoneName}</span>
+                          <span className="text-muted-foreground ml-2 text-xs">{z.zoneId}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    No hosted zones found — enter the zone ID in the config below.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cert-arn">ACM certificate (optional)</Label>
+                {issuedCerts.length > 0 ? (
+                  <Select value={pickedCertArn} onValueChange={setPickedCertArn}>
+                    <SelectTrigger id="cert-arn">
+                      <SelectValue placeholder="Select certificate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {issuedCerts.map((c) => (
+                        <SelectItem key={c.arn} value={c.arn}>
+                          <span className="font-mono">{c.domain}</span>
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            {c.notAfter ? `expires ${c.notAfter.slice(0, 10)}` : ""}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    No ISSUED certificates found — leave blank or enter a cert ARN in the config below.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dns-config">Additional config (JSON, optional)</Label>
+                <Textarea
+                  id="dns-config"
+                  value={dnsConfig}
+                  onChange={(e) => setDnsConfig(e.target.value)}
+                  rows={3}
+                  placeholder='{"zone_id": "...", "certificate_arn": "..."}'
+                  className="font-mono text-xs"
+                />
+                {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
+                <p className="text-muted-foreground text-[11px]">
+                  Override or add extra keys. Picker selections above take precedence over the same keys here.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="dns-config">DNS config (JSON, optional)</Label>
+              <Textarea
+                id="dns-config"
+                value={dnsConfig}
+                onChange={(e) => setDnsConfig(e.target.value)}
+                rows={4}
+                placeholder={'{"zone_id": "...", "certificate_arn": "..."}'}
+                className="font-mono text-xs"
+              />
+              {jsonError && <p className="text-destructive text-xs">{jsonError}</p>}
+              <p className="text-muted-foreground text-[11px]">
+                Driver-specific identifiers (hosted zone ID, ACM cert ARN, GCP
+                project, etc.). Empty is fine — the driver will discover what
+                it can.
+              </p>
+            </div>
+          )}
 
           {submitError && (
             <p className="text-destructive text-sm">{submitError}</p>

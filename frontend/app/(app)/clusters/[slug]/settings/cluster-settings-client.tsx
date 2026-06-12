@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -41,6 +41,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -57,6 +64,7 @@ import {
   DECOMMISSION_CLUSTER,
   INSTALL_CLUSTER_PREREQS,
   LIST_CLUSTERS,
+  PROVIDER_COGNITO_POOLS,
   RECONCILE_CLUSTER_INGRESSES,
   REFRESH_CLUSTER_MANAGEMENT,
   UPDATE_TENANT_CLUSTER,
@@ -1066,6 +1074,13 @@ interface IngressAuthConfig {
   user_pool_domain: string;
 }
 
+interface ProviderCognitoPool {
+  poolId: string;
+  poolArn: string;
+  name: string;
+  domain: string;
+}
+
 function isAlbAuthConfig(v: unknown): v is IngressAuthConfig {
   return (
     typeof v === "object" &&
@@ -1127,6 +1142,26 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
   const [poolArn, setPoolArn] = React.useState(existing?.user_pool_arn ?? "");
   const [clientId, setClientId] = React.useState(existing?.user_pool_client_id ?? "");
   const [domain, setDomain] = React.useState(existing?.user_pool_domain ?? "");
+
+  const [fetchPools, cognitoPools] = useLazyQuery<{
+    astroliftProviderCognitoPools: ProviderCognitoPool[];
+  }>(PROVIDER_COGNITO_POOLS);
+
+  const poolOptions = cognitoPools.data?.astroliftProviderCognitoPools ?? [];
+
+  // Fetch pools when the form opens for AWS clusters.
+  const prevEditing = React.useRef(false);
+  React.useEffect(() => {
+    if (editing && !prevEditing.current && cluster.providerPluginSlug === "aws") {
+      fetchPools({
+        variables: {
+          pluginSlug: cluster.providerPluginSlug,
+          region: cluster.region || null,
+        },
+      });
+    }
+    prevEditing.current = editing;
+  }, [editing, cluster.providerPluginSlug, cluster.region, fetchPools]);
 
   const [update, { loading: updating }] = useMutation<{
     updateTenantCluster: MutationResult<AstroliftTenantCluster>;
@@ -1322,13 +1357,43 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
         {editing ? (
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium">User pool ARN</label>
-              <Input
-                value={poolArn}
-                onChange={(e) => setPoolArn(e.target.value)}
-                placeholder="arn:aws:cognito-idp:us-west-2:…"
-                className="font-mono text-xs"
-              />
+              <label className="text-xs font-medium">User pool</label>
+              {poolOptions.length > 0 ? (
+                <Select
+                  value={poolArn}
+                  onValueChange={(v) => {
+                    setPoolArn(v);
+                    const picked = poolOptions.find((p) => p.poolArn === v);
+                    if (picked) {
+                      if (picked.domain) setDomain(picked.domain);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select user pool" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {poolOptions.map((p) => (
+                      <SelectItem key={p.poolArn} value={p.poolArn}>
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-muted-foreground ml-2 font-mono text-xs">{p.poolId}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={poolArn}
+                  onChange={(e) => setPoolArn(e.target.value)}
+                  placeholder="arn:aws:cognito-idp:us-west-2:…"
+                  className="font-mono text-xs"
+                />
+              )}
+              {poolOptions.length === 0 && (
+                <p className="text-muted-foreground text-[11px]">
+                  User pool ARN — e.g. <span className="font-mono">arn:aws:cognito-idp:us-west-2:…</span>
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium">App client ID</label>
