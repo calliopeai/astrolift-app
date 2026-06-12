@@ -859,7 +859,6 @@ def app_to_type(
         cron_paused=bool(app.cron_paused),
         deploy_branch=app.deploy_branch,
         preview_screenshot_url=app.preview_screenshot_url or "",
-        build_mode=app.build_mode or "off",
         is_archived=bool(app.archived_at),
         archived_at=app.archived_at,
         archived_by_email=_archived_by_email(app),

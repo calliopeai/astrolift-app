@@ -436,64 +436,6 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
 # Log streaming and metering (#51, #56)
 # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Cluster keep-alive / heartbeat (#808)
-# ---------------------------------------------------------------------------
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def cluster_heartbeat(request: HttpRequest, cluster_id: str) -> JsonResponse:
-    """Record a keep-alive ping from an in-cluster agent.
-
-    Auth: Bearer <api_key> — must match the SHA-256 stored in
-    TenantCluster.api_key_hash.  The cluster_id path segment is the
-    cluster's UUID (``guid`` field); it scopes the token lookup so that
-    a leaked key from cluster A cannot update cluster B.
-
-    Returns:
-        200 {"ok": true, "cluster_id": "<guid>", "received_at": "<iso>"}
-        401 {"error": "unauthorized"}
-        404 {"error": "cluster not found"}
-    """
-    from astrolift_clusters.models import TenantCluster
-
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return JsonResponse({"error": "unauthorized"}, status=401)
-    raw_key = auth[len("Bearer "):]
-    key_hash = _hash_key(raw_key)
-
-    cluster = TenantCluster.objects.filter(
-        guid=cluster_id,
-        api_key_hash=key_hash,
-        is_active=True,
-        deleted_at__isnull=True,
-    ).first()
-
-    if cluster is None:
-        # Distinguish missing cluster from bad token with a single 401 to
-        # avoid leaking cluster enumeration.  Log at DEBUG so operators can
-        # diagnose misconfigured tokens without alerting on every probe.
-        logger.debug(
-            "cluster_heartbeat: no match for cluster_id=%s (bad token or unknown cluster)",
-            cluster_id,
-        )
-        return JsonResponse({"error": "unauthorized"}, status=401)
-
-    now = timezone.now()
-    cluster.last_heartbeat_at = now
-    cluster.save(update_fields=["last_heartbeat_at", "updated_at", "version"])
-
-    logger.debug("cluster_heartbeat: cluster %s stamped at %s", cluster_id, now.isoformat())
-    return JsonResponse(
-        {
-            "ok": True,
-            "cluster_id": str(cluster.guid),
-            "received_at": now.isoformat(),
-        }
-    )
-
 
 from astrolift_dispatch.log_collector import store_agent_log_lines  # noqa: E402
 from astrolift_agents.models.task_meter import TaskMeteringRecord  # noqa: E402

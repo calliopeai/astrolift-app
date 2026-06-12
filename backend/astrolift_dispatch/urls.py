@@ -8,7 +8,6 @@ from django.views.decorators.csrf import csrf_exempt
 from astrolift_dispatch.views import (
     agent_callback,
     agent_checkin,
-    cluster_heartbeat,
     heartbeat,
     ingest_task_logs,
     ingest_task_meter,
@@ -23,12 +22,6 @@ urlpatterns = [
     # Registration and heartbeat
     path("api/dispatch/v1/register/", register, name="dispatch-register"),
     path("api/dispatch/v1/heartbeat/", heartbeat, name="dispatch-heartbeat"),
-    # Cluster keep-alive (#808)
-    path(
-        "api/dispatch/v1/clusters/<str:cluster_id>/heartbeat/",
-        cluster_heartbeat,
-        name="cluster-heartbeat",
-    ),
     # Task management
     path("api/dispatch/v1/tasks/", list_tasks, name="dispatch-tasks"),
     path("api/dispatch/v1/tasks/<str:task_id>/status/", update_task_status, name="dispatch-task-status"),
