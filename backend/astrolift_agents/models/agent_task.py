@@ -100,6 +100,19 @@ class AgentTask(BaseCoreModel):
     ended_at = models.DateTimeField(null=True, blank=True)
     # Redis key for live status/heartbeat/progress/token data.
     telemetry_key = models.CharField(max_length=512, blank=True, default="")
+    # Environment recipe this task launched from.  Nullable so a task
+    # survives spec deletion (the resolved values are frozen elsewhere).
+    environment_spec = models.ForeignKey(
+        "astrolift_agents.AgentEnvironmentSpec",
+        related_name="agent_tasks",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    # Pod/container name assigned by the dispatcher backend.
+    pod_name = models.CharField(max_length=255, blank=True, default="")
+    # "owner/repo@sha" frozen at dispatch so the run is reproducible.
+    source_ref = models.CharField(max_length=512, blank=True, default="")
 
     class Meta:
         indexes = [

@@ -40,6 +40,11 @@ class Skill(BaseCoreModel):
     skill_version = models.PositiveIntegerField(default=1)
     is_global = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    # Agent runtime this skill targets: "claude", "codex", or "any".
+    agent_type = models.CharField(max_length=50, blank=True, default="")
+    # Scaffolding categories used to surface the skill, e.g.
+    # ["code-review", "infra-ops"].
+    scaffolding_tags = models.JSONField(default=list, blank=True)
 
     class Meta:
         constraints = [
@@ -85,6 +90,17 @@ class ToolDef(BaseCoreModel):
     handler_ref = models.CharField(max_length=1024, blank=True, default="")
     # Adapter-specific config (e.g. HTTP headers, auth scheme, timeout).
     implementation_config = models.JSONField(default=dict, blank=True)
+    # Shell commands this tool exposes, e.g. ["git", "gh"].
+    commands = models.JSONField(default=list, blank=True)
+    # System packages the tool needs, e.g.
+    # [{"manager": "apt", "name": "git"}].
+    required_packages = models.JSONField(default=list, blank=True)
+    # Coarse grouping: dev | cloud | k8s | data | infra | custom.
+    capability_group = models.CharField(max_length=50, blank=True, default="")
+    # Agent runtimes this tool binds to: ["claude", "codex"] or ["*"].
+    agent_type_bindings = models.JSONField(default=list, blank=True)
+    # True = pre-installed in the image; False = installed on demand.
+    is_builtin = models.BooleanField(default=True)
 
     class Meta:
         constraints = [
