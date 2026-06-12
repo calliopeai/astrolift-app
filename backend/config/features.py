@@ -45,6 +45,7 @@ class Feature(StrEnum):
     # envelope. Cluster adoption (`bringClusterIntoManagement`) is not gated
     # — its workflow is fully implemented end-to-end.
     DEPLOY_PIPELINE = "deploy_pipeline"
+    AGENTS = "agents"
 
 
 # Feature -> environment variable -> default
@@ -54,6 +55,7 @@ FEATURE_DEFAULTS = {
     Feature.OPENSEARCH: ("FEATURE_OPENSEARCH", True),
     Feature.FILE_UPLOADS: ("FEATURE_FILE_UPLOADS", True),
     Feature.DEPLOY_PIPELINE: ("FEATURE_DEPLOY_PIPELINE", True),
+    Feature.AGENTS: ("FEATURE_AGENTS", True),
 }
 
 # Feature -> Django apps that belong to it
@@ -62,6 +64,7 @@ FEATURE_APPS = {
     Feature.TEMPORAL: [],
     Feature.OPENSEARCH: [],  # opensearch is a service, not a Django app
     Feature.FILE_UPLOADS: [],
+    Feature.AGENTS: ["astrolift_agents", "astrolift_dispatch"],
 }
 
 # Feature -> GraphQL schema module (app_label.schema)
