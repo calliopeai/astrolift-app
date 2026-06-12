@@ -212,6 +212,15 @@ EXEMPT: dict[str, str] = {
         "the form builder UI offers. Knowing which renderers exist "
         "leaks nothing about any tenant."
     ),
+    "AgentsQuery.dispatchers": (
+        "platform-level routing fabric: DispatcherInstances span tenants "
+        "(one per cluster/cloud/region) and are the dispatch router's "
+        "targets, not tenant-owned rows — same shape as "
+        "astrolift_provider_plugins. tenant_scoped() would filter the "
+        "platform fleet to nothing. Staff/superuser-only: the resolver "
+        "rejects anonymous + non-staff callers inline, and the type "
+        "omits api_key_hash so the scoped key never surfaces."
+    ),
 }
 
 
