@@ -253,6 +253,42 @@ def _dispatch_workflow_webhooks(event_kind: str, app, payload: dict) -> int:
     return dispatched
 
 
+def _sync_workflow_dsl(app, connection, payload: dict) -> None:
+    """Best-effort sync of in-repo WorkflowDefinitions from a push event.
+
+    Reads the pushed ``after`` ref from the GitHub push payload and
+    calls ``workflows.services.workflow_sync.sync_workflows_from_repo``.
+    All exceptions are caught and logged; this must never raise or block
+    the webhook ack.
+    """
+    try:
+        from workflows.services.workflow_sync import sync_workflows_from_repo
+
+        ref = payload.get("after") or payload.get("ref") or ""
+        if not ref:
+            return
+        result = sync_workflows_from_repo(app, connection, ref)
+        if result["errors"]:
+            logger.warning(
+                "_sync_workflow_dsl: errors for %s@%s: %s",
+                getattr(app, "source_repo", "?"),
+                ref,
+                result["errors"],
+            )
+        else:
+            logger.debug(
+                "_sync_workflow_dsl: %s created=%d updated=%d",
+                getattr(app, "source_repo", "?"),
+                result["created"],
+                result["updated"],
+            )
+    except Exception:
+        logger.exception(
+            "_sync_workflow_dsl: unexpected error for app=%s",
+            getattr(app, "pk", "?"),
+        )
+
+
 @require_http_methods(["POST"])
 def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     """POST /api/webhooks/github/<app_guid>/ — GitHub push / PR receiver.
@@ -330,6 +366,9 @@ def pr_webhook(request: HttpRequest, app_guid: str) -> JsonResponse:
     dispatched = _dispatch_workflow_webhooks(event, app, payload)
 
     if event == "push":
+        # Best-effort DSL sync: fetch .astrolift/workflows.yaml from the
+        # pushed ref and upsert WorkflowDefinitions. Never blocks the ack.
+        _sync_workflow_dsl(app, connection, payload)
         # Push has no preview-environment lifecycle; the workflow
         # dispatch above is the whole job. Ack so GitHub stops retrying.
         return JsonResponse(
