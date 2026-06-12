@@ -270,6 +270,169 @@ def update_task_status(request: HttpRequest, task_id: str) -> JsonResponse:
 
 
 # ---------------------------------------------------------------------------
+# Thread-mode agent checkin + callback
+# ---------------------------------------------------------------------------
+
+
+def _advance_to_running(task: AgentTask) -> None:
+    """Walk a task forward to RUNNING following the allowed state graph.
+
+    The runner checks in once its pod is live, so the task may legitimately
+    be QUEUED (dispatcher about to mark provisioning), PROVISIONING (spawn
+    in flight), or already RUNNING (re-checkin / race). The transition graph
+    is QUEUED → PROVISIONING → RUNNING, so a single jump to RUNNING from
+    QUEUED is illegal — we step through PROVISIONING first. Each step is
+    guarded so a concurrent advance by ``update_task_status`` is harmless.
+    """
+    if task.status == AgentTask.Status.QUEUED:
+        try:
+            task.transition_to(AgentTask.Status.PROVISIONING)
+        except ValueError:
+            return  # raced past QUEUED — re-read below or let caller proceed
+    if task.status == AgentTask.Status.PROVISIONING:
+        try:
+            task.transition_to(AgentTask.Status.RUNNING)
+        except ValueError:
+            pass  # already advanced by a race — fine
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_require_dispatcher
+def agent_checkin(request: HttpRequest, task_id: str) -> JsonResponse:
+    """Thread-mode agent checkin endpoint.
+
+    Called by ``runner.py`` after the pod starts — returns the Brief manifest
+    as the instruction packet the agent should execute.
+
+    Auth: same Bearer token as other dispatch endpoints (DispatcherInstance).
+    The task must belong to this dispatcher's org.
+
+    Returns JSON:
+    {
+      "task_id": "...",
+      "prompt": "...",           # from Brief.manifest_snapshot.system_prompt
+      "system": "...",           # same (may be identical or separate)
+      "tools": [...],            # from Brief.manifest_snapshot.tools
+      "context": {...},          # from Brief.context
+      "model": "...",            # from Brief.manifest_snapshot.model (if set)
+      "callback_url": "..."      # from AgentTask.callback_url
+    }
+    """
+    dispatcher = request.dispatcher
+
+    task = (
+        AgentTask.objects.filter(
+            guid=task_id,
+            organization=dispatcher.organization,
+            deleted_at__isnull=True,
+        )
+        .select_related("brief")
+        .first()
+    )
+
+    if task is None:
+        return JsonResponse({"error": "task not found"}, status=404)
+
+    dispatchable = {
+        AgentTask.Status.QUEUED,
+        AgentTask.Status.PROVISIONING,
+        AgentTask.Status.RUNNING,
+    }
+    if task.status not in dispatchable:
+        return JsonResponse(
+            {"error": f"task not in dispatchable state: {task.status}"},
+            status=409,
+        )
+
+    # Advance to RUNNING following the QUEUED → PROVISIONING → RUNNING graph.
+    if task.status != AgentTask.Status.RUNNING:
+        _advance_to_running(task)
+
+    # Build the instruction packet from the Brief manifest snapshot.
+    brief = task.brief
+    manifest = brief.manifest_snapshot if brief else {}
+
+    packet = {
+        "task_id": str(task.guid),
+        "prompt": manifest.get("system_prompt", ""),
+        "system": manifest.get(
+            "system_prompt",
+            "You are a helpful agent. Complete the task and report results.",
+        ),
+        "tools": manifest.get("tools", []),
+        "context": (brief.context if brief else {}),
+        "model": manifest.get("model", ""),
+        "callback_url": task.callback_url or "",
+    }
+
+    logger.info("dispatch.agent_checkin: task %s checked in", task_id)
+    return JsonResponse(packet)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_require_dispatcher
+def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
+    """Heartbeat and result callback from thread-mode agents.
+
+    Body: {status, result?, partial?, error?, continue?}
+
+    A terminal ``status`` of "completed"/"failed" records the outcome and
+    transitions the task. Any other value is treated as a heartbeat and
+    simply acknowledged. The response carries ``continue`` — false tells the
+    agent to stop (the task is no longer RUNNING).
+    """
+    dispatcher = request.dispatcher
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid JSON"}, status=400)
+
+    task = AgentTask.objects.filter(
+        guid=task_id,
+        organization=dispatcher.organization,
+        deleted_at__isnull=True,
+    ).first()
+
+    if task is None:
+        return JsonResponse({"error": "task not found"}, status=404)
+
+    new_status = body.get("status")
+
+    if new_status in {"completed", "failed"}:
+        if new_status == "completed":
+            task.result = {"output": body.get("result") or body.get("error", "")}
+        else:
+            task.failure = {
+                "message": body.get("error", ""),
+                "output": body.get("result", ""),
+            }
+        # Persist the terminal output explicitly: transition_to() saves a
+        # fixed update_fields set that excludes result/failure, so those
+        # columns would otherwise be dropped on the success path.
+        task.save(update_fields=["result", "failure", "updated_at", "version"])
+
+        target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
+        try:
+            task.transition_to(target)
+        except ValueError:
+            # Task was not in a state that allows this terminal transition
+            # (e.g. already terminal). The output above is already saved.
+            logger.warning(
+                "dispatch.agent_callback: task %s cannot transition %s → %s",
+                task_id,
+                task.status,
+                target,
+            )
+
+    # Heartbeat (any non-terminal status) is a no-op acknowledgement.
+
+    return JsonResponse({"ok": True, "continue": task.status == AgentTask.Status.RUNNING})
+
+
+# ---------------------------------------------------------------------------
 # Log streaming and metering (#51, #56)
 # ---------------------------------------------------------------------------
 
