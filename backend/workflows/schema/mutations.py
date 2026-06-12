@@ -21,6 +21,14 @@ class StartWorkflowResult(MutationResult):
 
 
 @strawberry.type
+class RunWorkflowDefinitionResult(MutationResult):
+    # WorkflowRun mirror pk (the executor keys stage executions to it).
+    workflow_run_id: Optional[strawberry.ID] = None
+    # Temporal workflow id, for the viewer / signalling.
+    temporal_workflow_id: Optional[str] = None
+
+
+@strawberry.type
 class CreateWorkflowStageResult(MutationResult):
     stage: Optional[WorkflowStageType] = None
 
@@ -58,6 +66,126 @@ class Mutation:
             return StartWorkflowResult(ok=True, instance_id=str(instance.pk))
         except ValidationError as e:
             raise GraphQLError(str(e))
+
+    @strawberry.mutation(
+        description=(
+            "Run an agent WorkflowDefinition's stages durably via Temporal "
+            "(WorkflowDefinitionRunWorkflow). Creates the WorkflowInstance + "
+            "WorkflowRun mirror rows and enqueues the stage executor."
+        )
+    )
+    def run_workflow_definition(
+        self,
+        info: Info,
+        workflow_slug: str,
+        trigger_payload: Optional[strawberry.scalars.JSON] = None,
+    ) -> RunWorkflowDefinitionResult:
+        user = info.context.user
+        _require_staff(user)
+
+        workflow = WorkflowDefinition.objects.filter(
+            slug=workflow_slug,
+            is_enabled=True,
+            deleted_at__isnull=True,
+        ).first()
+        if not workflow:
+            return RunWorkflowDefinitionResult(
+                ok=False,
+                errors=[
+                    GQLValidationError(
+                        field="workflow_slug",
+                        messages=[f'Workflow "{workflow_slug}" not found or disabled'],
+                    )
+                ],
+            )
+
+        if not workflow.stages.filter(deleted_at__isnull=True).exists():
+            return RunWorkflowDefinitionResult(
+                ok=False,
+                errors=[
+                    GQLValidationError(
+                        field="workflow_slug",
+                        messages=[
+                            f'Workflow "{workflow_slug}" has no stages to execute'
+                        ],
+                    )
+                ],
+            )
+
+        payload = dict(trigger_payload or {})
+
+        # Imports kept local so this engine app's schema module doesn't pull
+        # the Temporal client + operations models at import time (the app is
+        # feature-gated).
+        from astrolift_operations.models import WorkflowRun
+        from astrolift_workflows.client import start_workflow
+        from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
+        from core.tenancy import get_current_tenant
+        from django.utils import timezone
+
+        tenant = get_current_tenant()
+        organization_id = getattr(tenant, "organization_id", None) if tenant else None
+
+        # The WorkflowRun mirror is the executor's source of truth; create
+        # it first so the workflow id can key off its pk, then enqueue, then
+        # backfill the Temporal run_id.
+        run = WorkflowRun.objects.create(
+            workflow_kind="WorkflowDefinitionRunWorkflow",
+            workflow_id="",  # filled in below once the id is known
+            run_id="",
+            status=WorkflowRun.Status.RUNNING,
+            started_at=timezone.now(),
+            organization_id=organization_id,
+            trigger_actor_user_id=user.pk if getattr(user, "pk", None) else None,
+        )
+
+        # A WorkflowInstance keeps the existing instance surface populated.
+        # Agent stage workflows don't use the state-machine ``states`` array,
+        # so we point the instance at the definition itself and set a plain
+        # ``running`` state rather than going through ``WorkflowInstance.start``
+        # (which requires an initial state the stage model doesn't declare).
+        instance = WorkflowInstance.objects.create(
+            workflow=workflow,
+            content_type=ContentType.objects.get_for_model(WorkflowDefinition),
+            object_id=workflow.pk,
+            current_state="running",
+            created_by=user,
+            updated_by=user,
+        )
+
+        workflow_id = f"WorkflowDefinitionRunWorkflow-{run.pk}"
+        run.workflow_id = workflow_id
+        run.save(update_fields=["workflow_id", "updated_at", "version"])
+
+        handle = start_workflow(
+            "WorkflowDefinitionRunWorkflow",
+            args=[
+                WorkflowDefinitionRunInput(
+                    workflow_definition_slug=workflow.slug,
+                    workflow_run_id=str(run.pk),
+                    trigger_payload=payload,
+                    actor=Actor(
+                        kind="user",
+                        user_id=user.pk if getattr(user, "pk", None) else None,
+                        display=getattr(user, "username", "") or "",
+                    ),
+                )
+            ],
+            workflow_id=workflow_id,
+        )
+
+        if handle.enqueued and handle.run_id:
+            run.run_id = handle.run_id
+            run.save(update_fields=["run_id", "updated_at", "version"])
+
+        instance.temporal_workflow_id = workflow_id
+        instance.save(update_fields=["temporal_workflow_id"])
+
+        return RunWorkflowDefinitionResult(
+            ok=True,
+            workflow_run_id=str(run.pk),
+            temporal_workflow_id=workflow_id,
+        )
 
     @strawberry.mutation(description="Transition a workflow instance to a new state.")
     def transition_workflow(

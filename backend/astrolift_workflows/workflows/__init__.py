@@ -59,6 +59,9 @@ from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkf
 from astrolift_workflows.workflows.validate_custom_domain import (
     ValidateCustomDomainWorkflow,
 )
+from astrolift_workflows.workflows.workflow_definition_run import (
+    WorkflowDefinitionRunWorkflow,
+)
 
 __all__ = [
     "BringClusterIntoManagementWorkflow",
@@ -93,4 +96,5 @@ __all__ = [
     "TearDownAppWorkflow",
     "TearDownPreviewWorkflow",
     "ValidateCustomDomainWorkflow",
+    "WorkflowDefinitionRunWorkflow",
 ]
