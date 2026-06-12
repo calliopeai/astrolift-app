@@ -778,7 +778,7 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
     : null;
 
   return (
-    <div className="flex items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
+    <div className="flex min-w-0 items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
       <code className="flex-1 truncate font-mono text-xs">
         {row.workloadName}
       </code>
@@ -913,7 +913,7 @@ function EventRow({ event }: { event: ClusterEvent }) {
   const lastSeen = event.lastSeen ? formatRelativeAge(event.lastSeen) : "";
 
   return (
-    <div className="flex items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
+    <div className="flex min-w-0 items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
       <Icon className={`size-3.5 shrink-0 ${iconClass}`} />
       <code className="shrink-0 font-mono text-[11px]">{event.reason}</code>
       <span className="flex-1 truncate text-xs text-muted-foreground">
@@ -978,7 +978,7 @@ function WorkflowRunRow({ run }: { run: WorkflowRun }) {
   const duration = fmtDuration(run.startedAt, run.closedAt);
 
   return (
-    <div className="flex items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
+    <div className="flex min-w-0 items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
       <Icon className={`size-4 shrink-0 ${iconClass}`} />
       <span className="flex-1 truncate font-medium">
         {prettyWorkflowType(run.workflowType)}
@@ -1079,7 +1079,7 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
     : "text-destructive";
 
   return (
-    <div className="flex items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
+    <div className="flex min-w-0 items-center gap-3 border-b border-border/50 py-2 text-sm last:border-0">
       <span className={`shrink-0 text-base leading-none ${dotClass}`}>●</span>
       <span className="flex-1 truncate font-medium">
         {prettyOperation(entry.operation)}
