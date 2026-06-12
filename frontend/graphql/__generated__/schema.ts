@@ -1944,6 +1944,25 @@ export type AstroliftProviderPlugin = {
   version: Scalars['String']['output'];
 };
 
+export type AstroliftProviderRegion = {
+  continent: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
+export type AstroliftCognitoUserPool = {
+  domain: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  poolArn: Scalars['String']['output'];
+  poolId: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+};
+
+export type AstroliftCognitoUserPoolClient = {
+  clientId: Scalars['String']['output'];
+  clientName: Scalars['String']['output'];
+};
+
 export type AstroliftPushCiSecretsPayload = {
   repo: Scalars['String']['output'];
   rotatedTokenLast4: Scalars['String']['output'];
@@ -5194,6 +5213,8 @@ export type Query = {
   astroliftClusterLifecycleAudit: Array<AstroliftClusterLifecycleAuditEntry>;
   astroliftClusterWorkloadHealth: Array<AstroliftClusterWorkloadHealth>;
   astroliftClusters: Array<AstroliftTenantCluster>;
+  astroliftCognitoUserPoolClients: Array<AstroliftCognitoUserPoolClient>;
+  astroliftCognitoUserPools: Array<AstroliftCognitoUserPool>;
   astroliftCommandRuns: Array<AstroliftCommandRun>;
   astroliftCompareDeployments?: Maybe<AstroliftDeploymentComparison>;
   astroliftContainers: Array<AstroliftContainer>;
@@ -5247,6 +5268,7 @@ export type Query = {
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftProjects: Array<AstroliftProject>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
+  astroliftProviderRegions: Array<AstroliftProviderRegion>;
   astroliftQuotas: Array<AstroliftQuota>;
   astroliftRecentActivity: AstroliftActivityPage;
   astroliftRecentClusterWorkflows: Array<AstroliftClusterWorkflowRun>;
@@ -5527,6 +5549,22 @@ export type QueryAstroliftClusterBootstrapPlanArgs = {
 export type QueryAstroliftClusterHealthArgs = {
   clusterId: Scalars['GUID']['input'];
   eventLimit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftCognitoUserPoolClientsArgs = {
+  clusterId: Scalars['GUID']['input'];
+  poolId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftCognitoUserPoolsArgs = {
+  clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProviderRegionsArgs = {
+  providerPluginSlug: Scalars['String']['input'];
 };
 
 

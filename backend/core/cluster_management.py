@@ -139,6 +139,152 @@ def _driver_for_cluster(cluster: TenantCluster) -> Any:
         ) from exc
 
 
+def _config_for_plugin_slug(plugin_slug: str) -> Any:
+    """Build a minimal driver config from a plugin slug alone — no
+    TenantCluster row.
+
+    Used by the region-picker path (#860), which runs before any
+    cluster exists (the operator is filling in the register dialog).
+    The region listing doesn't need cluster-identifying config:
+      - AWS: ``ec2:DescribeRegions`` only needs a boto3 client, which
+        needs *a* region to construct (regions are account-global).
+        ``us-east-1`` is the conventional bootstrap region. The
+        placeholder ``cluster_name`` is never read by ``list_regions``.
+      - GCP / Azure / k8s_native: ``list_regions`` is a static list, so
+        empty-default configs suffice.
+
+    Raises :class:`ClusterManagementError` for an unknown slug so the
+    resolver can fall back rather than 500.
+    """
+    if plugin_slug == "aws":
+        from aws.cluster_eks import EKSConfig
+
+        return EKSConfig(region="us-east-1", cluster_name="_region_probe")
+    if plugin_slug == "gcp":
+        from gcp.cluster_gke import GKEConfig
+
+        return GKEConfig(project_id="", location="", cluster_name="_region_probe")
+    if plugin_slug == "azure":
+        from azure.cluster_aks import AKSConfig
+
+        return AKSConfig(subscription_id="", resource_group="", cluster_name="_region_probe")
+    if plugin_slug == "k8s_native":
+        from k8s_native.cluster import K8sNativeConfig
+
+        return K8sNativeConfig()
+    raise ClusterManagementError(f"no config builder wired for plugin {plugin_slug!r}")
+
+
+def _driver_for_plugin_slug(plugin_slug: str) -> Any:
+    """Resolve a ``ClusterDriver`` from a plugin slug with a minimal
+    bootstrap config (#860). Mirrors :func:`_driver_for_cluster` but
+    for the no-cluster region-picker path. Raises
+    :class:`ClusterManagementError` when the plugin isn't loaded or its
+    constructor rejects the config."""
+    try:
+        driver_cls = plugins.get(plugin_slug, "cluster")
+    except DriverNotFound as exc:
+        raise ClusterManagementError(
+            f"provider plugin {plugin_slug!r} does not register a 'cluster' driver",
+        ) from exc
+    cfg = _config_for_plugin_slug(plugin_slug)
+    try:
+        return driver_cls(config=cfg)
+    except TypeError as exc:
+        raise ClusterManagementError(
+            f"driver {plugin_slug!r} constructor rejected config payload: {exc}",
+        ) from exc
+
+
+def provider_regions_dispatch(*, provider_plugin_slug: str) -> list[dict[str, str]]:
+    """Driver-backed region listing for the cluster-register picker
+    (#860).
+
+    Resolves a driver from the plugin slug alone and calls
+    ``list_regions()``. Returns a list of plain dicts
+    ``[{"id", "label", "continent"}, ...]`` so the resolver layer
+    converts without strawberry-side coercion. The driver's own
+    ``list_regions`` falls back to a static list on live-API failure
+    (AWS) or is static to begin with (GCP/Azure); this dispatch raises
+    :class:`ClusterManagementError` only when the *driver* can't be
+    built (plugin not loaded), which the resolver maps to an empty
+    list so the picker degrades to free-entry.
+    """
+    driver = _driver_for_plugin_slug(provider_plugin_slug)
+    if not hasattr(driver, "list_regions"):
+        return []
+    try:
+        regions = driver.list_regions()
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"plugin {provider_plugin_slug!r}: list_regions raised {exc}",
+        ) from exc
+    return [
+        {"id": r.id, "label": r.label, "continent": r.continent}
+        for r in regions
+    ]
+
+
+def cognito_user_pools_dispatch(*, cluster: TenantCluster) -> list[dict[str, str]]:
+    """Driver-backed Cognito user-pool listing for the ingress
+    auth-gate picker (#859).
+
+    Delegates to the driver's ``list_cognito_user_pools`` (AWS-only;
+    other drivers inherit the SDK default that returns an empty list).
+    Returns plain dicts ``[{"pool_id", "pool_arn", "name", "domain",
+    "region"}, ...]``. Raises :class:`ClusterManagementError` on driver
+    build / call failure (no creds, unreachable, plugin missing); the
+    resolver swallows it into an empty list so the picker degrades to
+    free-entry.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "list_cognito_user_pools"):
+        return []
+    try:
+        pools = driver.list_cognito_user_pools()
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_cognito_user_pools raised {exc}",
+        ) from exc
+    return [
+        {
+            "pool_id": p.pool_id,
+            "pool_arn": p.pool_arn,
+            "name": p.name,
+            "domain": p.domain,
+            "region": p.region,
+        }
+        for p in pools
+    ]
+
+
+def cognito_user_pool_clients_dispatch(
+    *,
+    cluster: TenantCluster,
+    pool_id: str,
+) -> list[dict[str, str]]:
+    """Driver-backed Cognito app-client listing for a user pool (#859).
+
+    Delegates to the driver's ``list_cognito_user_pool_clients``
+    (AWS-only). Returns plain dicts ``[{"client_id", "client_name"},
+    ...]``. Same error contract as
+    :func:`cognito_user_pools_dispatch`.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "list_cognito_user_pool_clients"):
+        return []
+    try:
+        clients = driver.list_cognito_user_pool_clients(pool_id)
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_cognito_user_pool_clients raised {exc}",
+        ) from exc
+    return [
+        {"client_id": c.client_id, "client_name": c.client_name}
+        for c in clients
+    ]
+
+
 def bring_cluster_into_management(
     *,
     cluster: TenantCluster,
@@ -368,7 +514,10 @@ __all__ = [
     "cluster_alb_http_metrics_dispatch",
     "cluster_health_dispatch",
     "cluster_workload_health_dispatch",
+    "cognito_user_pool_clients_dispatch",
+    "cognito_user_pools_dispatch",
     "probe_cluster_capabilities_dispatch",
+    "provider_regions_dispatch",
     "reset_management_backend_for_tests",
     "set_management_backend_for_tests",
     "teardown_cluster_dispatch",

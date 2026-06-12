@@ -431,3 +431,56 @@ class ClusterPrometheusRangeMetricsType:
     range_seconds: int
     step_seconds: int
     series: list[ClusterPrometheusRangeSeriesType]
+
+
+# ---- Provider region picker (#860) ---------------------------------
+
+
+@strawberry.type(name="AstroliftProviderRegion")
+class ProviderRegionType:
+    """One selectable cloud region for the cluster-register dialog
+    (#860). Replaces the free-text region input with a driver-sourced
+    picker."""
+
+    id: str
+    """Wire-form region slug persisted on the cluster row —
+    'us-west-2' / 'us-central1' / 'eastus'."""
+
+    label: str
+    """Operator-facing display name — 'US West (Oregon)'. Falls back to
+    the slug when the driver can't map a friendly label."""
+
+    continent: str
+    """Optional grouping for long lists — 'Americas' / 'Europe' /
+    'Asia Pacific' / 'Middle East' / 'Africa'. Empty when unclassified."""
+
+
+# ---- Cognito user pool picker (#859) --------------------------------
+
+
+@strawberry.type(name="AstroliftCognitoUserPool")
+class CognitoUserPoolType:
+    """One Cognito user pool for the ingress auth-gate picker (#859).
+    Replaces the free-text user-pool-ARN / domain inputs."""
+
+    pool_id: str
+    pool_arn: str
+    """Composed arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id>
+    — what the ALB authenticate-cognito annotation consumes."""
+
+    name: str
+    domain: str
+    """Cognito-hosted domain prefix (without the
+    .auth.<region>.amazoncognito.com suffix); empty when the pool has no
+    hosted domain. Auto-fills the domain field on pool selection."""
+
+    region: str
+
+
+@strawberry.type(name="AstroliftCognitoUserPoolClient")
+class CognitoUserPoolClientType:
+    """One app client within a Cognito user pool (#859). Populates the
+    dependent client picker after a pool is selected."""
+
+    client_id: str
+    client_name: str

@@ -428,6 +428,50 @@ export const LIST_PROVIDER_PLUGINS = gql`
   }
 `;
 
+// Driver-sourced region list for the cluster-register dialog's region
+// picker (#860). Keyed by the selected provider plugin slug — AWS goes
+// live via ec2:DescribeRegions (static fallback), GCP/Azure return
+// curated static lists, k8s_native returns []. The dialog layers
+// free-text entry on top so an empty/errored list degrades to the old
+// free-entry behavior.
+export const PROVIDER_REGIONS = gql`
+  query ProviderRegions($providerPluginSlug: String!) {
+    astroliftProviderRegions(providerPluginSlug: $providerPluginSlug) {
+      id
+      label
+      continent
+    }
+  }
+`;
+
+// Cognito user pools reachable in a cluster's region, for the ingress
+// auth-gate picker (#859). Replaces the free-text pool-ARN / domain
+// inputs; selecting a pool auto-fills the domain. AWS-only; non-AWS
+// clusters return []. Degrades to free-entry on driver/credential
+// failure.
+export const COGNITO_USER_POOLS = gql`
+  query CognitoUserPools($clusterId: GUID!) {
+    astroliftCognitoUserPools(clusterId: $clusterId) {
+      poolId
+      poolArn
+      name
+      domain
+      region
+    }
+  }
+`;
+
+// App clients within a selected Cognito user pool (#859). Populates the
+// dependent client picker once a pool is chosen.
+export const COGNITO_USER_POOL_CLIENTS = gql`
+  query CognitoUserPoolClients($clusterId: GUID!, $poolId: String!) {
+    astroliftCognitoUserPoolClients(clusterId: $clusterId, poolId: $poolId) {
+      clientId
+      clientName
+    }
+  }
+`;
+
 // Per-Deployment workload health rollup for the Status tab (#362).
 // Drives the Workload health card — desired vs ready replicas, 24h
 // restart counts, last completed rollout timestamp.
