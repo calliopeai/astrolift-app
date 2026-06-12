@@ -108,6 +108,19 @@ class TenantCluster(NamedBaseCoreModel):
             "the Cognito auth annotations. Null = no auth gate."
         ),
     )
+    oidc_auth_config = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Dex + oauth2-proxy OIDC config for k8s_native edge auth. "
+            "Keys: discovery_url, client_id, cookie_secret, upstream_connector. "
+            "When set, every nginx Ingress rendered for this cluster carries "
+            "auth-url / auth-signin annotations pointing at the in-cluster "
+            "oauth2-proxy. Null = no auth gate. Dex + oauth2-proxy must have "
+            "been installed via the bootstrap recipe for this to function."
+        ),
+    )
     default_namespace_prefix = models.CharField(max_length=64, blank=True, default="")
     capabilities = models.JSONField(default=dict, blank=True)
     capabilities_probed_at = models.DateTimeField(null=True, blank=True)

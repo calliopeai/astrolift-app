@@ -151,6 +151,34 @@ class Command(BaseCommand):
                 "user_pool_domain": _alb_auth_domain,
             }
 
+        _oidc_discovery_url = _env("ASTROLIFT_CLUSTER_OIDC_DISCOVERY_URL")
+        _oidc_client_id = _env("ASTROLIFT_CLUSTER_OIDC_CLIENT_ID")
+        _oidc_cookie_secret = _env("ASTROLIFT_CLUSTER_OIDC_COOKIE_SECRET")
+        oidc_auth_config = None
+        if _oidc_discovery_url and _oidc_client_id and _oidc_cookie_secret:
+            # auth_proxy_host is the hostname of the in-cluster oauth2-proxy
+            # (e.g. auth.cluster.example.com). If not set explicitly, derive
+            # it from the discovery URL by replacing the "dex" subdomain with
+            # "auth" (the platform's conventional layout: Dex at
+            # dex.<domain>/dex, oauth2-proxy at auth.<domain>).
+            _oidc_auth_proxy_host = _env("ASTROLIFT_CLUSTER_OIDC_AUTH_PROXY_HOST")
+            if not _oidc_auth_proxy_host:
+                # Strip scheme and path from discovery_url to get the host.
+                # e.g. "https://dex.cluster.example.com/dex" -> "dex.cluster.example.com"
+                # Then replace leading "dex." with "auth.".
+                _stripped = _oidc_discovery_url.split("//", 1)[-1].split("/")[0]
+                if _stripped.startswith("dex."):
+                    _oidc_auth_proxy_host = "auth." + _stripped[4:]
+                else:
+                    _oidc_auth_proxy_host = _stripped
+            oidc_auth_config = {
+                "discovery_url": _oidc_discovery_url,
+                "client_id": _oidc_client_id,
+                "cookie_secret": _oidc_cookie_secret,
+                "upstream_connector": _env("ASTROLIFT_CLUSTER_OIDC_UPSTREAM_CONNECTOR") or "google",
+                "auth_proxy_host": _oidc_auth_proxy_host,
+            }
+
         auto_discover = opts["auto_discover_aws"]
         if auto_discover is None:
             auto_discover = _env_bool("ASTROLIFT_CLUSTER_AUTO_DISCOVER_AWS")
@@ -216,6 +244,7 @@ class Command(BaseCommand):
             "provider_config": provider_config,
             "ingress_class": ingress_class,
             "alb_auth_config": alb_auth_config,
+            "oidc_auth_config": oidc_auth_config,
             "is_active": True,
             "deleted_at": None,
             "deleted_by": None,

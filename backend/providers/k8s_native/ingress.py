@@ -29,6 +29,43 @@ SUPPORTED_VARIANTS = (
 
 
 @dataclass(frozen=True)
+class OIDCAuthConfig:
+    """oauth2-proxy OIDC auth config for nginx-style ingress auth_request.
+
+    When set on a K8sIngressConfig, the nginx / traefik / kong ingress
+    driver emits the nginx.ingress.kubernetes.io/auth-url +
+    auth-signin annotations that route unauthenticated requests through
+    the in-cluster oauth2-proxy (backed by Dex or an external OIDC
+    provider). Dex + oauth2-proxy must be installed via the bootstrap
+    recipe (``dex`` + ``oauth2-proxy`` components) before this takes
+    effect.
+
+    ``auth_proxy_host`` is the hostname at which oauth2-proxy is
+    reachable. Defaults to ``auth.<cluster-domain>``; pass the actual
+    hostname after the bootstrap install.
+    """
+
+    auth_proxy_host: str
+    """Hostname (no scheme) at which oauth2-proxy is reachable —
+    e.g. ``auth.cluster.example.com``. The driver constructs the
+    auth-url / auth-signin URLs from this."""
+
+    on_error: str = "redirect"
+    """``redirect`` (default) sends users to the Dex login page on
+    401; ``pass`` forwards the 401 upstream (for API clients that
+    handle auth themselves)."""
+
+    response_headers: tuple[str, ...] = (
+        "X-Auth-Request-User",
+        "X-Auth-Request-Email",
+        "X-Auth-Request-Access-Token",
+    )
+    """Headers oauth2-proxy injects after a successful auth check.
+    The Ingress controller passes them upstream so the app can see
+    the authenticated identity."""
+
+
+@dataclass(frozen=True)
 class K8sIngressConfig:
     variant: str = "nginx_ingress"
     """One of SUPPORTED_VARIANTS. Determines which annotations +
@@ -43,6 +80,14 @@ class K8sIngressConfig:
 
     cert_manager_issuer: str = "letsencrypt-prod"
     """ClusterIssuer name for cert-manager-driven cert provisioning."""
+
+    oidc_auth: OIDCAuthConfig | None = None
+    """When set, nginx / traefik / kong Ingresses carry the
+    nginx.ingress.kubernetes.io/auth-url + auth-signin annotations
+    that gate access through the in-cluster oauth2-proxy. Null = no
+    auth gate (public access). Gateway API + Istio variants ignore
+    this field — those controllers use a different extension model for
+    auth (ExtensionRef / EnvoyFilter) not yet wired up."""
 
     cluster_driver: Any | None = None
 
@@ -213,6 +258,17 @@ class K8sIngressDriver(IngressDriver):
         annotations: dict[str, str] = {}
         if tls_strategy == "letsencrypt":
             annotations["cert-manager.io/cluster-issuer"] = self._config.cert_manager_issuer
+        if self._config.oidc_auth is not None:
+            auth = self._config.oidc_auth
+            annotations["nginx.ingress.kubernetes.io/auth-url"] = (
+                f"https://{auth.auth_proxy_host}/oauth2/auth"
+            )
+            annotations["nginx.ingress.kubernetes.io/auth-signin"] = (
+                f"https://{auth.auth_proxy_host}/oauth2/start?rd=$escaped_request_uri"
+            )
+            annotations["nginx.ingress.kubernetes.io/auth-response-headers"] = (
+                ",".join(auth.response_headers)
+            )
 
         rules = [
             {
