@@ -1224,25 +1224,62 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
     if (ok) setEditing(false);
   }
 
-  const isAlb = cluster.ingressClass === "alb";
+  // Per-provider auth metadata. AWS+ALB is the only fully-supported path
+  // today; other providers show a "coming soon" state so the card is honest
+  // rather than showing AWS-specific copy on a GKE or AKS cluster.
+  const providerAuthMeta: Record<
+    string,
+    { supported: boolean; label: string; description: string; comingSoon?: string }
+  > = {
+    aws: {
+      supported: cluster.ingressClass === "alb",
+      label: "Cognito auth gate",
+      description:
+        "AWS ALB authenticate-cognito — applied to every managed-subdomain Ingress on this cluster.",
+      comingSoon:
+        cluster.ingressClass !== "alb"
+          ? "ALB Cognito auth requires ingressClass = alb."
+          : undefined,
+    },
+    gcp: {
+      supported: false,
+      label: "Google IAP",
+      description: "Google Identity-Aware Proxy — per-app OAuth gate on GKE Ingress rules.",
+      comingSoon: "Google IAP auth gate is not yet supported.",
+    },
+    azure: {
+      supported: false,
+      label: "Azure AD",
+      description: "Azure Active Directory — per-app auth gate on AKS Application Gateway Ingress.",
+      comingSoon: "Azure AD auth gate is not yet supported.",
+    },
+    k8s_native: {
+      supported: false,
+      label: "OIDC (oauth2-proxy)",
+      description: "Generic OIDC via oauth2-proxy — Dex or any OIDC-compliant IdP.",
+      comingSoon: "OIDC auth gate for raw k8s clusters is tracked in #852.",
+    },
+  };
 
-  if (!isAlb) {
+  const authMeta = providerAuthMeta[cluster.providerPluginSlug] ?? {
+    supported: false,
+    label: "Auth gate",
+    description: "Ingress-level auth gate.",
+    comingSoon: `Auth gate is not yet supported for provider ${cluster.providerPluginSlug}.`,
+  };
+
+  if (!authMeta.supported) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <KeyRoundIcon className="size-4" />
-            Auth gate
+            {authMeta.label}
           </CardTitle>
-          <CardDescription className="mt-1">
-            Ingress-level auth is only supported when ingressClass = alb.
-          </CardDescription>
+          <CardDescription className="mt-1">{authMeta.description}</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Change <span className="font-mono">ingressClass</span> to{" "}
-            <span className="font-mono">alb</span> to enable the Cognito auth gate.
-          </p>
+          <p className="text-muted-foreground text-sm">{authMeta.comingSoon}</p>
         </CardContent>
       </Card>
     );
@@ -1259,12 +1296,9 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
               ) : (
                 <KeyRoundIcon className="size-4" />
               )}
-              Auth gate
+              {authMeta.label}
             </CardTitle>
-            <CardDescription className="mt-1">
-              Cognito authenticate-cognito gate applied to every managed-subdomain ALB Ingress on
-              this cluster.
-            </CardDescription>
+            <CardDescription className="mt-1">{authMeta.description}</CardDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <AuthGateToggle
@@ -1349,7 +1383,7 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
               <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
               <p className="text-sm text-amber-700 dark:text-amber-400">
                 All apps on this cluster are publicly accessible. Enable the auth gate to put every
-                managed-subdomain Ingress behind Cognito.
+                managed-subdomain Ingress behind {authMeta.label}.
               </p>
             </div>
             <Button size="sm" onClick={openForm} disabled={busy} className="gap-1.5">
