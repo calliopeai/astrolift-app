@@ -76,8 +76,8 @@ from astrolift_workflows.activities import (
     record_cluster_bootstrap_run,
     refresh_secret_bundle_in_cluster,
     register_managed_domain_row,
-    reissue_cert,
     reheal_webhook_subscriptions,
+    reissue_cert,
     remove_platform_rbac,
     render_manifests,
     request_wildcard_cert_for_zone,
@@ -93,6 +93,10 @@ from astrolift_workflows.activities import (
     validate_migration_target,
     verify_reachability,
     wait_dns,
+)
+from astrolift_workflows.activities.agent_stage import (
+    cancel_agent_stage,
+    execute_agent_stage,
 )
 from astrolift_workflows.workflows import (
     BringClusterIntoManagementWorkflow,
@@ -169,6 +173,7 @@ ACTIVITIES = (
     apply_platform_rbac,
     apply_to_target_cluster,
     bounce_workloads_consuming_bundle,
+    cancel_agent_stage,
     capture_platform_cost_snapshot,
     cleanup_cluster_acm_certs,
     cleanup_cluster_dns_records,
@@ -188,6 +193,7 @@ ACTIVITIES = (
     drain_source_cluster,
     ensure_cluster_drained,
     ensure_platform_managed_records,
+    execute_agent_stage,
     expire_pending_approval_deployments,
     finalize_managed_service_deletion,
     gc_stale_previews,
