@@ -48,6 +48,19 @@ class RegisteredApp(NamedBaseCoreModel):
         # all — the operator points the app at a pre-built image.
         NONE = "none"
 
+    class BuildStrategy(models.TextChoices):
+        # *How* the platform builds the image, orthogonal to ``BuildMode``
+        # (which decides *who* publishes it — #867). Consumed by
+        # ``BuildImageActivity`` only when the platform performs the build.
+        # ``off`` (default) means no platform build strategy is selected;
+        # ``dockerfile`` builds from the repo's Dockerfile, while
+        # ``buildpacks`` / ``nixpacks`` use the respective toolchains
+        # without a Dockerfile.
+        OFF = "off"
+        DOCKERFILE = "dockerfile"
+        BUILDPACKS = "buildpacks"
+        NIXPACKS = "nixpacks"
+
     class ProvisioningStatus(models.TextChoices):
         PENDING = "pending"
         PROVISIONING = "provisioning"
@@ -96,6 +109,16 @@ class RegisteredApp(NamedBaseCoreModel):
         max_length=32,
         choices=BuildMode.choices,
         default=BuildMode.CI_PUSHED,
+    )
+    # Orthogonal "how to build" axis (#867). ``build_mode`` decides who
+    # publishes the image; ``build_strategy`` decides which builder the
+    # platform invokes when it performs the build itself. ``off`` (the
+    # default) selects no strategy; ``dockerfile`` / ``buildpacks`` /
+    # ``nixpacks`` pick the toolchain. Read by ``BuildImageActivity``.
+    build_strategy = models.CharField(
+        max_length=32,
+        choices=BuildStrategy.choices,
+        default=BuildStrategy.OFF,
     )
     dockerfile_path = models.CharField(max_length=512, default="Dockerfile", blank=True)
     build_context = models.CharField(max_length=512, default=".", blank=True)

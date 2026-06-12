@@ -211,7 +211,7 @@ ACTIVITIES = (
     ensure_platform_managed_records,
     execute_agent_stage,
     expire_pending_approval_deployments,
-    fetch_app_build_mode,
+    fetch_app_build_strategy,
     finalize_managed_service_deletion,
     gc_stale_previews,
     get_workflow_stages,

@@ -1,7 +1,7 @@
 """
 BuildImageActivity — build a container image from source (#865, #867).
 
-Invoked by ``DeployAppWorkflow`` when ``RegisteredApp.build_mode`` is not
+Invoked by ``DeployAppWorkflow`` when ``RegisteredApp.build_strategy`` is not
 ``"off"``. The activity locates the app's source connection, constructs a
 ``BuildSpec``, and dispatches through the cluster's registered
 ``BuildDriver`` plugin.
@@ -63,12 +63,12 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
     except RegisteredApp.DoesNotExist:
         raise RuntimeError(f"RegisteredApp with guid={inp.app_guid!r} not found")
 
-    build_mode = app.build_mode or "off"
-    if build_mode == "off":
-        # Caller should not reach here when build_mode is "off", but be
+    build_strategy = app.build_strategy or "off"
+    if build_strategy == "off":
+        # Caller should not reach here when build_strategy is "off", but be
         # defensive and return early rather than erroring.
         log.warning(
-            "build_image called for app %s with build_mode='off' — skipping",
+            "build_image called for app %s with build_strategy='off' — skipping",
             inp.app_guid,
         )
         return {"ok": True, "image_ref": inp.image_tag, "stub": True}
@@ -78,18 +78,18 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
 
     if build_driver is None:
         log.info(
-            "no BuildDriver registered for cluster %s (app=%s build_mode=%s) — using stub",
+            "no BuildDriver registered for cluster %s (app=%s build_strategy=%s) — using stub",
             getattr(cluster, "slug", "none"),
             inp.app_guid,
-            build_mode,
+            build_strategy,
         )
         return {"ok": True, "image_ref": inp.image_tag, "stub": True}
 
     source_url = _resolve_source_url(app, inp.commit_sha)
     log.info(
-        "build_image start app=%s build_mode=%s source_url=%s image_tag=%s",
+        "build_image start app=%s build_strategy=%s source_url=%s image_tag=%s",
         inp.app_guid,
-        build_mode,
+        build_strategy,
         source_url,
         inp.image_tag,
     )
@@ -174,20 +174,20 @@ def _resolve_source_url(app, commit_sha: str) -> str:
     return ""
 
 
-def _fetch_app_build_mode_sync(registered_app_id: int) -> str:
-    """Return the ``build_mode`` value for the given RegisteredApp PK."""
+def _fetch_app_build_strategy_sync(registered_app_id: int) -> str:
+    """Return the ``build_strategy`` value for the given RegisteredApp PK."""
     from astrolift_registry.models import RegisteredApp
 
     try:
-        app = RegisteredApp.all_objects.only("build_mode").get(pk=registered_app_id)
-        return app.build_mode or "off"
+        app = RegisteredApp.all_objects.only("build_strategy").get(pk=registered_app_id)
+        return app.build_strategy or "off"
     except RegisteredApp.DoesNotExist:
         return "off"
 
 
-@activity.defn(name="astrolift.build.fetch_app_build_mode")
-async def fetch_app_build_mode(registered_app_id: int) -> str:
-    """Return the ``build_mode`` for a RegisteredApp.
+@activity.defn(name="astrolift.build.fetch_app_build_strategy")
+async def fetch_app_build_strategy(registered_app_id: int) -> str:
+    """Return the ``build_strategy`` for a RegisteredApp.
 
     Called by ``DeployAppWorkflow`` before the build step so the workflow
     can branch without embedding Django model access in workflow code.
@@ -195,7 +195,7 @@ async def fetch_app_build_mode(registered_app_id: int) -> str:
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_fetch_app_build_mode_sync)(registered_app_id)
+    return await sync_to_async(_fetch_app_build_strategy_sync)(registered_app_id)
 
 
 @activity.defn(name="astrolift.build.build_image")
@@ -204,7 +204,7 @@ async def build_image(inp: BuildImageInput) -> dict:
 
     Returns ``{"ok": bool, "image_ref": str, "stub": bool}``.
     ``stub=True`` means no real build was performed (driver not wired or
-    ``build_mode`` is "off"). ``image_ref`` is always the usable image
+    ``build_strategy`` is "off"). ``image_ref`` is always the usable image
     reference — callers can treat it as the image to deploy regardless of
     whether a real build ran.
     """

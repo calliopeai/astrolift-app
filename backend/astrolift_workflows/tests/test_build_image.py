@@ -3,8 +3,8 @@
 Covers:
 - ``_build_image_sync`` returns the stub result when no BuildDriver is
   wired (the common case in test environments and pre-driver deploys).
-- ``_build_image_sync`` short-circuits cleanly when build_mode is "off".
-- ``_fetch_app_build_mode_sync`` returns the correct value from the DB.
+- ``_build_image_sync`` short-circuits cleanly when build_strategy is "off".
+- ``_fetch_app_build_strategy_sync`` returns the correct value from the DB.
 - ``BuildImageInput`` is a plain frozen dataclass that serialises correctly
   (Temporal requires primitive-typed fields).
 """
@@ -16,7 +16,7 @@ import pytest
 from astrolift_workflows.activities.build_image import (
     BuildImageInput,
     _build_image_sync,
-    _fetch_app_build_mode_sync,
+    _fetch_app_build_strategy_sync,
 )
 
 
@@ -52,9 +52,9 @@ def test_build_image_sync_returns_stub_when_no_driver(monkeypatch):
     import importlib
     build_image_mod = importlib.import_module("astrolift_workflows.activities.build_image")
 
-    # Simulate app found with build_mode='dockerfile' but no driver.
+    # Simulate app found with build_strategy='dockerfile' but no driver.
     class FakeApp:
-        build_mode = "dockerfile"
+        build_strategy = "dockerfile"
         source_repo = ""
         organization = None
         default_tenant_cluster = None
@@ -81,14 +81,14 @@ def test_build_image_sync_returns_stub_when_no_driver(monkeypatch):
     assert result["stub"] is True
 
 
-def test_build_image_sync_skips_when_build_mode_off(monkeypatch):
-    """When build_mode is 'off' the activity returns the stub immediately
+def test_build_image_sync_skips_when_build_strategy_off(monkeypatch):
+    """When build_strategy is 'off' the activity returns the stub immediately
     without attempting driver resolution."""
     import importlib
     build_image_mod = importlib.import_module("astrolift_workflows.activities.build_image")
 
     class FakeApp:
-        build_mode = "off"
+        build_strategy = "off"
         source_repo = ""
         organization = None
         default_tenant_cluster = None
@@ -130,7 +130,7 @@ def test_build_image_sync_skips_when_build_mode_off(monkeypatch):
 pytestmark = pytest.mark.django_db
 
 
-def test_fetch_app_build_mode_returns_correct_value():
+def test_fetch_app_build_strategy_returns_correct_value():
     from astrolift_identity.models import Organization, Team
     from astrolift_registry.models import RegisteredApp
 
@@ -143,19 +143,19 @@ def test_fetch_app_build_mode_returns_correct_value():
         slug="app-bm-act",
         provisioning_status="ready",
         subdomain="app-act",
-        build_mode="nixpacks",
+        build_strategy="nixpacks",
     )
 
-    result = _fetch_app_build_mode_sync(app.pk)
+    result = _fetch_app_build_strategy_sync(app.pk)
     assert result == "nixpacks"
 
 
-def test_fetch_app_build_mode_returns_off_for_missing_app():
-    result = _fetch_app_build_mode_sync(999_999_999)
+def test_fetch_app_build_strategy_returns_off_for_missing_app():
+    result = _fetch_app_build_strategy_sync(999_999_999)
     assert result == "off"
 
 
-def test_fetch_app_build_mode_returns_off_by_default():
+def test_fetch_app_build_strategy_returns_off_by_default():
     from astrolift_identity.models import Organization, Team
     from astrolift_registry.models import RegisteredApp
 
@@ -170,5 +170,5 @@ def test_fetch_app_build_mode_returns_off_by_default():
         subdomain="def-act",
     )
 
-    result = _fetch_app_build_mode_sync(app.pk)
+    result = _fetch_app_build_strategy_sync(app.pk)
     assert result == "off"

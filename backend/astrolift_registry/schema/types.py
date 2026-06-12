@@ -355,10 +355,12 @@ class RegisteredAppType:
     deploy_branch: str
     preview_screenshot_url: str
 
-    # Build mode (#867). "off" means the caller supplies a pre-built image;
-    # "dockerfile" / "buildpacks" / "nixpacks" trigger the build pipeline
-    # before the deploy activities run.
-    build_mode: str
+    # Build strategy (#867) — the orthogonal "how to build" axis. "off"
+    # means no platform build strategy is selected; "dockerfile" /
+    # "buildpacks" / "nixpacks" trigger the build pipeline before the
+    # deploy activities run. Distinct from ``build_mode`` above, which
+    # decides who publishes the image.
+    build_strategy: str
 
     # App-global webhook-deploy pause (#399). Independent of the
     # per-env axes. ``webhook_deploys_paused_by_email`` is rendered
@@ -832,6 +834,7 @@ def app_to_type(
         manifest_path=app.manifest_path,
         default_branch=app.default_branch,
         build_mode=app.build_mode,
+        build_strategy=app.build_strategy,
         dockerfile_path=app.dockerfile_path or "",
         build_context=app.build_context or "",
         build_args=dict(app.build_args or {}),

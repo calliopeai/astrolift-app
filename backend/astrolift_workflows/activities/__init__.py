@@ -121,7 +121,7 @@ from astrolift_workflows.activities.scheduled import (
 )
 from astrolift_workflows.activities.build_image import (
     build_image,
-    fetch_app_build_mode,
+    fetch_app_build_strategy,
 )
 from astrolift_workflows.activities.secret_rotation import (
     bounce_workloads_consuming_bundle,
@@ -174,7 +174,7 @@ __all__ = [
     "ensure_cluster_drained",
     "ensure_platform_managed_records",
     "expire_pending_approval_deployments",
-    "fetch_app_build_mode",
+    "fetch_app_build_strategy",
     "finalize_managed_service_deletion",
     "gc_stale_previews",
     "get_workflow_stages",

@@ -31,7 +31,7 @@ with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.build_image import (
         BuildImageInput,
         build_image,
-        fetch_app_build_mode,
+        fetch_app_build_strategy,
     )
 
 
@@ -60,19 +60,19 @@ class DeployAppWorkflow:
         await workflow.execute_activity(pre_flight, deployment_id, start_to_close_timeout=_TIMEOUT)
         await workflow.execute_activity(mark_deploying, deployment_id, start_to_close_timeout=_TIMEOUT)
 
-        # Build step (#865, #867): when build_mode != "off" the platform
+        # Build step (#865, #867): when build_strategy != "off" the platform
         # builds the container image from source before deploying. The
-        # fetch_app_build_mode activity keeps Django imports out of this
+        # fetch_app_build_strategy activity keeps Django imports out of this
         # sandbox. We use the first workload's image_tag from the input as
         # the target tag; when multiple workloads are present the first tag
         # is used as the build output and all workloads share it — this is
         # intentional for v1 (one build per deploy).
-        build_mode = await workflow.execute_activity(
-            fetch_app_build_mode,
+        build_strategy = await workflow.execute_activity(
+            fetch_app_build_strategy,
             args=[input.registered_app_id],
             start_to_close_timeout=_TIMEOUT,
         )
-        if build_mode != "off":
+        if build_strategy != "off":
             _image_tags: dict = input.image_tags or {}
             _image_tag = next(iter(_image_tags.values()), "")
             _commit_sha = ""  # TODO: thread commit_sha through DeployAppInput (#865)
