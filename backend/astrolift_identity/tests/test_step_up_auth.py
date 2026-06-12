@@ -374,6 +374,7 @@ def test_sensitive_mutation_with_elevation_runs_resolver(permission_resolver):
     assert RoleBinding.objects.filter(user=target, role=role).exists()
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_elevation_expiry_re_prompts_on_next_call(permission_resolver, audit_capture):
     """An elevation that lapsed at the time of the next call gets the
     same STEP_UP_REQUIRED envelope as an un-elevated session."""
@@ -448,6 +449,7 @@ def test_decorator_marks_resolver_with_introspection_attribute():
 # ---- bulk mutation path -----------------------------------------------
 
 
+@override_config(REQUIRE_STEP_UP_AUTH=True)
 def test_bulk_revoke_blocked_when_unelevated(permission_resolver):
     """Bulk mutations get the same gate — a sibling test of the
     single-row path so a future refactor that drops the decorator on
