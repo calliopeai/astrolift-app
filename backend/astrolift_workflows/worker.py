@@ -37,6 +37,7 @@ from astrolift_workflows.activities import (
     ensure_cluster_drained,
     ensure_platform_managed_records,
     expire_pending_approval_deployments,
+    fetch_app_build_strategy,
     finalize_managed_service_deletion,
     gc_stale_previews,
     get_workflow_stages,
