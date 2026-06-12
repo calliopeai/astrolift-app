@@ -366,6 +366,7 @@ INSTALLED_APPS = [
     "astrolift_pipelines",
     "astrolift_agents",
     "astrolift_dispatch",
+    "astrolift_ci",
     # End of Astrolift
     "constance",
     "constance.backends.database",
