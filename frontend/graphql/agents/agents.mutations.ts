@@ -86,3 +86,17 @@ export const CANCEL_TASK = gql`
     }
   }
 `;
+
+export const IMPORT_SKILLS_FROM_REPO = gql`
+  mutation ImportSkillsFromRepo($repoUrl: String!, $branch: String) {
+    importSkillsFromRepo(repoUrl: $repoUrl, branch: $branch) {
+      ok
+      errors { code message field }
+      data {
+        importedSkills
+        importedTools
+        sourceRef
+      }
+    }
+  }
+`;

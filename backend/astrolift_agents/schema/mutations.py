@@ -120,6 +120,13 @@ def _resolve_org(org_id: strawberry.ID) -> tuple[Organization | None, object | N
 # ---------------------------------------------------------------------------
 
 
+@strawberry.type(name="AstroliftImportSkillsResult")
+class ImportSkillsResult:
+    imported_skills: list[str]
+    imported_tools: list[str]
+    source_ref: str
+
+
 @strawberry.type
 class AgentsMutation:
     @strawberry.field
@@ -424,6 +431,53 @@ class AgentsMutation:
         except ValueError as exc:
             return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
         return gql_success(None)
+
+    @strawberry.field
+    @mutation_audit(action="agents.skill.import_from_repo")
+    @require_permission(Permission.SKILL_IMPORT)
+    @tenant_scoped()
+    def import_skills_from_repo(
+        self,
+        info: Info,
+        repo_url: str,
+        branch: str = "main",
+    ) -> MutationResultType[ImportSkillsResult]:
+        """Import Skills and ToolDefs from an ``astrolift.toml`` in a
+        GitHub repository.  Idempotent — re-importing updates existing
+        rows matched on ``(organization, slug)``; versions bump only when
+        content changes."""
+        from astrolift_agents.services.skill_importer import (
+            InvalidRepoURLError,
+            import_skills_from_repo,
+        )
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+
+        from astrolift_identity.models import Organization
+
+        org = Organization.objects.filter(pk=org_pk, deleted_at__isnull=True).first()
+        if org is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
+
+        try:
+            result = import_skills_from_repo(
+                organization=org, repo_url=repo_url, branch=branch
+            )
+        except InvalidRepoURLError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="repoUrl")
+        except Exception as exc:  # noqa: BLE001
+            return gql_failure(ErrorCode.INTERNAL.value, str(exc))
+
+        return gql_success(
+            ImportSkillsResult(
+                imported_skills=result.imported_skills,
+                imported_tools=result.imported_tools,
+                source_ref=result.source_ref,
+            )
+        )
 
 
 def json_canonical(payload: dict) -> str:

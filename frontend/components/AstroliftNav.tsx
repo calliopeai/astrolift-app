@@ -36,6 +36,7 @@ import {
   UsersRoundIcon,
   WebhookIcon,
   WorkflowIcon,
+  WrenchIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -151,6 +152,18 @@ const sections: NavSection[] = [
         label: "Agents",
         href: "/agents",
         icon: <BoxIcon />,
+        permission: "app.read",
+      },
+      {
+        label: "Skills",
+        href: "/agents/skills",
+        icon: <BookOpenIcon />,
+        permission: "app.read",
+      },
+      {
+        label: "Tools",
+        href: "/agents/tools",
+        icon: <WrenchIcon />,
         permission: "app.read",
       },
       {

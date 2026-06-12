@@ -134,6 +134,24 @@ class AgentsQuery:
     @strawberry.field
     @require_permission(Permission.APP_READ)
     @tenant_scoped()
+    def org_tool_defs(self, info: Info, org_id: strawberry.ID) -> list[ToolDefType]:
+        """All ToolDefs across every skill visible to ``org_id`` (own +
+        global). Allows the Tool Registry UI to list all tools without
+        fetching per-skill. Capped at 500 rows."""
+        from django.db.models import Q
+
+        org_pk = _caller_org_id(info, org_id)
+        skill_scope = Q(skill__organization_id=org_pk) | Q(skill__is_global=True)
+        qs = (
+            ToolDef.objects.filter(skill_scope, deleted_at__isnull=True)
+            .select_related("skill")
+            .order_by("skill__slug", "slug")[:500]
+        )
+        return [tool_def_to_type(t) for t in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ)
+    @tenant_scoped()
     def brief(self, info: Info, id: strawberry.ID) -> BriefType | None:
         """One Brief by GUID, scoped to the caller's org."""
         tenant = get_current_tenant()

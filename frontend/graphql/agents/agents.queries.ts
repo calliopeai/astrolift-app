@@ -50,6 +50,22 @@ export const LIST_TOOL_DEFS = gql`
   }
 `;
 
+export const LIST_ORG_TOOL_DEFS = gql`
+  query ListOrgToolDefs($orgId: ID!) {
+    orgToolDefs(orgId: $orgId) {
+      id
+      name
+      slug
+      description
+      adapter
+      inputSchema
+      outputSchema
+      handlerRef
+      createdAt
+    }
+  }
+`;
+
 export const GET_BRIEF = gql`
   query GetBrief($id: ID!) {
     brief(id: $id) {
