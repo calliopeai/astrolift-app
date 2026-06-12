@@ -154,6 +154,7 @@ class EKSClusterDriver(ClusterDriver):
         config: EKSConfig,
         eks_client: Any | None = None,
         sts_client: Any | None = None,
+        ec2_client: Any | None = None,
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
         log_backend: LogBackend | None = None,
@@ -174,6 +175,12 @@ class EKSClusterDriver(ClusterDriver):
             import boto3
 
             self._sts = boto3.client("sts", region_name=config.region)
+        if ec2_client is not None:
+            self._ec2 = ec2_client
+        else:
+            import boto3
+
+            self._ec2 = boto3.client("ec2", region_name=config.region)
         # Factory injection lets tests pass a stubbed kubernetes
         # client without contacting a real apiserver.
         self._k8s_factory = k8s_client_factory or _build_k8s_client
@@ -794,6 +801,58 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- bootstrap recipe ----------------------------------------
 
+    def _discover_backend_sg(self, cluster_name: str) -> str:
+        """Resolve the node *shared* security group for the LB controller's
+        ``backendSecurityGroup`` value.
+
+        Without an explicit value the controller does tag-based SG discovery
+        and fails when it finds two groups tagged
+        ``kubernetes.io/cluster/<cluster_name>: owned`` on the same ENI —
+        the EKS-created cluster SG (``eks-cluster-sg-*``) and the node
+        shared SG (``*-node-*``). We want the node shared SG.
+
+        Discovery is by EC2 tag + name: the ``kubernetes.io/cluster/<name>``
+        tag scopes to this cluster's groups, and the ``*-node-*`` group-name
+        filter selects the node shared SG over the ``eks-cluster-sg-*`` one.
+        ``remoteAccessSecurityGroup`` on the node group is deliberately NOT
+        used — that SG only exists when SSH remote access is configured and
+        is a separate SSH-ingress group, not the node shared SG.
+
+        Returns ``""`` (controller falls back to tag discovery) if the SG
+        can't be resolved — the API call failed or matched none/many groups.
+        """
+        try:
+            resp = self._ec2.describe_security_groups(
+                Filters=[
+                    {
+                        "Name": f"tag:kubernetes.io/cluster/{cluster_name}",
+                        "Values": ["owned"],
+                    },
+                    {"Name": "group-name", "Values": ["*-node-*"]},
+                ],
+            )
+        except Exception:
+            log.warning(
+                "bootstrap_components: EC2 describe_security_groups failed — "
+                "backendSecurityGroup will not be set; LB controller may hit "
+                "the dual-SG reconcile error",
+            )
+            return ""
+
+        groups = resp.get("SecurityGroups", [])
+        # Defend against the cluster SG slipping through the name filter.
+        groups = [g for g in groups if not g.get("GroupName", "").startswith("eks-cluster-sg-")]
+        if len(groups) != 1:
+            log.warning(
+                "bootstrap_components: expected exactly one node shared "
+                "security group tagged kubernetes.io/cluster/%s, found %d — "
+                "backendSecurityGroup will not be set",
+                cluster_name,
+                len(groups),
+            )
+            return ""
+        return groups[0].get("GroupId", "")
+
     @driver_op(cloud="aws", driver="cluster")
     def bootstrap_components(self, cluster: ClusterContext) -> list[BootstrapComponent]:
         """EKS recipe — leans on AWS-native services where they're the
@@ -862,6 +921,16 @@ class EKSClusterDriver(ClusterDriver):
                     "vpcId will not be set; ALB controller may fail on Fargate"
                 )
 
+        # backendSecurityGroup — the node *shared* SG. Pinning it avoids the
+        # controller's tag-based discovery, which fails when the cluster SG
+        # and the node shared SG are both tagged owned on the same ENI
+        # (FailedNetworkReconcile: expected exactly one securityGroup tagged
+        # with kubernetes.io/cluster/...). Override via
+        # auth_config["backend_security_group"] for non-standard setups.
+        backend_sg: str = auth_cfg.get("backend_security_group", "")
+        if not backend_sg:
+            backend_sg = self._discover_backend_sg(eks_cluster_name)
+
         def _irsa_arn(key: str) -> str:
             if key in irsa_overrides:
                 return irsa_overrides[key]
@@ -883,6 +952,8 @@ class EKSClusterDriver(ClusterDriver):
         }
         if vpc_id:
             alb_values["vpcId"] = vpc_id
+        if backend_sg:
+            alb_values["backendSecurityGroup"] = backend_sg
 
         return [
             BootstrapComponent(

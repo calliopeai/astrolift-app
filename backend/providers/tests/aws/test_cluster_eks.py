@@ -14,6 +14,7 @@ cluster.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -21,6 +22,7 @@ import boto3
 import pytest
 
 from _sdk.cluster import (
+    ClusterContext,
     WorkloadStatus,
 )
 from aws._errors import NotFoundError
@@ -394,3 +396,121 @@ def test_poll_rollout_workload_not_found(
     )
     assert result.success is False
     assert "not found" in result.message
+
+
+# ---- bootstrap_components: LB controller backendSecurityGroup -------
+
+
+_CLUSTER = "astrolift-eks"
+
+
+@contextmanager
+def _bootstrap_driver(fake_k8s_client: Any, *, tag_node_sg: bool = True):
+    """EKS driver backed by moto with a VPC, an EKS cluster, and the
+    dual-SG layout that trips the LB controller's tag discovery: the
+    ``eks-cluster-sg-*`` group and the ``*-node-*`` shared group, both
+    tagged ``kubernetes.io/cluster/<name>: owned``.
+
+    Yields ``(driver, node_sg_id)``. The moto context is torn down on
+    block exit even when an assertion fails, so the in-memory AWS state
+    can't leak into the next test.
+    """
+    from moto import mock_aws
+
+    with mock_aws():
+        ec2 = boto3.client("ec2", region_name="us-west-2")
+        eks = boto3.client("eks", region_name="us-west-2")
+        sts = boto3.client("sts", region_name="us-west-2")
+
+        vpc_id = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+        subnet_id = ec2.create_subnet(VpcId=vpc_id, CidrBlock="10.0.1.0/24")["Subnet"]["SubnetId"]
+        cluster_sg = ec2.create_security_group(
+            GroupName=f"eks-cluster-sg-{_CLUSTER}-1234567890",
+            Description="EKS-created cluster SG",
+            VpcId=vpc_id,
+        )["GroupId"]
+        node_sg = ec2.create_security_group(
+            GroupName=f"{_CLUSTER}-node-20240101000000000000000001",
+            Description="node shared SG",
+            VpcId=vpc_id,
+        )["GroupId"]
+        owned = [{"Key": f"kubernetes.io/cluster/{_CLUSTER}", "Value": "owned"}]
+        # The cluster SG is always tagged owned; the node SG tag is the knob
+        # the no-match test flips off.
+        ec2.create_tags(Resources=[cluster_sg], Tags=owned)
+        if tag_node_sg:
+            ec2.create_tags(Resources=[node_sg], Tags=owned)
+
+        eks.create_cluster(
+            name=_CLUSTER,
+            version="1.30",
+            roleArn="arn:aws:iam::123456789012:role/eks-cluster-role",
+            resourcesVpcConfig={"subnetIds": [subnet_id]},
+        )
+
+        d = EKSClusterDriver(
+            config=EKSConfig(region="us-west-2", cluster_name=_CLUSTER),
+            eks_client=eks,
+            sts_client=sts,
+            ec2_client=ec2,
+            k8s_client_factory=lambda **kw: fake_k8s_client,
+        )
+        yield d, node_sg
+
+
+def _alb_values(components: list) -> dict:
+    for c in components:
+        if c.key == "aws-load-balancer-controller":
+            return c.helm_values
+    raise AssertionError("aws-load-balancer-controller component not found")
+
+
+def test_bootstrap_sets_backend_sg_to_node_shared_sg(fake_k8s_client) -> None:
+    """The LB controller's backendSecurityGroup resolves to the
+    ``*-node-*`` shared SG, not the ``eks-cluster-sg-*`` group — the
+    fix for the dual-SG FailedNetworkReconcile error."""
+    with _bootstrap_driver(fake_k8s_client) as (driver, node_sg):
+        ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+
+        values = _alb_values(driver.bootstrap_components(ctx))
+
+        assert values["backendSecurityGroup"] == node_sg
+        assert not values["backendSecurityGroup"].startswith("eks-cluster-sg-")
+
+
+def test_bootstrap_backend_sg_override_skips_discovery(fake_k8s_client) -> None:
+    """auth_config["backend_security_group"] is taken verbatim and no
+    EC2 discovery runs."""
+    with _bootstrap_driver(fake_k8s_client) as (driver, _):
+        driver._ec2 = MagicMock()  # discovery must not be called
+        ctx = ClusterContext(
+            slug="aws-prod",
+            auth_method="exec_plugin",
+            auth_config={"backend_security_group": "sg-override123"},
+        )
+
+        values = _alb_values(driver.bootstrap_components(ctx))
+
+        assert values["backendSecurityGroup"] == "sg-override123"
+        driver._ec2.describe_security_groups.assert_not_called()
+
+
+def test_bootstrap_omits_backend_sg_when_no_node_sg(fake_k8s_client) -> None:
+    """No ``*-node-*`` SG tagged owned → key omitted so the controller
+    falls back to tag discovery rather than getting a bad value."""
+    with _bootstrap_driver(fake_k8s_client, tag_node_sg=False) as (driver, _):
+        ctx = ClusterContext(slug="aws-prod", auth_method="exec_plugin")
+
+        values = _alb_values(driver.bootstrap_components(ctx))
+
+        assert "backendSecurityGroup" not in values
+
+
+def test_discover_backend_sg_returns_empty_on_describe_error(fake_k8s_client) -> None:
+    """A failed describe_security_groups yields '' (caller omits the
+    key) instead of raising."""
+    with _bootstrap_driver(fake_k8s_client) as (driver, _):
+        driver._ec2 = MagicMock()
+        driver._ec2.describe_security_groups.side_effect = RuntimeError("boom")
+
+        assert driver._discover_backend_sg(_CLUSTER) == ""
