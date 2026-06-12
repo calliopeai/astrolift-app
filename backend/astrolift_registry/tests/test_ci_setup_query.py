@@ -19,6 +19,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 
+from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Role, RoleBinding, Team
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.queries import RegistryQuery
@@ -107,6 +108,56 @@ def test_app_type_blank_push_role_when_not_yet_bootstrapped():
     t = app_to_type(app)
     assert t.ecr_repo_uri == ""
     assert t.ecr_push_role_arn == ""
+
+
+def _bind_cluster(app: RegisteredApp, *, provider_slug: str) -> TenantCluster:
+    """Create a TenantCluster on ``app``'s org backed by a plugin with
+    ``provider_slug`` and set it as the app's default cluster.
+
+    ``ProviderPlugin.version`` is a CharField while ``BaseCoreModel.save``
+    bumps a numeric ``version`` — ``bulk_create`` the plugin to dodge that
+    conflict, mirroring the ``seed_cluster`` fixture.
+    """
+    [plugin] = ProviderPlugin.objects.bulk_create(
+        [ProviderPlugin(name=provider_slug.upper(), slug=provider_slug)]
+    )
+    cluster = TenantCluster.objects.create(
+        organization=app.organization,
+        name=f"cluster-{provider_slug}",
+        slug=f"cluster-{provider_slug}",
+        provider_plugin=plugin,
+        provider_config={},
+        endpoint="https://invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        is_active=True,
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+    app.default_tenant_cluster = cluster
+    app.save(update_fields=["default_tenant_cluster", "updated_at", "version"])
+    return cluster
+
+
+def test_app_type_exposes_provider_plugin_slug_from_default_cluster():
+    """``provider_plugin_slug`` follows ``default_tenant_cluster ->
+    provider_plugin -> slug`` so the CI-setup card can render
+    provider-correct secret names + workflow steps (#854)."""
+
+    app = _scaffold_app()
+    _bind_cluster(app, provider_slug="gcp")
+    t = app_to_type(app)
+    assert t.provider_plugin_slug == "gcp"
+
+
+def test_app_type_provider_plugin_slug_blank_without_default_cluster():
+    """An app with no default cluster bound (the FK is nullable until
+    provisioning binds one) surfaces an empty string — never null and
+    never a raise — so the FE can fall back to a generic CI template."""
+
+    app = _scaffold_app()
+    assert app.default_tenant_cluster_id is None
+    t = app_to_type(app)
+    assert t.provider_plugin_slug == ""
 
 
 def test_app_visible_to_app_read_viewer(seed_cluster):

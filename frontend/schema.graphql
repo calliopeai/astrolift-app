@@ -2021,6 +2021,7 @@ type AstroliftRegisteredApp {
   registryRepoUri: String!
   ecrRepoUri: String!
   ecrPushRoleArn: String!
+  providerPluginSlug: String!
   k8sNamespace: String!
   subdomain: String!
   isActive: Boolean!

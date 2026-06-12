@@ -318,6 +318,13 @@ class RegisteredAppType:
     # until provisioning lands the role ARN.
     ecr_repo_uri: str
     ecr_push_role_arn: str
+    # Provider-plugin slug of the app's default tenant cluster
+    # (``aws`` / ``gcp`` / ``azure`` / ``k8s_native``) — #854. Lets the
+    # Settings CI-setup card render provider-correct secret names and a
+    # matching reference workflow instead of the AWS-only hardcode. Empty
+    # string when the app has no default cluster assigned yet (the FK is
+    # nullable until provisioning binds a cluster).
+    provider_plugin_slug: str
     k8s_namespace: str
     subdomain: str
     managed_hostname: str
@@ -751,6 +758,20 @@ def _compute_managed_hostname(app) -> str:
         return ""
 
 
+def _provider_plugin_slug(app) -> str:
+    """Slug of the provider plugin backing the app's default cluster (#854).
+
+    Walks ``default_tenant_cluster -> provider_plugin -> slug``. The
+    cluster FK is nullable (an app may not have a default cluster bound
+    yet), so we return "" when it's unset; ``TenantCluster.provider_plugin``
+    is itself non-null, so once the cluster resolves the slug always does.
+    """
+    cluster = app.default_tenant_cluster if app.default_tenant_cluster_id else None
+    if cluster is None:
+        return ""
+    return cluster.provider_plugin.slug
+
+
 def app_to_type(
     app,
     *,
@@ -800,6 +821,7 @@ def app_to_type(
         registry_repo_uri=app.registry_repo_uri,
         ecr_repo_uri=app.registry_repo_uri,
         ecr_push_role_arn=app.push_role_ref or "",
+        provider_plugin_slug=_provider_plugin_slug(app),
         k8s_namespace=app.k8s_namespace,
         subdomain=app.subdomain,
         managed_hostname=_compute_managed_hostname(app),
