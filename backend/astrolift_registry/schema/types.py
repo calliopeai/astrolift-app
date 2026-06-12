@@ -302,6 +302,19 @@ class RegisteredAppType:
     manifest_path: str
     default_branch: str
 
+    # Build configuration. ``build_mode`` is the string value of
+    # ``RegisteredApp.BuildMode`` (``ci_pushed`` / ``platform_build`` /
+    # ``none``) — kept as a plain ``str`` to match the existing
+    # ``source_kind`` / ``trigger_mode`` style on this type. The
+    # ``dockerfile_path`` / ``build_context`` / ``build_args`` trio is
+    # only consumed under ``platform_build`` but always surfaced so the
+    # Settings form can seed every field. ``build_args`` is a flat
+    # string→string map serialised as JSON.
+    build_mode: str
+    dockerfile_path: str
+    build_context: str
+    build_args: JSON
+
     manifest_hash: str
     raw_manifest: str
     raw_manifest_staged: str
@@ -813,6 +826,10 @@ def app_to_type(
         source_url=app.source_url,
         manifest_path=app.manifest_path,
         default_branch=app.default_branch,
+        build_mode=app.build_mode,
+        dockerfile_path=app.dockerfile_path or "",
+        build_context=app.build_context or "",
+        build_args=dict(app.build_args or {}),
         manifest_hash=app.manifest_hash,
         raw_manifest=app.manifest_raw or "",
         raw_manifest_staged=app.manifest_raw_staged or "",
