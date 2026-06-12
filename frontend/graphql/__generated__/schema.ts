@@ -2056,6 +2056,7 @@ export type AstroliftRegisteredApp = {
   projectId?: Maybe<Scalars['GUID']['output']>;
   projectName: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
+  providerPluginSlug: Scalars['String']['output'];
   provisioningError: Scalars['String']['output'];
   provisioningStatus: Scalars['String']['output'];
   rawManifest: Scalars['String']['output'];

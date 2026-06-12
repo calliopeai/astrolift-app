@@ -38,11 +38,15 @@ import {
 import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 
 /**
- * CI setup section on the consolidated Settings page (#382).
+ * CI setup section on the consolidated Settings page (#382, #854).
  *
- * Lists the five GitHub Actions secrets an operator needs to wire CI
- * to Astrolift, with copy-buttons on the live values, and a paste-ready
- * reference workflow YAML keyed off those exact secret names.
+ * Lists the GitHub Actions secrets an operator needs to wire CI to
+ * Astrolift, with copy-buttons on the live values, and a paste-ready
+ * reference workflow YAML keyed off those exact secret names. The
+ * push-credential and registry rows + workflow steps are provider-aware
+ * (``providerCiMeta`` keyed by the app's default-cluster slug), so a
+ * GCP/Azure/raw-k8s app sees the right secret names instead of the AWS
+ * ECR/IAM-role shape.
  *
  * The deploy-token value itself never appears here — that's a one-shot
  * reveal handled by ``DeployTokenControl`` on the tokens page. We render
@@ -52,8 +56,19 @@ import { GET_PLATFORM_API_URL } from "@/graphql/registry/registry.queries";
 
 interface Props {
   appSlug: string;
-  ecrRepoUri: string;
-  ecrPushRoleArn: string;
+  /** Container-registry coordinate the build pushes to. ECR repo URI on
+   *  AWS, Artifact Registry path on GCP, ACR login server on Azure, or a
+   *  generic registry URI on raw-k8s. */
+  registryUri: string;
+  /** Reference to the push credential the CI runner uses. IAM role ARN on
+   *  AWS, Workload Identity provider on GCP, federated client id on Azure.
+   *  Empty until cluster bootstrap provisions it (#309). */
+  pushCredentialRef: string;
+  /** Provider-plugin slug of the app's default cluster (#854) — one of
+   *  `aws` / `gcp` / `azure` / `k8s_native`. Drives the provider-correct
+   *  secret names, hints, and reference workflow. Empty when no default
+   *  cluster is bound yet, in which case we fall back to the AWS shape. */
+  providerPluginSlug: string;
   /** ISO timestamp of the last successful webhook install / refresh
    *  (#385). `null` until the operator clicks "Install webhook" for
    *  the first time. */
@@ -62,6 +77,139 @@ interface Props {
 
 interface PlatformUrlResp {
   astroliftPlatformApiUrl: string;
+}
+
+/**
+ * Per-provider CI metadata (#854).
+ *
+ * The push-credential and registry concepts differ per cloud, so the two
+ * provider-specific secret rows and the reference-workflow steps are keyed
+ * off the app's default-cluster ``providerPluginSlug`` rather than hardcoded
+ * to AWS. Mirrors the ``providerAuthMeta`` map pattern the cluster Settings
+ * page (``IngressAuthCard``) uses.
+ *
+ * ``renderWorkflowSteps`` returns just the provider-variant job steps
+ * (configure-credentials + registry-login + build-and-push); the shared
+ * checkout / notify steps are templated once in ``renderWorkflowYaml``.
+ */
+interface ProviderCiMeta {
+  /** GitHub Actions secret name for the push credential. */
+  pushCredentialEnv: string;
+  /** Tooltip describing what the push-credential secret holds. */
+  pushCredentialHint: string;
+  /** GitHub Actions secret name for the registry coordinate. */
+  registryEnv: string;
+  /** Tooltip describing what the registry secret holds. */
+  registryHint: string;
+  /** Provider-specific job steps that authenticate + push the image. */
+  renderWorkflowSteps: () => string;
+}
+
+const providerCiMeta: Record<string, ProviderCiMeta> = {
+  aws: {
+    pushCredentialEnv: "ASTROLIFT_PUSH_ROLE_ARN",
+    pushCredentialHint:
+      "IAM role the GitHub Actions runner assumes via OIDC to push images. Provisioned by Astrolift on cluster bootstrap.",
+    registryEnv: "ASTROLIFT_ECR_URI",
+    registryHint:
+      "Amazon ECR repository URI this app pushes to. Tag with the commit SHA per build.",
+    renderWorkflowSteps: () => `      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: \${{ secrets.ASTROLIFT_PUSH_ROLE_ARN }}
+          aws-region: us-west-2
+          role-session-name: astrolift-\${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          IMAGE: \${{ secrets.ASTROLIFT_ECR_URI }}:\${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"`,
+  },
+  gcp: {
+    pushCredentialEnv: "ASTROLIFT_WORKLOAD_IDENTITY_PROVIDER",
+    pushCredentialHint:
+      "Workload Identity Federation provider resource the runner authenticates against via OIDC. Provisioned by Astrolift on cluster bootstrap.",
+    registryEnv: "ASTROLIFT_ARTIFACT_REGISTRY",
+    registryHint:
+      "Google Artifact Registry path this app pushes to (e.g. us-docker.pkg.dev/PROJECT/REPO/app). Tag with the commit SHA per build.",
+    renderWorkflowSteps:
+      () => `      - name: Authenticate to Google Cloud (OIDC)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: \${{ secrets.ASTROLIFT_WORKLOAD_IDENTITY_PROVIDER }}
+          token_format: access_token
+
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: \${{ secrets.ASTROLIFT_ARTIFACT_REGISTRY }}
+          username: oauth2accesstoken
+          password: \${{ steps.auth.outputs.access_token }}
+
+      - name: Build and push image
+        env:
+          IMAGE: \${{ secrets.ASTROLIFT_ARTIFACT_REGISTRY }}:\${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"`,
+  },
+  azure: {
+    pushCredentialEnv: "ASTROLIFT_AZURE_CLIENT_ID",
+    pushCredentialHint:
+      "Entra ID application (client) id with a GitHub federated credential. The runner logs in via OIDC — no client secret stored. Provisioned by Astrolift on cluster bootstrap.",
+    registryEnv: "ASTROLIFT_ACR_LOGIN_SERVER",
+    registryHint:
+      "Azure Container Registry login server this app pushes to (e.g. myregistry.azurecr.io). Tag with the commit SHA per build.",
+    renderWorkflowSteps: () => `      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: \${{ secrets.ASTROLIFT_AZURE_CLIENT_ID }}
+          tenant-id: \${{ secrets.ASTROLIFT_AZURE_TENANT_ID }}
+          subscription-id: \${{ secrets.ASTROLIFT_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name "\${{ secrets.ASTROLIFT_ACR_LOGIN_SERVER }}"
+
+      - name: Build and push image
+        env:
+          IMAGE: \${{ secrets.ASTROLIFT_ACR_LOGIN_SERVER }}:\${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"`,
+  },
+  k8s_native: {
+    pushCredentialEnv: "ASTROLIFT_REGISTRY_PASSWORD",
+    pushCredentialHint:
+      "Registry password or robot-account token used for docker login. Pair it with an ASTROLIFT_REGISTRY_USERNAME secret on the repo.",
+    registryEnv: "ASTROLIFT_REGISTRY_URI",
+    registryHint:
+      "Container registry URI this app pushes to. Any OCI-compliant registry the cluster can pull from. Tag with the commit SHA per build.",
+    renderWorkflowSteps: () => `      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: \${{ secrets.ASTROLIFT_REGISTRY_URI }}
+          username: \${{ secrets.ASTROLIFT_REGISTRY_USERNAME }}
+          password: \${{ secrets.ASTROLIFT_REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        env:
+          IMAGE: \${{ secrets.ASTROLIFT_REGISTRY_URI }}:\${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"`,
+  },
+};
+
+/** Default to the AWS shape for an unbound / unknown provider so the card
+ *  still renders a working reference rather than blanking out. */
+function resolveProviderCiMeta(slug: string): ProviderCiMeta {
+  return providerCiMeta[slug] ?? providerCiMeta.aws;
 }
 
 interface SecretRow {
@@ -78,8 +226,9 @@ interface SecretRow {
 
 export function CiSetupSection({
   appSlug,
-  ecrRepoUri,
-  ecrPushRoleArn,
+  registryUri,
+  pushCredentialRef,
+  providerPluginSlug,
   sourceWebhookInstalledAt,
 }: Props) {
   const { data, loading } = useQuery<PlatformUrlResp>(GET_PLATFORM_API_URL, {
@@ -87,17 +236,18 @@ export function CiSetupSection({
   });
   const apiUrl = data?.astroliftPlatformApiUrl ?? "";
 
+  const meta = resolveProviderCiMeta(providerPluginSlug);
+
   const rows: SecretRow[] = [
     {
-      name: "ASTROLIFT_PUSH_ROLE_ARN",
-      value: ecrPushRoleArn,
-      hint:
-        "IAM role the GitHub Actions runner assumes via OIDC to push images. Provisioned by Astrolift on cluster bootstrap.",
+      name: meta.pushCredentialEnv,
+      value: pushCredentialRef,
+      hint: meta.pushCredentialHint,
     },
     {
-      name: "ASTROLIFT_ECR_URI",
-      value: ecrRepoUri,
-      hint: "Container registry URI this app pushes to. Tag with the commit SHA per build.",
+      name: meta.registryEnv,
+      value: registryUri,
+      hint: meta.registryHint,
     },
     {
       name: "ASTROLIFT_APP_SLUG",
@@ -118,7 +268,7 @@ export function CiSetupSection({
     },
   ];
 
-  const workflowYaml = renderWorkflowYaml();
+  const workflowYaml = renderWorkflowYaml(meta);
 
   async function copyYaml() {
     try {
@@ -514,15 +664,18 @@ function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
 }
 
 /**
- * Reference GitHub Actions workflow.
+ * Reference GitHub Actions workflow (#382, #854).
  *
- * Keyed off the five ``ASTROLIFT_*`` secret names rendered above so the
- * operator can paste this verbatim — no per-app substitutions. The
- * commit SHA is the image tag; the deploy webhook POST tells the
- * platform which image to roll out. Matches the contract documented
- * in spec 09 §6.
+ * The shared scaffold (checkout + the platform-notify POST) is templated
+ * once here; the provider-variant credentials + registry-login + build
+ * steps come from ``meta.renderWorkflowSteps()`` so a GCP/Azure/raw-k8s
+ * cluster gets a runnable workflow rather than AWS-specific steps. Keyed
+ * off the ``ASTROLIFT_*`` secret names rendered above so the operator can
+ * paste it verbatim. The commit SHA is the image tag; the deploy webhook
+ * POST tells the platform which image to roll out. Matches the contract
+ * documented in spec 09 §6.
  */
-function renderWorkflowYaml(): string {
+function renderWorkflowYaml(meta: ProviderCiMeta): string {
   return `name: astrolift deploy
 
 on:
@@ -541,30 +694,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: \${{ secrets.ASTROLIFT_PUSH_ROLE_ARN }}
-          aws-region: us-west-2
-          role-session-name: astrolift-\${{ github.run_id }}
-
-      - name: Login to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        env:
-          IMAGE: \${{ secrets.ASTROLIFT_ECR_URI }}:\${{ github.sha }}
-        run: |
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
+${meta.renderWorkflowSteps()}
 
       - name: Notify Astrolift
         env:
           API_URL: \${{ secrets.ASTROLIFT_API_URL }}
           APP_SLUG: \${{ secrets.ASTROLIFT_APP_SLUG }}
           TOKEN: \${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}
-          IMAGE: \${{ secrets.ASTROLIFT_ECR_URI }}:\${{ github.sha }}
+          IMAGE: \${{ secrets.${meta.registryEnv} }}:\${{ github.sha }}
         run: |
           curl --fail-with-body -sS -X POST "$API_URL/api/v1/deploys" \\
             -H "Authorization: Bearer $TOKEN" \\

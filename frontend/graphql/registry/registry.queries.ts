@@ -27,6 +27,7 @@ const APP_FIELDS = `
   }
   ecrRepoUri
   ecrPushRoleArn
+  providerPluginSlug
   k8sNamespace
   subdomain
   managedHostname

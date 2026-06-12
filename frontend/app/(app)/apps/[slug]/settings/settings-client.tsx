@@ -358,8 +358,9 @@ export function SettingsClient({ slug }: { slug: string }) {
                 {card}
                 <CiSetupSection
                   appSlug={a.slug}
-                  ecrRepoUri={a.ecrRepoUri}
-                  ecrPushRoleArn={a.ecrPushRoleArn}
+                  registryUri={a.ecrRepoUri}
+                  pushCredentialRef={a.ecrPushRoleArn}
+                  providerPluginSlug={a.providerPluginSlug}
                   sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
                 />
                 <ForceRedeploySection appSlug={a.slug} />
