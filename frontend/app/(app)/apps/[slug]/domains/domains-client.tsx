@@ -188,6 +188,7 @@ function CertExpiryBadge({
   expiresAt: string | null;
   status: string;
 }) {
+  const [now] = React.useState(() => Date.now());
   if (status === "failed") {
     return (
       <Badge variant="destructive" className="text-[10px]">
@@ -196,7 +197,7 @@ function CertExpiryBadge({
     );
   }
   if (!expiresAt) return null;
-  const ms = new Date(expiresAt).getTime() - Date.now();
+  const ms = new Date(expiresAt).getTime() - now;
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (

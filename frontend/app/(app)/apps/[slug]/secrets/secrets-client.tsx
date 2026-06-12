@@ -206,8 +206,9 @@ function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
 /** #677 — small inline expiry chip for the secret key cell. Hidden when
  *  no rotation deadline is set; warning < 14d; destructive < 7d / past. */
 function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined }) {
+  const [now] = React.useState(() => Date.now());
   if (!expiresAt) return null;
-  const ms = new Date(expiresAt).getTime() - Date.now();
+  const ms = new Date(expiresAt).getTime() - now;
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (
