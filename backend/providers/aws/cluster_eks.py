@@ -1035,6 +1035,13 @@ class EKSClusterDriver(ClusterDriver):
             alb_values["vpcId"] = vpc_id
         if backend_sg:
             alb_values["backendSecurityGroup"] = backend_sg
+            # When backendSecurityGroup is explicitly set we manage the SG
+            # rule ourselves (or let bootstrap set it once). The TGB
+            # reconciler's ENI-tag lookup fails when both the EKS cluster SG
+            # and the node shared SG carry kubernetes.io/cluster/<name>:owned,
+            # producing a FailedNetworkReconcile loop that blocks target-group
+            # health on every Ingress reconcile (e.g. auth-gate toggle).
+            alb_values["manageBackendSecurityGroupRules"] = False
 
         return [
             BootstrapComponent(
