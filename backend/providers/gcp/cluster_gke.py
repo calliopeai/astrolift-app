@@ -28,6 +28,7 @@ from _sdk.cluster import (
     NamespaceState,
     PodInfo,
     PodLogLine,
+    RegionInfo,
     RolloutResult,
     TeardownReport,
     WorkloadStatus,
@@ -66,6 +67,56 @@ from k8s_native.observability import (
 # cache key is the (project, location, cluster_name) triple — one
 # entry per cluster the driver talks to.
 _WI_KUBECONFIG_TTL_SECONDS = 50 * 60
+
+
+# Curated GCP regions for the cluster-register picker (#860). Live
+# compute.regions.list needs a project + Compute Engine API; the
+# register path has neither, so this static list (slug, label,
+# continent) backs the picker. Continent strings match the AWS/Azure
+# tables so the UI buckets all clouds consistently.
+_GCP_REGIONS: tuple[tuple[str, str, str], ...] = (
+    ("us-central1", "Iowa", "Americas"),
+    ("us-east1", "South Carolina", "Americas"),
+    ("us-east4", "Northern Virginia", "Americas"),
+    ("us-east5", "Columbus", "Americas"),
+    ("us-south1", "Dallas", "Americas"),
+    ("us-west1", "Oregon", "Americas"),
+    ("us-west2", "Los Angeles", "Americas"),
+    ("us-west3", "Salt Lake City", "Americas"),
+    ("us-west4", "Las Vegas", "Americas"),
+    ("northamerica-northeast1", "Montréal", "Americas"),
+    ("northamerica-northeast2", "Toronto", "Americas"),
+    ("northamerica-south1", "Mexico", "Americas"),
+    ("southamerica-east1", "São Paulo", "Americas"),
+    ("southamerica-west1", "Santiago", "Americas"),
+    ("europe-central2", "Warsaw", "Europe"),
+    ("europe-north1", "Finland", "Europe"),
+    ("europe-southwest1", "Madrid", "Europe"),
+    ("europe-west1", "Belgium", "Europe"),
+    ("europe-west2", "London", "Europe"),
+    ("europe-west3", "Frankfurt", "Europe"),
+    ("europe-west4", "Netherlands", "Europe"),
+    ("europe-west6", "Zürich", "Europe"),
+    ("europe-west8", "Milan", "Europe"),
+    ("europe-west9", "Paris", "Europe"),
+    ("europe-west10", "Berlin", "Europe"),
+    ("europe-west12", "Turin", "Europe"),
+    ("asia-east1", "Taiwan", "Asia Pacific"),
+    ("asia-east2", "Hong Kong", "Asia Pacific"),
+    ("asia-northeast1", "Tokyo", "Asia Pacific"),
+    ("asia-northeast2", "Osaka", "Asia Pacific"),
+    ("asia-northeast3", "Seoul", "Asia Pacific"),
+    ("asia-south1", "Mumbai", "Asia Pacific"),
+    ("asia-south2", "Delhi", "Asia Pacific"),
+    ("asia-southeast1", "Singapore", "Asia Pacific"),
+    ("asia-southeast2", "Jakarta", "Asia Pacific"),
+    ("australia-southeast1", "Sydney", "Asia Pacific"),
+    ("australia-southeast2", "Melbourne", "Asia Pacific"),
+    ("me-central1", "Doha", "Middle East"),
+    ("me-central2", "Dammam", "Middle East"),
+    ("me-west1", "Tel Aviv", "Middle East"),
+    ("africa-south1", "Johannesburg", "Africa"),
+)
 
 
 @dataclass(frozen=True)
@@ -669,6 +720,19 @@ class GKEClusterDriver(ClusterDriver):
             client,
             namespaces=default_namespaces(namespaces),
         )
+
+    def list_regions(self) -> list[RegionInfo]:
+        """Curated static list of GCP regions for the register picker
+        (#860).
+
+        Live ``compute.regions.list`` needs a project id + the Compute
+        Engine API enabled, neither of which is available on the
+        no-cluster register path — so this returns a curated static
+        list (GCP regions change infrequently). The frontend keeps
+        free-entry on top for regions not listed here. Sorted by slug
+        for a stable, scannable list.
+        """
+        return [RegionInfo(id=slug, label=label, continent=continent) for slug, label, continent in _GCP_REGIONS]
 
     def _k8s(self, cluster: str) -> Any:
         if cluster in self._k8s_cache:

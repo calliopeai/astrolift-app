@@ -589,6 +589,55 @@ class ClusterEvent:
 
 
 @dataclass(frozen=True)
+class RegionInfo:
+    """One selectable cloud region for the cluster-register picker (#860).
+
+    ``id`` is the wire-form slug the platform persists on
+    ``TenantCluster.region`` (``us-west-2`` / ``us-central1`` /
+    ``eastus``). ``label`` is the operator-facing display name
+    (``US West (Oregon)``). ``continent`` is an optional grouping
+    string (``Americas`` / ``Europe`` / ``Asia Pacific`` / ``Middle
+    East`` / ``Africa``) the UI can use to bucket long lists; empty
+    when the driver can't classify the region.
+    """
+
+    id: str
+    label: str
+    continent: str = ""
+
+
+@dataclass(frozen=True)
+class CognitoUserPoolInfo:
+    """One Cognito user pool surfaced to the auth-gate picker (#859).
+
+    AWS-specific — only ``EKSClusterDriver`` returns these. ``pool_arn``
+    is composed from the caller's account id + region + pool id (the
+    ListUserPools API returns only ``Id`` + ``Name``, not the ARN).
+    ``domain`` is the Cognito-hosted domain prefix from
+    DescribeUserPool; empty when the pool has no hosted domain
+    configured.
+    """
+
+    pool_id: str
+    pool_arn: str
+    name: str
+    domain: str = ""
+    region: str = ""
+
+
+@dataclass(frozen=True)
+class CognitoUserPoolClientInfo:
+    """One app client within a Cognito user pool (#859).
+
+    Returned by ``list_cognito_user_pool_clients`` once the operator
+    has picked a pool in the auth-gate dialog.
+    """
+
+    client_id: str
+    client_name: str
+
+
+@dataclass(frozen=True)
 class WorkloadHealth:
     """Per-Deployment health row for the Cluster Status tab (#362).
 
@@ -908,3 +957,47 @@ class ClusterDriver(Protocol):
         return an empty list; the UI surfaces "no workload data".
         """
         ...
+
+    # ---- Region / Cognito discovery (#860 / #859) -----------------
+    #
+    # These three feed operator-facing pickers that replace free-text
+    # entry on the cluster-register dialog (region) and the ingress
+    # auth-gate card (Cognito pool / client). They're discovery reads —
+    # no cluster mutation — and degrade to free-entry on the frontend
+    # when the driver can't satisfy them, so implementations may raise
+    # on credential / API failure and the resolver layer swallows it.
+    #
+    # ``list_regions`` is the only one with a sensible cross-cloud
+    # default (a curated static list), so the SDK ships a default
+    # implementation; drivers override it to go live (EKS:
+    # ec2:DescribeRegions). The two Cognito methods are AWS-only — the
+    # default returns an empty list so non-AWS drivers don't have to
+    # implement them and the resolver renders the free-entry fallback.
+
+    def list_regions(self) -> list[RegionInfo]:
+        """Return the provider's selectable regions for the register
+        picker (#860).
+
+        No cluster context — this is called with a driver built from
+        the provider plugin slug alone (a bootstrap config). Live
+        implementations (EKS: ``ec2:DescribeRegions``) MUST fall back
+        to a curated static list on API / credential failure rather
+        than raising, so the picker always has options. The default
+        returns an empty list — drivers without a region concept
+        (k8s_native) inherit it untouched.
+        """
+        return []
+
+    def list_cognito_user_pools(self) -> list[CognitoUserPoolInfo]:
+        """Return the Cognito user pools reachable in the cluster's
+        region (#859). AWS-only; the default returns an empty list so
+        non-AWS drivers don't implement it and the auth-gate picker
+        falls back to free-entry. Live implementations raise on
+        credential / API failure; the resolver swallows it."""
+        return []
+
+    def list_cognito_user_pool_clients(self, pool_id: str) -> list[CognitoUserPoolClientInfo]:
+        """Return the app clients within ``pool_id`` (#859). AWS-only;
+        default returns an empty list. Live implementations raise on
+        credential / API failure; the resolver swallows it."""
+        return []

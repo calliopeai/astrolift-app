@@ -22,9 +22,12 @@ from astrolift_clusters.schema.types import (
     ClusterPrometheusRangeSeriesType,
     ClusterWorkflowRunType,
     ClusterWorkloadHealthType,
+    CognitoUserPoolClientType,
+    CognitoUserPoolType,
     ManagedDomainType,
     PodPhaseSummaryType,
     ProviderPluginType,
+    ProviderRegionType,
     TenantClusterType,
     bootstrap_plan_to_type,
     cluster_live_state_to_type,
@@ -100,6 +103,44 @@ class ClustersQuery:
             return []
         qs = ProviderPlugin.objects.order_by("slug")[:100]
         return [plugin_to_type(p) for p in qs]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_provider_regions(
+        self,
+        info: Info,
+        provider_plugin_slug: str,
+    ) -> list[ProviderRegionType]:
+        """Selectable cloud regions for ``provider_plugin_slug`` (#860).
+
+        Backs the region picker on the cluster-register dialog. Called
+        with the plugin slug alone (no cluster row exists yet — the
+        operator is mid-register), so the dispatch builds the driver
+        from a minimal bootstrap config and calls its ``list_regions``.
+        AWS goes live (``ec2:DescribeRegions``, with its own static
+        fallback); GCP / Azure return curated static lists;
+        ``k8s_native`` has no region concept and returns an empty list
+        (the UI hides the field).
+
+        Driver-resolution failure (plugin not loaded) yields an empty
+        list rather than an error — the frontend keeps free-text entry
+        layered on top of the picker, so an empty list degrades to the
+        old free-entry behavior instead of blocking registration.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            provider_regions_dispatch,
+        )
+
+        try:
+            rows = provider_regions_dispatch(provider_plugin_slug=provider_plugin_slug)
+        except ClusterManagementError:
+            return []
+        return [
+            ProviderRegionType(id=r["id"], label=r["label"], continent=r["continent"])
+            for r in rows
+        ]
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_REGISTER)
@@ -358,6 +399,98 @@ class ClustersQuery:
         if cluster is None:
             return None
         return cluster_live_state_to_type(cluster)
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_UPDATE)
+    @tenant_scoped()
+    def astrolift_cognito_user_pools(
+        self,
+        info: Info,
+        cluster_id: GUID,
+    ) -> list[CognitoUserPoolType]:
+        """Cognito user pools reachable in ``cluster_id``'s region (#859).
+
+        Backs the user-pool picker in the ingress auth-gate card,
+        replacing the free-text pool-ARN / domain inputs. Gated on
+        ``cluster.update`` — the same permission the auth-gate save
+        path requires — so the picker is only offered to operators who
+        can actually persist the resulting config.
+
+        Calls the driver's ``list_cognito_user_pools``
+        (``cognito-idp:ListUserPools`` + per-pool DescribeUserPool for
+        the hosted domain) using the cluster's IAM role (the ambient
+        credential chain, same path the provisioner uses). AWS-only;
+        non-AWS clusters return an empty list. Missing / soft-deleted
+        cluster or any driver / credential failure yields an empty list
+        so the picker degrades to free-entry rather than erroring the
+        card.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cognito_user_pools_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return []
+        try:
+            rows = cognito_user_pools_dispatch(cluster=cluster)
+        except ClusterManagementError:
+            return []
+        return [
+            CognitoUserPoolType(
+                pool_id=r["pool_id"],
+                pool_arn=r["pool_arn"],
+                name=r["name"],
+                domain=r["domain"],
+                region=r["region"],
+            )
+            for r in rows
+        ]
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_UPDATE)
+    @tenant_scoped()
+    def astrolift_cognito_user_pool_clients(
+        self,
+        info: Info,
+        cluster_id: GUID,
+        pool_id: str,
+    ) -> list[CognitoUserPoolClientType]:
+        """App clients within Cognito user pool ``pool_id`` on
+        ``cluster_id`` (#859).
+
+        Populates the dependent client picker after the operator picks
+        a pool. Same permission gate, credential path, and
+        degrade-to-empty contract as ``astroliftCognitoUserPools``.
+        """
+        from core.cluster_management import (
+            ClusterManagementError,
+            cognito_user_pool_clients_dispatch,
+        )
+
+        cluster = (
+            TenantCluster.objects.filter(guid=str(cluster_id), deleted_at__isnull=True)
+            .select_related("provider_plugin")
+            .first()
+        )
+        if cluster is None:
+            return []
+        try:
+            rows = cognito_user_pool_clients_dispatch(cluster=cluster, pool_id=pool_id)
+        except ClusterManagementError:
+            return []
+        return [
+            CognitoUserPoolClientType(
+                client_id=r["client_id"],
+                client_name=r["client_name"],
+            )
+            for r in rows
+        ]
 
     @strawberry.field
     @require_permission(Permission.CLUSTER_MANAGE)

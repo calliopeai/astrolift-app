@@ -1923,6 +1923,25 @@ type AstroliftProviderPlugin {
   isEnabled: Boolean!
 }
 
+type AstroliftProviderRegion {
+  id: String!
+  label: String!
+  continent: String!
+}
+
+type AstroliftCognitoUserPool {
+  poolId: String!
+  poolArn: String!
+  name: String!
+  domain: String!
+  region: String!
+}
+
+type AstroliftCognitoUserPoolClient {
+  clientId: String!
+  clientName: String!
+}
+
 type AstroliftPushCiSecretsPayload {
   secretNames: [String!]!
   rotatedTokenLast4: String!
@@ -4165,6 +4184,9 @@ type Query {
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
+  astroliftProviderRegions(providerPluginSlug: String!): [AstroliftProviderRegion!]!
+  astroliftCognitoUserPools(clusterId: GUID!): [AstroliftCognitoUserPool!]!
+  astroliftCognitoUserPoolClients(clusterId: GUID!, poolId: String!): [AstroliftCognitoUserPoolClient!]!
   astroliftClusterLifecycleAudit(clusterId: GUID!, limit: Int! = 50): [AstroliftClusterLifecycleAuditEntry!]!
   astroliftRecentClusterWorkflows(clusterId: GUID!, limit: Int! = 10): [AstroliftClusterWorkflowRun!]!
   astroliftAppCountForCluster(clusterId: GUID!): Int!

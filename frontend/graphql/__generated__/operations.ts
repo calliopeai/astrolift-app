@@ -6868,6 +6868,28 @@ export type ListProviderPluginsQueryVariables = Exact<{ [key: string]: never; }>
 
 export type ListProviderPluginsQuery = { astroliftProviderPlugins: Array<{ id: string, slug: string, name: string, version: string, capabilitiesManifest: Record<string, unknown>, isEnabled: boolean }> };
 
+export type ProviderRegionsQueryVariables = Exact<{
+  providerPluginSlug: Scalars['String']['input'];
+}>;
+
+
+export type ProviderRegionsQuery = { astroliftProviderRegions: Array<{ id: string, label: string, continent: string }> };
+
+export type CognitoUserPoolsQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+}>;
+
+
+export type CognitoUserPoolsQuery = { astroliftCognitoUserPools: Array<{ poolId: string, poolArn: string, name: string, domain: string, region: string }> };
+
+export type CognitoUserPoolClientsQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+  poolId: Scalars['String']['input'];
+}>;
+
+
+export type CognitoUserPoolClientsQuery = { astroliftCognitoUserPoolClients: Array<{ clientId: string, clientName: string }> };
+
 export type ClusterWorkloadHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
 }>;

@@ -42,6 +42,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -56,6 +64,8 @@ import {
   BRING_CLUSTER_INTO_MANAGEMENT,
   CLUSTER_BOOTSTRAP_PLAN,
   CLUSTER_BOOTSTRAP_RUNS,
+  COGNITO_USER_POOL_CLIENTS,
+  COGNITO_USER_POOLS,
   DECOMMISSION_CLUSTER,
   INSTALL_CLUSTER_PREREQS,
   ISSUE_CLUSTER_AGENT_KEY,
@@ -68,6 +78,10 @@ import type {
   AstroliftTenantCluster,
   ReconcileClusterIngressesResult,
 } from "@/graphql/clusters/clusters.types";
+import type {
+  CognitoUserPoolClientsQuery,
+  CognitoUserPoolsQuery,
+} from "@/graphql/__generated__/operations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
@@ -1299,6 +1313,39 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
   const [poolArn, setPoolArn] = React.useState(existing?.user_pool_arn ?? "");
   const [clientId, setClientId] = React.useState(existing?.user_pool_client_id ?? "");
   const [domain, setDomain] = React.useState(existing?.user_pool_domain ?? "");
+  // Pool id of the currently-picked pool — drives the dependent app-
+  // client query. Derived from the picked pool, or parsed out of an
+  // existing/pasted ARN (…:userpool/<poolId>) so the client picker
+  // works when editing an already-saved config.
+  const [poolId, setPoolId] = React.useState(() => poolIdFromArn(existing?.user_pool_arn ?? ""));
+  // "Advanced / paste directly" fallback. AWS-only pickers degrade to
+  // the original free-text inputs when the operator wants to paste a
+  // cross-account pool the cluster's IAM role can't enumerate, or when
+  // the Cognito list query errors.
+  const [useAdvanced, setUseAdvanced] = React.useState(false);
+
+  // Cognito pool list for the picker (#859). Only fetched for AWS
+  // clusters (the resolver returns [] otherwise) and only while the
+  // edit form is open — no point querying AWS on every settings view.
+  const isAws = cluster.providerPluginSlug === "aws";
+  const poolsQuery = useQuery<CognitoUserPoolsQuery>(COGNITO_USER_POOLS, {
+    variables: { clusterId: cluster.id },
+    skip: !editing || !isAws,
+    fetchPolicy: "cache-and-network",
+  });
+  const pools = poolsQuery.data?.astroliftCognitoUserPools ?? [];
+
+  // Dependent app-client list — fetched once a pool is selected.
+  const clientsQuery = useQuery<CognitoUserPoolClientsQuery>(COGNITO_USER_POOL_CLIENTS, {
+    variables: { clusterId: cluster.id, poolId },
+    skip: !editing || !isAws || !poolId,
+    fetchPolicy: "cache-and-network",
+  });
+  const clients = clientsQuery.data?.astroliftCognitoUserPoolClients ?? [];
+
+  // Surface the live-query failure so the operator knows to fall back to
+  // paste mode rather than staring at an empty dropdown.
+  const poolsErrored = !!poolsQuery.error;
 
   const [update, { loading: updating }] = useMutation<{
     updateTenantCluster: MutationResult<AstroliftTenantCluster>;
@@ -1365,7 +1412,22 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
     setPoolArn(existing?.user_pool_arn ?? "");
     setClientId(existing?.user_pool_client_id ?? "");
     setDomain(existing?.user_pool_domain ?? "");
+    setPoolId(poolIdFromArn(existing?.user_pool_arn ?? ""));
+    setUseAdvanced(false);
     setEditing(true);
+  }
+
+  // Operator picked a pool from the combobox: fill the ARN + pool id,
+  // auto-fill the hosted domain (the whole point of #859 — no more
+  // hand-typing it), and reset the app-client selection so the
+  // dependent picker re-queries against the new pool.
+  function pickPool(pool: CognitoUserPool) {
+    setPoolArn(pool.poolArn);
+    setPoolId(pool.poolId);
+    if (pool.domain) {
+      setDomain(pool.domain);
+    }
+    setClientId("");
   }
 
   async function handleToggle() {
@@ -1495,24 +1557,62 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
       <CardContent>
         {editing ? (
           <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium">User pool ARN</label>
-              <Input
-                value={poolArn}
-                onChange={(e) => setPoolArn(e.target.value)}
-                placeholder="arn:aws:cognito-idp:us-west-2:…"
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium">App client ID</label>
-              <Input
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                placeholder="abc123…"
-                className="font-mono text-xs"
-              />
-            </div>
+            {isAws && !useAdvanced ? (
+              <>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">User pool</label>
+                  <CognitoPoolCombobox
+                    pools={pools}
+                    loading={poolsQuery.loading}
+                    errored={poolsErrored}
+                    poolArn={poolArn}
+                    onPick={pickPool}
+                    onFreeText={(v) => {
+                      setPoolArn(v);
+                      setPoolId(poolIdFromArn(v));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">App client</label>
+                  <CognitoClientCombobox
+                    clients={clients}
+                    loading={clientsQuery.loading}
+                    disabled={!poolId}
+                    clientId={clientId}
+                    onPick={setClientId}
+                    onFreeText={setClientId}
+                  />
+                  {!poolId && (
+                    <p className="text-muted-foreground text-xs">Pick a user pool first.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">User pool ARN</label>
+                  <Input
+                    value={poolArn}
+                    onChange={(e) => {
+                      setPoolArn(e.target.value);
+                      setPoolId(poolIdFromArn(e.target.value));
+                    }}
+                    placeholder="arn:aws:cognito-idp:us-west-2:…"
+                    className="font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">App client ID</label>
+                  <Input
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="abc123…"
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-1">
               <label className="text-xs font-medium">User pool domain</label>
               <Input
@@ -1521,7 +1621,23 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
                 placeholder="my-domain (without .auth.region.amazoncognito.com)"
                 className="font-mono text-xs"
               />
+              {isAws && !useAdvanced && (
+                <p className="text-muted-foreground text-xs">
+                  Auto-filled from the selected pool; edit to override.
+                </p>
+              )}
             </div>
+            {isAws && (
+              <button
+                type="button"
+                onClick={() => setUseAdvanced((v) => !v)}
+                className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+              >
+                {useAdvanced
+                  ? "Use the pool picker"
+                  : "Advanced: paste ARN / client ID directly (cross-account pools)"}
+              </button>
+            )}
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" onClick={handleSaveAndApply} disabled={busy} className="gap-1.5">
                 {busy && <Loader2Icon className="size-3.5 animate-spin" />}
@@ -1574,5 +1690,144 @@ function IngressAuthCard({ cluster }: { cluster: AstroliftTenantCluster }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+type CognitoUserPool = CognitoUserPoolsQuery["astroliftCognitoUserPools"][number];
+type CognitoUserPoolClient = CognitoUserPoolClientsQuery["astroliftCognitoUserPoolClients"][number];
+
+// Parse the pool id out of a Cognito user-pool ARN
+// (arn:aws:cognito-idp:<region>:<account>:userpool/<poolId>). Returns ""
+// when the string isn't a recognizable pool ARN — used so the dependent
+// app-client picker can still query when editing an already-saved or
+// pasted ARN, without forcing the operator to re-pick the pool.
+function poolIdFromArn(arn: string): string {
+  const m = arn.match(/userpool\/(.+)$/);
+  return m ? m[1] : "";
+}
+
+// User-pool picker (#859) — searchable combobox over the cluster's
+// Cognito pools with free-text fallback. The displayed value is the
+// pool ARN; picking a pool fills the ARN + pool id + auto-fills the
+// domain (via onPick), while typing commits a raw ARN (via onFreeText)
+// for cross-account pools the cluster's IAM role can't enumerate.
+function CognitoPoolCombobox({
+  pools,
+  loading,
+  errored,
+  poolArn,
+  onPick,
+  onFreeText,
+}: {
+  pools: CognitoUserPool[];
+  loading: boolean;
+  errored: boolean;
+  poolArn: string;
+  onPick: (pool: CognitoUserPool) => void;
+  onFreeText: (v: string) => void;
+}) {
+  const selected = pools.find((p) => p.poolArn === poolArn) ?? null;
+  return (
+    <>
+      <Combobox<CognitoUserPool>
+        items={pools}
+        itemToStringLabel={(p) => p.poolArn}
+        value={selected}
+        onValueChange={(v) => {
+          if (v && typeof v === "object" && "poolArn" in v) {
+            onPick(v);
+          }
+        }}
+        inputValue={poolArn}
+        onInputValueChange={(v) => onFreeText(v ?? "")}
+      >
+        <ComboboxInput
+          placeholder={loading ? "Loading pools…" : "arn:aws:cognito-idp:us-west-2:…"}
+          className="font-mono text-xs"
+        />
+        <ComboboxContent>
+          <ComboboxEmpty>
+            {poolArn ? `Use "${poolArn}" (paste ARN directly)` : "No pools found — paste an ARN."}
+          </ComboboxEmpty>
+          <ComboboxList>
+            {(item: CognitoUserPool) => (
+              <ComboboxItem key={item.poolId} value={item}>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-sm">{item.name || item.poolId}</span>
+                  <span className="text-muted-foreground truncate font-mono text-[10px]">
+                    {item.poolId}
+                    {item.domain ? ` · ${item.domain}` : ""}
+                  </span>
+                </div>
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      {errored && (
+        <p className="text-muted-foreground text-xs">
+          Couldn&apos;t list pools (the cluster&apos;s role may lack cognito-idp:ListUserPools).
+          Paste the ARN directly.
+        </p>
+      )}
+    </>
+  );
+}
+
+// Dependent app-client picker (#859) — enabled once a pool is selected.
+// Same free-text fallback shape as the pool picker.
+function CognitoClientCombobox({
+  clients,
+  loading,
+  disabled,
+  clientId,
+  onPick,
+  onFreeText,
+}: {
+  clients: CognitoUserPoolClient[];
+  loading: boolean;
+  disabled: boolean;
+  clientId: string;
+  onPick: (v: string) => void;
+  onFreeText: (v: string) => void;
+}) {
+  const selected = clients.find((c) => c.clientId === clientId) ?? null;
+  return (
+    <Combobox<CognitoUserPoolClient>
+      items={clients}
+      itemToStringLabel={(c) => c.clientId}
+      value={selected}
+      onValueChange={(v) => {
+        if (v && typeof v === "object" && "clientId" in v) {
+          onPick(v.clientId);
+        }
+      }}
+      inputValue={clientId}
+      onInputValueChange={(v) => onFreeText(v ?? "")}
+      disabled={disabled}
+    >
+      <ComboboxInput
+        placeholder={loading ? "Loading clients…" : "abc123…"}
+        className="font-mono text-xs"
+        disabled={disabled}
+      />
+      <ComboboxContent>
+        <ComboboxEmpty>
+          {clientId ? `Use "${clientId}" (paste client ID directly)` : "No app clients in this pool."}
+        </ComboboxEmpty>
+        <ComboboxList>
+          {(item: CognitoUserPoolClient) => (
+            <ComboboxItem key={item.clientId} value={item}>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span className="truncate text-sm">{item.clientName || item.clientId}</span>
+                <span className="text-muted-foreground truncate font-mono text-[10px]">
+                  {item.clientId}
+                </span>
+              </div>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
