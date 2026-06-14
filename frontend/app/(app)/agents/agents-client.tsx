@@ -303,7 +303,9 @@ function DispatchTab({ agentWorkloads, workloadsLoading }: DispatchTabProps) {
 // History tab — completed / terminal agent tasks
 // ---------------------------------------------------------------------------
 
-const TERMINAL_STATUSES = ["succeeded", "failed", "cancelled"];
+// Terminal AgentTask.Status values (backend contract): there is no
+// "succeeded" — a successful task is "completed".
+const TERMINAL_STATUSES = ["completed", "failed", "timed_out", "cancelled"];
 
 function HistoryTab({ orgId }: { orgId: string }) {
   const { data, loading } = useQuery<AgentTasksData>(LIST_AGENT_TASKS, {
@@ -355,7 +357,7 @@ function HistoryTab({ orgId }: { orgId: string }) {
               <TableRow key={t.id}>
                 <TableCell className="font-mono text-xs">{t.id}</TableCell>
                 <TableCell>
-                  <Badge variant={t.status === "succeeded" ? "default" : "destructive"}>
+                  <Badge variant={t.status === "completed" ? "default" : "destructive"}>
                     {t.status}
                   </Badge>
                 </TableCell>
