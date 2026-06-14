@@ -7711,14 +7711,14 @@ export type ListAgentTasksQueryVariables = Exact<{
 }>;
 
 
-export type ListAgentTasksQuery = { agentTasks: Array<{ id: string, status: string, callbackUrl: string, result?: Record<string, unknown> | null, createdAt: string, startedAt?: string | null, finishedAt?: string | null }> };
+export type ListAgentTasksQuery = { agentTasks: Array<{ id: string, status: string, callbackUrl: string, result?: Record<string, unknown> | null, createdAt: string, startedAt?: string | null, finishedAt?: string | null, vncEnabled: boolean, vncUrl: string }> };
 
 export type GetAgentTaskQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetAgentTaskQuery = { agentTask?: { id: string, status: string, callbackUrl: string, result?: Record<string, unknown> | null, createdAt: string, startedAt?: string | null, finishedAt?: string | null } | null };
+export type GetAgentTaskQuery = { agentTask?: { id: string, status: string, callbackUrl: string, result?: Record<string, unknown> | null, createdAt: string, startedAt?: string | null, finishedAt?: string | null, vncEnabled: boolean, vncUrl: string } | null };
 
 export type ListQuotasQueryVariables = Exact<{ [key: string]: never; }>;
 

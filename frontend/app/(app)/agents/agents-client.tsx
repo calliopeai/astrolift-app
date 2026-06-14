@@ -5,6 +5,7 @@ import {
   BotIcon,
   ClockIcon,
   Loader2Icon,
+  MonitorPlayIcon,
   ZapIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -15,6 +16,13 @@ import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -33,6 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { VncViewer } from "@/components/observability/VncViewer";
 import { LIST_AGENT_TASKS } from "@/graphql/agents/agents.queries";
 import { LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
@@ -46,6 +55,8 @@ type AgentTask = {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  vncEnabled: boolean;
+  vncUrl: string;
 };
 
 type AgentTasksData = {
@@ -77,6 +88,13 @@ function ActiveTab({ orgId }: { orgId: string }) {
     skip: !orgId,
   });
   const tasks = data?.agentTasks ?? [];
+  // The task whose live session is open in the theater modal.
+  const [watching, setWatching] = React.useState<AgentTask | null>(null);
+
+  // A task is watchable only while RUNNING on a VNC-capable pod with a
+  // published relay path.
+  const canWatch = (t: AgentTask) =>
+    t.status === "running" && t.vncEnabled && Boolean(t.vncUrl);
 
   if (loading && tasks.length === 0) {
     return (
@@ -112,6 +130,7 @@ function ActiveTab({ orgId }: { orgId: string }) {
               <TableHead>ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Started</TableHead>
+              <TableHead className="text-right">Live</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -120,11 +139,35 @@ function ActiveTab({ orgId }: { orgId: string }) {
                 <TableCell className="font-mono text-xs">{t.id}</TableCell>
                 <TableCell><Badge variant="default">{t.status}</Badge></TableCell>
                 <TableCell className="text-muted-foreground text-sm">{t.startedAt ?? "—"}</TableCell>
+                <TableCell className="text-right">
+                  {canWatch(t) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setWatching(t)}
+                    >
+                      <MonitorPlayIcon className="size-4" />
+                      Watch live
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </CardContent>
+
+      <Dialog open={watching !== null} onOpenChange={(open) => !open && setWatching(null)}>
+        <DialogContent className="max-w-4xl sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Live agent session</DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              {watching?.id}
+            </DialogDescription>
+          </DialogHeader>
+          {watching && <VncViewer vncPath={watching.vncUrl} />}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

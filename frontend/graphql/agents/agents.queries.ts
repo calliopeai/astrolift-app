@@ -88,6 +88,8 @@ export const LIST_AGENT_TASKS = gql`
       createdAt
       startedAt
       finishedAt
+      vncEnabled
+      vncUrl
     }
   }
 `;
@@ -102,6 +104,8 @@ export const GET_AGENT_TASK = gql`
       createdAt
       startedAt
       finishedAt
+      vncEnabled
+      vncUrl
     }
   }
 `;
