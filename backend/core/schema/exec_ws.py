@@ -279,7 +279,7 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
         return
     app_slug, workload_slug = target
 
-    from core.schema.ws_views import (
+    from core.schema.ws_auth import (
         _parse_cookies,
         _resolve_tenant_for_user,
         _resolve_user_from_sessionid,

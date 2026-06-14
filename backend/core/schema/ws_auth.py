@@ -1,0 +1,128 @@
+"""Shared WebSocket auth: sessionid cookie -> user + tenant.
+
+The exec WS relay (:mod:`core.schema.exec_ws`) and the VNC WS relay
+(:mod:`core.schema.vnc_ws`) both need to turn an ASGI WebSocket
+handshake into an authenticated, tenant-scoped identity before they
+accept the connection. That resolution chain used to live inline in
+``ws_views.py`` (and was lazily imported by ``exec_ws.py``); it is
+extracted here so every WS surface shares one code path.
+
+The four primitives are:
+
+  * :func:`_parse_cookies` / :func:`_split_cookie_header` — pull the
+    cookie jar out of an ASGI scope dict or a Starlette request/WS.
+  * :func:`_resolve_user_from_sessionid` — Django session -> user.
+  * :func:`_resolve_tenant_for_user` — user + session -> TenantContext,
+    mirroring ``TenantContextMiddleware``.
+
+``ws_views.py`` re-exports these so the GraphQL-WS shim keeps importing
+them from its old home; new relays import from here directly.
+"""
+
+from __future__ import annotations
+
+import logging
+from importlib import import_module
+from typing import Any
+
+from asgiref.sync import sync_to_async
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_cookies(scope_or_request: Any) -> dict[str, str]:
+    """Pull cookies out of an ASGI scope or Starlette request."""
+    cookies: dict[str, str] = {}
+    headers = []
+    if hasattr(scope_or_request, "headers"):
+        # Starlette Request / WebSocket exposes headers as a Headers
+        # mapping; iterating yields lowercase names.
+        try:
+            cookie_header = scope_or_request.headers.get("cookie") or ""
+        except Exception:
+            cookie_header = ""
+        if cookie_header:
+            return _split_cookie_header(cookie_header)
+        headers = scope_or_request.headers
+    elif isinstance(scope_or_request, dict):
+        headers = scope_or_request.get("headers", [])
+        for name, value in headers:
+            if name.lower() == b"cookie":
+                return _split_cookie_header(value.decode("latin-1"))
+    return cookies
+
+
+def _split_cookie_header(raw: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for part in raw.split(";"):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        name, _, value = part.partition("=")
+        out[name.strip()] = value.strip()
+    return out
+
+
+@sync_to_async
+def _resolve_user_from_sessionid(session_key: str):
+    """Look up the Django user for a sessionid value.
+
+    Returns AnonymousUser when the session is missing/expired/has
+    no user. Wrapped in sync_to_async because Django's session +
+    user lookup hit the ORM.
+    """
+    if not session_key:
+        return AnonymousUser(), {}
+    try:
+        from django.conf import settings
+
+        engine = import_module(settings.SESSION_ENGINE)
+        store = engine.SessionStore(session_key)
+        if not store.exists(session_key):
+            return AnonymousUser(), {}
+        session_data = dict(store.items())
+        user_id = session_data.get("_auth_user_id")
+        if not user_id:
+            return AnonymousUser(), session_data
+        User = get_user_model()
+        user = User.objects.filter(pk=user_id).first()
+        if user is None or not getattr(user, "is_active", True):
+            return AnonymousUser(), session_data
+        return user, session_data
+    except Exception:  # noqa: BLE001
+        logger.exception("ws session resolution failed")
+        return AnonymousUser(), {}
+
+
+@sync_to_async
+def _resolve_tenant_for_user(user, session_data: dict) -> Any:
+    """Mirror what TenantContextMiddleware does, but synchronously
+    in a sync_to_async wrapper so we don't block the loop."""
+    from astrolift_identity.models import Member, Organization
+    from core.tenancy import TenantContext
+
+    if user is None or not getattr(user, "is_authenticated", False):
+        return None
+
+    # Active org guid pinned on the X-Astrolift-Organization header
+    # in HTTP requests; on WS we read it from the session if a
+    # client put it there, otherwise fall back to single-membership.
+    active_org_guid = session_data.get("astrolift_active_org") or ""
+    org_id = None
+    if active_org_guid:
+        org_id = Organization.objects.filter(guid=active_org_guid).values_list("pk", flat=True).first()
+
+    if org_id is None:
+        # Single-membership inference.
+        org_id = (
+            Member.objects.filter(user=user, scope_kind="ORG", is_active=True)
+            .order_by("scope_id")
+            .values_list("scope_id", flat=True)
+            .first()
+        )
+
+    if org_id is None:
+        return None
+    return TenantContext(organization_id=org_id, actor_user_id=user.pk)

@@ -112,9 +112,9 @@ class Permission(enum.StrEnum):
     FORM_MODERATE = "form.moderate"
 
     # --- Agent skills + tool defs (skill registry) ----------------
-    SKILL_READ = "skill.read"        # list/read Skill + ToolDef catalog
-    SKILL_WRITE = "skill.write"      # create/update/delete org skills + tool defs
-    SKILL_IMPORT = "skill.import"    # import skills/tools from a github config repo
+    SKILL_READ = "skill.read"  # list/read Skill + ToolDef catalog
+    SKILL_WRITE = "skill.write"  # create/update/delete org skills + tool defs
+    SKILL_IMPORT = "skill.import"  # import skills/tools from a github config repo
 
     # --- Agent environment specs (agent platform foundation) ------
     # CRUD on the reusable, org-scoped container-environment recipe an
@@ -125,13 +125,20 @@ class Permission(enum.StrEnum):
     AGENT_ENV_SPEC_UPDATE = "agent_env_spec.update"
     AGENT_ENV_SPEC_DELETE = "agent_env_spec.delete"
 
+    # --- Agent tasks (#877) ---------------------------------------
+    # Operator-grade live access into a RUNNING agent task's pod via
+    # the noVNC relay (the GUI equivalent of ``app.exec_pod``).
+    # Deny-by-default; granted to org owner/admin via the system-role
+    # comprehensions over the full enum.
+    AGENT_TASK_WATCH = "agent_task.watch"
+
     # --- Pipelines (#86) ------------------------------------------
     PIPELINE_READ = "pipeline.read"
     PIPELINE_CREATE = "pipeline.create"
     PIPELINE_UPDATE = "pipeline.update"
     PIPELINE_DELETE = "pipeline.delete"
-    PIPELINE_TRIGGER = "pipeline.trigger"      # dispatch a manual run
-    PIPELINE_CANCEL = "pipeline.cancel"        # cancel a running run
+    PIPELINE_TRIGGER = "pipeline.trigger"  # dispatch a manual run
+    PIPELINE_CANCEL = "pipeline.cancel"  # cancel a running run
     PIPELINE_SECRET_MANAGE = "pipeline.secret_manage"  # add/rotate pipeline secrets
 
     # --- Admin elevation ------------------------------------------

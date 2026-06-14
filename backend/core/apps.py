@@ -45,6 +45,16 @@ class CoreConfig(AppConfig):
 
         set_exec_backend(K8sExecBackend())
 
+        # Wire the production WebSocket VNC backend (#877). Same shape
+        # as the exec backend above — the default in core.schema.vnc_ws
+        # is a stub that EOFs immediately; replacing it here means the
+        # agent-task noVNC viewer opens a real kubernetes port-forward
+        # to the pod's 6080 as soon as Django boots.
+        from core.cluster_vnc import K8sVncBackend
+        from core.schema.vnc_ws import set_vnc_backend
+
+        set_vnc_backend(K8sVncBackend())
+
     @staticmethod
     def _register_file_exporters():
         """Register core file exporters."""

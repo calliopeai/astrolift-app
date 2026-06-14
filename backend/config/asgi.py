@@ -61,6 +61,10 @@ async def application(scope, receive, send):
             from core.schema.exec_ws import exec_ws_application
 
             return await exec_ws_application(scope, receive, send)
+        if path.startswith("/app/vnc/"):
+            from core.schema.vnc_ws import vnc_ws_application
+
+            return await vnc_ws_application(scope, receive, send)
         # Unknown WS path — close politely.
         await send({"type": "websocket.close", "code": 4404})
         return

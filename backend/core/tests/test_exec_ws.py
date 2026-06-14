@@ -186,15 +186,15 @@ async def test_dispatcher_routes_frames_to_backend(
     async def _noop_audit(**_kw):
         return None
 
-    import core.schema.ws_views as ws_views_mod
+    import core.schema.ws_auth as ws_auth_mod
 
     monkeypatch.setattr(
-        ws_views_mod,
+        ws_auth_mod,
         "_resolve_user_from_sessionid",
         _ok_user,
     )
     monkeypatch.setattr(
-        ws_views_mod,
+        ws_auth_mod,
         "_resolve_tenant_for_user",
         _ok_tenant,
     )
@@ -320,7 +320,7 @@ def _patch_authed(monkeypatch, *, perm_ok: bool, audit_sink: list | None = None)
     dispatcher's WS handshake succeeds (or fails on the permission
     gate when ``perm_ok=False``) without standing up Django session
     + RBAC seeds."""
-    import core.schema.ws_views as ws_views_mod
+    import core.schema.ws_auth as ws_auth_mod
     from core.schema import exec_ws as mod
 
     async def _ok_user(_session_key):
@@ -346,8 +346,8 @@ def _patch_authed(monkeypatch, *, perm_ok: bool, audit_sink: list | None = None)
         if audit_sink is not None:
             audit_sink.append(kw)
 
-    monkeypatch.setattr(ws_views_mod, "_resolve_user_from_sessionid", _ok_user)
-    monkeypatch.setattr(ws_views_mod, "_resolve_tenant_for_user", _ok_tenant)
+    monkeypatch.setattr(ws_auth_mod, "_resolve_user_from_sessionid", _ok_user)
+    monkeypatch.setattr(ws_auth_mod, "_resolve_tenant_for_user", _ok_tenant)
     monkeypatch.setattr(mod, "_check_app_in_tenant", _ok_app)
     monkeypatch.setattr(mod, "_check_exec_permission", _perm)
     monkeypatch.setattr(mod, "_audit_exec_open", _audit)
