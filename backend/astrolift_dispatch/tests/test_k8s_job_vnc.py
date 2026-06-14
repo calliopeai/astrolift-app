@@ -85,6 +85,17 @@ def _container_of(manifest: dict) -> dict:
             "ghcr.io/calliopeai/astrolift-agent-claude-vnc:1.2",
             "ghcr.io/calliopeai/astrolift-agent-claude-vnc:1.2",
         ),
+        # Digest-pinned ref: the digest's internal ":" must survive — the
+        # "-vnc" is appended to the repo, NOT inside the @sha256:... digest.
+        (
+            "ghcr.io/calliopeai/agent@sha256:abcd1234ef567890",
+            "ghcr.io/calliopeai/agent-vnc@sha256:abcd1234ef567890",
+        ),
+        # Digest-pinned ref that is already -vnc is returned unchanged.
+        (
+            "ghcr.io/calliopeai/agent-vnc@sha256:abcd1234ef567890",
+            "ghcr.io/calliopeai/agent-vnc@sha256:abcd1234ef567890",
+        ),
     ],
 )
 def test_vnc_image_variant(base, expected):

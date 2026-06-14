@@ -107,15 +107,29 @@ def _vnc_image(image: str) -> str:
     """Return the ``-vnc`` variant of an image ref.
 
     Appends ``-vnc`` to the repository component while preserving the tag
-    (and any digest), e.g.::
+    or digest, e.g.::
 
         ghcr.io/calliopeai/astrolift-agent-claude:1.2  ->
         ghcr.io/calliopeai/astrolift-agent-claude-vnc:1.2
 
-    The tag separator is the last ``:`` that is not part of a registry
-    ``host:port`` (i.e. it must come after the last ``/``). Idempotent:
-    an already ``-vnc`` repo is returned unchanged.
+        ghcr.io/calliopeai/agent@sha256:abcd  ->
+        ghcr.io/calliopeai/agent-vnc@sha256:abcd
+
+    A digest-pinned ref (``...@sha256:...``) must be split on ``@``: the
+    digest itself contains a ``:`` so an rpartition on ``:`` would slice
+    inside the digest and yield a corrupt, unpullable ref. Otherwise the
+    tag separator is the last ``:`` that is not part of a registry
+    ``host:port`` (it must come after the last ``/``). Idempotent: an
+    already ``-vnc`` repo is returned unchanged.
     """
+    # Digest-pinned ref: everything before "@" is the repo, the rest
+    # (including its internal ":") is the digest and must stay intact.
+    if "@" in image:
+        repo, sep, digest = image.partition("@")
+        if repo.endswith("-vnc"):
+            return image
+        return f"{repo}-vnc{sep}{digest}"
+
     repo, sep, tag = image.rpartition(":")
     # A ":" before the final "/" is a registry port, not a tag separator.
     if not sep or "/" not in repo or "/" in tag:
