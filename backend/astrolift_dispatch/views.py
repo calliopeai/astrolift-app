@@ -263,6 +263,16 @@ def update_task_status(request: HttpRequest, task_id: str) -> JsonResponse:
         task.ended_at = now
         update_fields.append("ended_at")
 
+    # Publish the noVNC relay path on the RUNNING transition for a
+    # vnc-enabled task. The Temporal transition_to() path does this in the
+    # model, but this push-mode dispatcher callback assigns status
+    # directly, so without this a vnc_enabled task reaching RUNNING here
+    # would keep an empty vnc_url forever and the viewer never connects.
+    # Mirrors AgentTask.transition_to()'s RUNNING branch exactly.
+    if new_status == "running" and task.vnc_enabled and not task.vnc_url:
+        task.vnc_url = f"/app/vnc/{task.guid}"
+        update_fields.append("vnc_url")
+
     task.save(update_fields=update_fields)
 
     logger.info("dispatch.task_status: task %s → %s", task_id, new_status)

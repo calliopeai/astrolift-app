@@ -15,7 +15,7 @@ resolution from :mod:`core.schema.ws_auth`. The caller must be:
   * scoped to the tenant org that owns the referenced AgentTask,
   * holding the ``agent_task.watch`` permission, and
   * watching a task that is RUNNING and VNC-capable
-    (``environment_spec.vnc_enabled``).
+    (the frozen ``AgentTask.vnc_enabled`` column).
 
 Close codes:
 
@@ -140,8 +140,7 @@ def _resolve_vnc_task(*, task_guid: str, tenant_org_id) -> dict | None:
         return None
 
     task = (
-        AgentTask.objects.select_related("environment_spec")
-        .filter(
+        AgentTask.objects.filter(
             guid=task_guid,
             organization_id=tenant_org_id,
             deleted_at__isnull=True,
@@ -152,8 +151,13 @@ def _resolve_vnc_task(*, task_guid: str, tenant_org_id) -> dict | None:
         return None
     if task.status != AgentTask.Status.RUNNING:
         return None
-    spec = task.environment_spec
-    if spec is None or not spec.vnc_enabled:
+    # Gate on the FROZEN task.vnc_enabled column — the same flag the
+    # GraphQL read surface exposes and that drives vnc_url publication.
+    # Reading the live spec here would let a spec edit/delete after spawn
+    # refuse a session that a published vnc_url already promised. The
+    # cluster/namespace/pod for the port-forward are re-resolved
+    # downstream in core.cluster_vnc, independently of the spec.
+    if not task.vnc_enabled:
         return None
     if not task.pod_name:
         return None
