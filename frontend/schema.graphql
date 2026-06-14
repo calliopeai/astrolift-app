@@ -4740,6 +4740,7 @@ input RegisterAppInput {
   deployBranch: String = null
   triggerMode: String = null
   buildMode: String! = "ci_pushed"
+  buildStrategy: String! = "off"
   dockerfilePath: String! = "Dockerfile"
   buildContext: String! = "."
   buildArgs: JSON = null
@@ -5197,6 +5198,7 @@ input UpdateAppInput {
   deployBranch: String = null
   triggerMode: String = null
   buildMode: String = null
+  buildStrategy: String = null
   dockerfilePath: String = null
   buildContext: String = null
   buildArgs: JSON = null

@@ -53,6 +53,12 @@ class RegisterAppInput:
     # a flat string→string map sent as JSON; None falls back to the empty
     # default on the row.
     build_mode: str = "ci_pushed"
+    # Orthogonal "how to build" axis (#867). ``build_mode`` decides who
+    # publishes the image; ``build_strategy`` selects which builder the
+    # platform invokes when it performs the build itself: ``off`` (the
+    # default — no strategy), ``dockerfile`` / ``buildpacks`` /
+    # ``nixpacks``. Validated against the model choices.
+    build_strategy: str = "off"
     dockerfile_path: str = "Dockerfile"
     build_context: str = "."
     build_args: strawberry.scalars.JSON | None = None
@@ -93,6 +99,9 @@ class UpdateAppInput:
     # untouched, so a caller can flip ``build_mode`` to ``platform_build``
     # without having to re-send the Dockerfile path it already saved.
     build_mode: str | None = None
+    # See ``RegisterAppInput.build_strategy``. None-sentinel on update:
+    # left None it stays as-is.
+    build_strategy: str | None = None
     dockerfile_path: str | None = None
     build_context: str | None = None
     build_args: strawberry.scalars.JSON | None = None
@@ -515,6 +524,28 @@ def _validate_build_mode(raw):
     return value, None
 
 
+def _validate_build_strategy(raw):
+    """Validate an incoming ``build_strategy`` against the model choices.
+
+    Returns ``(value, error)`` mirroring ``_validate_build_mode``: the
+    normalised string when valid, the failure envelope otherwise. A None
+    input (the update "leave untouched" sentinel) passes through as
+    ``(None, None)``. Deny-by-default: anything outside the four choices
+    is refused rather than silently coerced.
+    """
+    if raw is None:
+        return None, None
+    value = str(raw).strip()
+    valid = {choice.value for choice in RegisteredApp.BuildStrategy}
+    if value not in valid:
+        return None, gql_failure(
+            ErrorCode.VALIDATION.value,
+            f"buildStrategy must be one of {sorted(valid)}",
+            field="buildStrategy",
+        )
+    return value, None
+
+
 def _normalize_build_args(raw):
     """Coerce the incoming ``build_args`` JSON into a flat str→str map.
 
@@ -926,6 +957,9 @@ class RegistryMutation:
         build_mode, build_mode_err = _validate_build_mode(input.build_mode)
         if build_mode_err is not None:
             return build_mode_err
+        build_strategy, build_strategy_err = _validate_build_strategy(input.build_strategy)
+        if build_strategy_err is not None:
+            return build_strategy_err
         build_args, build_args_err = _normalize_build_args(input.build_args)
         if build_args_err is not None:
             return build_args_err
@@ -945,6 +979,7 @@ class RegistryMutation:
             default_branch=input.default_branch or "main",
             deploy_branch=input.deploy_branch or input.default_branch or "main",
             build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
+            build_strategy=build_strategy or RegisteredApp.BuildStrategy.OFF.value,
             dockerfile_path=input.dockerfile_path or "Dockerfile",
             build_context=input.build_context or ".",
             build_args=build_args,
@@ -1071,6 +1106,9 @@ class RegistryMutation:
         build_mode, build_mode_err = _validate_build_mode(input.build_mode)
         if build_mode_err is not None:
             return build_mode_err
+        build_strategy, build_strategy_err = _validate_build_strategy(input.build_strategy)
+        if build_strategy_err is not None:
+            return build_strategy_err
 
         for field in (
             "name",
@@ -1090,6 +1128,8 @@ class RegistryMutation:
                 setattr(app, field, new_value)
         if build_mode is not None:
             app.build_mode = build_mode
+        if build_strategy is not None:
+            app.build_strategy = build_strategy
         if input.build_args is not None:
             build_args, build_args_err = _normalize_build_args(input.build_args)
             if build_args_err is not None:

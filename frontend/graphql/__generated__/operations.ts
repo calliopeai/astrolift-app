@@ -6824,6 +6824,7 @@ export type RegisterAppInput = {
   buildArgs: InputMaybe<Scalars['JSON']['input']>;
   buildContext: Scalars['String']['input'];
   buildMode: Scalars['String']['input'];
+  buildStrategy: Scalars['String']['input'];
   cronExpression: InputMaybe<Scalars['String']['input']>;
   defaultBranch: InputMaybe<Scalars['String']['input']>;
   deployBranch: InputMaybe<Scalars['String']['input']>;
@@ -7312,6 +7313,7 @@ export type UpdateAppInput = {
   buildArgs: InputMaybe<Scalars['JSON']['input']>;
   buildContext: InputMaybe<Scalars['String']['input']>;
   buildMode: InputMaybe<Scalars['String']['input']>;
+  buildStrategy: InputMaybe<Scalars['String']['input']>;
   cronExpression: InputMaybe<Scalars['String']['input']>;
   cronPaused: InputMaybe<Scalars['Boolean']['input']>;
   defaultBranch: InputMaybe<Scalars['String']['input']>;
