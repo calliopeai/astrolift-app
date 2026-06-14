@@ -1,8 +1,11 @@
 """
-GitHub -> Brief assembly service (#41).
+SCM -> Brief assembly service (#41).
 
-``assemble_agent_brief`` fetches an agent config repository from GitHub as a
-zipball, parses the ``astrolift.toml`` it contains, and assembles an immutable
+``assemble_agent_brief`` fetches an agent config repository as a zipball —
+through the ``astrolift_scm`` provider abstraction when a SourceConnection is
+supplied (so non-GitHub hosts like GitLab work), or via the legacy GitHub /
+``GITHUB_PAT`` path otherwise — parses the ``astrolift.toml`` it contains, and
+assembles an immutable
 :class:`~astrolift_agents.models.brief.Brief` in ``READY`` status that an agent
 fetches at boot time.
 
@@ -61,6 +64,7 @@ def assemble_agent_brief(
     config_branch: str = "main",
     context: dict | None = None,
     ttl_seconds: int = 3600,
+    source_connection=None,
 ) -> Brief:
     """Fetch ``config_repo``, parse its ``astrolift.toml``, and assemble a Brief.
 
@@ -68,13 +72,18 @@ def assemble_agent_brief(
         organization: the ``astrolift_identity.Organization`` the Brief belongs
             to. The Brief is scoped to this org and the org identity is folded
             into the content hash.
-        config_repo: ``"owner/repo"`` of the GitHub repository holding the
-            agent's ``astrolift.toml``.
+        config_repo: ``"owner/repo"`` of the repository holding the agent's
+            ``astrolift.toml``.
         config_branch: the branch (or tag/ref) to fetch. Defaults to ``main``.
         context: optional task context metadata (task id, actor, slugs). Stored
             verbatim on the Brief and folded into the content hash.
         ttl_seconds: how long the READY Brief stays valid before the agent
             bootstrap layer treats it as expired. ``0`` means no expiry.
+        source_connection: optional ``astrolift_scm.SourceConnection`` whose
+            stored credential and host fetch the zipball through the SCM
+            provider abstraction — so a GitLab (or any supported host) config
+            repo works, not just GitHub. When None the fetch falls back to the
+            anonymous / ``GITHUB_PAT`` GitHub path for back-compat.
 
     Returns:
         A ``Brief`` in ``READY`` status. If an identical Brief (same org, same
@@ -82,13 +91,23 @@ def assemble_agent_brief(
         unchanged rather than re-assembled.
 
     Raises:
-        requests.HTTPError: GitHub returned a non-2xx response (e.g. the repo or
-            branch does not exist, or the configured PAT lacks access).
+        requests.HTTPError: the GitHub fallback path returned a non-2xx response.
+        astrolift_scm.providers.ProviderError: the SCM provider path failed
+            (auth, network, or an unsupported host).
     """
     context = context or {}
     owner_repo = config_repo.strip("/")
 
-    zip_bytes = _fetch_zipball(owner_repo, config_branch)
+    if source_connection is not None:
+        from astrolift_scm.providers import fetch_zipball
+
+        zip_bytes = fetch_zipball(
+            source_connection,
+            repo_full_name=owner_repo,
+            ref=config_branch,
+        )
+    else:
+        zip_bytes = _fetch_zipball(owner_repo, config_branch)
     zip_digest = hashlib.sha256(zip_bytes).hexdigest()
 
     # Content-address over the canonical payload, not the raw zip bytes, so the

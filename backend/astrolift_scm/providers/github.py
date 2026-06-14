@@ -276,6 +276,48 @@ def fetch_github_file(
         raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
 
+def fetch_github_zipball(
+    connection,
+    *,
+    repo_full_name: str,
+    ref: str,
+) -> bytes:
+    """Download the source archive (zip) of ``repo_full_name`` at ``ref``.
+
+    Returns the raw zipball bytes. The API replies with a 302 to a
+    short-lived codeload.github.com URL; ``urllib`` follows it by
+    default. Raises GithubProviderError on auth / network / API
+    failures so the dispatcher can translate to a clean envelope."""
+    token = _token(connection)
+    base = _api_base(connection)
+
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    url = f"{base}/repos/{safe_repo}/zipball/{urllib.parse.quote(ref)}"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                f"GitHub rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class PutFileResult:
     commit_sha: str

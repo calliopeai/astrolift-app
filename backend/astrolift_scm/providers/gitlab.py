@@ -245,6 +245,48 @@ def fetch_gitlab_file(
         raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
 
 
+def fetch_gitlab_zipball(
+    connection,
+    *,
+    repo_full_name: str,
+    ref: str,
+) -> bytes:
+    """Download the source archive (zip) of a GitLab project at ``ref``.
+
+    GitLab exposes ``/repository/archive.zip?sha={ref}``; the project
+    is addressed by its URL-encoded ``path_with_namespace``. Returns
+    the raw zip bytes. Like the GitHub driver, the archive nests
+    everything under a single top-level directory. Raises
+    GitlabProviderError on auth / network / API failures."""
+    token = _token(connection)
+    base = _api_base(connection)
+
+    project_path = urllib.parse.quote(repo_full_name, safe="")
+    sha = urllib.parse.quote(ref)
+    url = f"{base}/api/v4/projects/{project_path}/repository/archive.zip?sha={sha}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/zip",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class GitlabPutFileResult:
     commit_sha: str

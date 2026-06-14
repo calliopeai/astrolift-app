@@ -5,6 +5,7 @@ Each driver implements the same shape:
 
     list_repos(connection: SourceConnection, *, search: str | None) -> list[RemoteRepo]
     fetch_file(connection, *, repo_full_name, path, ref) -> str | None
+    fetch_zipball(connection, *, repo_full_name, ref) -> bytes
 
 The dispatcher in this package picks a driver by ``connection.kind``.
 Failures (auth, rate-limit, network) become structured errors the
@@ -44,6 +45,7 @@ from astrolift_scm.providers.github import (
     GithubProviderError,
     delete_github_webhook,
     fetch_github_file,
+    fetch_github_zipball,
     install_github_webhook,
     list_github_repos,
     open_github_pull_request,
@@ -52,6 +54,7 @@ from astrolift_scm.providers.github import (
 from astrolift_scm.providers.gitlab import (
     GitlabProviderError,
     fetch_gitlab_file,
+    fetch_gitlab_zipball,
     install_gitlab_webhook,
     list_gitlab_projects,
     open_gitlab_merge_request,
@@ -203,6 +206,45 @@ def fetch_file(
     raise ProviderError(
         "UNSUPPORTED",
         f"file fetch for {connection.kind!r} not implemented yet",
+    )
+
+
+def fetch_zipball(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    ref: str,
+) -> bytes:
+    """Download the source archive (zip) of a remote repo at ``ref``
+    through a stored connection. Returns the raw zip bytes; raises
+    ProviderError on auth/network failures or an unsupported host.
+
+    Both the GitHub and GitLab archives nest everything under a single
+    top-level directory, so callers parse the bundle the same way
+    regardless of host."""
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            return fetch_github_zipball(
+                connection,
+                repo_full_name=repo_full_name,
+                ref=ref,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITLAB_KINDS:
+        try:
+            return fetch_gitlab_zipball(
+                connection,
+                repo_full_name=repo_full_name,
+                ref=ref,
+            )
+        except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"zipball fetch for {connection.kind!r} not implemented yet",
     )
 
 

@@ -273,6 +273,74 @@ def test_no_auth_header_without_pat(monkeypatch, org, settings):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# SCM provider path (non-GitHub: e.g. GitLab) via a SourceConnection
+# ---------------------------------------------------------------------------
+
+
+class _FakeGitlabConn:
+    """SourceConnection-shaped stand-in routed through the SCM provider."""
+
+    kind = "gitlab_pat"
+
+
+def test_source_connection_fetches_via_scm_provider(monkeypatch, org):
+    """When a SourceConnection is supplied, the zipball comes from the
+    SCM provider abstraction — not the hardcoded GitHub requests.get
+    path — so a GitLab config repo assembles a valid Brief."""
+    calls = {}
+
+    def _fake_fetch_zipball(connection, *, repo_full_name, ref):
+        calls["connection"] = connection
+        calls["repo_full_name"] = repo_full_name
+        calls["ref"] = ref
+        return _make_zipball(_FULL_TOML)
+
+    monkeypatch.setattr("astrolift_scm.providers.fetch_zipball", _fake_fetch_zipball)
+
+    # Guard: the legacy GitHub path must NOT be touched on this branch.
+    def _boom(*_a, **_k):
+        raise AssertionError("requests.get must not be called on the SCM-provider path")
+
+    monkeypatch.setattr(brief_assembler.requests, "get", _boom)
+
+    conn = _FakeGitlabConn()
+    brief = brief_assembler.assemble_agent_brief(
+        organization=org,
+        config_repo="acme-group/agent-config",
+        config_branch="release",
+        context={"task": "t-gl"},
+        source_connection=conn,
+    )
+
+    assert brief.status == Brief.Status.READY
+    assert brief.manifest_snapshot["skill_slug"] == "reviewer"
+    # The provider got the repo/ref verbatim and the connection we passed.
+    assert calls["connection"] is conn
+    assert calls["repo_full_name"] == "acme-group/agent-config"
+    assert calls["ref"] == "release"
+
+
+def test_source_connection_provider_error_propagates(monkeypatch, org):
+    """A provider-side failure surfaces to the caller and no Brief is
+    written (the assembler never swallows the SCM error)."""
+    from astrolift_scm.providers import ProviderError
+
+    def _fake_fetch_zipball(connection, *, repo_full_name, ref):
+        raise ProviderError("AUTH_FAILED", "token rejected", recoverable=True)
+
+    monkeypatch.setattr("astrolift_scm.providers.fetch_zipball", _fake_fetch_zipball)
+
+    with pytest.raises(ProviderError):
+        brief_assembler.assemble_agent_brief(
+            organization=org,
+            config_repo="acme-group/agent-config",
+            source_connection=_FakeGitlabConn(),
+        )
+
+    assert Brief.objects.filter(organization=org).count() == 0
+
+
 def test_bundle_uploaded_when_blob_store_available(monkeypatch, org):
     _patch_get(monkeypatch, _FakeResponse(_make_zipball(_FULL_TOML)))
 
