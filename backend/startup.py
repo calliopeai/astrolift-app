@@ -80,10 +80,17 @@ for command in ON_STARTUP:
 # one process and reloads on source change like runserver does.
 # Falls back to runserver if uvicorn isn't installed (HTTP-only dev
 # without subscription delivery).
+#
+# --reload is a dev-only convenience: the file watcher adds overhead and
+# restarts the worker on any source change, which kills live websocket /
+# exec / VNC streams. Mirror settings.py's dev detection (Dev + Local*)
+# so production (prd/int/stg) runs uvicorn without it.
+_configuration = os.getenv("DJANGO_CONFIGURATION", "Dev").lower()
+_reload_flag = " --reload" if _configuration in ("dev", "local", "localpg", "localverbose") else ""
 try:
     import uvicorn  # noqa: F401
 
-    os.system("uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload")
+    os.system(f"uvicorn config.asgi:application --host 0.0.0.0 --port 8000{_reload_flag}")
 except ImportError:
     os.system("python manage.py runserver 0.0.0.0:8000")
 
